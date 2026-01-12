@@ -1,0 +1,69 @@
+graph TD
+    %% Node
+    __start__([<p>__start__</p>]):::first
+    info_chain(Information<br/>Collection)
+    validate_info{<b>🧠 Information<br/>Validation </b>}
+    
+    generate_pipeline(Pipeline<br/>Generation)
+    human_node{{Human<br/>Decision}}
+
+    subgraph react_agent["ReAct agent"]
+        Query[<b>🗨️ Multiple<br/>Querys</b>]
+        multiple_Query{<b>🧠 Multiple<br/>Query<br/>Generation</b>}
+        Thinking{<b>🧠<br/>Pipeline<br/>Selection</b>}
+        Tool[<b>🔧 Tool</b>]
+        Answer[<b>📝 Answer</b>]
+        
+        multiple_Query --> Query --> Thinking
+        Thinking -.->|<b>Action</b>| Tool
+        Thinking -.->|<b>Finish</b>| Answer
+        Tool -->|<b>Observation</b>| Thinking
+
+        subgraph Tool[MCP tools]
+            mcp_download[Article<br/>download]
+            lc[MAST-<br/>RAG]
+            mcp_st[Sequential<br/>Thinking]
+        end
+    end
+    
+    update_pipeline(Pipeline<br/>Update)
+    summary_pipeline(Pipeline<br/>Summary)
+    __end__([<p>__end__</p>]):::last
+    
+
+    %% Flow
+    __start__ --> info_chain
+    info_chain --> validate_info
+    validate_info -. &nbsp;continue&nbsp; .-> info_chain
+    validate_info --> generate_pipeline
+    generate_pipeline --> human_node
+    human_node -. &nbsp;1#46;default (HITL)&nbsp; .-> summary_pipeline
+    human_node -. &nbsp;2#46;update (HITL)&nbsp; .-> update_pipeline
+    human_node -. &nbsp;3#46;select (HITL)&nbsp; .-> multiple_Query
+
+    Answer --> summary_pipeline
+    update_pipeline --> summary_pipeline
+    summary_pipeline --> __end__
+    
+
+    %% color
+	classDef validate_infoNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
+    classDef default fill:#2d2d3d,stroke:#fff,stroke-width:2px,color:#fff
+    classDef queryNode fill:#ff7f50,stroke:#fff,stroke-width:2px,color:#000
+    classDef multiple_QueryNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
+    classDef thinkingNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
+    classDef toolNode fill:#d3d3d3,stroke:#fff,stroke-width:2px,color:#000
+    classDef answerNode fill:#ffd700,stroke:#fff,stroke-width:2px,color:#000
+    classDef inReAtc fill:#ab47bc,stroke:#fff,stroke-width:2px,color:#000
+    classDef humanNode fill:#4dabf7,stroke:#fff,stroke-width:2px,color:#000
+
+
+    class info_chain,summary_pipeline,generate_pipeline,update_pipeline inReAtc
+    class Query queryNode
+    class Thinking,multiple_Query,validate_info thinkingNode
+    class Tool toolNode
+    class Answer answerNode
+    class human_node humanNode
+
+    %% HITL 선 스타일 (파란 긴 대시)
+    linkStyle 10,11,12 stroke:#0000FF,stroke-width:2px,stroke-dasharray:15 5

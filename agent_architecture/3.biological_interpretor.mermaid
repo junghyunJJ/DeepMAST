@@ -1,0 +1,65 @@
+graph TD
+    %% Node
+    __start__([<p>__start__</p>]):::first
+    
+    sc_data["ST analysis<br/>resutls"]
+
+
+    subgraph react_agent2["Deep agnet"]
+        Query2[<b>🗨️ Query</b>]
+        Thinking2{<b>🧠<br/>Biological<br/>Interpreter</b>}
+        Tool2[<b>🔧 Tool</b>]
+        Answer2[<b>📝 Answer</b>]
+        
+        Query2 --> Thinking2
+        Thinking2 -.->|<b>Action</b>| Tool2
+        Thinking2 -.->|<b>Finish</b>| Answer2
+        Tool2 -->|<b>Observation</b>| Thinking2
+
+        subgraph Tool2[MCP tools]
+            mcp_cci[ST-CCI]
+            mcp_down[Article<br/>Download]
+            mcp_rag[CCI-RAG]
+            mcp_st2[Sequential<br/>Thinking]
+            mcp_biomcp["BioMCP<br/>(Article Search)"]
+            
+        end
+    end
+
+    
+    final_report["Final<br/>HTML reports"]
+
+    __end__([<p>__end__</p>]):::last
+
+
+    %% Flow
+    __start__ --> sc_data
+    sc_data --> Query2
+    Answer2 --> final_report
+
+    final_report -.->|<b>Countinue</b>| Thinking2
+    final_report -.->|<b>Finish</b>| __end__
+
+    %% color
+    classDef validate_infoNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
+    classDef default fill:#2d2d3d,stroke:#fff,stroke-width:2px,color:#fff
+    classDef queryNode fill:#ff7f50,stroke:#fff,stroke-width:2px,color:#000
+    classDef thinkingNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
+    classDef toolNode fill:#d3d3d3,stroke:#fff,stroke-width:2px,color:#000
+    classDef answerNode fill:#ffd700,stroke:#fff,stroke-width:2px,color:#000
+    classDef inReAtc fill:#ab47bc,stroke:#fff,stroke-width:2px,color:#000
+    classDef humanNode fill:#4dabf7,stroke:#fff,stroke-width:2px,color:#000
+
+
+    class sc_data,final_report inReAtc
+    class Platform validate_infoNode
+    class Query1,Query2 queryNode
+    class Thinking1,Thinking2 thinkingNode
+    class Tool1,Tool2 toolNode
+    class Answer1,Answer2 answerNode
+    class human_node humanNode
+
+    %% HITL 선 스타일 (파란 긴 대시)
+    %% linkStyle 11 stroke:#0000FF,stroke-width:2px,stroke-dasharray:15 5
+    style react_agent2 fill:#e1bee7,stroke:#9c27b0,stroke-width:2px
+    %% style react_agent1 fill:#bbdefb,stroke:#1976d2,stroke-width:2px

@@ -1,0 +1,46 @@
+graph TD
+    %% Node
+    __start__([<p>__start__</p>]):::first
+	__start__ --> rawdata["Raw data"]
+    rawdata --> Platform{<b>🧠 Platform<br/>Prediction </b>}
+    Platform --> Prep["Preprocessing &<br/>Normalization"]
+    Prep --> Query
+
+    subgraph react_agent["ReAct agnet"]
+        Query[<b>🗨️ Query</b>]
+        Thinking{<b>🧠<br/>Celltype<br/>Analysis</b>}
+        Tool[<b>🔧 Tool</b>]
+        Answer[<b>📝 Answer</b>]
+        
+        Query --> Thinking
+        Thinking -.->|<b>Action</b>| Tool
+        Thinking -.->|<b>Finish</b>| Answer
+        Tool -->|<b>Observation</b>| Thinking
+
+        subgraph Tool[MCP tools]
+            MCPgeneration[MCP<br/>generation<br/>Tool]
+            mcp_st[Sequential<br/>thinking]
+            Deconvolution[Deconvolution<br/>tools]
+            CelltypeAnnotation[Celltype<br/>annotation]
+        end
+    end
+
+    Answer --> __end__([<p>__end__</p>]):::last
+    
+
+
+    classDef validate_infoNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
+    classDef default fill:#2d2d3d,stroke:#fff,stroke-width:2px,color:#fff
+    classDef queryNode fill:#ff7f50,stroke:#fff,stroke-width:2px,color:#000
+    classDef thinkingNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
+    classDef toolNode fill:#d3d3d3,stroke:#fff,stroke-width:2px,color:#000
+    classDef answerNode fill:#ffd700,stroke:#fff,stroke-width:2px,color:#000
+    classDef inReAtc fill:#ab47bc,stroke:#fff,stroke-width:2px,color:#000
+
+
+    class rawdata,Prep,generate_pipeline inReAtc
+    class Platform validate_infoNode
+    class Query queryNode
+    class Thinking thinkingNode
+    class Tool toolNode
+    class Answer answerNode
