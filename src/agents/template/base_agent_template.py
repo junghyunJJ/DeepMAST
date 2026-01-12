@@ -4,7 +4,7 @@ from typing import Any, ClassVar
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph, START, END
 from langgraph.store.base import BaseStore
 
 from src.base import BaseAgent, BaseState
@@ -51,8 +51,8 @@ class NewAgentTemplate(BaseAgent):
         """Initialize edges in the graph"""
         default_node = self.get_node_name("DEFAULT")
         assert default_node is not None, "DEFAULT node name must be defined"
-        graph.set_entry_point(default_node)
-        graph.set_finish_point(default_node)
+        graph.add_edge(START, default_node)
+        graph.add_edge(default_node, END)
 
     async def new_node_function(self, state: BaseState, config: RunnableConfig):
         """새로운 노드 함수 정의(Async)"""
