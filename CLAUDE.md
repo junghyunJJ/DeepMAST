@@ -44,6 +44,9 @@ pnpm lint       # Run linter
 - `NEXT_PUBLIC_API_URL`: LangGraph API endpoint (default: `http://localhost:2024`)
 - `NEXT_PUBLIC_ASSISTANT_ID`: Graph ID (`agent` or `biological_interpreter`)
 
+### Version Pinning Note
+`langgraph-api` and `sse-starlette` are pinned for compatibility. See `pyproject.toml` comments before updating.
+
 ## Architecture
 
 ### Core Design Pattern
@@ -115,6 +118,20 @@ interpreter/
     └── analysis_tools.py            # Input schemas and utilities
 ```
 
+### State Serialization Pattern
+
+**Critical**: State uses `TypedDict` with file paths, not DataFrames. LangGraph's msgpack checkpointer cannot serialize pandas DataFrames.
+
+```python
+# ✓ Correct: Store file paths
+part1_results: Optional[dict[str, AnalysisDataRef]]  # {"spatial": {"figure_path": "res/1.png"}}
+
+# ✗ Wrong: Don't store DataFrames in state
+# part1_results: Optional[dict[str, pd.DataFrame]]  # Will fail serialization
+```
+
+Load DataFrames on-demand within node functions using `load_dataframe_from_ref()`.
+
 ### LLM Provider Abstraction
 
 `src/agents/model.py` provides `create_llm(provider)` factory:
@@ -136,7 +153,36 @@ The `langgraph.json` exports two graphs:
 
 ### Async Environment Loading
 
-For ASGI contexts, use `load_env_async()` from `src/base/async_env.py` to prevent blocking I/O warnings.
+For ASGI contexts (LangGraph dev server), use `load_env_async()` from `src/base/async_env.py` to prevent blocking I/O warnings. For CLI scripts and tests, use `load_env_sync_fallback()`.
+
+### HITL (Human-in-the-Loop) Pattern
+
+Use LangGraph's `interrupt()` for user interaction:
+
+```python
+from langgraph.types import interrupt
+
+async def get_user_input_node(self, state, config):
+    user_response = interrupt(value={"message": "Your prompt here"})
+    # Process user_response after resume
+    return {"user_input": user_response}
+```
+
+### Conditional Routing Pattern
+
+```python
+def init_edges(self, graph: StateGraph):
+    graph.add_conditional_edges(
+        self.get_node_name("SOURCE_NODE"),
+        self.routing_function,  # Must be sync, returns node name
+        [self.get_node_name("OPTION_A"), self.get_node_name("OPTION_B")]
+    )
+
+def routing_function(self, state, config) -> str:  # Sync, not async
+    if state.get("condition"):
+        return self.get_node_name("OPTION_A")
+    return self.get_node_name("OPTION_B")
+```
 
 ## Spatial Transcriptomics Platforms
 

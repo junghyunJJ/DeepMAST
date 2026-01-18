@@ -27,6 +27,22 @@ from src.agents.interpreter.nodes.load_results import (
 )
 
 
+# ===== Helper functions for analysis_plan context =====
+
+def format_priority_pathways(priority_pathways: list[str]) -> str:
+    """Format priority pathways for prompt inclusion."""
+    if not priority_pathways:
+        return "None specified"
+    return ", ".join(priority_pathways)
+
+
+def format_priority_celltypes(priority_celltypes: list[str]) -> str:
+    """Format priority cell types for prompt inclusion."""
+    if not priority_celltypes:
+        return "None specified"
+    return ", ".join(priority_celltypes)
+
+
 INTERPRETATION_SYSTEM_PROMPT = """You are an expert computational biologist specializing in spatial transcriptomics and cell-cell interaction analysis.
 Your task is to provide biological interpretations of analysis results.
 
@@ -235,6 +251,10 @@ async def interpret_pathway_factor(
     selected_factor = state.get("selected_factor")
     selected_pathways_part1 = state.get("selected_pathways", [])
 
+    # Get priority pathways from strategic planning
+    analysis_plan = state.get("analysis_plan", {})
+    priority_pathways = analysis_plan.get("priority_pathways", [])
+
     # Get pathways associated with selected factor
     factor_pathways = []
     if pathway_data is not None and selected_factor:
@@ -287,11 +307,23 @@ async def interpret_pathway_factor(
             status = "✓ Consistent" if comp["consistent"] else "⚠ Inconsistent"
         comparison_summary.append(f"{pw_name}: Part2={comp['part2_estimate']:.2f}, {status}")
 
+    # Build priority context
+    priority_context = ""
+    if priority_pathways:
+        # Highlight which pathways from priority list are present in findings
+        found_priority = [p for p in priority_pathways if p in pathway_comparison]
+        missing_priority = [p for p in priority_pathways if p not in pathway_comparison]
+        priority_context = f"\n**Priority Pathways (from strategic planning)**: {format_priority_pathways(priority_pathways)}"
+        if found_priority:
+            priority_context += f"\n  - Found in results: {', '.join(found_priority)}"
+        if missing_priority:
+            priority_context += f"\n  - Not significant: {', '.join(missing_priority)}\n"
+
     prompt = f"""## Pathway-Factor Analysis (Part 2-8)
 
 **Selected Factor**: {selected_factor}
 **Part1 Selected Pathways**: {selected_pathways_part1}
-
+{priority_context}
 **Figure**: {pathway_result.get('figure_path', 'Not available')}
 
 **Pathways Associated with Selected Factor**:
@@ -304,6 +336,7 @@ Please provide interpretation:
 1. Identify pathways strongly associated with the selected factor
 2. Compare Part1 and Part2 pathway findings - note consistencies and discrepancies
 3. Explain the biological significance of consistent pathways
+{f"4. **Priority Assessment**: Evaluate whether priority pathways ({format_priority_pathways(priority_pathways)}) are enriched with the selected factor, and discuss implications for the research hypothesis" if priority_pathways else ""}
 
 Keep your interpretation to 4-6 sentences.
 """
@@ -352,8 +385,26 @@ async def determine_scoring_weights(
     selected_factor = state.get("selected_factor", "")
     pathway_comparison = state.get("pathway_comparison", {})
 
+    # Extract priority information from analysis_plan
+    priority_pathways = analysis_plan.get("priority_pathways", [])
+    priority_celltypes = analysis_plan.get("priority_celltypes", [])
+    hypotheses = analysis_plan.get("hypotheses", [])
+
     # Count consistent pathways
     consistent_count = sum(1 for comp in pathway_comparison.values() if comp.get("consistent", False))
+
+    # Build strategic context
+    strategic_context = ""
+    if priority_pathways or priority_celltypes or hypotheses:
+        strategic_context = "\n**Strategic Planning Context**:"
+        if priority_pathways:
+            strategic_context += f"\n- Priority Pathways: {format_priority_pathways(priority_pathways)}"
+        if priority_celltypes:
+            strategic_context += f"\n- Priority Cell Types: {format_priority_celltypes(priority_celltypes)}"
+        if hypotheses:
+            hypothesis_summary = "; ".join([h.get("content", "")[:50] for h in hypotheses[:2]])
+            strategic_context += f"\n- Key Hypotheses: {hypothesis_summary}..."
+        strategic_context += "\n"
 
     prompt = f"""## L-R Pair Scoring Weight Adjustment
 
@@ -361,7 +412,7 @@ async def determine_scoring_weights(
 - Research Question: {research_question or "Not specified"}
 - Selected Factor: {selected_factor}
 - Consistent Pathways (Part1↔Part2): {consistent_count}
-
+{strategic_context}
 **Default Weights** (must sum to 1.0):
 - Factor loading: {base_config['base_weights']['factor']} (range: 0.20-0.50)
 - Pathway relevance: {base_config['base_weights']['pathway']} (range: 0.15-0.45)
@@ -369,10 +420,12 @@ async def determine_scoring_weights(
 - ctSVG overlap: {base_config['base_weights']['ctsvg']} (range: 0.05-0.30)
 
 Based on the analysis context, recommend adjusted weights:
-1. If pathway consistency is high, increase pathway weight
-2. If spatial patterns are important, increase morans weight
-3. If cell-type specificity is key, increase ctsvg weight
+1. If pathway consistency is high OR priority pathways are specified, increase pathway weight
+2. If spatial patterns are important for the research question, increase morans weight
+3. If cell-type specificity is key OR priority celltypes are specified, increase ctsvg weight
 4. Factor weight should remain relatively high as the anchor
+
+{f"**Note**: Priority pathways ({format_priority_pathways(priority_pathways)}) and celltypes ({format_priority_celltypes(priority_celltypes)}) should influence weight adjustments to prioritize L-R pairs relevant to the research hypothesis." if (priority_pathways or priority_celltypes) else ""}
 
 Provide your response in JSON format:
 ```json

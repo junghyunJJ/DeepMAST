@@ -15,6 +15,23 @@ from src.agents.interpreter.biological_interpreter_state import (
 )
 
 
+# ===== Helper functions for analysis_plan context =====
+
+def format_hypotheses(hypotheses: list[dict]) -> str:
+    """Format hypotheses for prompt inclusion."""
+    if not hypotheses:
+        return "No specific hypotheses generated"
+    lines = []
+    for h in hypotheses:
+        h_id = h.get("id", "H")
+        content = h.get("content", "")
+        expected = h.get("expected_evidence", "N/A")
+        lines.append(f"- **{h_id}**: {content}")
+        if expected and expected != "N/A":
+            lines.append(f"  (Expected evidence: {expected})")
+    return "\n".join(lines)
+
+
 INTERPRETATION_SYSTEM_PROMPT = """You are an expert computational biologist specializing in spatial transcriptomics and cell-cell interaction analysis.
 Your task is to provide biological interpretations of analysis results.
 
@@ -68,13 +85,25 @@ async def interpret_spatial_lr(
 
     clusters_context = interest_clusters or selected_clusters or []
 
+    # Get hypotheses from strategic planning
+    analysis_plan = state.get("analysis_plan", {})
+    hypotheses = analysis_plan.get("hypotheses", [])
+
+    # Build hypothesis context
+    hypothesis_context = ""
+    if hypotheses:
+        hypothesis_context = f"""
+### Initial Hypotheses to Address
+{format_hypotheses(hypotheses)}
+"""
+
     prompt = f"""## Spatial L-R Expression Patterns (Part 3-10)
 
 **Selected L-R Pairs**: {selected_lr_pairs}
 **Reference Clusters**: {clusters_context}
 **Target Cell Types**: {final_celltypes}
 **Selected Factor**: {selected_factor}
-
+{hypothesis_context}
 **Figure**: {spatial_lr_result.get('figure', 'Not available')}
 
 **L-R Pair Scores**:
@@ -91,6 +120,7 @@ Please provide interpretation:
 2. Identify regions of strong co-localization
 3. Relate patterns to the clusters and cell types of interest
 4. Discuss potential biological implications of these spatial patterns
+{f"5. **Hypothesis Assessment**: Evaluate how these L-R spatial patterns relate to the initial hypotheses. Do the patterns support or refute any hypothesis?" if hypotheses else ""}
 
 Keep your interpretation to 5-7 sentences.
 """
@@ -149,11 +179,23 @@ async def interpret_lr_summary(
     final_celltypes = state.get("final_celltypes_for_ctsvg", [])
     pathway_comparison = state.get("pathway_comparison", {})
 
+    # Get hypotheses from strategic planning
+    analysis_plan = state.get("analysis_plan", {})
+    hypotheses = analysis_plan.get("hypotheses", [])
+
+    # Build hypothesis context
+    hypothesis_context = ""
+    if hypotheses:
+        hypothesis_context = f"""
+### Initial Hypotheses to Address
+{format_hypotheses(hypotheses)}
+"""
+
     prompt = f"""## L-R Interaction Summary (Part 3-11)
 
 **Selected L-R Pairs**: {selected_lr_pairs}
 **Selection Rationale**: {lr_selection_rationale}
-
+{hypothesis_context}
 **Figure**: {lr_summary_result.get('figure', 'Not available')}
 
 **Detailed L-R Pair Scores**:
@@ -171,6 +213,7 @@ Please provide a comprehensive summary:
 3. Explain how these interactions relate to the pathways and cell types identified
 4. Provide hypotheses for the functional role of these interactions
 5. Note any patterns that suggest regulatory relationships
+{f"6. **Hypothesis Validation**: Based on the L-R findings, indicate which initial hypotheses are supported or refuted, and what new insights emerge" if hypotheses else ""}
 
 Keep your interpretation to 6-8 sentences.
 """

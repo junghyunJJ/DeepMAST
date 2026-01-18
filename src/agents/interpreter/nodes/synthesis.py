@@ -16,6 +16,37 @@ from src.agents.interpreter.biological_interpreter_state import (
 )
 
 
+# ===== Helper functions for analysis_plan context =====
+
+def format_hypotheses(hypotheses: list[dict]) -> str:
+    """Format hypotheses for prompt inclusion."""
+    if not hypotheses:
+        return "No specific hypotheses generated"
+    lines = []
+    for h in hypotheses:
+        h_id = h.get("id", "H")
+        content = h.get("content", "")
+        expected = h.get("expected_evidence", "N/A")
+        lines.append(f"- **{h_id}**: {content}")
+        if expected and expected != "N/A":
+            lines.append(f"  (Expected evidence: {expected})")
+    return "\n".join(lines)
+
+
+def format_questions(questions: list[str]) -> str:
+    """Format key questions for prompt inclusion."""
+    if not questions:
+        return "No specific questions"
+    return "\n".join([f"- {q}" for q in questions])
+
+
+def format_requirements(requirements: list[str]) -> str:
+    """Format evidence requirements for prompt inclusion."""
+    if not requirements:
+        return "No specific requirements"
+    return "\n".join([f"- {r}" for r in requirements])
+
+
 SYNTHESIS_SYSTEM_PROMPT = """You are an expert computational biologist creating a synthesis report.
 Your task is to integrate findings from multiple analyses into a coherent biological narrative.
 
@@ -25,6 +56,7 @@ Guidelines:
 - Generate specific, evidence-backed claims
 - Maintain scientific rigor while being accessible
 - Focus on biological insights, not just data description
+- Address initial hypotheses and key questions when provided
 """
 
 
@@ -84,18 +116,27 @@ async def cross_part_synthesis(
         if comp.get("consistent", False)
     ]
 
-    # Prepare hypotheses from analysis plan
+    # Prepare hypotheses, key questions, and evidence requirements from analysis plan
     hypotheses = analysis_plan.get("hypotheses", [])
-    hypothesis_text = "\n".join([
-        f"- {h.get('id', 'H')}: {h.get('content', '')}"
-        for h in hypotheses
-    ])
+    key_questions = analysis_plan.get("key_questions", [])
+    evidence_requirements = analysis_plan.get("evidence_requirements", [])
+
+    # Build strategic planning context section
+    strategic_context = ""
+    if hypotheses or key_questions or evidence_requirements:
+        strategic_context = "\n### Strategic Analysis Framework\n"
+        if hypotheses:
+            strategic_context += f"\n**Initial Hypotheses**:\n{format_hypotheses(hypotheses)}\n"
+        if key_questions:
+            strategic_context += f"\n**Key Questions to Address**:\n{format_questions(key_questions)}\n"
+        if evidence_requirements:
+            strategic_context += f"\n**Evidence Requirements**:\n{format_requirements(evidence_requirements)}\n"
 
     prompt = f"""## Cross-Part Synthesis
 
 **Analysis Mode**: {analysis_mode}
 **Input**: {"Clusters " + str(interest_clusters) if interest_clusters else "Cell Types " + str(interest_celltypes)}
-
+{strategic_context}
 ### Key Findings Summary
 
 **Part 1 (Before CCI)**:
@@ -115,9 +156,6 @@ async def cross_part_synthesis(
 **Part 3 (L-R Visualization)**:
 {part3_summary}
 
-### Initial Hypotheses
-{hypothesis_text if hypothesis_text else "No specific hypotheses generated"}
-
 ---
 
 ## Your Tasks
@@ -126,7 +164,8 @@ async def cross_part_synthesis(
    - Synthesize findings into a coherent biological story
    - Connect spatial organization → cell types → pathways → L-R interactions
    - Explain the biological significance of the findings
-   - Address the initial hypotheses with evidence
+   {f"- **Address each initial hypothesis** with supporting/refuting evidence" if hypotheses else ""}
+   {f"- **Answer the key questions** posed in the strategic framework" if key_questions else ""}
 
 2. **Generate Claims** (3-5 specific claims):
    For each claim, provide:
@@ -134,11 +173,13 @@ async def cross_part_synthesis(
    - Confidence level (high/medium/low)
    - Supporting evidence from the analyses
    - Source part (part1, part2, part3, or synthesis)
+   {f"- **Note**: Claims should address the evidence requirements: {format_requirements(evidence_requirements)}" if evidence_requirements else ""}
 
 Format your response as:
 
 ### NARRATIVE
 [Your integrated narrative here]
+{f"Include a section titled 'Hypothesis Assessment' that explicitly addresses each hypothesis." if hypotheses else ""}
 
 ### CLAIMS
 CLAIM_1:

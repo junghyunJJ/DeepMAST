@@ -61,12 +61,16 @@ class Claim(TypedDict):
     part_source: str  # "part1", "part2", "part3", "synthesis"
 
 
-class ReflectionResult(TypedDict):
-    """Result from quality reflection node."""
+class ReflectionResult(TypedDict, total=False):
+    """Result from quality reflection node.
+
+    Scores are 0.0-1.0, where higher is better.
+    """
     decision: Literal["pass", "refine"]
     biological_plausibility_score: float
     evidence_coverage_score: float
     cross_part_consistency_score: float
+    hypothesis_validation_score: float  # NEW: Were initial hypotheses addressed?
     issues: list[str]
     refinement_targets: list[str]
 
@@ -90,6 +94,10 @@ class BiologicalInterpreterState(TypedDict):
 
     # ===== MESSAGE HISTORY =====
     messages: Annotated[list, add_messages]
+
+    # ===== CONFIGURATION VALIDATION (HITL before load_results) =====
+    config_validated: bool              # True after config validation passes
+    require_config_review: bool         # True if config needs user review (conditional collection)
 
     # ===== INPUT (HITL at start - one of these must be provided) =====
     analysis_mode: Optional[Literal["cluster_to_celltype", "celltype_to_cluster"]]
@@ -285,6 +293,10 @@ def create_initial_state(
 
     return BiologicalInterpreterState(
         messages=[],
+        # Configuration validation
+        config_validated=False,
+        require_config_review=False,
+        # Analysis mode
         analysis_mode=analysis_mode,
         interest_clusters=interest_clusters,
         interest_celltypes=interest_celltypes,

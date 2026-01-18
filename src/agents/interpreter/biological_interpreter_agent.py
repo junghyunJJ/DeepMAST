@@ -14,7 +14,9 @@ Deep Agent features:
 - Cross-part synthesis for coherent narrative
 """
 
-from typing import Any, ClassVar, Literal
+import os
+from datetime import datetime
+from typing import Any, ClassVar, Literal, Optional
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -23,12 +25,46 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
+from pydantic import BaseModel, Field
 
 from src.base import BaseAgent
 from src.agents.interpreter.biological_interpreter_state import (
     BiologicalInterpreterState,
     DEFAULT_WEIGHT_CONFIG,
 )
+
+
+class BiologicalInterpreterConfig(BaseModel):
+    """Configuration for Biological Interpreter analysis.
+
+    This Pydantic model validates and documents the configuration options
+    that users can review and modify via the config_collection HITL node.
+    """
+
+    results_dir: str = Field(
+        default="res/",
+        description="Directory containing pre-computed analysis results"
+    )
+    adata_path: Optional[str] = Field(
+        default=None,
+        description="Path to normalized adata file (n_*adata.h5ad)"
+    )
+    organism: Literal["human", "mouse"] = Field(
+        default="human",
+        description="Organism for pathway databases"
+    )
+    cluster_key: str = Field(
+        default="celltype_niche",
+        description="Cluster column name in adata.obs"
+    )
+    force_regenerate: bool = Field(
+        default=False,
+        description="Force regeneration of all analyses"
+    )
+    skip_existing: bool = Field(
+        default=True,
+        description="Skip analyses if output files exist"
+    )
 
 
 class BiologicalInterpreterAgent(BaseAgent):
@@ -48,6 +84,11 @@ class BiologicalInterpreterAgent(BaseAgent):
     """
 
     NODE_NAMES: ClassVar[dict[str, str]] = {
+        # Config validation nodes (before load_results)
+        "CHECK_CONFIG": "check_config",
+        "CONFIG_COLLECTION": "config_collection",
+        "CONFIG_VALIDATION": "config_validation",
+
         # Foundation nodes
         "LOAD_RESULTS": "load_results",
         "GET_USER_TARGETS": "get_user_targets",
@@ -117,6 +158,11 @@ class BiologicalInterpreterAgent(BaseAgent):
     def init_nodes(self, graph: StateGraph):
         """Initialize all nodes in the graph."""
 
+        # Config validation nodes (before load_results)
+        graph.add_node(self.get_node_name("CHECK_CONFIG"), self.check_config_node)
+        graph.add_node(self.get_node_name("CONFIG_COLLECTION"), self.config_collection_node)
+        graph.add_node(self.get_node_name("CONFIG_VALIDATION"), self.config_validation_node)
+
         # Foundation nodes
         graph.add_node(self.get_node_name("LOAD_RESULTS"), self.load_results_node)
         graph.add_node(self.get_node_name("GET_USER_TARGETS"), self.get_user_targets_node)
@@ -155,8 +201,30 @@ class BiologicalInterpreterAgent(BaseAgent):
     def init_edges(self, graph: StateGraph):
         """Initialize all edges in the graph."""
 
-        # START -> load_results
-        graph.add_edge(START, self.get_node_name("LOAD_RESULTS"))
+        # START -> check_config
+        graph.add_edge(START, self.get_node_name("CHECK_CONFIG"))
+
+        # check_config -> conditional: config_collection (if review needed) OR config_validation (if complete)
+        graph.add_conditional_edges(
+            self.get_node_name("CHECK_CONFIG"),
+            self.route_after_config_check,
+            [
+                self.get_node_name("CONFIG_COLLECTION"),
+                self.get_node_name("CONFIG_VALIDATION"),
+            ]
+        )
+
+        # config_collection -> config_validation
+        graph.add_edge(
+            self.get_node_name("CONFIG_COLLECTION"),
+            self.get_node_name("CONFIG_VALIDATION")
+        )
+
+        # config_validation -> load_results
+        graph.add_edge(
+            self.get_node_name("CONFIG_VALIDATION"),
+            self.get_node_name("LOAD_RESULTS")
+        )
 
         # load_results -> get_user_targets (HITL)
         graph.add_edge(
@@ -288,6 +356,21 @@ class BiologicalInterpreterAgent(BaseAgent):
     # ROUTING FUNCTIONS
     # =========================================================================
 
+    def route_after_config_check(
+        self, state: BiologicalInterpreterState, config: RunnableConfig
+    ) -> str:
+        """Route after config check: to collection (if review needed) or validation (if complete)."""
+        require_review = state.get("require_config_review", False)
+
+        if require_review:
+            if self.is_debug:
+                print("Config review required, routing to config_collection")
+            return self.get_node_name("CONFIG_COLLECTION")
+
+        if self.is_debug:
+            print("Config complete, skipping to config_validation")
+        return self.get_node_name("CONFIG_VALIDATION")
+
     def route_after_reflection(
         self, state: BiologicalInterpreterState, config: RunnableConfig
     ) -> str:
@@ -305,6 +388,202 @@ class BiologicalInterpreterAgent(BaseAgent):
             return self.get_node_name("GENERATE_REPORT")
 
         return self.get_node_name("TARGETED_REFINEMENT")
+
+    # =========================================================================
+    # CONFIG VALIDATION NODES
+    # =========================================================================
+
+    async def check_config_node(
+        self, state: BiologicalInterpreterState, config: RunnableConfig
+    ) -> dict:
+        """Check if configuration is complete or needs user review.
+
+        Determines whether to skip to config_validation (all required values present)
+        or route to config_collection (needs user input).
+        """
+        results_dir = state.get("results_dir")
+        adata_path = state.get("adata_path")
+
+        # Check if results_dir exists and has files
+        results_dir_valid = results_dir and os.path.isdir(results_dir)
+
+        # Determine if review is needed
+        # Review is needed if: no results_dir OR results_dir doesn't exist
+        require_review = not results_dir_valid
+
+        if self.is_debug:
+            print(f"Config check: results_dir={results_dir}, valid={results_dir_valid}")
+            print(f"Config check: adata_path={adata_path}")
+            print(f"Config check: require_review={require_review}")
+
+        return {
+            "require_config_review": require_review,
+            "messages": [
+                AIMessage(content=f"Configuration check: {'review needed' if require_review else 'complete'}")
+            ]
+        }
+
+    async def config_collection_node(
+        self, state: BiologicalInterpreterState, config: RunnableConfig
+    ) -> dict:
+        """HITL node: Display current config and get user confirmation/updates.
+
+        Allows users to review and modify analysis configuration before proceeding.
+        """
+        # Get current config values with defaults
+        current_config = BiologicalInterpreterConfig(
+            results_dir=state.get("results_dir", "res/"),
+            adata_path=state.get("adata_path"),
+            organism=state.get("organism", "human"),
+            cluster_key=state.get("cluster_key", "celltype_niche"),
+            force_regenerate=state.get("force_regenerate", False),
+            skip_existing=state.get("skip_existing", True),
+        )
+
+        # Format config for display
+        prompt_message = f"""📋 **Analysis Configuration Review**
+
+Current settings:
+```
+- Results Directory: {current_config.results_dir}
+- AData Path: {current_config.adata_path or 'Not specified'}
+- Organism: {current_config.organism}
+- Cluster Key: {current_config.cluster_key}
+- Force Regenerate: {current_config.force_regenerate}
+- Skip Existing: {current_config.skip_existing}
+```
+
+**Options:**
+1️⃣ **Proceed** - Continue with current settings
+2️⃣ **Update** - Provide new configuration values
+
+To update, provide values in this format:
+```
+results_dir: /path/to/results
+adata_path: /path/to/n_adata.h5ad
+organism: human
+cluster_key: celltype_niche
+force_regenerate: false
+skip_existing: true
+```
+
+Please enter your choice (1/proceed or 2/update with values):"""
+
+        user_response = interrupt(value={"message": prompt_message})
+
+        # Parse user response
+        if isinstance(user_response, dict):
+            response_text = user_response.get("response", str(user_response))
+        else:
+            response_text = str(user_response)
+
+        response_lower = response_text.lower().strip()
+
+        # Check if user wants to proceed with current settings
+        if response_lower in ("1", "proceed", "yes", "ok", "continue"):
+            if self.is_debug:
+                print("User confirmed current config settings")
+            return {
+                "messages": [HumanMessage(content="Proceeding with current settings")]
+            }
+
+        # Parse configuration updates
+        updates = self._parse_config_updates(response_text)
+
+        if self.is_debug:
+            print(f"Config updates from user: {updates}")
+
+        return {
+            **updates,
+            "messages": [HumanMessage(content=response_text)]
+        }
+
+    def _parse_config_updates(self, response: str) -> dict:
+        """Parse user response to extract configuration updates."""
+        updates = {}
+
+        # Parse key: value pairs
+        for line in response.split("\n"):
+            line = line.strip()
+            if ":" in line:
+                key, value = line.split(":", 1)
+                key = key.strip().lower().replace(" ", "_")
+                value = value.strip()
+
+                # Map to state fields
+                if key == "results_dir":
+                    updates["results_dir"] = value
+                elif key == "adata_path":
+                    updates["adata_path"] = value if value.lower() != "none" else None
+                elif key == "organism":
+                    if value.lower() in ("human", "mouse"):
+                        updates["organism"] = value.lower()
+                elif key == "cluster_key":
+                    updates["cluster_key"] = value
+                elif key == "force_regenerate":
+                    updates["force_regenerate"] = value.lower() in ("true", "yes", "1")
+                elif key == "skip_existing":
+                    updates["skip_existing"] = value.lower() in ("true", "yes", "1")
+
+        return updates
+
+    async def config_validation_node(
+        self, state: BiologicalInterpreterState, config: RunnableConfig
+    ) -> dict:
+        """Validate configuration before proceeding to load_results.
+
+        Checks:
+        - results_dir exists (or can be created)
+        - adata_path exists (if specified)
+        - Required files are accessible
+        """
+        results_dir = state.get("results_dir", "res/")
+        adata_path = state.get("adata_path")
+
+        validation_errors = []
+        validation_warnings = []
+
+        # Validate results_dir
+        if not results_dir:
+            results_dir = "res/"
+
+        if not os.path.isdir(results_dir):
+            # Try to create if it doesn't exist
+            try:
+                os.makedirs(results_dir, exist_ok=True)
+                validation_warnings.append(f"Created results directory: {results_dir}")
+            except OSError as e:
+                validation_errors.append(f"Cannot create results directory '{results_dir}': {e}")
+
+        # Validate adata_path if specified
+        if adata_path:
+            if not os.path.isfile(adata_path):
+                validation_errors.append(f"AData file not found: {adata_path}")
+            elif not adata_path.endswith(".h5ad"):
+                validation_warnings.append(f"AData file may not be in h5ad format: {adata_path}")
+
+        # Handle validation results
+        if validation_errors:
+            error_msg = "Configuration validation failed:\n" + "\n".join(f"  - {e}" for e in validation_errors)
+            if self.is_debug:
+                print(error_msg)
+            raise ValueError(error_msg)
+
+        if validation_warnings and self.is_debug:
+            print("Configuration warnings:")
+            for w in validation_warnings:
+                print(f"  - {w}")
+
+        if self.is_debug:
+            print("Configuration validation passed")
+
+        return {
+            "config_validated": True,
+            "results_dir": results_dir,  # Ensure default is set
+            "messages": [
+                AIMessage(content="Configuration validated successfully.")
+            ]
+        }
 
     # =========================================================================
     # FOUNDATION NODES
@@ -898,7 +1177,7 @@ Please enter your targets:"""
     async def generate_report_node(
         self, state: BiologicalInterpreterState, config: RunnableConfig
     ) -> dict:
-        """Generate final HTML report."""
+        """Generate final HTML report and save to results_dir."""
         from src.agents.interpreter.nodes.report_generator import generate_html_report
 
         html = await generate_html_report(
@@ -907,9 +1186,29 @@ Please enter your targets:"""
             is_debug=self.is_debug
         )
 
+        # Save HTML report to results_dir
+        results_dir = state.get("results_dir")
+        saved_path = None
+
+        if results_dir and os.path.isdir(results_dir):
+            # Generate filename with timestamp for uniqueness
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_filename = f"cci_interpretation_report_{timestamp}.html"
+            saved_path = os.path.join(results_dir, report_filename)
+
+            with open(saved_path, "w", encoding="utf-8") as f:
+                f.write(html)
+
+            if self.is_debug:
+                print(f"HTML report saved to: {saved_path}")
+
+        message = (
+            f"HTML report generated and saved to: {saved_path}"
+            if saved_path
+            else "HTML report generated (no results_dir specified, not saved to file)"
+        )
+
         return {
             "html_report": html,
-            "messages": [
-                AIMessage(content="HTML report generated successfully.")
-            ]
+            "messages": [AIMessage(content=message)],
         }

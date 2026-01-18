@@ -128,7 +128,10 @@ graph = _get_graph()
 # Biological Interpreter Agent
 # ==============================================================================
 
+BI_LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
+
 async def create_biological_interpreter_graph(
+    # llm_provider: str = BI_LLM_PROVIDER,
     llm_provider: str = DEFAULT_LLM_PROVIDER,
     is_debug: bool = True,
     recursion_limit: int = 100,

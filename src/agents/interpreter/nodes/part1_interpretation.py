@@ -27,6 +27,36 @@ from src.agents.interpreter.nodes.load_results import (
 )
 
 
+# ===== Helper functions for analysis_plan context =====
+
+def format_priority_pathways(priority_pathways: list[str]) -> str:
+    """Format priority pathways for prompt inclusion."""
+    if not priority_pathways:
+        return "None specified"
+    return ", ".join(priority_pathways)
+
+
+def format_priority_celltypes(priority_celltypes: list[str]) -> str:
+    """Format priority cell types for prompt inclusion."""
+    if not priority_celltypes:
+        return "None specified"
+    return ", ".join(priority_celltypes)
+
+
+def format_analysis_focus(analysis_plan: dict) -> str:
+    """Extract and format analysis focus from strategic plan."""
+    if not analysis_plan:
+        return "General analysis"
+    # Check various possible keys for focus
+    focus = analysis_plan.get("analysis_focus", "")
+    if not focus:
+        # Try to extract from hypotheses
+        hypotheses = analysis_plan.get("hypotheses", [])
+        if hypotheses:
+            focus = f"Hypothesis-driven: {hypotheses[0].get('content', '')[:100]}"
+    return focus if focus else "General analysis"
+
+
 # PROGENy pathway descriptions for context
 PROGENY_PATHWAYS = {
     "Androgen": "involved in the growth and development of the male reproductive organs",
@@ -135,6 +165,10 @@ async def interpret_celltype(
     interest_clusters = state.get("interest_clusters", [])
     interest_celltypes = state.get("interest_celltypes", [])
 
+    # Get priority celltypes from strategic planning
+    analysis_plan = state.get("analysis_plan", {})
+    priority_celltypes = analysis_plan.get("priority_celltypes", [])
+
     # Prepare data summary
     data_summary = "No data available"
     if celltype_data is not None:
@@ -158,12 +192,17 @@ async def interpret_celltype(
             summary_df = sig_data[["cluster", "celltype", "fdr"]].head(20)
             data_summary = f"Top significant cluster-celltype associations:\n{summary_df.to_string()}"
 
+    # Build priority context for prompt
+    priority_context = ""
+    if priority_celltypes:
+        priority_context = f"\n**Priority Cell Types (from strategic planning)**: {format_priority_celltypes(priority_celltypes)}\n"
+
     prompt = f"""## Cell Type Composition Analysis (Part 1-2)
 
 **Analysis Mode**: {analysis_mode}
 **Interest Clusters**: {interest_clusters if interest_clusters else "N/A"}
 **Interest Cell Types**: {interest_celltypes if interest_celltypes else "N/A"}
-
+{priority_context}
 **Figure**: {celltype_result.get('figure_path', 'Not available')}
 
 **Data Summary**:
@@ -176,6 +215,7 @@ Please provide interpretation:
 1. {"Identify cell types enriched in the interest clusters" if analysis_mode == "cluster_to_celltype" else "Identify clusters enriched with the interest cell types"}
 2. Note the statistical significance (FDR values)
 3. Discuss biological implications of these associations
+{f"4. Specifically address whether priority cell types ({format_priority_celltypes(priority_celltypes)}) are present in the findings" if priority_celltypes else ""}
 
 Keep your interpretation to 4-6 sentences.
 """
@@ -285,6 +325,11 @@ async def interpret_decoupler(
     # Use either interest_clusters or selected_clusters
     clusters_to_analyze = interest_clusters or selected_clusters or []
 
+    # Get priority pathways and analysis focus from strategic planning
+    analysis_plan = state.get("analysis_plan", {})
+    priority_pathways = analysis_plan.get("priority_pathways", [])
+    analysis_focus = format_analysis_focus(analysis_plan)
+
     # Get pathway data summary
     pathway_summary = "No data available"
     if has_decoupler_data and clusters_to_analyze:
@@ -300,10 +345,16 @@ async def interpret_decoupler(
     # Add pathway descriptions
     pathway_descriptions = "\n".join([f"- {name}: {desc}" for name, desc in PROGENY_PATHWAYS.items()])
 
+    # Build priority pathway context
+    priority_context = ""
+    if priority_pathways:
+        priority_context = f"\n**Priority Pathways (from strategic planning)**: {format_priority_pathways(priority_pathways)}"
+        priority_context += f"\n**Analysis Focus**: {analysis_focus}\n"
+
     prompt = f"""## Spatial Pathway Enrichment Analysis - Decoupler (Part 1-4)
 
 **Interest Clusters**: {clusters_to_analyze if clusters_to_analyze else "N/A"}
-
+{priority_context}
 **Figure**: {decoupler_result.get('figure_path', 'Not available')}
 
 **Significant Pathways in Interest Clusters**:
@@ -319,6 +370,7 @@ Please provide interpretation:
 1. Identify the most significantly enriched pathways in the interest clusters
 2. Explain the biological functions of these pathways
 3. Discuss how these pathway activities relate to the tissue biology
+{f"4. **Priority Assessment**: Specifically evaluate whether the priority pathways ({format_priority_pathways(priority_pathways)}) show enrichment, and their relevance to the analysis focus" if priority_pathways else ""}
 
 Keep your interpretation to 4-6 sentences.
 """
@@ -363,6 +415,10 @@ async def interpret_misty(
 
     celltypes_of_interest = interest_celltypes or selected_celltypes or []
 
+    # Get priority pathways from strategic planning
+    analysis_plan = state.get("analysis_plan", {})
+    priority_pathways = analysis_plan.get("priority_pathways", [])
+
     # Prepare MISTy data summary
     misty_summary = "No data available"
     if misty_data is not None:
@@ -384,11 +440,16 @@ async def interpret_misty(
             sorted_data = misty_data.sort_values("importances", ascending=False).head(15)
             misty_summary = f"Top pathway-celltype relationships:\n{sorted_data[['target', 'predictor', 'importances']].to_string()}"
 
+    # Build priority context
+    priority_context = ""
+    if priority_pathways:
+        priority_context = f"\n**Priority Pathways (from strategic planning)**: {format_priority_pathways(priority_pathways)}\n"
+
     prompt = f"""## Spatial Pathway-CellType Relationship Analysis - MISTy (Part 1-5)
 
 **Cell Types of Interest**: {celltypes_of_interest if celltypes_of_interest else "N/A"}
 **Selected Pathways**: {selected_pathways if selected_pathways else "N/A"}
-
+{priority_context}
 **Figure**: {misty_result.get('figure_path', 'Not available')}
 
 **MISTy Results** (target=celltype, predictor=pathway):
@@ -402,6 +463,7 @@ Please provide interpretation:
 1. Identify which pathways strongly predict the distribution of interest cell types
 2. Explain the biological meaning of these pathway-celltype relationships
 3. Connect these findings to the Decoupler results from Part 1-4
+{f"4. **Priority Assessment**: If priority pathways ({format_priority_pathways(priority_pathways)}) appear as strong predictors, highlight their role in shaping cell type distributions" if priority_pathways else ""}
 
 Keep your interpretation to 4-6 sentences.
 """
