@@ -19,29 +19,16 @@ langgraph dev
 
 # Build LangGraph for deployment
 langgraph build
-
-# Run the main entry point
-python main.py
 ```
 
 ### Frontend (agent-chat-ui)
 
 ```bash
 cd agent-chat-ui
-
-# Install dependencies (uses pnpm)
 pnpm install
-
-# Run dev server (port 3001)
-pnpm dev
-
-# Build for production
-pnpm build
-
-# Lint and format
-pnpm lint
-pnpm lint:fix
-pnpm format
+pnpm dev        # Dev server on port 3001
+pnpm build      # Production build
+pnpm lint       # Run linter
 ```
 
 ## Environment Configuration
@@ -49,20 +36,19 @@ pnpm format
 ### Backend (.env)
 - `LLM_PROVIDER`: `google` (default), `openai`, or `ollama`
 - `GOOGLE_MODEL`: Default `gemini-2.0-flash`
-- `OPENAI_MODEL`: Default `gpt-4.1`
+- `OPENAI_MODEL`: Default `gpt-4.1-mini`
 - `OLLAMA_MODEL`: Default `gpt-oss:20b`
 - `OLLAMA_BASE_URL`: Default `http://localhost:6000`
-- LangSmith credentials for tracing (optional)
 
 ### Frontend (agent-chat-ui/.env)
 - `NEXT_PUBLIC_API_URL`: LangGraph API endpoint (default: `http://localhost:2024`)
-- `NEXT_PUBLIC_ASSISTANT_ID`: Graph ID (default: `agent`)
+- `NEXT_PUBLIC_ASSISTANT_ID`: Graph ID (`agent` or `biological_interpreter`)
 
 ## Architecture
 
 ### Core Design Pattern
 
-The codebase uses an OOP-based LangGraph agent architecture with:
+OOP-based LangGraph agent architecture:
 
 1. **BaseAgent** (`src/base/base_agent.py`): Abstract base class that all agents extend
    - Provides `init_nodes()` and `init_edges()` abstract methods
@@ -93,26 +79,57 @@ class MyAgent(BaseAgent):
         pass
 ```
 
-### Key Agents
+### Available Agents
 
-- **STPipelineBuilderAgent** (`src/agents/pipeline/`): Multi-node workflow for ST pipeline construction with human-in-the-loop (HITL) support
-- **CCIInterpreterAgent** (`src/agents/interpreter/`): Biological interpretation of CCI results with RAG and literature search
-- **NewAgentTemplate** (`src/agents/template/`): Copy this template when creating new agents
+**STPipelineBuilderAgent** (`src/agents/pipeline/`): Multi-node workflow for ST pipeline construction with human-in-the-loop (HITL) support.
+
+**BiologicalInterpreterAgent** (`src/agents/interpreter/`): Deep Agent for CCI analysis interpretation with:
+- Dual-mode workflow: `cluster_to_celltype` (Mode A) or `celltype_to_cluster` (Mode B)
+- 10-step sequential workflow: load → HITL targets → mode detection → strategic planning → Part 1-3 interpretation → synthesis → literature search → quality reflection → report generation
+- Iterative refinement with quality reflection (max 3 iterations)
+- Modular node implementations in `interpreter/nodes/`
+- LangGraph Tools for analysis generation in `interpreter/tools/`
+
+**NewAgentTemplate** (`src/agents/template/`): Copy this template when creating new agents.
+
+### BiologicalInterpreterAgent Nodes Structure
+
+```
+interpreter/
+├── biological_interpreter_agent.py  # Main agent with graph definition
+├── biological_interpreter_state.py  # State schema with TypedDicts
+├── nodes/                            # Node implementations
+│   ├── load_results.py              # Load/generate analysis results
+│   ├── strategic_planning.py        # Hypothesis-driven planning
+│   ├── part1_interpretation.py      # 5 spatial analyses (1-1 to 1-5)
+│   ├── part2_interpretation.py      # 4 CCI analyses (2-6 to 2-9)
+│   ├── part3_interpretation.py      # 2 L-R visualization analyses
+│   ├── synthesis.py                 # Cross-part narrative synthesis
+│   ├── literature_search.py         # PubMed evidence gathering
+│   ├── quality_reflection.py        # Quality validation + refinement
+│   └── report_generator.py          # HTML report generation
+└── tools/                           # LangGraph Tools for analysis generation
+    ├── part1_tools.py               # 5 tools (can run parallel)
+    ├── part2_tools.py               # 4 tools (must run sequential)
+    ├── part3_tools.py               # 2 tools (agent dynamic)
+    └── analysis_tools.py            # Input schemas and utilities
+```
 
 ### LLM Provider Abstraction
 
-`src/agents/model.py` provides `create_llm(provider)` factory supporting:
+`src/agents/model.py` provides `create_llm(provider)` factory:
 - Google Gemini (default)
 - OpenAI GPT-4
 - Ollama (local inference)
 
 ### LangGraph Deployment
 
-The `langgraph.json` configuration exports graphs via:
+The `langgraph.json` exports two graphs:
 ```json
 {
   "graphs": {
-    "agent": "src.agents.graph_builders:graph"
+    "agent": "src.agents.graph_builders:graph",
+    "biological_interpreter": "src.agents.graph_builders:biological_interpreter_graph"
   }
 }
 ```
@@ -121,21 +138,9 @@ The `langgraph.json` configuration exports graphs via:
 
 For ASGI contexts, use `load_env_async()` from `src/base/async_env.py` to prevent blocking I/O warnings.
 
-### Frontend Architecture (agent-chat-ui)
-
-Next.js 15 chat interface for LangGraph agents:
-- **Tech Stack**: Next.js 15, React 19, Tailwind CSS 4, Radix UI
-- **State**: React Hooks + nuqs (URL state)
-- **Configuration**: YAML-based (`public/chat-config.yaml`, `public/chat-openers.yaml`)
-- **Features**: File uploads, markdown/LaTeX rendering, tool call visualization, artifact viewer
-
-Key directories:
-- `src/`: Next.js app source code
-- `public/`: Static assets and YAML configuration files
-
 ## Spatial Transcriptomics Platforms
 
-The framework supports these ST normalization platforms:
+Supported ST normalization platforms:
 - **Spot-based**: Visium, Slide-seq, StereoSeq, STARmap
 - **Single-cell resolution**: MERFISH, Xenium, CosMx, seqFISH
 

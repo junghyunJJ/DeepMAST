@@ -1,40 +1,83 @@
-"""CCI Interpreter Agent module.
+"""Biological Interpreter Agent module.
 
-This module provides the CCIInterpreterAgent for biological interpretation
-of Cell-Cell Interaction (CCI) analysis results from spatial transcriptomics.
+This module provides the Deep Agent for interpreting CCI analysis results
+and generating comprehensive HTML reports with biological insights.
 
-Example usage:
-    from src.agents.interpreter import CCIInterpreterAgent, get_initial_state
-    from src.agents.model import create_llm
-
-    # Create agent
-    model = await create_llm("openai")
-    agent = CCIInterpreterAgent(model=model)
-
-    # Create initial state
-    state = get_initial_state(
-        result_dir="/path/to/results",
-        disease_context="breast cancer"
-    )
-
-    # Run analysis
-    result = await agent.ainvoke(state)
+Also provides LangGraph tools for generating analysis results when needed.
 """
 
-from src.agents.interpreter.cci_interpreter_agent import CCIInterpreterAgent
-from src.agents.interpreter.cci_interpreter_state import (
-    CCIInterpreterState,
-    Part1Selection,
-    Part2Selection,
-    LiteratureReference,
-    get_initial_state,
+from src.agents.interpreter.biological_interpreter_agent import (
+    BiologicalInterpreterAgent,
+)
+from src.agents.interpreter.biological_interpreter_state import (
+    BiologicalInterpreterState,
+    WeightConfiguration,
+    LRPairScore,
+    Claim,
+    ReflectionResult,
+    GeneratedAnalysis,
+    DEFAULT_WEIGHT_CONFIG,
+    create_initial_state,
+)
+
+# Analysis tools for generating results
+from src.agents.interpreter.tools import (
+    # Part 1 tools
+    tool_run_spatial_plot,
+    tool_run_celltype_analysis,
+    tool_run_neighborhood_enrichment,
+    tool_run_pathway_enrichment,
+    tool_run_misty_analysis,
+    # Part 2 tools
+    tool_run_liana_cci,
+    tool_run_factor_score,
+    tool_run_lr_loadings,
+    tool_run_quadrant_analysis,
+    # Part 3 tools
+    tool_run_lr_spatial_plot,
+    tool_run_lr_cluster_analysis,
+    # Tool aggregators
+    get_part1_tools,
+    get_part2_tools,
+    get_part3_tools,
+    get_all_tools,
+    # Utilities
+    check_missing_files,
+    get_missing_files_summary,
 )
 
 __all__ = [
-    "CCIInterpreterAgent",
-    "CCIInterpreterState",
-    "Part1Selection",
-    "Part2Selection",
-    "LiteratureReference",
-    "get_initial_state",
+    # Agent
+    "BiologicalInterpreterAgent",
+    # State types
+    "BiologicalInterpreterState",
+    "WeightConfiguration",
+    "LRPairScore",
+    "Claim",
+    "ReflectionResult",
+    "GeneratedAnalysis",
+    "DEFAULT_WEIGHT_CONFIG",
+    "create_initial_state",
+    # Part 1 tools
+    "tool_run_spatial_plot",
+    "tool_run_celltype_analysis",
+    "tool_run_neighborhood_enrichment",
+    "tool_run_pathway_enrichment",
+    "tool_run_misty_analysis",
+    # Part 2 tools
+    "tool_run_liana_cci",
+    "tool_run_factor_score",
+    "tool_run_lr_loadings",
+    "tool_run_quadrant_analysis",
+    # Part 3 tools
+    "tool_run_lr_spatial_plot",
+    "tool_run_lr_cluster_analysis",
+    # Tool aggregators
+    "get_part1_tools",
+    "get_part2_tools",
+    "get_part3_tools",
+    "get_all_tools",
+    # Utilities
+    "check_missing_files",
+    "get_missing_files_summary",
 ]

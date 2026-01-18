@@ -1,7 +1,8 @@
 {
   "dependencies": ["."],
   "graphs": {
-    "agent": "src.agents.graph_builders:graph"
+    "agent": "src.agents.graph_builders:graph",
+    "biological_interpreter": "src.agents.graph_builders:biological_interpreter_graph"
   },
   "env": ".env"
 }
