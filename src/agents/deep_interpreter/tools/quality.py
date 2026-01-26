@@ -7,6 +7,7 @@ and scientific rigor.
 
 import asyncio
 import json
+import os
 import re
 from typing import Optional
 
@@ -15,9 +16,12 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
 # Reflection-tool MCP server configuration (stdio transport)
+# Uses environment variables for portability:
+# - REFLECTION_TOOL_COMMAND: Path to fastmcp executable (default: "fastmcp")
+# - REFLECTION_TOOL_SERVER: Path to server.py (default: "reflection_tool/server.py")
 REFLECTION_TOOL_CONFIG = {
-    "command": "/Users/jungj2/Dropbox/Metadata/mcp/reflection_tool/.venv/bin/fastmcp",
-    "args": ["run", "/Users/jungj2/Dropbox/Metadata/mcp/reflection_tool/server.py"],
+    "command": os.getenv("REFLECTION_TOOL_COMMAND", "fastmcp"),
+    "args": ["run", os.getenv("REFLECTION_TOOL_SERVER", "reflection_tool/server.py")],
     "transport": "stdio",
 }
 

@@ -13,7 +13,7 @@ from typing import Optional
 from langchain_core.tools import tool
 
 
-# HTML template with dark theme styling (matching existing report style)
+# HTML template with dark theme styling (matching reference report style)
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -178,17 +178,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
 
         .tab-button.active {{
-            background: rgba(100, 255, 218, 0.3);
-            border-bottom-color: transparent;
+            background: #64ffda;
+            color: #1a1a2e;
+            font-weight: bold;
         }}
 
         .tab-content {{
             display: none;
-            padding: 20px 0;
+            animation: fadeIn 0.5s;
         }}
 
         .tab-content.active {{
             display: block;
+        }}
+
+        @keyframes fadeIn {{
+            from {{ opacity: 0; }}
+            to {{ opacity: 1; }}
         }}
 
         .confidence-bar {{
@@ -242,6 +248,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             background: rgba(100, 255, 218, 0.05);
         }}
 
+        .table-container {{
+            overflow-x: auto;
+        }}
+
         .score-badge {{
             display: inline-block;
             padding: 3px 10px;
@@ -282,6 +292,72 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             text-decoration: underline;
         }}
 
+        /* Highlight classes for semantic markup */
+        .highlight-cluster {{
+            color: #ffd166;
+            font-weight: bold;
+        }}
+
+        .highlight-pathway {{
+            color: #ff6b9d;
+            font-weight: bold;
+        }}
+
+        .highlight-celltype {{
+            color: #64ffda;
+            font-weight: bold;
+        }}
+
+        /* Pathway box for PROGENy descriptions */
+        .pathway-box {{
+            background: rgba(255, 209, 102, 0.1);
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #ffd166;
+        }}
+
+        .pathway-box ul {{
+            margin-left: 20px;
+            margin-top: 10px;
+        }}
+
+        /* Pagination for L-R interaction tables */
+        .pagination {{
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }}
+
+        .page-button {{
+            background: rgba(100, 255, 218, 0.2);
+            color: #64ffda;
+            border: 1px solid #64ffda;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }}
+
+        .page-button:hover {{
+            background: rgba(100, 255, 218, 0.4);
+        }}
+
+        .page-button.active {{
+            background: #64ffda;
+            color: #1a1a2e;
+            font-weight: bold;
+        }}
+
+        .interactions-page {{
+            display: none;
+        }}
+
+        .interactions-page.active {{
+            display: block;
+        }}
+
         .metadata {{
             color: #666;
             font-size: 0.9em;
@@ -299,7 +375,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         <!-- Executive Summary -->
         <div class="summary-box">
-            <h2>Executive Summary</h2>
+            <h3>Executive Summary</h3>
             {executive_summary}
         </div>
 
@@ -311,10 +387,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         <!-- Tabs Navigation -->
         <div class="tabs">
-            <button class="tab-button active" onclick="showTab('part1')">Part 1: Spatial & Pathway</button>
-            <button class="tab-button" onclick="showTab('part2')">Part 2: CCI & NMF</button>
-            <button class="tab-button" onclick="showTab('part3')">Part 3: L-R Interactions</button>
-            <button class="tab-button" onclick="showTab('summary')">Comprehensive Summary</button>
+            <button class="tab-button active" onclick="openTab(event, 'part1')">Part 1: Spatial & Pathway</button>
+            <button class="tab-button" onclick="openTab(event, 'part2')">Part 2: CCI & NMF</button>
+            <button class="tab-button" onclick="openTab(event, 'part3')">Part 3: L-R Interactions</button>
+            <button class="tab-button" onclick="openTab(event, 'summary')">Comprehensive Summary</button>
         </div>
 
         <!-- Part 1 Content -->
@@ -345,16 +421,52 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
 
     <script>
-        function showTab(tabId) {{
-            document.querySelectorAll('.tab-content').forEach(content => {{
-                content.classList.remove('active');
-            }});
-            document.querySelectorAll('.tab-button').forEach(btn => {{
-                btn.classList.remove('active');
-            }});
-            document.getElementById(tabId).classList.add('active');
-            event.target.classList.add('active');
+        function openTab(evt, tabName) {{
+            var i, tabcontent, tabbuttons;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {{
+                tabcontent[i].style.display = "none";
+                tabcontent[i].classList.remove("active");
+            }}
+            tabbuttons = document.getElementsByClassName("tab-button");
+            for (i = 0; i < tabbuttons.length; i++) {{
+                tabbuttons[i].classList.remove("active");
+            }}
+            document.getElementById(tabName).style.display = "block";
+            document.getElementById(tabName).classList.add("active");
+            if (evt) {{
+                evt.currentTarget.classList.add("active");
+            }}
         }}
+
+        function showPage(pageNum) {{
+            var i, pages, buttons;
+            pages = document.getElementsByClassName("interactions-page");
+            for (i = 0; i < pages.length; i++) {{
+                pages[i].style.display = "none";
+                pages[i].classList.remove("active");
+            }}
+            buttons = document.getElementsByClassName("page-button");
+            for (i = 0; i < buttons.length; i++) {{
+                buttons[i].classList.remove("active");
+            }}
+            var targetPage = document.getElementById("interactions-page-" + pageNum);
+            if (targetPage) {{
+                targetPage.style.display = "block";
+                targetPage.classList.add("active");
+            }}
+            if (buttons[pageNum - 1]) {{
+                buttons[pageNum - 1].classList.add("active");
+            }}
+        }}
+
+        // Initialize on DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', function() {{
+            openTab(null, 'part1');
+            if (document.getElementById("interactions-page-1")) {{
+                showPage(1);
+            }}
+        }});
     </script>
 </body>
 </html>
@@ -425,7 +537,7 @@ def _generate_interpretation_html(interpretation: str, title: str = "Biological 
     """Generate HTML for an interpretation block.
 
     Args:
-        interpretation: The interpretation text
+        interpretation: The interpretation text (can contain HTML)
         title: Block title
 
     Returns:
@@ -434,7 +546,7 @@ def _generate_interpretation_html(interpretation: str, title: str = "Biological 
     return f"""
     <div class="interpretation">
         <h4>{title}</h4>
-        <p>{interpretation}</p>
+        <div>{interpretation}</div>
     </div>
     """
 
@@ -451,8 +563,15 @@ def _generate_references_html(references: list[dict]) -> str:
     if not references:
         return ""
 
+    # Ensure references is a list
+    if not isinstance(references, list):
+        return ""
+
     cards = []
     for ref in references[:5]:
+        # Skip non-dict entries
+        if not isinstance(ref, dict):
+            continue
         pmid = ref.get("pmid", "")
         title = ref.get("title", f"Article {pmid}")
         cards.append(f"""
@@ -471,135 +590,170 @@ def _generate_references_html(references: list[dict]) -> str:
     """
 
 
-@tool
-def generate_html_report(
+def _generate_part_content(part_data: dict) -> str:
+    """Generate HTML content for a part section from structured data.
+
+    Args:
+        part_data: Dictionary with analysis_name -> {figure_path, interpretation, caption, references}
+
+    Returns:
+        HTML string for the part content
+    """
+    if not part_data or not isinstance(part_data, dict):
+        return "<p>No content available</p>"
+
+    sections = []
+    for analysis_name, analysis_data in part_data.items():
+        # Ensure analysis_data is a dict
+        if not isinstance(analysis_data, dict):
+            analysis_data = {"interpretation": str(analysis_data) if analysis_data else ""}
+        figure_path = analysis_data.get("figure_path")
+        interpretation = analysis_data.get("interpretation", "")
+        caption = analysis_data.get("caption", analysis_name)
+        refs = analysis_data.get("references", [])
+        if not isinstance(refs, list):
+            refs = []
+
+        sections.append(f"""
+        <div class="analysis-section">
+            <h3>{analysis_name}</h3>
+            {_generate_figure_html(figure_path, caption)}
+            {_generate_interpretation_html(interpretation)}
+            {_generate_references_html(refs)}
+        </div>
+        """)
+
+    return "\n".join(sections) if sections else "<p>No content available</p>"
+
+
+def _generate_html_report_impl(
     parts: dict,
     output_path: str,
 ) -> str:
-    """Generate a comprehensive HTML report for CCI analysis.
-
-    This tool creates a publication-quality HTML report with dark theme,
-    embedded figures, and organized interpretation sections.
+    """Internal implementation for HTML report generation.
 
     Args:
         parts: Dictionary containing report sections:
+            Required fields:
             - title: Report title
             - subtitle: Report subtitle
-            - executive_summary: Executive summary text
-            - analysis_config: Analysis configuration details
+            - executive_summary: Executive summary text (can contain HTML)
+            - analysis_config: Analysis configuration details (can contain HTML)
             - part1: Dict with interpretations and figures for Part 1
             - part2: Dict with interpretations and figures for Part 2
             - part3: Dict with interpretations and figures for Part 3
             - synthesis: Synthesis narrative
             - quality_score: Overall quality score
             - references: List of reference dictionaries
+
+            Optional fields (for LLM-generated HTML):
+            - part1_html: LLM-generated HTML for Part 1 (overrides part1 dict)
+            - part2_html: LLM-generated HTML for Part 2 (overrides part2 dict)
+            - part3_html: LLM-generated HTML for Part 3 (overrides part3 dict)
+            - summary_html: LLM-generated HTML for Summary (overrides synthesis)
+
         output_path: Path to save the HTML report
 
     Returns:
         String with report generation status and output path
     """
-    # Extract parts
+    # Extract parts with type validation
     title = parts.get("title", "CCI Analysis Report")
     subtitle = parts.get("subtitle", "Comprehensive Cell-Cell Interaction Analysis")
     executive_summary = parts.get("executive_summary", "")
     analysis_config = parts.get("analysis_config", "")
+
+    # Validate part1, part2, part3 are dicts
     part1 = parts.get("part1", {})
+    if not isinstance(part1, dict):
+        part1 = {}
+
     part2 = parts.get("part2", {})
+    if not isinstance(part2, dict):
+        part2 = {}
+
     part3 = parts.get("part3", {})
+    if not isinstance(part3, dict):
+        part3 = {}
+
     synthesis = parts.get("synthesis", "")
-    quality_score = parts.get("quality_score", 0.0)
+
+    # Validate quality_score is numeric
+    quality_score_raw = parts.get("quality_score", 0.0)
+    try:
+        quality_score = float(quality_score_raw) if quality_score_raw is not None else 0.0
+    except (TypeError, ValueError):
+        quality_score = 0.0
+
+    # Validate references is a list
     references = parts.get("references", [])
+    if not isinstance(references, list):
+        references = []
+
+    # Check for LLM-generated HTML overrides (backward compatible)
+    part1_html = parts.get("part1_html")
+    part2_html = parts.get("part2_html")
+    part3_html = parts.get("part3_html")
+    summary_html = parts.get("summary_html")
 
     # Build executive summary HTML
-    score_class = "score-high" if quality_score >= 0.7 else "score-medium" if quality_score >= 0.5 else "score-low"
-    exec_summary_html = f"""
-    <div class="key-findings">
-        <h4>Key Metrics</h4>
-        <ul>
-            <li><strong>Quality Score:</strong> <span class="score-badge {score_class}">{quality_score:.2f}</span></li>
-        </ul>
-    </div>
-    <div class="interpretation">
+    # If executive_summary already contains HTML tags, use it directly
+    if "<" in executive_summary and ">" in executive_summary:
+        exec_summary_html = executive_summary
+    else:
+        # Generate from plain text
+        score_class = "score-high" if quality_score >= 0.7 else "score-medium" if quality_score >= 0.5 else "score-low"
+        exec_summary_html = f"""
         <p>{executive_summary}</p>
-    </div>
-    """
+        <div class="key-findings">
+            <h4>Quality Metrics</h4>
+            <ul>
+                <li><strong>Quality Score:</strong> <span class="score-badge {score_class}">{quality_score:.2f}</span></li>
+            </ul>
+        </div>
+        """
 
-    # Build Part 1 content
-    part1_sections = []
-    for analysis_name, analysis_data in part1.items():
-        figure_path = analysis_data.get("figure_path")
-        interpretation = analysis_data.get("interpretation", "")
-        caption = analysis_data.get("caption", analysis_name)
-        refs = analysis_data.get("references", [])
+    # Build Part 1 content: HTML override or structured data
+    if part1_html:
+        part1_content = part1_html
+    else:
+        part1_content = _generate_part_content(part1)
 
-        part1_sections.append(f"""
+    # Build Part 2 content: HTML override or structured data
+    if part2_html:
+        part2_content = part2_html
+    else:
+        part2_content = _generate_part_content(part2)
+
+    # Build Part 3 content: HTML override or structured data
+    if part3_html:
+        part3_content = part3_html
+    else:
+        part3_content = _generate_part_content(part3)
+
+    # Build summary content: HTML override or structured data
+    if summary_html:
+        summary_content = summary_html
+    else:
+        score_class = "score-high" if quality_score >= 0.7 else "score-medium" if quality_score >= 0.5 else "score-low"
+        summary_content = f"""
         <div class="analysis-section">
-            <h3>{analysis_name}</h3>
-            {_generate_figure_html(figure_path, caption)}
-            {_generate_interpretation_html(interpretation)}
-            {_generate_references_html(refs)}
-        </div>
-        """)
-
-    part1_content = "\n".join(part1_sections) if part1_sections else "<p>No Part 1 content available</p>"
-
-    # Build Part 2 content
-    part2_sections = []
-    for analysis_name, analysis_data in part2.items():
-        figure_path = analysis_data.get("figure_path")
-        interpretation = analysis_data.get("interpretation", "")
-        caption = analysis_data.get("caption", analysis_name)
-        refs = analysis_data.get("references", [])
-
-        part2_sections.append(f"""
-        <div class="analysis-section">
-            <h3>{analysis_name}</h3>
-            {_generate_figure_html(figure_path, caption)}
-            {_generate_interpretation_html(interpretation)}
-            {_generate_references_html(refs)}
-        </div>
-        """)
-
-    part2_content = "\n".join(part2_sections) if part2_sections else "<p>No Part 2 content available</p>"
-
-    # Build Part 3 content
-    part3_sections = []
-    for analysis_name, analysis_data in part3.items():
-        figure_path = analysis_data.get("figure_path")
-        interpretation = analysis_data.get("interpretation", "")
-        caption = analysis_data.get("caption", analysis_name)
-        refs = analysis_data.get("references", [])
-
-        part3_sections.append(f"""
-        <div class="analysis-section">
-            <h3>{analysis_name}</h3>
-            {_generate_figure_html(figure_path, caption)}
-            {_generate_interpretation_html(interpretation)}
-            {_generate_references_html(refs)}
-        </div>
-        """)
-
-    part3_content = "\n".join(part3_sections) if part3_sections else "<p>No Part 3 content available</p>"
-
-    # Build summary content
-    summary_content = f"""
-    <div class="analysis-section">
-        <h3>Integrated Biological Narrative</h3>
-        <div class="interpretation">
-            <p>{synthesis}</p>
-        </div>
-    </div>
-    <div class="analysis-section">
-        <h3>Quality Assessment</h3>
-        <div class="summary-box">
-            <h4>Overall Quality Score: <span class="score-badge {score_class}">{quality_score:.2f}</span></h4>
-            <div class="confidence-bar">
-                <div class="confidence-fill" style="width: {quality_score * 100}%"></div>
+            <h3>Integrated Biological Narrative</h3>
+            <div class="interpretation">
+                <div>{synthesis}</div>
             </div>
         </div>
-    </div>
-    {_generate_references_html(references)}
-    """
+        <div class="analysis-section">
+            <h3>Quality Assessment</h3>
+            <div class="summary-box">
+                <h4>Overall Quality Score: <span class="score-badge {score_class}">{quality_score:.2f}</span></h4>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" style="width: {quality_score * 100}%"></div>
+                </div>
+            </div>
+        </div>
+        {_generate_references_html(references)}
+        """
 
     # Fill template
     html = HTML_TEMPLATE.format(
@@ -628,6 +782,59 @@ def generate_html_report(
         return f"Error generating report: {e}"
 
 
+@tool
+def generate_html_report(
+    parts: dict,
+    output_path: str,
+) -> str:
+    """Generate a comprehensive HTML report for CCI analysis.
+
+    This tool creates a publication-quality HTML report with dark theme,
+    embedded figures, and organized interpretation sections.
+
+    The report supports two modes:
+    1. Structured mode: Provide part1/part2/part3 dicts with figure_path, interpretation, etc.
+    2. HTML override mode: Provide part1_html/part2_html/part3_html with LLM-generated HTML
+
+    CSS classes available for LLM-generated HTML:
+    - .highlight-cluster: Yellow highlighting for cluster names
+    - .highlight-pathway: Pink highlighting for pathway names
+    - .highlight-celltype: Cyan highlighting for cell type names
+    - .pathway-box: Yellow-bordered box for pathway descriptions
+    - .key-findings: Pink-bordered box for key findings lists
+    - .interpretation: Cyan-bordered box for interpretations
+    - .analysis-section: Section container with cyan border
+    - .pagination, .page-button: Pagination controls for tables
+    - .interactions-page: Container for paginated content (use id="interactions-page-N")
+
+    Args:
+        parts: Dictionary containing report sections:
+            Required fields:
+            - title: Report title
+            - subtitle: Report subtitle
+            - executive_summary: Executive summary text (HTML allowed)
+            - analysis_config: Analysis configuration details (HTML allowed)
+            - part1: Dict with {analysis_name: {figure_path, interpretation, caption, references}}
+            - part2: Dict with Part 2 analyses
+            - part3: Dict with Part 3 analyses
+            - synthesis: Synthesis narrative
+            - quality_score: Overall quality score (0.0-1.0)
+            - references: List of {pmid, title} dictionaries
+
+            Optional HTML override fields:
+            - part1_html: Complete HTML for Part 1 tab (overrides part1)
+            - part2_html: Complete HTML for Part 2 tab (overrides part2)
+            - part3_html: Complete HTML for Part 3 tab (overrides part3)
+            - summary_html: Complete HTML for Summary tab (overrides synthesis)
+
+        output_path: Path to save the HTML report
+
+    Returns:
+        String with report generation status and output path
+    """
+    return _generate_html_report_impl(parts=parts, output_path=output_path)
+
+
 def generate_simple_report(
     title: str,
     content: dict,
@@ -654,6 +861,11 @@ def generate_simple_report(
         "synthesis": content.get("synthesis", ""),
         "quality_score": content.get("quality_score", 0.0),
         "references": content.get("references", []),
+        # Forward HTML overrides if present
+        "part1_html": content.get("part1_html"),
+        "part2_html": content.get("part2_html"),
+        "part3_html": content.get("part3_html"),
+        "summary_html": content.get("summary_html"),
     }
 
-    return generate_html_report.invoke({"parts": parts, "output_path": output_path})
+    return _generate_html_report_impl(parts=parts, output_path=output_path)

@@ -23,6 +23,15 @@ from src.agents.deep_interpreter.tools import (
     think_tool,
 )
 
+__all__ = [
+    "get_subagents",
+    "get_subagent_by_name",
+    "get_interpretation_subagents",
+    "get_workflow_subagents",
+    "get_hybrid_workflow_subagents",
+    "get_literature_searcher_subagent",
+]
+
 
 def get_literature_searcher_subagent() -> dict:
     """Get the literature-searcher CompiledSubAgent configuration.

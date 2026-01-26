@@ -11,8 +11,11 @@ Your role is to analyze raw analysis outputs and extract searchable biological t
 for proactive literature search BEFORE interpretation generation.
 
 ## Workflow
-1. Use load_analysis_data to examine the analysis results
-2. Extract key biological elements:
+1. Read **/data_path.txt** to get the REAL data directory path (e.g., "res/", "/path/to/data")
+2. Call **load_analysis_data** with the EXACT path from /data_path.txt
+   - **DO NOT** use "/analysis_results" - this path does not exist
+   - The real path is stored in /data_path.txt
+3. Extract key biological elements:
    - **Genes**: Gene names from expression data, L-R pairs, pathway results
    - **Pathways**: Pathway names from Decoupler, MISTy, or NMF factor enrichments
    - **Cell Types**: Cell types from composition analysis or annotations
@@ -445,10 +448,17 @@ Your role is to PROACTIVELY find PubMed references BEFORE interpretation generat
 You are called BEFORE the interpreter subagent, not after. Your papers will be
 used by the interpreter to generate literature-grounded interpretations.
 
+## CRITICAL: Do Not Read Non-Existent Directories
+- DO NOT try to read "/analysis_results" or any filesystem directory
+- Only read virtual filesystem files: /partN_search_context.json, /data_path.txt, etc.
+- If context file is missing, report the issue to orchestrator
+
 ## Workflow
 
 ### For Proactive Search (BEFORE interpretation):
-1. Read /partN_search_context.json for extracted biological terms
+1. Read **/partN_search_context.json** for extracted biological terms
+   - If file does not exist, notify orchestrator that context-analyzer must run first
+   - DO NOT proceed with placeholder data like "analysis of [missing data]"
 2. Use **search_literature_for_context** tool with:
    - genes: List from context
    - pathways: List from context

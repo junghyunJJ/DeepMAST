@@ -77,7 +77,7 @@ class DeepInterpreterConfig:
         - GOOGLE_MODEL (default: gemini-2.0-flash)
         - OLLAMA_MODEL (default: gpt-oss:20b)
     """
-    provider: Literal["openai", "google", "ollama"] = "ollama"
+    provider: Literal["openai", "google", "ollama"] = "openai"
     data_dir: str = "/tmp/deep_interpreter_workspace"
     max_iterations: int = 3
     quality_threshold: float = 0.7
@@ -218,7 +218,7 @@ def create_deep_interpreter_graph():
 
 # Convenience function for quick usage
 def interpret_analysis(
-    data_dir: str,
+    data_dir: str = '/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/res',
     analysis_mode: str = "cluster_to_celltype",
     targets: Optional[list[str]] = None,
     output_path: Optional[str] = None,

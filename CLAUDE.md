@@ -34,7 +34,7 @@ pnpm lint       # Run linter
 ## Environment Configuration
 
 ### Backend (.env)
-- `LLM_PROVIDER`: `google` (default), `openai`, or `ollama`
+- `LLM_PROVIDER`: `google`, `openai` (default), or `ollama`
 - `GOOGLE_MODEL`: Default `gemini-2.0-flash`
 - `OPENAI_MODEL`: Default `gpt-4.1-mini`
 - `OLLAMA_MODEL`: Default `gpt-oss:20b`
@@ -46,6 +46,11 @@ pnpm lint       # Run linter
 
 ### Version Pinning Note
 `langgraph-api` and `sse-starlette` are pinned for compatibility. See `pyproject.toml` comments before updating.
+
+### Recursion Limits
+Default recursion limits are set in `graph_builders.py`:
+- STPipelineBuilderAgent: 50
+- BiologicalInterpreterAgent: 100 (due to complex multi-node workflow)
 
 ## Architecture
 
@@ -95,39 +100,25 @@ class MyAgent(BaseAgent):
 
 **NewAgentTemplate** (`src/agents/template/`): Copy this template when creating new agents.
 
-### BiologicalInterpreterAgent Nodes Structure
+### Tool Execution Dependencies
 
-```
-interpreter/
-├── biological_interpreter_agent.py  # Main agent with graph definition
-├── biological_interpreter_state.py  # State schema with TypedDicts
-├── nodes/                            # Node implementations
-│   ├── load_results.py              # Load/generate analysis results
-│   ├── strategic_planning.py        # Hypothesis-driven planning
-│   ├── part1_interpretation.py      # 5 spatial analyses (1-1 to 1-5)
-│   ├── part2_interpretation.py      # 4 CCI analyses (2-6 to 2-9)
-│   ├── part3_interpretation.py      # 2 L-R visualization analyses
-│   ├── synthesis.py                 # Cross-part narrative synthesis
-│   ├── literature_search.py         # PubMed evidence gathering
-│   ├── quality_reflection.py        # Quality validation + refinement
-│   └── report_generator.py          # HTML report generation
-└── tools/                           # LangGraph Tools for analysis generation
-    ├── part1_tools.py               # 5 tools (can run parallel)
-    ├── part2_tools.py               # 4 tools (must run sequential)
-    ├── part3_tools.py               # 2 tools (agent dynamic)
-    └── analysis_tools.py            # Input schemas and utilities
-```
+**Part 1 tools** can run in parallel (all depend only on n_adata.h5ad):
+- Steps 1-5: spatial_plot, celltype_analysis, neighborhood_enrichment, pathway_enrichment, misty_analysis
 
-### State Serialization Pattern
+**Part 2 tools** must run sequentially:
+- Step 6 (`tool_run_liana_cci`) → creates `lrdata.h5ad`
+- Steps 7-9 → require `lrdata.h5ad` and agent's factor/celltype selection
 
-**Critical**: State uses `TypedDict` with file paths, not DataFrames. LangGraph's msgpack checkpointer cannot serialize pandas DataFrames.
+### State Serialization Pattern (Critical)
+
+LangGraph's msgpack checkpointer cannot serialize pandas DataFrames. State uses `TypedDict` with **file paths only**:
 
 ```python
-# ✓ Correct: Store file paths
+# ✓ Correct: Store file paths in AnalysisDataRef
 part1_results: Optional[dict[str, AnalysisDataRef]]  # {"spatial": {"figure_path": "res/1.png"}}
 
-# ✗ Wrong: Don't store DataFrames in state
-# part1_results: Optional[dict[str, pd.DataFrame]]  # Will fail serialization
+# ✗ Wrong: Will fail serialization
+# part1_results: Optional[dict[str, pd.DataFrame]]
 ```
 
 Load DataFrames on-demand within node functions using `load_dataframe_from_ref()`.
@@ -170,25 +161,29 @@ async def get_user_input_node(self, state, config):
 
 ### Conditional Routing Pattern
 
+**Important**: Routing functions must be **sync** (not async), returning node names as strings.
+
 ```python
 def init_edges(self, graph: StateGraph):
     graph.add_conditional_edges(
         self.get_node_name("SOURCE_NODE"),
-        self.routing_function,  # Must be sync, returns node name
+        self.routing_function,  # Must be sync
         [self.get_node_name("OPTION_A"), self.get_node_name("OPTION_B")]
     )
 
 def routing_function(self, state, config) -> str:  # Sync, not async
-    if state.get("condition"):
-        return self.get_node_name("OPTION_A")
-    return self.get_node_name("OPTION_B")
+    return self.get_node_name("OPTION_A") if state.get("condition") else self.get_node_name("OPTION_B")
 ```
 
-## Spatial Transcriptomics Platforms
+## Domain Knowledge
 
-Supported ST normalization platforms:
+### Supported ST Platforms
 - **Spot-based**: Visium, Slide-seq, StereoSeq, STARmap
 - **Single-cell resolution**: MERFISH, Xenium, CosMx, seqFISH
+
+### Prompts Module
+
+`src/prompts/` contains centralized prompt templates for both agents. When modifying LLM behavior, edit prompts here rather than hardcoding in node functions.
 
 ## Key Dependencies
 
@@ -196,3 +191,13 @@ Supported ST normalization platforms:
 - **scanpy/squidpy**: Single-cell and spatial transcriptomics analysis
 - **liana**: Cell-cell interaction analysis
 - **omnipath**: Pathway and interaction resources
+- **langchain-mcp-adapters**: MCP server integration for external tool calling
+
+## Adding a New Agent
+
+1. Copy `src/agents/template/` to a new directory
+2. Define `NODE_NAMES` class variable for all node names
+3. Implement `init_nodes()` and `init_edges()` methods
+4. Create state schema using `TypedDict` (avoid storing DataFrames)
+5. Add graph builder function in `src/agents/graph_builders.py`
+6. Export in `langgraph.json`

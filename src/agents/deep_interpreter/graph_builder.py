@@ -8,9 +8,15 @@ Two graph variants are available:
 2. deep_interpreter_wrapped_graph: Wrapper agent with HITL target collection (recommended)
 """
 
+import os
 from typing import Literal
 
+from dotenv import load_dotenv
 from langchain_core.runnables import Runnable
+
+# Load .env file before any os.getenv() calls
+# This ensures DEEP_INTERPRETER_DATA_DIR is available at module import time
+load_dotenv()
 
 from src.agents.deep_interpreter.agent import (
     create_deep_interpreter_agent,
@@ -64,11 +70,21 @@ def _get_deep_interpreter_graph() -> Runnable:
     Note: DeepAgents create_deep_agent() is synchronous, so no async
     wrapper is needed unlike the other agents.
 
+    Uses environment variables:
+    - LLM_PROVIDER: LLM provider (default: "openai")
+    - DEEP_INTERPRETER_DATA_DIR: Data directory path
+
     Returns:
         Compiled Deep Agent runnable
     """
+    provider = os.getenv("LLM_PROVIDER", "openai")
+    data_dir = os.getenv(
+        "DEEP_INTERPRETER_DATA_DIR",
+        "/tmp/deep_interpreter_workspace"
+    )
     return create_deep_interpreter_graph(
-        provider='ollama',
+        provider=provider,
+        data_dir=data_dir,
         use_checkpointer=False,  # LangGraph CLI uses its own persistence
         is_debug=False,
     )
@@ -130,11 +146,22 @@ def _get_deep_interpreter_graph_wrapped() -> Runnable:
     This is the recommended variant that uses the wrapper agent pattern
     for reliable HITL target selection.
 
+    Uses environment variables:
+    - LLM_PROVIDER: LLM provider (default: "openai")
+    - DEEP_INTERPRETER_DATA_DIR: Default data directory path
+    Note: Wrapper may override with user-provided path during HITL.
+
     Returns:
         Compiled Wrapper Agent runnable
     """
+    provider = os.getenv("LLM_PROVIDER", "openai")
+    data_dir = os.getenv(
+        "DEEP_INTERPRETER_DATA_DIR",
+        "/tmp/deep_interpreter_workspace"
+    )
     return create_deep_interpreter_graph_wrapped(
-        provider='ollama',
+        provider=provider,
+        data_dir=data_dir,
         use_checkpointer=False,  # LangGraph CLI uses its own persistence
         is_debug=False,
     )
