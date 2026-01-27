@@ -2,16 +2,47 @@
 
 Detailed search strategies and keyword combinations by result type.
 
+> **Note**: This is a supplementary reference for `SKILL.md`. See SKILL.md for the complete 5-phase workflow.
+
+---
+
+## Tool API Reference
+
+### search_literature_for_context (Primary)
+Multi-strategy search with coverage tracking.
+
+```python
+search_literature_for_context(
+    genes=["GENE1", "GENE2"],      # Gene symbols (10-15 prioritized)
+    pathways=["pathway1"],          # Pathway names
+    celltypes=["CellType1"],        # Cell type names
+    disease="disease name",         # Disease context (string, not list)
+    max_results=20                  # Number of results
+)
+```
+
+### search_literature (Targeted)
+Single-query PubMed search for specific topics.
+
+```python
+search_literature(
+    query="specific search terms",
+    max_results=20
+)
+```
+
+---
+
 ## L-R Interaction Search Strategy
 
 ### Required Parameters
 - `genes`: Include both ligand and receptor gene symbols
-- `keywords`: "ligand receptor", "cell cell interaction" required
+- `disease`: Disease context as string
 
 ### Recommended Keyword Combinations
 
-| Analysis Tool | Additional Keywords |
-|---------------|---------------------|
+| Analysis Tool | Additional Keywords for query |
+|---------------|-------------------------------|
 | LIANA+ | "LIANA", "ligand receptor inference" |
 | CellChat | "CellChat", "cell communication" |
 | CellPhoneDB | "CellPhoneDB", "receptor ligand" |
@@ -25,21 +56,27 @@ Detailed search strategies and keyword combinations by result type.
 ### Search Examples
 ```python
 # Apoe-Trem2 in AD
-article_searcher(
-  genes=["APOE", "TREM2"],
-  diseases=["Alzheimer disease"],
-  keywords=["ligand receptor", "microglia", "cell cell interaction"],
-  include_preprints=True,
-  page_size=20
+search_literature_for_context(
+    genes=["APOE", "TREM2"],
+    pathways=["TREM2 signaling", "microglial activation"],
+    celltypes=["Microglia"],
+    disease="Alzheimer disease",
+    max_results=20
 )
 
 # SPP1-CD44 in tumor
-article_searcher(
-  genes=["SPP1", "CD44"],
-  diseases=["neoplasms"],
-  keywords=["ligand receptor", "tumor microenvironment", "macrophage"],
-  include_preprints=True,
-  page_size=20
+search_literature_for_context(
+    genes=["SPP1", "CD44"],
+    pathways=["integrin signaling", "ECM remodeling"],
+    celltypes=["Macrophages", "Tumor"],
+    disease="breast cancer",
+    max_results=20
+)
+
+# Targeted follow-up search
+search_literature(
+    query="SPP1 CD44 tumor microenvironment macrophage",
+    max_results=10
 )
 ```
 
@@ -48,12 +85,13 @@ article_searcher(
 ## Pathway Search Strategy
 
 ### Required Parameters
-- `keywords`: pathway name + "pathway" or "signaling"
+- `pathways`: Pathway names from analysis (PROGENy, decoupler)
+- `disease`: Disease context
 
 ### Major Pathway Keywords
 
-| Pathway | Recommended Keywords |
-|---------|---------------------|
+| Pathway | Recommended Search Terms |
+|---------|--------------------------|
 | WNT | "WNT pathway", "WNT signaling", "beta-catenin" |
 | NFkB | "NFkB pathway", "NF-kappa B", "inflammatory signaling" |
 | TNFa | "TNF signaling", "TNF-alpha", "TNFR" |
@@ -61,6 +99,12 @@ article_searcher(
 | JAK-STAT | "JAK STAT pathway", "cytokine signaling" |
 | PI3K-AKT | "PI3K AKT", "mTOR signaling" |
 | MAPK | "MAPK pathway", "ERK signaling" |
+| Hypoxia | "hypoxia", "HIF-1", "oxygen sensing" |
+| Estrogen | "estrogen receptor", "ER signaling" |
+| Androgen | "androgen receptor", "AR signaling" |
+| EGFR | "EGFR signaling", "ErbB", "receptor tyrosine kinase" |
+| VEGF | "VEGF signaling", "angiogenesis", "vascular" |
+| p53 | "p53 pathway", "tumor suppressor", "apoptosis" |
 
 ### Analysis Tool-specific Keywords
 - PROGENy: "pathway activity", "footprint"
@@ -69,22 +113,28 @@ article_searcher(
 
 ### Search Examples
 ```python
-# WNT pathway in AD
-article_searcher(
-  genes=None,
-  diseases=["Alzheimer disease"],
-  keywords=["WNT pathway", "spatial transcriptomics", "neurodegeneration"],
-  include_preprints=True,
-  page_size=20
+# Pathway-focused search (no specific genes)
+search_literature_for_context(
+    genes=[],
+    pathways=["WNT", "TGFb", "Hypoxia"],
+    celltypes=["Fibroblast", "Tumor"],
+    disease="breast cancer",
+    max_results=20
 )
 
-# With specific pathway genes
-article_searcher(
-  genes=["CTNNB1", "WNT5A"],
-  diseases=["Alzheimer disease"],
-  keywords=["WNT signaling", "spatial"],
-  include_preprints=True,
-  page_size=20
+# With pathway-associated genes
+search_literature_for_context(
+    genes=["CTNNB1", "WNT5A", "AXIN2"],
+    pathways=["WNT"],
+    celltypes=["Epithelial"],
+    disease="colorectal cancer",
+    max_results=20
+)
+
+# Targeted pathway search
+search_literature(
+    query="TGF-beta signaling EMT breast cancer spatial transcriptomics",
+    max_results=15
 )
 ```
 
@@ -93,42 +143,72 @@ article_searcher(
 ## Gene/Marker Search Strategy
 
 ### Required Parameters
-- `genes`: List of target gene symbols
+- `genes`: List of target gene symbols (prioritize 10-15)
+- `celltypes`: Associated cell types
 
-### Context-specific Keywords
+### Context-specific Search Terms
 
-| Context | Recommended Keywords |
-|---------|---------------------|
+| Context | Recommended Keywords for query |
+|---------|--------------------------------|
 | Spatial marker | "spatial transcriptomics", "spatial distribution" |
 | Cell type marker | "cell type", "marker gene", "single cell" |
 | DEG | "differential expression", "upregulated", "downregulated" |
 | Cluster marker | "cluster", "subpopulation", "heterogeneity" |
+| EMT markers | "epithelial mesenchymal transition", "E-cadherin", "vimentin" |
 
 ### Search Examples
 ```python
 # Spatial marker genes
-article_searcher(
-  genes=["GFAP", "AQP4"],
-  diseases=["Alzheimer disease"],
-  keywords=["astrocyte", "spatial transcriptomics", "marker"],
-  include_preprints=True,
-  page_size=20
+search_literature_for_context(
+    genes=["GFAP", "AQP4", "SLC1A2"],
+    pathways=[],
+    celltypes=["Astrocyte"],
+    disease="Alzheimer disease",
+    max_results=20
+)
+
+# EMT-related markers
+search_literature_for_context(
+    genes=["CDH1", "VIM", "SNAI1", "ZEB1"],
+    pathways=["EMT", "TGFb"],
+    celltypes=["Tumor", "Epithelial"],
+    disease="breast cancer",
+    max_results=20
+)
+
+# Targeted gene search
+search_literature(
+    query="CDH1 E-cadherin loss breast cancer invasion",
+    max_results=10
 )
 ```
 
 ---
 
-## Search Result Filtering Tips
+## Search Result Optimization
 
-### include_preprints Setting
-- `True`: Include latest research, quick trend identification
-- `False`: Peer-reviewed papers only, more reliable references
-
-### page_size Setting
-- 10-20: General reference search
-- 30-50: Comprehensive literature review
+### max_results Setting
+- 15-20: Standard search (meets quality threshold)
+- 10: Targeted follow-up search
+- 30: Comprehensive literature review
 
 ### When Results Are Scarce
-1. Remove some keywords to expand search scope
-2. Change diseases to more general terms
-3. Search with genes only, then filter manually
+1. Use `search_literature` with broader query terms
+2. Remove specific cell types to expand scope
+3. Search with genes only: `search_literature(query="GENE1 GENE2 disease")`
+4. Add synonyms: "E-cadherin" for CDH1, "TGF-beta" for TGFB1
+
+### Coverage Optimization
+Per SKILL.md quality criteria:
+- Gene coverage >= 60%
+- Pathway coverage >= 50%
+- Total papers >= 15
+
+If coverage is insufficient after initial search:
+```python
+# Follow-up for missing genes
+search_literature(
+    query="MISSING_GENE disease_context spatial",
+    max_results=10
+)
+```
