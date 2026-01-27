@@ -6,9 +6,9 @@ and scientific rigor.
 """
 
 import asyncio
-import json
 import os
 import re
+from pathlib import Path
 from typing import Optional
 
 from langchain_core.tools import tool
@@ -18,10 +18,17 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 # Reflection-tool MCP server configuration (stdio transport)
 # Uses environment variables for portability:
 # - REFLECTION_TOOL_COMMAND: Path to fastmcp executable (default: "fastmcp")
-# - REFLECTION_TOOL_SERVER: Path to server.py (default: "reflection_tool/server.py")
+# - REFLECTION_TOOL_SERVER: Path to server.py (default: ~/Dropbox/Metadata/mcp/reflection_tool/server.py)
+#
+# Note: reflection_tool is an external MCP server, not part of this project.
+# The default path assumes the standard location in the user's mcp directory.
+_DEFAULT_SERVER_PATH = str(
+    Path.home() / "Dropbox" / "Metadata" / "mcp" / "reflection_tool" / "server.py"
+)
+
 REFLECTION_TOOL_CONFIG = {
     "command": os.getenv("REFLECTION_TOOL_COMMAND", "fastmcp"),
-    "args": ["run", os.getenv("REFLECTION_TOOL_SERVER", "reflection_tool/server.py")],
+    "args": ["run", os.getenv("REFLECTION_TOOL_SERVER", _DEFAULT_SERVER_PATH)],
     "transport": "stdio",
 }
 
@@ -168,26 +175,29 @@ async def _validate_with_reflection_tool(
 
     Returns:
         Dictionary with LLM-based quality assessment, or None if unavailable
+
+    Note:
+        As of langchain-mcp-adapters 0.1.0, MultiServerMCPClient cannot be
+        used as a context manager. Use client.get_tools() directly instead.
     """
     try:
-        async with MultiServerMCPClient(
-            {"reflection": REFLECTION_TOOL_CONFIG}
-        ) as client:
-            tools = client.get_tools()
+        # Note: Do not use 'async with' - API changed in langchain-mcp-adapters 0.1.0
+        client = MultiServerMCPClient({"reflection": REFLECTION_TOOL_CONFIG})
+        tools = await client.get_tools()
 
-            # Find think_tool
-            think_tool = None
-            for tool_obj in tools:
-                if hasattr(tool_obj, 'name') and 'think' in tool_obj.name:
-                    think_tool = tool_obj
-                    break
+        # Find think_tool
+        think_tool = None
+        for tool_obj in tools:
+            if hasattr(tool_obj, 'name') and 'think' in tool_obj.name:
+                think_tool = tool_obj
+                break
 
-            if think_tool is None:
-                return None
+        if think_tool is None:
+            return None
 
-            # Construct reflection prompt
-            ref_summary = f"{len(references)} references" if references else "No references"
-            reflection_text = f"""Evaluate this CCI interpretation for quality:
+        # Construct reflection prompt
+        ref_summary = f"{len(references)} references" if references else "No references"
+        reflection_text = f"""Evaluate this CCI interpretation for quality:
 
 **Interpretation** (first 800 chars):
 {interpretation[:800]}...
@@ -214,10 +224,10 @@ async def _validate_with_reflection_tool(
 - Passed: [yes/no] (threshold: 0.7)
 - Recommendations: [specific improvements]"""
 
-            result = await think_tool.ainvoke({"reflection": reflection_text})
+        result = await think_tool.ainvoke({"reflection": reflection_text})
 
-            # Parse result
-            return _parse_reflection_result(result)
+        # Parse result
+        return _parse_reflection_result(result)
 
     except Exception as e:
         print(f"Reflection-tool connection failed: {e}")

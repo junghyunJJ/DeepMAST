@@ -5,86 +5,143 @@ supporting literature for CCI interpretations.
 """
 
 import asyncio
+import atexit
+import concurrent.futures
 import json
+import logging
+import os
 import re
-from typing import Any, Optional
+from typing import Any
 
 from langchain_core.tools import tool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
+logger = logging.getLogger(__name__)
+
 # Default BioMCP server configuration
-DEFAULT_BIOMCP_URL = "http://0.0.0.0:8000/mcp"
+# 0.0.0.0 is for server binding, localhost is for client connections
+DEFAULT_BIOMCP_URL = os.getenv("BIOMCP_URL", "http://localhost:8000/mcp")
+
+# Module-level executor for async operations in sync contexts
+_EXECUTOR: concurrent.futures.ThreadPoolExecutor | None = None
+
+
+def _get_executor() -> concurrent.futures.ThreadPoolExecutor:
+    """Get or create the module-level ThreadPoolExecutor."""
+    global _EXECUTOR
+    if _EXECUTOR is None:
+        _EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+            max_workers=2, thread_name_prefix="biomcp"
+        )
+        atexit.register(_EXECUTOR.shutdown, wait=False)
+    return _EXECUTOR
 
 
 async def _search_with_biomcp(
-    query: str,
-    max_results: int = 10,
+    genes: list[str] | None = None,
+    diseases: list[str] | None = None,
+    keywords: list[str] | None = None,
+    chemicals: list[str] | None = None,
+    page_size: int = 10,
+    include_preprints: bool = True,
     biomcp_url: str = DEFAULT_BIOMCP_URL,
 ) -> list[dict]:
-    """Execute PubMed search via BioMCP.
+    """Execute PubMed search via BioMCP article_searcher.
 
     Args:
-        query: PubMed search query
-        max_results: Maximum number of results
+        genes: List of gene symbols to search for (e.g., ["CDH1", "TGFB1"])
+        diseases: List of disease names to search for (e.g., ["breast cancer"])
+        keywords: List of free-text keywords (e.g., ["EMT", "spatial transcriptomics"])
+        chemicals: List of chemical/drug names (optional)
+        page_size: Number of results per page (default 10, max 100)
+        include_preprints: Include bioRxiv/medRxiv preprints (default True)
         biomcp_url: URL of the BioMCP server
 
     Returns:
         List of article dictionaries with pmid, title, abstract
+
+    Note:
+        As of langchain-mcp-adapters 0.1.0, MultiServerMCPClient cannot be
+        used as a context manager. Use client.get_tools() directly instead.
     """
     articles = []
 
+    # Ensure at least one search parameter is provided
+    if not any([genes, diseases, keywords, chemicals]):
+        logger.warning("No search parameters provided to _search_with_biomcp")
+        return []
+
     try:
-        async with MultiServerMCPClient(
+        # Note: Do not use 'async with' - API changed in langchain-mcp-adapters 0.1.0
+        client = MultiServerMCPClient(
             {"biomcp": {"url": biomcp_url, "transport": "http"}}
-        ) as client:
-            tools = client.get_tools()
+        )
+        tools = await client.get_tools()
 
-            # Find article_searcher tool
-            article_searcher = None
-            article_getter = None
+        # Find article_searcher tool
+        article_searcher = None
+        article_getter = None
 
-            for tool_obj in tools:
-                if hasattr(tool_obj, 'name'):
-                    if 'article_searcher' in tool_obj.name:
-                        article_searcher = tool_obj
-                    elif 'article_getter' in tool_obj.name:
-                        article_getter = tool_obj
+        for tool_obj in tools:
+            if hasattr(tool_obj, 'name'):
+                if 'article_searcher' in tool_obj.name:
+                    article_searcher = tool_obj
+                elif 'article_getter' in tool_obj.name:
+                    article_getter = tool_obj
 
-            if article_searcher is None:
-                return []
+        if article_searcher is None:
+            available_tools = [getattr(t, "name", str(t)) for t in tools]
+            logger.warning(
+                f"article_searcher tool not found in BioMCP. "
+                f"Available tools: {available_tools}"
+            )
+            return []
 
-            # Search for articles
-            search_result = await article_searcher.ainvoke({
-                "query": query,
-                "max_results": max_results,
-            })
+        # Build search parameters - only include non-None values
+        search_params = {
+            "page_size": min(page_size, 100),  # Max 100 per BioMCP spec
+            "include_preprints": include_preprints,
+        }
+        if genes:
+            search_params["genes"] = genes
+        if diseases:
+            search_params["diseases"] = diseases
+        if keywords:
+            search_params["keywords"] = keywords
+        if chemicals:
+            search_params["chemicals"] = chemicals
 
-            pmids = _parse_pmids(search_result)
+        logger.debug(f"BioMCP article_searcher params: {search_params}")
 
-            # Fetch article details
-            for pmid in pmids:
-                if article_getter:
-                    try:
-                        article_result = await article_getter.ainvoke({"pmid": pmid})
-                        article = _parse_article(pmid, article_result)
-                        articles.append(article)
-                    except Exception:
-                        articles.append({
-                            "pmid": pmid,
-                            "title": f"Article {pmid}",
-                            "abstract": "",
-                        })
-                else:
+        # Search for articles using correct BioMCP parameters
+        search_result = await article_searcher.ainvoke(search_params)
+
+        pmids = _parse_pmids(search_result)
+
+        # Fetch article details
+        for pmid in pmids:
+            if article_getter:
+                try:
+                    article_result = await article_getter.ainvoke({"pmid": pmid})
+                    article = _parse_article(pmid, article_result)
+                    articles.append(article)
+                except Exception:
                     articles.append({
                         "pmid": pmid,
                         "title": f"Article {pmid}",
                         "abstract": "",
                     })
+            else:
+                articles.append({
+                    "pmid": pmid,
+                    "title": f"Article {pmid}",
+                    "abstract": "",
+                })
 
     except Exception as e:
         # Return empty list on connection failure
-        print(f"BioMCP connection failed: {e}")
+        logger.error(f"BioMCP connection failed: {e}")
 
     return articles
 
@@ -213,14 +270,13 @@ def search_literature(
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            # In async context, create a new thread
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(
-                    asyncio.run,
-                    _search_with_biomcp(query, max_results)
-                )
-                return future.result(timeout=60)
+            # In async context, use module-level executor
+            executor = _get_executor()
+            future = executor.submit(
+                asyncio.run,
+                _search_with_biomcp(query, max_results)
+            )
+            return future.result(timeout=60)
         else:
             return asyncio.run(_search_with_biomcp(query, max_results))
     except Exception:
@@ -372,13 +428,13 @@ def search_literature_for_context(
     for sq in search_queries:
         try:
             if is_running:
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(
-                        asyncio.run,
-                        _search_with_biomcp(sq["query"], max_results // len(search_queries) + 5)
-                    )
-                    results = future.result(timeout=60)
+                # Use module-level executor
+                executor = _get_executor()
+                future = executor.submit(
+                    asyncio.run,
+                    _search_with_biomcp(sq["query"], max_results // len(search_queries) + 5)
+                )
+                results = future.result(timeout=60)
             else:
                 results = asyncio.run(
                     _search_with_biomcp(sq["query"], max_results // len(search_queries) + 5)
@@ -392,7 +448,7 @@ def search_literature_for_context(
                     papers.append(paper)
 
         except Exception as e:
-            print(f"Search failed for query {sq['type']}: {e}")
+            logger.warning(f"Search failed for query {sq['type']}: {e}")
             continue
 
     # Limit to max_results

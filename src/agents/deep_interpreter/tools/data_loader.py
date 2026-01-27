@@ -139,13 +139,16 @@ def get_recommended_targets(data_dir: str, max_clusters: int = 3, max_celltypes:
     }
 
 
-def _extract_metadata_from_csv(csv_path: Path, clusters: set, celltypes: set) -> None:
-    """Extract cluster IDs and cell type names from a CSV file.
+def _extract_metadata_from_csv(
+    csv_path: Path, clusters: set, celltypes: set, genes: set = None
+) -> None:
+    """Extract cluster IDs, cell type names, and gene names from a CSV file.
 
     Args:
         csv_path: Path to the CSV file
         clusters: Set to add cluster IDs to
         celltypes: Set to add cell type names to
+        genes: Optional set to add gene names to (from ligand/receptor columns)
     """
     try:
         import pandas as pd
@@ -166,6 +169,14 @@ def _extract_metadata_from_csv(csv_path: Path, clusters: set, celltypes: set) ->
                         celltypes.update([ct.strip() for ct in val.split(';') if ct.strip()])
                     elif isinstance(val, str):
                         celltypes.add(val.strip())
+
+        # Extract actual gene names from ligand/receptor columns (LIANA results)
+        # These are real gene symbols, NOT pathway names
+        if genes is not None:
+            gene_columns = ['ligand', 'receptor']
+            for col in gene_columns:
+                if col in df.columns:
+                    genes.update(df[col].dropna().unique())
     except Exception:
         # Silently skip files that can't be parsed
         pass
@@ -183,7 +194,7 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     - /analysis_summary.md - Full summary for subagents to read
     - /data_path.txt - Data directory path
 
-    Subagents (like target-selector) will use read_file to access these files.
+    Subagents (like planner, searcher) will use read_file to access these files.
 
     Args:
         data_dir: Path to the directory containing analysis results
@@ -212,6 +223,7 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
             "summary": f"Error: Directory not found at {data_dir}",
             "clusters": [],
             "celltypes": [],
+            "genes": [],  # Actual gene names from LIANA
         }
 
     available_analyses = []
@@ -219,9 +231,13 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     data_files = {}
     missing_analyses = []
 
-    # Extract clusters and cell types
+    # Extract clusters, cell types, and genes
     clusters = set()
     celltypes = set()
+    genes = set()  # Actual gene names from LIANA ligand/receptor columns
+
+    # Files that contain actual gene names (ligand/receptor columns)
+    LIANA_FILES = {"sig_liana.csv", "anno_sig_liana.csv", "interest_sig_liana.csv"}
 
     for analysis_name, config in ANALYSIS_FILES.items():
         figure_path = data_path / config["figure"]
@@ -235,7 +251,11 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
             if has_data:
                 data_path_str = str(data_file)
                 # Extract clusters and celltypes from CSV files
-                _extract_metadata_from_csv(data_file, clusters, celltypes)
+                # Only extract genes from LIANA files (which have ligand/receptor columns)
+                extract_genes = config["data"] in LIANA_FILES
+                _extract_metadata_from_csv(
+                    data_file, clusters, celltypes, genes if extract_genes else None
+                )
 
         if has_figure:
             available_analyses.append(analysis_name)
@@ -255,6 +275,7 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
 
     clusters_list = sorted([str(c) for c in clusters], key=sort_key)
     celltypes_list = sorted(list(celltypes))
+    genes_list = sorted(list(genes))  # Actual gene names from LIANA
 
     # Generate summary with clusters and celltypes
     summary_lines = [
@@ -285,7 +306,7 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     ])
 
     for name in ["1_1_spatial", "1_2_celltype", "1_3_nhood", "1_4_decoupler", "1_5_misty"]:
-        status = "✓" if name in available_analyses else "✗"
+        status = "[OK]" if name in available_analyses else "[MISSING]"
         desc = ANALYSIS_FILES[name]["description"]
         summary_lines.append(f"  {status} {name}: {desc}")
 
@@ -293,7 +314,7 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     summary_lines.append("Part 2 - CCI & NMF:")
 
     for name in ["2_6_morans", "2_7_nmf", "2_8_pathway_factor", "2_9_ctsvg"]:
-        status = "✓" if name in available_analyses else "✗"
+        status = "[OK]" if name in available_analyses else "[MISSING]"
         desc = ANALYSIS_FILES[name]["description"]
         summary_lines.append(f"  {status} {name}: {desc}")
 
@@ -301,12 +322,15 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     summary_lines.append("Part 3 - L-R Interactions:")
 
     for name in ["3_10_spatial_lr", "3_11_lr_summary"]:
-        status = "✓" if name in available_analyses else "✗"
+        status = "[OK]" if name in available_analyses else "[MISSING]"
         desc = ANALYSIS_FILES[name]["description"]
         summary_lines.append(f"  {status} {name}: {desc}")
 
     # Get recommended targets for auto-selection
     recommendations = get_recommended_targets(data_dir)
+
+    # Extract search context for subagents (prevents CSV context overflow)
+    search_context = _extract_search_context(data_path)
 
     # Build the full summary markdown for subagents
     full_summary_md = f"""# CCI Analysis Data Summary
@@ -329,13 +353,13 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
 ## Analysis Status
 
 ### Part 1 - Spatial & Pathway
-{chr(10).join(f"- {'✓' if name in available_analyses else '✗'} {name}: {ANALYSIS_FILES[name]['description']}" for name in ['1_1_spatial', '1_2_celltype', '1_3_nhood', '1_4_decoupler', '1_5_misty'])}
+{chr(10).join(f"- {'[OK]' if name in available_analyses else '[MISSING]'} {name}: {ANALYSIS_FILES[name]['description']}" for name in ['1_1_spatial', '1_2_celltype', '1_3_nhood', '1_4_decoupler', '1_5_misty'])}
 
 ### Part 2 - CCI & NMF
-{chr(10).join(f"- {'✓' if name in available_analyses else '✗'} {name}: {ANALYSIS_FILES[name]['description']}" for name in ['2_6_morans', '2_7_nmf', '2_8_pathway_factor', '2_9_ctsvg'])}
+{chr(10).join(f"- {'[OK]' if name in available_analyses else '[MISSING]'} {name}: {ANALYSIS_FILES[name]['description']}" for name in ['2_6_morans', '2_7_nmf', '2_8_pathway_factor', '2_9_ctsvg'])}
 
 ### Part 3 - L-R Interactions
-{chr(10).join(f"- {'✓' if name in available_analyses else '✗'} {name}: {ANALYSIS_FILES[name]['description']}" for name in ['3_10_spatial_lr', '3_11_lr_summary'])}
+{chr(10).join(f"- {'[OK]' if name in available_analyses else '[MISSING]'} {name}: {ANALYSIS_FILES[name]['description']}" for name in ['3_10_spatial_lr', '3_11_lr_summary'])}
 """
 
     # Track files written
@@ -355,11 +379,17 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
         "summary": "\n".join(summary_lines),
         "clusters": clusters_list,
         "celltypes": celltypes_list,
+        # Actual gene names from LIANA ligand/receptor columns (NOT pathway names)
+        "genes": genes_list,
         # Recommended targets for AUTO-SELECTION (no user input needed)
         "recommended_clusters": recommendations["recommended_clusters"],
         "recommended_celltypes": recommendations["recommended_celltypes"],
         "recommended_mode": recommendations["recommended_mode"],
         "selection_rationale": recommendations["rationale"],
+        # Pre-extracted search context for subagents (prevents CSV context overflow)
+        # Contains ALL unique genes, pathways, celltypes from interest_sig_liana.csv
+        # Subagents should use this instead of reading CSV files directly
+        "search_context": search_context,
         # Pre-formatted content for write_file - orchestrator MUST write these
         "_MUST_WRITE_FILES": {
             "/analysis_summary.md": full_summary_md,
@@ -436,3 +466,129 @@ def load_csv_data(data_path: str) -> Optional[dict]:
         }
     except Exception as e:
         return {"error": str(e), "path": data_path}
+
+
+def _extract_search_context(data_path: Path) -> dict:
+    """Extract ALL unique biological terms from interest_sig_liana.csv (pre-filtered important L-R pairs).
+
+    Uses interest_sig_liana.csv first (already filtered for significant interactions).
+    Falls back to sig_liana.csv if interest file doesn't exist.
+
+    Returns ~5KB instead of 571KB while preserving ALL important terms.
+    This prevents context overflow when subagents try to read CSV files directly.
+
+    Args:
+        data_path: Path to the data directory
+
+    Returns:
+        Dictionary with genes, pathways, celltypes, source info, and stats.
+    """
+    import pandas as pd
+
+    genes = set()
+    pathways = set()
+    celltypes = set()
+
+    # Priority: interest_sig_liana.csv (pre-filtered important pairs)
+    liana_files = ['interest_sig_liana.csv', 'sig_liana.csv', 'anno_sig_liana.csv']
+    source_file = None
+
+    for fname in liana_files:
+        csv_path = data_path / fname
+        if csv_path.exists():
+            try:
+                df = pd.read_csv(csv_path)
+
+                # Extract ALL unique genes (not top N - preserve all important items)
+                for col in ['ligand', 'receptor']:
+                    if col in df.columns:
+                        genes.update(df[col].dropna().unique())
+
+                # Extract pathways from progeny column
+                if 'progeny' in df.columns:
+                    pathways.update(df['progeny'].dropna().unique())
+
+                # Extract cell types from ctSVG columns
+                for col in ['ligand_ctSVG', 'receptor_ctSVG']:
+                    if col in df.columns:
+                        for val in df[col].dropna():
+                            celltypes.update([ct.strip() for ct in str(val).split(';') if ct.strip()])
+
+                source_file = fname
+                if fname == 'interest_sig_liana.csv':
+                    break  # Use interest file if available (most filtered)
+            except Exception:
+                continue
+
+    # Also extract pathways from decoupler results
+    decoupler_path = data_path / 'sig_PathwayEnrich_decoupler.csv'
+    if decoupler_path.exists():
+        try:
+            df = pd.read_csv(decoupler_path)
+            if 'name' in df.columns:
+                pathways.update(df['name'].dropna().unique())
+        except Exception:
+            pass
+
+    return {
+        "genes": sorted(list(genes)),           # ALL unique genes (~352)
+        "pathways": sorted(list(pathways)),     # ALL unique pathways (~64)
+        "celltypes": sorted(list(celltypes)),   # ALL unique cell types (~13)
+        "source": source_file or "no LIANA files found",
+        "note": "Pre-extracted from interest_sig_liana.csv (pre-filtered important L-R pairs). "
+                "DO NOT read CSV files directly with read_file - causes context overflow.",
+        "stats": {
+            "total_genes": len(genes),
+            "total_pathways": len(pathways),
+            "total_celltypes": len(celltypes),
+        }
+    }
+
+
+def get_recommended_search_terms(data_dir: str, max_genes: int = 15) -> dict:
+    """Get recommended search terms based on LIANA results.
+
+    Extracts actual gene names from ligand/receptor columns,
+    NOT pathway names from enrichment results. This ensures PubMed
+    searches use proper gene symbols.
+
+    Args:
+        data_dir: Path to the analysis results directory
+        max_genes: Maximum number of top genes to return (default: 15)
+
+    Returns:
+        Dictionary with recommended_genes (actual gene symbols),
+        gene_counts by frequency, and source information.
+    """
+    from collections import Counter
+
+    import pandas as pd
+
+    data_path = Path(data_dir)
+    gene_counts = Counter()
+
+    # Priority: LIANA files contain actual L-R gene pairs
+    liana_files = ['sig_liana.csv', 'anno_sig_liana.csv', 'interest_sig_liana.csv']
+
+    for fname in liana_files:
+        csv_path = data_path / fname
+        if not csv_path.exists():
+            continue
+        try:
+            df = pd.read_csv(csv_path)
+            for col in ['ligand', 'receptor']:
+                if col in df.columns:
+                    gene_counts.update(df[col].dropna().tolist())
+        except Exception:
+            continue
+
+    # Return top genes by frequency
+    top_genes = [g for g, _ in gene_counts.most_common(max_genes)]
+
+    return {
+        "recommended_genes": top_genes,
+        "gene_counts": dict(gene_counts.most_common(20)),
+        "source": "LIANA ligand/receptor columns (actual gene symbols)",
+        "note": "These are actual gene names suitable for PubMed [Gene] searches, "
+                "NOT pathway names like EGFR/p53/TGFb from decoupler results.",
+    }

@@ -18,14 +18,14 @@ from langchain_core.runnables import Runnable
 # This ensures DEEP_INTERPRETER_DATA_DIR is available at module import time
 load_dotenv()
 
-from src.agents.deep_interpreter.agent import (
+from src.agents.deep_interpreter.agent import (  # noqa: E402
     create_deep_interpreter_agent,
     DeepInterpreterConfig,
 )
-from src.agents.deep_interpreter.wrapper_agent import (
+from src.agents.deep_interpreter.wrapper_agent import (  # noqa: E402
     DeepInterpreterWrapperAgent,
 )
-from src.agents.model import create_llm
+from src.agents.model import create_llm  # noqa: E402
 
 
 def create_deep_interpreter_graph(
@@ -39,7 +39,7 @@ def create_deep_interpreter_graph(
     The Deep Interpreter uses the DeepAgents framework which provides:
     - FilesystemMiddleware for context management
     - TodoListMiddleware for task tracking
-    - SubAgentMiddleware for specialized subagents (11 subagents)
+    - SubAgentMiddleware for specialized subagents (4 subagents: planner, searcher, interpreter, reporter)
     - Quality validation loop (think_tool, max 3 iterations)
     - CompositeBackend with FilesystemBackend for persistent file storage
 
@@ -102,7 +102,7 @@ def create_deep_interpreter_graph_wrapped(
     1. Wrapper collects data_directory, analysis_mode, clusters/celltypes from user (HITL)
     2. Wrapper validates the selection using Pydantic model
     3. Wrapper writes /targets.json to filesystem
-    4. Wrapper invokes Deep Agent with readonly target-selector
+    4. Wrapper invokes Deep Agent with readonly planner subagent
 
     This is the RECOMMENDED variant for interactive use.
 

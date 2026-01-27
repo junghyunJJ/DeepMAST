@@ -7,14 +7,14 @@ Deep Agents' interrupt_on doesn't work at subagent level.
 Architecture:
 1. Wrapper Agent (this file): Collects data_directory, analysis_mode, clusters/celltypes
 2. Writes /targets.json to filesystem
-3. Invokes Deep Agent with readonly target-selector
+3. Invokes Deep Agent with readonly planner subagent
 
 Pattern Reference: STPipelineBuilderAgent (st_pipeline_info_agent.py)
 """
 
 import json
 from pathlib import Path
-from typing import Any, ClassVar, Literal, Optional
+from typing import Any, ClassVar, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
@@ -411,7 +411,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         targets = interest_clusters if analysis_mode == "cluster_to_celltype" else interest_celltypes
 
         if self.is_debug:
-            print(f"Info collection complete:")
+            print("Info collection complete:")
             print(f"  Data directory: {data_directory}")
             print(f"  Analysis mode: {analysis_mode}")
             print(f"  Targets: {targets}")
@@ -450,7 +450,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         """Write targets.json file for Deep Agent consumption.
 
         Creates /targets.json in the data directory with the collected
-        configuration, which the readonly target-selector will read.
+        configuration, which the readonly planner subagent will read.
         """
         data_directory = state.get("data_directory")
         if not data_directory:
@@ -499,7 +499,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
 
         The Deep Agent will:
         1. Load analysis data from data_directory
-        2. Read pre-written /targets.json (readonly target-selector)
+        2. Read pre-written /targets.json (readonly planner subagent)
         3. Proceed with strategic planning → interpretation → report generation
         """
         data_directory = state.get("data_directory")
@@ -533,7 +533,7 @@ The following targets have been pre-selected by the user (DO NOT ask for user in
 {json.dumps(targets_content, indent=2)}
 ```
 
-IMPORTANT: The target-selector subagent will parse the targets from this message and write /targets.json to the virtual filesystem.
+IMPORTANT: The planner subagent will parse the targets from this message and write /targets.json to the virtual filesystem.
 After target confirmation, proceed directly to strategic planning with these targets."""
 
         # Invoke Deep Agent

@@ -1,11 +1,12 @@
 """Subagent configurations for Deep Interpreter Agent.
 
-This module provides the subagent definitions used by create_deep_agent().
-Each subagent has a name, description, system_prompt, and tools.
+Simplified 4-Agent Architecture:
+- PLANNER: Target confirmation + hypothesis generation (load_analysis_data)
+- SEARCHER: Context extraction + literature search (load_analysis_data, search_literature_for_context, search_literature, think_tool)
+- INTERPRETER: Part 1/2/3 interpretation with inline validation (load_analysis_data, validate_claim_literature, validate_quality, think_tool)
+- REPORTER: Cross-part synthesis + HTML report (load_analysis_data, generate_html_report)
 
-Architecture:
-- 10 Simple SubAgents (configured via dict)
-- 1 CompiledSubAgent (literature-searcher with BioMCP workflow)
+This module provides the subagent definitions used by create_deep_agent().
 """
 
 from typing import Callable, Sequence
@@ -26,181 +27,103 @@ from src.agents.deep_interpreter.tools import (
 __all__ = [
     "get_subagents",
     "get_subagent_by_name",
-    "get_interpretation_subagents",
-    "get_workflow_subagents",
-    "get_hybrid_workflow_subagents",
-    "get_literature_searcher_subagent",
+    "get_simplified_subagents",
+    "SUBAGENT_CONFIGS",
 ]
 
 
-def get_literature_searcher_subagent() -> dict:
-    """Get the literature-searcher CompiledSubAgent configuration.
+# =============================================================================
+# 4-Agent Configuration Definitions
+# =============================================================================
 
-    This subagent uses the BioMCP workflow pattern:
-    think → article_searcher → quality loop
-
-    Returns:
-        Dictionary with subagent configuration (runnable will be created by DeepAgents)
-    """
-    # For now, use Simple SubAgent pattern with enhanced tools
-    # In future, this could be upgraded to a full CompiledSubAgent with its own graph
-    return {
-        "name": "literature-searcher",
+SUBAGENT_CONFIGS = {
+    "planner": {
+        "name": "planner",
         "description": (
-            "Search PubMed for literature BEFORE interpretation (proactive search). "
-            "Uses BioMCP workflow: think → search → quality validation loop. "
-            "Outputs to /partN_papers.json for use by interpreters."
+            "Strategic planning agent. Reads /targets.json, loads analysis data, "
+            "and generates testable hypotheses. Outputs /strategic_plan.md. "
+            "Use this FIRST to establish the interpretation strategy."
         ),
-        "system_prompt": SUBAGENT_PROMPTS["literature-searcher"],
-        "tools": [search_literature, search_literature_for_context, think_tool],
-    }
+        "system_prompt": SUBAGENT_PROMPTS["planner"],
+        "tools": [load_analysis_data],
+    },
+    "searcher": {
+        "name": "searcher",
+        "description": (
+            "Literature search agent. For each Part (1, 2, 3): extracts biological context "
+            "(genes, pathways, cell types) from analysis data, then searches PubMed BEFORE interpretation. "
+            "Outputs /partN_search_context.json and /partN_papers.json. "
+            "Papers will be the ONLY citation source for interpreter - this prevents hallucination."
+        ),
+        "system_prompt": SUBAGENT_PROMPTS["searcher"],
+        "tools": [
+            load_analysis_data,
+            search_literature_for_context,
+            search_literature,
+            think_tool,
+        ],
+    },
+    "interpreter": {
+        "name": "interpreter",
+        "description": (
+            "Interpretation agent with inline validation. For each Part (1, 2, 3): "
+            "reads /partN_papers.json, generates literature-grounded interpretation, "
+            "validates each claim against cited papers, and ensures quality score >= 0.7. "
+            "Every claim must cite PMID or be marked (Novel Finding). "
+            "Outputs /partN_final.md. Maximum 3 quality iterations per part."
+        ),
+        "system_prompt": SUBAGENT_PROMPTS["interpreter"],
+        "tools": [
+            load_analysis_data,
+            validate_claim_literature,
+            validate_quality,
+            think_tool,
+        ],
+    },
+    "reporter": {
+        "name": "reporter",
+        "description": (
+            "Synthesis and report generation agent. Reads all /partN_final.md files, "
+            "identifies cross-part themes, validates hypotheses, and generates final HTML report. "
+            "Outputs /synthesis.md and CCI_Analysis_Report.html."
+        ),
+        "system_prompt": SUBAGENT_PROMPTS["reporter"],
+        "tools": [load_analysis_data, generate_html_report],
+    },
+}
 
 
 def get_subagents(
     custom_tools: Sequence[BaseTool | Callable] | None = None,
-    exclude_literature_searcher: bool = False,
 ) -> list[dict]:
     """Get the subagent configurations for Deep Interpreter.
 
-    Returns 11 subagents (or 10 if exclude_literature_searcher=True):
-    - 1 CompiledSubAgent-style (literature-searcher with BioMCP workflow)
-    - 10 Simple SubAgents
+    Returns 4 subagents in workflow order:
+    1. planner - Target confirmation + hypothesis generation
+    2. searcher - Context extraction + literature search
+    3. interpreter - Literature-grounded interpretation with inline validation
+    4. reporter - Cross-part synthesis + HTML report
 
     Args:
-        custom_tools: Optional list of additional tools to include
-        exclude_literature_searcher: If True, exclude the Simple SubAgent version
-            of literature-searcher. Set to True when using CompiledSubAgent with
-            backend from create_deep_interpreter_agent().
+        custom_tools: Optional list of additional tools to include in all subagents
 
     Returns:
         List of subagent configuration dictionaries
     """
-    # Default tools
-    default_tools = [load_analysis_data, search_literature, validate_quality, generate_html_report]
-
-    # Merge with custom tools if provided
-    all_tools = list(default_tools)
-    if custom_tools:
-        all_tools.extend(custom_tools)
-
+    # Build subagent list in workflow order
     subagents = [
-        # Context Analyzer - Extract searchable terms before literature search
-        {
-            "name": "context-analyzer",
-            "description": (
-                "Extract searchable biological terms from analysis results BEFORE literature search. "
-                "Use this agent to identify genes, pathways, cell types, and keywords for proactive search."
-            ),
-            "system_prompt": SUBAGENT_PROMPTS["context-analyzer"],
-            "tools": [load_analysis_data],
-        },
-        # Claim Validator - Validate claims against cited literature
-        {
-            "name": "claim-validator",
-            "description": (
-                "Validate that each claim in interpretation is supported by cited literature. "
-                "Use after interpretation to check PMID citations are accurate. "
-                "Prevents hallucination by ensuring claims match paper content."
-            ),
-            "system_prompt": SUBAGENT_PROMPTS["claim-validator"],
-            "tools": [validate_claim_literature],
-        },
-        # Target Selector (READONLY) - Parse pre-selected targets
-        {
-            "name": "target-selector",
-            "description": (
-                "Parse pre-selected targets from initial message and write to /targets.json. "
-                "HITL is handled by wrapper agent - DO NOT ask for user input. "
-                "After parsing, use write_file to save /targets.json for downstream subagents."
-            ),
-            "system_prompt": SUBAGENT_PROMPTS["target-selector"],
-            "tools": [],  # Filesystem tools (read_file, write_file) are automatic via FilesystemMiddleware
-        },
-        # Strategic Planner - Hypothesis generation
-        {
-            "name": "strategic-planner",
-            "description": (
-                "Generate hypothesis-driven interpretation strategies. "
-                "Use after target selection to plan the interpretation approach."
-            ),
-            "system_prompt": SUBAGENT_PROMPTS["strategic-planner"],
-            "tools": [search_literature],  # Can search for background literature
-        },
+        SUBAGENT_CONFIGS["planner"].copy(),
+        SUBAGENT_CONFIGS["searcher"].copy(),
+        SUBAGENT_CONFIGS["interpreter"].copy(),
+        SUBAGENT_CONFIGS["reporter"].copy(),
     ]
 
-    # Add literature-searcher as Simple SubAgent only if not excluded
-    # When exclude_literature_searcher=True, a CompiledSubAgent with backend
-    # is added separately in create_deep_interpreter_agent()
-    if not exclude_literature_searcher:
-        subagents.append(get_literature_searcher_subagent())
-
-    # Continue with remaining subagents
-    subagents.extend([
-        # Part 1 Interpreter - Spatial & Pathway (Literature-Based)
-        {
-            "name": "part1-interpreter",
-            "description": (
-                "Interpret Part 1: Spatial Distribution & Pathway Analysis (Literature-Based). "
-                "REQUIRES /part1_papers.json to be available first. "
-                "Analyses: 1-1 Spatial, 1-2 CellType, 1-3 Neighborhood, 1-4 Decoupler, 1-5 MISTy."
-            ),
-            "system_prompt": SUBAGENT_PROMPTS["part1-interpreter"],
-            "tools": [load_analysis_data],
-        },
-        # Part 2 Interpreter - CCI & NMF (Literature-Based)
-        {
-            "name": "part2-interpreter",
-            "description": (
-                "Interpret Part 2: CCI & NMF Analysis (Literature-Based). "
-                "REQUIRES /part2_papers.json to be available first. "
-                "Analyses: 2-6 LIANA Moran's R, 2-7 NMF Factor, 2-8 Pathway-Factor, 2-9 ctSVG."
-            ),
-            "system_prompt": SUBAGENT_PROMPTS["part2-interpreter"],
-            "tools": [load_analysis_data],
-        },
-        # Part 3 Interpreter - L-R Details (Literature-Based)
-        {
-            "name": "part3-interpreter",
-            "description": (
-                "Interpret Part 3: L-R Interaction Details (Literature-Based). "
-                "REQUIRES /part3_papers.json to be available first. "
-                "Analyses: 3-10 Spatial L-R Visualization, 3-11 L-R Summary."
-            ),
-            "system_prompt": SUBAGENT_PROMPTS["part3-interpreter"],
-            "tools": [load_analysis_data],
-        },
-        # Quality Reviewer - Validation with reflection
-        {
-            "name": "quality-reviewer",
-            "description": (
-                "Review interpretation quality using think_tool for reflection. "
-                "Validates statistics, references, mechanism clarity, and specificity. "
-                "Score threshold: 0.7, max 3 iterations."
-            ),
-            "system_prompt": SUBAGENT_PROMPTS["quality-reviewer"],
-            "tools": [validate_quality, think_tool],
-        },
-        # Synthesizer - Cross-part integration
-        {
-            "name": "synthesizer",
-            "description": (
-                "Synthesize cross-part findings into unified narrative. "
-                "Integrates Part 1-3 interpretations and validates hypotheses."
-            ),
-            "system_prompt": SUBAGENT_PROMPTS["synthesizer"],
-            "tools": [],  # Uses filesystem only
-        },
-        # Report Generator - HTML output
-        {
-            "name": "report-generator",
-            "description": (
-                "Generate final publication-quality HTML report. "
-                "Creates tabbed report with figures, interpretations, and references."
-            ),
-            "system_prompt": SUBAGENT_PROMPTS["report-generator"],
-            "tools": [generate_html_report, load_analysis_data],
-        },
-    ])
+    # Add custom tools if provided
+    if custom_tools:
+        for subagent in subagents:
+            current_tools = list(subagent.get("tools", []))
+            current_tools.extend(custom_tools)
+            subagent["tools"] = current_tools
 
     return subagents
 
@@ -209,81 +132,68 @@ def get_subagent_by_name(name: str) -> dict | None:
     """Get a specific subagent configuration by name.
 
     Args:
-        name: Subagent name (e.g., "target-selector")
+        name: Subagent name ('planner', 'searcher', 'interpreter', or 'reporter')
 
     Returns:
         Subagent configuration dict, or None if not found
     """
-    subagents = get_subagents()
-    for subagent in subagents:
-        if subagent["name"] == name:
-            return subagent
+    config = SUBAGENT_CONFIGS.get(name)
+    if config:
+        return config.copy()
     return None
 
 
-def get_interpretation_subagents() -> list[dict]:
-    """Get only the interpretation subagents (Part 1/2/3).
+def get_simplified_subagents() -> list[dict]:
+    """Get the simplified 4-agent configuration.
+
+    This is the recommended configuration for the Deep Interpreter.
+    Same as get_subagents() but makes the simplified nature explicit.
 
     Returns:
-        List of interpreter subagent configurations
+        List of 4 subagent configurations in workflow order
     """
-    all_subagents = get_subagents()
-    return [
-        s for s in all_subagents
-        if s["name"] in ["part1-interpreter", "part2-interpreter", "part3-interpreter"]
-    ]
+    return get_subagents()
 
 
-def get_workflow_subagents() -> list[dict]:
-    """Get workflow-related subagents (non-interpretation).
+# =============================================================================
+# Workflow Order Constants
+# =============================================================================
 
-    Returns:
-        List of workflow subagent configurations
-    """
-    all_subagents = get_subagents()
-    return [
-        s for s in all_subagents
-        if s["name"] in [
-            "context-analyzer",
-            "claim-validator",
-            "target-selector",
-            "strategic-planner",
-            "literature-searcher",
-            "quality-reviewer",
-            "synthesizer",
-            "report-generator",
-        ]
-    ]
+WORKFLOW_ORDER = ["planner", "searcher", "interpreter", "reporter"]
 
+WORKFLOW_DESCRIPTION = """
+Deep Interpreter 4-Agent Workflow:
 
-def get_hybrid_workflow_subagents() -> list[dict]:
-    """Get subagents for the hybrid literature-based workflow.
+1. PLANNER (target-selector + strategic-planner consolidated)
+   - Reads /targets.json
+   - Loads analysis data
+   - Generates 2-4 testable hypotheses
+   - Outputs: /strategic_plan.md, /analysis_summary.md, /data_path.txt
 
-    Returns:
-        List of subagent configurations in workflow order
-    """
-    all_subagents = get_subagents()
+2. SEARCHER (context-analyzer + literature-searcher consolidated)
+   - For EACH Part (1, 2, 3):
+     a. Extract biological context (genes, pathways, cell types)
+     b. Search PubMed proactively (BEFORE interpretation)
+     c. Ensure coverage: >= 60% genes, >= 50% pathways, 15-20 papers
+   - Outputs: /part1_search_context.json, /part1_papers.json, etc.
 
-    # Define the order for hybrid workflow
-    hybrid_order = [
-        "target-selector",
-        "strategic-planner",
-        "context-analyzer",
-        "literature-searcher",
-        "part1-interpreter",
-        "claim-validator",
-        "quality-reviewer",
-        "part2-interpreter",
-        "part3-interpreter",
-        "synthesizer",
-        "report-generator",
-    ]
+3. INTERPRETER (part1/2/3-interpreter + claim-validator + quality-reviewer consolidated)
+   - For EACH Part (1, 2, 3):
+     a. Read /partN_papers.json (ONLY citation source)
+     b. Generate literature-grounded interpretation
+     c. Inline claim validation (every PMID checked)
+     d. Inline quality check (score >= 0.7, max 3 iterations)
+   - Outputs: /part1_final.md, /part2_final.md, /part3_final.md
 
-    ordered_subagents = []
-    for name in hybrid_order:
-        for s in all_subagents:
-            if s["name"] == name:
-                ordered_subagents.append(s)
-                break
+4. REPORTER (synthesizer + report-generator consolidated)
+   - Read all /partN_final.md files
+   - Identify cross-part themes
+   - Validate hypotheses from strategic plan
+   - Generate HTML report
+   - Outputs: /synthesis.md, CCI_Analysis_Report.html
 
-    return ordered_subagents
+Hallucination Prevention (maintained):
+- Literature-First: Papers searched BEFORE interpretation
+- Claim Validation: Every PMID citation verified
+- Novel Finding Tags: Unsupported but valid findings clearly marked
+"""

@@ -7,7 +7,7 @@ HITL issues with Deep Agents' subagent-level interrupt_on.
 Workflow:
 1. Wrapper collects data_directory, analysis_mode, clusters/celltypes from user
 2. Wrapper writes /targets.json to filesystem
-3. Wrapper invokes Deep Agent with readonly target-selector
+3. Wrapper invokes Deep Agent with readonly planner subagent
 4. Deep Agent proceeds without HITL for target selection
 """
 
