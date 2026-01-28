@@ -33,7 +33,8 @@ This skill provides the **complete workflow** for the SEARCHER subagent. It defi
 │  - load_analysis_data: Load analysis results and search_context  │
 │  - search_literature: Single query search                        │
 │  - search_literature_for_context: Multi-strategy search          │
-│  - think_tool: Strategic planning and reflection                 │
+│  - BioMCP think: Strategic planning (Phase 2)                    │
+│  - reflection-tool think_tool: Quality reflection (Phase 4)      │
 │  - read_file / write_file: Virtual filesystem operations         │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -91,13 +92,16 @@ Write extracted context to **/partN_search_context.json**:
 
 ## Phase 2: Think (Strategic Planning)
 
-**MANDATORY**: Use **think_tool** to plan the optimal search strategy BEFORE searching.
+**MANDATORY**: Use **BioMCP think** (`mcp__biomcp__think`) to plan the optimal search strategy BEFORE searching.
+
+> **Tool**: BioMCP think is optimized for biomedical research planning with structured sequential thinking.
 
 ### Three-Thought Planning Workflow
 
 **Thought 1: Context Analysis**
 ```python
-think_tool(
+# Use BioMCP think for strategic planning
+mcp__biomcp__think(
     thought="Analyzing Part 1 context: {N} genes extracted from search_context. "
             "Prioritizing {TOP_GENES} based on their roles in {BIOLOGICAL_PROCESS}. "
             "Key pathways identified: {PATHWAYS}. Disease context: {DISEASE}.",
@@ -112,7 +116,7 @@ think_tool(
 
 **Thought 2: Search Strategy Development**
 ```python
-think_tool(
+mcp__biomcp__think(
     thought="Search strategy for Part {N}: "
             "1) Gene+disease queries for top 10 genes: {GENE_LIST}, "
             "2) Pathway+celltype for {FOCUS_AREA}: {PATHWAY_LIST}, "
@@ -129,7 +133,7 @@ think_tool(
 
 **Thought 3: Expected Findings Prediction**
 ```python
-think_tool(
+mcp__biomcp__think(
     thought="Expected findings: Papers should cover mechanisms including {MECHANISMS}. "
             "Known relationships to validate: {GENE1}-{PATHWAY1}, {GENE2}-{CELLTYPE}. "
             "Potential gaps requiring targeted follow-up: {GAPS}.",
@@ -188,6 +192,10 @@ The tool returns:
 
 ## Phase 4: Reflect (Quality Loop)
 
+**MANDATORY**: Use **reflection-tool think_tool** (`mcp__reflection-tool__think_tool`) for quality validation and gap analysis.
+
+> **Tool**: reflection-tool is optimized for self-reflection and quality assessment with branching support.
+
 ### Quality Criteria
 
 | Criterion | Threshold | Action if Failed |
@@ -201,7 +209,8 @@ The tool returns:
 
 **Reflection Thought 1: Coverage Analysis**
 ```python
-think_tool(
+# Use reflection-tool for quality validation
+mcp__reflection-tool__think_tool(
     thought="Coverage analysis for Part {N}: "
             "{GENES_COVERED}/{TOTAL_GENES} priority genes covered ({X}%), "
             "{PATHWAYS_COVERED}/{TOTAL_PATHWAYS} pathways covered ({Y}%). "
@@ -217,7 +226,7 @@ think_tool(
 
 **Reflection Thought 2: Gap-Targeted Strategy** (if coverage < threshold)
 ```python
-think_tool(
+mcp__reflection-tool__think_tool(
     thought="Targeted follow-up strategy: "
             "Searching for {MISSING_GENES} with synonyms {SYNONYMS}. "
             "Adding broader terms for {PATHWAY}: '{PATHWAY} signaling {DISEASE}'. "
@@ -341,7 +350,8 @@ Mechanism keywords: binding, signaling cascade, downstream effects."
 - **USE** search_context field from load_analysis_data - all terms pre-extracted
 - **USE** genes for actual gene symbols: CDH1, CEACAM5, ERBB2, TGFB1, MMP2, VEGFA
 - **USE** pathways for pathway names: NFkB, Hypoxia, TGFb, MAPK, PI3K, Estrogen, EGFR
-- **USE** think_tool to plan strategy BEFORE search_literature_for_context
+- **USE** BioMCP think to plan strategy BEFORE search_literature_for_context
+- **USE** reflection-tool think_tool for quality validation AFTER search
 - **WRITE** /partN_search_strategy.json before searching
 - **RUN** follow-up searches for missing coverage
 - **WRITE** /partN_papers.json with coverage metrics
@@ -385,11 +395,12 @@ search_literature_for_context(
 
 **Use when**: Comprehensive literature support for interpretation.
 
-### think_tool
-Strategic planning and reflection.
+### BioMCP think (Phase 2: Strategic Planning)
+Structured sequential thinking for biomedical research planning.
 
 ```python
-think_tool(
+# MCP tool: mcp__biomcp__think
+mcp__biomcp__think(
     thought="Analysis of search context...",
     thoughtNumber=1,
     totalThoughts=3,
@@ -397,7 +408,22 @@ think_tool(
 )
 ```
 
-**Use when**: Phase 2 (planning) and Phase 4 (reflection).
+**Use when**: Phase 2 - developing search strategy before literature search.
+
+### reflection-tool think_tool (Phase 4: Quality Reflection)
+Self-reflection tool for quality validation and coverage analysis.
+
+```python
+# MCP tool: mcp__reflection-tool__think_tool
+mcp__reflection-tool__think_tool(
+    thought="Coverage analysis: X% genes, Y% pathways...",
+    thoughtNumber=1,
+    totalThoughts=2,
+    nextThoughtNeeded=True
+)
+```
+
+**Use when**: Phase 4 - validating coverage and planning follow-up searches.
 
 ---
 
@@ -445,10 +471,10 @@ Furthermore, [expand context] (Author2 et al., Year; PMID: xxxxx).
 | Pathway coverage | >= 50% | Add "signaling", disease context |
 | Max iterations | 3 | Proceed with warning |
 
-| Phase | Thoughts | Purpose | Output |
-|-------|----------|---------|--------|
-| Phase 2 (Planning) | 3 thoughts | Develop search strategy | /partN_search_strategy.json |
-| Phase 4 (Reflection) | 1-2 thoughts | Validate coverage, plan follow-up | Updated /partN_papers.json |
+| Phase | Tool | Thoughts | Purpose | Output |
+|-------|------|----------|---------|--------|
+| Phase 2 (Planning) | BioMCP think | 3 thoughts | Develop search strategy | /partN_search_strategy.json |
+| Phase 4 (Reflection) | reflection-tool | 1-2 thoughts | Validate coverage, plan follow-up | Updated /partN_papers.json |
 
 | Thought Type | Key Content | nextThoughtNeeded |
 |--------------|-------------|-------------------|
@@ -471,9 +497,9 @@ Furthermore, [expand context] (Author2 et al., Year; PMID: xxxxx).
 - Cell types: Microglia
 - Disease: Alzheimer's disease
 
-### Phase 2: Think Strategy
+### Phase 2: Think Strategy (BioMCP think)
 ```python
-think_tool(thought="Context: APOE-TREM2 in microglia. Priority genes: APOE, TREM2.
+mcp__biomcp__think(thought="Context: APOE-TREM2 in microglia. Priority genes: APOE, TREM2.
 Key pathways: microglial activation, neuroinflammation. Disease: AD.",
 thoughtNumber=1, totalThoughts=3, nextThoughtNeeded=True)
 ```
@@ -489,7 +515,12 @@ result = search_literature_for_context(
 )
 ```
 
-### Phase 4: Reflect on Coverage
+### Phase 4: Reflect on Coverage (reflection-tool)
+```python
+mcp__reflection-tool__think_tool(thought="Coverage: 18 papers found. Genes: APOE, TREM2 (100%).
+Pathways: TREM2 signaling (50%). All thresholds met.",
+thoughtNumber=1, totalThoughts=1, nextThoughtNeeded=False)
+```
 - Papers found: 18 (pass)
 - Genes covered: ["APOE", "TREM2"] (100%) (pass)
 - Pathways covered: ["TREM2 signaling"] (50%) (pass)
