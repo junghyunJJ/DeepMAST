@@ -155,7 +155,7 @@ Use the **reporter** subagent to:
 | Subagent | Role | Inputs | Outputs |
 |----------|------|--------|---------|
 | **planner** | Target confirmation + hypothesis generation | /targets.json (from message) | /strategic_plan.md, /analysis_summary.md, /data_path.txt |
-| **searcher** | Context extraction + literature search | /data_path.txt | /part1_search_context.json, /part1_papers.json, /part2_*.json, /part3_*.json |
+| **searcher** | Context extraction + literature search | /data_path.txt, spatial_search_context (Part 1), lr_search_context (Part 2/3) | /part1_papers.json, /liana_papers.json (Part 2/3 shared) |
 | **interpreter** | Part 1/2/3 interpretation with inline validation | /partN_papers.json, /strategic_plan.md | /part1_final.md, /part2_final.md, /part3_final.md |
 | **reporter** | Cross-part synthesis + HTML report | /partN_final.md, /synthesis.md | /synthesis.md, CCI_Analysis_Report.html |
 
@@ -176,7 +176,8 @@ Use the **reporter** subagent to:
 │  - Extract context (genes, pathways, cell types)                            │
 │  - Search PubMed proactively                                                │
 │  - Quality loop: coverage >= 60% genes, >= 50% pathways, 15-20 papers       │
-│  → /partN_search_context.json, /partN_papers.json                           │
+│  → /part1_search_context.json, /part1_papers.json (Part 1)                  │
+│  → /lr_search_context.json, /liana_papers.json (Part 2/3 shared)            │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -210,6 +211,113 @@ Use the **reporter** subagent to:
 """
 
 
+LITERATURE_QUERY_GENERATION_PROMPT = """You are a biomedical literature search expert specializing in spatial transcriptomics, cell-cell interactions, and cancer biology.
+
+Given the analysis context below, generate optimal PubMed search queries that capture biological meaning and maximize relevant literature retrieval.
+
+## Analysis Context
+- **Genes**: {genes}
+- **Pathways**: {pathways}
+- **Cell types**: {celltypes}
+- **Disease**: {disease}
+{gene_aliases}
+## Strategic Context from BioMCP Analysis
+{strategic_context}
+
+## Query Generation Guidelines
+
+**CRITICAL: Balanced Coverage Strategy**
+- Generate queries that cover BOTH genes AND pathways
+- BioMCP automatically resolves gene aliases (e.g., ACKR3 → CXCR7), so use official symbols
+- Use pathway-specific keywords to improve pathway coverage
+
+### Required Query Distribution (6-9 total queries):
+
+1. **Gene-centric queries (at least 2-3 queries)**:
+   - Search priority genes with disease context
+   - Use official gene symbols (aliases are resolved automatically)
+   - Include gene function keywords (receptor, ligand, protease, etc.)
+
+2. **Pathway-centric queries (at least 2 queries)**:
+   - Search EACH pathway name explicitly in keywords
+   - Use pathway-specific terms: "androgen signaling", "MAPK pathway", "PI3K/AKT", "NF-kB", "estrogen receptor"
+   - Combine pathway with disease and cell types
+
+3. **Cell type-centric queries (at least 1-2 queries)**:
+   - Search cell type names with tumor microenvironment context
+   - Include cell type terms: "macrophage", "T cell", "fibroblast", "endothelial", "epithelial"
+   - Add keywords: "tumor microenvironment", "immune infiltration", "cell composition", "spatial distribution"
+   - For cancer-specific cell types (e.g., DCIS, invasive carcinoma), include histological terms
+
+4. **Integrated queries (1-2 queries)**:
+   - Combine key genes with pathway AND cell type context
+   - Include spatial transcriptomics and cell-cell interaction terms
+
+## Output Format
+
+Return a JSON array of search query objects. Each object should have:
+- `genes`: List of gene symbols (REQUIRED for gene-centric queries)
+- `diseases`: List of disease terms
+- `keywords`: List of free-text keywords (REQUIRED for pathway/cell type-centric queries)
+
+Generate 6-9 diverse search strategies:
+- **At least 2-3 queries** with non-empty `genes` field
+- **At least 2 queries** with pathway names in `keywords` field
+- **At least 1-2 queries** with cell type names in `keywords` field
+
+## Example Output
+```json
+[
+  {{"genes": ["ACKR3"], "diseases": ["breast cancer"], "keywords": ["chemokine receptor", "cell migration"]}},
+  {{"genes": ["ADAM10", "ADAM17"], "diseases": ["breast cancer"], "keywords": ["metalloprotease", "shedding", "ligand-receptor"]}},
+  {{"genes": ["CDH1"], "diseases": ["breast cancer"], "keywords": ["E-cadherin", "EMT", "cell adhesion"]}},
+  {{"genes": [], "diseases": ["breast cancer"], "keywords": ["androgen receptor signaling", "androgen pathway", "hormone signaling"]}},
+  {{"genes": [], "diseases": ["breast cancer"], "keywords": ["MAPK signaling", "ERK pathway", "PI3K/AKT", "tumor progression"]}},
+  {{"genes": [], "diseases": ["breast cancer"], "keywords": ["macrophage", "tumor-associated macrophage", "TAM", "immune infiltration"]}},
+  {{"genes": [], "diseases": ["breast cancer"], "keywords": ["DCIS", "ductal carcinoma in situ", "preinvasive", "tumor progression"]}},
+  {{"genes": [], "diseases": ["breast cancer"], "keywords": ["spatial transcriptomics", "cell-cell interaction", "tumor microenvironment"]}}
+]
+```
+
+Generate queries now based on the provided context:"""
+
+
+GAP_FILLING_QUERY_PROMPT = """You are a biomedical literature search expert. The initial search did not find papers mentioning certain genes or pathways.
+
+## Coverage Gap Analysis
+- **Missing Genes**: {missing_genes}
+- **Missing Pathways**: {missing_pathways}
+- **Disease Context**: {disease}
+
+## Already Covered (DO NOT search again)
+- Genes: {covered_genes}
+- Pathways: {covered_pathways}
+
+## Task
+Generate targeted PubMed search queries specifically to find papers mentioning the MISSING genes and pathways.
+
+## Strategy Guidelines
+1. **Individual gene searches**: Search each missing gene individually with the disease
+2. **Gene aliases**: Consider common aliases (e.g., ACKR3 = CXCR7, ADAM10 = CD156c)
+3. **Pathway-specific**: Search pathway names with disease context
+4. **Functional terms**: Include gene function keywords (e.g., "protease", "receptor", "ligand")
+
+## Output Format
+Return a JSON array. Focus on MISSING items only.
+
+```json
+[
+  {{"genes": ["MISSING_GENE1"], "diseases": ["{disease}"], "keywords": ["gene function"]}},
+  {{"genes": ["MISSING_GENE2"], "diseases": ["{disease}"], "keywords": []}},
+  {{"keywords": ["MISSING_PATHWAY signaling", "{disease}"]}}
+]
+```
+
+Generate 3-5 targeted queries for the missing genes/pathways:"""
+
+
 __all__ = [
     "ORCHESTRATOR_SYSTEM_PROMPT",
+    "LITERATURE_QUERY_GENERATION_PROMPT",
+    "GAP_FILLING_QUERY_PROMPT",
 ]

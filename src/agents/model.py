@@ -9,7 +9,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 
 def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
     """
-    Create LLM based on provider (default: google with gemini-2.0-flash)
+    Create LLM based on provider (default: openai with gpt-4.1-mini)
     
     Args:
         provider: LLM provider ('openai', 'google', 'ollama'). 
@@ -20,7 +20,7 @@ def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
         BaseChatModel instance
     """
     if provider is None:
-        provider = os.getenv("LLM_PROVIDER", "google")
+        provider = os.getenv("LLM_PROVIDER", "openai")
     
     provider = provider.lower()
     

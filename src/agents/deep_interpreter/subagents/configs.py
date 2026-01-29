@@ -2,7 +2,7 @@
 
 Simplified 4-Agent Architecture:
 - PLANNER: Target confirmation + hypothesis generation (load_analysis_data)
-- SEARCHER: Context extraction + literature search (load_analysis_data, search_literature_for_context, search_literature, think_tool)
+- SEARCHER: Context extraction + literature search (load_analysis_data, search_literature_dynamic, search_literature_for_context, search_literature, think_tool)
 - INTERPRETER: Part 1/2/3 interpretation with inline validation (load_analysis_data, validate_claim_literature, validate_quality, think_tool)
 - REPORTER: Cross-part synthesis + HTML report (load_analysis_data, generate_html_report)
 
@@ -18,6 +18,7 @@ from src.agents.deep_interpreter.tools import (
     load_analysis_data,
     search_literature,
     search_literature_for_context,
+    search_literature_dynamic,
     validate_claim_literature,
     validate_quality,
     generate_html_report,
@@ -50,16 +51,18 @@ SUBAGENT_CONFIGS = {
     "searcher": {
         "name": "searcher",
         "description": (
-            "Literature search agent. For each Part (1, 2, 3): extracts biological context "
-            "(genes, pathways, cell types) from analysis data, then searches PubMed BEFORE interpretation. "
-            "Outputs /partN_search_context.json and /partN_papers.json. "
+            "Literature search agent. Searches PubMed BEFORE interpretation. "
+            "Part 1: uses spatial_search_context, outputs /part1_papers.json. "
+            "Part 2+3: uses lr_search_context (SHARED), outputs /liana_papers.json ONCE for both parts. "
+            "Uses search_literature_dynamic (LLM-powered) as primary tool, with search_literature_for_context as fallback. "
             "Papers will be the ONLY citation source for interpreter - this prevents hallucination."
         ),
         "system_prompt": SUBAGENT_PROMPTS["searcher"],
         "tools": [
             load_analysis_data,
-            search_literature_for_context,
-            search_literature,
+            search_literature_dynamic,  # PRIMARY: LLM-powered context-aware search
+            search_literature_for_context,  # FALLBACK: Fixed 4-strategy search
+            search_literature,  # Follow-up: Single query search
             think_tool,
         ],
     },
@@ -171,11 +174,17 @@ Deep Interpreter 4-Agent Workflow:
    - Outputs: /strategic_plan.md, /analysis_summary.md, /data_path.txt
 
 2. SEARCHER (context-analyzer + literature-searcher consolidated)
-   - For EACH Part (1, 2, 3):
-     a. Extract biological context (genes, pathways, cell types)
+   - For Part 1:
+     a. Extract context using spatial_search_context (pathways + celltypes, NO genes)
      b. Search PubMed proactively (BEFORE interpretation)
+     c. Ensure coverage: >= 50% pathways, 15-20 papers
+     d. Output: /part1_papers.json
+   - For Part 2+3 (SHARED - identical lr_search_context):
+     a. Extract context using lr_search_context (genes + pathways + celltypes)
+     b. Search PubMed ONCE for both parts (saves API calls)
      c. Ensure coverage: >= 60% genes, >= 50% pathways, 15-20 papers
-   - Outputs: /part1_search_context.json, /part1_papers.json, etc.
+     d. Output: /liana_papers.json (shared by Part 2 and Part 3)
+   - Total Outputs: /part1_papers.json, /liana_papers.json (2 files, not 3)
 
 3. INTERPRETER (part1/2/3-interpreter + claim-validator + quality-reviewer consolidated)
    - For EACH Part (1, 2, 3):

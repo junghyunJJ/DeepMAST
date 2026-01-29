@@ -6,12 +6,15 @@ and scientific rigor.
 """
 
 import asyncio
+import logging
 import os
 import re
 from pathlib import Path
 from typing import Optional
 
 from langchain_core.tools import tool
+
+logger = logging.getLogger(__name__)
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
@@ -230,7 +233,7 @@ async def _validate_with_reflection_tool(
         return _parse_reflection_result(result)
 
     except Exception as e:
-        print(f"Reflection-tool connection failed: {e}")
+        logger.error(f"Reflection-tool connection failed: {e}")
         return None
 
 

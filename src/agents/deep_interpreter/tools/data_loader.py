@@ -330,7 +330,13 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     recommendations = get_recommended_targets(data_dir)
 
     # Extract search context for subagents (prevents CSV context overflow)
+    # Combined context for backward compatibility
     search_context = _extract_search_context(data_path)
+    # Context-type based extraction (reduced redundancy)
+    # - spatial_search_context: For Part 1 (pathways + celltypes, NO genes)
+    # - lr_search_context: For Part 2 & 3 (genes + pathways + celltypes)
+    spatial_search_context = _extract_search_context(data_path, context_type="spatial")
+    lr_search_context = _extract_search_context(data_path, context_type="lr_interaction")
 
     # Build the full summary markdown for subagents
     full_summary_md = f"""# CCI Analysis Data Summary
@@ -389,7 +395,13 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
         # Pre-extracted search context for subagents (prevents CSV context overflow)
         # Contains ALL unique genes, pathways, celltypes from interest_sig_liana.csv
         # Subagents should use this instead of reading CSV files directly
-        "search_context": search_context,
+        "search_context": search_context,  # Combined for backward compatibility
+        # Context-type based search contexts for targeted literature search
+        # - spatial_search_context: For Part 1 (pathways + celltypes, NO genes)
+        # - lr_search_context: For Part 2 & 3 (genes + pathways + celltypes)
+        # Note: Part 2 & 3 merged to eliminate redundancy (identical data)
+        "spatial_search_context": spatial_search_context,
+        "lr_search_context": lr_search_context,
         # Pre-formatted content for write_file - orchestrator MUST write these
         "_MUST_WRITE_FILES": {
             "/analysis_summary.md": full_summary_md,
@@ -468,8 +480,8 @@ def load_csv_data(data_path: str) -> Optional[dict]:
         return {"error": str(e), "path": data_path}
 
 
-def _extract_search_context(data_path: Path) -> dict:
-    """Extract ALL unique biological terms from interest_sig_liana.csv (pre-filtered important L-R pairs).
+def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
+    """Extract biological terms from analysis files with context-type filtering.
 
     Uses interest_sig_liana.csv first (already filtered for significant interactions).
     Falls back to sig_liana.csv if interest file doesn't exist.
@@ -479,6 +491,14 @@ def _extract_search_context(data_path: Path) -> dict:
 
     Args:
         data_path: Path to the data directory
+        context_type: Context type for extraction:
+                     - "spatial": For Part 1 - pathways + celltypes only (NO genes)
+                     - "lr_interaction": For Part 2 & 3 - genes + pathways + celltypes
+                     - None: Returns combined context for all Parts (backward compatibility)
+
+    Context-type logic:
+        - spatial: Part 1 cluster/pathway/celltype level analysis (NO gene-level)
+        - lr_interaction: Part 2 & 3 LIANA L-R interaction analysis (includes genes)
 
     Returns:
         Dictionary with genes, pathways, celltypes, source info, and stats.
@@ -520,7 +540,7 @@ def _extract_search_context(data_path: Path) -> dict:
             except Exception:
                 continue
 
-    # Also extract pathways from decoupler results
+    # Also extract pathways from decoupler results (Part 1 relevant)
     decoupler_path = data_path / 'sig_PathwayEnrich_decoupler.csv'
     if decoupler_path.exists():
         try:
@@ -530,19 +550,71 @@ def _extract_search_context(data_path: Path) -> dict:
         except Exception:
             pass
 
-    return {
-        "genes": sorted(list(genes)),           # ALL unique genes (~352)
-        "pathways": sorted(list(pathways)),     # ALL unique pathways (~64)
-        "celltypes": sorted(list(celltypes)),   # ALL unique cell types (~13)
-        "source": source_file or "no LIANA files found",
-        "note": "Pre-extracted from interest_sig_liana.csv (pre-filtered important L-R pairs). "
-                "DO NOT read CSV files directly with read_file - causes context overflow.",
-        "stats": {
-            "total_genes": len(genes),
-            "total_pathways": len(pathways),
-            "total_celltypes": len(celltypes),
+    # Also extract cell types from celltype heatmap (Part 1 relevant)
+    celltype_path = data_path / 'sig_clusterwithcelltyp.csv'
+    if celltype_path.exists():
+        try:
+            df = pd.read_csv(celltype_path)
+            for col in ['celltype', 'CellType', 'cell_type']:
+                if col in df.columns:
+                    celltypes.update(df[col].dropna().unique())
+        except Exception:
+            pass
+
+    # Context-type filtering
+    if context_type == "spatial":
+        # Part 1: Spatial, Neighborhood, Decoupler, MISTy analyses
+        # These are cluster/pathway/celltype level - NO gene-level analysis
+        return {
+            "genes": [],  # Part 1 has NO gene-level analysis
+            "pathways": sorted(list(pathways)),
+            "celltypes": sorted(list(celltypes)),
+            "source": "Decoupler + MISTy pathways, cell type composition",
+            "context_type": "spatial",
+            "applicable_parts": [1],
+            "note": "Part 1 analyzes clusters/pathways/celltypes, not individual genes. "
+                    "Gene-level data (L-R pairs) is only available in Part 2/3 (LIANA analysis).",
+            "stats": {
+                "total_genes": 0,
+                "total_pathways": len(pathways),
+                "total_celltypes": len(celltypes),
+            }
         }
-    }
+    elif context_type == "lr_interaction":
+        # Part 2 & 3: LIANA L-R analysis - includes genes
+        # Merged to avoid redundancy (Part 2 & 3 used identical data)
+        return {
+            "genes": sorted(list(genes)),
+            "pathways": sorted(list(pathways)),
+            "celltypes": sorted(list(celltypes)),
+            "source": source_file or "no LIANA files found",
+            "context_type": "lr_interaction",
+            "applicable_parts": [2, 3],
+            "note": "L-R interaction analysis with gene-level data from LIANA. "
+                    "Use for Part 2 (CCI & NMF) and Part 3 (L-R mechanism details).",
+            "stats": {
+                "total_genes": len(genes),
+                "total_pathways": len(pathways),
+                "total_celltypes": len(celltypes),
+            }
+        }
+    else:
+        # Default: Combined context for all Parts (backward compatibility)
+        return {
+            "genes": sorted(list(genes)),           # ALL unique genes (~352)
+            "pathways": sorted(list(pathways)),     # ALL unique pathways (~64)
+            "celltypes": sorted(list(celltypes)),   # ALL unique cell types (~13)
+            "source": source_file or "no LIANA files found",
+            "context_type": "combined",
+            "applicable_parts": [1, 2, 3],
+            "note": "Pre-extracted from interest_sig_liana.csv (pre-filtered important L-R pairs). "
+                    "DO NOT read CSV files directly with read_file - causes context overflow.",
+            "stats": {
+                "total_genes": len(genes),
+                "total_pathways": len(pathways),
+                "total_celltypes": len(celltypes),
+            }
+        }
 
 
 def get_recommended_search_terms(data_dir: str, max_genes: int = 15) -> dict:

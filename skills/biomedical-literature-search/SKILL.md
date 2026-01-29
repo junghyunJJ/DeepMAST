@@ -22,7 +22,7 @@ This skill provides the **complete workflow** for the SEARCHER subagent. It defi
 │          This SKILL.md (Workflow Definition)                     │
 │  - Phase 1: Extract Context                                      │
 │  - Phase 2: Think (Strategic Planning)                           │
-│  - Phase 3: Search Literature                                    │
+│  - Phase 3: Search Literature (Dynamic → Fallback)               │
 │  - Phase 4: Reflect (Quality Loop)                               │
 │  - Phase 5: Write Output                                         │
 └────────────────────────────┬────────────────────────────────────┘
@@ -31,8 +31,9 @@ This skill provides the **complete workflow** for the SEARCHER subagent. It defi
 ┌─────────────────────────────────────────────────────────────────┐
 │          Python Tools (Execution Layer)                          │
 │  - load_analysis_data: Load analysis results and search_context  │
-│  - search_literature: Single query search                        │
-│  - search_literature_for_context: Multi-strategy search          │
+│  - search_literature_dynamic: LLM-powered search (PRIMARY)       │
+│  - search_literature_for_context: Fixed strategy search (FALLBACK)│
+│  - search_literature: Single query search (follow-up)            │
 │  - BioMCP think: Strategic planning (Phase 2)                    │
 │  - reflection-tool think_tool: Quality reflection (Phase 4)      │
 │  - read_file / write_file: Virtual filesystem operations         │
@@ -59,17 +60,42 @@ Read **/data_path.txt** to get the REAL data directory path.
 Call **load_analysis_data** with the exact path from /data_path.txt.
 
 ### Step 1.3: Using search_context (MANDATORY)
-The load_analysis_data tool returns a pre-extracted **search_context** field containing:
-- `genes`: ALL unique genes from interest_sig_liana.csv (~352 items)
-- `pathways`: ALL pathways from LIANA progeny + decoupler (~64 items)
-- `celltypes`: ALL cell types from ctSVG columns (~13 items)
+The load_analysis_data tool returns pre-extracted search context fields:
 
-**Example search_context structure:**
+**Part-specific contexts (RECOMMENDED):**
+| Part | Context Field | Contains |
+|------|---------------|----------|
+| Part 1 | `spatial_search_context` | pathways, celltypes (NO genes) |
+| Part 2 | `lr_search_context` | genes, pathways, celltypes |
+| Part 3 | `lr_search_context` | genes, pathways, celltypes |
+
+**Combined context (backward compatibility):**
+- `search_context`: ALL genes, pathways, celltypes combined
+
+**Why Part-specific contexts?**
+- Part 1 analyzes clusters/pathways/celltypes at the spatial level (no gene-level)
+- Part 2 & 3 analyze L-R interactions with gene-level data from LIANA
+
+**Example spatial_search_context (Part 1):**
+```json
+{
+  "genes": [],
+  "pathways": ["Androgen", "EGFR", "Estrogen", "Hypoxia", "NFkB", "TGFb", "MAPK", "PI3K"],
+  "celltypes": ["B cells", "Endothelial", "Invasive Tumor", "Stromal", "Macrophages"],
+  "context_type": "spatial",
+  "applicable_parts": [1],
+  "source": "Decoupler + MISTy pathways, cell type composition"
+}
+```
+
+**Example lr_search_context (Part 2 & 3):**
 ```json
 {
   "genes": ["ADAM10", "ADAM17", "B2M", "CD44", "CDH1", "CEACAM5", "ERBB2", "TGFB1", "MMP2", "VEGFA"],
   "pathways": ["Androgen", "EGFR", "Estrogen", "Hypoxia", "NFkB", "TGFb", "MAPK", "PI3K"],
   "celltypes": ["B cells", "Endothelial", "Invasive Tumor", "Stromal", "Macrophages"],
+  "context_type": "lr_interaction",
+  "applicable_parts": [2, 3],
   "source": "interest_sig_liana.csv",
   "stats": {"total_genes": 352, "total_pathways": 64, "total_celltypes": 13}
 }
@@ -163,15 +189,15 @@ Write **/partN_search_strategy.json**:
 
 ## Phase 3: Search Literature
 
-### Step 3.1: Execute Multi-Strategy Search
-Use **search_literature_for_context** tool with **prioritized** terms from Phase 2:
+### Step 3.1: Execute LLM-Powered Dynamic Search (Primary)
+Use **search_literature_dynamic** tool for context-aware, LLM-generated queries:
 - genes: Priority genes from search strategy (NOT all 352)
 - pathways: Priority pathways from search strategy
 - celltypes: Relevant cell types for this Part
 - disease: Disease context (e.g., "breast cancer")
 
 ```python
-search_literature_for_context(
+search_literature_dynamic(
     genes=["CDH1", "TGFB1", "VIM", "ERBB2", "MMP2"],  # Top 10-15 only
     pathways=["EMT", "TGFB", "WNT", "Hypoxia"],
     celltypes=["Tumor", "Fibroblast", "Macrophages"],
@@ -180,13 +206,44 @@ search_literature_for_context(
 )
 ```
 
-### Step 3.2: Tool Returns
-The tool returns:
+**Why Dynamic Search First?**
+- LLM understands biological context and generates optimized queries
+- BioMCP think provides strategic planning before search
+- Better adaptation to Part-specific analysis types (L-R, pathway, spatial)
+- More relevant papers for specialized disease/tissue contexts
+
+### Step 3.2: Fallback to Fixed Strategy (If Dynamic Fails)
+If `search_literature_dynamic` fails (LLM error, parsing failure, timeout),
+automatically falls back to **search_literature_for_context**:
+
+```python
+# Automatic fallback inside search_literature_dynamic
+# OR manual fallback if dynamic returns insufficient results
+search_literature_for_context(
+    genes=["CDH1", "TGFB1", "VIM", "ERBB2", "MMP2"],
+    pathways=["EMT", "TGFB", "WNT", "Hypoxia"],
+    celltypes=["Tumor", "Fibroblast", "Macrophages"],
+    disease="breast cancer",
+    max_results=20
+)
+```
+
+**When to Manually Fallback:**
+- `search_literature_dynamic` returns `think_success: False`
+- Coverage < 50% after dynamic search
+- Timeout or connection errors
+
+### Step 3.3: Tool Returns
+Both tools return:
 - `papers`: List of found papers with PMIDs
 - `total_papers`: Number of unique papers
 - `genes_covered`: Genes found in papers
 - `pathways_covered`: Pathways found in papers
 - `coverage_summary`: Coverage statistics
+
+**Additional fields from `search_literature_dynamic`:**
+- `generated_queries`: LLM-generated query structures (for debugging)
+- `think_success`: Whether BioMCP think succeeded
 
 ---
 
@@ -350,31 +407,46 @@ Mechanism keywords: binding, signaling cascade, downstream effects."
 - **USE** search_context field from load_analysis_data - all terms pre-extracted
 - **USE** genes for actual gene symbols: CDH1, CEACAM5, ERBB2, TGFB1, MMP2, VEGFA
 - **USE** pathways for pathway names: NFkB, Hypoxia, TGFb, MAPK, PI3K, Estrogen, EGFR
-- **USE** BioMCP think to plan strategy BEFORE search_literature_for_context
+- **USE** BioMCP think to plan strategy BEFORE searching
+- **USE** search_literature_dynamic as PRIMARY search tool
+- **FALLBACK** to search_literature_for_context if dynamic fails (think_success=False, timeout, parsing error)
 - **USE** reflection-tool think_tool for quality validation AFTER search
 - **WRITE** /partN_search_strategy.json before searching
-- **RUN** follow-up searches for missing coverage
-- **WRITE** /partN_papers.json with coverage metrics
+- **RUN** follow-up searches for missing coverage using search_literature
+- **WRITE** /partN_papers.json with coverage metrics and search_method indicator
 
 ---
 
 ## Tool Reference
 
-### search_literature
-Single-query PubMed search for specific topics.
+### search_literature_dynamic (PRIMARY)
+LLM-powered dynamic search with context-aware query generation.
 
 ```python
-search_literature(
-    query="APOE TREM2 microglia Alzheimer",
-    max_results=20,
-    include_preprints=True
+search_literature_dynamic(
+    genes=["CDH1", "TGFB1", "VIM"],
+    pathways=["EMT", "TGFB", "WNT"],
+    celltypes=["Tumor", "Fibroblast"],
+    disease="breast cancer",
+    max_results=20
 )
 ```
 
-**Use when**: Targeted search for specific gene/pathway/interaction.
+**Returns**:
+- `papers`: List of found papers with PMIDs
+- `generated_queries`: LLM-generated query structures
+- `coverage`: Detailed coverage metrics with percentages
+- `think_success`: Whether BioMCP think was successful
 
-### search_literature_for_context
-Multi-strategy search with coverage tracking.
+**Use when**:
+- Primary tool for all literature searches
+- Part-specific analysis requiring context understanding
+- Specialized disease/tissue contexts
+
+**Fallback behavior**: Automatically calls `search_literature_for_context` if LLM fails.
+
+### search_literature_for_context (FALLBACK)
+Fixed 4-strategy search with coverage tracking.
 
 ```python
 search_literature_for_context(
@@ -388,12 +460,26 @@ search_literature_for_context(
 
 **Returns**:
 - `papers`: List of found papers with PMIDs
-- `total_papers`: Number of unique papers
-- `genes_covered`: Genes found in papers
-- `pathways_covered`: Pathways found in papers
-- `coverage_summary`: Coverage statistics
+- `search_queries`: Fixed strategy queries used
+- `coverage`: Coverage statistics
 
-**Use when**: Comprehensive literature support for interpretation.
+**Use when**:
+- `search_literature_dynamic` fails or times out
+- Need predictable, fast results
+- Debugging search issues
+
+### search_literature
+Single-query PubMed search for specific topics.
+
+```python
+search_literature(
+    query="APOE TREM2 microglia Alzheimer",
+    max_results=20,
+    include_preprints=True
+)
+```
+
+**Use when**: Targeted follow-up search for specific gene/pathway/interaction gaps.
 
 ### BioMCP think (Phase 2: Strategic Planning)
 Structured sequential thinking for biomedical research planning.
@@ -457,12 +543,23 @@ Furthermore, [expand context] (Author2 et al., Year; PMID: xxxxx).
 
 ## Quick Reference Card
 
-| Analysis Type | Primary Tool | Key Parameters |
-|--------------|--------------|----------------|
-| L-R Interaction | `search_literature_for_context` | genes=[ligand, receptor], disease |
-| Pathway | `search_literature_for_context` | pathways=[...], disease |
-| Gene Markers | `search_literature_for_context` | genes=[...], celltypes |
-| Specific Query | `search_literature` | query=specific_terms |
+| Analysis Type | Primary Tool | Fallback Tool | Key Parameters |
+|--------------|--------------|---------------|----------------|
+| L-R Interaction | `search_literature_dynamic` | `search_literature_for_context` | genes=[ligand, receptor], disease |
+| Pathway | `search_literature_dynamic` | `search_literature_for_context` | pathways=[...], disease |
+| Gene Markers | `search_literature_dynamic` | `search_literature_for_context` | genes=[...], celltypes |
+| Specific Query | `search_literature` | - | query=specific_terms |
+
+### Tool Selection Flow
+```
+search_literature_dynamic (try first)
+        │
+        ├─ Success → Use results
+        │
+        └─ Failure (LLM error, timeout, think_success=False)
+                │
+                └─ search_literature_for_context (fallback)
+```
 
 | Quality Check | Threshold | Action if Failed |
 |--------------|-----------|------------------|
@@ -504,33 +601,52 @@ Key pathways: microglial activation, neuroinflammation. Disease: AD.",
 thoughtNumber=1, totalThoughts=3, nextThoughtNeeded=True)
 ```
 
-### Phase 3: Execute Search
+### Phase 3: Execute Dynamic Search (Primary)
 ```python
-result = search_literature_for_context(
+result = search_literature_dynamic(
     genes=["APOE", "TREM2"],
     pathways=["TREM2 signaling", "microglial activation"],
     celltypes=["Microglia"],
     disease="Alzheimer disease",
     max_results=20
 )
+
+# Check if dynamic search succeeded
+if not result.get("think_success") or result["coverage"]["total_papers"] < 10:
+    # Fallback to fixed strategy
+    result = search_literature_for_context(
+        genes=["APOE", "TREM2"],
+        pathways=["TREM2 signaling", "microglial activation"],
+        celltypes=["Microglia"],
+        disease="Alzheimer disease",
+        max_results=20
+    )
 ```
+
+**Dynamic search benefits in this example:**
+- LLM understands APOE-TREM2 is a well-known AD pathway
+- Generates optimized queries like "TREM2 APOE microglia neurodegeneration"
+- Better coverage of mechanistic papers
 
 ### Phase 4: Reflect on Coverage (reflection-tool)
 ```python
 mcp__reflection-tool__think_tool(thought="Coverage: 18 papers found. Genes: APOE, TREM2 (100%).
-Pathways: TREM2 signaling (50%). All thresholds met.",
+Pathways: TREM2 signaling (50%). All thresholds met. think_success: True.",
 thoughtNumber=1, totalThoughts=1, nextThoughtNeeded=False)
 ```
 - Papers found: 18 (pass)
 - Genes covered: ["APOE", "TREM2"] (100%) (pass)
 - Pathways covered: ["TREM2 signaling"] (50%) (pass)
+- think_success: True (no fallback needed)
 
 ### Phase 5: Write Output
 ```python
 write_file("/part2_papers.json", json.dumps({
     "papers": [...],
     "coverage": {"genes_coverage_pct": 100, "pathways_coverage_pct": 50, "total_papers": 18},
-    "search_iterations": 1
+    "search_iterations": 1,
+    "search_method": "dynamic",  # or "fallback" if fixed strategy used
+    "think_success": True
 }))
 ```
 

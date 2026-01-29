@@ -122,17 +122,23 @@ Follow the workflow defined in SKILL.md:
 
 1. **Phase 1: Extract Context**
    - Read /data_path.txt for real data directory
-   - Call load_analysis_data to get search_context
-   - Write /partN_search_context.json
+   - Call load_analysis_data to get search contexts:
+     - `spatial_search_context`: For Part 1 (pathways + celltypes, NO genes)
+     - `lr_search_context`: For Part 2 & 3 (genes + pathways + celltypes)
+   - Write appropriate context file based on Part number
 
 2. **Phase 2: Think (Strategic Planning)**
    - Use think_tool x3 to plan search strategy
-   - Prioritize 10-15 genes (NOT all 352)
+   - Prioritize 10-15 genes (NOT all 352) for Part 2/3
    - Write /partN_search_strategy.json
 
-3. **Phase 3: Search Literature**
-   - Call search_literature_for_context with prioritized terms
-   - Use search_literature for targeted follow-up
+3. **Phase 3: Search Literature (Dynamic → Fallback)**
+   - **PRIMARY**: Call search_literature_dynamic with prioritized terms
+     - LLM-powered, context-aware query generation
+     - Better for specialized disease/tissue contexts
+   - **FALLBACK**: If dynamic fails (think_success=False, timeout, parsing error):
+     - Call search_literature_for_context as fallback
+   - Use search_literature for targeted follow-up gaps
 
 4. **Phase 4: Reflect (Quality Loop)**
    - Use think_tool to check coverage
@@ -140,22 +146,62 @@ Follow the workflow defined in SKILL.md:
    - Run follow-up searches if needed (max 2 iterations)
 
 5. **Phase 5: Write Output**
-   - Write /partN_papers.json with papers and coverage metrics
+   - Write /partN_papers.json with papers, coverage metrics, and search_method
+
+## CRITICAL: Tool Output Faithful Writing
+
+When writing /part1_papers.json or /liana_papers.json:
+1. **NEVER truncate** the papers array from tool output
+2. **NEVER recalculate** or modify coverage metrics
+3. **COPY EXACTLY** the tool's JSON output to file:
+   - Write the COMPLETE papers array (all 15-30 papers)
+   - total_papers MUST equal len(papers) in the written file
+   - Do NOT summarize, reformat, or select subset of papers
+
+Example WRONG pattern (DO NOT DO):
+```json
+{
+  "papers": [... 7 papers truncated ...],
+  "coverage": {"total_papers": 30}  // WRONG: mismatch with array length!
+}
+```
+
+Example CORRECT pattern:
+```json
+{
+  "papers": [... all 30 papers from tool output ...],
+  "coverage": {"total_papers": 30}  // CORRECT: matches array length
+}
+```
 
 ## Tools Available
 - **read_file**: Load SKILL.md and other files
 - **write_file**: Write output files
 - **load_analysis_data**: Load analysis results and search_context
-- **search_literature_for_context**: Multi-strategy PubMed search
-- **search_literature**: Single query PubMed search
+- **search_literature_dynamic**: LLM-powered PubMed search (PRIMARY)
+- **search_literature_for_context**: Fixed multi-strategy PubMed search (FALLBACK)
+- **search_literature**: Single query PubMed search (follow-up)
 - **think_tool**: Strategic planning (Phase 2) and reflection (Phase 4)
 
 ## Quick Reference: Common Mistakes
 - DO NOT read .csv files directly (causes context overflow)
 - DO NOT search with all 352 genes (prioritize 10-15)
 - DO NOT skip Phase 2 (Think) before searching
-- USE search_context field from load_analysis_data
-- USE think_tool BEFORE search_literature_for_context
+- USE appropriate search context from load_analysis_data:
+  - Part 1: Use `spatial_search_context` (pathways + celltypes only)
+  - Part 2/3: Use `lr_search_context` (genes + pathways + celltypes)
+- USE think_tool BEFORE search_literature_dynamic
+- USE search_literature_dynamic first, FALLBACK to search_literature_for_context if it fails
+
+## Search Context Selection
+| Part | Context Field | Output File |
+|------|---------------|-------------|
+| Part 1 | spatial_search_context | /part1_papers.json |
+| Part 2+3 | lr_search_context | /liana_papers.json (shared) |
+
+**Note**: Part 2 and Part 3 use IDENTICAL search context (lr_search_context).
+Generate papers ONCE and save to /liana_papers.json for both parts.
+Do NOT create separate /part2_papers.json and /part3_papers.json files.
 """
 
 
@@ -173,7 +219,7 @@ Your role is to:
 ## CRITICAL: Literature-First Interpretation
 
 Every biological claim MUST either:
-- **Cite a PMID** from /partN_papers.json with supporting evidence
+- **Cite a PMID** from the appropriate papers file with supporting evidence
 - **Be marked as (Novel Finding)** if no literature support exists
 
 This is the core hallucination prevention mechanism.
@@ -182,7 +228,10 @@ This is the core hallucination prevention mechanism.
 
 ### Phase 1: Load Context
 
-1. Read **/partN_papers.json** - this is your ONLY citation source
+1. Read the appropriate papers file - this is your ONLY citation source:
+   - Part 1: **/part1_papers.json**
+   - Part 2: **/liana_papers.json** (shared with Part 3)
+   - Part 3: **/liana_papers.json** (shared with Part 2)
 2. Read **/strategic_plan.md** - understand the hypotheses being tested
 3. Read **/data_path.txt** - get the data directory path
 4. Call **load_analysis_data** to get analysis results and figures
@@ -191,7 +240,7 @@ This is the core hallucination prevention mechanism.
 
 For each analysis in the Part, write interpretation that:
 - Describes quantitative findings (2+ statistics per analysis)
-- Cites supporting literature from /partN_papers.json
+- Cites supporting literature from the appropriate papers file
 - Follows the citation format strictly
 
 #### Citation Format:
@@ -308,7 +357,9 @@ Focus on: Specific mechanisms of selected L-R pairs, source→target relationshi
 
 ## Quality Requirements (per analysis)
 - At least 2 quantitative statistics (p-values, fold changes, percentages)
-- At least 2 PMID citations from /partN_papers.json
+- At least 2 PMID citations from the appropriate papers file:
+  - Part 1: /part1_papers.json
+  - Part 2/3: /liana_papers.json (shared)
 - Clear biological mechanism described
 - Specific language (no vague hedging)
 - Mark genuinely novel observations as **(Novel Finding)**
@@ -343,7 +394,8 @@ Your role is to:
 
 2. Read supporting files:
    - **/strategic_plan.md** - Original hypotheses
-   - **/part1_papers.json**, **/part2_papers.json**, **/part3_papers.json** - All references
+   - **/part1_papers.json** - Part 1 references
+   - **/liana_papers.json** - Part 2/3 shared references
    - **/data_path.txt** - Data directory for figure paths
 
 3. Call **load_analysis_data** to get figure paths

@@ -14,8 +14,10 @@ from src.agents.deep_interpreter.tools.data_loader import (
 from src.agents.deep_interpreter.tools.literature import (
     search_literature,
     search_literature_for_context,
+    search_literature_dynamic,
     search_literature_async,
     search_literature_for_context_async,
+    search_literature_dynamic_async,
     format_references,
 )
 from src.agents.deep_interpreter.tools.quality import (
@@ -46,8 +48,10 @@ __all__ = [
     # Literature
     "search_literature",
     "search_literature_for_context",
+    "search_literature_dynamic",
     "search_literature_async",
     "search_literature_for_context_async",
+    "search_literature_dynamic_async",
     "format_references",
     # Quality
     "validate_quality",
