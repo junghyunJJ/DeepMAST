@@ -1,14 +1,201 @@
 import os
+import pickle
+import logging
+import warnings
+from threading import Lock
 
 from typing import Optional, Literal, List
 
 import anndata
+import numpy as np
 import pandas as pd
 import scanpy as sc
 import squidpy as sq
 import matplotlib.pyplot as plt
+from sklearn.metrics.pairwise import cosine_similarity
 
 from utils.run_liana import run_liana, run_liana_bivariate, run_liana_nmf
+from utils.download_genept import ensure_genept_embeddings, DEFAULT_EMBEDDINGS_PATH
+
+# GenePT Embeddings Configuration
+GENEPT_EMBEDDINGS_ENV_VAR = "GENEPT_EMBEDDINGS_PATH"
+
+logger = logging.getLogger(__name__)
+
+
+class _GenePTScorer:
+    """Lightweight GenePT scorer for L-R pair similarity.
+
+    Singleton with lazy loading. Only loads embeddings when scoring is called.
+    Automatically downloads embeddings from Zenodo if not found.
+    Designed to be self-contained (no external DeepMAST imports).
+
+    Path Resolution Priority:
+        1. Custom path parameter (if provided)
+        2. GENEPT_EMBEDDINGS_PATH environment variable (if set)
+        3. ~/.cache/genept/embeddings.pickle (auto-download if needed)
+
+    GenePT Reference:
+        Chen & Zou (2024). GenePT: A Simple But Effective Foundation Model
+        for Genes and Cells Built From ChatGPT. Nature Biomedical Engineering.
+        https://doi.org/10.1038/s41551-024-01284-6
+    """
+
+    _instance = None
+    _lock = Lock()
+
+    def __new__(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+                cls._instance._initialized = False
+            return cls._instance
+
+    def __init__(self):
+        if self._initialized:
+            return
+        self._embeddings = None
+        self._embeddings_path = None
+        self._load_attempted = False
+        self._initialized = True
+
+    def _get_embeddings_path(self, custom_path=None):
+        """Resolve embeddings path from custom, env var, or default with auto-download.
+
+        Args:
+            custom_path: Optional explicit path to embeddings file
+
+        Returns:
+            Path to embeddings file, or None if unavailable
+        """
+        # Priority 1: Custom path parameter
+        if custom_path:
+            if os.path.exists(custom_path):
+                return custom_path
+            logger.warning(f"Custom embeddings path not found: {custom_path}")
+            return None
+
+        # Priority 2: Environment variable
+        env_path = os.environ.get(GENEPT_EMBEDDINGS_ENV_VAR)
+        if env_path:
+            if os.path.exists(env_path):
+                return env_path
+            logger.warning(
+                f"GENEPT_EMBEDDINGS_PATH points to non-existent file: {env_path}. "
+                f"Falling back to default location with auto-download."
+            )
+
+        # Priority 3: Default location with auto-download
+        result = ensure_genept_embeddings()
+        return str(result) if result else None
+
+    def _load_embeddings(self, embeddings_path=None):
+        """Load embeddings lazily. Returns True if loaded, False otherwise."""
+        if self._embeddings is not None:
+            return True
+
+        if self._load_attempted:
+            return False
+
+        self._load_attempted = True
+        path = self._get_embeddings_path(embeddings_path)
+
+        if path is None:
+            logger.warning(
+                "GenePT embeddings unavailable. "
+                "Check network connection or set GENEPT_EMBEDDINGS_PATH manually. "
+                "Skipping GenePT scoring."
+            )
+            return False
+
+        try:
+            logger.info(f"Loading GenePT embeddings from {path}")
+            with open(path, "rb") as f:
+                raw_embeddings = pickle.load(f)
+
+            # Normalize gene names to uppercase
+            self._embeddings = {
+                gene.upper(): np.array(embedding)
+                for gene, embedding in raw_embeddings.items()
+            }
+            self._embeddings_path = path
+            logger.info(f"Loaded {len(self._embeddings)} gene embeddings")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to load GenePT embeddings: {e}. Skipping GenePT scoring.")
+            return False
+
+    def get_embedding(self, gene):
+        """Get embedding for a gene. Returns None if not found."""
+        if self._embeddings is None:
+            return None
+        return self._embeddings.get(gene.upper())
+
+    def score_lr_pair(self, ligand, receptor):
+        """Calculate cosine similarity between ligand and receptor.
+
+        Returns:
+            float (0-1 range) or None if either gene not found
+        """
+        if self._embeddings is None:
+            return None
+
+        ligand_emb = self.get_embedding(ligand)
+        receptor_emb = self.get_embedding(receptor)
+
+        if ligand_emb is None or receptor_emb is None:
+            return None
+
+        similarity = cosine_similarity(
+            ligand_emb.reshape(1, -1),
+            receptor_emb.reshape(1, -1)
+        )[0, 0]
+
+        # Normalize from [-1, 1] to [0, 1]
+        return float((similarity + 1) / 2)
+
+    def score_dataframe(self, df, ligand_col="ligand", receptor_col="receptor",
+                        score_col="genept_score", embeddings_path=None):
+        """Add GenePT scores to a DataFrame.
+
+        Args:
+            df: DataFrame with ligand and receptor columns
+            ligand_col: Name of ligand column
+            receptor_col: Name of receptor column
+            score_col: Name for output score column
+            embeddings_path: Optional custom path to embeddings
+
+        Returns:
+            DataFrame with added score column (NaN for missing genes)
+        """
+        result_df = df.copy()
+
+        # Attempt to load embeddings (triggers auto-download if needed)
+        if not self._load_embeddings(embeddings_path):
+            # Add NaN column if embeddings not available
+            result_df[score_col] = np.nan
+            return result_df
+
+        scores = []
+        for _, row in result_df.iterrows():
+            ligand = str(row[ligand_col])
+            receptor = str(row[receptor_col])
+
+            # Handle complex receptor names (e.g., "ITGA3_ITGB1")
+            if "_" in receptor and self.get_embedding(receptor) is None:
+                receptor_parts = receptor.split("_")
+                receptor = receptor_parts[0]
+
+            score = self.score_lr_pair(ligand, receptor)
+            scores.append(score)
+
+        result_df[score_col] = scores
+        return result_df
+
+
+def _get_genept_scorer():
+    """Factory function for GenePT scorer singleton."""
+    return _GenePTScorer()
 
 
 def detect_platform(adata) -> str:
@@ -784,6 +971,7 @@ def runplot_liana_loadings(
     width: Optional[int] = None,
     height: Optional[int] = None,
     save_path: str = 'res/',
+    genept_embeddings_path: Optional[str] = None,
     ) -> None:
     """
     Part 2: CCI Analysis with NMF - Step 8. Ligand-Receptor Pattern Analysis (Loadings; NMF)
@@ -843,6 +1031,16 @@ def runplot_liana_loadings(
         height (int, optional): Figure height in inches for heatmap. If None, auto-calculated
                                 based on number of factors (~0.5 inch per factor). Default: None
         save_path (str): Output directory for saving plots and results (default: 'res/')
+        genept_embeddings_path (str, optional): Path to GenePT embeddings pickle file.
+            Path resolution priority:
+            1. This parameter (if provided)
+            2. GENEPT_EMBEDDINGS_PATH environment variable (if set)
+            3. ~/.cache/genept/embeddings.pickle (auto-downloaded from Zenodo if needed)
+
+            GenePT provides semantic similarity scores between ligand-receptor pairs
+            based on gene embeddings trained on NCBI/UniProt descriptions.
+            Reference: Chen & Zou (2024) GenePT, Nature Biomedical Engineering.
+            Default: None (uses auto-download to default location)
 
     Outputs:
         - Image: {save_path}/8.loadings_NMF.png
@@ -861,6 +1059,9 @@ def runplot_liana_loadings(
             - pval: P-value for spatial significance
             - min_mean_moransr: Minimum mean Moran's R across spots
             - Factor_0, Factor_1, ..., Factor_N: NMF loading values per factor
+            - genept_score: GenePT embedding cosine similarity (0-1, higher = more similar)
+                           NaN if embeddings not available or gene not found.
+                           Auto-downloaded from Zenodo on first use if needed.
 
         - CSV: {save_path}/sig_liana_pathway_factor.csv
           Significant pathway enrichments for each factor (adj_pval < 0.05)
@@ -912,6 +1113,17 @@ def runplot_liana_loadings(
 
     # 2. lr_loadings and sig_liana
     anno_sig_liana = res_liana_loadings(lrdata, th_morans=th_morans, p_th=p_th, organism=organism, geneset=geneset, plot=True, save_path=save_path)
+
+    # 2.5. Add GenePT embedding-based L-R similarity scores
+    scorer = _get_genept_scorer()
+    anno_sig_liana = scorer.score_dataframe(
+        anno_sig_liana,
+        ligand_col="ligand",
+        receptor_col="receptor",
+        score_col="genept_score",
+        embeddings_path=genept_embeddings_path,
+    )
+
     anno_sig_liana.to_csv(f"{save_path}/sig_liana.csv")
 
     # 3. enrich_pathway_factor
