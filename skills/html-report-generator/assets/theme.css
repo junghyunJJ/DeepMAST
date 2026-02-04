@@ -1,0 +1,502 @@
+/**
+ * DeepMAST HTML Report Theme
+ *
+ * Dark theme styling for CCI Analysis Reports
+ * Compatible with Deep Interpreter Agent report generation
+ *
+ * Usage:
+ * - Import via report.py tool (automatic)
+ * - Customize colors via :root CSS variables
+ * - Use semantic highlight classes for biological entities
+ */
+
+/* ==========================================================================
+   CSS Variables (Customization Layer)
+   ========================================================================== */
+
+:root {
+  /* Primary Colors */
+  --color-primary: #64ffda;           /* Cyan - titles, accents, links, cell types */
+  --color-secondary: #ffd166;         /* Yellow - clusters, h3 headings, pathway boxes */
+  --color-accent: #ff6b9d;            /* Pink - pathways, h4 headings, key findings */
+
+  /* Background Colors */
+  --bg-primary: #1a1a2e;              /* Main body background (dark) */
+  --bg-secondary: #16213e;            /* Gradient end */
+  --bg-container: rgba(26, 26, 46, 0.95);  /* Container background */
+  --bg-section: rgba(35, 35, 60, 0.6);     /* Section background */
+  --bg-figure: rgba(0, 0, 0, 0.3);         /* Figure container */
+  --bg-dark: rgba(30, 30, 50, 0.8);        /* Paper cards, darker elements */
+
+  /* Text Colors */
+  --text-primary: #e4e4e4;            /* Main text */
+  --text-secondary: #aaa;             /* Subtitles, captions, muted text */
+  --text-muted: #666;                 /* Metadata, very muted text */
+
+  /* Semantic Colors (matching highlight classes) */
+  --highlight-cluster: #ffd166;       /* .highlight-cluster */
+  --highlight-pathway: #ff6b9d;       /* .highlight-pathway */
+  --highlight-celltype: #64ffda;      /* .highlight-celltype */
+
+  /* Component Colors */
+  --border-primary: #64ffda;          /* Primary borders */
+  --border-secondary: rgba(100, 255, 218, 0.3);  /* Subtle borders */
+  --border-muted: rgba(100, 255, 218, 0.1);      /* Very subtle borders */
+
+  /* Gradient Colors */
+  --gradient-primary: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  --gradient-summary: linear-gradient(135deg, rgba(100, 255, 218, 0.1) 0%, rgba(255, 107, 157, 0.1) 100%);
+  --gradient-confidence: linear-gradient(90deg, #ff6b9d, #64ffda);
+
+  /* Shadow Colors */
+  --shadow-container: 0 10px 40px rgba(0, 0, 0, 0.5);
+  --shadow-figure: 0 5px 15px rgba(100, 255, 218, 0.3);
+  --shadow-title: 0 0 10px rgba(100, 255, 218, 0.5);
+
+  /* Spacing */
+  --container-max-width: 1400px;
+  --container-padding: 40px;
+  --section-margin: 30px;
+  --element-gap: 20px;
+
+  /* Border Radius */
+  --radius-large: 15px;               /* Container */
+  --radius-medium: 10px;              /* Sections, figures */
+  --radius-small: 5px;                /* Buttons, small elements */
+  --radius-round: 15px;               /* Badges */
+
+  /* Typography */
+  --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --line-height: 1.6;
+
+  /* Font Sizes */
+  --font-size-h1: 2.5em;
+  --font-size-h2: 2em;
+  --font-size-h3: 1.5em;
+  --font-size-h4: 1.2em;
+  --font-size-tab: 1.1em;
+  --font-size-caption: 0.95em;
+  --font-size-metadata: 0.9em;
+  --font-size-badge: 0.85em;
+
+  /* Transitions */
+  --transition-fast: 0.3s ease;
+  --transition-medium: 0.5s ease;
+}
+
+/* ==========================================================================
+   Reset & Base Styles
+   ========================================================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family);
+  background: var(--gradient-primary);
+  color: var(--text-primary);
+  line-height: var(--line-height);
+  padding: 20px;
+}
+
+/* ==========================================================================
+   Layout Components
+   ========================================================================== */
+
+.container {
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+  background: var(--bg-container);
+  border-radius: var(--radius-large);
+  box-shadow: var(--shadow-container);
+  padding: var(--container-padding);
+}
+
+/* ==========================================================================
+   Typography
+   ========================================================================== */
+
+h1 {
+  color: var(--color-primary);
+  font-size: var(--font-size-h1);
+  margin-bottom: 10px;
+  text-align: center;
+  text-shadow: var(--shadow-title);
+}
+
+.subtitle {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 1.2em;
+  margin-bottom: 40px;
+  font-style: italic;
+}
+
+h2 {
+  color: var(--color-primary);
+  font-size: var(--font-size-h2);
+  margin-top: 40px;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--border-primary);
+}
+
+h3 {
+  color: var(--color-secondary);
+  font-size: var(--font-size-h3);
+  margin-top: 30px;
+  margin-bottom: 15px;
+}
+
+h4 {
+  color: var(--color-accent);
+  font-size: var(--font-size-h4);
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+/* ==========================================================================
+   Section Components
+   ========================================================================== */
+
+.analysis-section {
+  background: var(--bg-section);
+  padding: 25px;
+  border-radius: var(--radius-medium);
+  margin-bottom: var(--section-margin);
+  border-left: 4px solid var(--border-primary);
+}
+
+.summary-box {
+  background: var(--gradient-summary);
+  padding: 25px;
+  border-radius: var(--radius-medium);
+  margin: var(--section-margin) 0;
+  border: 2px solid var(--border-secondary);
+}
+
+.interpretation {
+  background: rgba(100, 255, 218, 0.1);
+  padding: var(--element-gap);
+  border-left: 4px solid var(--border-primary);
+  border-radius: var(--radius-small);
+  margin: var(--element-gap) 0;
+}
+
+.interpretation h4 {
+  color: var(--color-primary);
+  margin-bottom: 10px;
+}
+
+.key-findings {
+  background: rgba(255, 107, 157, 0.1);
+  padding: var(--element-gap);
+  border-radius: var(--radius-small);
+  margin: var(--element-gap) 0;
+}
+
+.key-findings ul {
+  list-style-position: inside;
+  margin-left: 20px;
+}
+
+.key-findings li {
+  margin: 10px 0;
+  color: var(--text-primary);
+}
+
+.pathway-box {
+  background: rgba(255, 209, 102, 0.1);
+  padding: 15px;
+  border-radius: var(--radius-small);
+  margin: 10px 0;
+  border-left: 4px solid var(--color-secondary);
+}
+
+.pathway-box ul {
+  margin-left: 20px;
+  margin-top: 10px;
+}
+
+/* ==========================================================================
+   Figure Components
+   ========================================================================== */
+
+.figure-container {
+  text-align: center;
+  margin: var(--section-margin) 0;
+  background: var(--bg-figure);
+  padding: var(--element-gap);
+  border-radius: var(--radius-medium);
+}
+
+.figure-container img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: var(--shadow-figure);
+}
+
+.figure-caption {
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-top: 15px;
+  font-size: var(--font-size-caption);
+}
+
+/* ==========================================================================
+   Tab Navigation
+   ========================================================================== */
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin: var(--element-gap) 0;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--border-primary);
+  padding-bottom: 10px;
+}
+
+.tab-button {
+  background: rgba(35, 35, 60, 0.8);
+  color: var(--color-primary);
+  border: 2px solid var(--border-primary);
+  padding: 12px 24px;
+  cursor: pointer;
+  border-radius: var(--radius-small) var(--radius-small) 0 0;
+  transition: all var(--transition-fast);
+  font-size: var(--font-size-tab);
+  font-weight: 500;
+}
+
+.tab-button:hover {
+  background: rgba(100, 255, 218, 0.2);
+  transform: translateY(-2px);
+}
+
+.tab-button.active {
+  background: var(--color-primary);
+  color: var(--bg-primary);
+  font-weight: bold;
+}
+
+.tab-content {
+  display: none;
+  animation: fadeIn var(--transition-medium);
+}
+
+.tab-content.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ==========================================================================
+   Table Components
+   ========================================================================== */
+
+.table-container {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--element-gap) 0;
+  background: var(--bg-section);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+th {
+  background: rgba(100, 255, 218, 0.2);
+  color: var(--color-primary);
+  padding: 12px;
+  text-align: left;
+  font-weight: bold;
+  border-bottom: 2px solid var(--border-primary);
+}
+
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+tr:hover {
+  background: rgba(100, 255, 218, 0.05);
+}
+
+/* ==========================================================================
+   Pagination Components
+   ========================================================================== */
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: var(--element-gap) 0;
+}
+
+.page-button {
+  background: rgba(100, 255, 218, 0.2);
+  color: var(--color-primary);
+  border: 1px solid var(--border-primary);
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: var(--radius-small);
+  transition: all var(--transition-fast);
+}
+
+.page-button:hover {
+  background: rgba(100, 255, 218, 0.4);
+}
+
+.page-button.active {
+  background: var(--color-primary);
+  color: var(--bg-primary);
+  font-weight: bold;
+}
+
+.interactions-page {
+  display: none;
+}
+
+.interactions-page.active {
+  display: block;
+}
+
+/* ==========================================================================
+   Score & Badge Components
+   ========================================================================== */
+
+.score-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-round);
+  font-size: var(--font-size-badge);
+  margin-left: 10px;
+}
+
+.score-high {
+  background: rgba(100, 255, 218, 0.3);
+  color: var(--color-primary);
+}
+
+.score-medium {
+  background: rgba(255, 209, 102, 0.3);
+  color: var(--color-secondary);
+}
+
+.score-low {
+  background: rgba(255, 107, 157, 0.3);
+  color: var(--color-accent);
+}
+
+.confidence-bar {
+  background: rgba(100, 100, 100, 0.3);
+  border-radius: var(--radius-medium);
+  height: 10px;
+  margin: 5px 0;
+  overflow: hidden;
+}
+
+.confidence-fill {
+  height: 100%;
+  background: var(--gradient-confidence);
+  border-radius: var(--radius-medium);
+}
+
+/* ==========================================================================
+   Reference & Paper Components
+   ========================================================================== */
+
+.reference {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.reference:hover {
+  text-decoration: underline;
+}
+
+.paper-card {
+  background: var(--bg-dark);
+  border-radius: 8px;
+  padding: 15px;
+  margin: 10px 0;
+  border-left: 3px solid var(--border-primary);
+}
+
+.paper-title a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.paper-title a:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   Semantic Highlight Classes (for LLM-generated HTML)
+   ========================================================================== */
+
+/**
+ * Use these classes to highlight biological entities:
+ * - .highlight-cluster: Yellow - for cluster names (e.g., "Cluster 0")
+ * - .highlight-pathway: Pink - for pathway names (e.g., "NFkB signaling")
+ * - .highlight-celltype: Cyan - for cell type names (e.g., "Macrophages")
+ */
+
+.highlight-cluster {
+  color: var(--highlight-cluster);
+  font-weight: bold;
+}
+
+.highlight-pathway {
+  color: var(--highlight-pathway);
+  font-weight: bold;
+}
+
+.highlight-celltype {
+  color: var(--highlight-celltype);
+  font-weight: bold;
+}
+
+/* ==========================================================================
+   Metadata & Footer
+   ========================================================================== */
+
+.metadata {
+  color: var(--text-muted);
+  font-size: var(--font-size-metadata);
+  text-align: center;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-secondary);
+}
+
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
+
+.text-center {
+  text-align: center;
+}
+
+.text-muted {
+  color: var(--text-secondary);
+}
+
+.mt-1 { margin-top: 10px; }
+.mt-2 { margin-top: 20px; }
+.mt-3 { margin-top: 30px; }
+.mb-1 { margin-bottom: 10px; }
+.mb-2 { margin-bottom: 20px; }
+.mb-3 { margin-bottom: 30px; }

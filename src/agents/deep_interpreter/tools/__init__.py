@@ -34,6 +34,19 @@ from src.agents.deep_interpreter.tools.report import (
 from src.agents.deep_interpreter.tools.think import (
     think_tool,
 )
+from src.agents.deep_interpreter.tools.literature_rag import (
+    prepare_rag_literature,
+    search_literature_fulltext,
+    validate_claim_fulltext,
+    check_rag_availability_sync,
+    get_rag_status,
+    is_rag_mode_active,
+)
+from src.agents.deep_interpreter.tools.lr_prioritizer import (
+    HybridLRPrioritizer,
+    create_lr_prioritizer,
+    prioritize_lr_pairs,
+)
 
 __all__ = [
     # Think tool
@@ -62,4 +75,15 @@ __all__ = [
     # Report
     "generate_html_report",
     "generate_simple_report",
+    # RAG Literature
+    "prepare_rag_literature",
+    "search_literature_fulltext",
+    "validate_claim_fulltext",
+    "check_rag_availability_sync",
+    "get_rag_status",
+    "is_rag_mode_active",
+    # L-R Prioritizer
+    "HybridLRPrioritizer",
+    "create_lr_prioritizer",
+    "prioritize_lr_pairs",
 ]

@@ -8,7 +8,7 @@ Architecture:
     SkillsMiddleware (Strategy Layer) → Python Tools (Execution Layer) → MCP Servers
 """
 
-from src.agents.deep_interpreter.middleware.skills import SkillsMiddleware
+from src.agents.deep_interpreter.middleware.skills_middleware import SkillsMiddleware
 from src.agents.deep_interpreter.middleware.load import list_skills, SkillMetadata
 
 __all__ = [

@@ -45,9 +45,11 @@ This skill provides the **complete workflow** for the SEARCHER subagent. It defi
 | File | Phase | Content |
 |------|-------|---------|
 | `/data_path.txt` | Read | Real data directory path |
-| `/partN_search_context.json` | Phase 1 | Extracted biological terms |
+| `/part1_search_context.json` | Phase 1 | Part 1 spatial context |
+| `/lr_search_context.json` | Phase 1 | Part 2+3 L-R context (shared) |
 | `/partN_search_strategy.json` | Phase 2 | Prioritized search plan |
-| `/partN_papers.json` | Phase 5 | Search results with coverage |
+| `/part1_papers.json` | Phase 5 | Part 1 search results |
+| `/liana_papers.json` | Phase 5 | Part 2+3 search results (shared) |
 
 ---
 
@@ -63,11 +65,10 @@ Call **load_analysis_data** with the exact path from /data_path.txt.
 The load_analysis_data tool returns pre-extracted search context fields:
 
 **Part-specific contexts (RECOMMENDED):**
-| Part | Context Field | Contains |
-|------|---------------|----------|
-| Part 1 | `spatial_search_context` | pathways, celltypes (NO genes) |
-| Part 2 | `lr_search_context` | genes, pathways, celltypes |
-| Part 3 | `lr_search_context` | genes, pathways, celltypes |
+| Part | Context Field | Contains | Output File |
+|------|---------------|----------|-------------|
+| Part 1 | `spatial_search_context` | pathways, celltypes (NO genes) | `/part1_papers.json` |
+| Part 2+3 | `lr_search_context` | genes, pathways, celltypes | `/liana_papers.json` (shared) |
 
 **Combined context (backward compatibility):**
 - `search_context`: ALL genes, pathways, celltypes combined
@@ -257,7 +258,7 @@ Both tools return:
 
 | Criterion | Threshold | Action if Failed |
 |-----------|-----------|------------------|
-| **Total Papers** | >= 15 unique papers | Broaden search terms |
+| **Total Papers** | >= 25 unique papers | Broaden search terms |
 | **Gene Coverage** | >= 60% of priority genes | Add synonyms, search individually |
 | **Pathway Coverage** | >= 50% of priority pathways | Add "signaling", disease context |
 | **Max Iterations** | 3 | Proceed with warning |
@@ -319,7 +320,11 @@ search_literature(
 ## Phase 5: Write Output
 
 ### Write Papers File
-Write **/partN_papers.json** with this format:
+Write the appropriate papers file:
+- Part 1: **/part1_papers.json**
+- Part 2+3: **/liana_papers.json** (shared, generate ONCE)
+
+Format:
 ```json
 {
   "papers": [
@@ -413,7 +418,7 @@ Mechanism keywords: binding, signaling cascade, downstream effects."
 - **USE** reflection-tool think_tool for quality validation AFTER search
 - **WRITE** /partN_search_strategy.json before searching
 - **RUN** follow-up searches for missing coverage using search_literature
-- **WRITE** /partN_papers.json with coverage metrics and search_method indicator
+- **WRITE** /part1_papers.json (Part 1) or /liana_papers.json (Part 2+3 shared)
 
 ---
 
@@ -563,7 +568,7 @@ search_literature_dynamic (try first)
 
 | Quality Check | Threshold | Action if Failed |
 |--------------|-----------|------------------|
-| Papers | >= 15 | Broaden search terms |
+| Papers | >= 25 | Broaden search terms |
 | Gene coverage | >= 60% | Add synonyms, search individually |
 | Pathway coverage | >= 50% | Add "signaling", disease context |
 | Max iterations | 3 | Proceed with warning |
@@ -571,7 +576,7 @@ search_literature_dynamic (try first)
 | Phase | Tool | Thoughts | Purpose | Output |
 |-------|------|----------|---------|--------|
 | Phase 2 (Planning) | BioMCP think | 3 thoughts | Develop search strategy | /partN_search_strategy.json |
-| Phase 4 (Reflection) | reflection-tool | 1-2 thoughts | Validate coverage, plan follow-up | Updated /partN_papers.json |
+| Phase 4 (Reflection) | reflection-tool | 1-2 thoughts | Validate coverage | /part1_papers.json or /liana_papers.json |
 
 | Thought Type | Key Content | nextThoughtNeeded |
 |--------------|-------------|-------------------|
@@ -641,7 +646,8 @@ thoughtNumber=1, totalThoughts=1, nextThoughtNeeded=False)
 
 ### Phase 5: Write Output
 ```python
-write_file("/part2_papers.json", json.dumps({
+# For Part 2+3: write to shared liana_papers.json (generate ONCE, not twice)
+write_file("/liana_papers.json", json.dumps({
     "papers": [...],
     "coverage": {"genes_coverage_pct": 100, "pathways_coverage_pct": 50, "total_papers": 18},
     "search_iterations": 1,

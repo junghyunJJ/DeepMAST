@@ -64,7 +64,7 @@ class DeepInterpreterConfig:
     """Configuration for Deep Interpreter Agent.
 
     Attributes:
-        provider: LLM provider ('openai', 'google', 'ollama').
+        provider: LLM provider ('openai', 'google', 'ollama', 'claude').
                   Uses LLM_PROVIDER env var if not specified.
         data_dir: Directory for CCI analysis results and agent workspace
         max_iterations: Maximum quality refinement iterations per part (default: 3)
@@ -81,8 +81,9 @@ class DeepInterpreterConfig:
         - OPENAI_MODEL (default: gpt-4.1-mini)
         - GOOGLE_MODEL (default: gemini-2.0-flash)
         - OLLAMA_MODEL (default: gpt-oss:20b)
+        - ANTHROPIC_MODEL (default: claude-haiku-4-5-20251001)
     """
-    provider: Literal["openai", "google", "ollama"] = "openai"
+    provider: Literal["openai", "google", "ollama", "claude"] = "openai"
     data_dir: str = "/tmp/deep_interpreter_workspace"
     max_iterations: int = 3
     quality_threshold: float = 0.7
@@ -229,7 +230,7 @@ def interpret_analysis(
     analysis_mode: str = "cluster_to_celltype",
     targets: Optional[list[str]] = None,
     output_path: Optional[str] = None,
-    provider: Literal["openai", "google", "ollama"] = "ollama",
+    provider: Literal["openai", "google", "ollama", "claude"] = "ollama",
     thread_id: Optional[str] = None,
     use_checkpointer: bool = False,
 ) -> dict:
@@ -244,7 +245,7 @@ def interpret_analysis(
         analysis_mode: 'cluster_to_celltype' (Mode A) or 'celltype_to_cluster' (Mode B)
         targets: List of cluster IDs (Mode A) or cell type names (Mode B)
         output_path: Output path for HTML report (default: {data_dir}/CCI_Analysis_Report.html)
-        provider: LLM provider ('openai', 'google', 'ollama')
+        provider: LLM provider ('openai', 'google', 'ollama', 'claude')
         thread_id: Optional thread ID for checkpointer. Auto-generated if not provided.
         use_checkpointer: Whether to use memory checkpointer (default: False)
 

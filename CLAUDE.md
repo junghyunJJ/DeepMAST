@@ -34,146 +34,116 @@ pnpm lint       # Run linter
 ## Environment Configuration
 
 ### Backend (.env)
-- `LLM_PROVIDER`: `google`, `openai` (default), or `ollama`
-- `GOOGLE_MODEL`: Default `gemini-2.0-flash`
+- `LLM_PROVIDER`: `openai` (default), `google`, `ollama`, or `claude`
 - `OPENAI_MODEL`: Default `gpt-4.1-mini`
+- `GOOGLE_MODEL`: Default `gemini-2.0-flash`
 - `OLLAMA_MODEL`: Default `gpt-oss:20b`
 - `OLLAMA_BASE_URL`: Default `http://localhost:6000`
+- `ANTHROPIC_MODEL`: Default `claude-haiku-4-5-20251001`
+- `DEEP_INTERPRETER_DATA_DIR`: Directory for CCI analysis results
 
 ### Frontend (agent-chat-ui/.env)
 - `NEXT_PUBLIC_API_URL`: LangGraph API endpoint (default: `http://localhost:2024`)
-- `NEXT_PUBLIC_ASSISTANT_ID`: Graph ID (`agent` or `biological_interpreter`)
+- `NEXT_PUBLIC_ASSISTANT_ID`: Graph ID (see langgraph.json for available graphs)
 
 ### Version Pinning Note
 `langgraph-api` and `sse-starlette` are pinned for compatibility. See `pyproject.toml` comments before updating.
 
-### Recursion Limits
-Default recursion limits are set in `graph_builders.py`:
-- STPipelineBuilderAgent: 50
-- BiologicalInterpreterAgent: 100 (due to complex multi-node workflow)
-
 ## Architecture
 
-### Core Design Pattern
+### Core Design Patterns
 
-OOP-based LangGraph agent architecture:
+**Two Agent Frameworks in Use:**
 
-1. **BaseAgent** (`src/base/base_agent.py`): Abstract base class that all agents extend
-   - Provides `init_nodes()` and `init_edges()` abstract methods
-   - Handles graph compilation with optional checkpointer/store
-   - Supports sync (`invoke`/`stream`) and async (`ainvoke`/`astream`) execution
+1. **OOP BaseAgent Pattern** (`src/base/base_agent.py`): Traditional LangGraph agents
+   - Used by: `STPipelineBuilderAgent`, `PubMedRAGAgent`
+   - Subclasses implement `init_nodes()` and `init_edges()` methods
+   - Uses `NODE_NAMES` class variable to prevent string typos
 
-2. **BaseState** (`src/base/base_state.py`): Pydantic-based state with message history using `add_messages` reducer
-
-3. **Graph Builders** (`src/agents/graph_builders.py`): Factory functions that create compiled graphs for LangGraph CLI
-
-### Agent Implementation Pattern
-
-```python
-class MyAgent(BaseAgent):
-    NODE_NAMES: ClassVar[dict[str, str]] = {
-        "NODE_KEY": "node_function_name",
-    }
-
-    def init_nodes(self, graph: StateGraph):
-        graph.add_node(self.get_node_name("NODE_KEY"), self.node_function)
-
-    def init_edges(self, graph: StateGraph):
-        graph.add_edge(START, self.get_node_name("NODE_KEY"))
-        graph.add_edge(self.get_node_name("NODE_KEY"), END)
-
-    async def node_function(self, state: MyState, config: RunnableConfig):
-        # Node implementation
-        pass
-```
-
-### Available Agents
-
-**STPipelineBuilderAgent** (`src/agents/pipeline/`): Multi-node workflow for ST pipeline construction with human-in-the-loop (HITL) support.
-
-**BiologicalInterpreterAgent** (`src/agents/interpreter/`): Deep Agent for CCI analysis interpretation with:
-- Dual-mode workflow: `cluster_to_celltype` (Mode A) or `celltype_to_cluster` (Mode B)
-- 10-step sequential workflow: load → HITL targets → mode detection → strategic planning → Part 1-3 interpretation → synthesis → literature search → quality reflection → report generation
-- Iterative refinement with quality reflection (max 3 iterations)
-- Modular node implementations in `interpreter/nodes/`
-- LangGraph Tools for analysis generation in `interpreter/tools/`
-
-**NewAgentTemplate** (`src/agents/template/`): Copy this template when creating new agents.
-
-### Tool Execution Dependencies
-
-**Part 1 tools** can run in parallel (all depend only on n_adata.h5ad):
-- Steps 1-5: spatial_plot, celltype_analysis, neighborhood_enrichment, pathway_enrichment, misty_analysis
-
-**Part 2 tools** must run sequentially:
-- Step 6 (`tool_run_liana_cci`) → creates `lrdata.h5ad`
-- Steps 7-9 → require `lrdata.h5ad` and agent's factor/celltype selection
-
-### State Serialization Pattern (Critical)
-
-LangGraph's msgpack checkpointer cannot serialize pandas DataFrames. State uses `TypedDict` with **file paths only**:
-
-```python
-# ✓ Correct: Store file paths in AnalysisDataRef
-part1_results: Optional[dict[str, AnalysisDataRef]]  # {"spatial": {"figure_path": "res/1.png"}}
-
-# ✗ Wrong: Will fail serialization
-# part1_results: Optional[dict[str, pd.DataFrame]]
-```
-
-Load DataFrames on-demand within node functions using `load_dataframe_from_ref()`.
-
-### LLM Provider Abstraction
-
-`src/agents/model.py` provides `create_llm(provider)` factory:
-- Google Gemini (default)
-- OpenAI GPT-4
-- Ollama (local inference)
+2. **DeepAgents Framework** (`deepagents` package): Multi-agent orchestration
+   - Used by: `DeepInterpreterAgent` (the main CCI interpreter)
+   - Uses `create_deep_agent()` with subagent configurations
+   - Supports middleware (SkillsMiddleware), backends (FilesystemBackend)
+   - 4 specialized subagents: planner, searcher, interpreter, reporter
 
 ### LangGraph Deployment
 
-The `langgraph.json` exports two graphs:
+The `langgraph.json` exports these graphs:
+
 ```json
 {
-  "graphs": {
-    "agent": "src.agents.graph_builders:graph",
-    "biological_interpreter": "src.agents.graph_builders:biological_interpreter_graph"
-  }
+  "Pipeline_builder": "src.agents.graph_builders:graph",
+  "DeepMAST_RAG": "src.agents.graph_builders:pubmed_rag_graph",
+  "Interpreter": "src.agents.deep_interpreter.graph_builder:deep_interpreter_wrapped_graph",
+  "Sub_Planner": "src.agents.deep_interpreter.graph_builder:planner_subagent_graph",
+  "Sub_Searcher": "src.agents.deep_interpreter.graph_builder:searcher_subagent_graph",
+  "Sub_Interpreter": "src.agents.deep_interpreter.graph_builder:interpreter_subagent_graph",
+  "Sub_Reporter": "src.agents.deep_interpreter.graph_builder:reporter_subagent_graph"
 }
 ```
 
-### Async Environment Loading
+### Deep Interpreter 4-Agent Workflow
 
-For ASGI contexts (LangGraph dev server), use `load_env_async()` from `src/base/async_env.py` to prevent blocking I/O warnings. For CLI scripts and tests, use `load_env_sync_fallback()`.
+The main analysis agent uses a simplified 4-subagent architecture:
+
+1. **PLANNER**: Reads `/targets.json`, loads analysis data, generates hypotheses → outputs `/strategic_plan.md`
+2. **SEARCHER**: Extracts context, searches literature (Part 1 → `/part1_papers.json`, Part 2+3 → `/liana_papers.json` shared)
+3. **INTERPRETER**: Literature-grounded interpretation with inline validation, max 3 quality iterations → outputs `/partN_final.md`
+4. **REPORTER**: Cross-part synthesis with independent literature validation → outputs `/synthesis.md`, `CCI_Analysis_Report.html`
+
+Subagent configs are in `src/agents/deep_interpreter/subagents/configs.py`.
 
 ### HITL (Human-in-the-Loop) Pattern
 
-Use LangGraph's `interrupt()` for user interaction:
+For Deep Interpreter, HITL is handled by the **wrapper agent** (`wrapper_agent.py`), not the Deep Agent itself:
+1. Wrapper collects `data_directory`, `analysis_mode`, targets from user
+2. Wrapper writes `/targets.json` to filesystem
+3. Wrapper invokes Deep Agent with pre-selected targets
 
+For traditional BaseAgent HITL, use LangGraph's `interrupt()`:
 ```python
 from langgraph.types import interrupt
+user_response = interrupt(value={"message": "Your prompt here"})
+```
 
-async def get_user_input_node(self, state, config):
-    user_response = interrupt(value={"message": "Your prompt here"})
-    # Process user_response after resume
-    return {"user_input": user_response}
+### Skills System (Progressive Disclosure)
+
+Skills provide workflow guidance for subagents. Located in `skills/`:
+- `biomedical-literature-search/SKILL.md`: 5-phase search workflow for SEARCHER
+- `html-report-generator/SKILL.md`: Report generation guidelines
+
+Skills are injected via `SkillsMiddleware` - agents see skill metadata in system prompt and can read full SKILL.md files for detailed strategies.
+
+### State Serialization (Critical)
+
+LangGraph's msgpack checkpointer cannot serialize pandas DataFrames. State must use **file paths only**:
+
+```python
+# ✓ Correct: Store file paths in state
+part1_results: dict[str, AnalysisDataRef]  # {"spatial": {"figure_path": "res/1.png"}}
+
+# ✗ Wrong: Will fail serialization
+part1_results: dict[str, pd.DataFrame]
 ```
 
 ### Conditional Routing Pattern
 
-**Important**: Routing functions must be **sync** (not async), returning node names as strings.
+Routing functions must be **sync** (not async), returning node names as strings:
 
 ```python
-def init_edges(self, graph: StateGraph):
-    graph.add_conditional_edges(
-        self.get_node_name("SOURCE_NODE"),
-        self.routing_function,  # Must be sync
-        [self.get_node_name("OPTION_A"), self.get_node_name("OPTION_B")]
-    )
-
 def routing_function(self, state, config) -> str:  # Sync, not async
     return self.get_node_name("OPTION_A") if state.get("condition") else self.get_node_name("OPTION_B")
 ```
+
+### LLM Provider Abstraction
+
+`src/agents/model.py` provides `create_llm(provider)` factory:
+- OpenAI (default), Google Gemini, Ollama, Claude (Anthropic)
+- Provider determined by `LLM_PROVIDER` env var or explicit parameter
+
+### Async Environment Loading
+
+For ASGI contexts (LangGraph dev server), use `load_env_async()` from `src/base/async_env.py`. For CLI/tests, use `load_env_sync_fallback()`.
 
 ## Domain Knowledge
 
@@ -181,23 +151,49 @@ def routing_function(self, state, config) -> str:  # Sync, not async
 - **Spot-based**: Visium, Slide-seq, StereoSeq, STARmap
 - **Single-cell resolution**: MERFISH, Xenium, CosMx, seqFISH
 
-### Prompts Module
+### Analysis Parts (Deep Interpreter)
+- **Part 1**: Spatial patterns, pathway biology (no gene-level analysis)
+- **Part 2**: CCI/NMF patterns, L-R interactions with LIANA
+- **Part 3**: Detailed L-R biology and mechanisms
 
-`src/prompts/` contains centralized prompt templates for both agents. When modifying LLM behavior, edit prompts here rather than hardcoding in node functions.
+### Literature Search Strategy
+SEARCHER uses context-aware searches:
+- Part 1: `spatial_search_context` (pathways + celltypes, NO genes)
+- Part 2+3: `lr_search_context` (genes + pathways + celltypes) - searched ONCE, shared
 
 ## Key Dependencies
 
 - **langchain/langgraph**: LLM orchestration and agentic workflows
+- **deepagents**: Multi-agent orchestration framework (for Deep Interpreter)
 - **scanpy/squidpy**: Single-cell and spatial transcriptomics analysis
 - **liana**: Cell-cell interaction analysis
-- **omnipath**: Pathway and interaction resources
-- **langchain-mcp-adapters**: MCP server integration for external tool calling
+- **langchain-mcp-adapters**: MCP server integration
 
 ## Adding a New Agent
 
+### Using BaseAgent (Traditional LangGraph)
+
 1. Copy `src/agents/template/` to a new directory
-2. Define `NODE_NAMES` class variable for all node names
+2. Define `NODE_NAMES` class variable
 3. Implement `init_nodes()` and `init_edges()` methods
 4. Create state schema using `TypedDict` (avoid storing DataFrames)
 5. Add graph builder function in `src/agents/graph_builders.py`
 6. Export in `langgraph.json`
+
+### Using DeepAgents Framework
+
+1. Define subagent configs with tools and prompts
+2. Create backend factory for filesystem operations
+3. Use `create_deep_agent()` with subagents list
+4. Optionally add middleware (SkillsMiddleware, etc.)
+
+## Testing Subagents
+
+Individual subagents can be tested via LangGraph CLI:
+```bash
+# Test SEARCHER subagent
+langgraph dev --graph Sub_Searcher
+
+# Test INTERPRETER subagent
+langgraph dev --graph Sub_Interpreter
+```

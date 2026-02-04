@@ -920,6 +920,161 @@ async def search_literature_for_context_async(
     }
 
 
+def _execute_fixed_strategy_search(
+    genes: list[str],
+    pathways: list[str],
+    celltypes: list[str],
+    disease: str,
+    max_results: int = 20,
+) -> dict:
+    """Internal fixed-strategy search function (used as fallback).
+
+    This function implements the same 4-strategy search as search_literature_for_context
+    but is called internally by search_literature_dynamic when LLM generation fails.
+    This avoids exposing the fallback tool to the SEARCHER subagent while still
+    providing robust fallback behavior.
+
+    Args:
+        genes: List of gene names
+        pathways: List of pathways
+        celltypes: List of cell types
+        disease: Disease context
+        max_results: Maximum papers to return
+
+    Returns:
+        Dictionary with papers, search_queries, and coverage
+    """
+    papers = []
+    search_queries = []
+
+    # Strategy 1: Gene + Disease + Interaction focused search
+    if genes and disease:
+        search_queries.append({
+            "type": "gene_disease",
+            "genes": genes[:5],
+            "diseases": [disease],
+            "keywords": [],
+        })
+
+    # Strategy 2: Pathway + Cell type search
+    if pathways and celltypes:
+        pathway_keywords = pathways[:3] + celltypes[:3]
+        diseases_list = [disease] if disease else []
+        search_queries.append({
+            "type": "pathway_celltype",
+            "genes": None,
+            "diseases": diseases_list,
+            "keywords": pathway_keywords,
+        })
+
+    # Strategy 3: Ligand-receptor interaction search
+    if genes and len(genes) >= 2:
+        lr_keywords = ["ligand receptor", "cell-cell interaction", "signaling"]
+        diseases_list = [disease] if disease else []
+        search_queries.append({
+            "type": "lr_pair",
+            "genes": genes[:4],
+            "diseases": diseases_list,
+            "keywords": lr_keywords,
+        })
+
+    # Strategy 4: Spatial transcriptomics context
+    if celltypes and disease:
+        spatial_keywords = ["spatial transcriptomics", "single cell", "tumor microenvironment"]
+        spatial_keywords.extend(celltypes[:3])
+        search_queries.append({
+            "type": "spatial",
+            "genes": None,
+            "diseases": [disease],
+            "keywords": spatial_keywords,
+        })
+
+    # Execute searches
+    try:
+        loop = asyncio.get_event_loop()
+        is_running = loop.is_running()
+    except RuntimeError:
+        is_running = False
+
+    seen_pmids = set()
+    results_per_query = max(5, max_results // len(search_queries) + 2) if search_queries else 10
+
+    for sq in search_queries:
+        try:
+            if is_running:
+                executor = _get_executor()
+                future = executor.submit(
+                    asyncio.run,
+                    _search_with_biomcp(
+                        genes=sq.get("genes"),
+                        diseases=sq.get("diseases"),
+                        keywords=sq.get("keywords"),
+                        page_size=results_per_query,
+                    )
+                )
+                results = future.result(timeout=60)
+            else:
+                results = asyncio.run(
+                    _search_with_biomcp(
+                        genes=sq.get("genes"),
+                        diseases=sq.get("diseases"),
+                        keywords=sq.get("keywords"),
+                        page_size=results_per_query,
+                    )
+                )
+
+            for paper in results:
+                pmid = paper.get("pmid", "")
+                if pmid and pmid not in seen_pmids:
+                    seen_pmids.add(pmid)
+                    paper["search_type"] = sq["type"]
+                    papers.append(paper)
+
+        except Exception as e:
+            logger.warning(f"Fixed strategy search failed for query {sq['type']}: {e}")
+            continue
+
+    papers = papers[:max_results]
+
+    # Calculate coverage
+    coverage = {
+        "genes_covered": [],
+        "pathways_covered": [],
+        "celltypes_covered": [],
+        "total_papers": len(papers),
+    }
+
+    for paper in papers:
+        combined = (paper.get("abstract", "") + " " + paper.get("title", "")).lower()
+
+        for gene in genes:
+            if gene.lower() in combined and gene not in coverage["genes_covered"]:
+                coverage["genes_covered"].append(gene)
+
+        for pathway in pathways:
+            if pathway.lower() in combined and pathway not in coverage["pathways_covered"]:
+                coverage["pathways_covered"].append(pathway)
+
+        for celltype in celltypes:
+            if celltype.lower() in combined and celltype not in coverage["celltypes_covered"]:
+                coverage["celltypes_covered"].append(celltype)
+
+    return {
+        "papers": papers,
+        "search_queries": [
+            {
+                "type": sq["type"],
+                "genes": sq.get("genes"),
+                "diseases": sq.get("diseases"),
+                "keywords": sq.get("keywords"),
+            }
+            for sq in search_queries
+        ],
+        "coverage": coverage,
+        "search_method": "fixed_strategy_fallback",
+    }
+
+
 def _validate_generated_queries(queries: list[dict]) -> list[dict]:
     """Validate and filter LLM-generated queries.
 
@@ -1418,7 +1573,7 @@ def search_literature_dynamic(
     pathways: list[str],
     celltypes: list[str],
     disease: str,
-    max_results: int = 30,
+    max_results: int = 40,
     target_gene_coverage: float = 0.6,
     target_pathway_coverage: float = 0.5,
     max_iterations: int = 3,
@@ -1537,14 +1692,14 @@ def search_literature_dynamic(
         except Exception as e:
             logger.error(f"LLM query generation failed at iteration {iteration}: {e}")
             if iteration == 0:
-                # Fallback on first iteration
-                return search_literature_for_context.invoke({
-                    "genes": genes,
-                    "pathways": pathways,
-                    "celltypes": celltypes,
-                    "disease": disease,
-                    "max_results": max_results,
-                })
+                # Fallback on first iteration - use fixed strategy search internally
+                return _execute_fixed_strategy_search(
+                    genes=genes,
+                    pathways=pathways,
+                    celltypes=celltypes,
+                    disease=disease,
+                    max_results=max_results,
+                )
             break
 
         # Parse and validate queries
@@ -1554,13 +1709,14 @@ def search_literature_dynamic(
         if not validated_queries:
             if iteration == 0:
                 logger.warning("No valid queries on first iteration, falling back")
-                return search_literature_for_context.invoke({
-                    "genes": genes,
-                    "pathways": pathways,
-                    "celltypes": celltypes,
-                    "disease": disease,
-                    "max_results": max_results,
-                })
+                # Fallback on first iteration - use fixed strategy search internally
+                return _execute_fixed_strategy_search(
+                    genes=genes,
+                    pathways=pathways,
+                    celltypes=celltypes,
+                    disease=disease,
+                    max_results=max_results,
+                )
             logger.warning(f"No valid queries at iteration {iteration}, stopping")
             break
 
@@ -1705,7 +1861,7 @@ async def search_literature_dynamic_async(
     pathways: list[str],
     celltypes: list[str],
     disease: str,
-    max_results: int = 30,
+    max_results: int = 40,
     target_gene_coverage: float = 0.6,
     target_pathway_coverage: float = 0.5,
     max_iterations: int = 3,

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCI Analysis Report - Reference Example</title>
+    <!--
+    DeepMAST HTML Report Reference Example
+
+    This is a minimal, shareable example showing the complete structure
+    of a CCI Analysis Report. Use this as a template for understanding:
+    - Tab navigation structure
+    - Section layouts and CSS classes
+    - Figure and interpretation formatting
+    - Pagination for L-R interaction tables
+    - Reference citation format
+
+    All content uses generalized placeholders for sharing.
+    -->
+    <style>
+        /* Inline CSS for self-contained sharing - see assets/theme.css for full version */
+        :root {
+            --color-primary: #64ffda;
+            --color-secondary: #ffd166;
+            --color-accent: #ff6b9d;
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --text-primary: #e4e4e4;
+            --text-secondary: #aaa;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(26, 26, 46, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            padding: 40px;
+        }
+        h1 { color: var(--color-primary); font-size: 2.5em; text-align: center; margin-bottom: 10px; text-shadow: 0 0 10px rgba(100, 255, 218, 0.5); }
+        .subtitle { text-align: center; color: var(--text-secondary); font-size: 1.2em; margin-bottom: 40px; font-style: italic; }
+        h2 { color: var(--color-primary); font-size: 2em; margin: 40px 0 20px; border-bottom: 2px solid var(--color-primary); padding-bottom: 10px; }
+        h3 { color: var(--color-secondary); font-size: 1.5em; margin: 30px 0 15px; }
+        h4 { color: var(--color-accent); font-size: 1.2em; margin: 20px 0 10px; }
+
+        .summary-box {
+            background: linear-gradient(135deg, rgba(100, 255, 218, 0.1) 0%, rgba(255, 107, 157, 0.1) 100%);
+            padding: 25px; border-radius: 10px; margin: 30px 0;
+            border: 2px solid rgba(100, 255, 218, 0.3);
+        }
+        .analysis-section {
+            background: rgba(35, 35, 60, 0.6);
+            padding: 25px; border-radius: 10px; margin-bottom: 30px;
+            border-left: 4px solid var(--color-primary);
+        }
+        .interpretation {
+            background: rgba(100, 255, 218, 0.1);
+            padding: 20px; border-left: 4px solid var(--color-primary);
+            border-radius: 5px; margin: 20px 0;
+        }
+        .interpretation h4 { color: var(--color-primary); margin-bottom: 10px; }
+        .key-findings {
+            background: rgba(255, 107, 157, 0.1);
+            padding: 20px; border-radius: 5px; margin: 20px 0;
+        }
+        .key-findings ul { list-style-position: inside; margin-left: 20px; }
+        .key-findings li { margin: 10px 0; }
+        .pathway-box {
+            background: rgba(255, 209, 102, 0.1);
+            padding: 15px; border-radius: 5px; margin: 10px 0;
+            border-left: 4px solid var(--color-secondary);
+        }
+        .figure-container {
+            text-align: center; margin: 30px 0;
+            background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 10px;
+        }
+        .figure-placeholder {
+            background: rgba(100, 255, 218, 0.1);
+            border: 2px dashed var(--color-primary);
+            padding: 60px 40px; border-radius: 8px;
+            color: var(--text-secondary);
+        }
+        .figure-caption { color: var(--text-secondary); font-style: italic; margin-top: 15px; font-size: 0.95em; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; border-bottom: 2px solid var(--color-primary); padding-bottom: 10px; }
+        .tab-button {
+            background: rgba(35, 35, 60, 0.8); color: var(--color-primary);
+            border: 2px solid var(--color-primary); padding: 12px 24px;
+            cursor: pointer; border-radius: 5px 5px 0 0; transition: all 0.3s ease;
+            font-size: 1.1em; font-weight: 500;
+        }
+        .tab-button:hover { background: rgba(100, 255, 218, 0.2); transform: translateY(-2px); }
+        .tab-button.active { background: var(--color-primary); color: var(--bg-primary); font-weight: bold; }
+        .tab-content { display: none; animation: fadeIn 0.5s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: rgba(35, 35, 60, 0.6); border-radius: 8px; overflow: hidden; }
+        th { background: rgba(100, 255, 218, 0.2); color: var(--color-primary); padding: 12px; text-align: left; border-bottom: 2px solid var(--color-primary); }
+        td { padding: 10px 12px; border-bottom: 1px solid rgba(100, 255, 218, 0.1); }
+        tr:hover { background: rgba(100, 255, 218, 0.05); }
+
+        /* Pagination */
+        .pagination { display: flex; justify-content: center; gap: 10px; margin: 20px 0; }
+        .page-button {
+            background: rgba(100, 255, 218, 0.2); color: var(--color-primary);
+            border: 1px solid var(--color-primary); padding: 8px 16px;
+            cursor: pointer; border-radius: 5px; transition: all 0.3s ease;
+        }
+        .page-button:hover { background: rgba(100, 255, 218, 0.4); }
+        .page-button.active { background: var(--color-primary); color: var(--bg-primary); font-weight: bold; }
+        .interactions-page { display: none; }
+        .interactions-page.active { display: block; }
+
+        /* Badges & Scores */
+        .score-badge { display: inline-block; padding: 3px 10px; border-radius: 15px; font-size: 0.85em; margin-left: 10px; }
+        .score-high { background: rgba(100, 255, 218, 0.3); color: var(--color-primary); }
+        .score-medium { background: rgba(255, 209, 102, 0.3); color: var(--color-secondary); }
+        .confidence-bar { background: rgba(100, 100, 100, 0.3); border-radius: 10px; height: 10px; margin: 5px 0; overflow: hidden; }
+        .confidence-fill { height: 100%; background: linear-gradient(90deg, var(--color-accent), var(--color-primary)); border-radius: 10px; }
+
+        /* References */
+        .reference { color: var(--color-primary); text-decoration: none; font-weight: bold; }
+        .reference:hover { text-decoration: underline; }
+        .paper-card { background: rgba(30, 30, 50, 0.8); border-radius: 8px; padding: 15px; margin: 10px 0; border-left: 3px solid var(--color-primary); }
+        .paper-title a { color: var(--color-primary); text-decoration: none; }
+        .paper-title a:hover { text-decoration: underline; }
+
+        /* Semantic Highlights */
+        .highlight-cluster { color: var(--color-secondary); font-weight: bold; }
+        .highlight-pathway { color: var(--color-accent); font-weight: bold; }
+        .highlight-celltype { color: var(--color-primary); font-weight: bold; }
+
+        /* Metadata */
+        .metadata { color: #666; font-size: 0.9em; text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(100, 255, 218, 0.2); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Cell-Cell Interaction Analysis Report</h1>
+        <p class="subtitle">Comprehensive Spatial Transcriptomics Analysis - [Sample Name]</p>
+
+        <!-- Executive Summary -->
+        <div class="summary-box">
+            <h3>Executive Summary</h3>
+            <p>This report presents a comprehensive analysis of cell-cell interactions in [tissue type] spatial transcriptomics data. Key findings include identification of [N] spatially significant ligand-receptor pairs, with <span class="highlight-pathway">TGFb signaling</span> emerging as a dominant communication axis between <span class="highlight-celltype">stromal cells</span> and <span class="highlight-celltype">tumor cells</span>.</p>
+            <div class="key-findings">
+                <h4>Quality Metrics</h4>
+                <ul>
+                    <li><strong>Quality Score:</strong> <span class="score-badge score-high">0.85</span></li>
+                    <li><strong>Spatial Coverage:</strong> 95% of tissue regions analyzed</li>
+                    <li><strong>L-R Pairs Identified:</strong> 127 significant interactions</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Analysis Configuration -->
+        <div class="analysis-section">
+            <h3>Analysis Configuration</h3>
+            <table>
+                <tr><th>Parameter</th><th>Value</th></tr>
+                <tr><td>Target Cluster</td><td><span class="highlight-cluster">Cluster 5</span> (Invasive Tumor)</td></tr>
+                <tr><td>Reference Clusters</td><td>Clusters 0, 1, 2 (Stromal, Immune, Epithelial)</td></tr>
+                <tr><td>Analysis Mode</td><td>Cluster-to-CellType (Mode A)</td></tr>
+                <tr><td>Significance Threshold</td><td>FDR < 0.05, Moran's R > 0.3</td></tr>
+            </table>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <button class="tab-button active" onclick="openTab(event, 'part1')">Part 1: Spatial & Pathway</button>
+            <button class="tab-button" onclick="openTab(event, 'part2')">Part 2: CCI & NMF</button>
+            <button class="tab-button" onclick="openTab(event, 'part3')">Part 3: L-R Interactions</button>
+            <button class="tab-button" onclick="openTab(event, 'summary')">Comprehensive Summary</button>
+        </div>
+
+        <!-- Part 1 Content -->
+        <div id="part1" class="tab-content active">
+            <h2>Part 1: Spatial Distribution & Pathway Analysis</h2>
+
+            <div class="analysis-section">
+                <h3>1.1 Spatial Distribution Analysis</h3>
+                <div class="figure-container">
+                    <div class="figure-placeholder">
+                        [Spatial plot showing cluster distribution across tissue sections]<br>
+                        <small>Figure embedded as Base64 in actual reports</small>
+                    </div>
+                    <p class="figure-caption">Figure 1.1: Spatial distribution of cell clusters in [tissue type]. <span class="highlight-cluster">Cluster 5</span> (orange) shows enrichment in the invasive tumor margin.</p>
+                </div>
+                <div class="interpretation">
+                    <h4>Biological Interpretation</h4>
+                    <p><span class="highlight-cluster">Cluster 5</span> exhibits a distinct spatial localization pattern at the tumor-stroma interface, suggesting active intercellular communication. This finding is consistent with previous reports demonstrating that invasive tumor margins are characterized by increased cell-cell signaling (Smith et al., 2023; PMID: 12345678).</p>
+                </div>
+            </div>
+
+            <div class="analysis-section">
+                <h3>1.4 Pathway Enrichment (Decoupler)</h3>
+                <div class="pathway-box">
+                    <h4>Top Enriched Pathways in <span class="highlight-cluster">Cluster 5</span></h4>
+                    <ul>
+                        <li><span class="highlight-pathway">TGFb signaling</span> (Activity score: 2.3, p < 0.001)</li>
+                        <li><span class="highlight-pathway">Hypoxia response</span> (Activity score: 1.8, p < 0.01)</li>
+                        <li><span class="highlight-pathway">EMT (Epithelial-Mesenchymal Transition)</span> (Activity score: 1.5, p < 0.05)</li>
+                    </ul>
+                </div>
+                <div class="interpretation">
+                    <h4>Biological Interpretation</h4>
+                    <p>The enrichment of <span class="highlight-pathway">TGFb signaling</span> and <span class="highlight-pathway">EMT</span> pathways in <span class="highlight-cluster">Cluster 5</span> suggests active tumor invasion processes. These pathways are known drivers of epithelial plasticity and metastatic potential in [cancer type] (Jones et al., 2022; PMID: 23456789).</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Part 2 Content -->
+        <div id="part2" class="tab-content">
+            <h2>Part 2: Cell-Cell Interaction & NMF Analysis</h2>
+
+            <div class="analysis-section">
+                <h3>2.6 LIANA Analysis (Moran's R Filtered)</h3>
+                <p>Spatially significant ligand-receptor pairs identified between <span class="highlight-cluster">Cluster 5</span> and neighboring cell types:</p>
+                <table>
+                    <tr>
+                        <th>Ligand</th>
+                        <th>Receptor</th>
+                        <th>Source</th>
+                        <th>Target</th>
+                        <th>Moran's R</th>
+                    </tr>
+                    <tr>
+                        <td>TGFB1</td>
+                        <td>TGFBR2</td>
+                        <td><span class="highlight-celltype">Stromal</span></td>
+                        <td><span class="highlight-cluster">Cluster 5</span></td>
+                        <td>0.45</td>
+                    </tr>
+                    <tr>
+                        <td>VEGFA</td>
+                        <td>KDR</td>
+                        <td><span class="highlight-cluster">Cluster 5</span></td>
+                        <td><span class="highlight-celltype">Endothelial</span></td>
+                        <td>0.38</td>
+                    </tr>
+                </table>
+                <div class="interpretation">
+                    <h4>Biological Interpretation</h4>
+                    <p>The TGFB1-TGFBR2 axis shows the highest spatial correlation (Moran's R = 0.45), indicating coordinated expression between <span class="highlight-celltype">stromal cells</span> and <span class="highlight-cluster">Cluster 5</span>. This supports the role of stromal-derived TGFb in promoting tumor invasion (Wang et al., 2021; PMID: 34567890).</p>
+                </div>
+            </div>
+
+            <div class="analysis-section">
+                <h3>2.7 NMF Factor Analysis</h3>
+                <p>Non-negative matrix factorization reveals [N] spatial programs:</p>
+                <div class="key-findings">
+                    <h4>Factor 3: Invasion Program</h4>
+                    <ul>
+                        <li>Dominant genes: <strong>VIM, MMP2, SNAI1, CDH2</strong></li>
+                        <li>Associated cell types: <span class="highlight-celltype">Invasive Tumor</span>, <span class="highlight-celltype">CAF</span></li>
+                        <li>Pathway enrichment: EMT (p < 0.001), ECM remodeling (p < 0.01)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Part 3 Content -->
+        <div id="part3" class="tab-content">
+            <h2>Part 3: Ligand-Receptor Interaction Details</h2>
+
+            <div class="analysis-section">
+                <h3>3.10 L-R Interaction Visualization</h3>
+
+                <!-- Pagination Example -->
+                <div class="pagination">
+                    <button class="page-button active" onclick="showPage(1)">1</button>
+                    <button class="page-button" onclick="showPage(2)">2</button>
+                </div>
+
+                <div id="interactions-page-1" class="interactions-page active">
+                    <h4>TGFB1 - TGFBR2 Interaction</h4>
+                    <div class="figure-container">
+                        <div class="figure-placeholder">
+                            [Spatial co-localization plot for TGFB1-TGFBR2]
+                        </div>
+                        <p class="figure-caption">Figure 3.10a: Spatial co-expression of TGFB1 (ligand) and TGFBR2 (receptor).</p>
+                    </div>
+                    <div class="interpretation">
+                        <h4>Mechanism</h4>
+                        <p>TGFB1 secreted by <span class="highlight-celltype">stromal fibroblasts</span> binds to TGFBR2 on <span class="highlight-cluster">Cluster 5</span> cells, activating downstream SMAD signaling that promotes EMT and invasion capabilities.</p>
+                    </div>
+                </div>
+
+                <div id="interactions-page-2" class="interactions-page">
+                    <h4>VEGFA - KDR Interaction</h4>
+                    <div class="figure-container">
+                        <div class="figure-placeholder">
+                            [Spatial co-localization plot for VEGFA-KDR]
+                        </div>
+                        <p class="figure-caption">Figure 3.10b: Spatial co-expression of VEGFA (ligand) and KDR (receptor).</p>
+                    </div>
+                    <div class="interpretation">
+                        <h4>Mechanism</h4>
+                        <p>Tumor-derived VEGFA from <span class="highlight-cluster">Cluster 5</span> promotes angiogenesis by binding KDR on <span class="highlight-celltype">endothelial cells</span>, facilitating nutrient supply and potential metastatic routes.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Content -->
+        <div id="summary" class="tab-content">
+            <h2>Comprehensive Summary</h2>
+
+            <div class="analysis-section">
+                <h3>Integrated Biological Narrative</h3>
+                <div class="interpretation">
+                    <p>This comprehensive spatial transcriptomics analysis reveals a complex cell-cell communication network centered on <span class="highlight-cluster">Cluster 5</span> (Invasive Tumor). The dominant signaling axes involve:</p>
+                    <ol>
+                        <li><strong>TGFb signaling</strong>: Stromal-to-tumor communication promoting EMT</li>
+                        <li><strong>VEGF signaling</strong>: Tumor-to-endothelial communication driving angiogenesis</li>
+                        <li><strong>Hypoxia response</strong>: Spatial organization reflecting microenvironmental gradients</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="analysis-section">
+                <h3>Quality Assessment</h3>
+                <div class="summary-box">
+                    <h4>Overall Quality Score: <span class="score-badge score-high">0.85</span></h4>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" style="width: 85%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="analysis-section">
+                <h3>References</h3>
+                <div class="key-findings">
+                    <h4>Supporting Literature</h4>
+                    <div class="paper-card">
+                        <div class="paper-title">
+                            <a href="https://pubmed.ncbi.nlm.nih.gov/12345678/" target="_blank">Smith et al. (2023) - Cell-cell communication at tumor margins</a>
+                        </div>
+                    </div>
+                    <div class="paper-card">
+                        <div class="paper-title">
+                            <a href="https://pubmed.ncbi.nlm.nih.gov/23456789/" target="_blank">Jones et al. (2022) - TGFb signaling in EMT</a>
+                        </div>
+                    </div>
+                    <div class="paper-card">
+                        <div class="paper-title">
+                            <a href="https://pubmed.ncbi.nlm.nih.gov/34567890/" target="_blank">Wang et al. (2021) - Stromal-tumor interactions</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metadata -->
+        <div class="metadata">
+            <p>Generated by DeepMAST Deep Interpreter (DeepAgents Framework)</p>
+            <p>Date: [Generation Date]</p>
+            <p><em>This is a reference example for the html-report-generator skill.</em></p>
+        </div>
+    </div>
+
+    <script>
+        /* Tab navigation and pagination - see assets/interactive.js for full version */
+        function openTab(evt, tabName) {
+            var i, tabcontent, tabbuttons;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+                tabcontent[i].classList.remove("active");
+            }
+            tabbuttons = document.getElementsByClassName("tab-button");
+            for (i = 0; i < tabbuttons.length; i++) {
+                tabbuttons[i].classList.remove("active");
+            }
+            document.getElementById(tabName).style.display = "block";
+            document.getElementById(tabName).classList.add("active");
+            if (evt) {
+                evt.currentTarget.classList.add("active");
+            }
+        }
+
+        function showPage(pageNum) {
+            var i, pages, buttons;
+            pages = document.getElementsByClassName("interactions-page");
+            for (i = 0; i < pages.length; i++) {
+                pages[i].style.display = "none";
+                pages[i].classList.remove("active");
+            }
+            buttons = document.getElementsByClassName("page-button");
+            for (i = 0; i < buttons.length; i++) {
+                buttons[i].classList.remove("active");
+            }
+            var targetPage = document.getElementById("interactions-page-" + pageNum);
+            if (targetPage) {
+                targetPage.style.display = "block";
+                targetPage.classList.add("active");
+            }
+            if (buttons[pageNum - 1]) {
+                buttons[pageNum - 1].classList.add("active");
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            openTab(null, 'part1');
+            if (document.getElementById("interactions-page-1")) {
+                showPage(1);
+            }
+        });
+    </script>
+</body>
+</html>

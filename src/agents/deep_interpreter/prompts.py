@@ -75,14 +75,20 @@ Use the **planner** subagent to:
 Use the **searcher** subagent to search literature for ALL three parts:
 
 ```
-For Part 1, Part 2, Part 3:
-  1. Extract biological context (genes, pathways, cell types)
+For Part 1:
+  1. Extract spatial context (pathways, celltypes, NO genes)
+  2. Search PubMed proactively
+  3. Ensure coverage >= 50% pathways
+  4. Output: /part1_search_context.json, /part1_papers.json
+
+For Part 2+3 (shared search):
+  1. Extract L-R context (genes, pathways, celltypes)
   2. Search PubMed proactively
   3. Ensure coverage >= 60% genes, >= 50% pathways
-  4. Output: /partN_search_context.json, /partN_papers.json
+  4. Output: /lr_search_context.json, /liana_papers.json (shared)
 ```
 
-**CRITICAL**: ALL /partN_papers.json files must exist BEFORE calling interpreter.
+**CRITICAL**: Both /part1_papers.json and /liana_papers.json must exist BEFORE calling interpreter.
 
 ### Step 3: INTERPRETER (for ALL Parts)
 Use the **interpreter** subagent to interpret ALL three parts:

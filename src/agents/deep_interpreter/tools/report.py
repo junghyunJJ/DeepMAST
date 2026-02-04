@@ -2,6 +2,9 @@
 
 This tool generates publication-quality HTML reports for CCI analysis
 interpretations with dark theme styling and embedded figures.
+
+CSS and JavaScript are loaded from external files in the skills directory,
+with fallback to embedded content if files are not found.
 """
 
 import base64
@@ -13,7 +16,169 @@ from typing import Optional
 from langchain_core.tools import tool
 
 
-# HTML template with dark theme styling (matching reference report style)
+# Path to skills assets directory
+_SKILLS_ASSETS_DIR = (
+    Path(__file__).resolve().parent.parent.parent.parent.parent
+    / "skills"
+    / "html-report-generator"
+    / "assets"
+)
+
+
+def _load_css() -> str:
+    """Load CSS from external file or return fallback.
+
+    Loads theme.css from skills/html-report-generator/assets/ directory.
+    Falls back to embedded minimal CSS if file is not found.
+
+    Returns:
+        CSS content as string
+    """
+    css_path = _SKILLS_ASSETS_DIR / "theme.css"
+    if css_path.exists():
+        try:
+            return css_path.read_text(encoding="utf-8")
+        except Exception:
+            pass
+    # Fallback CSS (minimal version for compatibility)
+    return _FALLBACK_CSS
+
+
+def _load_js() -> str:
+    """Load JavaScript from external file or return fallback.
+
+    Loads interactive.js from skills/html-report-generator/assets/ directory.
+    Falls back to embedded JavaScript if file is not found.
+
+    Returns:
+        JavaScript content as string
+    """
+    js_path = _SKILLS_ASSETS_DIR / "interactive.js"
+    if js_path.exists():
+        try:
+            return js_path.read_text(encoding="utf-8")
+        except Exception:
+            pass
+    # Fallback JavaScript
+    return _FALLBACK_JS
+
+
+# Fallback CSS (embedded for when external file is not available)
+_FALLBACK_CSS = """
+:root {
+    --color-primary: #64ffda;
+    --color-secondary: #ffd166;
+    --color-accent: #ff6b9d;
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --text-primary: #e4e4e4;
+    --text-secondary: #aaa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%); color: var(--text-primary); line-height: 1.6; padding: 20px; }
+.container { max-width: 1400px; margin: 0 auto; background: rgba(26, 26, 46, 0.95); border-radius: 15px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); padding: 40px; }
+h1 { color: var(--color-primary); font-size: 2.5em; margin-bottom: 10px; text-align: center; text-shadow: 0 0 10px rgba(100, 255, 218, 0.5); }
+.subtitle { text-align: center; color: var(--text-secondary); font-size: 1.2em; margin-bottom: 40px; font-style: italic; }
+h2 { color: var(--color-primary); font-size: 2em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid var(--color-primary); }
+h3 { color: var(--color-secondary); font-size: 1.5em; margin-top: 30px; margin-bottom: 15px; }
+h4 { color: var(--color-accent); font-size: 1.2em; margin-top: 20px; margin-bottom: 10px; }
+.analysis-section { background: rgba(35, 35, 60, 0.6); padding: 25px; border-radius: 10px; margin-bottom: 30px; border-left: 4px solid var(--color-primary); }
+.figure-container { text-align: center; margin: 30px 0; background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 10px; }
+.figure-container img { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(100, 255, 218, 0.3); }
+.figure-caption { color: var(--text-secondary); font-style: italic; margin-top: 15px; font-size: 0.95em; }
+.interpretation { background: rgba(100, 255, 218, 0.1); padding: 20px; border-left: 4px solid var(--color-primary); border-radius: 5px; margin: 20px 0; }
+.interpretation h4 { color: var(--color-primary); margin-bottom: 10px; }
+.key-findings { background: rgba(255, 107, 157, 0.1); padding: 20px; border-radius: 5px; margin: 20px 0; }
+.key-findings ul { list-style-position: inside; margin-left: 20px; }
+.key-findings li { margin: 10px 0; color: var(--text-primary); }
+.summary-box { background: linear-gradient(135deg, rgba(100, 255, 218, 0.1) 0%, rgba(255, 107, 157, 0.1) 100%); padding: 25px; border-radius: 10px; margin: 30px 0; border: 2px solid rgba(100, 255, 218, 0.3); }
+.tabs { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; border-bottom: 2px solid var(--color-primary); padding-bottom: 10px; }
+.tab-button { background: rgba(35, 35, 60, 0.8); color: var(--color-primary); border: 2px solid var(--color-primary); padding: 12px 24px; cursor: pointer; border-radius: 5px 5px 0 0; transition: all 0.3s ease; font-size: 1.1em; font-weight: 500; }
+.tab-button:hover { background: rgba(100, 255, 218, 0.2); transform: translateY(-2px); }
+.tab-button.active { background: var(--color-primary); color: var(--bg-primary); font-weight: bold; }
+.tab-content { display: none; animation: fadeIn 0.5s; }
+.tab-content.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.confidence-bar { background: rgba(100, 100, 100, 0.3); border-radius: 10px; height: 10px; margin: 5px 0; overflow: hidden; }
+.confidence-fill { height: 100%; background: linear-gradient(90deg, var(--color-accent), var(--color-primary)); border-radius: 10px; }
+.reference { color: var(--color-primary); text-decoration: none; font-weight: bold; }
+.reference:hover { text-decoration: underline; }
+table { width: 100%; border-collapse: collapse; margin: 20px 0; background: rgba(35, 35, 60, 0.6); border-radius: 8px; overflow: hidden; }
+th { background: rgba(100, 255, 218, 0.2); color: var(--color-primary); padding: 12px; text-align: left; font-weight: bold; border-bottom: 2px solid var(--color-primary); }
+td { padding: 10px 12px; border-bottom: 1px solid rgba(100, 255, 218, 0.1); }
+tr:hover { background: rgba(100, 255, 218, 0.05); }
+.table-container { overflow-x: auto; }
+.score-badge { display: inline-block; padding: 3px 10px; border-radius: 15px; font-size: 0.85em; margin-left: 10px; }
+.score-high { background: rgba(100, 255, 218, 0.3); color: var(--color-primary); }
+.score-medium { background: rgba(255, 209, 102, 0.3); color: var(--color-secondary); }
+.score-low { background: rgba(255, 107, 157, 0.3); color: var(--color-accent); }
+.paper-card { background: rgba(30, 30, 50, 0.8); border-radius: 8px; padding: 15px; margin: 10px 0; border-left: 3px solid var(--color-primary); }
+.paper-title a { color: var(--color-primary); text-decoration: none; }
+.paper-title a:hover { text-decoration: underline; }
+.highlight-cluster { color: var(--color-secondary); font-weight: bold; }
+.highlight-pathway { color: var(--color-accent); font-weight: bold; }
+.highlight-celltype { color: var(--color-primary); font-weight: bold; }
+.pathway-box { background: rgba(255, 209, 102, 0.1); padding: 15px; border-radius: 5px; margin: 10px 0; border-left: 4px solid var(--color-secondary); }
+.pathway-box ul { margin-left: 20px; margin-top: 10px; }
+.pagination { display: flex; justify-content: center; gap: 10px; margin: 20px 0; }
+.page-button { background: rgba(100, 255, 218, 0.2); color: var(--color-primary); border: 1px solid var(--color-primary); padding: 8px 16px; cursor: pointer; border-radius: 5px; transition: all 0.3s ease; }
+.page-button:hover { background: rgba(100, 255, 218, 0.4); }
+.page-button.active { background: var(--color-primary); color: var(--bg-primary); font-weight: bold; }
+.interactions-page { display: none; }
+.interactions-page.active { display: block; }
+.metadata { color: #666; font-size: 0.9em; text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(100, 255, 218, 0.2); }
+"""
+
+# Fallback JavaScript (embedded for when external file is not available)
+_FALLBACK_JS = """
+function openTab(evt, tabName) {
+    var i, tabcontent, tabbuttons;
+    tabcontent = document.getElementsByClassName("tab-content");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+        tabcontent[i].classList.remove("active");
+    }
+    tabbuttons = document.getElementsByClassName("tab-button");
+    for (i = 0; i < tabbuttons.length; i++) {
+        tabbuttons[i].classList.remove("active");
+    }
+    document.getElementById(tabName).style.display = "block";
+    document.getElementById(tabName).classList.add("active");
+    if (evt) {
+        evt.currentTarget.classList.add("active");
+    }
+}
+
+function showPage(pageNum) {
+    var i, pages, buttons;
+    pages = document.getElementsByClassName("interactions-page");
+    for (i = 0; i < pages.length; i++) {
+        pages[i].style.display = "none";
+        pages[i].classList.remove("active");
+    }
+    buttons = document.getElementsByClassName("page-button");
+    for (i = 0; i < buttons.length; i++) {
+        buttons[i].classList.remove("active");
+    }
+    var targetPage = document.getElementById("interactions-page-" + pageNum);
+    if (targetPage) {
+        targetPage.style.display = "block";
+        targetPage.classList.add("active");
+    }
+    if (buttons[pageNum - 1]) {
+        buttons[pageNum - 1].classList.add("active");
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    openTab(null, 'part1');
+    if (document.getElementById("interactions-page-1")) {
+        showPage(1);
+    }
+});
+"""
+
+# HTML template with placeholders for CSS and JS
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -21,351 +186,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title}</title>
     <style>
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-
-        body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #e4e4e4;
-            line-height: 1.6;
-            padding: 20px;
-        }}
-
-        .container {{
-            max-width: 1400px;
-            margin: 0 auto;
-            background: rgba(26, 26, 46, 0.95);
-            border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-            padding: 40px;
-        }}
-
-        h1 {{
-            color: #64ffda;
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-align: center;
-            text-shadow: 0 0 10px rgba(100, 255, 218, 0.5);
-        }}
-
-        .subtitle {{
-            text-align: center;
-            color: #aaa;
-            font-size: 1.2em;
-            margin-bottom: 40px;
-            font-style: italic;
-        }}
-
-        h2 {{
-            color: #64ffda;
-            font-size: 2em;
-            margin-top: 40px;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #64ffda;
-        }}
-
-        h3 {{
-            color: #ffd166;
-            font-size: 1.5em;
-            margin-top: 30px;
-            margin-bottom: 15px;
-        }}
-
-        h4 {{
-            color: #ff6b9d;
-            font-size: 1.2em;
-            margin-top: 20px;
-            margin-bottom: 10px;
-        }}
-
-        .analysis-section {{
-            background: rgba(35, 35, 60, 0.6);
-            padding: 25px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            border-left: 4px solid #64ffda;
-        }}
-
-        .figure-container {{
-            text-align: center;
-            margin: 30px 0;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 20px;
-            border-radius: 10px;
-        }}
-
-        .figure-container img {{
-            max-width: 100%;
-            height: auto;
-            border-radius: 8px;
-            box-shadow: 0 5px 15px rgba(100, 255, 218, 0.3);
-        }}
-
-        .figure-caption {{
-            color: #aaa;
-            font-style: italic;
-            margin-top: 15px;
-            font-size: 0.95em;
-        }}
-
-        .interpretation {{
-            background: rgba(100, 255, 218, 0.1);
-            padding: 20px;
-            border-left: 4px solid #64ffda;
-            border-radius: 5px;
-            margin: 20px 0;
-        }}
-
-        .interpretation h4 {{
-            color: #64ffda;
-            margin-bottom: 10px;
-        }}
-
-        .key-findings {{
-            background: rgba(255, 107, 157, 0.1);
-            padding: 20px;
-            border-radius: 5px;
-            margin: 20px 0;
-        }}
-
-        .key-findings ul {{
-            list-style-position: inside;
-            margin-left: 20px;
-        }}
-
-        .key-findings li {{
-            margin: 10px 0;
-            color: #e4e4e4;
-        }}
-
-        .summary-box {{
-            background: linear-gradient(135deg, rgba(100, 255, 218, 0.1) 0%, rgba(255, 107, 157, 0.1) 100%);
-            padding: 25px;
-            border-radius: 10px;
-            margin: 30px 0;
-            border: 2px solid rgba(100, 255, 218, 0.3);
-        }}
-
-        .tabs {{
-            display: flex;
-            gap: 10px;
-            margin: 20px 0;
-            flex-wrap: wrap;
-            border-bottom: 2px solid #64ffda;
-            padding-bottom: 10px;
-        }}
-
-        .tab-button {{
-            background: rgba(35, 35, 60, 0.8);
-            color: #64ffda;
-            border: 2px solid #64ffda;
-            padding: 12px 24px;
-            cursor: pointer;
-            border-radius: 5px 5px 0 0;
-            transition: all 0.3s ease;
-            font-size: 1.1em;
-            font-weight: 500;
-        }}
-
-        .tab-button:hover {{
-            background: rgba(100, 255, 218, 0.2);
-            transform: translateY(-2px);
-        }}
-
-        .tab-button.active {{
-            background: #64ffda;
-            color: #1a1a2e;
-            font-weight: bold;
-        }}
-
-        .tab-content {{
-            display: none;
-            animation: fadeIn 0.5s;
-        }}
-
-        .tab-content.active {{
-            display: block;
-        }}
-
-        @keyframes fadeIn {{
-            from {{ opacity: 0; }}
-            to {{ opacity: 1; }}
-        }}
-
-        .confidence-bar {{
-            background: rgba(100, 100, 100, 0.3);
-            border-radius: 10px;
-            height: 10px;
-            margin: 5px 0;
-            overflow: hidden;
-        }}
-
-        .confidence-fill {{
-            height: 100%;
-            background: linear-gradient(90deg, #ff6b9d, #64ffda);
-            border-radius: 10px;
-        }}
-
-        .reference {{
-            color: #64ffda;
-            text-decoration: none;
-            font-weight: bold;
-        }}
-
-        .reference:hover {{
-            text-decoration: underline;
-        }}
-
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            background: rgba(35, 35, 60, 0.6);
-            border-radius: 8px;
-            overflow: hidden;
-        }}
-
-        th {{
-            background: rgba(100, 255, 218, 0.2);
-            color: #64ffda;
-            padding: 12px;
-            text-align: left;
-            font-weight: bold;
-            border-bottom: 2px solid #64ffda;
-        }}
-
-        td {{
-            padding: 10px 12px;
-            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
-        }}
-
-        tr:hover {{
-            background: rgba(100, 255, 218, 0.05);
-        }}
-
-        .table-container {{
-            overflow-x: auto;
-        }}
-
-        .score-badge {{
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 15px;
-            font-size: 0.85em;
-            margin-left: 10px;
-        }}
-
-        .score-high {{
-            background: rgba(100, 255, 218, 0.3);
-            color: #64ffda;
-        }}
-
-        .score-medium {{
-            background: rgba(255, 209, 102, 0.3);
-            color: #ffd166;
-        }}
-
-        .score-low {{
-            background: rgba(255, 107, 157, 0.3);
-            color: #ff6b9d;
-        }}
-
-        .paper-card {{
-            background: rgba(30, 30, 50, 0.8);
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px 0;
-            border-left: 3px solid #64ffda;
-        }}
-
-        .paper-title a {{
-            color: #64ffda;
-            text-decoration: none;
-        }}
-
-        .paper-title a:hover {{
-            text-decoration: underline;
-        }}
-
-        /* Highlight classes for semantic markup */
-        .highlight-cluster {{
-            color: #ffd166;
-            font-weight: bold;
-        }}
-
-        .highlight-pathway {{
-            color: #ff6b9d;
-            font-weight: bold;
-        }}
-
-        .highlight-celltype {{
-            color: #64ffda;
-            font-weight: bold;
-        }}
-
-        /* Pathway box for PROGENy descriptions */
-        .pathway-box {{
-            background: rgba(255, 209, 102, 0.1);
-            padding: 15px;
-            border-radius: 5px;
-            margin: 10px 0;
-            border-left: 4px solid #ffd166;
-        }}
-
-        .pathway-box ul {{
-            margin-left: 20px;
-            margin-top: 10px;
-        }}
-
-        /* Pagination for L-R interaction tables */
-        .pagination {{
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin: 20px 0;
-        }}
-
-        .page-button {{
-            background: rgba(100, 255, 218, 0.2);
-            color: #64ffda;
-            border: 1px solid #64ffda;
-            padding: 8px 16px;
-            cursor: pointer;
-            border-radius: 5px;
-            transition: all 0.3s ease;
-        }}
-
-        .page-button:hover {{
-            background: rgba(100, 255, 218, 0.4);
-        }}
-
-        .page-button.active {{
-            background: #64ffda;
-            color: #1a1a2e;
-            font-weight: bold;
-        }}
-
-        .interactions-page {{
-            display: none;
-        }}
-
-        .interactions-page.active {{
-            display: block;
-        }}
-
-        .metadata {{
-            color: #666;
-            font-size: 0.9em;
-            text-align: center;
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid rgba(100, 255, 218, 0.2);
-        }}
+{css}
     </style>
 </head>
 <body>
@@ -421,52 +242,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
 
     <script>
-        function openTab(evt, tabName) {{
-            var i, tabcontent, tabbuttons;
-            tabcontent = document.getElementsByClassName("tab-content");
-            for (i = 0; i < tabcontent.length; i++) {{
-                tabcontent[i].style.display = "none";
-                tabcontent[i].classList.remove("active");
-            }}
-            tabbuttons = document.getElementsByClassName("tab-button");
-            for (i = 0; i < tabbuttons.length; i++) {{
-                tabbuttons[i].classList.remove("active");
-            }}
-            document.getElementById(tabName).style.display = "block";
-            document.getElementById(tabName).classList.add("active");
-            if (evt) {{
-                evt.currentTarget.classList.add("active");
-            }}
-        }}
-
-        function showPage(pageNum) {{
-            var i, pages, buttons;
-            pages = document.getElementsByClassName("interactions-page");
-            for (i = 0; i < pages.length; i++) {{
-                pages[i].style.display = "none";
-                pages[i].classList.remove("active");
-            }}
-            buttons = document.getElementsByClassName("page-button");
-            for (i = 0; i < buttons.length; i++) {{
-                buttons[i].classList.remove("active");
-            }}
-            var targetPage = document.getElementById("interactions-page-" + pageNum);
-            if (targetPage) {{
-                targetPage.style.display = "block";
-                targetPage.classList.add("active");
-            }}
-            if (buttons[pageNum - 1]) {{
-                buttons[pageNum - 1].classList.add("active");
-            }}
-        }}
-
-        // Initialize on DOMContentLoaded
-        document.addEventListener('DOMContentLoaded', function() {{
-            openTab(null, 'part1');
-            if (document.getElementById("interactions-page-1")) {{
-                showPage(1);
-            }}
-        }});
+{js}
     </script>
 </body>
 </html>
@@ -755,10 +531,16 @@ def _generate_html_report_impl(
         {_generate_references_html(references)}
         """
 
+    # Load CSS and JavaScript (from external files or fallback)
+    css_content = _load_css()
+    js_content = _load_js()
+
     # Fill template
     html = HTML_TEMPLATE.format(
         title=title,
         subtitle=subtitle,
+        css=css_content,
+        js=js_content,
         executive_summary=exec_summary_html,
         analysis_config=analysis_config,
         part1_content=part1_content,

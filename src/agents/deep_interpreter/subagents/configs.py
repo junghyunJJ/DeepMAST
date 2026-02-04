@@ -2,9 +2,10 @@
 
 Simplified 4-Agent Architecture:
 - PLANNER: Target confirmation + hypothesis generation (load_analysis_data)
-- SEARCHER: Context extraction + literature search (load_analysis_data, search_literature_dynamic, search_literature_for_context, search_literature, think_tool)
+- SEARCHER: Context extraction + literature search (load_analysis_data, search_literature_dynamic, search_literature, think_tool)
 - INTERPRETER: Part 1/2/3 interpretation with inline validation (load_analysis_data, validate_claim_literature, validate_quality, think_tool)
-- REPORTER: Cross-part synthesis + HTML report (load_analysis_data, generate_html_report)
+- REPORTER: Cross-part synthesis + literature validation + HTML report
+  (load_analysis_data, generate_html_report, literature search tools, RAG tools)
 
 This module provides the subagent definitions used by create_deep_agent().
 """
@@ -23,7 +24,12 @@ from src.agents.deep_interpreter.tools import (
     validate_quality,
     generate_html_report,
     think_tool,
+    # RAG tools for interpreter
+    prepare_rag_literature,
+    search_literature_fulltext,
+    validate_claim_fulltext,
 )
+from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
 
 __all__ = [
     "get_subagents",
@@ -54,14 +60,13 @@ SUBAGENT_CONFIGS = {
             "Literature search agent. Searches PubMed BEFORE interpretation. "
             "Part 1: uses spatial_search_context, outputs /part1_papers.json. "
             "Part 2+3: uses lr_search_context (SHARED), outputs /liana_papers.json ONCE for both parts. "
-            "Uses search_literature_dynamic (LLM-powered) as primary tool, with search_literature_for_context as fallback. "
+            "Uses search_literature_dynamic (LLM-powered) with automatic internal fallback. "
             "Papers will be the ONLY citation source for interpreter - this prevents hallucination."
         ),
         "system_prompt": SUBAGENT_PROMPTS["searcher"],
         "tools": [
             load_analysis_data,
-            search_literature_dynamic,  # PRIMARY: LLM-powered context-aware search
-            search_literature_for_context,  # FALLBACK: Fixed 4-strategy search
+            search_literature_dynamic,  # PRIMARY: LLM-powered (내부 자동 fallback 포함)
             search_literature,  # Follow-up: Single query search
             think_tool,
         ],
@@ -69,11 +74,16 @@ SUBAGENT_CONFIGS = {
     "interpreter": {
         "name": "interpreter",
         "description": (
-            "Interpretation agent with inline validation. For each Part (1, 2, 3): "
-            "reads /partN_papers.json, generates literature-grounded interpretation, "
-            "validates each claim against cited papers, and ensures quality score >= 0.7. "
+            "Interpretation agent with inline validation and RAG support. For each Part (1, 2, 3): "
+            "reads /partN_papers.json, optionally downloads full-text papers for RAG search, "
+            "generates literature-grounded interpretation with full-text context, "
+            "validates each claim against cited papers (using full-text if available), "
+            "and ensures quality score >= 0.7. "
+            "For Part 3: uses prioritize_top_lr_pairs to select top L-R pairs via hybrid "
+            "GenePT + Moran's R scoring (spatial 60% + semantic 40%). "
             "Every claim must cite PMID or be marked (Novel Finding). "
-            "Outputs /partN_final.md. Maximum 3 quality iterations per part."
+            "Outputs /partN_final.md. Maximum 3 quality iterations per part. "
+            "Falls back to Abstract mode if RAG infrastructure unavailable."
         ),
         "system_prompt": SUBAGENT_PROMPTS["interpreter"],
         "tools": [
@@ -81,17 +91,39 @@ SUBAGENT_CONFIGS = {
             validate_claim_literature,
             validate_quality,
             think_tool,
+            # RAG tools for full-text literature support
+            prepare_rag_literature,
+            search_literature_fulltext,
+            validate_claim_fulltext,
+            # Hybrid L-R prioritization (GenePT + Moran's R)
+            prioritize_top_lr_pairs,
         ],
     },
     "reporter": {
         "name": "reporter",
         "description": (
             "Synthesis and report generation agent. Reads all /partN_final.md files, "
-            "identifies cross-part themes, validates hypotheses, and generates final HTML report. "
-            "Outputs /synthesis.md and CCI_Analysis_Report.html."
+            "identifies cross-part themes, validates synthesis claims with NEW literature search "
+            "(following biomedical-literature-search workflow), and generates final HTML report. "
+            "Phase 4.5 validates integration claims against independent literature sources. "
+            "Outputs /synthesis.md, /synthesis_papers.json, /synthesis_validation.json, "
+            "and CCI_Analysis_Report.html."
         ),
         "system_prompt": SUBAGENT_PROMPTS["reporter"],
-        "tools": [load_analysis_data, generate_html_report],
+        "tools": [
+            # Core tools
+            load_analysis_data,
+            generate_html_report,
+            # Literature search tools (reuse from SEARCHER for synthesis validation)
+            search_literature_dynamic,
+            search_literature_for_context,
+            search_literature,
+            # RAG validation tools
+            prepare_rag_literature,
+            validate_claim_fulltext,
+            # Think tool for strategic planning and reflection
+            think_tool,
+        ],
     },
 }
 
@@ -194,15 +226,23 @@ Deep Interpreter 4-Agent Workflow:
      d. Inline quality check (score >= 0.7, max 3 iterations)
    - Outputs: /part1_final.md, /part2_final.md, /part3_final.md
 
-4. REPORTER (synthesizer + report-generator consolidated)
+4. REPORTER (synthesizer + report-generator consolidated + synthesis validation)
    - Read all /partN_final.md files
    - Identify cross-part themes
    - Validate hypotheses from strategic plan
+   - **Phase 4.5: Validate synthesis claims with independent literature search**
+     a. Extract synthesis context (genes, pathways, celltypes from Themes 1-4)
+     b. Strategic planning with think_tool (3 thoughts)
+     c. Search literature (search_literature_dynamic with integration-focused terms)
+     d. Quality reflection (theme coverage, gap-filling)
+     e. RAG validate & write (prepare_rag_literature, validate_claim_fulltext)
    - Generate HTML report
-   - Outputs: /synthesis.md, CCI_Analysis_Report.html
+   - Outputs: /synthesis.md, /synthesis_papers.json, /synthesis_validation.json, CCI_Analysis_Report.html
+   - Papers stored in: {data_path}/papers/synthesis/ (separate from Part papers)
 
 Hallucination Prevention (maintained):
 - Literature-First: Papers searched BEFORE interpretation
 - Claim Validation: Every PMID citation verified
+- **Synthesis Validation**: Integration claims validated with independent literature
 - Novel Finding Tags: Unsupported but valid findings clearly marked
 """

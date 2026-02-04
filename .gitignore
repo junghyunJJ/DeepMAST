@@ -43,3 +43,7 @@ papers/
 
 # resutls files
 res*
+old*
+
+# GenePT embeddings (large files, download via scripts/download_genept_embeddings.py)
+data/genept/

@@ -1,10 +1,13 @@
 {
   "dependencies": ["."],
   "graphs": {
-    "agent": "src.agents.graph_builders:graph",
-    "biological_interpreter": "src.agents.graph_builders:biological_interpreter_graph",
-    "deep_interpreter": "src.agents.deep_interpreter.graph_builder:deep_interpreter_graph",
-    "deep_interpreter_wrapped": "src.agents.deep_interpreter.graph_builder:deep_interpreter_wrapped_graph"
+    "Pipeline_builder": "src.agents.graph_builders:graph",
+    "DeepMAST_RAG": "src.agents.graph_builders:pubmed_rag_graph",
+    "Interpreter": "src.agents.deep_interpreter.graph_builder:deep_interpreter_wrapped_graph",
+    "Sub_Planner": "src.agents.deep_interpreter.graph_builder:planner_subagent_graph",
+    "Sub_Searcher": "src.agents.deep_interpreter.graph_builder:searcher_subagent_graph",
+    "Sub_Interpreter": "src.agents.deep_interpreter.graph_builder:interpreter_subagent_graph",
+    "Sub_Reporter": "src.agents.deep_interpreter.graph_builder:reporter_subagent_graph"
   },
   "env": ".env"
 }

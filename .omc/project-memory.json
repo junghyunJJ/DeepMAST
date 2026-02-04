@@ -1,0 +1,185 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1770191037512,
+  "projectRoot": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "pyproject.toml"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "pytest",
+    "lintCommand": "ruff check",
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "src",
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "agent-chat-ui": {
+      "path": "agent-chat-ui",
+      "purpose": null,
+      "fileCount": 24,
+      "lastAccessed": 1770191037505,
+      "keyFiles": [
+        "LICENSE",
+        "Makefile",
+        "PR_DESCRIPTION.md",
+        "README.md",
+        "REVIEW_REPORT.md"
+      ]
+    },
+    "agent_architecture": {
+      "path": "agent_architecture",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1770191037505,
+      "keyFiles": [
+        "1.pipeline_builder.mermaid",
+        "1.pipeline_builder.png",
+        "2.pipeline_executor.mermaid",
+        "2.pipeline_executor.png",
+        "3.biological_interpretor.mermaid"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 9,
+      "lastAccessed": 1770191037506,
+      "keyFiles": [
+        "deep_interpreter_architecture.md",
+        "deep_interpreter_overview.md",
+        "interpreter_rag_mode_workflow.md",
+        "interpreter_subagent_workflow.md",
+        "langgraph_graphs_reference.md"
+      ]
+    },
+    "mcp_servers": {
+      "path": "mcp_servers",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1770191037506,
+      "keyFiles": [
+        "read.py",
+        "runplot_LIANAp_NMF.py",
+        "runplot_NeighborEnrich.py",
+        "runplot_PathwayEnrich.py",
+        "runplot_SpatialRelation.py"
+      ]
+    },
+    "notebook": {
+      "path": "notebook",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1770191037506,
+      "keyFiles": [
+        "test_interpreter_steps.ipynb",
+        "test_load_analysis_data.ipynb"
+      ]
+    },
+    "old": {
+      "path": "old",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1770191037507,
+      "keyFiles": [
+        "st_pipeline_info_agent copy.py"
+      ]
+    },
+    "order": {
+      "path": "order",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1770191037507,
+      "keyFiles": [
+        "Untitled",
+        "order_deepagent",
+        "order_html",
+        "order_interpreotr",
+        "order_pubmedrag_agnet"
+      ]
+    },
+    "res": {
+      "path": "res",
+      "purpose": null,
+      "fileCount": 23,
+      "lastAccessed": 1770191037507,
+      "keyFiles": [
+        "1.spatial.png",
+        "10.spatial_plot_interections.png",
+        "11.lr_interections.png",
+        "2.celltype_heatmap_analysis.png",
+        "3.neighborhood_enrichment_squidpy.png"
+      ]
+    },
+    "skills": {
+      "path": "skills",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1770191037507,
+      "keyFiles": []
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1770191037508,
+      "keyFiles": [
+        "__init__.py"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 2,
+      "lastAccessed": 1770191037508,
+      "keyFiles": [
+        "__init__.py",
+        "test_reporter_phase45.py"
+      ]
+    },
+    "mcp_servers/utils": {
+      "path": "mcp_servers/utils",
+      "purpose": "Utility functions",
+      "fileCount": 16,
+      "lastAccessed": 1770191037508,
+      "keyFiles": [
+        "__init__.py",
+        "cci_analysis.py",
+        "lr_annotation.py"
+      ]
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

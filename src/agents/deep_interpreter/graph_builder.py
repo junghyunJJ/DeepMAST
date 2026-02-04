@@ -3,9 +3,10 @@
 This module provides the graph builder function for LangGraph CLI integration.
 The Deep Interpreter uses the DeepAgents framework (create_deep_agent).
 
-Two graph variants are available:
+Graph variants available:
 1. deep_interpreter_graph: Deep Agent with pre-selected targets (no HITL in agent)
 2. deep_interpreter_wrapped_graph: Wrapper agent with HITL target collection (recommended)
+3. interpreter_subagent_graph: Standalone INTERPRETER subagent for testing (NEW)
 """
 
 import os
@@ -13,6 +14,7 @@ from typing import Literal
 
 from dotenv import load_dotenv
 from langchain_core.runnables import Runnable
+from langgraph.prebuilt import create_react_agent
 
 # Load .env file before any os.getenv() calls
 # This ensures DEEP_INTERPRETER_DATA_DIR is available at module import time
@@ -155,6 +157,9 @@ def _get_deep_interpreter_graph_wrapped() -> Runnable:
         Compiled Wrapper Agent runnable
     """
     provider = os.getenv("LLM_PROVIDER", "openai")
+    # provider = os.getenv("LLM_PROVIDER", "claude")
+    # provider = os.getenv("LLM_PROVIDER", "ollama")
+
     data_dir = os.getenv(
         "DEEP_INTERPRETER_DATA_DIR",
         "/tmp/deep_interpreter_workspace"
@@ -175,9 +180,133 @@ deep_interpreter_graph = _get_deep_interpreter_graph()
 deep_interpreter_wrapped_graph = _get_deep_interpreter_graph_wrapped()
 
 
+# =============================================================================
+# Standalone Subagent Graphs (for testing individual subagents)
+# =============================================================================
+# Each subagent can be run independently via `langgraph dev` for testing.
+# Workflow order: PLANNER → SEARCHER → INTERPRETER → REPORTER
+# =============================================================================
+
+
+def create_subagent_graph(
+    subagent_name: Literal["planner", "searcher", "interpreter", "reporter"],
+    provider: Literal["openai", "google", "ollama", "claude"] = "openai",
+) -> Runnable:
+    """Create standalone subagent graph for testing.
+
+    This creates a React agent using the specified subagent configuration,
+    allowing you to test each subagent independently via `langgraph dev`.
+
+    Subagent Descriptions:
+    - **planner**: Target confirmation + hypothesis generation
+      - Reads /targets.json, loads analysis data
+      - Outputs: /strategic_plan.md, /analysis_summary.md, /data_path.txt
+
+    - **searcher**: Context extraction + literature search
+      - For Part 1: outputs /part1_papers.json
+      - For Part 2+3: outputs /liana_papers.json (shared)
+      - Uses search_literature_dynamic with automatic fallback
+
+    - **interpreter**: Literature-grounded interpretation
+      - Reads /partN_papers.json (ONLY citation source)
+      - Validates claims, ensures quality >= 0.7
+      - Outputs: /part1_final.md, /part2_final.md, /part3_final.md
+
+    - **reporter**: Cross-part synthesis + HTML report
+      - Reads all /partN_final.md files
+      - Outputs: /synthesis.md, CCI_Analysis_Report.html
+
+    Args:
+        subagent_name: Name of the subagent
+        provider: LLM provider ('openai', 'google', 'ollama', 'claude')
+
+    Returns:
+        Compiled React Agent runnable for the specified subagent
+    """
+    from src.agents.deep_interpreter.subagents.configs import SUBAGENT_CONFIGS
+    from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
+
+    # Get subagent config
+    config = SUBAGENT_CONFIGS[subagent_name]
+
+    # Create LLM
+    llm = create_llm(provider=provider)
+
+    # Get tools from config
+    tools = config["tools"]
+
+    # Get system prompt
+    system_prompt = SUBAGENT_PROMPTS[subagent_name]
+
+    # Create React agent with subagent config
+    agent = create_react_agent(
+        model=llm,
+        tools=tools,
+        prompt=system_prompt,
+    )
+
+    return agent
+
+
+# -----------------------------------------------------------------------------
+# PLANNER Subagent
+# -----------------------------------------------------------------------------
+def _get_planner_subagent_graph() -> Runnable:
+    """Standalone PLANNER subagent graph - for LangGraph CLI."""
+    provider = os.getenv("LLM_PROVIDER", "openai")
+    return create_subagent_graph("planner", provider=provider)
+
+
+planner_subagent_graph = _get_planner_subagent_graph()
+
+
+# -----------------------------------------------------------------------------
+# SEARCHER Subagent
+# -----------------------------------------------------------------------------
+def _get_searcher_subagent_graph() -> Runnable:
+    """Standalone SEARCHER subagent graph - for LangGraph CLI."""
+    provider = os.getenv("LLM_PROVIDER", "openai")
+    return create_subagent_graph("searcher", provider=provider)
+
+
+searcher_subagent_graph = _get_searcher_subagent_graph()
+
+
+# -----------------------------------------------------------------------------
+# INTERPRETER Subagent
+# -----------------------------------------------------------------------------
+def _get_interpreter_subagent_graph() -> Runnable:
+    """Standalone INTERPRETER subagent graph - for LangGraph CLI."""
+    provider = os.getenv("LLM_PROVIDER", "openai")
+    return create_subagent_graph("interpreter", provider=provider)
+
+
+interpreter_subagent_graph = _get_interpreter_subagent_graph()
+
+
+# -----------------------------------------------------------------------------
+# REPORTER Subagent
+# -----------------------------------------------------------------------------
+def _get_reporter_subagent_graph() -> Runnable:
+    """Standalone REPORTER subagent graph - for LangGraph CLI."""
+    provider = os.getenv("LLM_PROVIDER", "openai")
+    return create_subagent_graph("reporter", provider=provider)
+
+
+reporter_subagent_graph = _get_reporter_subagent_graph()
+
+
 __all__ = [
+    # Main graphs
     "create_deep_interpreter_graph",
     "create_deep_interpreter_graph_wrapped",
     "deep_interpreter_graph",
     "deep_interpreter_wrapped_graph",
+    # Subagent factory
+    "create_subagent_graph",
+    # Individual subagent graphs
+    "planner_subagent_graph",
+    "searcher_subagent_graph",
+    "interpreter_subagent_graph",
+    "reporter_subagent_graph",
 ]

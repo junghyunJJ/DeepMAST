@@ -1,6 +1,7 @@
 """model - Create Language Models for different providers"""
 import os
 from typing import Optional
+from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
@@ -10,12 +11,12 @@ from langchain_core.language_models.chat_models import BaseChatModel
 def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
     """
     Create LLM based on provider (default: openai with gpt-4.1-mini)
-    
+
     Args:
-        provider: LLM provider ('openai', 'google', 'ollama'). 
+        provider: LLM provider ('openai', 'google', 'ollama', 'claude').
                  If None, uses LLM_PROVIDER env var or defaults to 'openai'
         **kwargs: Provider-specific arguments
-    
+
     Returns:
         BaseChatModel instance
     """
@@ -30,6 +31,8 @@ def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
         return create_google_llm(**kwargs)
     elif provider == "openai":
         return create_openai_llm(**kwargs)
+    elif provider == "claude":
+        return create_claude_llm(**kwargs)
     else:
         raise ValueError(f"Unknown LLM provider: {provider}")
 
@@ -37,16 +40,37 @@ def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
 def create_openai_llm(**kwargs) -> ChatOpenAI:
     """
     Create OpenAI LLM instance
-    
+
     Args:
         model: Model name (default: gpt-4.1-mini)
         temperature: Temperature setting (default: 0)
     """
     model = kwargs.get("model", os.getenv("OPENAI_MODEL", "gpt-4.1-mini"))
+    # model = kwargs.get("model", os.getenv("OPENAI_MODEL", "gpt-5-nano"))
+    # model = kwargs.get("model", os.getenv("OPENAI_MODEL", "gpt-5-nano"))
     # model = kwargs.get("model", os.getenv("OPENAI_MODEL", "gpt-4.1"))
     temperature = kwargs.get("temperature", 0)
-    
+
     return ChatOpenAI(
+        model=model,
+        temperature=temperature,
+    )
+
+
+def create_claude_llm(**kwargs) -> ChatAnthropic:
+    """
+    Create Anthropic Claude LLM instance
+
+    Args:
+        model: Model name (default: claude-haiku-4-5-20251001)
+        temperature: Temperature setting (default: 0)
+    """
+    # model = kwargs.get("model", os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929"))
+    model = kwargs.get("model", os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"))
+
+    temperature = kwargs.get("temperature", 0)
+
+    return ChatAnthropic(
         model=model,
         temperature=temperature,
     )
