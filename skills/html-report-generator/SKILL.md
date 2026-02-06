@@ -573,7 +573,7 @@ generate_html_report(
 ```
 biomedical-literature-search
         │
-        │ search_literature_dynamic() / search_literature_for_context()
+        │ search_literature_dynamic() / search_literature()
         ▼
     papers: [{pmid, title, authors}]
         │

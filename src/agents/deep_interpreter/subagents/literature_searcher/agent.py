@@ -22,7 +22,7 @@ from langchain_core.runnables import Runnable
 
 from src.agents.deep_interpreter.tools import (
     search_literature,
-    search_literature_for_context,
+    search_literature_dynamic,
     think_tool,
 )
 
@@ -47,18 +47,19 @@ used by the interpreter to generate literature-grounded interpretations.
    - Which pathways are most relevant?
 3. Output: Search plan with prioritized terms
 
-### Phase 2: Search - Execute Multi-Strategy Search
-Use search_literature_for_context with:
-- genes: Prioritized gene list from think phase
+### Phase 2: Search - Execute LLM-Powered Dynamic Search
+Use search_literature_dynamic with:
+- genes: Prioritized gene list from think phase (top 10-15)
 - pathways: Prioritized pathway list
 - celltypes: Relevant cell types
 - disease: Disease context
+- max_results: Number of results (default 20)
 
 ### Phase 3: Quality Validation Loop
 1. Check paper coverage using think_tool:
    - Are all major genes covered?
    - Are key pathways represented?
-   - Do we have sufficient papers (15-20)?
+   - Do we have sufficient papers (>= 25)?
 2. If coverage < 60% genes or < 50% pathways:
    - Identify gaps
    - Execute targeted follow-up searches
@@ -89,7 +90,7 @@ Write comprehensive /partN_papers.json with:
     "pathways_covered": ["EMT", "TGFB"],
     "pathways_missing": [],
     "celltypes_covered": ["Tumor", "Fibroblast"],
-    "total_papers": 15,
+    "total_papers": 25,
     "coverage_score": 0.85
   },
   "search_iterations": 2,
@@ -100,7 +101,7 @@ Write comprehensive /partN_papers.json with:
 ```
 
 ## Quality Criteria
-- Aim for 15-20 papers per part
+- Aim for >= 25 papers per part
 - Gene coverage >= 60%
 - Pathway coverage >= 50%
 - Papers should have substantial abstracts
@@ -108,8 +109,8 @@ Write comprehensive /partN_papers.json with:
 
 ## Available Tools
 - think_tool: For strategic planning and quality validation
-- search_literature: For targeted single-query searches
-- search_literature_for_context: For comprehensive multi-strategy searches
+- search_literature: For targeted single-query searches (follow-up gaps)
+- search_literature_dynamic: LLM-powered iterative search with coverage targets and internal fallback
 """
 
 
@@ -133,7 +134,7 @@ def create_literature_searcher_agent(
     tools = [
         think_tool,
         search_literature,
-        search_literature_for_context,
+        search_literature_dynamic,
     ]
 
     # Create agent with optional backend

@@ -51,7 +51,7 @@ from src.agents.deep_interpreter.subagents.configs import get_subagents
 from src.agents.deep_interpreter.tools import (
     load_analysis_data,
     search_literature,
-    search_literature_for_context,
+    search_literature_dynamic,
     validate_quality,
     validate_claim_literature,
     generate_html_report,
@@ -164,7 +164,7 @@ def create_deep_interpreter_agent(
     tools = [
         load_analysis_data,
         search_literature,
-        search_literature_for_context,  # Proactive search for context
+        search_literature_dynamic,  # LLM-powered search with internal fallback
         validate_quality,
         validate_claim_literature,  # Claim-literature alignment validation
         generate_html_report,

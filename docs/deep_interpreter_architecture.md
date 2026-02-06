@@ -153,7 +153,7 @@ class DeepInterpreterInfoExtraction(BaseModel):
 │ SEARCHER (for Part 1, 2, 3)                                                 │
 │  - Extract context (genes, pathways, cell types)                            │
 │  - Search PubMed proactively (BEFORE interpretation)                        │
-│  - Quality loop: coverage >= 60% genes, >= 50% pathways, 15-20 papers       │
+│  - Quality loop: coverage >= 60% genes, >= 50% pathways, >= 25 papers       │
 │  → /part1_papers.json (Part 1)                                              │
 │  → /liana_papers.json (Part 2/3 shared)                                     │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -316,7 +316,7 @@ def generate_html_report(parts: dict, output_path: str) -> str:
 | `/strategic_plan.md` | PLANNER | 2-4개 가설 + 해석 우선순위 |
 | `/analysis_summary.md` | PLANNER | 분석 데이터 요약 |
 | `/data_path.txt` | PLANNER | 데이터 디렉토리 경로 |
-| `/part1_papers.json` | SEARCHER | Part 1 문헌 (15-20개) |
+| `/part1_papers.json` | SEARCHER | Part 1 문헌 (>= 25개) |
 | `/liana_papers.json` | SEARCHER | Part 2/3 공유 문헌 |
 | `/part1_final.md` | INTERPRETER | Part 1 최종 해석 |
 | `/part2_final.md` | INTERPRETER | Part 2 최종 해석 |

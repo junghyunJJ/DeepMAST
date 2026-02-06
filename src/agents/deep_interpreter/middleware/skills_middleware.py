@@ -74,7 +74,7 @@ You have access to a skills library for specialized workflows.
 
 **Important:**
 - Skills provide *strategy guidance*, not direct tool execution
-- After reading a skill, use the appropriate Python tools (search_literature, search_literature_for_context)
+- After reading a skill, use the appropriate Python tools (search_literature_dynamic, search_literature)
 - The skill file explains WHEN and HOW to search, the tools execute the search
 """
 

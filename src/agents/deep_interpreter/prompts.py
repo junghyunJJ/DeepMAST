@@ -149,8 +149,8 @@ Use the **reporter** subagent to:
 ## Available Tools (Orchestrator Level)
 
 - **load_analysis_data**: Load analysis results from a directory
-- **search_literature**: Search PubMed for supporting references
-- **search_literature_for_context**: Proactive search based on analysis context
+- **search_literature**: Search PubMed for supporting references (targeted single-query)
+- **search_literature_dynamic**: LLM-powered iterative search with coverage targets and internal fallback
 - **validate_quality**: Validate interpretation quality
 - **validate_claim_literature**: Verify claim-paper alignment
 - **generate_html_report**: Generate final HTML report
@@ -181,7 +181,7 @@ Use the **reporter** subagent to:
 │ SEARCHER (for Part 1, 2, 3)                                                 │
 │  - Extract context (genes, pathways, cell types)                            │
 │  - Search PubMed proactively                                                │
-│  - Quality loop: coverage >= 60% genes, >= 50% pathways, 15-20 papers       │
+│  - Quality loop: coverage >= 60% genes, >= 50% pathways, >= 25 papers       │
 │  → /part1_search_context.json, /part1_papers.json (Part 1)                  │
 │  → /lr_search_context.json, /liana_papers.json (Part 2/3 shared)            │
 └─────────────────────────────────────────────────────────────────────────────┘

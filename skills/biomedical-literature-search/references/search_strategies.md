@@ -8,11 +8,11 @@ Detailed search strategies and keyword combinations by result type.
 
 ## Tool API Reference
 
-### search_literature_for_context (Primary)
-Multi-strategy search with coverage tracking.
+### search_literature_dynamic (PRIMARY)
+LLM-powered dynamic search with context-aware query generation and internal fallback.
 
 ```python
-search_literature_for_context(
+search_literature_dynamic(
     genes=["GENE1", "GENE2"],      # Gene symbols (10-15 prioritized)
     pathways=["pathway1"],          # Pathway names
     celltypes=["CellType1"],        # Cell type names
@@ -56,7 +56,7 @@ search_literature(
 ### Search Examples
 ```python
 # Apoe-Trem2 in AD
-search_literature_for_context(
+search_literature_dynamic(
     genes=["APOE", "TREM2"],
     pathways=["TREM2 signaling", "microglial activation"],
     celltypes=["Microglia"],
@@ -65,7 +65,7 @@ search_literature_for_context(
 )
 
 # SPP1-CD44 in tumor
-search_literature_for_context(
+search_literature_dynamic(
     genes=["SPP1", "CD44"],
     pathways=["integrin signaling", "ECM remodeling"],
     celltypes=["Macrophages", "Tumor"],
@@ -114,7 +114,7 @@ search_literature(
 ### Search Examples
 ```python
 # Pathway-focused search (no specific genes)
-search_literature_for_context(
+search_literature_dynamic(
     genes=[],
     pathways=["WNT", "TGFb", "Hypoxia"],
     celltypes=["Fibroblast", "Tumor"],
@@ -123,7 +123,7 @@ search_literature_for_context(
 )
 
 # With pathway-associated genes
-search_literature_for_context(
+search_literature_dynamic(
     genes=["CTNNB1", "WNT5A", "AXIN2"],
     pathways=["WNT"],
     celltypes=["Epithelial"],
@@ -159,7 +159,7 @@ search_literature(
 ### Search Examples
 ```python
 # Spatial marker genes
-search_literature_for_context(
+search_literature_dynamic(
     genes=["GFAP", "AQP4", "SLC1A2"],
     pathways=[],
     celltypes=["Astrocyte"],
@@ -168,7 +168,7 @@ search_literature_for_context(
 )
 
 # EMT-related markers
-search_literature_for_context(
+search_literature_dynamic(
     genes=["CDH1", "VIM", "SNAI1", "ZEB1"],
     pathways=["EMT", "TGFb"],
     celltypes=["Tumor", "Epithelial"],
@@ -188,7 +188,7 @@ search_literature(
 ## Search Result Optimization
 
 ### max_results Setting
-- 15-20: Standard search (meets quality threshold)
+- 25-30: Standard search (meets quality threshold)
 - 10: Targeted follow-up search
 - 30: Comprehensive literature review
 
@@ -202,7 +202,7 @@ search_literature(
 Per SKILL.md quality criteria:
 - Gene coverage >= 60%
 - Pathway coverage >= 50%
-- Total papers >= 15
+- Total papers >= 25
 
 If coverage is insufficient after initial search:
 ```python

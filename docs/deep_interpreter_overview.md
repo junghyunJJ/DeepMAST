@@ -105,9 +105,9 @@ END
   - Part 1: `spatial_search_context` (pathways + celltypes, 유전자 제외)
   - Part 2+3: `lr_search_context` (genes + pathways + celltypes, 공유)
 - **출력**:
-  - `/part1_papers.json` - Part 1용 문헌 (15-20편)
-  - `/liana_papers.json` - Part 2&3 공유 문헌 (15-20편)
-- **Tools**: `load_analysis_data`, `search_literature_dynamic`, `search_literature_for_context`, `think_tool`
+  - `/part1_papers.json` - Part 1용 문헌 (>= 25편)
+  - `/liana_papers.json` - Part 2&3 공유 문헌 (>= 25편)
+- **Tools**: `load_analysis_data`, `search_literature_dynamic`, `search_literature`, `think_tool`
 - **Coverage 목표**: genes ≥60%, pathways ≥50%
 
 #### Subagent 3: INTERPRETER
@@ -144,7 +144,7 @@ END
 | `/analysis_summary.md` | PLANNER | Phase 2-1 | 전체 데이터 요약 |
 | `/data_path.txt` | PLANNER | Phase 2-1 | 데이터 디렉토리 경로 |
 | `/strategic_plan.md` | PLANNER | Phase 2-1 | 2-4개 테스트 가설 |
-| `/part1_papers.json` | SEARCHER | Phase 2-2 | Part 1 문헌 (15-20편) |
+| `/part1_papers.json` | SEARCHER | Phase 2-2 | Part 1 문헌 (>= 25편) |
 | `/liana_papers.json` | SEARCHER | Phase 2-2 | Part 2&3 공유 문헌 |
 | `/part1_final.md` | INTERPRETER | Phase 2-3 | Part 1 최종 해석 |
 | `/part2_final.md` | INTERPRETER | Phase 2-3 | Part 2 최종 해석 |
@@ -311,7 +311,7 @@ search_literature_dynamic(
 
 **동적 검색 워크플로우:**
 ```
-Step 0: BioMCP think (3단계 전략 계획)
+Step 0: think_tool (3단계 전략 계획)
   ├── Step 1: Context Analysis
   ├── Step 2: Search Keywords
   └── Step 3: Expected Results
@@ -431,8 +431,8 @@ Papers = ONLY citation source for interpreter → Hallucination 방지
 
 ## 5-Phase Workflow
 1. Extract Context (spatial_search_context for Part 1, lr_search_context for Part 2+3)
-2. Think (BioMCP think x3 for strategic planning)
-3. Search (search_literature_dynamic PRIMARY, search_literature_for_context FALLBACK)
+2. Think (think_tool x3 for strategic planning)
+3. Search (search_literature_dynamic PRIMARY, auto-fallback internally)
 4. Reflect (think_tool for coverage check: genes >= 60%, pathways >= 50%)
 5. Write Output (/part1_papers.json, /liana_papers.json)
 
@@ -493,7 +493,7 @@ deep_interpreter는 **2-Tier 아키텍처**로 구성됩니다:
 
 | 도구 | 목적 | 핵심 로직 |
 |------|------|-----------|
-| `search_literature_dynamic` | LLM 기반 반복 검색 | BioMCP think → LLM query 생성 → coverage 평가 → gap filling |
+| `search_literature_dynamic` | LLM 기반 반복 검색 | think_tool → LLM query 생성 → coverage 평가 → gap filling |
 | `validate_quality` | 해석 품질 검증 | 4기준 가중 평균 (statistics, references, mechanism, specificity) |
 | `validate_claim_literature` | Claim-PMID 정합성 | alignment 판정 → keep/revise/mark_novel |
 

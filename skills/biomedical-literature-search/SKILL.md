@@ -22,7 +22,7 @@ This skill provides the **complete workflow** for the SEARCHER subagent. It defi
 │          This SKILL.md (Workflow Definition)                     │
 │  - Phase 1: Extract Context                                      │
 │  - Phase 2: Think (Strategic Planning)                           │
-│  - Phase 3: Search Literature (Dynamic → Fallback)               │
+│  - Phase 3: Search Literature (Dynamic with auto-fallback)       │
 │  - Phase 4: Reflect (Quality Loop)                               │
 │  - Phase 5: Write Output                                         │
 └────────────────────────────┬────────────────────────────────────┘
@@ -31,11 +31,9 @@ This skill provides the **complete workflow** for the SEARCHER subagent. It defi
 ┌─────────────────────────────────────────────────────────────────┐
 │          Python Tools (Execution Layer)                          │
 │  - load_analysis_data: Load analysis results and search_context  │
-│  - search_literature_dynamic: LLM-powered search (PRIMARY)       │
-│  - search_literature_for_context: Fixed strategy search (FALLBACK)│
+│  - search_literature_dynamic: LLM-powered search (auto-fallback) │
 │  - search_literature: Single query search (follow-up)            │
-│  - BioMCP think: Strategic planning (Phase 2)                    │
-│  - reflection-tool think_tool: Quality reflection (Phase 4)      │
+│  - think_tool: Strategic planning (Phase 2) & reflection (Phase 4)│
 │  - read_file / write_file: Virtual filesystem operations         │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -119,22 +117,21 @@ Write extracted context to **/partN_search_context.json**:
 
 ## Phase 2: Think (Strategic Planning)
 
-**MANDATORY**: Use **BioMCP think** (`mcp__biomcp__think`) to plan the optimal search strategy BEFORE searching.
+**MANDATORY**: Use **think_tool** to plan the optimal search strategy BEFORE searching.
 
-> **Tool**: BioMCP think is optimized for biomedical research planning with structured sequential thinking.
+> **Tool**: think_tool provides structured sequential thinking for both strategic planning and quality validation.
 
 ### Three-Thought Planning Workflow
 
 **Thought 1: Context Analysis**
 ```python
-# Use BioMCP think for strategic planning
-mcp__biomcp__think(
-    thought="Analyzing Part 1 context: {N} genes extracted from search_context. "
-            "Prioritizing {TOP_GENES} based on their roles in {BIOLOGICAL_PROCESS}. "
-            "Key pathways identified: {PATHWAYS}. Disease context: {DISEASE}.",
-    thoughtNumber=1,
-    totalThoughts=3,
-    nextThoughtNeeded=True
+# Use think_tool for strategic planning
+think_tool(
+    reflection="Analyzing Part 1 context: {N} genes extracted from search_context. "
+               "Prioritizing {TOP_GENES} based on their roles in {BIOLOGICAL_PROCESS}. "
+               "Key pathways identified: {PATHWAYS}. Disease context: {DISEASE}.",
+    iteration=1,
+    max_iterations=3
 )
 ```
 - Assess the extracted biological context
@@ -143,15 +140,14 @@ mcp__biomcp__think(
 
 **Thought 2: Search Strategy Development**
 ```python
-mcp__biomcp__think(
-    thought="Search strategy for Part {N}: "
-            "1) Gene+disease queries for top 10 genes: {GENE_LIST}, "
-            "2) Pathway+celltype for {FOCUS_AREA}: {PATHWAY_LIST}, "
-            "3) Spatial transcriptomics + {DISEASE} for methodology papers. "
-            "Priority L-R pairs: {LR_PAIRS}.",
-    thoughtNumber=2,
-    totalThoughts=3,
-    nextThoughtNeeded=True
+think_tool(
+    reflection="Search strategy for Part {N}: "
+               "1) Gene+disease queries for top 10 genes: {GENE_LIST}, "
+               "2) Pathway+celltype for {FOCUS_AREA}: {PATHWAY_LIST}, "
+               "3) Spatial transcriptomics + {DISEASE} for methodology papers. "
+               "Priority L-R pairs: {LR_PAIRS}.",
+    iteration=2,
+    max_iterations=3
 )
 ```
 - Define prioritized gene list (top 10-15, NOT all extracted genes)
@@ -160,13 +156,12 @@ mcp__biomcp__think(
 
 **Thought 3: Expected Findings Prediction**
 ```python
-mcp__biomcp__think(
-    thought="Expected findings: Papers should cover mechanisms including {MECHANISMS}. "
-            "Known relationships to validate: {GENE1}-{PATHWAY1}, {GENE2}-{CELLTYPE}. "
-            "Potential gaps requiring targeted follow-up: {GAPS}.",
-    thoughtNumber=3,
-    totalThoughts=3,
-    nextThoughtNeeded=False
+think_tool(
+    reflection="Expected findings: Papers should cover mechanisms including {MECHANISMS}. "
+               "Known relationships to validate: {GENE1}-{PATHWAY1}, {GENE2}-{CELLTYPE}. "
+               "Potential gaps requiring targeted follow-up: {GAPS}.",
+    iteration=3,
+    max_iterations=3
 )
 ```
 - Predict what biological mechanisms papers should cover
@@ -209,30 +204,63 @@ search_literature_dynamic(
 
 **Why Dynamic Search First?**
 - LLM understands biological context and generates optimized queries
-- BioMCP think provides strategic planning before search
+- think_tool provides strategic planning before search
 - Better adaptation to Part-specific analysis types (L-R, pathway, spatial)
 - More relevant papers for specialized disease/tissue contexts
 
-### Step 3.2: Fallback to Fixed Strategy (If Dynamic Fails)
-If `search_literature_dynamic` fails (LLM error, parsing failure, timeout),
-automatically falls back to **search_literature_for_context**:
+### Step 3.1b: Advanced Search with E-utilities (Optional — Gap-Filling)
 
+After `search_literature_dynamic`, if coverage gaps remain in specific areas,
+use `search_pubmed_advanced` for targeted precision searches:
+
+**When to use:**
+- Gene coverage < 60% after Phase 3.1: Search missing genes with MeSH terms
+- Need recent papers (last 2 years): Use date filter
+- Need specific study types: Use publication type filter
+- Need pathway-specific papers: Use MeSH subheadings
+
+**Example queries:**
 ```python
-# Automatic fallback inside search_literature_dynamic
-# OR manual fallback if dynamic returns insufficient results
-search_literature_for_context(
-    genes=["CDH1", "TGFB1", "VIM", "ERBB2", "MMP2"],
-    pathways=["EMT", "TGFB", "WNT", "Hypoxia"],
-    celltypes=["Tumor", "Fibroblast", "Macrophages"],
-    disease="breast cancer",
-    max_results=20
+# MeSH subheading for pathway mechanisms
+search_pubmed_advanced(query="TGF-beta signaling/physiology[mh] AND spatial transcriptomics[tiab]")
+
+# Recent systematic reviews
+search_pubmed_advanced(query="cell-cell interaction[tiab] AND systematic review[pt]", min_date="2023/01/01")
+
+# Specific L-R interaction with date range
+search_pubmed_advanced(query="CDH1[tiab] AND E-cadherin[tiab] AND epithelial mesenchymal[mh]", min_date="2020/01/01")
+
+# Proximity search for co-occurring terms
+search_pubmed_advanced(query='"spatial transcriptomics cell interaction"[TIAB:~5]')
+
+# Multiple genes with publication type filter
+search_pubmed_advanced(
+    query="(VEGFA[tiab] OR TGFB1[tiab]) AND neoplasms[mh] AND review[pt]",
+    min_date="2022/01/01",
+    max_results=10
 )
 ```
 
-**When to Manually Fallback:**
-- `search_literature_dynamic` returns `think_success: False`
-- Coverage < 50% after dynamic search
-- Timeout or connection errors
+**Key advantage over BioMCP**: Full control over PubMed query syntax including
+MeSH subheadings, field tags, date ranges, proximity operators, and publication
+type filters. Use this when you know exactly what you're looking for.
+
+For complete E-utilities search syntax reference, see:
+`skills/pubmed-eutils-search/SKILL.md`
+
+### Step 3.2: Automatic Internal Fallback
+`search_literature_dynamic` handles fallback internally — no manual intervention needed.
+
+If the LLM-powered query generation fails (LLM error, parsing failure, timeout),
+the tool automatically falls back to a fixed 4-strategy search internally.
+
+You do **NOT** need to call any fallback tool separately. The `search_literature_dynamic`
+return value includes `think_success` to indicate which path was taken:
+- `think_success: True` — LLM-generated queries were used
+- `think_success: False` — internal fixed-strategy fallback was used
+
+If coverage is still insufficient after `search_literature_dynamic`, use
+**search_literature** for targeted follow-up searches on specific gaps.
 
 ### Step 3.3: Tool Returns
 Both tools return:
@@ -244,15 +272,15 @@ Both tools return:
 
 **Additional fields from `search_literature_dynamic`:**
 - `generated_queries`: LLM-generated query structures (for debugging)
-- `think_success`: Whether BioMCP think succeeded
+- `think_success`: Whether strategic planning succeeded
 
 ---
 
 ## Phase 4: Reflect (Quality Loop)
 
-**MANDATORY**: Use **reflection-tool think_tool** (`mcp__reflection-tool__think_tool`) for quality validation and gap analysis.
+**MANDATORY**: Use **think_tool** for quality validation and gap analysis.
 
-> **Tool**: reflection-tool is optimized for self-reflection and quality assessment with branching support.
+> **Tool**: think_tool provides structured sequential thinking for both strategic planning and quality validation.
 
 ### Quality Criteria
 
@@ -267,31 +295,29 @@ Both tools return:
 
 **Reflection Thought 1: Coverage Analysis**
 ```python
-# Use reflection-tool for quality validation
-mcp__reflection-tool__think_tool(
-    thought="Coverage analysis for Part {N}: "
-            "{GENES_COVERED}/{TOTAL_GENES} priority genes covered ({X}%), "
-            "{PATHWAYS_COVERED}/{TOTAL_PATHWAYS} pathways covered ({Y}%). "
-            "Gaps identified: {MISSING_ITEMS}. "
-            "Expected mechanisms covered: {COVERED_MECHANISMS}. "
-            "Missing mechanisms: {MISSING_MECHANISMS}. "
-            "Follow-up search needed: {YES/NO}",
-    thoughtNumber=1,
-    totalThoughts=2,
-    nextThoughtNeeded=True  # True if gaps exist
+# Use think_tool for quality validation
+think_tool(
+    reflection="Coverage analysis for Part {N}: "
+               "{GENES_COVERED}/{TOTAL_GENES} priority genes covered ({X}%), "
+               "{PATHWAYS_COVERED}/{TOTAL_PATHWAYS} pathways covered ({Y}%). "
+               "Gaps identified: {MISSING_ITEMS}. "
+               "Expected mechanisms covered: {COVERED_MECHANISMS}. "
+               "Missing mechanisms: {MISSING_MECHANISMS}. "
+               "Follow-up search needed: {YES/NO}",
+    iteration=1,
+    max_iterations=2
 )
 ```
 
 **Reflection Thought 2: Gap-Targeted Strategy** (if coverage < threshold)
 ```python
-mcp__reflection-tool__think_tool(
-    thought="Targeted follow-up strategy: "
-            "Searching for {MISSING_GENES} with synonyms {SYNONYMS}. "
-            "Adding broader terms for {PATHWAY}: '{PATHWAY} signaling {DISEASE}'. "
-            "Alternative queries: {ALTERNATIVE_QUERIES}.",
-    thoughtNumber=2,
-    totalThoughts=2,
-    nextThoughtNeeded=False
+think_tool(
+    reflection="Targeted follow-up strategy: "
+               "Searching for {MISSING_GENES} with synonyms {SYNONYMS}. "
+               "Adding broader terms for {PATHWAY}: '{PATHWAY} signaling {DISEASE}'. "
+               "Alternative queries: {ALTERNATIVE_QUERIES}.",
+    iteration=2,
+    max_iterations=2
 )
 ```
 
@@ -301,7 +327,7 @@ If genes_covered < 60%:
     -> Add gene synonyms, search individually with search_literature
 If pathways_covered < 50%:
     -> Search pathway + "signaling" + disease
-If total_papers < 15:
+If total_papers < 25:
     -> Broaden disease context, add "spatial transcriptomics"
 ```
 
@@ -343,7 +369,7 @@ Format:
     "pathways_covered": ["EMT", "TGFB"],
     "pathways_missing": [],
     "pathways_coverage_pct": 100,
-    "total_papers": 18
+    "total_papers": 28
   },
   "search_iterations": 2,
   "search_queries": [
@@ -412,10 +438,10 @@ Mechanism keywords: binding, signaling cascade, downstream effects."
 - **USE** search_context field from load_analysis_data - all terms pre-extracted
 - **USE** genes for actual gene symbols: CDH1, CEACAM5, ERBB2, TGFB1, MMP2, VEGFA
 - **USE** pathways for pathway names: NFkB, Hypoxia, TGFb, MAPK, PI3K, Estrogen, EGFR
-- **USE** BioMCP think to plan strategy BEFORE searching
+- **USE** think_tool to plan strategy BEFORE searching
 - **USE** search_literature_dynamic as PRIMARY search tool
-- **FALLBACK** to search_literature_for_context if dynamic fails (think_success=False, timeout, parsing error)
-- **USE** reflection-tool think_tool for quality validation AFTER search
+- **NOTE** search_literature_dynamic handles fallback internally (no separate tool call needed)
+- **USE** think_tool for quality validation AFTER search
 - **WRITE** /partN_search_strategy.json before searching
 - **RUN** follow-up searches for missing coverage using search_literature
 - **WRITE** /part1_papers.json (Part 1) or /liana_papers.json (Part 2+3 shared)
@@ -441,37 +467,14 @@ search_literature_dynamic(
 - `papers`: List of found papers with PMIDs
 - `generated_queries`: LLM-generated query structures
 - `coverage`: Detailed coverage metrics with percentages
-- `think_success`: Whether BioMCP think was successful
+- `think_success`: Whether think_tool succeeded
 
 **Use when**:
 - Primary tool for all literature searches
 - Part-specific analysis requiring context understanding
 - Specialized disease/tissue contexts
 
-**Fallback behavior**: Automatically calls `search_literature_for_context` if LLM fails.
-
-### search_literature_for_context (FALLBACK)
-Fixed 4-strategy search with coverage tracking.
-
-```python
-search_literature_for_context(
-    genes=["CDH1", "TGFB1", "VIM"],
-    pathways=["EMT", "TGFB", "WNT"],
-    celltypes=["Tumor", "Fibroblast"],
-    disease="breast cancer",
-    max_results=20
-)
-```
-
-**Returns**:
-- `papers`: List of found papers with PMIDs
-- `search_queries`: Fixed strategy queries used
-- `coverage`: Coverage statistics
-
-**Use when**:
-- `search_literature_dynamic` fails or times out
-- Need predictable, fast results
-- Debugging search issues
+**Fallback behavior**: Automatically uses internal fixed-strategy search if LLM fails. No separate tool call needed.
 
 ### search_literature
 Single-query PubMed search for specific topics.
@@ -486,35 +489,21 @@ search_literature(
 
 **Use when**: Targeted follow-up search for specific gene/pathway/interaction gaps.
 
-### BioMCP think (Phase 2: Strategic Planning)
-Structured sequential thinking for biomedical research planning.
+### think_tool (Phase 2: Strategic Planning & Phase 4: Quality Reflection)
+Structured sequential thinking for strategic planning and quality validation.
 
 ```python
-# MCP tool: mcp__biomcp__think
-mcp__biomcp__think(
-    thought="Analysis of search context...",
-    thoughtNumber=1,
-    totalThoughts=3,
-    nextThoughtNeeded=True
+think_tool(
+    reflection="Analysis of search context...",  # Your thinking content
+    iteration=1,                                  # Current thought number
+    max_iterations=3,                             # Total thoughts planned
+    score_threshold=0.7                           # Optional: quality threshold
 )
 ```
 
-**Use when**: Phase 2 - developing search strategy before literature search.
-
-### reflection-tool think_tool (Phase 4: Quality Reflection)
-Self-reflection tool for quality validation and coverage analysis.
-
-```python
-# MCP tool: mcp__reflection-tool__think_tool
-mcp__reflection-tool__think_tool(
-    thought="Coverage analysis: X% genes, Y% pathways...",
-    thoughtNumber=1,
-    totalThoughts=2,
-    nextThoughtNeeded=True
-)
-```
-
-**Use when**: Phase 4 - validating coverage and planning follow-up searches.
+**Use when**:
+- Phase 2: Developing search strategy before literature search (3 thoughts)
+- Phase 4: Validating coverage and planning follow-up searches (1-2 thoughts)
 
 ---
 
@@ -548,22 +537,22 @@ Furthermore, [expand context] (Author2 et al., Year; PMID: xxxxx).
 
 ## Quick Reference Card
 
-| Analysis Type | Primary Tool | Fallback Tool | Key Parameters |
-|--------------|--------------|---------------|----------------|
-| L-R Interaction | `search_literature_dynamic` | `search_literature_for_context` | genes=[ligand, receptor], disease |
-| Pathway | `search_literature_dynamic` | `search_literature_for_context` | pathways=[...], disease |
-| Gene Markers | `search_literature_dynamic` | `search_literature_for_context` | genes=[...], celltypes |
+| Analysis Type | Primary Tool | Follow-up Tool | Key Parameters |
+|--------------|--------------|----------------|----------------|
+| L-R Interaction | `search_literature_dynamic` | `search_literature` | genes=[ligand, receptor], disease |
+| Pathway | `search_literature_dynamic` | `search_literature` | pathways=[...], disease |
+| Gene Markers | `search_literature_dynamic` | `search_literature` | genes=[...], celltypes |
 | Specific Query | `search_literature` | - | query=specific_terms |
 
 ### Tool Selection Flow
 ```
-search_literature_dynamic (try first)
+search_literature_dynamic (primary — handles fallback internally)
         │
         ├─ Success → Use results
         │
-        └─ Failure (LLM error, timeout, think_success=False)
+        └─ Insufficient coverage
                 │
-                └─ search_literature_for_context (fallback)
+                └─ search_literature (targeted follow-up for gaps)
 ```
 
 | Quality Check | Threshold | Action if Failed |
@@ -575,10 +564,10 @@ search_literature_dynamic (try first)
 
 | Phase | Tool | Thoughts | Purpose | Output |
 |-------|------|----------|---------|--------|
-| Phase 2 (Planning) | BioMCP think | 3 thoughts | Develop search strategy | /partN_search_strategy.json |
-| Phase 4 (Reflection) | reflection-tool | 1-2 thoughts | Validate coverage | /part1_papers.json or /liana_papers.json |
+| Phase 2 (Planning) | think_tool | 3 thoughts | Develop search strategy | /partN_search_strategy.json |
+| Phase 4 (Reflection) | think_tool | 1-2 thoughts | Validate coverage | /part1_papers.json or /liana_papers.json |
 
-| Thought Type | Key Content | nextThoughtNeeded |
+| Thought Type | Key Content | should_continue |
 |--------------|-------------|-------------------|
 | Context Analysis | Gene priorities, pathway focus | True |
 | Strategy Development | Search queries, L-R pairs | True |
@@ -599,14 +588,14 @@ search_literature_dynamic (try first)
 - Cell types: Microglia
 - Disease: Alzheimer's disease
 
-### Phase 2: Think Strategy (BioMCP think)
+### Phase 2: Think Strategy (think_tool)
 ```python
-mcp__biomcp__think(thought="Context: APOE-TREM2 in microglia. Priority genes: APOE, TREM2.
+think_tool(reflection="Context: APOE-TREM2 in microglia. Priority genes: APOE, TREM2.
 Key pathways: microglial activation, neuroinflammation. Disease: AD.",
-thoughtNumber=1, totalThoughts=3, nextThoughtNeeded=True)
+iteration=1, max_iterations=3)
 ```
 
-### Phase 3: Execute Dynamic Search (Primary)
+### Phase 3: Execute Dynamic Search
 ```python
 result = search_literature_dynamic(
     genes=["APOE", "TREM2"],
@@ -615,31 +604,23 @@ result = search_literature_dynamic(
     disease="Alzheimer disease",
     max_results=20
 )
-
-# Check if dynamic search succeeded
-if not result.get("think_success") or result["coverage"]["total_papers"] < 10:
-    # Fallback to fixed strategy
-    result = search_literature_for_context(
-        genes=["APOE", "TREM2"],
-        pathways=["TREM2 signaling", "microglial activation"],
-        celltypes=["Microglia"],
-        disease="Alzheimer disease",
-        max_results=20
-    )
+# Fallback is handled internally — no manual fallback needed
+# Check result["think_success"] to see which path was taken
 ```
 
 **Dynamic search benefits in this example:**
 - LLM understands APOE-TREM2 is a well-known AD pathway
 - Generates optimized queries like "TREM2 APOE microglia neurodegeneration"
 - Better coverage of mechanistic papers
+- Automatic internal fallback if LLM fails
 
-### Phase 4: Reflect on Coverage (reflection-tool)
+### Phase 4: Reflect on Coverage (think_tool)
 ```python
-mcp__reflection-tool__think_tool(thought="Coverage: 18 papers found. Genes: APOE, TREM2 (100%).
+think_tool(reflection="Coverage: 28 papers found. Genes: APOE, TREM2 (100%).
 Pathways: TREM2 signaling (50%). All thresholds met. think_success: True.",
-thoughtNumber=1, totalThoughts=1, nextThoughtNeeded=False)
+iteration=1, max_iterations=1)
 ```
-- Papers found: 18 (pass)
+- Papers found: 28 (pass)
 - Genes covered: ["APOE", "TREM2"] (100%) (pass)
 - Pathways covered: ["TREM2 signaling"] (50%) (pass)
 - think_success: True (no fallback needed)
@@ -649,9 +630,9 @@ thoughtNumber=1, totalThoughts=1, nextThoughtNeeded=False)
 # For Part 2+3: write to shared liana_papers.json (generate ONCE, not twice)
 write_file("/liana_papers.json", json.dumps({
     "papers": [...],
-    "coverage": {"genes_coverage_pct": 100, "pathways_coverage_pct": 50, "total_papers": 18},
+    "coverage": {"genes_coverage_pct": 100, "pathways_coverage_pct": 50, "total_papers": 28},
     "search_iterations": 1,
-    "search_method": "dynamic",  # or "fallback" if fixed strategy used
+    "search_method": "dynamic",  # "dynamic" if LLM succeeded, "fallback" if internal fallback used
     "think_success": True
 }))
 ```

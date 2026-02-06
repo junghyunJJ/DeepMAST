@@ -18,8 +18,8 @@ from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
 from src.agents.deep_interpreter.tools import (
     load_analysis_data,
     search_literature,
-    search_literature_for_context,
     search_literature_dynamic,
+    search_pubmed_advanced,
     validate_claim_literature,
     validate_quality,
     generate_html_report,
@@ -68,6 +68,7 @@ SUBAGENT_CONFIGS = {
             load_analysis_data,
             search_literature_dynamic,  # PRIMARY: LLM-powered (내부 자동 fallback 포함)
             search_literature,  # Follow-up: Single query search
+            search_pubmed_advanced,  # NEW: E-utilities (MeSH/날짜/pub type)
             think_tool,
         ],
     },
@@ -116,7 +117,6 @@ SUBAGENT_CONFIGS = {
             generate_html_report,
             # Literature search tools (reuse from SEARCHER for synthesis validation)
             search_literature_dynamic,
-            search_literature_for_context,
             search_literature,
             # RAG validation tools
             prepare_rag_literature,
@@ -209,12 +209,12 @@ Deep Interpreter 4-Agent Workflow:
    - For Part 1:
      a. Extract context using spatial_search_context (pathways + celltypes, NO genes)
      b. Search PubMed proactively (BEFORE interpretation)
-     c. Ensure coverage: >= 50% pathways, 15-20 papers
+     c. Ensure coverage: >= 50% pathways, >= 25 papers
      d. Output: /part1_papers.json
    - For Part 2+3 (SHARED - identical lr_search_context):
      a. Extract context using lr_search_context (genes + pathways + celltypes)
      b. Search PubMed ONCE for both parts (saves API calls)
-     c. Ensure coverage: >= 60% genes, >= 50% pathways, 15-20 papers
+     c. Ensure coverage: >= 60% genes, >= 50% pathways, >= 25 papers
      d. Output: /liana_papers.json (shared by Part 2 and Part 3)
    - Total Outputs: /part1_papers.json, /liana_papers.json (2 files, not 3)
 

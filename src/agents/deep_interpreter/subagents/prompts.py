@@ -141,7 +141,7 @@ Follow the workflow defined in SKILL.md:
 
 4. **Phase 4: Reflect (Quality Loop)**
    - Use think_tool to check coverage
-   - Gene coverage >= 60%, Pathway coverage >= 50%, Papers >= 15
+   - Gene coverage >= 60%, Pathway coverage >= 50%, Papers >= 25
    - Run follow-up searches if needed (max 2 iterations)
 
 5. **Phase 5: Write Output**
@@ -153,7 +153,7 @@ When writing /part1_papers.json or /liana_papers.json:
 1. **NEVER truncate** the papers array from tool output
 2. **NEVER recalculate** or modify coverage metrics
 3. **COPY EXACTLY** the tool's JSON output to file:
-   - Write the COMPLETE papers array (all 15-30 papers)
+   - Write the COMPLETE papers array (all 25-40 papers)
    - total_papers MUST equal len(papers) in the written file
    - Do NOT summarize, reformat, or select subset of papers
 
@@ -177,11 +177,25 @@ Example CORRECT pattern:
 - **read_file**: Load SKILL.md and other files
 - **write_file**: Write output files
 - **load_analysis_data**: Load analysis results and search_context
-- **search_literature_dynamic**: LLM-powered PubMed search (USE THIS FOR ALL SEARCHES)
-- **search_literature**: Single query PubMed search (follow-up)
+- **search_literature_dynamic**: LLM-powered PubMed search via BioMCP (USE THIS FOR PRIMARY SEARCHES)
+- **search_literature**: Single query PubMed search via BioMCP (follow-up)
+- **search_pubmed_advanced**: Advanced PubMed E-utilities search (NEW)
+  - Use when you need: MeSH subheadings, date filters, publication type filters, proximity search
+  - Accepts raw PubMed query syntax: "VEGFA[tiab] AND cancer[mh] AND 2020:2025[dp]"
+  - Best for: targeted gap-filling with precise queries, finding systematic reviews, date-restricted searches
 - **think_tool**: Strategic planning (Phase 2) and reflection (Phase 4)
 
-**IMPORTANT**: Always use search_literature_dynamic. It handles fallback internally.
+## When to Use Which Search Tool
+| Situation | Tool | Why |
+|-----------|------|-----|
+| Initial comprehensive search | search_literature_dynamic | NER-based, auto-iterates for coverage |
+| Gap-filling specific genes | search_literature | Simple BioMCP query |
+| Need MeSH precision | search_pubmed_advanced | "diabetes/therapy[mh]" |
+| Need recent papers only | search_pubmed_advanced | min_date="2023/01/01" |
+| Need systematic reviews | search_pubmed_advanced | "systematic review[pt]" |
+| Need spatial transcriptomics methods | search_pubmed_advanced | "spatial transcriptomics[tiab] AND 2023:2025[dp]" |
+
+**IMPORTANT**: Always use search_literature_dynamic as primary search. Use search_pubmed_advanced for targeted gap-filling.
 
 ## Quick Reference: Common Mistakes
 - DO NOT read .csv files directly (causes context overflow)
@@ -710,37 +724,34 @@ Use **think_tool** to plan the search strategy:
 ```
 # Thought 1: Context Analysis
 think_tool(
-    thought="Analyzing synthesis context: Themes 1-4 identify integration of "
-            "spatial patterns (Part 1) with CCI (Part 2) and L-R details (Part 3). "
-            "Key integration claims: TGF-β EMT in spatial gradient, "
-            "fibroblast-epithelial communication axis. "
-            "Priority terms: TGFB1, CDH1, EMT, fibroblast, epithelial, spatial.",
-    thought_number=1,
-    total_thoughts=3,
-    next_thought_needed=True
+    reflection="Analyzing synthesis context: Themes 1-4 identify integration of "
+               "spatial patterns (Part 1) with CCI (Part 2) and L-R details (Part 3). "
+               "Key integration claims: TGF-β EMT in spatial gradient, "
+               "fibroblast-epithelial communication axis. "
+               "Priority terms: TGFB1, CDH1, EMT, fibroblast, epithelial, spatial.",
+    iteration=1,
+    max_iterations=3
 )
 
 # Thought 2: Search Strategy
 think_tool(
-    thought="Search strategy for synthesis validation: "
-            "1) Integration queries: 'TGF-beta EMT spatial tumor microenvironment', "
-            "2) Mechanism queries: 'fibroblast epithelial crosstalk breast cancer', "
-            "3) Communication queries: 'cell-cell interaction spatial transcriptomics'. "
-            "Focus on papers discussing COMBINATIONS, not individual components.",
-    thought_number=2,
-    total_thoughts=3,
-    next_thought_needed=True
+    reflection="Search strategy for synthesis validation: "
+               "1) Integration queries: 'TGF-beta EMT spatial tumor microenvironment', "
+               "2) Mechanism queries: 'fibroblast epithelial crosstalk breast cancer', "
+               "3) Communication queries: 'cell-cell interaction spatial transcriptomics'. "
+               "Focus on papers discussing COMBINATIONS, not individual components.",
+    iteration=2,
+    max_iterations=3
 )
 
 # Thought 3: Expected Findings
 think_tool(
-    thought="Expected findings: Papers should discuss integrated mechanisms including "
-            "spatial organization of cell communication, paracrine signaling gradients, "
-            "EMT in tumor microenvironment. Potential gaps: Novel spatial patterns, "
-            "specific L-R pair spatial co-localization.",
-    thought_number=3,
-    total_thoughts=3,
-    next_thought_needed=False
+    reflection="Expected findings: Papers should discuss integrated mechanisms including "
+               "spatial organization of cell communication, paracrine signaling gradients, "
+               "EMT in tumor microenvironment. Potential gaps: Novel spatial patterns, "
+               "specific L-R pair spatial co-localization.",
+    iteration=3,
+    max_iterations=3
 )
 ```
 
@@ -765,7 +776,7 @@ search_literature_dynamic(
 - SEARCHER: Part-specific terms (genes from Part 1 OR Part 2)
 - REPORTER: Integration terms (genes + pathways + celltypes COMBINED)
 
-**Fallback**: If search_literature_dynamic fails, use search_literature_for_context
+**Fallback**: search_literature_dynamic handles fallback internally. Use search_literature for targeted gap-filling.
 
 #### Step 4: Quality Reflection (think_tool)
 
@@ -773,16 +784,15 @@ Use **think_tool** to assess coverage:
 
 ```
 think_tool(
-    thought="Synthesis validation coverage: "
-            "{N} papers found. "
-            "Integration themes covered: Theme 1 ({X}%), Theme 2 ({Y}%), "
-            "Theme 3 ({Z}%), Theme 4 ({W}%). "
-            "Key mechanism papers: {COUNT}. "
-            "Gaps: {MISSING_THEMES}. "
-            "Follow-up needed: {YES/NO}",
-    thought_number=1,
-    total_thoughts=2,
-    next_thought_needed=True  # if gaps exist
+    reflection="Synthesis validation coverage: "
+               "{N} papers found. "
+               "Integration themes covered: Theme 1 ({X}%), Theme 2 ({Y}%), "
+               "Theme 3 ({Z}%), Theme 4 ({W}%). "
+               "Key mechanism papers: {COUNT}. "
+               "Gaps: {MISSING_THEMES}. "
+               "Follow-up needed: {YES/NO}",
+    iteration=1,
+    max_iterations=2
 )
 ```
 
@@ -935,8 +945,7 @@ The HTML report will have:
 - **generate_html_report**: Generate the final HTML report
 
 ### Literature Search Tools (for Phase 4.5)
-- **search_literature_dynamic**: LLM-powered PubMed search (PRIMARY for synthesis validation)
-- **search_literature_for_context**: Context-based search (fallback)
+- **search_literature_dynamic**: LLM-powered PubMed search (PRIMARY, handles fallback internally)
 - **search_literature**: Single query search (gap-filling)
 
 ### RAG Validation Tools (for Phase 4.5)

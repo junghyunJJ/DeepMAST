@@ -5,12 +5,27 @@ with iteration tracking for the quality validation loop.
 """
 
 import asyncio
+import atexit
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from langchain_core.tools import tool
 from langchain_mcp_adapters.client import MultiServerMCPClient
+
+
+# Module-level singleton ThreadPoolExecutor (matches literature.py pattern)
+_EXECUTOR: ThreadPoolExecutor | None = None
+
+
+def _get_executor() -> ThreadPoolExecutor:
+    """Get or create the singleton ThreadPoolExecutor for async bridging."""
+    global _EXECUTOR
+    if _EXECUTOR is None:
+        _EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="think")
+        atexit.register(_EXECUTOR.shutdown, wait=False)
+    return _EXECUTOR
 
 
 # Reflection-tool MCP server configuration (stdio transport)
@@ -132,13 +147,11 @@ Score threshold: {score_threshold}
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(
-                    asyncio.run,
-                    _invoke_think_tool(enhanced_reflection)
-                )
-                result = future.result(timeout=60)
+            future = _get_executor().submit(
+                asyncio.run,
+                _invoke_think_tool(enhanced_reflection)
+            )
+            result = future.result(timeout=60)
         else:
             result = asyncio.run(_invoke_think_tool(enhanced_reflection))
 
