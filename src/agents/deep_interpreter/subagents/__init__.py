@@ -1,7 +1,7 @@
 """SubAgent configurations for Deep Interpreter Agent.
 
 Simplified 4-Agent Architecture:
-- PLANNER: Target confirmation + hypothesis generation
+- PLANNER: Target confirmation + data assessment + interpretation guide
 - SEARCHER: Context extraction + literature search
 - INTERPRETER: Part 1/2/3 interpretation with inline validation
 - REPORTER: Cross-part synthesis + HTML report generation

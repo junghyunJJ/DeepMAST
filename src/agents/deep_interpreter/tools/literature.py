@@ -3,49 +3,36 @@
 This tool provides PubMed search capabilities via BioMCP for finding
 supporting literature for CCI interpretations.
 
-Includes both fixed-strategy (search_literature_for_context) and
+Includes fixed-strategy internal fallback (_execute_fixed_strategy_search) and
 LLM-powered dynamic query generation (search_literature_dynamic).
 """
 
 import asyncio
-import atexit
-import concurrent.futures
 import json
 import logging
-import os
 import re
+import threading
 from typing import Any
 
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
-from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from src.agents.model import create_llm
 from src.agents.deep_interpreter.prompts import (
     LITERATURE_QUERY_GENERATION_PROMPT,
     GAP_FILLING_QUERY_PROMPT,
 )
+from src.agents.deep_interpreter.tools.mcp_clients import (
+    get_executor,
+    run_async,
+    find_tool_by_name,
+    DEFAULT_BIOMCP_URL,
+    get_biomcp_tools,
+    invalidate_client,
+)
 
 
 logger = logging.getLogger(__name__)
-
-# Default BioMCP server configuration
-# 0.0.0.0 is for server binding, localhost is for client connections
-DEFAULT_BIOMCP_URL = os.getenv("BIOMCP_URL", "http://localhost:8000/mcp")
-
-# Module-level executor for async operations in sync contexts
-_EXECUTOR: concurrent.futures.ThreadPoolExecutor | None = None
-
-
-def _get_executor() -> concurrent.futures.ThreadPoolExecutor:
-    """Get or create the module-level ThreadPoolExecutor."""
-    global _EXECUTOR
-    if _EXECUTOR is None:
-        _EXECUTOR = concurrent.futures.ThreadPoolExecutor(
-            max_workers=2, thread_name_prefix="biomcp"
-        )
-        atexit.register(_EXECUTOR.shutdown, wait=False)
-    return _EXECUTOR
 
 
 # =============================================================================
@@ -54,6 +41,7 @@ def _get_executor() -> concurrent.futures.ThreadPoolExecutor:
 # Session-level cache for gene aliases fetched from BioMCP
 # This avoids repeated API calls for the same gene
 _GENE_ALIAS_CACHE: dict[str, list[str]] = {}
+_GENE_ALIAS_CACHE_LOCK = threading.Lock()
 
 
 async def _fetch_gene_aliases_from_biomcp(
@@ -78,28 +66,23 @@ async def _fetch_gene_aliases_from_biomcp(
         Results are cached at module level to avoid repeated API calls.
         Token cost: 0 (API call, not LLM)
     """
-    # Check cache first
+    # Check cache first (thread-safe)
     cache_key = gene_symbol.upper()
-    if cache_key in _GENE_ALIAS_CACHE:
-        return _GENE_ALIAS_CACHE[cache_key]
+    with _GENE_ALIAS_CACHE_LOCK:
+        if cache_key in _GENE_ALIAS_CACHE:
+            return _GENE_ALIAS_CACHE[cache_key]
 
     aliases = []
     try:
-        client = MultiServerMCPClient(
-            {"biomcp": {"url": biomcp_url, "transport": "streamable_http"}}
-        )
-        tools = await client.get_tools()
+        tools = await get_biomcp_tools(biomcp_url)
 
         # Find gene_getter tool
-        gene_getter = None
-        for tool_obj in tools:
-            if hasattr(tool_obj, 'name') and 'gene_getter' in tool_obj.name:
-                gene_getter = tool_obj
-                break
+        gene_getter = find_tool_by_name(tools, "gene_getter")
 
         if gene_getter is None:
             logger.debug(f"gene_getter tool not found, skipping alias fetch for {gene_symbol}")
-            _GENE_ALIAS_CACHE[cache_key] = []
+            with _GENE_ALIAS_CACHE_LOCK:
+                _GENE_ALIAS_CACHE[cache_key] = []
             return []
 
         # Fetch gene info
@@ -111,9 +94,11 @@ async def _fetch_gene_aliases_from_biomcp(
 
     except Exception as e:
         logger.debug(f"Failed to fetch aliases for {gene_symbol}: {e}")
+        invalidate_client(f"biomcp_{biomcp_url}")
 
-    # Cache result (even empty list to avoid retries)
-    _GENE_ALIAS_CACHE[cache_key] = aliases
+    # Cache result (even empty list to avoid retries) - thread-safe
+    with _GENE_ALIAS_CACHE_LOCK:
+        _GENE_ALIAS_CACHE[cache_key] = aliases
     return aliases
 
 
@@ -184,26 +169,13 @@ def _fetch_gene_aliases_sync(
     biomcp_url: str = DEFAULT_BIOMCP_URL,
 ) -> list[str]:
     """Sync wrapper for _fetch_gene_aliases_from_biomcp."""
-    # Check cache first (fast path)
+    # Check cache first (fast path) - thread-safe
     cache_key = gene_symbol.upper()
-    if cache_key in _GENE_ALIAS_CACHE:
-        return _GENE_ALIAS_CACHE[cache_key]
+    with _GENE_ALIAS_CACHE_LOCK:
+        if cache_key in _GENE_ALIAS_CACHE:
+            return _GENE_ALIAS_CACHE[cache_key]
 
-    try:
-        loop = asyncio.get_event_loop()
-        is_running = loop.is_running()
-    except RuntimeError:
-        is_running = False
-
-    if is_running:
-        executor = _get_executor()
-        future = executor.submit(
-            asyncio.run,
-            _fetch_gene_aliases_from_biomcp(gene_symbol, biomcp_url)
-        )
-        return future.result(timeout=30)
-    else:
-        return asyncio.run(_fetch_gene_aliases_from_biomcp(gene_symbol, biomcp_url))
+    return run_async(_fetch_gene_aliases_from_biomcp(gene_symbol, biomcp_url), timeout=30)
 
 
 async def _fetch_missing_gene_aliases(
@@ -282,23 +254,11 @@ async def _search_with_biomcp(
         return []
 
     try:
-        # Note: Do not use 'async with' - API changed in langchain-mcp-adapters 0.1.0
-        # Use "streamable_http" transport type for langchain-mcp-adapters 0.1.8+
-        client = MultiServerMCPClient(
-            {"biomcp": {"url": biomcp_url, "transport": "streamable_http"}}
-        )
-        tools = await client.get_tools()
+        tools = await get_biomcp_tools(biomcp_url)
 
-        # Find article_searcher tool
-        article_searcher = None
-        article_getter = None
-
-        for tool_obj in tools:
-            if hasattr(tool_obj, 'name'):
-                if 'article_searcher' in tool_obj.name:
-                    article_searcher = tool_obj
-                elif 'article_getter' in tool_obj.name:
-                    article_getter = tool_obj
+        # Find article_searcher and article_getter tools
+        article_searcher = find_tool_by_name(tools, "article_searcher")
+        article_getter = find_tool_by_name(tools, "article_getter")
 
         if article_searcher is None:
             available_tools = [getattr(t, "name", str(t)) for t in tools]
@@ -329,20 +289,22 @@ async def _search_with_biomcp(
 
         pmids = _parse_pmids(search_result)
 
-        # Fetch article details
-        for pmid in pmids:
-            if article_getter:
-                try:
-                    article_result = await article_getter.ainvoke({"pmid": pmid})
-                    article = _parse_article(pmid, article_result)
-                    articles.append(article)
-                except Exception:
+        # Fetch article details in parallel
+        if article_getter and pmids:
+            tasks = [article_getter.ainvoke({"pmid": pmid}) for pmid in pmids]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for pmid, result in zip(pmids, results):
+                if isinstance(result, Exception):
                     articles.append({
                         "pmid": pmid,
                         "title": f"Article {pmid}",
                         "abstract": "",
                     })
-            else:
+                else:
+                    article = _parse_article(pmid, result)
+                    articles.append(article)
+        else:
+            for pmid in pmids:
                 articles.append({
                     "pmid": pmid,
                     "title": f"Article {pmid}",
@@ -352,6 +314,7 @@ async def _search_with_biomcp(
     except Exception as e:
         # Return empty list on connection failure
         logger.error(f"BioMCP connection failed: {e}")
+        invalidate_client(f"biomcp_{biomcp_url}")
 
     return articles
 
@@ -540,31 +503,16 @@ def search_literature(
     diseases_list = [disease] if disease else None
     keywords_list = keywords[:5] if keywords else None
 
-    # Run async search with proper BioMCP parameters
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # In async context, use module-level executor
-            executor = _get_executor()
-            future = executor.submit(
-                asyncio.run,
-                _search_with_biomcp(
-                    genes=genes_list,
-                    diseases=diseases_list,
-                    keywords=keywords_list,
-                    page_size=max_results,
-                )
-            )
-            return future.result(timeout=60)
-        else:
-            return asyncio.run(
-                _search_with_biomcp(
-                    genes=genes_list,
-                    diseases=diseases_list,
-                    keywords=keywords_list,
-                    page_size=max_results,
-                )
-            )
+        return run_async(
+            _search_with_biomcp(
+                genes=genes_list,
+                diseases=diseases_list,
+                keywords=keywords_list,
+                page_size=max_results,
+            ),
+            timeout=60,
+        )
     except Exception:
         # Fallback: return empty list
         return []
@@ -638,288 +586,6 @@ def format_references(articles: list[dict], max_refs: int = 5) -> str:
     return "\n".join(lines)
 
 
-@tool
-def search_literature_for_context(
-    genes: list[str],
-    pathways: list[str],
-    celltypes: list[str],
-    disease: str,
-    interaction_type: str = "",
-    max_results: int = 20,
-) -> dict:
-    """Search PubMed for contextual literature BEFORE generating interpretations.
-
-    This tool performs proactive literature search based on analysis context
-    (genes, pathways, cell types) to provide a reference foundation for
-    interpretation generation. Unlike search_literature, this is designed
-    to be called BEFORE interpretation to prevent hallucination.
-
-    Args:
-        genes: List of gene names identified in analysis (e.g., ["CDH1", "TGFB1", "VIM"])
-        pathways: List of pathways identified (e.g., ["EMT", "TGFB", "WNT"])
-        celltypes: List of cell types in analysis (e.g., ["Tumor", "Fibroblast"])
-        disease: Disease context (e.g., "breast cancer")
-        interaction_type: Type of interaction focus (e.g., "cell-cell interaction", "spatial")
-        max_results: Maximum number of papers to return (default 20)
-
-    Returns:
-        Dictionary with:
-        - papers: List of relevant papers with pmid, title, abstract
-        - search_queries: The queries used for searching
-        - coverage: Summary of what biological concepts are covered
-    """
-    papers = []
-    search_queries = []
-
-    # Strategy 1: Gene + Disease + Interaction focused search
-    if genes and disease:
-        keywords_for_strategy = [interaction_type] if interaction_type else []
-        search_queries.append({
-            "type": "gene_disease",
-            "genes": genes[:5],  # Top 5 genes
-            "diseases": [disease],
-            "keywords": keywords_for_strategy,
-        })
-
-    # Strategy 2: Pathway + Cell type search
-    if pathways and celltypes:
-        pathway_keywords = pathways[:3] + celltypes[:3]
-        diseases_list = [disease] if disease else []
-        search_queries.append({
-            "type": "pathway_celltype",
-            "genes": None,
-            "diseases": diseases_list,
-            "keywords": pathway_keywords,
-        })
-
-    # Strategy 3: Ligand-receptor interaction search
-    if genes and len(genes) >= 2:
-        lr_keywords = ["ligand receptor", "cell-cell interaction", "signaling"]
-        diseases_list = [disease] if disease else []
-        search_queries.append({
-            "type": "lr_pair",
-            "genes": genes[:4],  # Top 4 genes for L-R pairs
-            "diseases": diseases_list,
-            "keywords": lr_keywords,
-        })
-
-    # Strategy 4: Spatial transcriptomics context
-    if celltypes and disease:
-        spatial_keywords = ["spatial transcriptomics", "single cell", "tumor microenvironment"]
-        spatial_keywords.extend(celltypes[:3])
-        search_queries.append({
-            "type": "spatial",
-            "genes": None,
-            "diseases": [disease],
-            "keywords": spatial_keywords,
-        })
-
-    # Execute searches using proper BioMCP parameters
-    seen_pmids = set()
-    try:
-        loop = asyncio.get_event_loop()
-        is_running = loop.is_running()
-    except RuntimeError:
-        is_running = False
-
-    results_per_query = max(5, max_results // len(search_queries) + 2) if search_queries else 10
-
-    for sq in search_queries:
-        try:
-            if is_running:
-                # Use module-level executor
-                executor = _get_executor()
-                future = executor.submit(
-                    asyncio.run,
-                    _search_with_biomcp(
-                        genes=sq.get("genes"),
-                        diseases=sq.get("diseases"),
-                        keywords=sq.get("keywords"),
-                        page_size=results_per_query,
-                    )
-                )
-                results = future.result(timeout=60)
-            else:
-                results = asyncio.run(
-                    _search_with_biomcp(
-                        genes=sq.get("genes"),
-                        diseases=sq.get("diseases"),
-                        keywords=sq.get("keywords"),
-                        page_size=results_per_query,
-                    )
-                )
-
-            for paper in results:
-                pmid = paper.get("pmid", "")
-                if pmid and pmid not in seen_pmids:
-                    seen_pmids.add(pmid)
-                    paper["search_type"] = sq["type"]
-                    papers.append(paper)
-
-        except Exception as e:
-            logger.warning(f"Search failed for query {sq['type']}: {e}")
-            continue
-
-    # Limit to max_results
-    papers = papers[:max_results]
-
-    # Calculate coverage
-    coverage = {
-        "genes_covered": [],
-        "pathways_covered": [],
-        "celltypes_covered": [],
-        "total_papers": len(papers),
-    }
-
-    for paper in papers:
-        abstract_lower = paper.get("abstract", "").lower()
-        title_lower = paper.get("title", "").lower()
-        combined = abstract_lower + " " + title_lower
-
-        for gene in genes:
-            if gene.lower() in combined and gene not in coverage["genes_covered"]:
-                coverage["genes_covered"].append(gene)
-
-        for pathway in pathways:
-            if pathway.lower() in combined and pathway not in coverage["pathways_covered"]:
-                coverage["pathways_covered"].append(pathway)
-
-        for celltype in celltypes:
-            if celltype.lower() in combined and celltype not in coverage["celltypes_covered"]:
-                coverage["celltypes_covered"].append(celltype)
-
-    return {
-        "papers": papers,
-        "search_queries": [
-            {
-                "type": sq["type"],
-                "genes": sq.get("genes"),
-                "diseases": sq.get("diseases"),
-                "keywords": sq.get("keywords"),
-            }
-            for sq in search_queries
-        ],
-        "coverage": coverage,
-    }
-
-
-async def search_literature_for_context_async(
-    genes: list[str],
-    pathways: list[str],
-    celltypes: list[str],
-    disease: str,
-    interaction_type: str = "",
-    max_results: int = 20,
-    biomcp_url: str = DEFAULT_BIOMCP_URL,
-) -> dict:
-    """Async version of search_literature_for_context.
-
-    Args:
-        genes: List of gene names
-        pathways: List of pathways
-        celltypes: List of cell types
-        disease: Disease context
-        interaction_type: Type of interaction focus
-        max_results: Maximum papers to return
-        biomcp_url: BioMCP server URL
-
-    Returns:
-        Dictionary with papers, search_queries, and coverage
-    """
-    papers = []
-    search_queries = []
-
-    # Strategy 1: Gene + Disease + Interaction focused search
-    if genes and disease:
-        keywords_for_strategy = [interaction_type] if interaction_type else []
-        search_queries.append({
-            "type": "gene_disease",
-            "genes": genes[:5],
-            "diseases": [disease],
-            "keywords": keywords_for_strategy,
-        })
-
-    # Strategy 2: Pathway + Cell type search
-    if pathways and celltypes:
-        pathway_keywords = pathways[:3] + celltypes[:3]
-        diseases_list = [disease] if disease else []
-        search_queries.append({
-            "type": "pathway_celltype",
-            "genes": None,
-            "diseases": diseases_list,
-            "keywords": pathway_keywords,
-        })
-
-    # Strategy 3: Spatial transcriptomics context
-    if celltypes and disease:
-        spatial_keywords = ["spatial transcriptomics", "single cell", "tumor microenvironment"]
-        spatial_keywords.extend(celltypes[:3])
-        search_queries.append({
-            "type": "spatial",
-            "genes": None,
-            "diseases": [disease],
-            "keywords": spatial_keywords,
-        })
-
-    # Execute searches using proper BioMCP parameters
-    seen_pmids = set()
-    results_per_query = max(5, max_results // len(search_queries) + 2) if search_queries else 10
-
-    for sq in search_queries:
-        try:
-            results = await _search_with_biomcp(
-                genes=sq.get("genes"),
-                diseases=sq.get("diseases"),
-                keywords=sq.get("keywords"),
-                page_size=results_per_query,
-                biomcp_url=biomcp_url,
-            )
-            for paper in results:
-                pmid = paper.get("pmid", "")
-                if pmid and pmid not in seen_pmids:
-                    seen_pmids.add(pmid)
-                    paper["search_type"] = sq["type"]
-                    papers.append(paper)
-        except Exception:
-            continue
-
-    papers = papers[:max_results]
-
-    # Calculate coverage
-    coverage = {
-        "genes_covered": [],
-        "pathways_covered": [],
-        "celltypes_covered": [],
-        "total_papers": len(papers),
-    }
-
-    for paper in papers:
-        combined = (paper.get("abstract", "") + " " + paper.get("title", "")).lower()
-        for gene in genes:
-            if gene.lower() in combined and gene not in coverage["genes_covered"]:
-                coverage["genes_covered"].append(gene)
-        for pathway in pathways:
-            if pathway.lower() in combined and pathway not in coverage["pathways_covered"]:
-                coverage["pathways_covered"].append(pathway)
-        for celltype in celltypes:
-            if celltype.lower() in combined and celltype not in coverage["celltypes_covered"]:
-                coverage["celltypes_covered"].append(celltype)
-
-    return {
-        "papers": papers,
-        "search_queries": [
-            {
-                "type": sq["type"],
-                "genes": sq.get("genes"),
-                "diseases": sq.get("diseases"),
-                "keywords": sq.get("keywords"),
-            }
-            for sq in search_queries
-        ],
-        "coverage": coverage,
-    }
-
-
 def _execute_fixed_strategy_search(
     genes: list[str],
     pathways: list[str],
@@ -929,10 +595,7 @@ def _execute_fixed_strategy_search(
 ) -> dict:
     """Internal fixed-strategy search function (used as fallback).
 
-    This function implements the same 4-strategy search as search_literature_for_context
-    but is called internally by search_literature_dynamic when LLM generation fails.
-    This avoids exposing the fallback tool to the SEARCHER subagent while still
-    providing robust fallback behavior.
+    Sync wrapper that delegates to _execute_fixed_strategy_search_async.
 
     Args:
         genes: List of gene names
@@ -943,6 +606,43 @@ def _execute_fixed_strategy_search(
 
     Returns:
         Dictionary with papers, search_queries, and coverage
+    """
+    return run_async(
+        _execute_fixed_strategy_search_async(
+            genes=genes,
+            pathways=pathways,
+            celltypes=celltypes,
+            disease=disease,
+            max_results=max_results,
+        ),
+        timeout=120,
+    )
+
+
+async def _execute_fixed_strategy_search_async(
+    genes: list[str],
+    pathways: list[str],
+    celltypes: list[str],
+    disease: str,
+    max_results: int = 20,
+    biomcp_url: str = DEFAULT_BIOMCP_URL,
+) -> dict:
+    """Async fixed-strategy search function (used as fallback).
+
+    Natively async version of _execute_fixed_strategy_search that uses
+    await _search_with_biomcp() directly instead of the executor pattern.
+    Implements the same 4-strategy search logic including the lr_pair strategy.
+
+    Args:
+        genes: List of gene names
+        pathways: List of pathways
+        celltypes: List of cell types
+        disease: Disease context
+        max_results: Maximum papers to return
+        biomcp_url: BioMCP server URL
+
+    Returns:
+        Dictionary with papers, search_queries, coverage, and search_method
     """
     papers = []
     search_queries = []
@@ -989,75 +689,33 @@ def _execute_fixed_strategy_search(
             "keywords": spatial_keywords,
         })
 
-    # Execute searches
-    try:
-        loop = asyncio.get_event_loop()
-        is_running = loop.is_running()
-    except RuntimeError:
-        is_running = False
-
-    seen_pmids = set()
+    # Execute searches natively async
+    seen_pmids: set[str] = set()
     results_per_query = max(5, max_results // len(search_queries) + 2) if search_queries else 10
 
     for sq in search_queries:
         try:
-            if is_running:
-                executor = _get_executor()
-                future = executor.submit(
-                    asyncio.run,
-                    _search_with_biomcp(
-                        genes=sq.get("genes"),
-                        diseases=sq.get("diseases"),
-                        keywords=sq.get("keywords"),
-                        page_size=results_per_query,
-                    )
-                )
-                results = future.result(timeout=60)
-            else:
-                results = asyncio.run(
-                    _search_with_biomcp(
-                        genes=sq.get("genes"),
-                        diseases=sq.get("diseases"),
-                        keywords=sq.get("keywords"),
-                        page_size=results_per_query,
-                    )
-                )
-
+            results = await _search_with_biomcp(
+                genes=sq.get("genes"),
+                diseases=sq.get("diseases"),
+                keywords=sq.get("keywords"),
+                page_size=results_per_query,
+                biomcp_url=biomcp_url,
+            )
             for paper in results:
                 pmid = paper.get("pmid", "")
                 if pmid and pmid not in seen_pmids:
                     seen_pmids.add(pmid)
                     paper["search_type"] = sq["type"]
                     papers.append(paper)
-
         except Exception as e:
-            logger.warning(f"Fixed strategy search failed for query {sq['type']}: {e}")
+            logger.warning(f"Async fixed strategy search failed for query {sq['type']}: {e}")
             continue
 
     papers = papers[:max_results]
 
-    # Calculate coverage
-    coverage = {
-        "genes_covered": [],
-        "pathways_covered": [],
-        "celltypes_covered": [],
-        "total_papers": len(papers),
-    }
-
-    for paper in papers:
-        combined = (paper.get("abstract", "") + " " + paper.get("title", "")).lower()
-
-        for gene in genes:
-            if gene.lower() in combined and gene not in coverage["genes_covered"]:
-                coverage["genes_covered"].append(gene)
-
-        for pathway in pathways:
-            if pathway.lower() in combined and pathway not in coverage["pathways_covered"]:
-                coverage["pathways_covered"].append(pathway)
-
-        for celltype in celltypes:
-            if celltype.lower() in combined and celltype not in coverage["celltypes_covered"]:
-                coverage["celltypes_covered"].append(celltype)
+    # Use unified coverage calculation (same as search_literature_dynamic)
+    coverage = _calculate_coverage(papers, genes, pathways, celltypes)
 
     return {
         "papers": papers,
@@ -1281,14 +939,6 @@ def _generate_gene_patterns(gene: str, include_biomcp_aliases: bool = True) -> l
             alias_patterns = _generate_gene_patterns(alias, include_biomcp_aliases=False)
             patterns.update(alias_patterns)
 
-    # 6. Add BioMCP-fetched aliases from cache (if available)
-    if include_biomcp_aliases and gene_upper in _GENE_ALIAS_CACHE:
-        for alias in _GENE_ALIAS_CACHE[gene_upper]:
-            patterns.add(alias.lower())
-            # Generate patterns for each alias (but don't recurse BioMCP)
-            alias_patterns = _generate_gene_patterns(alias, include_biomcp_aliases=False)
-            patterns.update(alias_patterns)
-
     return list(patterns)
 
 
@@ -1468,16 +1118,9 @@ async def _think_with_biomcp(
         Dictionary with strategic_context string and success flag
     """
     try:
-        client = MultiServerMCPClient(
-            {"biomcp": {"url": biomcp_url, "transport": "streamable_http"}}
-        )
-        tools = await client.get_tools()
+        tools = await get_biomcp_tools(biomcp_url)
 
-        think_tool = None
-        for tool_obj in tools:
-            if hasattr(tool_obj, 'name') and 'think' in tool_obj.name:
-                think_tool = tool_obj
-                break
+        think_tool = find_tool_by_name(tools, "think")
 
         if think_tool is None:
             logger.warning("BioMCP think tool not found")
@@ -1531,6 +1174,7 @@ Analysis type: CCI (Cell-Cell Interaction) from spatial transcriptomics
 
     except Exception as e:
         logger.warning(f"BioMCP think failed: {e}")
+        invalidate_client(f"biomcp_{biomcp_url}")
         return {"strategic_context": "", "success": False}
 
 
@@ -1552,18 +1196,146 @@ def _execute_biomcp_think(
         Dictionary with strategic_context string and success flag
     """
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            executor = _get_executor()
-            future = executor.submit(
-                asyncio.run,
-                _think_with_biomcp(genes, pathways, celltypes, disease)
-            )
-            return future.result(timeout=30)
-        else:
-            return asyncio.run(_think_with_biomcp(genes, pathways, celltypes, disease))
+        return run_async(_think_with_biomcp(genes, pathways, celltypes, disease), timeout=30)
     except Exception as e:
         logger.warning(f"BioMCP think execution failed: {e}")
+        return {"strategic_context": "", "success": False}
+
+
+async def _think_with_biomcp_for_planner(
+    celltypes: list[str],
+    pathways: list[str],
+    available_analyses: str,
+    disease: str,
+    biomcp_url: str = DEFAULT_BIOMCP_URL,
+) -> dict:
+    """Execute 3-step strategic thinking via BioMCP think tool for PLANNER.
+
+    PLANNER-specific chain for interpretation planning context:
+    - Step 1: Disease Biology Analysis — analyze celltypes + pathways + tissue context
+    - Step 2: Interpretation Directions — suggest promising CCI interpretation focus areas
+    - Step 3: Expected Mechanisms — predict key L-R pairs, pathway crosstalk, spatial patterns
+
+    Args:
+        celltypes: List of cell types from analysis data
+        pathways: List of pathways from analysis data
+        available_analyses: Summary of available Part 1/2/3 analyses
+        disease: Disease context (inferred from cell types)
+        biomcp_url: BioMCP server URL
+
+    Returns:
+        Dictionary with strategic_context string and success flag
+    """
+    try:
+        tools = await get_biomcp_tools(biomcp_url)
+
+        think_tool = find_tool_by_name(tools, "think")
+
+        if think_tool is None:
+            logger.warning("BioMCP think tool not found for PLANNER")
+            return {"strategic_context": "", "success": False}
+
+        # Build context summary (no genes — PLANNER doesn't have gene-level data)
+        context = f"""
+Cell types: {', '.join(celltypes) if celltypes else 'None'}
+Pathways: {', '.join(pathways[:10]) if pathways else 'None'}
+Available analyses: {available_analyses}
+Disease: {disease or 'Not specified'}
+Analysis type: CCI (Cell-Cell Interaction) from spatial transcriptomics
+"""
+
+        results = []
+
+        # Step 1: Disease Biology Analysis
+        celltypes_str = ', '.join(celltypes) if celltypes else 'unknown'
+        pathways_str = ', '.join(pathways[:10]) if pathways else 'unknown'
+        step1 = await think_tool.ainvoke({
+            "thought": (
+                f"Disease biology analysis for {disease}: Given cell types "
+                f"[{celltypes_str}] and pathways [{pathways_str}], what are "
+                f"the key biological processes and known cell-cell interactions "
+                f"in this tissue context?"
+            ),
+            "thoughtNumber": 1,
+            "totalThoughts": 3,
+            "nextThoughtNeeded": True,
+        })
+        results.append(f"Disease Biology: {step1}")
+
+        # Step 2: Interpretation Directions
+        step2 = await think_tool.ainvoke({
+            "thought": (
+                f"Interpretation directions for CCI analysis: Given the disease "
+                f"biology and available analyses [{available_analyses}], what "
+                f"are the most promising focus areas for cell-cell "
+                f"interaction interpretation?"
+            ),
+            "thoughtNumber": 2,
+            "totalThoughts": 3,
+            "nextThoughtNeeded": True,
+        })
+        results.append(f"Interpretation Directions: {step2}")
+
+        # Step 3: Expected Mechanisms
+        step3 = await think_tool.ainvoke({
+            "thought": (
+                "Expected mechanisms: For the identified interpretation directions, "
+                "predict key ligand-receptor pairs, pathway crosstalk patterns, "
+                "and spatial organization features expected in this tissue."
+            ),
+            "thoughtNumber": 3,
+            "totalThoughts": 3,
+            "nextThoughtNeeded": False,
+        })
+        results.append(f"Expected Mechanisms: {step3}")
+
+        strategic_context = "\n".join(results)
+        logger.info("BioMCP think for PLANNER completed successfully (3 steps)")
+
+        return {
+            "strategic_context": strategic_context,
+            "success": True,
+        }
+
+    except Exception as e:
+        logger.warning(f"BioMCP think for PLANNER failed: {e}")
+        invalidate_client(f"biomcp_{biomcp_url}")
+        return {"strategic_context": "", "success": False}
+
+
+@tool
+def generate_biomedical_context(
+    celltypes: list[str],
+    pathways: list[str],
+    available_analyses: str,
+    disease: str,
+) -> dict:
+    """Generate biomedical context for interpretation planning using BioMCP's strategic reasoning.
+
+    Uses BioMCP's think tool to analyze disease biology, suggest interpretation directions,
+    and predict expected mechanisms BEFORE literature search. This enriches PLANNER's
+    interpretation guide with structured biomedical reasoning.
+
+    Args:
+        celltypes: List of cell types from analysis data (e.g., ["Tumor", "Fibroblast", "Macrophage"])
+        pathways: List of pathways from analysis data (e.g., ["EMT", "TGFB", "WNT"])
+        available_analyses: Summary of available analyses (e.g., "Part 1: spatial, celltype, neighborhood; Part 2: LIANA, NMF")
+        disease: Disease context inferred from cell types (e.g., "breast cancer")
+
+    Returns:
+        Dictionary with:
+        - strategic_context: BioMCP's biomedical reasoning output
+        - success: Whether the analysis completed successfully
+    """
+    try:
+        return run_async(
+            _think_with_biomcp_for_planner(
+                celltypes, pathways, available_analyses, disease
+            ),
+            timeout=45,
+        )
+    except Exception as e:
+        logger.warning(f"generate_biomedical_context failed: {e}")
         return {"strategic_context": "", "success": False}
 
 
@@ -1580,6 +1352,9 @@ def search_literature_dynamic(
 ) -> dict:
     """LLM-powered dynamic literature search with ITERATIVE coverage improvement.
 
+    Sync wrapper that delegates to search_literature_dynamic_async.
+    Uses a single run_async call instead of multiple nested ones.
+
     This function uses a multi-iteration approach:
     1. Initial broad search based on biological context
     2. Coverage evaluation after each iteration
@@ -1591,7 +1366,7 @@ def search_literature_dynamic(
         pathways: List of pathways identified (e.g., ["EMT", "TGFB", "WNT"])
         celltypes: List of cell types in analysis (e.g., ["Tumor", "Fibroblast"])
         disease: Disease context (e.g., "breast cancer")
-        max_results: Maximum number of papers to return (default 30)
+        max_results: Maximum number of papers to return (default 40)
         target_gene_coverage: Target gene coverage percentage (default 0.6 = 60%)
         target_pathway_coverage: Target pathway coverage percentage (default 0.5 = 50%)
         max_iterations: Maximum search iterations (default 3)
@@ -1605,255 +1380,19 @@ def search_literature_dynamic(
         - iterations: Number of iterations performed
         - coverage_history: Coverage at each iteration
     """
-    # Initialize tracking variables
-    all_papers = []
-    all_queries = []
-    seen_pmids = set()
-    coverage_history = []
-
-    # Check event loop status
-    try:
-        loop = asyncio.get_event_loop()
-        is_running = loop.is_running()
-    except RuntimeError:
-        is_running = False
-
-    # Step 0: BioMCP think for strategic planning (once)
-    think_result = _execute_biomcp_think(genes, pathways, celltypes, disease)
-    strategic_context = think_result.get("strategic_context", "")
-
-    # Note: Step 0.5 (pre-fetch aliases) removed - BioMCP article_searcher
-    # automatically handles gene aliases internally (e.g., ACKR3 -> CXCR7)
-
-    llm = create_llm()
-
-    for iteration in range(max_iterations):
-        logger.info(f"=== Iteration {iteration + 1}/{max_iterations} ===")
-
-        # Calculate current coverage
-        current_coverage = _calculate_coverage(all_papers, genes, pathways, celltypes)
-        covered_genes = set(current_coverage.get("genes_covered", []))
-        covered_pathways = set(current_coverage.get("pathways_covered", []))
-
-        gene_coverage_pct = current_coverage.get("genes_coverage_pct", 0) / 100
-        pathway_coverage_pct = current_coverage.get("pathways_coverage_pct", 0) / 100
-
-        coverage_history.append({
-            "iteration": iteration,
-            "papers": len(all_papers),
-            "gene_coverage": gene_coverage_pct,
-            "pathway_coverage": pathway_coverage_pct,
-        })
-
-        # Check if targets are met
-        if iteration > 0:
-            if gene_coverage_pct >= target_gene_coverage and pathway_coverage_pct >= target_pathway_coverage:
-                logger.info(f"Coverage targets met: genes={gene_coverage_pct:.1%}, pathways={pathway_coverage_pct:.1%}")
-                break
-            if len(all_papers) >= max_results:
-                logger.info(f"Max results reached: {len(all_papers)}")
-                break
-
-        # Generate queries based on iteration
-        if iteration == 0:
-            # Initial broad search
-            # Note: gene_aliases="" - BioMCP article_searcher handles aliases internally
-            prompt_text = LITERATURE_QUERY_GENERATION_PROMPT.format(
-                genes=", ".join(genes) if genes else "None",
-                pathways=", ".join(pathways) if pathways else "None",
-                celltypes=", ".join(celltypes) if celltypes else "None",
-                disease=disease or "Not specified",
-                gene_aliases="",  # BioMCP article_searcher handles aliases internally
-                strategic_context=strategic_context,
-            )
-        else:
-            # Gap-filling search for missing genes/pathways
-            missing_genes = [g for g in genes if g not in covered_genes]
-            missing_pathways = [p for p in pathways if p not in covered_pathways]
-
-            if not missing_genes and not missing_pathways:
-                logger.info("No missing genes or pathways to search for")
-                break
-
-            # Note: Alias fetching removed - BioMCP article_searcher handles aliases internally
-            prompt_text = GAP_FILLING_QUERY_PROMPT.format(
-                missing_genes=", ".join(missing_genes) if missing_genes else "None",
-                missing_pathways=", ".join(missing_pathways) if missing_pathways else "None",
-                disease=disease or "Not specified",
-                covered_genes=", ".join(covered_genes) if covered_genes else "None",
-                covered_pathways=", ".join(covered_pathways) if covered_pathways else "None",
-            )
-            logger.info(f"Gap-filling: {len(missing_genes)} missing genes, {len(missing_pathways)} missing pathways")
-
-        # Generate queries using LLM
-        try:
-            response = llm.invoke([HumanMessage(content=prompt_text)])
-            response_text = response.content if hasattr(response, "content") else str(response)
-        except Exception as e:
-            logger.error(f"LLM query generation failed at iteration {iteration}: {e}")
-            if iteration == 0:
-                # Fallback on first iteration - use fixed strategy search internally
-                return _execute_fixed_strategy_search(
-                    genes=genes,
-                    pathways=pathways,
-                    celltypes=celltypes,
-                    disease=disease,
-                    max_results=max_results,
-                )
-            break
-
-        # Parse and validate queries
-        raw_queries = _parse_llm_queries(response_text)
-        validated_queries = _validate_generated_queries(raw_queries)
-
-        if not validated_queries:
-            if iteration == 0:
-                logger.warning("No valid queries on first iteration, falling back")
-                # Fallback on first iteration - use fixed strategy search internally
-                return _execute_fixed_strategy_search(
-                    genes=genes,
-                    pathways=pathways,
-                    celltypes=celltypes,
-                    disease=disease,
-                    max_results=max_results,
-                )
-            logger.warning(f"No valid queries at iteration {iteration}, stopping")
-            break
-
-        all_queries.extend(validated_queries)
-        logger.info(f"Generated {len(validated_queries)} queries for iteration {iteration + 1}")
-
-        # Separate gene-centric and pathway-centric queries for balanced execution
-        gene_queries = [q for q in validated_queries if q.get("genes")]
-        pathway_queries = [q for q in validated_queries if not q.get("genes")]
-
-        # Execute gene queries first with guaranteed minimum slots
-        # Then pathway queries with remaining slots
-        logger.info(f"Query distribution: {len(gene_queries)} gene + {len(pathway_queries)} pathway queries")
-
-        remaining_slots = max_results - len(all_papers)
-
-        # Allocate 60% to gene queries, 40% to pathway queries (minimum 3 per query)
-        gene_slots = int(remaining_slots * 0.6) if gene_queries else 0
-        pathway_slots = remaining_slots - gene_slots if pathway_queries else remaining_slots
-
-        gene_results_per_query = max(5, gene_slots // len(gene_queries) + 1) if gene_queries else 0
-        pathway_results_per_query = max(3, pathway_slots // len(pathway_queries) + 1) if pathway_queries else 0
-
-        logger.info(f"Slot allocation: gene={gene_slots} ({gene_results_per_query}/query), pathway={pathway_slots} ({pathway_results_per_query}/query)")
-
-        # Process gene queries first with higher allocation
-        for i, query in enumerate(gene_queries):
-            if len(all_papers) >= max_results:
-                break
-
-            try:
-                if is_running:
-                    executor = _get_executor()
-                    future = executor.submit(
-                        asyncio.run,
-                        _search_with_biomcp(
-                            genes=query.get("genes"),
-                            diseases=query.get("diseases"),
-                            keywords=query.get("keywords"),
-                            page_size=gene_results_per_query,
-                        )
-                    )
-                    results = future.result(timeout=60)
-                else:
-                    results = asyncio.run(
-                        _search_with_biomcp(
-                            genes=query.get("genes"),
-                            diseases=query.get("diseases"),
-                            keywords=query.get("keywords"),
-                            page_size=gene_results_per_query,
-                        )
-                    )
-
-                # Deduplicate by PMID
-                new_papers = 0
-                for paper in results:
-                    pmid = paper.get("pmid", "")
-                    if pmid and pmid not in seen_pmids:
-                        seen_pmids.add(pmid)
-                        paper["query_index"] = len(all_queries) - len(validated_queries) + i
-                        paper["iteration"] = iteration
-                        paper["query_type"] = "gene"
-                        all_papers.append(paper)
-                        new_papers += 1
-
-                logger.debug(f"Gene query {i}: {new_papers} new papers")
-
-            except Exception as e:
-                logger.warning(f"Gene search failed for query {i} at iteration {iteration}: {e}")
-                continue
-
-        # Process pathway queries with remaining slots
-        for i, query in enumerate(pathway_queries):
-            if len(all_papers) >= max_results:
-                break
-
-            try:
-                if is_running:
-                    executor = _get_executor()
-                    future = executor.submit(
-                        asyncio.run,
-                        _search_with_biomcp(
-                            genes=query.get("genes"),
-                            diseases=query.get("diseases"),
-                            keywords=query.get("keywords"),
-                            page_size=pathway_results_per_query,
-                        )
-                    )
-                    results = future.result(timeout=60)
-                else:
-                    results = asyncio.run(
-                        _search_with_biomcp(
-                            genes=query.get("genes"),
-                            diseases=query.get("diseases"),
-                            keywords=query.get("keywords"),
-                            page_size=pathway_results_per_query,
-                        )
-                    )
-
-                # Deduplicate by PMID
-                new_papers = 0
-                for paper in results:
-                    pmid = paper.get("pmid", "")
-                    if pmid and pmid not in seen_pmids:
-                        seen_pmids.add(pmid)
-                        paper["query_index"] = len(all_queries) - len(validated_queries) + len(gene_queries) + i
-                        paper["iteration"] = iteration
-                        paper["query_type"] = "pathway"
-                        all_papers.append(paper)
-                        new_papers += 1
-
-                logger.debug(f"Pathway query {i}: {new_papers} new papers")
-
-            except Exception as e:
-                logger.warning(f"Pathway search failed for query {i} at iteration {iteration}: {e}")
-                continue
-
-    # Final coverage calculation
-    final_papers = all_papers[:max_results]
-    final_coverage = _calculate_coverage(final_papers, genes, pathways, celltypes)
-
-    # Add final state to history
-    coverage_history.append({
-        "iteration": "final",
-        "papers": len(final_papers),
-        "gene_coverage": final_coverage.get("genes_coverage_pct", 0) / 100,
-        "pathway_coverage": final_coverage.get("pathways_coverage_pct", 0) / 100,
-    })
-
-    return {
-        "papers": final_papers,
-        "generated_queries": all_queries,
-        "coverage": final_coverage,
-        "think_success": think_result.get("success", False),
-        "iterations": len(coverage_history) - 1,  # Exclude 'final'
-        "coverage_history": coverage_history,
-    }
+    return run_async(
+        search_literature_dynamic_async(
+            genes=genes,
+            pathways=pathways,
+            celltypes=celltypes,
+            disease=disease,
+            max_results=max_results,
+            target_gene_coverage=target_gene_coverage,
+            target_pathway_coverage=target_pathway_coverage,
+            max_iterations=max_iterations,
+        ),
+        timeout=300,
+    )
 
 
 async def search_literature_dynamic_async(
@@ -1876,7 +1415,7 @@ async def search_literature_dynamic_async(
         pathways: List of pathways identified
         celltypes: List of cell types in analysis
         disease: Disease context
-        max_results: Maximum papers to return (default 30)
+        max_results: Maximum papers to return (default 40)
         target_gene_coverage: Target gene coverage percentage (default 0.6)
         target_pathway_coverage: Target pathway coverage percentage (default 0.5)
         max_iterations: Maximum search iterations (default 3)
@@ -1966,7 +1505,7 @@ async def search_literature_dynamic_async(
         except Exception as e:
             logger.error(f"LLM query generation failed at iteration {iteration}: {e}")
             if iteration == 0:
-                return await search_literature_for_context_async(
+                return await _execute_fixed_strategy_search_async(
                     genes=genes,
                     pathways=pathways,
                     celltypes=celltypes,
@@ -1983,7 +1522,7 @@ async def search_literature_dynamic_async(
         if not validated_queries:
             if iteration == 0:
                 logger.warning("No valid queries on first iteration, falling back")
-                return await search_literature_for_context_async(
+                return await _execute_fixed_strategy_search_async(
                     genes=genes,
                     pathways=pathways,
                     celltypes=celltypes,
@@ -2091,6 +1630,7 @@ async def search_literature_dynamic_async(
         "papers": final_papers,
         "generated_queries": all_queries,
         "coverage": final_coverage,
+        "search_method": "search_literature_dynamic",
         "think_success": think_result.get("success", False),
         "iterations": len(coverage_history) - 1,
         "coverage_history": coverage_history,

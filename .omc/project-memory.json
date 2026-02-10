@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1770323066213,
+  "lastScanned": 1770625102284,
   "projectRoot": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST",
   "techStack": {
     "languages": [
@@ -49,7 +49,7 @@
       "path": "agent-chat-ui",
       "purpose": null,
       "fileCount": 24,
-      "lastAccessed": 1770323066203,
+      "lastAccessed": 1770625102275,
       "keyFiles": [
         "LICENSE",
         "Makefile",
@@ -62,7 +62,7 @@
       "path": "agent_architecture",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1770323066204,
+      "lastAccessed": 1770625102275,
       "keyFiles": [
         "1.pipeline_builder.mermaid",
         "1.pipeline_builder.png",
@@ -74,21 +74,21 @@
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 12,
-      "lastAccessed": 1770323066205,
+      "fileCount": 15,
+      "lastAccessed": 1770625102276,
       "keyFiles": [
+        "HypoGeniC.pdf",
+        "biomedical_thinking_mcp_server.md",
         "deep_interpreter_architecture.md",
         "deep_interpreter_overview.md",
-        "fig_des copy.md",
-        "fig_des.md",
-        "interpreter_rag_mode_workflow.md"
+        "fig_des copy.md"
       ]
     },
     "mcp_servers": {
       "path": "mcp_servers",
       "purpose": null,
       "fileCount": 7,
-      "lastAccessed": 1770323066205,
+      "lastAccessed": 1770625102276,
       "keyFiles": [
         "read.py",
         "runplot_LIANAp_NMF.py",
@@ -101,7 +101,7 @@
       "path": "notebook",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1770323066205,
+      "lastAccessed": 1770625102277,
       "keyFiles": [
         "test_interpreter_steps.ipynb",
         "test_load_analysis_data.ipynb"
@@ -111,7 +111,7 @@
       "path": "old",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1770323066205,
+      "lastAccessed": 1770625102277,
       "keyFiles": [
         "st_pipeline_info_agent copy.py"
       ]
@@ -120,7 +120,7 @@
       "path": "order",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1770323066206,
+      "lastAccessed": 1770625102278,
       "keyFiles": [
         "Untitled",
         "order_deepagent",
@@ -132,8 +132,8 @@
     "res": {
       "path": "res",
       "purpose": null,
-      "fileCount": 23,
-      "lastAccessed": 1770323066206,
+      "fileCount": 32,
+      "lastAccessed": 1770625102278,
       "keyFiles": [
         "1.spatial.png",
         "10.spatial_plot_interections.png",
@@ -146,14 +146,14 @@
       "path": "skills",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1770323066207,
+      "lastAccessed": 1770625102279,
       "keyFiles": []
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1770323066207,
+      "lastAccessed": 1770625102279,
       "keyFiles": [
         "__init__.py"
       ]
@@ -162,7 +162,7 @@
       "path": "tests",
       "purpose": "Test files",
       "fileCount": 2,
-      "lastAccessed": 1770323066207,
+      "lastAccessed": 1770625102279,
       "keyFiles": [
         "__init__.py",
         "test_reporter_phase45.py"
@@ -172,7 +172,7 @@
       "path": "mcp_servers/utils",
       "purpose": "Utility functions",
       "fileCount": 17,
-      "lastAccessed": 1770323066207,
+      "lastAccessed": 1770625102280,
       "keyFiles": [
         "__init__.py",
         "cci_analysis.py",

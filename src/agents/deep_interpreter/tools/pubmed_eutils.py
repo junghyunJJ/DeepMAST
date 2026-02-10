@@ -12,42 +12,57 @@ Uses only Python stdlib (urllib, xml.etree, json) — no extra dependencies.
 """
 
 import asyncio
-import atexit
 import json
 import logging
+import os
+import threading
 import time
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from concurrent.futures import ThreadPoolExecutor
 
 from langchain_core.tools import tool
 
+from src.agents.deep_interpreter.tools.mcp_clients import run_async
+
 logger = logging.getLogger(__name__)
 
-# Module-level singleton ThreadPoolExecutor (matches literature.py pattern)
-_EXECUTOR: ThreadPoolExecutor | None = None
+# Backward-compatible module-level aliases (kept for import compatibility;
+# all internal usage goes through _get_ncbi_credentials())
+NCBI_API_KEY = os.getenv("NCBI_API_KEY", "")
+PUBMED_EMAIL = os.getenv("PUBMED_EMAIL", "")
+PUBMED_TOOL = "DeepMAST"
 
-# Rate limiting: track last request time (3 req/s without API key)
+
+def _get_ncbi_credentials() -> tuple[str, str]:
+    """Read NCBI credentials at call time (not import time).
+
+    In LangGraph ASGI contexts, .env is loaded after module imports,
+    so os.getenv() at import time returns empty strings.
+    """
+    return os.getenv("NCBI_API_KEY", ""), os.getenv("PUBMED_EMAIL", "")
+
+
+# Rate limiting: track last request time
+# With API key: 10 req/s (0.11s), without: 3 req/s (0.34s)
 _last_request_time: float = 0.0
-
-
-def _get_executor() -> ThreadPoolExecutor:
-    """Get or create the singleton ThreadPoolExecutor for async bridging."""
-    global _EXECUTOR
-    if _EXECUTOR is None:
-        _EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="eutils")
-        atexit.register(_EXECUTOR.shutdown, wait=False)
-    return _EXECUTOR
+_rate_limit_lock = threading.Lock()
 
 
 def _rate_limit() -> None:
-    """Enforce NCBI rate limit: max 3 requests/second without API key."""
+    """Enforce NCBI rate limit: 10 req/s with API key, 3 req/s without.
+
+    Safe to call from any context — uses only synchronous primitives.
+    Should be called inside executor threads, not on the event loop.
+    """
     global _last_request_time
-    elapsed = time.time() - _last_request_time
-    if elapsed < 0.34:
-        time.sleep(0.34 - elapsed)
-    _last_request_time = time.time()
+    with _rate_limit_lock:
+        api_key, _ = _get_ncbi_credentials()
+        interval = 0.11 if api_key else 0.34
+        elapsed = time.time() - _last_request_time
+        if elapsed < interval:
+            time.sleep(interval - elapsed)
+        _last_request_time = time.time()
 
 
 # =============================================================================
@@ -84,6 +99,9 @@ async def _search_with_eutilities(
     """
     max_results = min(max_results, 100)
 
+    # Read credentials at call time (not import time) for ASGI compatibility
+    api_key, email = _get_ncbi_credentials()
+
     # Build ESearch URL
     params = {
         "db": "pubmed",
@@ -92,6 +110,11 @@ async def _search_with_eutilities(
         "retmode": "json",
         "sort": sort,
     }
+    if email:
+        params["email"] = email
+        params["tool"] = PUBMED_TOOL
+    if api_key:
+        params["api_key"] = api_key
     if min_date:
         params["mindate"] = min_date
         params["datetype"] = "pdat"  # publication date
@@ -103,12 +126,14 @@ async def _search_with_eutilities(
     esearch_url = f"{ESEARCH_URL}?{urllib.parse.urlencode(params)}"
 
     # Step 1: ESearch — get PMIDs
-    loop = asyncio.get_event_loop()
-    try:
+    loop = asyncio.get_running_loop()
+
+    def _esearch_with_rate_limit():
         _rate_limit()
-        esearch_response = await loop.run_in_executor(
-            None, lambda: urllib.request.urlopen(esearch_url, timeout=30).read()
-        )
+        return urllib.request.urlopen(esearch_url, timeout=30).read()
+
+    try:
+        esearch_response = await loop.run_in_executor(None, _esearch_with_rate_limit)
         esearch_data = json.loads(esearch_response)
         esearch_result = esearch_data.get("esearchresult", {})
         pmids = esearch_result.get("idlist", [])
@@ -145,13 +170,19 @@ async def _search_with_eutilities(
             "rettype": "xml",
             "retmode": "xml",
         }
+        if email:
+            efetch_params["email"] = email
+            efetch_params["tool"] = PUBMED_TOOL
+        if api_key:
+            efetch_params["api_key"] = api_key
         efetch_url = f"{EFETCH_URL}?{urllib.parse.urlencode(efetch_params)}"
 
-        try:
+        def _efetch_with_rate_limit(url=efetch_url):
             _rate_limit()
-            efetch_response = await loop.run_in_executor(
-                None, lambda url=efetch_url: urllib.request.urlopen(url, timeout=30).read()
-            )
+            return urllib.request.urlopen(url, timeout=30).read()
+
+        try:
+            efetch_response = await loop.run_in_executor(None, _efetch_with_rate_limit)
             batch_papers = _parse_pubmed_xml(efetch_response)
             papers.extend(batch_papers)
         except Exception as e:
@@ -231,6 +262,16 @@ def _parse_pubmed_xml(xml_data: bytes) -> list[dict]:
 # Query builder helper
 # =============================================================================
 
+def _sanitize_pubmed_term(term: str) -> str:
+    """Sanitize a term for use in PubMed queries.
+
+    Removes characters that could break query syntax.
+    """
+    # Remove unbalanced quotes and special PubMed operators
+    sanitized = term.replace('"', '').replace('[', '').replace(']', '')
+    return sanitized.strip()
+
+
 def build_pubmed_query(
     genes: list[str] | None = None,
     pathways: list[str] | None = None,
@@ -263,22 +304,22 @@ def build_pubmed_query(
 
     # Genes: OR together, search in title/abstract
     if genes:
-        gene_terms = " OR ".join(f"{g}[tiab]" for g in genes)
+        gene_terms = " OR ".join(f"{_sanitize_pubmed_term(g)}[tiab]" for g in genes)
         parts.append(f"({gene_terms})")
 
     # Pathways: OR together, search in title/abstract
     if pathways:
-        pathway_terms = " OR ".join(f'"{p}"[tiab]' for p in pathways)
+        pathway_terms = " OR ".join(f'"{_sanitize_pubmed_term(p)}"[tiab]' for p in pathways)
         parts.append(f"({pathway_terms})")
 
     # Cell types: OR together, search in title/abstract
     if celltypes:
-        ct_terms = " OR ".join(f'"{ct}"[tiab]' for ct in celltypes)
+        ct_terms = " OR ".join(f'"{_sanitize_pubmed_term(ct)}"[tiab]' for ct in celltypes)
         parts.append(f"({ct_terms})")
 
     # Disease: prefer MeSH if looks like a standard term
     if disease:
-        parts.append(f'"{disease}"[tiab]')
+        parts.append(f'"{_sanitize_pubmed_term(disease)}"[tiab]')
 
     # Explicit MeSH terms
     if mesh_terms:
@@ -357,32 +398,18 @@ def search_pubmed_advanced(
     min_date_val = min_date.strip() if min_date and min_date.strip() else None
     max_date_val = max_date.strip() if max_date and max_date.strip() else None
 
-    # Run async function with proper event loop handling
+    # Run async function using shared executor from mcp_clients
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # In async context (LangGraph dev server), use executor
-            future = _get_executor().submit(
-                asyncio.run,
-                _search_with_eutilities(
-                    query=query.strip(),
-                    max_results=max_results,
-                    sort=sort,
-                    min_date=min_date_val,
-                    max_date=max_date_val,
-                )
-            )
-            return future.result(timeout=60)
-        else:
-            return asyncio.run(
-                _search_with_eutilities(
-                    query=query.strip(),
-                    max_results=max_results,
-                    sort=sort,
-                    min_date=min_date_val,
-                    max_date=max_date_val,
-                )
-            )
+        return run_async(
+            _search_with_eutilities(
+                query=query.strip(),
+                max_results=max_results,
+                sort=sort,
+                min_date=min_date_val,
+                max_date=max_date_val,
+            ),
+            timeout=60,
+        )
     except Exception as e:
         logger.error(f"search_pubmed_advanced failed: {e}")
         return {

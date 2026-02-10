@@ -7,8 +7,6 @@ Falls back to Abstract-based approach if Docker/RAG unavailable.
 """
 
 import asyncio
-import atexit
-import concurrent.futures
 import json
 import logging
 import os
@@ -17,7 +15,13 @@ from pathlib import Path
 from typing import Any
 
 from langchain_core.tools import tool
-from langchain_mcp_adapters.client import MultiServerMCPClient
+
+from src.agents.deep_interpreter.tools.mcp_clients import (
+    run_async,
+    _get_cached_tools,
+    find_tool_by_name,
+    invalidate_client,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -37,14 +41,114 @@ def _mkdir_parents(path: str) -> None:
 
 
 def _read_json_file(path: str) -> Any:
-    """Sync helper for reading JSON files."""
+    """Sync helper for reading JSON files with LLM error repair."""
     with open(path, 'r') as f:
-        return json.load(f)
+        raw = f.read()
+    return _repair_json(raw)
 
 
 def _resolve_path(path: str) -> str:
     """Sync helper for resolving path to absolute."""
     return str(Path(path).resolve())
+
+
+def _resolve_papers_path(path: str) -> str:
+    """Resolve virtual/relative papers path to real OS path.
+
+    DeepAgents uses virtual paths like '/part1_papers.json' which resolve
+    to the OS root instead of the data directory. This helper resolves:
+    1. If path exists as-is → use directly
+    2. If virtual path (/file.json) → try DEEP_INTERPRETER_DATA_DIR/{basename}
+    3. Fallback → CWD resolution (existing behavior)
+
+    Args:
+        path: Virtual, relative, or absolute path to papers JSON
+
+    Returns:
+        Resolved absolute path to the file
+    """
+    # 1. If path exists as-is, use it directly
+    if Path(path).exists():
+        return str(Path(path).resolve())
+
+    # 2. Try DEEP_INTERPRETER_DATA_DIR + basename (for virtual paths like /file.json)
+    data_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR")
+    if data_dir:
+        basename = Path(path).name
+        candidate = Path(data_dir) / basename
+        if candidate.exists():
+            logger.debug(f"_resolve_papers_path: resolved '{path}' -> '{candidate}'")
+            return str(candidate.resolve())
+
+    # 3. Fallback: CWD resolution
+    resolved = Path(path).resolve()
+    logger.debug(f"_resolve_papers_path: fallback resolution '{path}' -> '{resolved}'")
+    return str(resolved)
+
+
+def _repair_json(raw: str) -> Any:
+    """Conservative JSON repair for common LLM writing errors.
+
+    Handles:
+    - Trailing commas before ] or }
+    - Extra closing braces/brackets
+    - Missing closing braces/brackets
+
+    Args:
+        raw: Raw JSON string (potentially malformed)
+
+    Returns:
+        Parsed Python object (dict or list)
+
+    Raises:
+        json.JSONDecodeError: If JSON is unrecoverable
+    """
+    # Fast path: try parsing as-is
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    text = raw.strip()
+
+    # Remove trailing commas before ] or }
+    text = re.sub(r',\s*([}\]])', r'\1', text)
+
+    # Remove trailing comma at end of string (before adding missing braces)
+    text = re.sub(r',\s*$', '', text)
+
+    # Try again after comma fix
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Balance braces/brackets
+    open_braces = text.count('{') - text.count('}')
+    open_brackets = text.count('[') - text.count(']')
+
+    if open_braces < 0:
+        # Extra closing braces - remove from end
+        for _ in range(-open_braces):
+            idx = text.rfind('}')
+            if idx != -1:
+                text = text[:idx] + text[idx + 1:]
+    elif open_braces > 0:
+        # Missing closing braces - add at end
+        text = text + '}' * open_braces
+
+    if open_brackets < 0:
+        # Extra closing brackets - remove from end
+        for _ in range(-open_brackets):
+            idx = text.rfind(']')
+            if idx != -1:
+                text = text[:idx] + text[idx + 1:]
+    elif open_brackets > 0:
+        # Missing closing brackets - add at end
+        text = text + ']' * open_brackets
+
+    # Final attempt
+    return json.loads(text)
 
 
 def _glob_files(directory: str, pattern: str) -> list[str]:
@@ -70,21 +174,6 @@ CCI_RAG_BASE_URL = os.getenv("CCI_RAG_BASE_URL", "http://localhost:8888")
 RAG_COLLECTION_PREFIX = "deep_interpreter_"
 DEFAULT_PAPERS_DIR = "res/papers"
 
-# Module-level executor for async operations in sync contexts
-_EXECUTOR: concurrent.futures.ThreadPoolExecutor | None = None
-
-
-def _get_executor() -> concurrent.futures.ThreadPoolExecutor:
-    """Get or create the module-level ThreadPoolExecutor."""
-    global _EXECUTOR
-    if _EXECUTOR is None:
-        _EXECUTOR = concurrent.futures.ThreadPoolExecutor(
-            max_workers=2, thread_name_prefix="literature_rag"
-        )
-        atexit.register(_EXECUTOR.shutdown, wait=False)
-    return _EXECUTOR
-
-
 # Module-level cache for RAG state
 _RAG_STATE: dict[str, Any] = {
     "available": None,  # None = not checked, True/False = checked
@@ -105,7 +194,7 @@ def _normalize_search_result(item: dict) -> dict:
         Normalized dict with page_content, metadata, score, id fields
     """
     # Debug: Log raw item structure before normalization
-    print(f"[DEBUG] _normalize_search_result: raw item keys = {list(item.keys())}")
+    logger.debug(f"_normalize_search_result: raw item keys = {list(item.keys())}")
 
     # Try multiple possible score field names (different vector DBs use different names)
     score = (
@@ -121,7 +210,7 @@ def _normalize_search_result(item: dict) -> dict:
         distance = item.get("distance", 1.0)
         score = max(0, 1 - distance)  # Convert distance to similarity
 
-    print(f"[DEBUG] _normalize_search_result: extracted score = {score} (raw fields: score={item.get('score', 'MISSING')}, similarity={item.get('similarity', 'MISSING')}, distance={item.get('distance', 'MISSING')})")
+    logger.debug(f"_normalize_search_result: extracted score = {score} (raw fields: score={item.get('score', 'MISSING')}, similarity={item.get('similarity', 'MISSING')}, distance={item.get('distance', 'MISSING')})")
 
     return {
         "page_content": item.get("content") or item.get("page_content", ""),
@@ -140,13 +229,14 @@ def reset_rag_state() -> None:
     }
 
 
-def _create_rag_client() -> MultiServerMCPClient:
-    """Create MCP client for langconnect-rag using stdio transport.
+async def _get_cci_rag_tools() -> list:
+    """Get cached CCI-RAG tools via singleton MCP client.
 
-    Uses the same connection pattern as st_pipeline_info_agent.py.
+    Uses _get_cached_tools from mcp_clients.py to prevent spawning
+    a new subprocess on every call.
 
     Returns:
-        MultiServerMCPClient configured for CCI-RAG server
+        List of LangChain tool objects from CCI-RAG server
 
     Raises:
         ValueError: If required environment variables are not set
@@ -157,14 +247,44 @@ def _create_rag_client() -> MultiServerMCPClient:
             "Please set them in your .env file."
         )
 
-    return MultiServerMCPClient({
-        "CCI-RAG": {
-            "command": CCI_RAG_PYTHON,
-            "args": [CCI_RAG_SERVER],
-            "env": {"API_BASE_URL": CCI_RAG_BASE_URL},
-            "transport": "stdio",
-        }
-    })
+    config = {
+        "command": CCI_RAG_PYTHON,
+        "args": [CCI_RAG_SERVER],
+        "env": {"API_BASE_URL": CCI_RAG_BASE_URL},
+        "transport": "stdio",
+    }
+    return await _get_cached_tools("CCI-RAG", config)
+
+
+async def _get_pubmed_download_tools() -> list:
+    """Get cached pubmed-download tools via singleton MCP client.
+
+    Returns:
+        List of LangChain tool objects from pubmed-download server
+
+    Raises:
+        ValueError: If required environment variables are not set
+    """
+    if not PUBMED_MCP_PYTHON or not PUBMED_MCP_SERVER:
+        raise ValueError(
+            "PUBMED_MCP_PYTHON and PUBMED_MCP_SERVER environment variables are required."
+        )
+
+    mcp_env = {}
+    if PUBMED_EMAIL:
+        mcp_env["PUBMED_EMAIL"] = PUBMED_EMAIL
+    if JINA_API_KEY:
+        mcp_env["JINA_API_KEY"] = JINA_API_KEY
+    if NCBI_API_KEY:
+        mcp_env["NCBI_API_KEY"] = NCBI_API_KEY
+
+    config = {
+        "command": PUBMED_MCP_PYTHON,
+        "args": [PUBMED_MCP_SERVER],
+        "env": mcp_env,
+        "transport": "stdio",
+    }
+    return await _get_cached_tools("pubmed-download", config)
 
 
 # =============================================================================
@@ -181,32 +301,31 @@ async def check_rag_availability() -> bool:
     """
     # Return cached result if available
     if _RAG_STATE["available"] is not None:
-        print(f"[DEBUG] check_rag_availability: using cached result = {_RAG_STATE['available']}")
+        logger.debug(f"check_rag_availability: using cached result = {_RAG_STATE['available']}")
         return _RAG_STATE["available"]
 
     # Check if environment variables are set
     if not CCI_RAG_PYTHON or not CCI_RAG_SERVER:
-        print(f"[DEBUG] check_rag_availability: CCI_RAG env vars not set")
-        print(f"[DEBUG]   CCI_RAG_PYTHON={CCI_RAG_PYTHON}")
-        print(f"[DEBUG]   CCI_RAG_SERVER={CCI_RAG_SERVER}")
+        logger.debug(f"check_rag_availability: CCI_RAG env vars not set")
+        logger.debug(f"  CCI_RAG_PYTHON={CCI_RAG_PYTHON}")
+        logger.debug(f"  CCI_RAG_SERVER={CCI_RAG_SERVER}")
         logger.info("RAG not available: CCI_RAG_PYTHON or CCI_RAG_SERVER not set")
         _RAG_STATE["available"] = False
         return False
 
-    print(f"[DEBUG] check_rag_availability: using stdio transport")
-    print(f"[DEBUG]   CCI_RAG_PYTHON={CCI_RAG_PYTHON}")
-    print(f"[DEBUG]   CCI_RAG_SERVER={CCI_RAG_SERVER}")
-    print(f"[DEBUG]   CCI_RAG_BASE_URL={CCI_RAG_BASE_URL}")
+    logger.debug(f"check_rag_availability: using stdio transport")
+    logger.debug(f"  CCI_RAG_PYTHON={CCI_RAG_PYTHON}")
+    logger.debug(f"  CCI_RAG_SERVER={CCI_RAG_SERVER}")
+    logger.debug(f"  CCI_RAG_BASE_URL={CCI_RAG_BASE_URL}")
 
     try:
-        client = _create_rag_client()
-        tools = await client.get_tools()
-        print(f"[DEBUG] check_rag_availability: got {len(tools)} tools")
+        tools = await _get_cci_rag_tools()
+        logger.debug(f"check_rag_availability: got {len(tools)} tools")
 
         # Find health check tool
         for tool_obj in tools:
             if hasattr(tool_obj, 'name') and 'health' in tool_obj.name.lower():
-                print(f"[DEBUG] check_rag_availability: calling health tool")
+                logger.debug(f"check_rag_availability: calling health tool")
                 result = await tool_obj.ainvoke({})
                 # Handle different result formats
                 if isinstance(result, dict):
@@ -217,19 +336,20 @@ async def check_rag_availability() -> bool:
                     _RAG_STATE["available"] = "ok" in text.lower() or "healthy" in text.lower()
                 else:
                     _RAG_STATE["available"] = True
-                print(f"[DEBUG] check_rag_availability: health check result = {_RAG_STATE['available']}")
+                logger.debug(f"check_rag_availability: health check result = {_RAG_STATE['available']}")
                 logger.info(f"RAG availability check: {_RAG_STATE['available']}")
                 return _RAG_STATE["available"]
 
         # If no health tool but got tools, assume working
         _RAG_STATE["available"] = len(tools) > 0
-        print(f"[DEBUG] check_rag_availability: no health tool, assuming {_RAG_STATE['available']}")
+        logger.debug(f"check_rag_availability: no health tool, assuming {_RAG_STATE['available']}")
         logger.info(f"RAG availability (no health tool, {len(tools)} tools found): {_RAG_STATE['available']}")
         return _RAG_STATE["available"]
 
     except Exception as e:
-        print(f"[DEBUG] check_rag_availability: EXCEPTION {type(e).__name__}: {e}")
+        logger.debug(f"check_rag_availability: EXCEPTION {type(e).__name__}: {e}")
         logger.info(f"RAG not available (using Abstract mode): {e}")
+        invalidate_client("CCI-RAG")
         _RAG_STATE["available"] = False
         return False
 
@@ -244,21 +364,7 @@ def check_rag_availability_sync() -> bool:
         return _RAG_STATE["available"]
 
     try:
-        loop = asyncio.get_event_loop()
-        is_running = loop.is_running()
-    except RuntimeError:
-        is_running = False
-
-    try:
-        if is_running:
-            executor = _get_executor()
-            future = executor.submit(
-                asyncio.run,
-                check_rag_availability()
-            )
-            return future.result(timeout=10)
-        else:
-            return asyncio.run(check_rag_availability())
+        return run_async(check_rag_availability(), timeout=10)
     except Exception as e:
         logger.debug(f"RAG availability check failed: {e}")
         _RAG_STATE["available"] = False
@@ -292,15 +398,15 @@ async def download_papers_for_rag(
     # not in the MCP server's working directory
     # Use asyncio.to_thread to avoid blocking os.getcwd() call in ASGI context
     output_dir_abs = await asyncio.to_thread(_resolve_path, output_dir)
-    print(f"[DEBUG] download_papers_for_rag: {len(pmids)} PMIDs")
-    print(f"[DEBUG] download_papers_for_rag: output_dir resolved to {output_dir_abs}")
+    logger.debug(f"download_papers_for_rag: {len(pmids)} PMIDs")
+    logger.debug(f"download_papers_for_rag: output_dir resolved to {output_dir_abs}")
     results = {}
 
     # Check if environment variables are set
     if not PUBMED_MCP_PYTHON or not PUBMED_MCP_SERVER:
-        print(f"[DEBUG] download_papers_for_rag: PUBMED_MCP env vars not set")
-        print(f"[DEBUG]   PUBMED_MCP_PYTHON={PUBMED_MCP_PYTHON}")
-        print(f"[DEBUG]   PUBMED_MCP_SERVER={PUBMED_MCP_SERVER}")
+        logger.debug(f"download_papers_for_rag: PUBMED_MCP env vars not set")
+        logger.debug(f"  PUBMED_MCP_PYTHON={PUBMED_MCP_PYTHON}")
+        logger.debug(f"  PUBMED_MCP_SERVER={PUBMED_MCP_SERVER}")
         logger.warning("pubmed-download MCP not configured: PUBMED_MCP_PYTHON or PUBMED_MCP_SERVER not set")
         return results
 
@@ -308,30 +414,9 @@ async def download_papers_for_rag(
     await asyncio.to_thread(_mkdir_parents, output_dir_abs)
 
     try:
-        print(f"[DEBUG] download_papers_for_rag: connecting via stdio transport")
-        print(f"[DEBUG]   PUBMED_MCP_PYTHON={PUBMED_MCP_PYTHON}")
-        print(f"[DEBUG]   PUBMED_MCP_SERVER={PUBMED_MCP_SERVER}")
-        # Build env dict with only set values
-        mcp_env = {}
-        if PUBMED_EMAIL:
-            mcp_env["PUBMED_EMAIL"] = PUBMED_EMAIL
-        if JINA_API_KEY:
-            mcp_env["JINA_API_KEY"] = JINA_API_KEY
-        if NCBI_API_KEY:
-            mcp_env["NCBI_API_KEY"] = NCBI_API_KEY
-
-        print(f"[DEBUG]   PUBMED_EMAIL={PUBMED_EMAIL}")
-
-        client = MultiServerMCPClient({
-            "pubmed-download": {
-                "command": PUBMED_MCP_PYTHON,
-                "args": [PUBMED_MCP_SERVER],
-                "env": mcp_env,
-                "transport": "stdio",
-            }
-        })
-        tools = await client.get_tools()
-        print(f"[DEBUG] download_papers_for_rag: got {len(tools)} tools")
+        logger.debug(f"download_papers_for_rag: connecting via cached stdio transport")
+        tools = await _get_pubmed_download_tools()
+        logger.debug(f"download_papers_for_rag: got {len(tools)} tools")
 
         # Find download_paper tool
         download_tool = None
@@ -341,15 +426,15 @@ async def download_papers_for_rag(
                 break
 
         if download_tool is None:
-            print(f"[DEBUG] download_papers_for_rag: download_paper tool NOT FOUND")
+            logger.debug(f"download_papers_for_rag: download_paper tool NOT FOUND")
             logger.warning("download_paper tool not found in pubmed-download MCP")
             return results
 
-        print(f"[DEBUG] download_papers_for_rag: download_paper tool found")
+        logger.debug(f"download_papers_for_rag: download_paper tool found")
 
         # Download papers with rate limiting
         total = min(len(pmids), 30)
-        print(f"[DEBUG] download_papers_for_rag: downloading {total} papers (max 30)")
+        logger.debug(f"download_papers_for_rag: downloading {total} papers (max 30)")
 
         for i, pmid in enumerate(pmids[:30]):  # Limit to prevent rate limiting
             file_path = str(Path(output_dir_abs) / f"pmid_{pmid}.txt")
@@ -361,7 +446,7 @@ async def download_papers_for_rag(
                     "file_path": file_path,
                     "source": "Cache",
                 }
-                print(f"[DEBUG] PMID {pmid} [{i+1}/{total}]: CACHED")
+                logger.debug(f"PMID {pmid} [{i+1}/{total}]: CACHED")
                 continue
 
             try:
@@ -412,32 +497,32 @@ async def download_papers_for_rag(
 
                 status = "OK" if results[pmid].get("success") else "FAIL"
                 source = results[pmid].get("source", "Unknown")
-                print(f"[DEBUG] PMID {pmid} [{i+1}/{total}]: {status} ({source})")
+                logger.debug(f"PMID {pmid} [{i+1}/{total}]: {status} ({source})")
                 logger.debug(f"Downloaded PMID {pmid}: {results[pmid].get('source')}")
 
                 # Rate limiting delay
                 await asyncio.sleep(1.0)
 
             except Exception as e:
-                print(f"[DEBUG] PMID {pmid} [{i+1}/{total}]: EXCEPTION {e}")
+                logger.debug(f"PMID {pmid} [{i+1}/{total}]: EXCEPTION {e}")
                 logger.warning(f"Failed to download PMID {pmid}: {e}")
                 results[pmid] = {"success": False, "error": str(e)}
 
         successful = sum(1 for r in results.values() if r.get("success"))
-        print(f"[DEBUG] download_papers_for_rag: DONE - {successful}/{len(results)} successful")
+        logger.debug(f"download_papers_for_rag: DONE - {successful}/{len(results)} successful")
 
         # Verify actual files exist (final sanity check)
         existing_files = await asyncio.to_thread(_glob_files, output_dir_abs, "pmid_*.txt")
-        print(f"[DEBUG] download_papers_for_rag: ACTUAL FILES in {output_dir_abs}: {len(existing_files)}")
+        logger.debug(f"download_papers_for_rag: ACTUAL FILES in {output_dir_abs}: {len(existing_files)}")
         if len(existing_files) != successful:
-            print(f"[WARNING] Mismatch: {successful} reported vs {len(existing_files)} actual files")
+            logger.warning(f"Mismatch: {successful} reported vs {len(existing_files)} actual files")
             logger.warning(
                 f"File count mismatch: {successful} reported successful, "
                 f"but {len(existing_files)} files found in {output_dir_abs}"
             )
 
     except Exception as e:
-        print(f"[DEBUG] download_papers_for_rag: CONNECTION EXCEPTION {type(e).__name__}: {e}")
+        logger.debug(f"download_papers_for_rag: CONNECTION EXCEPTION {type(e).__name__}: {e}")
         logger.error(f"pubmed-download MCP connection failed: {e}")
 
     return results
@@ -462,13 +547,12 @@ async def index_papers_to_vectordb(
         {"success": bool, "collection_id": str, "indexed_count": int}
     """
     full_collection_name = f"{RAG_COLLECTION_PREFIX}{collection_name}"
-    print(f"[DEBUG] index_papers_to_vectordb: {len(file_paths)} files, collection={full_collection_name}")
+    logger.debug(f"index_papers_to_vectordb: {len(file_paths)} files, collection={full_collection_name}")
 
     try:
-        print(f"[DEBUG] index_papers_to_vectordb: connecting via stdio transport")
-        client = _create_rag_client()
-        tools = await client.get_tools()
-        print(f"[DEBUG] index_papers_to_vectordb: got {len(tools)} tools")
+        logger.debug(f"index_papers_to_vectordb: connecting via cached stdio transport")
+        tools = await _get_cci_rag_tools()
+        logger.debug(f"index_papers_to_vectordb: got {len(tools)} tools")
 
         # Find required tools
         tools_map = {}
@@ -484,11 +568,11 @@ async def index_papers_to_vectordb(
                 tools_map['delete'] = tool_obj
 
         if 'add_docs' not in tools_map:
-            print(f"[DEBUG] index_papers_to_vectordb: add_documents_from_files NOT FOUND")
+            logger.debug(f"index_papers_to_vectordb: add_documents_from_files NOT FOUND")
             logger.error("add_documents_from_files tool not found in langconnect-rag")
             return {"success": False, "error": "add_documents_from_files not found"}
 
-        print(f"[DEBUG] index_papers_to_vectordb: found tools: {list(tools_map.keys())}")
+        logger.debug(f"index_papers_to_vectordb: found tools: {list(tools_map.keys())}")
 
         # Check/create collection
         collection_id = _RAG_STATE["collection_ids"].get(collection_name)
@@ -496,52 +580,52 @@ async def index_papers_to_vectordb(
         if collection_id is None and 'list' in tools_map:
             try:
                 collections_result = await tools_map['list'].ainvoke({})
-                print(f"[DEBUG] list_collections raw result type: {type(collections_result)}")
-                print(f"[DEBUG] list_collections content: {collections_result}")
+                logger.debug(f"list_collections raw result type: {type(collections_result)}")
+                logger.debug(f"list_collections content: {collections_result}")
 
                 # Parse collections result
                 collections = []
                 if isinstance(collections_result, list):
                     for item in collections_result:
-                        print(f"[DEBUG] Processing list item: {type(item)}")
+                        logger.debug(f"Processing list item: {type(item)}")
                         if isinstance(item, dict):
                             if 'text' in item:
                                 # BioMCP/langconnect format - parse JSON from text
                                 try:
                                     parsed = json.loads(item['text'])
-                                    print(f"[DEBUG] Parsed JSON type: {type(parsed)}")
+                                    logger.debug(f"Parsed JSON type: {type(parsed)}")
                                     if isinstance(parsed, list):
                                         collections = parsed
-                                        print(f"[DEBUG] Found {len(collections)} collections from JSON list")
+                                        logger.debug(f"Found {len(collections)} collections from JSON list")
                                     elif isinstance(parsed, dict) and 'collections' in parsed:
                                         collections = parsed['collections']
-                                        print(f"[DEBUG] Found {len(collections)} collections from JSON dict")
+                                        logger.debug(f"Found {len(collections)} collections from JSON dict")
                                     elif isinstance(parsed, dict) and ('id' in parsed or 'name' in parsed):
                                         # Single collection object
                                         collections.append(parsed)
-                                        print(f"[DEBUG] Added single collection from JSON")
+                                        logger.debug(f"Added single collection from JSON")
                                 except json.JSONDecodeError as e:
-                                    print(f"[DEBUG] JSON decode failed: {e}")
-                                    print(f"[DEBUG] Raw text: {item['text'][:200]}..." if len(item['text']) > 200 else f"[DEBUG] Raw text: {item['text']}")
+                                    logger.debug(f"JSON decode failed: {e}")
+                                    logger.debug(f"Raw text: {item['text'][:200]}..." if len(item['text']) > 200 else f"Raw text: {item['text']}")
                             elif 'id' in item or 'name' in item:
                                 # Direct collection object
                                 collections.append(item)
-                                print(f"[DEBUG] Added direct collection item: {item.get('name')}")
+                                logger.debug(f"Added direct collection item: {item.get('name')}")
                 elif isinstance(collections_result, dict):
                     if 'collections' in collections_result:
                         collections = collections_result.get('collections', [])
                     elif 'id' in collections_result and 'name' in collections_result:
                         # Single collection returned
                         collections = [collections_result]
-                    print(f"[DEBUG] Parsed from dict: {len(collections)} collections")
+                    logger.debug(f"Parsed from dict: {len(collections)} collections")
 
-                print(f"[DEBUG] Total collections found: {len(collections)}")
+                logger.debug(f"Total collections found: {len(collections)}")
                 for col in collections:
-                    print(f"[DEBUG] Checking collection: {col}")
+                    logger.debug(f"Checking collection: {col}")
                     if isinstance(col, dict) and col.get("name") == full_collection_name:
                         collection_id = col.get("id")
                         _RAG_STATE["collection_ids"][collection_name] = collection_id
-                        print(f"[DEBUG] Found existing collection: {full_collection_name} (id: {collection_id})")
+                        logger.debug(f"Found existing collection: {full_collection_name} (id: {collection_id})")
                         logger.info(f"Found existing collection: {full_collection_name}")
                         # Early return - skip re-indexing existing collection
                         return {
@@ -554,9 +638,9 @@ async def index_papers_to_vectordb(
                             "message": f"Collection already exists: {full_collection_name}",
                         }
 
-                print(f"[DEBUG] Collection {full_collection_name} not found in existing collections")
+                logger.debug(f"Collection {full_collection_name} not found in existing collections")
             except Exception as e:
-                print(f"[DEBUG] list_collections EXCEPTION: {type(e).__name__}: {e}")
+                logger.debug(f"list_collections EXCEPTION: {type(e).__name__}: {e}")
                 logger.debug(f"Error listing collections: {e}")
 
         if collection_id is None and 'create' in tools_map:
@@ -626,7 +710,7 @@ async def index_papers_to_vectordb(
                 else:
                     chunk_ids = item.get("added_chunk_ids", [])
 
-        print(f"[DEBUG] index_papers_to_vectordb: SUCCESS - {len(file_paths)} papers, {len(chunk_ids)} chunks")
+        logger.debug(f"index_papers_to_vectordb: SUCCESS - {len(file_paths)} papers, {len(chunk_ids)} chunks")
         logger.info(f"Indexed {len(file_paths)} papers to {full_collection_name}")
 
         return {
@@ -638,7 +722,7 @@ async def index_papers_to_vectordb(
         }
 
     except Exception as e:
-        print(f"[DEBUG] index_papers_to_vectordb: EXCEPTION {type(e).__name__}: {e}")
+        logger.debug(f"index_papers_to_vectordb: EXCEPTION {type(e).__name__}: {e}")
         logger.error(f"Indexing failed: {e}")
         return {"success": False, "error": str(e)}
 
@@ -659,11 +743,10 @@ async def _lookup_collection_from_db(collection_name: str) -> str | None:
         Collection ID if found, None otherwise
     """
     full_collection_name = f"{RAG_COLLECTION_PREFIX}{collection_name}"
-    print(f"[DEBUG] _lookup_collection_from_db: looking for {full_collection_name}")
+    logger.debug(f"_lookup_collection_from_db: looking for {full_collection_name}")
 
     try:
-        client = _create_rag_client()
-        tools = await client.get_tools()
+        tools = await _get_cci_rag_tools()
 
         list_tool = None
         for tool_obj in tools:
@@ -672,11 +755,11 @@ async def _lookup_collection_from_db(collection_name: str) -> str | None:
                 break
 
         if list_tool is None:
-            print(f"[DEBUG] _lookup_collection_from_db: list_collections tool not found")
+            logger.debug(f"_lookup_collection_from_db: list_collections tool not found")
             return None
 
         collections_result = await list_tool.ainvoke({})
-        print(f"[DEBUG] _lookup_collection_from_db: raw result type: {type(collections_result)}")
+        logger.debug(f"_lookup_collection_from_db: raw result type: {type(collections_result)}")
 
         # Parse collections result (same logic as index_papers_to_vectordb)
         collections = []
@@ -693,7 +776,7 @@ async def _lookup_collection_from_db(collection_name: str) -> str | None:
                             elif isinstance(parsed, dict) and ('id' in parsed or 'name' in parsed):
                                 collections.append(parsed)
                         except json.JSONDecodeError as e:
-                            print(f"[DEBUG] _lookup_collection_from_db: JSON decode failed: {e}")
+                            logger.debug(f"_lookup_collection_from_db: JSON decode failed: {e}")
                     elif 'id' in item or 'name' in item:
                         collections.append(item)
         elif isinstance(collections_result, dict):
@@ -702,19 +785,19 @@ async def _lookup_collection_from_db(collection_name: str) -> str | None:
             elif 'id' in collections_result and 'name' in collections_result:
                 collections = [collections_result]
 
-        print(f"[DEBUG] _lookup_collection_from_db: found {len(collections)} collections")
+        logger.debug(f"_lookup_collection_from_db: found {len(collections)} collections")
 
         for col in collections:
             if isinstance(col, dict) and col.get("name") == full_collection_name:
                 collection_id = col.get("id")
-                print(f"[DEBUG] _lookup_collection_from_db: FOUND {full_collection_name} -> {collection_id}")
+                logger.debug(f"_lookup_collection_from_db: FOUND {full_collection_name} -> {collection_id}")
                 return collection_id
 
-        print(f"[DEBUG] _lookup_collection_from_db: {full_collection_name} NOT FOUND in DB")
+        logger.debug(f"_lookup_collection_from_db: {full_collection_name} NOT FOUND in DB")
         return None
 
     except Exception as e:
-        print(f"[DEBUG] _lookup_collection_from_db EXCEPTION: {type(e).__name__}: {e}")
+        logger.debug(f"_lookup_collection_from_db EXCEPTION: {type(e).__name__}: {e}")
         logger.debug(f"Error looking up collection from DB: {e}")
         return None
 
@@ -740,8 +823,7 @@ async def _search_single_query(
         List of normalized search results
     """
     try:
-        client = _create_rag_client()
-        tools = await client.get_tools()
+        tools = await _get_cci_rag_tools()
 
         search_tool = None
         for tool_obj in tools:
@@ -760,16 +842,16 @@ async def _search_single_query(
         })
 
         # Debug: Log raw MCP response structure
-        print(f"[DEBUG] _search_single_query: raw MCP result type = {type(result)}")
+        logger.debug(f"_search_single_query: raw MCP result type = {type(result)}")
         if isinstance(result, list) and len(result) > 0:
             first_item = result[0]
-            print(f"[DEBUG] _search_single_query: first raw item type = {type(first_item)}")
+            logger.debug(f"_search_single_query: first raw item type = {type(first_item)}")
             if isinstance(first_item, dict):
-                print(f"[DEBUG] _search_single_query: first raw item keys = {list(first_item.keys())}")
+                logger.debug(f"_search_single_query: first raw item keys = {list(first_item.keys())}")
                 if 'text' in first_item:
                     # Log first 300 chars of text to see JSON structure
                     text_preview = first_item['text'][:300] if len(first_item['text']) > 300 else first_item['text']
-                    print(f"[DEBUG] _search_single_query: raw text preview = {text_preview}")
+                    logger.debug(f"_search_single_query: raw text preview = {text_preview}")
 
         # Parse search results
         results = []
@@ -805,10 +887,10 @@ async def _search_single_query(
 
         # Debug: Log parsed results summary
         if results:
-            print(f"[DEBUG] _search_single_query: num results = {len(results)}")
+            logger.debug(f"_search_single_query: num results = {len(results)}")
             first = results[0]
-            print(f"[DEBUG] _search_single_query: first result keys = {list(first.keys())}")
-            print(f"[DEBUG] _search_single_query: first result score = {first.get('score', 'MISSING')}")
+            logger.debug(f"_search_single_query: first result keys = {list(first.keys())}")
+            logger.debug(f"_search_single_query: first result score = {first.get('score', 'MISSING')}")
 
         return results
 
@@ -842,39 +924,39 @@ async def search_fulltext_rag(
         [{"page_content": str, "metadata": dict, "score": float}]
     """
     query_preview = query[:50] + "..." if len(query) > 50 else query
-    print(f"[DEBUG] search_fulltext_rag: query={query_preview}, collection={collection_name}")
+    logger.debug(f"search_fulltext_rag: query={query_preview}, collection={collection_name}")
 
     collection_id = _RAG_STATE["collection_ids"].get(collection_name)
 
     # Fallback: look up from Vector DB if not in cache
     if collection_id is None:
-        print(f"[DEBUG] search_fulltext_rag: Collection {collection_name} not in cache, looking up from DB...")
+        logger.debug(f"search_fulltext_rag: Collection {collection_name} not in cache, looking up from DB...")
         collection_id = await _lookup_collection_from_db(collection_name)
         if collection_id:
             _RAG_STATE["collection_ids"][collection_name] = collection_id
-            print(f"[DEBUG] search_fulltext_rag: Found collection in DB and cached: {collection_id}")
+            logger.debug(f"search_fulltext_rag: Found collection in DB and cached: {collection_id}")
 
     if collection_id is None:
-        print(f"[DEBUG] search_fulltext_rag: Collection {collection_name} not found in cache or DB")
+        logger.debug(f"search_fulltext_rag: Collection {collection_name} not found in cache or DB")
         logger.warning(f"Collection {collection_name} not indexed")
         return []
 
-    print(f"[DEBUG] search_fulltext_rag: Using collection_id: {collection_id}")
+    logger.debug(f"search_fulltext_rag: Using collection_id: {collection_id}")
 
     # Generate multiple search queries using LLM
     queries = await generate_multi_query(query, num_queries=5)
-    print(f"[DEBUG] search_fulltext_rag: generated {len(queries)} queries")
+    logger.debug(f"search_fulltext_rag: generated {len(queries)} queries")
 
     # Search with each query and collect all results
     all_results = []
     for i, q in enumerate(queries):
         q_preview = q[:50] + "..." if len(q) > 50 else q
-        print(f"[DEBUG] search_fulltext_rag: searching query {i+1}/{len(queries)}: {q_preview}")
+        logger.debug(f"search_fulltext_rag: searching query {i+1}/{len(queries)}: {q_preview}")
         results = await _search_single_query(q, collection_id, limit=3, search_type=search_type)
         all_results.extend(results)
-        print(f"[DEBUG]   -> got {len(results)} results (total: {len(all_results)})")
+        logger.debug(f"  -> got {len(results)} results (total: {len(all_results)})")
 
-    print(f"[DEBUG] search_fulltext_rag: total {len(all_results)} results from multi-query")
+    logger.debug(f"search_fulltext_rag: total {len(all_results)} results from multi-query")
 
     # Deduplicate by content (keep highest score)
     seen = {}
@@ -885,7 +967,7 @@ async def search_fulltext_rag(
 
     results = list(seen.values())
     results.sort(key=lambda x: x.get("score", 0), reverse=True)
-    print(f"[DEBUG] search_fulltext_rag: {len(results)} unique results after dedup")
+    logger.debug(f"search_fulltext_rag: {len(results)} unique results after dedup")
 
     return results[:limit]
 
@@ -906,11 +988,10 @@ async def generate_multi_query(claim: str, num_queries: int = 5) -> list[str]:
     Returns:
         List of search queries (including original claim as fallback)
     """
-    print(f"[DEBUG] generate_multi_query: claim={claim[:50]}...")
+    logger.debug(f"generate_multi_query: claim={claim[:50]}...")
 
     try:
-        client = _create_rag_client()
-        tools = await client.get_tools()
+        tools = await _get_cci_rag_tools()
 
         # Find multi_query tool
         multi_query_tool = None
@@ -920,10 +1001,10 @@ async def generate_multi_query(claim: str, num_queries: int = 5) -> list[str]:
                 break
 
         if multi_query_tool is None:
-            print(f"[DEBUG] generate_multi_query: multi_query tool NOT FOUND, fallback to original claim")
+            logger.debug(f"generate_multi_query: multi_query tool NOT FOUND, fallback to original claim")
             return [claim]
 
-        print(f"[DEBUG] generate_multi_query: calling multi_query tool...")
+        logger.debug(f"generate_multi_query: calling multi_query tool...")
         result = await multi_query_tool.ainvoke({"question": claim})
 
         # Parse result - multi_query returns list of queries
@@ -939,7 +1020,7 @@ async def generate_multi_query(claim: str, num_queries: int = 5) -> list[str]:
                             queries.extend(parsed['queries'])
                         elif isinstance(parsed, dict) and 'error' in parsed:
                             # MCP tool returned error - log and skip
-                            print(f"[DEBUG] generate_multi_query: MCP error: {str(parsed.get('error', ''))[:100]}")
+                            logger.debug(f"generate_multi_query: MCP error: {str(parsed.get('error', ''))[:100]}")
                             continue
                         else:
                             queries.append(str(parsed))
@@ -955,7 +1036,7 @@ async def generate_multi_query(claim: str, num_queries: int = 5) -> list[str]:
         elif isinstance(result, dict):
             if 'error' in result:
                 # MCP tool returned error at top level
-                print(f"[DEBUG] generate_multi_query: MCP top-level error: {str(result.get('error', ''))[:100]}")
+                logger.debug(f"generate_multi_query: MCP top-level error: {str(result.get('error', ''))[:100]}")
             elif 'queries' in result:
                 queries = result['queries']
             elif 'text' in result:
@@ -964,7 +1045,7 @@ async def generate_multi_query(claim: str, num_queries: int = 5) -> list[str]:
                     if isinstance(parsed, list):
                         queries = parsed
                     elif isinstance(parsed, dict) and 'error' in parsed:
-                        print(f"[DEBUG] generate_multi_query: MCP error in text: {str(parsed.get('error', ''))[:100]}")
+                        logger.debug(f"generate_multi_query: MCP error in text: {str(parsed.get('error', ''))[:100]}")
                 except json.JSONDecodeError:
                     pass
 
@@ -973,14 +1054,14 @@ async def generate_multi_query(claim: str, num_queries: int = 5) -> list[str]:
 
         # Limit to num_queries and ensure we have at least the original claim
         queries = queries[:num_queries] if queries else [claim]
-        print(f"[DEBUG] generate_multi_query: generated {len(queries)} valid queries")
+        logger.debug(f"generate_multi_query: generated {len(queries)} valid queries")
         for i, q in enumerate(queries):
-            print(f"[DEBUG]   Query {i+1}: {q[:60]}...")
+            logger.debug(f"  Query {i+1}: {q[:60]}...")
 
         return queries
 
     except Exception as e:
-        print(f"[DEBUG] generate_multi_query EXCEPTION: {type(e).__name__}: {e}")
+        logger.debug(f"generate_multi_query EXCEPTION: {type(e).__name__}: {e}")
         logger.warning(f"multi_query generation failed: {e}, using original claim")
         return [claim]
 
@@ -1016,7 +1097,7 @@ async def validate_claim_with_rag(
     """
     # DEBUG: Entry point
     claim_preview = claim[:50] + "..." if len(claim) > 50 else claim
-    print(f"[DEBUG] validate_claim_with_rag: claim={claim_preview}, pmid={pmid}, collection={collection_name}")
+    logger.debug(f"validate_claim_with_rag: claim={claim_preview}, pmid={pmid}, collection={collection_name}")
 
     # search_fulltext_rag now handles multi-query internally
     # Request more results to allow PMID filtering
@@ -1027,12 +1108,12 @@ async def validate_claim_with_rag(
         search_type="hybrid",
     )
 
-    print(f"[DEBUG] validate_claim_with_rag: got {len(results)} results from search_fulltext_rag")
+    logger.debug(f"validate_claim_with_rag: got {len(results)} results from search_fulltext_rag")
 
     # DEBUG: Log metadata structure of results
     if results:
-        print(f"[DEBUG] validate_claim_with_rag: First result keys: {list(results[0].keys())}")
-        print(f"[DEBUG] validate_claim_with_rag: First result metadata: {results[0].get('metadata', {})}")
+        logger.debug(f"validate_claim_with_rag: First result keys: {list(results[0].keys())}")
+        logger.debug(f"validate_claim_with_rag: First result metadata: {results[0].get('metadata', {})}")
 
     # Filter by PMID if metadata available
     # langconnect-rag stores filename in metadata (e.g., "pmid_12345678.txt")
@@ -1056,14 +1137,14 @@ async def validate_claim_with_rag(
 
         if pmid_found:
             relevant_chunks.append(r)
-            print(f"[DEBUG] validate_claim_with_rag: PMID {pmid} MATCHED in filename={filename[:50]}...")
+            logger.debug(f"validate_claim_with_rag: PMID {pmid} MATCHED in filename={filename[:50]}...")
 
-    print(f"[DEBUG] validate_claim_with_rag: {len(relevant_chunks)} PMID-specific chunks found")
+    logger.debug(f"validate_claim_with_rag: {len(relevant_chunks)} PMID-specific chunks found")
 
     # If no PMID-specific results, use all results (less strict)
     if not relevant_chunks:
         relevant_chunks = results[:3]
-        print(f"[DEBUG] validate_claim_with_rag: using top {len(relevant_chunks)} results (no PMID match)")
+        logger.debug(f"validate_claim_with_rag: using top {len(relevant_chunks)} results (no PMID match)")
 
     if relevant_chunks:
         # Sort by score descending
@@ -1075,7 +1156,7 @@ async def validate_claim_with_rag(
         best_match = relevant_chunks_sorted[0]
         confidence = best_match.get("score", 0)
 
-        print(f"[DEBUG] validate_claim_with_rag: best_match score raw = {confidence}")
+        logger.debug(f"validate_claim_with_rag: best_match score raw = {confidence}")
 
         # If score is 0 or missing, estimate confidence based on text length
         # (longer matching text from the right paper = higher confidence)
@@ -1083,7 +1164,7 @@ async def validate_claim_with_rag(
             content_len = len(best_match.get("page_content", ""))
             # Heuristic: 400+ chars = 0.6, 1000+ = 0.7, 1800+ = 0.85 (raised cap)
             confidence = min(0.85, 0.4 + (content_len / 2000))
-            print(f"[DEBUG] validate_claim_with_rag: estimated confidence from text length ({content_len}) = {confidence}")
+            logger.debug(f"validate_claim_with_rag: estimated confidence from text length ({content_len}) = {confidence}")
 
         # Normalize confidence if it's outside 0-1 range
         if confidence > 1:
@@ -1095,7 +1176,7 @@ async def validate_claim_with_rag(
             "supporting_text": best_match.get("page_content", "")[:500],
             "source": "full_text",
         }
-        print(f"[DEBUG] validate_claim_with_rag: returning valid={result['valid']}, confidence={result['confidence']}")
+        logger.debug(f"validate_claim_with_rag: returning valid={result['valid']}, confidence={result['confidence']}")
         return result
 
     result = {
@@ -1105,7 +1186,7 @@ async def validate_claim_with_rag(
         "source": "full_text",
         "message": "No supporting text found in full paper",
     }
-    print(f"[DEBUG] validate_claim_with_rag: returning valid={result['valid']}, confidence={result['confidence']}")
+    logger.debug(f"validate_claim_with_rag: returning valid={result['valid']}, confidence={result['confidence']}")
     return result
 
 
@@ -1133,15 +1214,15 @@ async def prepare_rag_for_interpretation(
             "message": str
         }
     """
-    print(f"[DEBUG] prepare_rag_for_interpretation START")
+    logger.debug(f"prepare_rag_for_interpretation START")
 
     # Check RAG availability
-    print(f"[DEBUG] Checking RAG availability...")
+    logger.debug(f"Checking RAG availability...")
     rag_available = await check_rag_availability()
-    print(f"[DEBUG] RAG available: {rag_available}")
+    logger.debug(f"RAG available: {rag_available}")
 
     if not rag_available:
-        print(f"[DEBUG] RAG not available - returning Abstract mode")
+        logger.debug(f"RAG not available - returning Abstract mode")
         return {
             "rag_mode": False,
             "collection_id": None,
@@ -1150,23 +1231,27 @@ async def prepare_rag_for_interpretation(
             "message": "RAG not available, using Abstract mode",
         }
 
-    # Load papers from JSON (async-safe)
-    print(f"[DEBUG] Loading papers from: {papers_json_path}")
+    # Resolve virtual/relative path to real OS path
+    resolved_path = await asyncio.to_thread(_resolve_papers_path, papers_json_path)
+    logger.debug(f"Resolved papers path: {papers_json_path} -> {resolved_path}")
+
+    # Load papers from JSON (async-safe, with LLM error repair)
+    logger.debug(f"Loading papers from: {resolved_path}")
     try:
-        data = await asyncio.to_thread(_read_json_file, papers_json_path)
+        data = await asyncio.to_thread(_read_json_file, resolved_path)
         papers = data.get("papers", data) if isinstance(data, dict) else data
-        print(f"[DEBUG] Papers loaded: {type(papers)}, count: {len(papers) if isinstance(papers, list) else 'N/A'}")
+        logger.debug(f"Papers loaded: {type(papers)}, count: {len(papers) if isinstance(papers, list) else 'N/A'}")
     except FileNotFoundError:
-        print(f"[DEBUG] ERROR: Papers file not found: {papers_json_path}")
+        logger.debug(f"ERROR: Papers file not found: {resolved_path} (original: {papers_json_path})")
         return {
             "rag_mode": False,
             "collection_id": None,
             "papers_count": 0,
             "fulltext_count": 0,
-            "message": f"Papers file not found: {papers_json_path}",
+            "message": f"Papers file not found: {resolved_path} (original: {papers_json_path})",
         }
     except json.JSONDecodeError as e:
-        print(f"[DEBUG] ERROR: JSON decode failed: {e}")
+        logger.debug(f"ERROR: JSON decode failed: {e}")
         return {
             "rag_mode": False,
             "collection_id": None,
@@ -1175,7 +1260,7 @@ async def prepare_rag_for_interpretation(
             "message": f"Failed to parse papers JSON: {e}",
         }
     except Exception as e:
-        print(f"[DEBUG] ERROR: Load failed: {e}")
+        logger.debug(f"ERROR: Load failed: {e}")
         return {
             "rag_mode": False,
             "collection_id": None,
@@ -1191,12 +1276,12 @@ async def prepare_rag_for_interpretation(
     elif isinstance(papers, dict):
         pmids = [papers.get("pmid")] if papers.get("pmid") else []
 
-    print(f"[DEBUG] Extracted PMIDs: {len(pmids)}")
+    logger.debug(f"Extracted PMIDs: {len(pmids)}")
     if pmids:
-        print(f"[DEBUG] First 5 PMIDs: {pmids[:5]}")
+        logger.debug(f"First 5 PMIDs: {pmids[:5]}")
 
     if not pmids:
-        print(f"[DEBUG] ERROR: No PMIDs found")
+        logger.debug(f"ERROR: No PMIDs found")
         return {
             "rag_mode": False,
             "collection_id": None,
@@ -1206,17 +1291,17 @@ async def prepare_rag_for_interpretation(
         }
 
     # Download papers
-    print(f"[DEBUG] Downloading {len(pmids)} papers...")
+    logger.debug(f"Downloading {len(pmids)} papers...")
     download_results = await download_papers_for_rag(pmids)
     successful_paths = [
         r["file_path"]
         for r in download_results.values()
         if r.get("success") and r.get("file_path")
     ]
-    print(f"[DEBUG] Download results: {len(successful_paths)}/{len(pmids)} successful")
+    logger.debug(f"Download results: {len(successful_paths)}/{len(pmids)} successful")
 
     if not successful_paths:
-        print(f"[DEBUG] ERROR: No papers downloaded")
+        logger.debug(f"ERROR: No papers downloaded")
         return {
             "rag_mode": False,
             "collection_id": None,
@@ -1226,12 +1311,12 @@ async def prepare_rag_for_interpretation(
         }
 
     # Index to Vector DB
-    print(f"[DEBUG] Indexing {len(successful_paths)} papers to VectorDB...")
+    logger.debug(f"Indexing {len(successful_paths)} papers to VectorDB...")
     index_result = await index_papers_to_vectordb(successful_paths, part_name)
-    print(f"[DEBUG] Index result: success={index_result.get('success')}, collection_id={index_result.get('collection_id')}")
+    logger.debug(f"Index result: success={index_result.get('success')}, collection_id={index_result.get('collection_id')}")
 
     if not index_result.get("success"):
-        print(f"[DEBUG] ERROR: Indexing failed: {index_result.get('error')}")
+        logger.debug(f"ERROR: Indexing failed: {index_result.get('error')}")
         return {
             "rag_mode": False,
             "collection_id": None,
@@ -1242,8 +1327,8 @@ async def prepare_rag_for_interpretation(
 
     fulltext_ratio = len(successful_paths) / len(pmids) if pmids else 0
 
-    print(f"[DEBUG] RAG preparation SUCCESS!")
-    print(f"[DEBUG] rag_mode=True, papers={len(pmids)}, fulltext={len(successful_paths)}, ratio={fulltext_ratio:.2f}")
+    logger.debug(f"RAG preparation SUCCESS!")
+    logger.debug(f"rag_mode=True, papers={len(pmids)}, fulltext={len(successful_paths)}, ratio={fulltext_ratio:.2f}")
 
     return {
         "rag_mode": True,
@@ -1272,7 +1357,7 @@ def prepare_rag_literature(
 
     Args:
         papers_json_path: Path to papers JSON (e.g., "res/part1_papers.json")
-        part_name: Part identifier ("part1", "part2", "part3", "liana")
+        part_name: Part identifier ("part1", "part2", "part3", "liana", "synthesis")
 
     Returns:
         RAG preparation result with:
@@ -1284,45 +1369,24 @@ def prepare_rag_literature(
         - message: str - Status message
     """
     # DEBUG: Entry point
-    print("=" * 60)
-    print("[DEBUG] prepare_rag_literature CALLED")
-    print(f"[DEBUG] papers_json_path: {papers_json_path}")
-    print(f"[DEBUG] part_name: {part_name}")
-    print("=" * 60)
+    logger.debug("=" * 60)
+    logger.debug("prepare_rag_literature CALLED")
+    logger.debug(f"papers_json_path: {papers_json_path}")
+    logger.debug(f"part_name: {part_name}")
+    logger.debug("=" * 60)
 
     try:
-        loop = asyncio.get_event_loop()
-        is_running = loop.is_running()
-    except RuntimeError:
-        is_running = False
+        result = run_async(
+            prepare_rag_for_interpretation(papers_json_path, part_name),
+            timeout=300,
+        )
 
-    print(f"[DEBUG] Event loop running: {is_running}")
-
-    try:
-        if is_running:
-            executor = _get_executor()
-            future = executor.submit(
-                asyncio.run,
-                prepare_rag_for_interpretation(papers_json_path, part_name)
-            )
-            result = future.result(timeout=300)  # 5 min timeout
-        else:
-            result = asyncio.run(
-                prepare_rag_for_interpretation(papers_json_path, part_name)
-            )
-
-        # DEBUG: Result
-        print(f"[DEBUG] prepare_rag_literature RESULT:")
-        print(f"[DEBUG]   rag_mode: {result.get('rag_mode')}")
-        print(f"[DEBUG]   papers_count: {result.get('papers_count')}")
-        print(f"[DEBUG]   fulltext_count: {result.get('fulltext_count')}")
-        print(f"[DEBUG]   message: {result.get('message')}")
-        print("=" * 60)
+        logger.debug(f"prepare_rag_literature RESULT: rag_mode={result.get('rag_mode')}, "
+                      f"papers={result.get('papers_count')}, fulltext={result.get('fulltext_count')}")
 
         return result
     except Exception as e:
-        print(f"[DEBUG] prepare_rag_literature EXCEPTION: {type(e).__name__}: {e}")
-        logger.error(f"RAG preparation failed: {e}")
+        logger.error(f"RAG preparation failed: {type(e).__name__}: {e}")
         return {
             "rag_mode": False,
             "collection_id": None,
@@ -1352,51 +1416,32 @@ def search_literature_fulltext(
         - score: float - Relevance score
     """
     # DEBUG: Entry point
-    print("=" * 60)
-    print("[DEBUG] search_literature_fulltext CALLED")
-    print(f"[DEBUG] query: {query[:50]}..." if len(query) > 50 else f"[DEBUG] query: {query}")
-    print(f"[DEBUG] part_name: {part_name}")
-    print(f"[DEBUG] limit: {limit}")
-    print(f"[DEBUG] _RAG_STATE['available']: {_RAG_STATE.get('available')}")
-    print(f"[DEBUG] _RAG_STATE['collection_ids']: {_RAG_STATE.get('collection_ids')}")
-    print("=" * 60)
+    logger.debug("=" * 60)
+    logger.debug("search_literature_fulltext CALLED")
+    logger.debug(f"query: {query[:50]}..." if len(query) > 50 else f"query: {query}")
+    logger.debug(f"part_name: {part_name}")
+    logger.debug(f"limit: {limit}")
+    logger.debug(f"_RAG_STATE['available']: {_RAG_STATE.get('available')}")
+    logger.debug(f"_RAG_STATE['collection_ids']: {_RAG_STATE.get('collection_ids')}")
+    logger.debug("=" * 60)
 
     # Check if availability has been initialized
     if _RAG_STATE.get("available") is None:
-        print("[DEBUG] search_literature_fulltext: RAG availability not initialized, checking now...")
+        logger.debug("search_literature_fulltext: RAG availability not initialized, checking now...")
         check_rag_availability_sync()
-        print(f"[DEBUG] search_literature_fulltext: After init, available = {_RAG_STATE.get('available')}")
+        logger.debug(f"search_literature_fulltext: After init, available = {_RAG_STATE.get('available')}")
 
     if not _RAG_STATE.get("available"):
-        print("[DEBUG] search_literature_fulltext: RAG not available, returning empty results")
+        logger.debug("search_literature_fulltext: RAG not available, returning empty results")
         logger.debug("RAG not available, returning empty results")
         return []
 
     try:
-        loop = asyncio.get_event_loop()
-        is_running = loop.is_running()
-    except RuntimeError:
-        is_running = False
-
-    print(f"[DEBUG] search_literature_fulltext: Event loop running: {is_running}")
-
-    try:
-        if is_running:
-            executor = _get_executor()
-            future = executor.submit(
-                asyncio.run,
-                search_fulltext_rag(query, part_name, limit)
-            )
-            result = future.result(timeout=30)
-        else:
-            result = asyncio.run(search_fulltext_rag(query, part_name, limit))
-
-        print(f"[DEBUG] search_literature_fulltext: returning {len(result)} results")
-        print("=" * 60)
+        result = run_async(search_fulltext_rag(query, part_name, limit), timeout=30)
+        logger.debug(f"search_literature_fulltext: returning {len(result)} results")
         return result
     except Exception as e:
-        print(f"[DEBUG] search_literature_fulltext: EXCEPTION {type(e).__name__}: {e}")
-        logger.warning(f"Full-text search failed: {e}")
+        logger.warning(f"Full-text search failed: {type(e).__name__}: {e}")
         return []
 
 
@@ -1424,24 +1469,24 @@ def validate_claim_fulltext(
         - source: str - "full_text" or "abstract"
     """
     # DEBUG: Entry point
-    print("=" * 60)
-    print("[DEBUG] validate_claim_fulltext CALLED")
+    logger.debug("=" * 60)
+    logger.debug("validate_claim_fulltext CALLED")
     claim_preview = claim[:80] + "..." if len(claim) > 80 else claim
-    print(f"[DEBUG] claim: {claim_preview}")
-    print(f"[DEBUG] pmid: {pmid}")
-    print(f"[DEBUG] part_name: {part_name}")
-    print(f"[DEBUG] _RAG_STATE['available']: {_RAG_STATE.get('available')}")
-    print(f"[DEBUG] _RAG_STATE['collection_ids']: {_RAG_STATE.get('collection_ids')}")
-    print("=" * 60)
+    logger.debug(f"claim: {claim_preview}")
+    logger.debug(f"pmid: {pmid}")
+    logger.debug(f"part_name: {part_name}")
+    logger.debug(f"_RAG_STATE['available']: {_RAG_STATE.get('available')}")
+    logger.debug(f"_RAG_STATE['collection_ids']: {_RAG_STATE.get('collection_ids')}")
+    logger.debug("=" * 60)
 
     # Check if availability has been initialized
     if _RAG_STATE.get("available") is None:
-        print("[DEBUG] validate_claim_fulltext: RAG availability not initialized, checking now...")
+        logger.debug("validate_claim_fulltext: RAG availability not initialized, checking now...")
         check_rag_availability_sync()
-        print(f"[DEBUG] validate_claim_fulltext: After init, available = {_RAG_STATE.get('available')}")
+        logger.debug(f"validate_claim_fulltext: After init, available = {_RAG_STATE.get('available')}")
 
     if not _RAG_STATE.get("available"):
-        print("[DEBUG] validate_claim_fulltext: RAG not available, returning abstract fallback")
+        logger.debug("validate_claim_fulltext: RAG not available, returning abstract fallback")
         return {
             "valid": False,
             "confidence": 0.0,
@@ -1451,33 +1496,12 @@ def validate_claim_fulltext(
         }
 
     try:
-        loop = asyncio.get_event_loop()
-        is_running = loop.is_running()
-    except RuntimeError:
-        is_running = False
-
-    print(f"[DEBUG] validate_claim_fulltext: Event loop running: {is_running}")
-
-    try:
-        if is_running:
-            executor = _get_executor()
-            future = executor.submit(
-                asyncio.run,
-                validate_claim_with_rag(claim, pmid, part_name)
-            )
-            result = future.result(timeout=30)
-        else:
-            result = asyncio.run(validate_claim_with_rag(claim, pmid, part_name))
-
-        print(f"[DEBUG] validate_claim_fulltext RESULT:")
-        print(f"[DEBUG]   valid: {result.get('valid')}")
-        print(f"[DEBUG]   confidence: {result.get('confidence')}")
-        print(f"[DEBUG]   source: {result.get('source')}")
-        print("=" * 60)
+        result = run_async(validate_claim_with_rag(claim, pmid, part_name), timeout=30)
+        logger.debug(f"validate_claim_fulltext RESULT: valid={result.get('valid')}, "
+                      f"confidence={result.get('confidence')}, source={result.get('source')}")
         return result
     except Exception as e:
-        print(f"[DEBUG] validate_claim_fulltext EXCEPTION: {type(e).__name__}: {e}")
-        logger.warning(f"Full-text claim validation failed: {e}")
+        logger.warning(f"Full-text claim validation failed: {type(e).__name__}: {e}")
         return {
             "valid": False,
             "confidence": 0.0,

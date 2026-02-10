@@ -47,8 +47,8 @@ class DeepInterpreterWrapperState(TypedDict):
     info_complete: bool
     targets_written: bool
 
-    # Deep Agent output
-    deep_agent_result: Optional[dict]
+    # Deep Agent output (JSON string for checkpoint serialization safety)
+    deep_agent_result: Optional[str]
 
 
 def create_initial_state() -> DeepInterpreterWrapperState:

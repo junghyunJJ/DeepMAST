@@ -13,6 +13,7 @@ Pattern Reference: STPipelineBuilderAgent (st_pipeline_info_agent.py)
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
@@ -25,6 +26,8 @@ from langgraph.store.base import BaseStore
 from src.base import BaseAgent
 from src.agents.deep_interpreter.info_extraction import DeepInterpreterInfoExtraction
 from src.agents.deep_interpreter.wrapper_state import DeepInterpreterWrapperState
+
+logger = logging.getLogger(__name__)
 
 
 class DeepInterpreterWrapperAgent(BaseAgent):
@@ -423,7 +426,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
                     tool_call_id=tool_call_id,
                 )
             ],
-            "data_directory": data_directory,
+            "data_directory": str(Path(data_directory).expanduser().resolve()),
             "analysis_mode": analysis_mode,
             "interest_clusters": interest_clusters if analysis_mode == "cluster_to_celltype" else None,
             "interest_celltypes": interest_celltypes if analysis_mode == "celltype_to_cluster" else None,
@@ -447,48 +450,33 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
     async def write_targets_node(
         self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
     ) -> dict:
-        """Write targets.json file for Deep Agent consumption.
+        """Finalize target configuration for Deep Agent consumption.
 
-        Creates /targets.json in the data directory with the collected
-        configuration, which the readonly planner subagent will read.
+        Marks targets as written in state. The actual target data is passed
+        to the Deep Agent via the initial message embedding in invoke_deep_agent_node
+        (not via physical filesystem write).
         """
         data_directory = state.get("data_directory")
         if not data_directory:
             raise ValueError("data_directory not set in state")
 
-        # Expand user home directory if needed
-        data_path = Path(data_directory).expanduser()
+        data_path = Path(data_directory).expanduser().resolve()
 
-        # Create targets.json content
-        targets_content = {
+        targets_summary = {
             "analysis_mode": state.get("analysis_mode"),
             "interest_clusters": state.get("interest_clusters"),
             "interest_celltypes": state.get("interest_celltypes"),
-            "data_directory": str(data_path),
-            "user_confirmed": True,
         }
+        logger.debug(f"Targets finalized for {data_path}: {targets_summary}")
 
-        # Write to file in data directory
-        targets_path = data_path / "targets.json"
-        try:
-            with open(targets_path, "w") as f:
-                json.dump(targets_content, f, indent=2)
-
-            if self.is_debug:
-                print(f"Wrote targets.json to: {targets_path}")
-
-            return {
-                "targets_written": True,
-                "messages": [
-                    AIMessage(
-                        content=f"Configuration saved to {targets_path}. Starting Deep Interpreter..."
-                    )
-                ],
-            }
-        except Exception as e:
-            if self.is_debug:
-                print(f"Error writing targets.json: {e}")
-            raise
+        return {
+            "targets_written": True,
+            "messages": [
+                AIMessage(
+                    content=f"Configuration ready for {data_path}. Starting Deep Interpreter..."
+                )
+            ],
+        }
 
     # ===== Invoke Deep Agent Node =====
 
@@ -549,8 +537,19 @@ After target confirmation, proceed directly to strategic planning with these tar
             # Extract messages from Deep Agent result
             deep_messages = result.get("messages", [])
 
+            # Serialize result to JSON string for checkpoint safety
+            # (avoids msgpack failures on non-serializable LangChain objects)
+            try:
+                result_summary = {
+                    "status": "completed",
+                    "message_count": len(deep_messages),
+                }
+                serialized_result = json.dumps(result_summary)
+            except (TypeError, ValueError):
+                serialized_result = json.dumps({"status": "completed"})
+
             return {
-                "deep_agent_result": result,
+                "deep_agent_result": serialized_result,
                 "messages": deep_messages,  # Pass through Deep Agent messages
             }
         except Exception as e:

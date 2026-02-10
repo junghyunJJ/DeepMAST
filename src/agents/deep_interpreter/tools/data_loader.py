@@ -89,7 +89,7 @@ def get_recommended_targets(data_dir: str, max_clusters: int = 3, max_celltypes:
     """
     from collections import Counter
 
-    data_path = Path(data_dir)
+    data_path = Path(data_dir).expanduser().resolve()
     cluster_counts = Counter()
     celltype_counts = Counter()
 
@@ -211,7 +211,7 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
         - celltypes: List of unique cell type names found in the data
         - files_written: List of files automatically saved to filesystem
     """
-    data_path = Path(data_dir)
+    data_path = Path(data_dir).expanduser().resolve()
 
     if not data_path.exists():
         return {
@@ -429,7 +429,7 @@ def get_figure_path(data_dir: str, analysis_name: str) -> Optional[str]:
         return None
 
     config = ANALYSIS_FILES[analysis_name]
-    figure_path = Path(data_dir) / config["figure"]
+    figure_path = Path(data_dir).expanduser().resolve() / config["figure"]
 
     return str(figure_path) if figure_path.exists() else None
 
@@ -451,7 +451,7 @@ def get_data_path(data_dir: str, analysis_name: str) -> Optional[str]:
     if "data" not in config:
         return None
 
-    data_path = Path(data_dir) / config["data"]
+    data_path = Path(data_dir).expanduser().resolve() / config["data"]
 
     return str(data_path) if data_path.exists() else None
 
@@ -504,8 +504,10 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
         Dictionary with genes, pathways, celltypes, source info, and stats.
     """
     import pandas as pd
+    from collections import Counter
 
     genes = set()
+    gene_counts = Counter()
     pathways = set()
     celltypes = set()
 
@@ -520,9 +522,11 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
                 df = pd.read_csv(csv_path)
 
                 # Extract ALL unique genes (not top N - preserve all important items)
+                # Also count frequency for ranking
                 for col in ['ligand', 'receptor']:
                     if col in df.columns:
                         genes.update(df[col].dropna().unique())
+                        gene_counts.update(df[col].dropna().tolist())
 
                 # Extract pathways from progeny column
                 if 'progeny' in df.columns:
@@ -582,18 +586,32 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
         }
     elif context_type == "lr_interaction":
         # Part 2 & 3: LIANA L-R analysis - includes genes
-        # Merged to avoid redundancy (Part 2 & 3 used identical data)
+        # Use frequency-ranked top N genes for effective search coverage
+        MAX_SEARCH_GENES = 30
+        all_genes_sorted = sorted(list(genes))
+
+        # Rank by frequency (most frequent L-R pairs are most important)
+        if gene_counts:
+            top_genes = [g for g, _ in gene_counts.most_common(MAX_SEARCH_GENES)]
+        else:
+            top_genes = all_genes_sorted[:MAX_SEARCH_GENES]
+
         return {
-            "genes": sorted(list(genes)),
+            "genes": top_genes,  # Top N by frequency for search
+            "all_genes": all_genes_sorted,  # Full list for reference
             "pathways": sorted(list(pathways)),
             "celltypes": sorted(list(celltypes)),
             "source": source_file or "no LIANA files found",
             "context_type": "lr_interaction",
             "applicable_parts": [2, 3],
-            "note": "L-R interaction analysis with gene-level data from LIANA. "
-                    "Use for Part 2 (CCI & NMF) and Part 3 (L-R mechanism details).",
+            "note": (
+                f"Top {len(top_genes)} genes by L-R frequency from {source_file or 'LIANA files'}. "
+                f"Full gene set: {len(all_genes_sorted)} unique genes. "
+                "Use 'genes' for search, 'all_genes' for complete reference."
+            ),
             "stats": {
-                "total_genes": len(genes),
+                "total_genes": len(all_genes_sorted),
+                "search_genes": len(top_genes),
                 "total_pathways": len(pathways),
                 "total_celltypes": len(celltypes),
             }
@@ -636,7 +654,7 @@ def get_recommended_search_terms(data_dir: str, max_genes: int = 15) -> dict:
 
     import pandas as pd
 
-    data_path = Path(data_dir)
+    data_path = Path(data_dir).expanduser().resolve()
     gene_counts = Counter()
 
     # Priority: LIANA files contain actual L-R gene pairs

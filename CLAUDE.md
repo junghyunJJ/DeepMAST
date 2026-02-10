@@ -86,7 +86,7 @@ The `langgraph.json` exports these graphs:
 
 The main analysis agent uses a simplified 4-subagent architecture:
 
-1. **PLANNER**: Reads `/targets.json`, loads analysis data, generates hypotheses → outputs `/strategic_plan.md`
+1. **PLANNER**: Reads `/targets.json`, loads analysis data, generates biomedical context, searches literature → outputs `/interpretation_guide.md`
 2. **SEARCHER**: Extracts context, searches literature (Part 1 → `/part1_papers.json`, Part 2+3 → `/liana_papers.json` shared)
 3. **INTERPRETER**: Literature-grounded interpretation with inline validation, max 3 quality iterations → outputs `/partN_final.md`
 4. **REPORTER**: Cross-part synthesis with independent literature validation → outputs `/synthesis.md`, `CCI_Analysis_Report.html`
@@ -189,11 +189,16 @@ SEARCHER uses context-aware searches:
 
 ## Testing Subagents
 
-Individual subagents can be tested via LangGraph CLI:
-```bash
-# Test SEARCHER subagent
-langgraph dev --graph Sub_Searcher
+`langgraph dev` serves **all** graphs defined in `langgraph.json` simultaneously. There is no `--graph` option to select individual graphs.
 
-# Test INTERPRETER subagent
-langgraph dev --graph Sub_Interpreter
+```bash
+# 1. Start the dev server (serves all graphs)
+langgraph dev
+
+# 2. Select the subagent in LangGraph Studio UI:
+#    Sub_Planner, Sub_Searcher, Sub_Interpreter, Sub_Reporter
+
+# Or call a specific subagent via API:
+# curl -X POST http://localhost:2024/runs \
+#   -d '{"assistant_id": "Sub_Searcher", "input": {...}}'
 ```

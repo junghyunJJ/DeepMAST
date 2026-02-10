@@ -1,8 +1,8 @@
 """Subagent configurations for Deep Interpreter Agent.
 
 Simplified 4-Agent Architecture:
-- PLANNER: Target confirmation + hypothesis generation (load_analysis_data)
-- SEARCHER: Context extraction + literature search (load_analysis_data, search_literature_dynamic, search_literature, think_tool)
+- PLANNER: Target confirmation + data assessment + interpretation guide (load_analysis_data, generate_biomedical_context, search_pubmed_advanced, think_tool)
+- SEARCHER: Context extraction + literature search (load_analysis_data, search_literature_dynamic, search_literature, search_pubmed_advanced, think_tool)
 - INTERPRETER: Part 1/2/3 interpretation with inline validation (load_analysis_data, validate_claim_literature, validate_quality, think_tool)
 - REPORTER: Cross-part synthesis + literature validation + HTML report
   (load_analysis_data, generate_html_report, literature search tools, RAG tools)
@@ -17,6 +17,7 @@ from langchain_core.tools import BaseTool
 from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
 from src.agents.deep_interpreter.tools import (
     load_analysis_data,
+    generate_biomedical_context,
     search_literature,
     search_literature_dynamic,
     search_pubmed_advanced,
@@ -48,11 +49,14 @@ SUBAGENT_CONFIGS = {
         "name": "planner",
         "description": (
             "Strategic planning agent. Reads /targets.json, loads analysis data, "
-            "and generates testable hypotheses. Outputs /strategic_plan.md. "
+            "generates biomedical context via BioMCP think (disease biology context), "
+            "searches literature for grounding (10 papers), assesses data availability, "
+            "and creates a data-driven interpretation guide with focus areas and priorities. "
+            "Outputs /interpretation_guide.md, /planner_literature_context.md, /planner_biomcp_context.md. "
             "Use this FIRST to establish the interpretation strategy."
         ),
         "system_prompt": SUBAGENT_PROMPTS["planner"],
-        "tools": [load_analysis_data],
+        "tools": [load_analysis_data, generate_biomedical_context, search_pubmed_advanced, think_tool],
     },
     "searcher": {
         "name": "searcher",
@@ -66,9 +70,9 @@ SUBAGENT_CONFIGS = {
         "system_prompt": SUBAGENT_PROMPTS["searcher"],
         "tools": [
             load_analysis_data,
-            search_literature_dynamic,  # PRIMARY: LLM-powered (내부 자동 fallback 포함)
-            search_literature,  # Follow-up: Single query search
-            search_pubmed_advanced,  # NEW: E-utilities (MeSH/날짜/pub type)
+            search_literature_dynamic,   # PRIMARY: LLM-powered (내부 자동 fallback 포함)
+            search_literature,           # Follow-up: Single query search
+            search_pubmed_advanced,      # E-utilities (MeSH/날짜/pub type)
             think_tool,
         ],
     },
@@ -134,7 +138,7 @@ def get_subagents(
     """Get the subagent configurations for Deep Interpreter.
 
     Returns 4 subagents in workflow order:
-    1. planner - Target confirmation + hypothesis generation
+    1. planner - Target confirmation + data assessment + interpretation guide
     2. searcher - Context extraction + literature search
     3. interpreter - Literature-grounded interpretation with inline validation
     4. reporter - Cross-part synthesis + HTML report
@@ -202,8 +206,12 @@ Deep Interpreter 4-Agent Workflow:
 1. PLANNER (target-selector + strategic-planner consolidated)
    - Reads /targets.json
    - Loads analysis data
-   - Generates 2-4 testable hypotheses
-   - Outputs: /strategic_plan.md, /analysis_summary.md, /data_path.txt
+   - Generates biomedical context via BioMCP think (optional enrichment)
+   - Literature initialization via search_pubmed_advanced (10 papers for grounding)
+   - Data assessment + analysis coverage checklist via think_tool
+   - Creates data-driven interpretation guide with focus areas and priorities
+   - Outputs: /interpretation_guide.md, /analysis_summary.md, /data_path.txt,
+     /planner_literature_context.md, /planner_biomcp_context.md
 
 2. SEARCHER (context-analyzer + literature-searcher consolidated)
    - For Part 1:
@@ -228,8 +236,7 @@ Deep Interpreter 4-Agent Workflow:
 
 4. REPORTER (synthesizer + report-generator consolidated + synthesis validation)
    - Read all /partN_final.md files
-   - Identify cross-part themes
-   - Validate hypotheses from strategic plan
+   - Identify emergent cross-part themes
    - **Phase 4.5: Validate synthesis claims with independent literature search**
      a. Extract synthesis context (genes, pathways, celltypes from Themes 1-4)
      b. Strategic planning with think_tool (3 thoughts)

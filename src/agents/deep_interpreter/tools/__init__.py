@@ -13,12 +13,11 @@ from src.agents.deep_interpreter.tools.data_loader import (
 )
 from src.agents.deep_interpreter.tools.literature import (
     search_literature,
-    search_literature_for_context,
     search_literature_dynamic,
     search_literature_async,
-    search_literature_for_context_async,
     search_literature_dynamic_async,
     format_references,
+    generate_biomedical_context,
 )
 from src.agents.deep_interpreter.tools.quality import (
     validate_quality,
@@ -33,6 +32,10 @@ from src.agents.deep_interpreter.tools.report import (
 )
 from src.agents.deep_interpreter.tools.think import (
     think_tool,
+    analyze_research_question,
+    expand_search_entities,
+    build_search_queries,
+    evaluate_search_results,
 )
 from src.agents.deep_interpreter.tools.literature_rag import (
     prepare_rag_literature,
@@ -46,6 +49,7 @@ from src.agents.deep_interpreter.tools.lr_prioritizer import (
     HybridLRPrioritizer,
     create_lr_prioritizer,
     prioritize_lr_pairs,
+    prioritize_top_lr_pairs,
 )
 from src.agents.deep_interpreter.tools.pubmed_eutils import (
     search_pubmed_advanced,
@@ -53,8 +57,12 @@ from src.agents.deep_interpreter.tools.pubmed_eutils import (
 )
 
 __all__ = [
-    # Think tool
+    # Think tool (think_tool used by subagents; others exported for orchestrator-level use)
     "think_tool",
+    "analyze_research_question",  # Orchestrator-level: biomedical thinking chain
+    "expand_search_entities",     # Orchestrator-level: entity expansion via BioMCP
+    "build_search_queries",       # Orchestrator-level: query construction via BioMCP
+    "evaluate_search_results",    # Orchestrator-level: result evaluation via BioMCP
     # Data loader
     "load_analysis_data",
     "get_figure_path",
@@ -64,12 +72,11 @@ __all__ = [
     "ANALYSIS_FILES",
     # Literature
     "search_literature",
-    "search_literature_for_context",
     "search_literature_dynamic",
     "search_literature_async",
-    "search_literature_for_context_async",
     "search_literature_dynamic_async",
     "format_references",
+    "generate_biomedical_context",
     # Quality
     "validate_quality",
     "validate_claim_literature",
@@ -90,6 +97,7 @@ __all__ = [
     "HybridLRPrioritizer",
     "create_lr_prioritizer",
     "prioritize_lr_pairs",
+    "prioritize_top_lr_pairs",
     # PubMed E-utilities
     "search_pubmed_advanced",
     "build_pubmed_query",

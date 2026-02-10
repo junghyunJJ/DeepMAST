@@ -1,7 +1,7 @@
 """Orchestrator system prompts for Deep Interpreter Agent.
 
 Simplified 4-Agent Architecture:
-1. PLANNER: Target confirmation + hypothesis generation
+1. PLANNER: Target confirmation + data assessment + interpretation guide generation
 2. SEARCHER: Context extraction + literature search
 3. INTERPRETER: Part 1/2/3 interpretation with inline validation
 4. REPORTER: Cross-part synthesis + HTML report generation
@@ -22,7 +22,7 @@ CCI analysis results with publication-quality output and NO HALLUCINATION.
 
 You orchestrate 4 specialized subagents:
 
-1. **planner**: Target confirmation + hypothesis generation
+1. **planner**: Target confirmation + data assessment + interpretation guide generation
 2. **searcher**: Context extraction + literature search (for ALL Parts)
 3. **interpreter**: Part 1/2/3 interpretation with inline validation
 4. **reporter**: Cross-part synthesis + HTML report generation
@@ -68,8 +68,10 @@ Use the **planner** subagent to:
 - Parse the embedded target configuration from initial message
 - Write /targets.json to virtual filesystem
 - Load analysis data and write /analysis_summary.md, /data_path.txt
-- Generate 2-4 testable hypotheses
-- Output: /strategic_plan.md
+- Generate biomedical context via BioMCP think (optional enrichment)
+- Search literature for grounding (search_pubmed_advanced, 10 papers)
+- Assess data availability and create interpretation focus areas
+- Output: /interpretation_guide.md, /planner_literature_context.md, /planner_biomcp_context.md
 
 ### Step 2: SEARCHER (for ALL Parts)
 Use the **searcher** subagent to search literature for ALL three parts:
@@ -107,10 +109,11 @@ For Part 1, Part 2, Part 3:
 ### Step 4: REPORTER
 Use the **reporter** subagent to:
 - Read all /partN_final.md files
-- Identify cross-part themes
-- Validate hypotheses from strategic plan
+- Identify emergent cross-part themes
+- Synthesize findings into coherent biological narrative
+- Validate synthesis claims with independent literature search
 - Generate HTML report
-- Output: /synthesis.md, CCI_Analysis_Report.html
+- Output: /synthesis.md, /synthesis_papers.json, CCI_Analysis_Report.html
 
 ## Important Guidelines
 
@@ -143,8 +146,8 @@ Use the **reporter** subagent to:
    - Clear biological mechanism
    - Specific, concrete language (no vague statements)
 
-7. **Hypothesis Validation**: Track hypotheses from strategic planning through
-   to synthesis. Document which hypotheses are supported or refuted.
+7. **Emergent Themes**: Let themes emerge from data interpretation rather than
+   testing pre-formed hypotheses. Document cross-part patterns in synthesis.
 
 ## Available Tools (Orchestrator Level)
 
@@ -160,10 +163,10 @@ Use the **reporter** subagent to:
 
 | Subagent | Role | Inputs | Outputs |
 |----------|------|--------|---------|
-| **planner** | Target confirmation + hypothesis generation | /targets.json (from message) | /strategic_plan.md, /analysis_summary.md, /data_path.txt |
+| **planner** | Target confirmation + data assessment + interpretation guide | /targets.json (from message) | /interpretation_guide.md, /analysis_summary.md, /data_path.txt, /planner_literature_context.md, /planner_biomcp_context.md |
 | **searcher** | Context extraction + literature search | /data_path.txt, spatial_search_context (Part 1), lr_search_context (Part 2/3) | /part1_papers.json, /liana_papers.json (Part 2/3 shared) |
-| **interpreter** | Part 1/2/3 interpretation with inline validation | /partN_papers.json, /strategic_plan.md | /part1_final.md, /part2_final.md, /part3_final.md |
-| **reporter** | Cross-part synthesis + HTML report | /partN_final.md, /synthesis.md | /synthesis.md, CCI_Analysis_Report.html |
+| **interpreter** | Part 1/2/3 interpretation with inline validation | /partN_papers.json, /interpretation_guide.md | /part1_final.md, /part2_final.md, /part3_final.md |
+| **reporter** | Cross-part synthesis + emergent themes + HTML report | /partN_final.md, /interpretation_guide.md | /synthesis.md, /synthesis_papers.json, CCI_Analysis_Report.html |
 
 ## Workflow Diagram
 
@@ -172,8 +175,11 @@ Use the **reporter** subagent to:
 │ PLANNER                                                                      │
 │  - Parse /targets.json from initial message                                 │
 │  - Load analysis data                                                       │
-│  - Generate 2-4 hypotheses                                                  │
-│  → /strategic_plan.md, /analysis_summary.md, /data_path.txt                 │
+│  - Generate biomedical context (BioMCP think, optional)                     │
+│  - Literature initialization (search_pubmed_advanced, 10 papers)            │
+│  - Data assessment + analysis coverage checklist                            │
+│  → /interpretation_guide.md, /analysis_summary.md, /data_path.txt,         │
+│    /planner_literature_context.md, /planner_biomcp_context.md               │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -200,10 +206,10 @@ Use the **reporter** subagent to:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ REPORTER                                                                     │
 │  - Read all /partN_final.md                                                 │
-│  - Identify cross-part themes                                               │
-│  - Validate hypotheses                                                      │
+│  - Identify emergent cross-part themes                                      │
+│  - Validate synthesis claims with independent literature search             │
 │  - Generate HTML report                                                     │
-│  → /synthesis.md, CCI_Analysis_Report.html                                  │
+│  → /synthesis.md, /synthesis_papers.json, CCI_Analysis_Report.html          │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 

@@ -5,35 +5,18 @@ and provides scores for biological plausibility, evidence coverage,
 and scientific rigor.
 """
 
-import asyncio
 import logging
-import os
 import re
-from pathlib import Path
 from typing import Optional
 
 from langchain_core.tools import tool
 
-logger = logging.getLogger(__name__)
-from langchain_mcp_adapters.client import MultiServerMCPClient
-
-
-# Reflection-tool MCP server configuration (stdio transport)
-# Uses environment variables for portability:
-# - REFLECTION_TOOL_COMMAND: Path to fastmcp executable (default: "fastmcp")
-# - REFLECTION_TOOL_SERVER: Path to server.py (default: ~/Dropbox/Metadata/mcp/reflection_tool/server.py)
-#
-# Note: reflection_tool is an external MCP server, not part of this project.
-# The default path assumes the standard location in the user's mcp directory.
-_DEFAULT_SERVER_PATH = str(
-    Path.home() / "Dropbox" / "Metadata" / "mcp" / "reflection_tool" / "server.py"
+from src.agents.deep_interpreter.tools.mcp_clients import (
+    invoke_reflection_tool,
+    run_async,
 )
 
-REFLECTION_TOOL_CONFIG = {
-    "command": os.getenv("REFLECTION_TOOL_COMMAND", "fastmcp"),
-    "args": ["run", os.getenv("REFLECTION_TOOL_SERVER", _DEFAULT_SERVER_PATH)],
-    "transport": "stdio",
-}
+logger = logging.getLogger(__name__)
 
 # Quality criteria weights
 QUALITY_CRITERIA = {
@@ -178,26 +161,8 @@ async def _validate_with_reflection_tool(
 
     Returns:
         Dictionary with LLM-based quality assessment, or None if unavailable
-
-    Note:
-        As of langchain-mcp-adapters 0.1.0, MultiServerMCPClient cannot be
-        used as a context manager. Use client.get_tools() directly instead.
     """
     try:
-        # Note: Do not use 'async with' - API changed in langchain-mcp-adapters 0.1.0
-        client = MultiServerMCPClient({"reflection": REFLECTION_TOOL_CONFIG})
-        tools = await client.get_tools()
-
-        # Find think_tool
-        think_tool = None
-        for tool_obj in tools:
-            if hasattr(tool_obj, 'name') and 'think' in tool_obj.name:
-                think_tool = tool_obj
-                break
-
-        if think_tool is None:
-            return None
-
         # Construct reflection prompt
         ref_summary = f"{len(references)} references" if references else "No references"
         reflection_text = f"""Evaluate this CCI interpretation for quality:
@@ -227,10 +192,15 @@ async def _validate_with_reflection_tool(
 - Passed: [yes/no] (threshold: 0.7)
 - Recommendations: [specific improvements]"""
 
-        result = await think_tool.ainvoke({"reflection": reflection_text})
+        # Invoke reflection tool via shared client
+        result_dict = await invoke_reflection_tool(reflection_text)
+
+        if not result_dict.get("success"):
+            logger.error(f"Reflection-tool invocation failed: {result_dict.get('error')}")
+            return None
 
         # Parse result
-        return _parse_reflection_result(result)
+        return _parse_reflection_result(result_dict["result"])
 
     except Exception as e:
         logger.error(f"Reflection-tool connection failed: {e}")
@@ -251,10 +221,12 @@ def _parse_reflection_result(result: str) -> dict:
     if score_match:
         assessment["llm_score"] = min(float(score_match.group(1)), 1.0)
 
-    # Check for passed/failed
-    if "passed" in result_str or "yes" in result_str:
+    # Check for passed/failed - use specific patterns to avoid false positives
+    passed_pattern = re.search(r'passed[:\s]*(yes|true)', result_str)
+    failed_pattern = re.search(r'passed[:\s]*(no|false)', result_str) or re.search(r'\bfailed\b', result_str)
+    if passed_pattern:
         assessment["llm_passed"] = True
-    elif "failed" in result_str or "no" in result_str:
+    elif failed_pattern:
         assessment["llm_passed"] = False
 
     return assessment
@@ -297,19 +269,10 @@ def validate_quality(
     # Optionally enhance with LLM validation
     if use_llm:
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(
-                        asyncio.run,
-                        _validate_with_reflection_tool(interpretation, references)
-                    )
-                    llm_result = future.result(timeout=30)
-            else:
-                llm_result = asyncio.run(
-                    _validate_with_reflection_tool(interpretation, references)
-                )
+            llm_result = run_async(
+                _validate_with_reflection_tool(interpretation, references),
+                timeout=30
+            )
 
             if llm_result:
                 result.update(llm_result)

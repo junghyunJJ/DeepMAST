@@ -22,7 +22,6 @@ def test_reporter_has_phase45_tools():
     from src.agents.deep_interpreter.subagents.configs import SUBAGENT_CONFIGS
     from src.agents.deep_interpreter.tools import (
         search_literature_dynamic,
-        search_literature_for_context,
         search_literature,
         prepare_rag_literature,
         validate_claim_fulltext,
@@ -35,7 +34,6 @@ def test_reporter_has_phase45_tools():
     # Phase 4.5 required tools
     required_tools = [
         search_literature_dynamic,
-        search_literature_for_context,
         search_literature,
         prepare_rag_literature,
         validate_claim_fulltext,
@@ -55,9 +53,10 @@ def test_reporter_tool_count():
     reporter_config = SUBAGENT_CONFIGS["reporter"]
     tools = reporter_config["tools"]
 
-    # Expected: load_analysis_data, generate_html_report + 8 Phase 4.5 tools
-    # Actually: 10 tools total (2 core + 8 Phase 4.5)
-    assert len(tools) >= 8, f"Expected >= 8 tools, got {len(tools)}"
+    # Expected: load_analysis_data, generate_html_report + Phase 4.5 tools
+    # 7 tools total (2 core + 5 Phase 4.5: search_literature_dynamic, search_literature,
+    # prepare_rag_literature, validate_claim_fulltext, think_tool)
+    assert len(tools) >= 7, f"Expected >= 7 tools, got {len(tools)}"
 
     tool_names = [t.__name__ if hasattr(t, "__name__") else str(t) for t in tools]
     print(f"✅ REPORTER tools ({len(tools)}): {tool_names}")
@@ -264,12 +263,12 @@ The **EMT pathway** shows highest activity in regions where **TGFb signaling** a
 In the context of **breast cancer**, these findings suggest that CAF-epithelial
 crosstalk drives **EMT** and potentially **metastasis**.
 
-## Hypothesis Validation
+## Emergent Themes Summary
 
-| Hypothesis | Status | Evidence |
-|------------|--------|----------|
-| H1: TGF-β drives EMT | Supported | Part 2-6, Part 3-10 |
-| H2: Spatial gradient exists | Supported | Part 1-1, Part 1-3 |
+| Theme | Strength | Supporting Evidence |
+|-------|----------|---------------------|
+| TGF-β drives EMT | Strong | Part 2-6, Part 3-10 |
+| Spatial gradient exists | Strong | Part 1-1, Part 1-3 |
 """
 
 

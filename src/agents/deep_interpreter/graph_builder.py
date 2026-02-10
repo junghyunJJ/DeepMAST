@@ -31,7 +31,7 @@ from src.agents.model import create_llm  # noqa: E402
 
 
 def create_deep_interpreter_graph(
-    provider: Literal["openai", "google", "ollama"] = "ollama",
+    provider: Literal["openai", "google", "ollama", "claude"] = "ollama",
     data_dir: str = "/tmp/deep_interpreter_workspace",
     use_checkpointer: bool = True,
     is_debug: bool = False,
@@ -93,7 +93,7 @@ def _get_deep_interpreter_graph() -> Runnable:
 
 
 def create_deep_interpreter_graph_wrapped(
-    provider: Literal["openai", "google", "ollama"] = "ollama",
+    provider: Literal["openai", "google", "ollama", "claude"] = "ollama",
     data_dir: str = "/tmp/deep_interpreter_workspace",
     use_checkpointer: bool = False,
     is_debug: bool = False,
@@ -157,8 +157,6 @@ def _get_deep_interpreter_graph_wrapped() -> Runnable:
         Compiled Wrapper Agent runnable
     """
     provider = os.getenv("LLM_PROVIDER", "openai")
-    # provider = os.getenv("LLM_PROVIDER", "claude")
-    # provider = os.getenv("LLM_PROVIDER", "ollama")
 
     data_dir = os.getenv(
         "DEEP_INTERPRETER_DATA_DIR",
@@ -198,9 +196,9 @@ def create_subagent_graph(
     allowing you to test each subagent independently via `langgraph dev`.
 
     Subagent Descriptions:
-    - **planner**: Target confirmation + hypothesis generation
+    - **planner**: Target confirmation + data assessment + interpretation guide
       - Reads /targets.json, loads analysis data
-      - Outputs: /strategic_plan.md, /analysis_summary.md, /data_path.txt
+      - Outputs: /interpretation_guide.md, /analysis_summary.md, /data_path.txt
 
     - **searcher**: Context extraction + literature search
       - For Part 1: outputs /part1_papers.json
@@ -245,7 +243,18 @@ def create_subagent_graph(
         prompt=system_prompt,
     )
 
-    return agent
+    # Apply per-subagent recursion limits.
+    # The default recursion_limit=25 from langchain_core is too low for
+    # standalone subagent graphs (e.g., reporter needs ~70-90 node transitions).
+    # Production path (full pipeline) uses SubAgentMiddleware which sets 10,000.
+    SUBAGENT_RECURSION_LIMITS = {
+        "planner": 100,
+        "searcher": 150,
+        "interpreter": 200,
+        "reporter": 200,
+    }
+    limit = SUBAGENT_RECURSION_LIMITS.get(subagent_name, 100)
+    return agent.with_config({"recursion_limit": limit})
 
 
 # -----------------------------------------------------------------------------

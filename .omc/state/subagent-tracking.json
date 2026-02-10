@@ -1,7 +1,26 @@
 {
-  "agents": [],
-  "total_spawned": 0,
-  "total_completed": 0,
+  "agents": [
+    {
+      "agent_id": "af10d5d",
+      "agent_type": "oh-my-claudecode:explore-high",
+      "started_at": "2026-02-10T01:34:55.259Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-02-10T01:40:22.262Z",
+      "duration_ms": 327003
+    },
+    {
+      "agent_id": "adb83eb",
+      "agent_type": "code-reviewer-fixer",
+      "started_at": "2026-02-10T01:35:01.745Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-02-10T01:38:40.243Z",
+      "duration_ms": 218498
+    }
+  ],
+  "total_spawned": 2,
+  "total_completed": 2,
   "total_failed": 0,
-  "last_updated": "2026-02-06T19:08:12.854Z"
+  "last_updated": "2026-02-10T01:40:22.365Z"
 }

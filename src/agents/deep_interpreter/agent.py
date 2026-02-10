@@ -1,7 +1,7 @@
 """Deep Interpreter Agent using DeepAgents framework.
 
 Simplified 4-Agent Architecture:
-1. PLANNER: Target confirmation + hypothesis generation
+1. PLANNER: Target confirmation + data assessment + interpretation guide
 2. SEARCHER: Context extraction + literature search
 3. INTERPRETER: Part 1/2/3 interpretation with inline validation
 4. REPORTER: Cross-part synthesis + HTML report generation
@@ -139,7 +139,7 @@ def create_deep_interpreter_agent(
     - CompositeBackend with FilesystemBackend for persistent file storage
 
     The 4 subagents are:
-    1. planner - Target confirmation + hypothesis generation
+    1. planner - Target confirmation + data assessment + interpretation guide
     2. searcher - Context extraction + literature search
     3. interpreter - Part 1/2/3 interpretation with inline validation
     4. reporter - Cross-part synthesis + HTML report
@@ -226,7 +226,7 @@ def create_deep_interpreter_graph():
 
 # Convenience function for quick usage
 def interpret_analysis(
-    data_dir: str = '/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/res',
+    data_dir: str = './res',
     analysis_mode: str = "cluster_to_celltype",
     targets: Optional[list[str]] = None,
     output_path: Optional[str] = None,

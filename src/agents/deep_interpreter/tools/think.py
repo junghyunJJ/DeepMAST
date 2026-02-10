@@ -4,95 +4,15 @@ This tool provides quality validation using the reflection-tool MCP server
 with iteration tracking for the quality validation loop.
 """
 
-import asyncio
-import atexit
-import os
 import re
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 from langchain_core.tools import tool
-from langchain_mcp_adapters.client import MultiServerMCPClient
 
-
-# Module-level singleton ThreadPoolExecutor (matches literature.py pattern)
-_EXECUTOR: ThreadPoolExecutor | None = None
-
-
-def _get_executor() -> ThreadPoolExecutor:
-    """Get or create the singleton ThreadPoolExecutor for async bridging."""
-    global _EXECUTOR
-    if _EXECUTOR is None:
-        _EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="think")
-        atexit.register(_EXECUTOR.shutdown, wait=False)
-    return _EXECUTOR
-
-
-# Reflection-tool MCP server configuration (stdio transport)
-# Uses environment variables for portability:
-# - REFLECTION_TOOL_COMMAND: Path to fastmcp executable (default: "fastmcp")
-# - REFLECTION_TOOL_SERVER: Path to server.py (default: ~/Dropbox/Metadata/mcp/reflection_tool/server.py)
-#
-# Note: reflection_tool is an external MCP server, not part of this project.
-# The default path assumes the standard location in the user's mcp directory.
-_DEFAULT_SERVER_PATH = str(
-    Path.home() / "Dropbox" / "Metadata" / "mcp" / "reflection_tool" / "server.py"
+from src.agents.deep_interpreter.tools.mcp_clients import (
+    invoke_biomedical_thinking,
+    invoke_reflection_tool,
+    run_async,
 )
-
-REFLECTION_TOOL_CONFIG = {
-    "command": os.getenv("REFLECTION_TOOL_COMMAND", "fastmcp"),
-    "args": ["run", os.getenv("REFLECTION_TOOL_SERVER", _DEFAULT_SERVER_PATH)],
-    "transport": "stdio",
-}
-
-
-async def _invoke_think_tool(reflection_text: str) -> dict:
-    """Invoke the reflection-tool MCP server's think_tool.
-
-    Args:
-        reflection_text: The reflection prompt to process
-
-    Returns:
-        Dictionary with thinking result and metadata
-
-    Note:
-        As of langchain-mcp-adapters 0.1.0, MultiServerMCPClient cannot be
-        used as a context manager. Use client.get_tools() directly instead.
-    """
-    try:
-        # Note: Do not use 'async with' - API changed in langchain-mcp-adapters 0.1.0
-        client = MultiServerMCPClient({"reflection": REFLECTION_TOOL_CONFIG})
-        tools = await client.get_tools()
-
-        # Find think_tool
-        think_tool_obj = None
-        for tool_obj in tools:
-            if hasattr(tool_obj, 'name') and 'think' in tool_obj.name:
-                think_tool_obj = tool_obj
-                break
-
-        if think_tool_obj is None:
-            return {
-                "success": False,
-                "error": "think_tool not found in reflection MCP server",
-                "result": None,
-            }
-
-        # Invoke think_tool
-        result = await think_tool_obj.ainvoke({"reflection": reflection_text})
-
-        return {
-            "success": True,
-            "result": str(result),
-            "tool_name": think_tool_obj.name,
-        }
-
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Reflection-tool invocation failed: {e}",
-            "result": None,
-        }
 
 
 @tool
@@ -143,23 +63,17 @@ Max iterations: {max_iterations}
 Score threshold: {score_threshold}
 """
 
-    # Run async function
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            future = _get_executor().submit(
-                asyncio.run,
-                _invoke_think_tool(enhanced_reflection)
-            )
-            result = future.result(timeout=60)
-        else:
-            result = asyncio.run(_invoke_think_tool(enhanced_reflection))
+        result = run_async(invoke_reflection_tool(enhanced_reflection), timeout=60)
 
         # Parse score from result if available
         parsed_score = None
         if result.get("success") and result.get("result"):
             result_text = result["result"].lower()
-            score_match = re.search(r'score[:\s]*(\d+\.?\d*)', result_text)
+            score_match = re.search(r'overall\s+score[:\s]*(\d+\.?\d*)', result_text)
+            if not score_match:
+                # Fallback: match generic "score" pattern
+                score_match = re.search(r'score[:\s]*(\d+\.?\d*)', result_text)
             if score_match:
                 parsed_score = min(float(score_match.group(1)), 1.0)
 
@@ -193,3 +107,216 @@ Score threshold: {score_threshold}
             "parsed_score": None,
             "should_continue": False,
         }
+
+
+@tool
+def analyze_research_question(
+    question: str,
+    context: str = "",
+    analysis_type: str = "auto",
+) -> dict:
+    """Decompose a biomedical research question into structured sub-questions with entity extraction.
+
+    This tool analyzes a complex biomedical question and:
+    1. Extracts entities (genes, pathways, cell types, diseases)
+    2. Classifies question type (cci_mechanism, spatial_pattern, pathway, etc.)
+    3. Decomposes into focused sub-questions for targeted literature search
+    4. Suggests search strategy and estimates search rounds
+
+    Use this BEFORE literature search to structure your query approach.
+
+    Args:
+        question: The biomedical research question to analyze.
+            Example: "Does TGFB1-TGFBR2 signaling drive EMT in breast cancer fibroblasts?"
+        context: Optional context from analysis data (cell types, pathways found).
+        analysis_type: Question type hint. "spatial_pattern", "cci_mechanism",
+            "pathway", "gene_function", or "auto" (default).
+
+    Returns:
+        Dictionary with:
+        - question_type: Classified question type
+        - complexity: "simple", "moderate", or "multi_hop"
+        - sub_questions: List of focused sub-questions with priority and search_focus
+        - entities: Extracted genes, pathways, celltypes, diseases
+        - suggested_strategy: Recommended search approach
+        - estimated_search_rounds: Expected number of search iterations
+    """
+    arguments = {
+        "research_question": question,
+        "context": context,
+        "analysis_type": analysis_type,
+    }
+
+    try:
+        result = run_async(
+            invoke_biomedical_thinking("analyze_and_decompose", arguments),
+            timeout=30
+        )
+
+        if result.get("success"):
+            return result["result"]
+        return {"error": result.get("error", "Unknown error"), "success": False}
+
+    except Exception as e:
+        return {"error": str(e), "success": False}
+
+
+@tool
+def expand_search_entities(
+    genes: list[str] | None = None,
+    pathways: list[str] | None = None,
+    celltypes: list[str] | None = None,
+    diseases: list[str] | None = None,
+    expand_aliases: bool = True,
+    expand_mesh: bool = True,
+    expand_related: bool = False,
+) -> dict:
+    """Expand biomedical entities with MeSH terms, aliases, and subtypes for PubMed search.
+
+    Takes entities extracted from analyze_research_question (or manually specified)
+    and expands them with:
+    - Gene aliases (e.g., TGFB1 → TGF-beta-1, TGF-β1)
+    - MeSH term mappings (e.g., TGFB1 → "Transforming Growth Factor beta1"[mh])
+    - Cell type subtypes (e.g., Fibroblast → CAF, myofibroblast)
+    - Disease subtypes (e.g., breast cancer → DCIS, TNBC, HER2+)
+
+    Returns ready-to-use PubMed query fragments in pubmed_query_fragments.
+
+    Args:
+        genes: Gene symbols to expand. Example: ["TGFB1", "TGFBR2"]
+        pathways: Pathway names. Example: ["EMT", "TGF-beta signaling"]
+        celltypes: Cell type names. Example: ["Fibroblast", "Epithelial cell"]
+        diseases: Disease names. Example: ["breast cancer"]
+        expand_aliases: Expand gene aliases (default True).
+        expand_mesh: Look up MeSH terms (default True).
+        expand_related: Find related genes - slower (default False).
+
+    Returns:
+        Dictionary with:
+        - expanded_genes: Gene info with aliases, MeSH IDs
+        - expanded_pathways: Pathway info with MeSH, keywords
+        - expanded_celltypes: Cell type info with MeSH, subtypes
+        - expanded_diseases: Disease info with MeSH, subtypes
+        - pubmed_query_fragments: Ready-to-use PubMed query strings
+        - coverage_stats: Expansion statistics
+    """
+    arguments = {
+        "genes": genes or [],
+        "pathways": pathways or [],
+        "celltypes": celltypes or [],
+        "diseases": diseases or [],
+        "expand_aliases": expand_aliases,
+        "expand_mesh": expand_mesh,
+        "expand_related": expand_related,
+    }
+
+    try:
+        result = run_async(
+            invoke_biomedical_thinking("expand_entities", arguments),
+            timeout=60
+        )
+
+        if result.get("success"):
+            return result["result"]
+        return {"error": result.get("error", "Unknown error"), "success": False}
+
+    except Exception as e:
+        return {"error": str(e), "success": False}
+
+
+@tool
+def build_search_queries(
+    sub_questions: list[dict],
+    pubmed_query_fragments: dict,
+    question_type: str = "general",
+    suggested_strategy: str = "balanced",
+    max_queries: int = 5,
+    disease_context: str = "",
+) -> dict:
+    """Build optimized PubMed queries from Stage 1-2 outputs.
+
+    Combines sub-questions (Stage 1) with MeSH-enriched query fragments (Stage 2)
+    into ready-to-use PubMed queries using strategy-aware composition.
+
+    Use AFTER analyze_research_question + expand_search_entities.
+    Returns queries ready for search_pubmed_advanced.
+
+    Args:
+        sub_questions: Sub-questions from analyze_research_question output.
+        pubmed_query_fragments: Query fragments from expand_search_entities output.
+        question_type: Question type from analyze_research_question (default "general").
+        suggested_strategy: Strategy from analyze_research_question (default "balanced").
+        max_queries: Maximum queries to generate (default 5).
+        disease_context: Optional disease context string.
+
+    Returns:
+        Dictionary with search_queries (ready-to-use PubMed query strings),
+        iteration_roadmap, total_queries, and strategy_applied.
+    """
+    arguments = {
+        "sub_questions": sub_questions,
+        "pubmed_query_fragments": pubmed_query_fragments,
+        "question_type": question_type,
+        "suggested_strategy": suggested_strategy,
+        "max_queries": max_queries,
+        "disease_context": disease_context,
+    }
+
+    try:
+        result = run_async(
+            invoke_biomedical_thinking("build_search_queries", arguments),
+            timeout=60
+        )
+
+        if result.get("success"):
+            return result["result"]
+        return {"error": result.get("error", "Unknown error"), "success": False}
+
+    except Exception as e:
+        return {"error": str(e), "success": False}
+
+
+@tool
+def evaluate_search_results(
+    papers: list[dict],
+    sub_questions: list[dict],
+    entities: dict,
+    question_type: str = "general",
+) -> dict:
+    """Evaluate search results against sub-questions and entities.
+
+    Assesses coverage of search results by checking paper relevance to
+    each sub-question and tracking entity coverage (genes, pathways, celltypes).
+
+    Use AFTER search_pubmed_advanced to assess if results are sufficient
+    or if gap-fill searches are needed.
+
+    Args:
+        papers: Search results as list of {pmid, title, abstract} dicts.
+        sub_questions: Sub-questions from analyze_research_question output.
+        entities: Extracted entities from analyze_research_question output.
+        question_type: Question type from analyze_research_question (default "general").
+
+    Returns:
+        Dictionary with sub_question_coverage, entity_coverage, gap_analysis,
+        overall_score, and recommendation.
+    """
+    arguments = {
+        "papers": papers,
+        "sub_questions": sub_questions,
+        "entities": entities,
+        "question_type": question_type,
+    }
+
+    try:
+        result = run_async(
+            invoke_biomedical_thinking("evaluate_search_results", arguments),
+            timeout=60
+        )
+
+        if result.get("success"):
+            return result["result"]
+        return {"error": result.get("error", "Unknown error"), "success": False}
+
+    except Exception as e:
+        return {"error": str(e), "success": False}

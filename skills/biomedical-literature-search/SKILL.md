@@ -1,6 +1,6 @@
 ---
 name: biomedical-literature-search
-description: Complete literature search workflow for CCI analysis interpretation - provides 5-phase workflow with search timing, strategic planning, quality criteria, and tool usage guidance.
+description: Complete literature search workflow for CCI analysis interpretation - provides 4-phase workflow with search timing, quality criteria, and tool usage guidance.
 ---
 
 # Biomedical Literature Search Strategy
@@ -21,10 +21,9 @@ This skill provides the **complete workflow** for the SEARCHER subagent. It defi
 ┌─────────────────────────────────────────────────────────────────┐
 │          This SKILL.md (Workflow Definition)                     │
 │  - Phase 1: Extract Context                                      │
-│  - Phase 2: Think (Strategic Planning)                           │
-│  - Phase 3: Search Literature (Dynamic with auto-fallback)       │
-│  - Phase 4: Reflect (Quality Loop)                               │
-│  - Phase 5: Write Output                                         │
+│  - Phase 2: Search Literature (Dynamic with auto-fallback)       │
+│  - Phase 3: Reflect (Quality Loop)                               │
+│  - Phase 4: Write Output                                         │
 └────────────────────────────┬────────────────────────────────────┘
                              │ (SEARCHER reads workflow, then calls tools)
                              ▼
@@ -33,7 +32,7 @@ This skill provides the **complete workflow** for the SEARCHER subagent. It defi
 │  - load_analysis_data: Load analysis results and search_context  │
 │  - search_literature_dynamic: LLM-powered search (auto-fallback) │
 │  - search_literature: Single query search (follow-up)            │
-│  - think_tool: Strategic planning (Phase 2) & reflection (Phase 4)│
+│  - think_tool: Reflection (Phase 3)                               │
 │  - read_file / write_file: Virtual filesystem operations         │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -45,9 +44,8 @@ This skill provides the **complete workflow** for the SEARCHER subagent. It defi
 | `/data_path.txt` | Read | Real data directory path |
 | `/part1_search_context.json` | Phase 1 | Part 1 spatial context |
 | `/lr_search_context.json` | Phase 1 | Part 2+3 L-R context (shared) |
-| `/partN_search_strategy.json` | Phase 2 | Prioritized search plan |
-| `/part1_papers.json` | Phase 5 | Part 1 search results |
-| `/liana_papers.json` | Phase 5 | Part 2+3 search results (shared) |
+| `/part1_papers.json` | Phase 4 | Part 1 search results |
+| `/liana_papers.json` | Phase 4 | Part 2+3 search results (shared) |
 
 ---
 
@@ -90,15 +88,17 @@ The load_analysis_data tool returns pre-extracted search context fields:
 **Example lr_search_context (Part 2 & 3):**
 ```json
 {
-  "genes": ["ADAM10", "ADAM17", "B2M", "CD44", "CDH1", "CEACAM5", "ERBB2", "TGFB1", "MMP2", "VEGFA"],
+  "genes": ["ITGB1", "CD44", "APP", "FYN", "ITGAV", "FN1", "TGFB1", "...top 30 by frequency"],
+  "all_genes": ["ACKR3", "ADAM10", "ADAM17", "...all 352 unique genes sorted"],
   "pathways": ["Androgen", "EGFR", "Estrogen", "Hypoxia", "NFkB", "TGFb", "MAPK", "PI3K"],
   "celltypes": ["B cells", "Endothelial", "Invasive Tumor", "Stromal", "Macrophages"],
   "context_type": "lr_interaction",
   "applicable_parts": [2, 3],
   "source": "interest_sig_liana.csv",
-  "stats": {"total_genes": 352, "total_pathways": 64, "total_celltypes": 13}
+  "stats": {"total_genes": 352, "search_genes": 30, "total_pathways": 64, "total_celltypes": 13}
 }
 ```
+**Note:** `genes` contains top 30 by L-R frequency (used for search). `all_genes` has the full set for reference.
 
 ### Step 1.4: Write Context File
 Write extracted context to **/partN_search_context.json**:
@@ -115,79 +115,11 @@ Write extracted context to **/partN_search_context.json**:
 
 ---
 
-## Phase 2: Think (Strategic Planning)
+## Phase 2: Search Literature
 
-**MANDATORY**: Use **think_tool** to plan the optimal search strategy BEFORE searching.
-
-> **Tool**: think_tool provides structured sequential thinking for both strategic planning and quality validation.
-
-### Three-Thought Planning Workflow
-
-**Thought 1: Context Analysis**
-```python
-# Use think_tool for strategic planning
-think_tool(
-    reflection="Analyzing Part 1 context: {N} genes extracted from search_context. "
-               "Prioritizing {TOP_GENES} based on their roles in {BIOLOGICAL_PROCESS}. "
-               "Key pathways identified: {PATHWAYS}. Disease context: {DISEASE}.",
-    iteration=1,
-    max_iterations=3
-)
-```
-- Assess the extracted biological context
-- Identify most biologically significant genes
-- Note key pathways and disease mechanisms
-
-**Thought 2: Search Strategy Development**
-```python
-think_tool(
-    reflection="Search strategy for Part {N}: "
-               "1) Gene+disease queries for top 10 genes: {GENE_LIST}, "
-               "2) Pathway+celltype for {FOCUS_AREA}: {PATHWAY_LIST}, "
-               "3) Spatial transcriptomics + {DISEASE} for methodology papers. "
-               "Priority L-R pairs: {LR_PAIRS}.",
-    iteration=2,
-    max_iterations=3
-)
-```
-- Define prioritized gene list (top 10-15, NOT all extracted genes)
-- Plan pathway search with cell type context
-- Identify key L-R pairs for Part 2/3
-
-**Thought 3: Expected Findings Prediction**
-```python
-think_tool(
-    reflection="Expected findings: Papers should cover mechanisms including {MECHANISMS}. "
-               "Known relationships to validate: {GENE1}-{PATHWAY1}, {GENE2}-{CELLTYPE}. "
-               "Potential gaps requiring targeted follow-up: {GAPS}.",
-    iteration=3,
-    max_iterations=3
-)
-```
-- Predict what biological mechanisms papers should cover
-- List known relationships to validate
-- Anticipate potential coverage gaps
-
-### Write Search Strategy
-Write **/partN_search_strategy.json**:
-```json
-{
-  "priority_genes": ["CDH1", "ERBB2", "TGFB1", "MMP2", "VIM"],
-  "priority_pathways": ["NFkB", "Hypoxia", "TGFb", "EMT"],
-  "key_lr_pairs": ["TGFB1-TGFBR1", "CDH1-CTNNB1"],
-  "search_focus": "EMT and tumor invasion in breast cancer TME",
-  "expected_mechanisms": ["E-cadherin loss", "TGFb-induced EMT", "hypoxia response"],
-  "predicted_gaps": ["spatial co-localization patterns"]
-}
-```
-
----
-
-## Phase 3: Search Literature
-
-### Step 3.1: Execute LLM-Powered Dynamic Search (Primary)
+### Step 2.1: Execute LLM-Powered Dynamic Search (Primary)
 Use **search_literature_dynamic** tool for context-aware, LLM-generated queries:
-- genes: Priority genes from search strategy (NOT all 352)
+- genes: lr_search_context["genes"] (pre-filtered top 30 by frequency, use directly)
 - pathways: Priority pathways from search strategy
 - celltypes: Relevant cell types for this Part
 - disease: Disease context (e.g., "breast cancer")
@@ -204,14 +136,14 @@ search_literature_dynamic(
 
 **Why Dynamic Search First?**
 - LLM understands biological context and generates optimized queries
-- think_tool provides strategic planning before search
 - Better adaptation to Part-specific analysis types (L-R, pathway, spatial)
 - More relevant papers for specialized disease/tissue contexts
 
-### Step 3.1b: Advanced Search with E-utilities (Optional — Gap-Filling)
+### Step 2.1b: Advanced Search with E-utilities (Optional — Gap-Filling)
 
 After `search_literature_dynamic`, if coverage gaps remain in specific areas,
-use `search_pubmed_advanced` for targeted precision searches:
+use `search_pubmed_advanced` for targeted precision searches.
+Use lr_search_context["genes"] (already top 30 by frequency) for Part 2/3:
 
 **When to use:**
 - Gene coverage < 60% after Phase 3.1: Search missing genes with MeSH terms
@@ -248,7 +180,7 @@ type filters. Use this when you know exactly what you're looking for.
 For complete E-utilities search syntax reference, see:
 `skills/pubmed-eutils-search/SKILL.md`
 
-### Step 3.2: Automatic Internal Fallback
+### Step 2.2: Automatic Internal Fallback
 `search_literature_dynamic` handles fallback internally — no manual intervention needed.
 
 If the LLM-powered query generation fails (LLM error, parsing failure, timeout),
@@ -262,7 +194,7 @@ return value includes `think_success` to indicate which path was taken:
 If coverage is still insufficient after `search_literature_dynamic`, use
 **search_literature** for targeted follow-up searches on specific gaps.
 
-### Step 3.3: Tool Returns
+### Step 2.3: Tool Returns
 Both tools return:
 - `papers`: List of found papers with PMIDs
 - `total_papers`: Number of unique papers
@@ -276,7 +208,7 @@ Both tools return:
 
 ---
 
-## Phase 4: Reflect (Quality Loop)
+## Phase 3: Reflect (Quality Loop)
 
 **MANDATORY**: Use **think_tool** for quality validation and gap analysis.
 
@@ -343,7 +275,7 @@ search_literature(
 
 ---
 
-## Phase 5: Write Output
+## Phase 4: Write Output
 
 ### Write Papers File
 Write the appropriate papers file:
@@ -388,39 +320,6 @@ Format:
 | **Part 2** (CCI/NMF) | Cell-cell interaction, NMF patterns | L-R pairs, factor composition | 2-6 LIANA Moran's R, 2-7 NMF, 2-8 Pathway-Factor, 2-9 ctSVG |
 | **Part 3** (L-R Details) | Ligand-receptor biology | Specific L-R mechanisms | 3-10 L-R Visualization, 3-11 L-R Summary |
 
-### Part 1 Planning Focus
-```python
-# Thought 1 emphasis: Spatial organization genes
-"Prioritizing genes with spatial patterns: markers with high Moran's R,
-neighborhood enrichment drivers, pathway-associated genes."
-
-# Thought 2 emphasis: Pathway-spatial queries
-"Strategy: 1) Spatial marker genes + disease, 2) Pathway activity + tissue type,
-3) Cell type composition + microenvironment."
-```
-
-### Part 2 Planning Focus
-```python
-# Thought 1 emphasis: L-R pairs and cell communication
-"Prioritizing L-R pairs from LIANA with high Moran's R (>0.3),
-NMF factor-associated genes, ctSVG significant pairs."
-
-# Thought 2 emphasis: Interaction-focused queries
-"Strategy: 1) Ligand + receptor + cell-cell interaction, 2) NMF factor genes + pathway,
-3) Cell type pairs + communication."
-```
-
-### Part 3 Planning Focus
-```python
-# Thought 1 emphasis: Specific L-R mechanisms
-"Focusing on selected L-R pairs: {LR1}, {LR2}, {LR3}.
-Mechanism keywords: binding, signaling cascade, downstream effects."
-
-# Thought 2 emphasis: Mechanistic queries
-"Strategy: 1) Specific L-R pair + signaling mechanism, 2) Receptor + downstream pathway,
-3) Ligand + secretion + source cell type."
-```
-
 ---
 
 ## Common Mistakes to Avoid
@@ -429,8 +328,7 @@ Mechanism keywords: binding, signaling cascade, downstream effects."
 - **DO NOT** use read_file on .csv files - causes context overflow (571KB -> 5KB)
 - **DO NOT** try to parse raw CSV data manually
 - **DO NOT** extract genes from pathway enrichment `name` column - those are pathways, not genes
-- **DO NOT** skip Phase 2 (Think) - MUST plan search strategy before searching
-- **DO NOT** search with all 352 genes instead of prioritized 10-15 genes
+- **DO NOT** override lr_search_context["genes"] with all_genes (top 30 is pre-filtered for search)
 - **DO NOT** proceed with < 60% gene coverage without additional searches
 - **DO NOT** skip reflection after search (Phase 4)
 
@@ -438,11 +336,9 @@ Mechanism keywords: binding, signaling cascade, downstream effects."
 - **USE** search_context field from load_analysis_data - all terms pre-extracted
 - **USE** genes for actual gene symbols: CDH1, CEACAM5, ERBB2, TGFB1, MMP2, VEGFA
 - **USE** pathways for pathway names: NFkB, Hypoxia, TGFb, MAPK, PI3K, Estrogen, EGFR
-- **USE** think_tool to plan strategy BEFORE searching
 - **USE** search_literature_dynamic as PRIMARY search tool
 - **NOTE** search_literature_dynamic handles fallback internally (no separate tool call needed)
-- **USE** think_tool for quality validation AFTER search
-- **WRITE** /partN_search_strategy.json before searching
+- **USE** think_tool for quality validation AFTER search (Phase 3 Reflect)
 - **RUN** follow-up searches for missing coverage using search_literature
 - **WRITE** /part1_papers.json (Part 1) or /liana_papers.json (Part 2+3 shared)
 
@@ -481,29 +377,29 @@ Single-query PubMed search for specific topics.
 
 ```python
 search_literature(
-    query="APOE TREM2 microglia Alzheimer",
-    max_results=20,
-    include_preprints=True
+    genes=["APOE", "TREM2"],
+    disease="Alzheimer",
+    keywords=["microglia", "neuroinflammation"],
+    max_results=15
 )
 ```
 
 **Use when**: Targeted follow-up search for specific gene/pathway/interaction gaps.
 
-### think_tool (Phase 2: Strategic Planning & Phase 4: Quality Reflection)
-Structured sequential thinking for strategic planning and quality validation.
+### think_tool (Phase 3: Quality Reflection)
+Structured sequential thinking for quality validation.
 
 ```python
 think_tool(
-    reflection="Analysis of search context...",  # Your thinking content
-    iteration=1,                                  # Current thought number
-    max_iterations=3,                             # Total thoughts planned
-    score_threshold=0.7                           # Optional: quality threshold
+    reflection="Coverage analysis for Part N...",  # Your thinking content
+    iteration=1,                                    # Current thought number
+    max_iterations=2,                               # Total thoughts planned
+    score_threshold=0.7                             # Optional: quality threshold
 )
 ```
 
 **Use when**:
-- Phase 2: Developing search strategy before literature search (3 thoughts)
-- Phase 4: Validating coverage and planning follow-up searches (1-2 thoughts)
+- Phase 3: Validating coverage and planning follow-up searches (1-2 thoughts)
 
 ---
 
@@ -564,14 +460,10 @@ search_literature_dynamic (primary — handles fallback internally)
 
 | Phase | Tool | Thoughts | Purpose | Output |
 |-------|------|----------|---------|--------|
-| Phase 2 (Planning) | think_tool | 3 thoughts | Develop search strategy | /partN_search_strategy.json |
-| Phase 4 (Reflection) | think_tool | 1-2 thoughts | Validate coverage | /part1_papers.json or /liana_papers.json |
+| Phase 3 (Reflection) | think_tool | 1-2 thoughts | Validate coverage | /part1_papers.json or /liana_papers.json |
 
 | Thought Type | Key Content | should_continue |
 |--------------|-------------|-------------------|
-| Context Analysis | Gene priorities, pathway focus | True |
-| Strategy Development | Search queries, L-R pairs | True |
-| Expected Findings | Mechanisms, gaps | False |
 | Coverage Reflection | Coverage %, gaps | True if gaps |
 | Follow-up Strategy | Targeted queries | False |
 
@@ -588,14 +480,7 @@ search_literature_dynamic (primary — handles fallback internally)
 - Cell types: Microglia
 - Disease: Alzheimer's disease
 
-### Phase 2: Think Strategy (think_tool)
-```python
-think_tool(reflection="Context: APOE-TREM2 in microglia. Priority genes: APOE, TREM2.
-Key pathways: microglial activation, neuroinflammation. Disease: AD.",
-iteration=1, max_iterations=3)
-```
-
-### Phase 3: Execute Dynamic Search
+### Phase 2: Execute Dynamic Search
 ```python
 result = search_literature_dynamic(
     genes=["APOE", "TREM2"],
@@ -614,7 +499,7 @@ result = search_literature_dynamic(
 - Better coverage of mechanistic papers
 - Automatic internal fallback if LLM fails
 
-### Phase 4: Reflect on Coverage (think_tool)
+### Phase 3: Reflect on Coverage (think_tool)
 ```python
 think_tool(reflection="Coverage: 28 papers found. Genes: APOE, TREM2 (100%).
 Pathways: TREM2 signaling (50%). All thresholds met. think_success: True.",
@@ -625,7 +510,7 @@ iteration=1, max_iterations=1)
 - Pathways covered: ["TREM2 signaling"] (50%) (pass)
 - think_success: True (no fallback needed)
 
-### Phase 5: Write Output
+### Phase 4: Write Output
 ```python
 # For Part 2+3: write to shared liana_papers.json (generate ONCE, not twice)
 write_file("/liana_papers.json", json.dumps({

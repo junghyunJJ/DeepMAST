@@ -1,616 +1,333 @@
-# REPORTER Subagent Workflow
+# REPORTER Subagent 상세 분석
 
-REPORTER subagent의 구조, 워크플로우, 생성 파일에 대한 상세 문서입니다.
+> 종합 & 리포트 생성 에이전트 — 교차 파트 합성 + 독립 문헌 검증 + HTML 리포트
 
-## 1. REPORTER Subagent 전체 구조
+## 목차
 
-### 1.1 위치 및 역할
+- [개요](#개요)
+- [설정](#설정)
+- [6-Phase 실행 워크플로우](#6-phase-실행-워크플로우)
+- [Phase 4.5 독립 문헌 검증](#phase-45-독립-문헌-검증)
+- [도구 상세](#도구-상세)
+- [HTML 리포트 구조](#html-리포트-구조)
+- [입출력 파일 계약](#입출력-파일-계약)
+- [서브에이전트 비교](#서브에이전트-비교)
+- [수정 가이드](#수정-가이드)
 
-REPORTER는 Deep Interpreter의 4-Agent 아키텍처에서 **마지막 단계**를 담당하는 subagent입니다.
+---
 
-**아키텍처 구성:**
-```
-PLANNER → SEARCHER → INTERPRETER → REPORTER
-```
+## 개요
 
-### 1.2 설정 파일 위치
+REPORTER는 4-에이전트 워크플로우의 **최종 (네 번째)** 서브에이전트입니다.
 
-| 파일 경로 | 역할 |
-|-----------|------|
-| `src/agents/deep_interpreter/subagents/configs.py` | Subagent 설정 정의 |
-| `src/agents/deep_interpreter/subagents/prompts.py` | System prompt 정의 |
-| `src/agents/deep_interpreter/tools/report.py` | HTML 리포트 생성 도구 |
+**유일하게 모든 Part 해석을 동시에 읽는 에이전트**로서:
+1. 교차 파트 종합 (Cross-Part Synthesis)
+2. 독립 문헌 검증 (Phase 4.5)
+3. 자체 완결형 HTML 리포트 생성
 
-### 1.3 REPORTER 설정 (configs.py)
+**핵심 특징**: Phase 4.5 — 종합 주장을 SEARCHER와는 **독립적으로** 새로 검색한 문헌으로 검증
+
+---
+
+## 설정
+
+### configs.py
 
 ```python
 "reporter": {
-    "name": "reporter",
-    "description": (
-        "Synthesis and report generation agent. Reads all /partN_final.md files, "
-        "identifies cross-part themes, validates synthesis claims with NEW literature search "
-        "(following biomedical-literature-search workflow), and generates final HTML report. "
-        "Phase 4.5 validates integration claims against independent literature sources. "
-        "Outputs /synthesis.md, /synthesis_papers.json, /synthesis_validation.json, "
-        "and CCI_Analysis_Report.html."
-    ),
-    "system_prompt": SUBAGENT_PROMPTS["reporter"],
     "tools": [
-        # Core tools
-        load_analysis_data,
-        generate_html_report,
-        # Literature search tools (reuse from SEARCHER for synthesis validation)
-        search_literature_dynamic,
-        search_literature_for_context,
-        search_literature,
-        # RAG validation tools
-        prepare_rag_literature,
-        validate_claim_fulltext,
-        # Think tool for strategic planning and reflection
-        think_tool,
+        load_analysis_data,           # 1. 분석 데이터 + 그림 경로
+        generate_html_report,          # 2. HTML 리포트 생성
+        search_literature_dynamic,     # 3. LLM 기반 통합 문헌 검색
+        search_literature,             # 4. 단일 쿼리 보충 검색
+        prepare_rag_literature,        # 5. RAG: 전문 다운로드 + 인덱싱
+        validate_claim_fulltext,       # 6. RAG: 전문 기반 주장 검증
+        think_tool,                    # 7. 전략 계획 + 반성
     ],
 }
 ```
 
-### 1.4 사용 가능 도구
+**7개 도구** — SEARCHER와 달리 `generate_html_report` 보유, INTERPRETER와 달리 `search_literature_dynamic` 보유
 
-| 도구 | 용도 |
+---
+
+## 6-Phase 실행 워크플로우
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  REPORTER 실행 흐름                                                      │
+│                                                                          │
+│  ═══════ Phase 1: 모든 입력 읽기 ═══════                                 │
+│                                                                          │
+│  read_file("/part1_final.md")         ← INTERPRETER Part 1              │
+│  read_file("/part2_final.md")         ← INTERPRETER Part 2              │
+│  read_file("/part3_final.md")         ← INTERPRETER Part 3              │
+│  read_file("/interpretation_guide.md") ← PLANNER 초점 영역              │
+│  read_file("/part1_papers.json")      ← SEARCHER Part 1 논문            │
+│  read_file("/liana_papers.json")      ← SEARCHER Part 2+3 논문          │
+│  read_file("/data_path.txt")          ← 실제 데이터 경로                 │
+│  load_analysis_data(data_dir)         ← 그림 경로 + 메타데이터           │
+│                                                                          │
+│  ═══════ Phase 2: 교차 파트 종합 ═══════                                 │
+│                                                                          │
+│  4가지 테마 식별:                                                        │
+│  ┌────────────────────────────────────────────────────────────────┐      │
+│  │ Theme 1: 공간 조직                                             │      │
+│  │   Part 1 공간 패턴 ↔ Part 2 CCI 패턴                          │      │
+│  ├────────────────────────────────────────────────────────────────┤      │
+│  │ Theme 2: 세포 통신 축                                          │      │
+│  │   어떤 세포 (Part 1+2) ↔ 어떤 L-R 쌍 (Part 2+3)               │      │
+│  ├────────────────────────────────────────────────────────────────┤      │
+│  │ Theme 3: 경로 통합                                             │      │
+│  │   Part 1 Decoupler ↔ Part 2 L-R 시그널링                      │      │
+│  ├────────────────────────────────────────────────────────────────┤      │
+│  │ Theme 4: 질병 메커니즘                                         │      │
+│  │   질병 진행 관계 + 치료적 시사점                                │      │
+│  └────────────────────────────────────────────────────────────────┘      │
+│                                                                          │
+│  ═══════ Phase 3: 창발적 테마 식별 ═══════                               │
+│                                                                          │
+│  ├── Strong Theme: 여러 파트의 일관된 증거                               │
+│  ├── Emerging Theme: 부분적 증거                                        │
+│  └── Unexpected Pattern: 예상 밖 발견                                   │
+│                                                                          │
+│  ═══════ Phase 4: 초안 synthesis.md 작성 ═══════                         │
+│                                                                          │
+│  write_file("/synthesis.md")                                             │
+│  ├── # Integrated Biological Narrative                                   │
+│  ├── ## Executive Summary (2-3 단락)                                     │
+│  ├── ## Cross-Part Themes (4개 테마)                                     │
+│  ├── ## Emergent Themes Summary (강도 등급 테이블)                        │
+│  ├── ## Clinical/Biological Implications                                 │
+│  ├── ## Limitations                                                      │
+│  └── ## Novel Findings Summary                                           │
+│                                                                          │
+│  ═══════ Phase 4.5: 독립 문헌 검증 (5단계) ═══════                       │
+│  → 아래 [Phase 4.5 상세](#phase-45-독립-문헌-검증) 참조                   │
+│                                                                          │
+│  ═══════ Phase 5: HTML 리포트 생성 ═══════                               │
+│                                                                          │
+│  generate_html_report(parts={...}, output_path="CCI_Analysis_Report.html")│
+│                                                                          │
+│  ═══════ Phase 6: 검증 ═══════                                           │
+│                                                                          │
+│  HTML 파일 생성 확인 + 오케스트레이터에 보고                              │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Phase 4.5 독립 문헌 검증
+
+Phase 4.5는 REPORTER의 가장 중요한 아키텍처적 특징입니다.
+
+### 설계 원리
+
+```
+SEARCHER가 찾은 논문:          REPORTER가 찾는 논문:
+  "CDH1 in breast cancer"       "CDH1 + EMT + fibroblast spatial
+  "EMT pathway activation"       interaction in breast cancer"
+  "Fibroblast signaling"        → 성분 조합을 다루는 논문
+  → 개별 성분 논문
+
+종합 주장: "TGF-β 시그널링이 섬유아세포-상피세포 공간 근접을 통해 EMT를 유도"
+  ↑ Part별 논문으로는 검증 불가 → 통합 컨텍스트의 독립 논문이 필요
+```
+
+### 5단계 상세
+
+```
+┌── Step 1: 종합 컨텍스트 추출 ──────────────────────────────────┐
+│  synthesis.md에서 genes, pathways, celltypes,                  │
+│  integration_keywords, disease_context 파싱                    │
+│  → write_file("/synthesis_search_context.json")                │
+└────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌── Step 2: 전략 계획 (think_tool × 3회) ────────────────────────┐
+│  Thought 1: 통합 테마 분석                                     │
+│  Thought 2: 통합 중심 검색 전략 수립                            │
+│  Thought 3: 예상 메커니즘 예측                                  │
+│  → write_file("/synthesis_search_strategy.json")               │
+└────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌── Step 3: 통합 문헌 검색 ──────────────────────────────────────┐
+│  search_literature_dynamic(                                    │
+│    genes + pathways + celltypes를 통합하여 검색                 │
+│    ⚠️ SEARCHER와 차이: 개별 성분이 아닌 "조합"을 검색           │
+│  )                                                             │
+│  + search_literature()로 특정 테마 갭 보충                     │
+└────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌── Step 4: 품질 반성 (think_tool) ──────────────────────────────┐
+│  기준: papers ≥ 20, theme_coverage ≥ 3/4, mechanism_papers ≥ 5 │
+│  미달 시 → 추가 검색 (최대 3회 반복)                            │
+└────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌── Step 5: RAG 검증 + 업데이트 ─────────────────────────────────┐
+│  5.1: write_file("/synthesis_papers.json")                     │
+│       prepare_rag_literature(part_name="synthesis")            │
+│       → 컬렉션: "deep_interpreter_synthesis" (독립 저장)        │
+│       → 논문: {data_path}/papers/synthesis/ (별도 디렉토리)      │
+│                                                                │
+│  5.2: 각 핵심 종합 주장에 대해:                                 │
+│       validate_claim_fulltext(claim, pmid, "synthesis")        │
+│                                                                │
+│  5.3: 신뢰도 기반 업데이트:                                     │
+│       ≥ 0.7 → 유지 + PMID 인용 추가                            │
+│       0.4~0.7 → 완화 표현 ("suggests", "consistent with")      │
+│       < 0.4 → (Hypothesis) 또는 (Needs Validation)             │
+│                                                                │
+│  5.4: write_file("/synthesis_validation.json")                 │
+│       {                                                        │
+│         overall_confidence: 0.72,                              │
+│         claims_validated: 14,                                  │
+│         claims_by_status: {strong: 8, weak: 4, unsupported: 2},│
+│         validation_results: [{section, claim, alignment,       │
+│           confidence, supporting_pmids, recommendation}]       │
+│       }                                                        │
+│                                                                │
+│  5.5: synthesis.md 최종 업데이트                                │
+└────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 도구 상세
+
+### `generate_html_report`
+
+**파일**: `tools/report.py`
+
+| 항목 | 설명 |
 |------|------|
-| `load_analysis_data` | 분석 결과 및 Figure 경로 로드 |
-| `generate_html_report` | HTML 리포트 생성 |
-| `search_literature_dynamic` | LLM-powered PubMed 검색 (Phase 4.5 synthesis validation) |
-| `search_literature_for_context` | Context-based 검색 (fallback) |
-| `search_literature` | 단일 쿼리 검색 (gap-filling) |
-| `prepare_rag_literature` | Full-text 논문 다운로드 및 RAG 인덱싱 |
-| `validate_claim_fulltext` | Full-text 기반 claim 검증 |
-| `think_tool` | 전략적 계획 (Step 2) 및 품질 reflection (Step 4) |
+| 입력 | `parts: dict` (리포트 콘텐츠), `output_path: str` |
+| 출력 | 상태 메시지 `"Report generated: {path} ({bytes} bytes)"` |
+
+**두 가지 모드**:
+- **Structured**: `part1`/`part2`/`part3` → `{analysis_name: {figure_path, interpretation, references}}`
+- **HTML Override**: `part1_html`/`part2_html`/`part3_html`/`summary_html` 문자열
+
+**내부 처리**:
+1. CSS 로딩: `skills/html-report-generator/assets/theme.css` (503줄, 폴백 내장)
+2. JS 로딩: `skills/html-report-generator/assets/interactive.js` (105줄, 폴백 내장)
+3. 그림 Base64 인코딩: `_encode_image()` → `data:{mime};base64,{data}` URI
+4. HTML 템플릿 채우기 → 파일 쓰기
+
+### `search_literature_dynamic` (통합 검색용)
+
+SEARCHER와 동일한 도구이지만, REPORTER는 **통합 중심 용어**로 검색:
+- 개별 유전자가 아닌 유전자+경로+세포유형 조합
+- 예: `"TGFb + EMT + fibroblast + breast cancer"`
+
+### `prepare_rag_literature` + `validate_claim_fulltext`
+
+INTERPRETER와 동일하지만 `part_name="synthesis"` 사용:
+- 별도 디렉토리: `{data_path}/papers/synthesis/`
+- 별도 RAG 컬렉션: `deep_interpreter_synthesis`
+- Part별 증거와의 오염 방지
 
 ---
 
-## 2. 워크플로우 흐름도
-
-### 2.1 REPORTER의 7-Phase 워크플로우 (Phase 4.5 추가)
+## HTML 리포트 구조
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ Phase 1: READ ALL INPUTS                                                    │
-│                                                                             │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐          │
-│  │ /part1_final.md  │  │ /part2_final.md  │  │ /part3_final.md  │          │
-│  │ (Spatial+Pathway)│  │ (CCI+NMF)        │  │ (L-R Details)    │          │
-│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘          │
-│           │                     │                     │                     │
-│           └─────────────────────┼─────────────────────┘                     │
-│                                 ▼                                           │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐          │
-│  │/strategic_plan.md│  │/part1_papers.json│  │/liana_papers.json│          │
-│  │ (Hypotheses)     │  │ (Part 1 refs)    │  │ (Part 2/3 refs)  │          │
-│  └──────────────────┘  └──────────────────┘  └──────────────────┘          │
-│                                 │                                           │
-│                                 ▼                                           │
-│                      ┌──────────────────────┐                               │
-│                      │   load_analysis_data │ → Figure paths                │
-│                      └──────────────────────┘                               │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ Phase 2: CROSS-PART SYNTHESIS                                               │
-│                                                                             │
-│  ┌──────────────────────────────────────────────────────────────┐          │
-│  │ Theme 1: Spatial Organization                                 │          │
-│  │   - Part 1 evidence → Part 2 CCI patterns → Integration       │          │
-│  └──────────────────────────────────────────────────────────────┘          │
-│  ┌──────────────────────────────────────────────────────────────┐          │
-│  │ Theme 2: Cell Communication Axis                              │          │
-│  │   - Key cell types + Key L-R pairs + Communication pattern    │          │
-│  └──────────────────────────────────────────────────────────────┘          │
-│  ┌──────────────────────────────────────────────────────────────┐          │
-│  │ Theme 3: Pathway Integration                                  │          │
-│  │   - Part 1 Decoupler → Part 2 L-R signaling → Connection      │          │
-│  └──────────────────────────────────────────────────────────────┘          │
-│  ┌──────────────────────────────────────────────────────────────┐          │
-│  │ Theme 4: Disease Mechanism (optional)                         │          │
-│  │   - Disease progression + Therapeutic implications            │          │
-│  └──────────────────────────────────────────────────────────────┘          │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ Phase 3: HYPOTHESIS VALIDATION                                              │
-│                                                                             │
-│  For each hypothesis from /strategic_plan.md:                               │
-│                                                                             │
-│  ┌────────────────┬─────────────────────┬─────────────────────────────┐    │
-│  │   Hypothesis   │       Status        │         Evidence            │    │
-│  ├────────────────┼─────────────────────┼─────────────────────────────┤    │
-│  │      H1        │ Supported           │ Part 1-3 + Part 2-6 findings│    │
-│  │      H2        │ Partially Supported │ Part 2-9 only               │    │
-│  │      H3        │ Not Supported       │ No evidence found           │    │
-│  └────────────────┴─────────────────────┴─────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ Phase 4: WRITE SYNTHESIS (Draft)                                            │
-│                                                                             │
-│  Output: /synthesis.md (initial draft)                                      │
-│                                                                             │
-│  ├── # Integrated Biological Narrative                                      │
-│  │   ├── ## Executive Summary                                               │
-│  │   ├── ## Cross-Part Themes                                               │
-│  │   │   ├── ### Theme 1: Spatial Organization                              │
-│  │   │   ├── ### Theme 2: Cell Communication Axis                           │
-│  │   │   ├── ### Theme 3: Pathway Integration                               │
-│  │   │   └── ### Theme 4: Disease Mechanism                                 │
-│  │   ├── ## Hypothesis Validation (Table)                                   │
-│  │   ├── ## Clinical/Biological Implications                                │
-│  │   ├── ## Limitations                                                     │
-│  │   └── ## Novel Findings Summary                                          │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ Phase 4.5: VALIDATE SYNTHESIS WITH LITERATURE (NEW)                         │
-│                                                                             │
-│  Purpose: Validate integration claims with INDEPENDENT literature search    │
-│                                                                             │
-│  ┌──────────────────────────────────────────────────────────────┐          │
-│  │ Step 1: Extract Synthesis Context                             │          │
-│  │   - Parse /synthesis.md → Extract genes, pathways, celltypes  │          │
-│  │   - Output: /synthesis_search_context.json                    │          │
-│  └──────────────────────────────────────────────────────────────┘          │
-│                            │                                                │
-│                            ▼                                                │
-│  ┌──────────────────────────────────────────────────────────────┐          │
-│  │ Step 2: Strategic Planning (think_tool x3)                    │          │
-│  │   - Thought 1: Context Analysis                               │          │
-│  │   - Thought 2: Search Strategy (INTEGRATION-focused)          │          │
-│  │   - Thought 3: Expected Findings                              │          │
-│  │   - Output: /synthesis_search_strategy.json                   │          │
-│  └──────────────────────────────────────────────────────────────┘          │
-│                            │                                                │
-│                            ▼                                                │
-│  ┌──────────────────────────────────────────────────────────────┐          │
-│  │ Step 3: Search Literature                                     │          │
-│  │   - search_literature_dynamic (integration-focused queries)   │          │
-│  │   - Key difference: COMBINED terms (not Part-specific)        │          │
-│  │   - Fallback: search_literature_for_context                   │          │
-│  └──────────────────────────────────────────────────────────────┘          │
-│                            │                                                │
-│                            ▼                                                │
-│  ┌──────────────────────────────────────────────────────────────┐          │
-│  │ Step 4: Quality Reflection (think_tool)                       │          │
-│  │   - Check coverage: >= 20 papers, >= 3/4 themes               │          │
-│  │   - Gap-filling: search_literature for missing themes         │          │
-│  │   - Max 3 iterations                                          │          │
-│  └──────────────────────────────────────────────────────────────┘          │
-│                            │                                                │
-│                            ▼                                                │
-│  ┌──────────────────────────────────────────────────────────────┐          │
-│  │ Step 5: RAG Validate & Write                                  │          │
-│  │   5.1: write_file("/synthesis_papers.json")                   │          │
-│  │   5.2: prepare_rag_literature(part_name="synthesis")          │          │
-│  │        → Papers stored in {data_path}/papers/synthesis/       │          │
-│  │        → RAG collection: deep_interpreter_synthesis           │          │
-│  │   5.3: validate_claim_fulltext for each Theme claim           │          │
-│  │   5.4: Update /synthesis.md based on validation               │          │
-│  │        - confidence >= 0.7: Keep + add PMID                   │          │
-│  │        - 0.4 <= conf < 0.7: Add caveat                        │          │
-│  │        - confidence < 0.4: Mark as (Hypothesis)               │          │
-│  │   5.5: write_file("/synthesis_validation.json")               │          │
-│  └──────────────────────────────────────────────────────────────┘          │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ Phase 5: GENERATE HTML REPORT                                               │
-│                                                                             │
-│  Tool call: generate_html_report(parts={...}, output_path="...")            │
-│                                                                             │
-│  Output: CCI_Analysis_Report.html                                           │
-│                                                                             │
-│  ├── Header (Title, Subtitle, Date)                                         │
-│  ├── Executive Summary (Quality Score Badge)                                │
-│  ├── Analysis Configuration                                                 │
-│  ├── Tabs Navigation                                                        │
-│  │   ├── [Part 1: Spatial & Pathway] ← part1 dict or part1_html             │
-│  │   ├── [Part 2: CCI & NMF]         ← part2 dict or part2_html             │
-│  │   ├── [Part 3: L-R Interactions]  ← part3 dict or part3_html             │
-│  │   └── [Comprehensive Summary]      ← synthesis or summary_html           │
-│  └── Footer (Quality Metrics, Generation Info)                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ Phase 6: VERIFICATION                                                       │
-│                                                                             │
-│  1. Confirm HTML file was created                                           │
-│  2. Report file path to orchestrator                                        │
-│  3. Summarize key findings and quality metrics                              │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  CCI_Analysis_Report.html (자체 완결형)           │
+│                                                   │
+│  <head>                                           │
+│    theme.css 인라인 (다크 테마)                    │
+│    interactive.js 인라인 (탭/페이지네이션)         │
+│                                                   │
+│  Header: 제목 (시안 글로우) + 부제목               │
+│  Executive Summary: 그래디언트 배경 + 품질 뱃지    │
+│  Analysis Config: 모드/타겟/디렉토리               │
+│                                                   │
+│  ┌── 탭 네비게이션 ──────────────────────────┐    │
+│  │  [Part 1] [Part 2] [Part 3] [Summary]    │    │
+│  │                                           │    │
+│  │  Part 1-3 탭:                             │    │
+│  │    .figure-container                      │    │
+│  │      <img src="data:image/png;base64,..."> │    │
+│  │    .interpretation (생물학적 해석)         │    │
+│  │    .paper-card (PubMed 링크)              │    │
+│  │                                           │    │
+│  │  Summary 탭:                              │    │
+│  │    종합 서사 + 품질 평가 + 참고문헌        │    │
+│  └───────────────────────────────────────────┘    │
+│                                                   │
+│  Footer: "Generated by DeepMAST" + 타임스탬프      │
+│                                                   │
+│  색상: 배경 #1a1a2e→#16213e                       │
+│  Primary: #64ffda (시안)                          │
+│  Secondary: #ffd166 (옐로우)                      │
+│  Accent: #ff6b9d (핑크)                           │
+│                                                   │
+│  그림: Base64 인코딩 (외부 파일 의존 없음)         │
+└──────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. 생성되는 파일들
+## 입출력 파일 계약
 
-### 3.1 REPORTER가 생성하는 파일
+### 읽기 (Input)
 
-| 파일명 | 형식 | Phase | 설명 |
-|--------|------|-------|------|
-| `/synthesis.md` | Markdown | 4 (draft), 4.5 (updated) | 통합 생물학적 서술, Cross-part 테마, 가설 검증 결과 |
-| `/synthesis_search_context.json` | JSON | 4.5 Step 1 | 추출된 integration terms (genes, pathways, celltypes) |
-| `/synthesis_search_strategy.json` | JSON | 4.5 Step 2 | think_tool 기반 검색 전략 |
-| `/synthesis_papers.json` | JSON | 4.5 Step 5 | Synthesis validation용 논문 (Part papers와 별도) |
-| `/synthesis_validation.json` | JSON | 4.5 Step 5 | 상세 claim 검증 결과 |
-| `CCI_Analysis_Report.html` | HTML | 5 | 최종 발행 품질 리포트 (Dark theme, 탭 네비게이션, 임베디드 Figure) |
+| 가상 경로 | Phase | 소스 |
+|----------|-------|------|
+| `/part1_final.md` | 1 | INTERPRETER |
+| `/part2_final.md` | 1 | INTERPRETER |
+| `/part3_final.md` | 1 | INTERPRETER |
+| `/interpretation_guide.md` | 1 | PLANNER |
+| `/part1_papers.json` | 1 | SEARCHER |
+| `/liana_papers.json` | 1 | SEARCHER |
+| `/data_path.txt` | 1 | PLANNER |
 
-### 3.2 Paper Storage 구조
+### 쓰기 (Output)
 
-**Phase 4.5에서 생성된 synthesis 논문은 Part 논문과 별도 폴더에 저장됩니다:**
-
-```
-{data_path}/papers/
-├── part1/              # Part 1 spatial analysis 논문
-├── part2/              # Part 2 CCI analysis 논문 (= liana)
-├── part3/              # Part 3 L-R details 논문 (= liana와 공유)
-└── synthesis/          # Phase 4.5: Synthesis validation 전용 논문
-```
-
-**RAG Collection 분리:**
-
-| Collection Name | 용도 |
-|-----------------|------|
-| `deep_interpreter_part1` | Part 1 full-text |
-| `deep_interpreter_part2` | Part 2 full-text |
-| `deep_interpreter_part3` | Part 3 full-text |
-| `deep_interpreter_synthesis` | Synthesis validation full-text |
-
-### 3.3 REPORTER가 읽는 입력 파일
-
-| 파일명 | 생성 주체 | 내용 |
-|--------|-----------|------|
-| `/part1_final.md` | INTERPRETER | Part 1 해석 (Spatial & Pathway) |
-| `/part2_final.md` | INTERPRETER | Part 2 해석 (CCI & NMF) |
-| `/part3_final.md` | INTERPRETER | Part 3 해석 (L-R Details) |
-| `/strategic_plan.md` | PLANNER | 가설 및 해석 전략 |
-| `/part1_papers.json` | SEARCHER | Part 1 문헌 참조 |
-| `/liana_papers.json` | SEARCHER | Part 2/3 공유 문헌 참조 |
-| `/data_path.txt` | PLANNER | Figure 경로를 위한 데이터 디렉토리 |
-
-### 3.4 synthesis_validation.json 구조
-
-```json
-{
-  "validation_timestamp": "2025-01-30T12:00:00",
-  "overall_confidence": 0.72,
-  "claims_validated": 14,
-  "claims_by_status": {
-    "strong": 8,
-    "weak": 4,
-    "unsupported": 2
-  },
-  "validation_results": [
-    {
-      "section": "Theme 4: Disease Mechanism",
-      "claim": "TGF-β signaling drives EMT through spatial proximity",
-      "alignment": "strong",
-      "confidence": 0.85,
-      "supporting_evidence": "Recent studies show that spatially proximate CAFs...",
-      "supporting_pmids": ["38123456", "38234567"],
-      "recommendation": "keep",
-      "revision_applied": null
-    },
-    {
-      "section": "Executive Summary",
-      "claim": "Fibroblasts exclusively communicate with epithelial cells",
-      "alignment": "weak",
-      "confidence": 0.55,
-      "supporting_evidence": "Macrophage-epithelial crosstalk is also observed...",
-      "supporting_pmids": ["38345678"],
-      "recommendation": "add_caveat",
-      "revision_applied": "Changed 'exclusively' to 'predominantly'"
-    }
-  ],
-  "search_summary": {
-    "method": "dynamic",
-    "papers_found": 28,
-    "iterations": 2,
-    "theme_coverage": {
-      "Theme 1": 0.8,
-      "Theme 2": 0.9,
-      "Theme 3": 0.7,
-      "Theme 4": 0.85
-    }
-  }
-}
-```
-
-### 3.5 HTML Report 구조
-
-```
-CCI_Analysis_Report.html
-├── <head>
-│   └── CSS (Dark theme: #1a1a2e 배경, #64ffda 강조)
-├── <body>
-│   ├── .container
-│   │   ├── <h1> Title
-│   │   ├── .subtitle
-│   │   ├── .summary-box (Executive Summary)
-│   │   ├── .analysis-section (Configuration)
-│   │   ├── .tabs (Navigation)
-│   │   │   ├── [Part 1: Spatial & Pathway]
-│   │   │   ├── [Part 2: CCI & NMF]
-│   │   │   ├── [Part 3: L-R Interactions]
-│   │   │   └── [Comprehensive Summary]
-│   │   ├── #part1.tab-content
-│   │   ├── #part2.tab-content
-│   │   ├── #part3.tab-content
-│   │   ├── #summary.tab-content
-│   │   └── .metadata (Footer)
-│   └── <script> (Tab navigation, Pagination)
-```
-
-### 3.6 HTML CSS 클래스 (LLM 생성 HTML용)
-
-| CSS 클래스 | 용도 | 스타일 |
-|------------|------|--------|
-| `.highlight-cluster` | 클러스터명 강조 | Yellow (#ffd166) |
-| `.highlight-pathway` | Pathway명 강조 | Pink (#ff6b9d) |
-| `.highlight-celltype` | 세포 유형 강조 | Cyan (#64ffda) |
-| `.pathway-box` | Pathway 설명 박스 | Yellow border |
-| `.key-findings` | 주요 발견 목록 | Pink border |
-| `.interpretation` | 해석 블록 | Cyan border |
-| `.analysis-section` | 섹션 컨테이너 | Cyan left border |
-| `.score-badge` | 품질 점수 배지 | high/medium/low 색상 |
+| 가상 경로 | Phase | 내용 |
+|----------|-------|------|
+| `/synthesis.md` | 4 → 4.5 | 초안 → 검증 후 업데이트 |
+| `/synthesis_search_context.json` | 4.5-1 | 추출된 통합 컨텍스트 |
+| `/synthesis_search_strategy.json` | 4.5-2 | think_tool 전략 |
+| `/synthesis_papers.json` | 4.5-5 | 독립 검색 논문 |
+| `/synthesis_validation.json` | 4.5-5 | 주장별 검증 결과 |
+| `CCI_Analysis_Report.html` | 5 | **최종 산출물** |
 
 ---
 
-## 4. 다른 Subagent들과의 관계
+## 서브에이전트 비교
 
-### 4.1 4-Agent 워크플로우 의존성
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           DEEP INTERPRETER WORKFLOW                          │
-│                                                                              │
-│  ┌──────────────┐                                                            │
-│  │   PLANNER    │ ─────────────────────────────────────────────────────────┐│
-│  │              │                                                          ││
-│  │ Inputs:      │  Outputs:                                                ││
-│  │ /targets.json│  /strategic_plan.md ──────────────────────────────────┐  ││
-│  │              │  /analysis_summary.md                                 │  ││
-│  │              │  /data_path.txt ──────────────────────────────────┐   │  ││
-│  └──────────────┘                                                   │   │  ││
-│         │                                                           │   │  ││
-│         ▼                                                           │   │  ││
-│  ┌──────────────┐                                                   │   │  ││
-│  │   SEARCHER   │                                                   │   │  ││
-│  │              │                                                   │   │  ││
-│  │ Inputs:      │  Outputs:                                         │   │  ││
-│  │ /data_path   │  /part1_papers.json ─────────────────────────┐    │   │  ││
-│  │ (from PLANNER)  /liana_papers.json ─────────────────────┐   │    │   │  ││
-│  │              │                                          │   │    │   │  ││
-│  └──────────────┘                                          │   │    │   │  ││
-│         │                                                  │   │    │   │  ││
-│         ▼                                                  │   │    │   │  ││
-│  ┌──────────────┐                                          │   │    │   │  ││
-│  │  INTERPRETER │                                          │   │    │   │  ││
-│  │              │                                          │   │    │   │  ││
-│  │ Inputs:      │  Outputs:                                │   │    │   │  ││
-│  │ papers.json ◄┼──────────────────────────────────────────┼───┘    │   │  ││
-│  │ strategic_plan◄─────────────────────────────────────────┼────────┘   │  ││
-│  │              │  /part1_final.md ───────────────────┐    │            │  ││
-│  │              │  /part2_final.md ───────────────────┼────┼────────┐   │  ││
-│  │              │  /part3_final.md ───────────────────┼────┼────────┼───┘  ││
-│  └──────────────┘                                     │    │        │      ││
-│         │                                             │    │        │      ││
-│         ▼                                             ▼    ▼        ▼      ▼│
-│  ┌──────────────────────────────────────────────────────────────────────────┤
-│  │                          REPORTER                                        │
-│  │                                                                          │
-│  │ Inputs:                                                                  │
-│  │  ├── /part1_final.md      (from INTERPRETER)                             │
-│  │  ├── /part2_final.md      (from INTERPRETER)                             │
-│  │  ├── /part3_final.md      (from INTERPRETER)                             │
-│  │  ├── /strategic_plan.md   (from PLANNER)                                 │
-│  │  ├── /part1_papers.json   (from SEARCHER)                                │
-│  │  ├── /liana_papers.json   (from SEARCHER)                                │
-│  │  └── /data_path.txt       (from PLANNER)                                 │
-│  │                                                                          │
-│  │ Outputs:                                                                 │
-│  │  ├── /synthesis.md (Phase 4 draft + Phase 4.5 updated)                  │
-│  │  ├── /synthesis_papers.json (Phase 4.5)                                 │
-│  │  ├── /synthesis_validation.json (Phase 4.5)                             │
-│  │  └── CCI_Analysis_Report.html (Phase 5)                                 │
-│  └──────────────────────────────────────────────────────────────────────────┘
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 4.2 데이터 흐름 요약
-
-| From | To | Data |
-|------|----|------|
-| PLANNER | REPORTER | `/strategic_plan.md` (가설 검증용) |
-| PLANNER | REPORTER | `/data_path.txt` (Figure 경로용) |
-| SEARCHER | REPORTER | `/part1_papers.json`, `/liana_papers.json` (참조 문헌) |
-| INTERPRETER | REPORTER | `/part1_final.md`, `/part2_final.md`, `/part3_final.md` (해석 내용) |
-
-### 4.3 각 Subagent 역할 비교
-
-| Subagent | 주요 역할 | 도구 | 출력 |
-|----------|----------|------|------|
-| **PLANNER** | 타겟 확인 + 가설 생성 | `load_analysis_data` | strategic_plan.md, analysis_summary.md, data_path.txt |
-| **SEARCHER** | 문헌 검색 (사전 검색) | `search_literature_dynamic`, `search_literature`, `think_tool` | part1_papers.json, liana_papers.json |
-| **INTERPRETER** | Part 1/2/3 해석 + 검증 | `validate_claim_literature`, `validate_quality`, `think_tool`, RAG tools | part1_final.md, part2_final.md, part3_final.md |
-| **REPORTER** | 통합 + **Synthesis validation** + HTML 리포트 | `load_analysis_data`, `generate_html_report`, `search_literature_dynamic`, RAG tools, `think_tool` | synthesis.md, synthesis_papers.json, synthesis_validation.json, CCI_Analysis_Report.html |
+| 특성 | PLANNER | SEARCHER | INTERPRETER | **REPORTER** |
+|------|---------|----------|-------------|-------------|
+| 읽는 Part | 없음 | 없음 | 개별 Part | **모든 Part** |
+| 검색 능력 | PubMed (10편) | Dynamic + E-utils | 없음 | Dynamic + 단일 |
+| 검증 능력 | 없음 | 커버리지 | 주장 검증 + 품질 | **독립 주장 검증** |
+| RAG 사용 | 없음 | 없음 | Part별 컬렉션 | **Synthesis 컬렉션** |
+| 최종 산출물 | 가이드 | 논문 JSON | Part별 MD | **HTML 리포트** |
 
 ---
 
-## 5. generate_html_report 도구 상세
+## 수정 가이드
 
-### 5.1 함수 시그니처
+### 안전한 수정
 
-```python
-@tool
-def generate_html_report(
-    parts: dict,
-    output_path: str,
-) -> str:
-```
-
-### 5.2 parts 파라미터 구조
-
-```python
-parts = {
-    # 필수 필드
-    "title": "CCI Analysis Report",
-    "subtitle": "Comprehensive Cell-Cell Interaction Analysis",
-    "executive_summary": "<HTML allowed>",
-    "analysis_config": "<HTML allowed>",
-    "part1": {
-        "1-1 Spatial Clustering": {
-            "figure_path": "/absolute/path/to/figure.png",
-            "interpretation": "<interpretation text>",
-            "caption": "Figure caption",
-            "references": [{"pmid": "12345678", "title": "Paper title"}]
-        },
-        "1-2 Cell Type Composition": {...},
-        # ...
-    },
-    "part2": {...},
-    "part3": {...},
-    "synthesis": "<synthesis narrative>",
-    "quality_score": 0.85,  # 0.0-1.0
-    "references": [{"pmid": "...", "title": "..."}],
-
-    # 선택적 HTML 오버라이드 필드 (LLM 생성 HTML용)
-    "part1_html": "<complete HTML for Part 1>",
-    "part2_html": "<complete HTML for Part 2>",
-    "part3_html": "<complete HTML for Part 3>",
-    "summary_html": "<complete HTML for Summary>",
-}
-```
-
-### 5.3 Figure 임베딩
-
-`generate_html_report`는 Figure를 Base64 인코딩하여 HTML에 직접 임베딩합니다.
-
-```python
-def _encode_image(image_path: str) -> Optional[str]:
-    """Encode an image as Base64 data URI."""
-    # 지원 형식: PNG, JPG, JPEG, GIF, SVG
-    mime_types = {
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".gif": "image/gif",
-        ".svg": "image/svg+xml",
-    }
-```
-
----
-
-## 6. 독립 실행 (테스트용)
-
-REPORTER subagent는 독립적으로 테스트할 수 있습니다.
-
-### 6.1 LangGraph CLI 등록
-
-`src/agents/deep_interpreter/graph_builder.py`:
-
-```python
-def _get_reporter_subagent_graph() -> Runnable:
-    """Standalone REPORTER subagent graph - for LangGraph CLI."""
-    provider = os.getenv("LLM_PROVIDER", "openai")
-    return create_subagent_graph("reporter", provider=provider)
-
-reporter_subagent_graph = _get_reporter_subagent_graph()
-```
-
-### 6.2 테스트 실행
-
-```bash
-# langgraph.json에 등록된 경우
-langgraph dev --graph reporter_subagent_graph
-```
-
----
-
-## 7. Phase 4.5: Synthesis Validation 상세
-
-### 7.1 목적
-
-Synthesis claims는 Part 1-3의 개별 findings를 통합하여 **새로운 생물학적 메커니즘**을 제안합니다.
-기존 Part-specific papers (part1_papers.json, liana_papers.json)는 개별 컴포넌트용이며,
-통합 메커니즘을 다루는 논문이 아닙니다.
-
-Phase 4.5는 이러한 **integration claims**를 독립적인 문헌 검색으로 검증합니다.
-
-### 7.2 SEARCHER vs REPORTER 검색 차이
-
-| 구분 | SEARCHER | REPORTER (Phase 4.5) |
-|------|----------|---------------------|
-| 목적 | Part-specific interpretation | Integration validation |
-| 검색 대상 | Part 1 또는 Part 2/3 | Themes 1-4 통합 |
-| 쿼리 포커스 | 개별 genes/pathways | **COMBINED** terms |
-| 예시 쿼리 | "TGFB1 TGFb signaling" | "TGF-beta EMT spatial tumor microenvironment" |
-| 출력 | part1_papers.json, liana_papers.json | synthesis_papers.json |
-| 저장 위치 | papers/part1/, papers/liana/ | papers/synthesis/ |
-
-### 7.3 5-Step Workflow
-
-```
-Step 1: Extract Context
-    ↓  Parse /synthesis.md → /synthesis_search_context.json
-Step 2: Strategic Planning
-    ↓  think_tool x3 → /synthesis_search_strategy.json
-Step 3: Search Literature
-    ↓  search_literature_dynamic (integration-focused)
-Step 4: Quality Reflection
-    ↓  think_tool (coverage check, gap-filling)
-Step 5: RAG Validate & Write
-    ↓  prepare_rag_literature → validate_claim_fulltext
-    ↓  Update /synthesis.md, Write outputs
-```
-
-### 7.4 Quality Criteria
-
-| Criterion | Threshold | Action if Failed |
-|-----------|-----------|------------------|
-| Total Papers | >= 20 | Broaden integration terms |
-| Theme Coverage | >= 3/4 themes | Targeted theme-specific search |
-| Mechanism Papers | >= 5 | Add mechanism keywords |
-| Max Iterations | 3 | Proceed with warning |
-
-### 7.5 Validation Confidence Levels
-
-| Confidence | Action |
-|------------|--------|
-| >= 0.7 | Keep claim + add PMID citation |
-| 0.4 - 0.7 | Add caveat ("suggests", "consistent with") |
-| < 0.4 | Mark as **(Hypothesis)** or **(Needs Validation)** |
-
----
-
-## 8. 핵심 요약
-
-| 항목 | 내용 |
+| 대상 | 파일 |
 |------|------|
-| **역할** | Cross-part 통합 + **Synthesis validation** + 가설 검증 + HTML 리포트 생성 |
-| **입력** | 3개의 part_final.md, strategic_plan.md, papers.json 파일들 |
-| **출력** | synthesis.md, synthesis_papers.json, synthesis_validation.json, CCI_Analysis_Report.html |
-| **도구** | `load_analysis_data`, `generate_html_report`, `search_literature_dynamic`, `prepare_rag_literature`, `validate_claim_fulltext`, `think_tool` |
-| **특징** | Dark theme HTML, Base64 Figure 임베딩, 탭 네비게이션, **Phase 4.5 synthesis validation** |
-| **의존성** | PLANNER, SEARCHER, INTERPRETER의 모든 출력에 의존 (최종 단계) |
-| **NEW Phase 4.5** | Integration claims를 독립 문헌으로 검증, 별도 papers/synthesis/ 폴더에 저장 |
+| HTML 테마 변경 | `skills/html-report-generator/assets/theme.css` (CSS 변수) |
+| 탭 추가 | `tools/report.py` (`HTML_TEMPLATE` + `_generate_html_report_impl`) |
+| Phase 4.5 신뢰도 기준 | `subagents/prompts.py` (REPORTER_PROMPT) |
+| Phase 4.5 품질 기준 | `subagents/prompts.py` (≥20 papers, ≥3/4 themes) |
+| synthesis.md 구조 | `subagents/prompts.py` (Phase 4 섹션) |
 
----
+### 위험한 결합
 
-## 관련 문서
-
-- [Deep Interpreter Overview](./deep_interpreter_overview.md)
-- [Deep Interpreter Architecture](./deep_interpreter_architecture.md)
-- [Interpreter Subagent Workflow](./interpreter_subagent_workflow.md)
-- [Literature Search Strategy](./literature_search_strategy.md)
+| 대상 | 영향 |
+|------|------|
+| `_encode_image` 경로 | `load_analysis_data` 반환 경로와 일치 필요 |
+| 가상 경로 해석 | `_resolve_papers_path` 3단계 폴백 체인 |
+| CSS 폴백 | `report.py` 내장 CSS와 `theme.css` 수동 동기화 필요 |
+| 프롬프트 길이 | REPORTER_PROMPT ~420줄, 작은 모델에서 지시 따르기 저하 가능 |
