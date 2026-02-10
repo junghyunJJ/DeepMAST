@@ -48,7 +48,7 @@ class DeepInterpreterInfoExtraction(BaseModel):
         default=None,
         description=(
             "Clusters of interest for Mode A (cluster_to_celltype) analysis. "
-            "Example: ['4', '16', '176']. "
+            "Example: ['4', '16', '17']. "
             "Provide this when analysis_mode is 'cluster_to_celltype'."
         ),
     )
@@ -80,7 +80,7 @@ class DeepInterpreterInfoExtraction(BaseModel):
             if not has_clusters:
                 raise ValueError(
                     "Mode A (cluster_to_celltype) requires interest_clusters. "
-                    "Provide a list of cluster IDs, e.g., ['4', '16', '176']."
+                    "Provide a list of cluster IDs, e.g., ['4', '16', '17']."
                 )
             if has_celltypes:
                 # Clear celltypes for Mode A

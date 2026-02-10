@@ -499,6 +499,14 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         if self.is_debug:
             print(f"Invoking Deep Agent for: {data_directory}")
 
+        # Override deep_agent_config with user-provided data_directory
+        if self.deep_agent_config is not None:
+            current_data_dir = getattr(self.deep_agent_config, 'data_dir', None)
+            if current_data_dir != data_directory:
+                self.deep_agent_config.data_dir = str(data_directory)
+                self._deep_agent = None  # Force re-creation with new data_dir
+                logger.debug(f"Updated deep_agent_config.data_dir: {current_data_dir} -> {data_directory}")
+
         # Get or create Deep Agent
         deep_agent = self.get_deep_agent()
 
@@ -548,9 +556,22 @@ After target confirmation, proceed directly to strategic planning with these tar
             except (TypeError, ValueError):
                 serialized_result = json.dumps({"status": "completed"})
 
+            # Convert Deep Agent messages to safe AIMessage summaries
+            # (avoids msgpack checkpoint failures from non-serializable DeepAgents objects)
+            safe_messages = []
+            for msg in deep_messages:
+                try:
+                    if hasattr(msg, 'content') and msg.content:
+                        safe_messages.append(AIMessage(content=str(msg.content)))
+                except Exception:
+                    continue
+
+            if not safe_messages:
+                safe_messages = [AIMessage(content="Deep Interpreter analysis completed.")]
+
             return {
                 "deep_agent_result": serialized_result,
-                "messages": deep_messages,  # Pass through Deep Agent messages
+                "messages": safe_messages,
             }
         except Exception as e:
             if self.is_debug:
