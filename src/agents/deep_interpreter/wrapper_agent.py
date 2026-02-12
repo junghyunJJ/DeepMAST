@@ -7,9 +7,9 @@ Architecture (8-node graph):
 1. check_state: Route to next incomplete phase
 2. info_collection: Collect h5ad files, keys, directories from user
 3. info_validation: Validate collected information
-4. run_analysis_1_8: Execute spatial analysis Steps 1-8 via MCP ReAct agent
+4. run_single_analysis_step: Execute spatial analysis Steps 1-8 via MCP (one step per loop iteration)
 5. research_discussion: HITL with 2x interrupt() for cluster/celltype/factor selection
-6. run_analysis_9_11: Execute targeted analysis Steps 9-11 via MCP ReAct agent
+6. run_single_analysis_step_9_11: Execute targeted analysis Steps 9-11 via MCP (one step per loop iteration)
 7. confirm_interpretation: HITL confirmation before expensive Deep Agent invocation
 8. invoke_deep_agent: Invoke Deep Agent for interpretation/report generation
 
@@ -18,6 +18,7 @@ Pattern Reference: STPipelineBuilderAgent (st_pipeline_info_agent.py)
 """
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -31,9 +32,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.runnables import RunnableConfig
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
-from langgraph.prebuilt import create_react_agent
 from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
 
@@ -53,12 +52,16 @@ class DeepInterpreterWrapperAgent(BaseAgent):
           │                     ↓              │
           │               info_validation ─────┘
           │                     ↓ (complete)
-          ├─(info_complete)───→ run_analysis_1_8
-          │                          ↓
+          ├─(info_complete)───→ run_single_analysis_step ←──┐
+          │                          ↓ (loop)               │
+          │                     route_after_step ────────────┘
+          │                          ↓ (done)
           ├─(analysis done)──→ research_discussion (2x interrupt() HITL)
           │                          ↓
-          ├─(research done)──→ run_analysis_9_11
-          │                          ↓
+          ├─(research done)──→ run_single_analysis_step_9_11 ←──┐
+          │                          ↓ (loop)                    │
+          │                     route_after_step_9_11 ───────────┘
+          │                          ↓ (done)
           ├─(9-11 done)──────→ confirm_interpretation (interrupt() HITL)
           │                          ↓
           └─(confirmed)──────→ invoke_deep_agent → END
@@ -68,12 +71,29 @@ class DeepInterpreterWrapperAgent(BaseAgent):
         "CHECK_STATE": "check_state",
         "INFO_COL": "info_collection",
         "INFO_VAL": "info_validation",
-        "RUN_ANALYSIS_1_8": "run_analysis_1_8",
+        "RUN_SINGLE_STEP": "run_single_analysis_step",
         "RESEARCH_DISCUSSION": "research_discussion",
-        "RUN_ANALYSIS_9_11": "run_analysis_9_11",
+        "RUN_SINGLE_STEP_9_11": "run_single_analysis_step_9_11",
         "CONFIRM_INTERP": "confirm_interpretation",
         "INVOKE_DEEP": "invoke_deep_agent",
     }
+
+    ANALYSIS_STEPS = [
+        {"step": 1, "tool": "plot_cluster", "desc": "Spatial clustering", "figures": ["1.cluster_spatial.png"]},
+        {"step": 2, "tool": "runplot_clusterwithcelltyp", "desc": "Cluster-celltype heatmap", "figures": ["2.celltype_heatmap_analysis.png"]},
+        {"step": 3, "tool": "plot_neighborhood_enrichment", "desc": "Neighborhood enrichment", "figures": ["3.neighborhood_enrichment_squidpy.png"]},
+        {"step": 4, "tool": "runplot_pathway_enrich", "desc": "Pathway enrichment", "figures": ["4.spatial_enrich_decoupler.png"]},
+        {"step": 5, "tool": "runplot_spatial_relationship", "desc": "Spatial relationships (MISTy)", "figures": ["5.spatial_relation_MISTy.png"]},
+        {"step": 6, "tool": "run_lianap", "desc": "LIANA+ CCI analysis (10+ min)", "figures": ["6.liana_MoransR.png"]},
+        {"step": 7, "tool": "runplot_liana_factorscore", "desc": "NMF factor scores", "figures": []},  # Figure deferred to step 8
+        {"step": 8, "tool": "runplot_liana_loadings", "desc": "NMF loadings", "figures": ["7.factor_spatial_NMF.png", "8.pathway_factor_heatmap.png"]},
+    ]
+
+    ANALYSIS_STEPS_9_11 = [
+        {"step": 9, "tool": "plot_liana_nmf", "desc": "NMF quadrant plot", "figures": ["9.quadrant_analysis.png"]},
+        {"step": 10, "tool": "plot_liana_spatial_interections", "desc": "Spatial LR interactions", "figures": ["10.spatial_plot_interections.png"]},
+        {"step": 11, "tool": "plot_liana_interections", "desc": "Cluster-level LR interactions", "figures": ["11.lr_interections.png"]},
+    ]
 
     SYSTEM_TEMPLATE: ClassVar[str] = """You are a Deep Interpreter assistant for spatial transcriptomics analysis.
 
@@ -275,6 +295,180 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         means = filtered[factor_cols].mean()
         return str(means.idxmax())
 
+    def _build_step_args(self, step: int, state: dict) -> dict:
+        """Build MCP tool arguments for Steps 1-8."""
+        h5ad_files = state.get("h5ad_files") or []
+        if not h5ad_files:
+            raise ValueError("h5ad_files is empty or not set in state. Info collection may have failed.")
+        filename = h5ad_files[0]
+        organism = state.get("species") or "human"
+        cluster_key = state["cluster_key"]
+        celltype_key = state.get("celltype_key")
+        sample_key = state.get("sample_key")
+        interest_sample = state.get("interest_sample")
+        save_path = state["data_directory"]
+        lrdata_path = f"{save_path}/lrdata.h5ad"
+
+        if step == 1:
+            args = {"filename": filename, "cluster_key": cluster_key, "save_path": save_path}
+            if sample_key:
+                args["sample_key"] = sample_key
+            return args
+
+        if step == 2:
+            args = {"filename": filename, "cluster_key": cluster_key, "save_path": save_path}
+            if celltype_key:
+                args["celltype_key"] = celltype_key
+            return args
+
+        if step == 3:
+            return {"filename": filename, "cluster_key": cluster_key, "save_path": save_path}
+
+        if step == 4:
+            return {"filename": filename, "cluster_key": cluster_key,
+                    "organism": organism, "geneset": "progeny", "save_path": save_path}
+
+        if step == 5:
+            args = {"filename": filename, "cluster_key": cluster_key,
+                    "organism": organism, "geneset": "progeny", "save_path": save_path}
+            if celltype_key:
+                args["celltype_key"] = celltype_key
+            return args
+
+        if step == 6:
+            args = {"filename": filename, "organism": organism,
+                    "platform": "auto", "save_path": save_path}
+            if sample_key:
+                args["sample_key"] = sample_key
+            if interest_sample:
+                args["interest_sample"] = interest_sample
+            return args
+
+        if step == 7:
+            args = {"filename": lrdata_path, "cluster_key": cluster_key, "save_path": save_path}
+            if sample_key:
+                args["sample_key"] = sample_key
+            return args
+
+        if step == 8:
+            return {"filename": lrdata_path, "organism": organism,
+                    "geneset": "progeny", "save_path": save_path}
+
+        return {}
+
+    def _build_step_args_9_11(self, step: int, state: dict, sel_factor: str) -> dict:
+        """Build MCP tool arguments for Steps 9-11."""
+        save_path = state["data_directory"]
+        lrdata_path = f"{save_path}/lrdata.h5ad"
+        csv_path = f"{save_path}/sig_liana.csv"
+        cluster_key = state["cluster_key"]
+        sample_key = state.get("sample_key")
+        sel_interest_cluster = state["interest_clusters"]
+
+        if step == 9:
+            return {
+                "lrdata_path": lrdata_path,
+                "csv_path": csv_path,
+                "cluster_key": cluster_key,
+                "sel_interest_cluster": sel_interest_cluster,
+                "sel_factor": sel_factor,
+                "save_path": save_path,
+            }
+
+        # Steps 10-11: read top 3 interactions from Step 9 output CSV
+        # CSV is pre-sorted by combinedscore (descending) in Step 9
+        sel_interactions_csv = f"{save_path}/sel_interest_sig_liana.csv"
+        try:
+            sel_interactions_df = pd.read_csv(sel_interactions_csv)
+            if "interaction" not in sel_interactions_df.columns:
+                logger.error(f"'interaction' column not found in {sel_interactions_csv}. Available: {list(sel_interactions_df.columns)}")
+                sel_interactions = []
+            else:
+                sel_interactions = sel_interactions_df["interaction"].head(3).tolist()
+        except FileNotFoundError:
+            logger.error(f"sel_interest_sig_liana.csv not found at {sel_interactions_csv}. Step 9 may have failed.")
+            sel_interactions = []
+        except Exception as e:
+            logger.error(f"Failed to read {sel_interactions_csv}: {e}")
+            sel_interactions = []
+
+        if step == 10:
+            args = {
+                "filename": lrdata_path,
+                "sel_interactions": sel_interactions,
+                "cluster_key": cluster_key,
+                "save_path": save_path,
+            }
+            if sample_key:
+                args["sample_key"] = sample_key
+            return args
+
+        if step == 11:
+            args = {
+                "filename": lrdata_path,
+                "cluster_key": cluster_key,
+                "sel_interactions": sel_interactions,
+                "sel_interest_cluster": sel_interest_cluster,
+                "save_path": save_path,
+            }
+            if sample_key:
+                args["sample_key"] = sample_key
+            return args
+
+        return {}
+
+    def _build_step_message(self, step, step_config, status, save_path, error_msg, total_steps=8):
+        """Build multimodal message with progress bar and base64 figure."""
+        content_parts = []
+
+        # Text progress
+        bar = "=" * step + "." * (total_steps - step)
+        text = f"**Step {step}/{total_steps}: {step_config['desc']}** [{bar}]\n"
+        text += "Completed successfully" if status == "completed" else f"Failed: {error_msg}"
+        content_parts.append({"type": "text", "text": text})
+
+        # Image(s) using Base64ContentBlock format
+        if status == "completed":
+            for fig_name in step_config["figures"]:
+                fig_path = f"{save_path}/{fig_name}"
+                if os.path.exists(fig_path):
+                    try:
+                        img_bytes = self._read_and_resize(fig_path)
+                        img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+                        content_parts.append({
+                            "type": "image",
+                            "source_type": "base64",
+                            "mime_type": "image/png",
+                            "data": img_b64,
+                            "metadata": {"name": fig_name},
+                        })
+                    except Exception:
+                        content_parts.append({"type": "text", "text": f"\n[Figure not readable: {fig_name}]"})
+                else:
+                    content_parts.append({"type": "text", "text": f"\n[Figure not found: {fig_name}]"})
+
+        return content_parts
+
+    def _read_and_resize(self, fig_path, max_bytes=2_000_000):
+        """Read figure, resize if >2MB to limit checkpoint growth."""
+        file_size = os.path.getsize(fig_path)
+        if file_size <= max_bytes:
+            with open(fig_path, "rb") as f:
+                return f.read()
+        # Try resize with PIL, fall back to raw bytes
+        try:
+            from PIL import Image
+            import io
+            img = Image.open(fig_path)
+            img.thumbnail((1200, 900), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG", optimize=True)
+            return buf.getvalue()
+        except Exception:
+            # PIL unavailable or failed — return raw bytes as fallback
+            with open(fig_path, "rb") as f:
+                return f.read()
+
     # ===== Node Initialization =====
 
     def init_nodes(self, graph: StateGraph):
@@ -282,9 +476,9 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         graph.add_node(self.get_node_name("CHECK_STATE"), self.check_state_node)
         graph.add_node(self.get_node_name("INFO_COL"), self.info_collection_node)
         graph.add_node(self.get_node_name("INFO_VAL"), self.info_validation_node)
-        graph.add_node(self.get_node_name("RUN_ANALYSIS_1_8"), self.run_analysis_1_8_node)
+        graph.add_node(self.get_node_name("RUN_SINGLE_STEP"), self.run_single_analysis_step_node)
         graph.add_node(self.get_node_name("RESEARCH_DISCUSSION"), self.research_discussion_node)
-        graph.add_node(self.get_node_name("RUN_ANALYSIS_9_11"), self.run_analysis_9_11_node)
+        graph.add_node(self.get_node_name("RUN_SINGLE_STEP_9_11"), self.run_single_analysis_step_9_11_node)
         graph.add_node(self.get_node_name("CONFIRM_INTERP"), self.confirm_interpretation_node)
         graph.add_node(self.get_node_name("INVOKE_DEEP"), self.invoke_deep_agent_node)
 
@@ -293,9 +487,9 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         check_state = self.get_node_name("CHECK_STATE")
         info_col = self.get_node_name("INFO_COL")
         info_val = self.get_node_name("INFO_VAL")
-        run_1_8 = self.get_node_name("RUN_ANALYSIS_1_8")
+        run_single_step = self.get_node_name("RUN_SINGLE_STEP")
         research = self.get_node_name("RESEARCH_DISCUSSION")
-        run_9_11 = self.get_node_name("RUN_ANALYSIS_9_11")
+        run_single_step_9_11 = self.get_node_name("RUN_SINGLE_STEP_9_11")
         confirm_interp = self.get_node_name("CONFIRM_INTERP")
         invoke_deep = self.get_node_name("INVOKE_DEEP")
 
@@ -306,7 +500,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         graph.add_conditional_edges(
             check_state,
             self.route_after_check,
-            [info_col, run_1_8, research, run_9_11, confirm_interp, invoke_deep],
+            [info_col, run_single_step, research, run_single_step_9_11, confirm_interp, invoke_deep],
         )
 
         # info_collection → [END | info_validation | info_collection]
@@ -316,24 +510,36 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             [END, info_val, info_col],
         )
 
-        # info_validation → [info_collection | run_analysis_1_8]
+        # info_validation → [info_collection | run_single_step]
         graph.add_conditional_edges(
             info_val,
             self.route_after_validation,
-            [info_col, run_1_8],
+            [info_col, run_single_step],
         )
 
-        # run_analysis_1_8 → research_discussion
-        graph.add_edge(run_1_8, research)
+        # run_single_step → loop or proceed to research
+        graph.add_conditional_edges(
+            run_single_step,
+            self.route_after_step,
+            [run_single_step, research],
+        )
 
-        # research_discussion → run_analysis_9_11
-        graph.add_edge(research, run_9_11)
+        # research_discussion → run_single_step_9_11
+        graph.add_edge(research, run_single_step_9_11)
 
-        # run_analysis_9_11 → confirm_interpretation
-        graph.add_edge(run_9_11, confirm_interp)
+        # run_single_step_9_11 → loop or proceed to confirm
+        graph.add_conditional_edges(
+            run_single_step_9_11,
+            self.route_after_step_9_11,
+            [run_single_step_9_11, confirm_interp],
+        )
 
-        # confirm_interpretation → invoke_deep_agent
-        graph.add_edge(confirm_interp, invoke_deep)
+        # confirm_interpretation → invoke_deep_agent OR END (if user declines)
+        graph.add_conditional_edges(
+            confirm_interp,
+            self.route_after_confirmation,
+            [invoke_deep, END],
+        )
 
         # invoke_deep_agent → END
         graph.add_edge(invoke_deep, END)
@@ -347,11 +553,11 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         if not state.get("info_complete"):
             return self.get_node_name("INFO_COL")
         if not state.get("analysis_1_8_complete"):
-            return self.get_node_name("RUN_ANALYSIS_1_8")
+            return self.get_node_name("RUN_SINGLE_STEP")
         if not state.get("research_discussion_complete"):
             return self.get_node_name("RESEARCH_DISCUSSION")
         if not state.get("analysis_9_11_complete"):
-            return self.get_node_name("RUN_ANALYSIS_9_11")
+            return self.get_node_name("RUN_SINGLE_STEP_9_11")
         if not state.get("interpretation_confirmed"):
             return self.get_node_name("CONFIRM_INTERP")
         return self.get_node_name("INVOKE_DEEP")
@@ -361,7 +567,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
     ) -> str:
         """Route after info_validation: back to info_collection or forward to analysis."""
         if state.get("info_complete"):
-            return self.get_node_name("RUN_ANALYSIS_1_8")
+            return self.get_node_name("RUN_SINGLE_STEP")
         return self.get_node_name("INFO_COL")
 
     def get_state(
@@ -377,6 +583,30 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             return END
 
         return self.get_node_name("INFO_COL")
+
+    def route_after_step(
+        self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
+    ) -> str:
+        """Route after single analysis step: loop or proceed to research."""
+        if state.get("analysis_1_8_complete"):
+            return self.get_node_name("RESEARCH_DISCUSSION")
+        return self.get_node_name("RUN_SINGLE_STEP")
+
+    def route_after_step_9_11(
+        self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
+    ) -> str:
+        """Route after single analysis step 9-11: loop or proceed to confirm."""
+        if state.get("analysis_9_11_complete"):
+            return self.get_node_name("CONFIRM_INTERP")
+        return self.get_node_name("RUN_SINGLE_STEP_9_11")
+
+    def route_after_confirmation(
+        self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
+    ) -> str:
+        """Route after confirmation: invoke Deep Agent or end if user declined."""
+        if state.get("interpretation_confirmed"):
+            return self.get_node_name("INVOKE_DEEP")
+        return END
 
     # ===== Node 1: Check State =====
 
@@ -563,99 +793,38 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             "info_complete": True,
         }
 
-    # ===== Node 4: Run Analysis Steps 1-8 (MCP ReAct Agent) =====
+    # ===== Node 4: Run Single Analysis Step (Loop Pattern) =====
 
-    async def run_analysis_1_8_node(
+    async def run_single_analysis_step_node(
         self, state: DeepInterpreterWrapperState, config: RunnableConfig
     ) -> dict:
-        """Execute spatial analysis Steps 1-8 via MCP ReAct agent.
+        """Execute ONE spatial analysis step per invocation (Steps 1-8).
 
-        Steps:
-        1. plot_cluster - Spatial clustering visualization
-        2. runplot_clusterwithcelltyp - Cluster-celltype heatmap
-        3. plot_neighborhood_enrichment - Neighborhood enrichment
-        4. runplot_pathway_enrich - Pathway enrichment (decoupler)
-        5. runplot_spatial_relationship - Spatial relationships (MISTy)
-        6. run_lianap - LIANA+ CCI analysis (produces lrdata.h5ad)
-        7. runplot_liana_factorscore - NMF factor scores
-        8. runplot_liana_loadings - NMF loadings
+        This node is called repeatedly via a conditional edge loop.
+        Each invocation runs one MCP tool and returns a multimodal
+        message with progress bar and inline base64 figure.
         """
-        # Derive parameters from state
-        filename = state["h5ad_files"][0]
-        organism = state.get("species") or "human"
-        cluster_key = state["cluster_key"]
-        celltype_key = state.get("celltype_key")
-        sample_key = state.get("sample_key")
-        interest_sample = state.get("interest_sample")
+        current_step = state.get("current_analysis_step") or 1
+        step_config = self.ANALYSIS_STEPS[current_step - 1]
         save_path = state["data_directory"]
-        lrdata_path = f"{save_path}/lrdata.h5ad"
 
-        # Build Step 2 and Step 5 blocks - always included
-        # Both MCP tools accept celltype_key=None and fall back to adata.obsm['compositions'] for Visium
-        if celltype_key:
-            celltype_param_step2 = f', celltype_key="{celltype_key}"'
-            celltype_param_step5 = f', celltype_key="{celltype_key}"'
-        else:
-            celltype_param_step2 = ""
-            celltype_param_step5 = ""
+        # Dependency check: Steps 7-8 need lrdata.h5ad from Step 6
+        if current_step in (7, 8):
+            lrdata_path = f"{save_path}/lrdata.h5ad"
+            if not os.path.exists(lrdata_path):
+                message_content = [{"type": "text",
+                    "text": f"**Step {current_step}/8: {step_config['desc']}** - SKIPPED (lrdata.h5ad not found, Step 6 may have failed)"}]
+                is_last = current_step >= 8
+                return {
+                    "current_analysis_step": current_step + 1 if not is_last else current_step,
+                    "messages": [AIMessage(content=message_content)],
+                    **({"analysis_1_8_complete": True} if is_last else {}),
+                }
 
-        step2_block = f"""
-**Step 2**: Call `runplot_clusterwithcelltyp`
-  - filename="{filename}", cluster_key="{cluster_key}"{celltype_param_step2}, save_path="{save_path}"
-"""
-        step5_block = f"""
-**Step 5**: Call `runplot_spatial_relationship`
-  - filename="{filename}", cluster_key="{cluster_key}"{celltype_param_step5}, organism="{organism}", geneset="progeny", save_path="{save_path}"
-"""
-        skipped_steps_note = ""
+        # Build tool args
+        tool_args = self._build_step_args(current_step, state)
 
-        # Build system prompt for ReAct agent
-        analysis_prompt = f"""You are a spatial transcriptomics analysis executor.
-Execute the following 8 analysis steps IN ORDER using the available MCP tools.
-Wait for each step to complete before starting the next.
-
-## Parameters
-- filename: {filename}
-- organism: {organism}
-- cluster_key: {cluster_key}
-- celltype_key: {celltype_key if celltype_key else "N/A (spot-based platform)"}
-- sample_key: {sample_key if sample_key else "None"}
-- interest_sample: {interest_sample if interest_sample else "None"}
-- save_path: {save_path}
-- geneset: progeny
-
-## Execution Sequence
-
-**Step 1**: Call `plot_cluster`
-  - filename="{filename}", cluster_key="{cluster_key}"{f', sample_key="{sample_key}"' if sample_key else ''}, save_path="{save_path}"
-
-{step2_block}
-
-**Step 3**: Call `plot_neighborhood_enrichment`
-  - filename="{filename}", cluster_key="{cluster_key}", save_path="{save_path}"
-
-**Step 4**: Call `runplot_pathway_enrich`
-  - filename="{filename}", cluster_key="{cluster_key}", organism="{organism}", geneset="progeny", save_path="{save_path}"
-
-{step5_block}
-
-**Step 6**: Call `run_lianap` (THIS MAY TAKE 10+ MINUTES - be patient)
-  - filename="{filename}", organism="{organism}", platform="auto"{f', sample_key="{sample_key}"' if sample_key else ''}{f', interest_sample="{interest_sample}"' if interest_sample else ''}, save_path="{save_path}"
-
-**Step 7**: Call `runplot_liana_factorscore`
-  - filename="{lrdata_path}", cluster_key="{cluster_key}"{f', sample_key="{sample_key}"' if sample_key else ''}, save_path="{save_path}"
-
-**Step 8**: Call `runplot_liana_loadings`
-  - filename="{lrdata_path}", organism="{organism}", geneset="progeny", save_path="{save_path}"
-
-## Important Notes
-- Execute steps sequentially, waiting for each to complete
-- Step 6 (run_lianap) produces lrdata.h5ad which is required for Steps 7-8
-- Steps 7-8 use lrdata.h5ad as input (path: {lrdata_path})
-- If a step fails, log the error and continue to the next step
-- Report completion status for all steps at the end{skipped_steps_note}"""
-
-        # Get MCP server paths from environment
+        # Get MCP server paths
         sp_python = os.getenv("SP_ENRICH_MCP_PYTHON")
         sp_server_path = os.getenv("SP_ENRICH_MCP_SERVER_PATH")
 
@@ -665,61 +834,46 @@ Wait for each step to complete before starting the next.
             )
 
         if self.is_debug:
-            print(f"Starting analysis Steps 1-8 for {filename}")
-            print(f"  MCP Python: {sp_python}")
-            print(f"  MCP Server: {sp_server_path}/server.py")
+            print(f"Step {current_step}/8: {step_config['desc']} - Starting")
 
-        # Initialize MCP client per-node
-        mcp_client = MultiServerMCPClient(
-            {
+        # Call MCP tool with safe lifecycle (async with auto-cleanup)
+        try:
+            client = MultiServerMCPClient({
                 "sp-enrich-mcp": {
                     "command": sp_python,
                     "args": [f"{sp_server_path}/server.py"],
                     "transport": "stdio",
                 }
-            }
-        )
-        tools = await mcp_client.get_tools()
+            })
+            tools = await client.get_tools()
+            tool = next((t for t in tools if t.name == step_config["tool"]
+                         or t.name.endswith(f'__{step_config["tool"]}')), None)
+            if tool is None:
+                raise ValueError(f"Tool {step_config['tool']} not found")
+            result = await tool.ainvoke(tool_args)
+            status = "completed"
+            error_msg = None
+        except Exception as e:
+            status = "failed"
+            error_msg = str(e)
 
         if self.is_debug:
-            print(f"  MCP tools available: {[t.name for t in tools]}")
+            print(f"Step {current_step}/8: {step_config['desc']} - {status}")
 
-        # Create ReAct agent
-        agent = create_react_agent(
-            model=self.model,
-            tools=tools,
-            prompt=analysis_prompt,
-            checkpointer=MemorySaver(),
+        # Build multimodal message with base64 figure
+        message_content = self._build_step_message(
+            current_step, step_config, status, save_path, error_msg
         )
 
-        # Execute with high recursion limit (Step 6 can take many turns)
-        react_config = {
-            "recursion_limit": 50,
-            "configurable": {
-                "thread_id": config.get("configurable", {}).get("thread_id", "analysis_1_8")
-            },
+        is_last = current_step >= 8
+        update = {
+            "current_analysis_step": current_step + 1 if not is_last else current_step,
+            "messages": [AIMessage(content=message_content)],
         }
+        if is_last:
+            update["analysis_1_8_complete"] = True
 
-        result = await agent.ainvoke(
-            {"messages": [HumanMessage(content="Execute all 8 analysis steps now.")]},
-            config=react_config,
-        )
-
-        if self.is_debug:
-            print("Steps 1-8 completed")
-
-        # Extract last AI message as summary
-        result_messages = result.get("messages", [])
-        summary = "Spatial analysis Steps 1-8 completed."
-        for msg in reversed(result_messages):
-            if isinstance(msg, AIMessage) and msg.content:
-                summary = str(msg.content)
-                break
-
-        return {
-            "analysis_1_8_complete": True,
-            "messages": [AIMessage(content=summary)],
-        }
+        return update
 
     # ===== Node 5: Research Discussion (HITL with 2x interrupt()) =====
 
@@ -763,8 +917,12 @@ Wait for each step to complete before starting the next.
         ])
 
         # Phase B: interrupt() #1 - Confirm interest_celltypes + interest_clusters
-        prompt1 = f"""## Analysis Summary
-{summary}
+        # User-facing prompt omits CSV tables (LLM suggestion already used full summary above)
+        disease = state.get("disease", "unknown")
+        st_tech = state.get("st_technology", "unknown")
+        prompt1 = f"""## Analysis Context
+- Disease: {disease}
+- Platform: {st_tech}
 
 ## AI Suggestion
 {llm_suggestion.content}
@@ -799,10 +957,15 @@ Please provide your selections as JSON or natural language."""
             parsed1 = json.loads(parse_result1.content)
             parsed_celltypes = parsed1.get("interest_celltypes", [])
             parsed_clusters = parsed1.get("interest_clusters", [])
-        except (json.JSONDecodeError, AttributeError):
-            # Fallback: use LLM suggestion
-            parsed_celltypes = []
-            parsed_clusters = []
+        except (json.JSONDecodeError, AttributeError) as e:
+            logger.warning(f"JSON parse failed: {e}. Raw: {parse_result1.content[:200]}")
+            # Regex fallback: extract cluster numbers and quoted cell type strings
+            cluster_match = re.findall(r'\b(\d+)\b', actual_response1)
+            parsed_clusters = cluster_match[:10] if cluster_match else []
+            celltype_match = re.findall(r'"([^"]+)"', actual_response1)
+            parsed_celltypes = celltype_match if celltype_match else []
+            if not parsed_clusters:
+                logger.error("Could not extract interest_clusters - Steps 9-11 may produce empty results")
 
         # Phase C: interrupt() #2 - Confirm sel_factor
         sel_factor_suggestion = self._suggest_factor(factor_csv, parsed_clusters)
@@ -847,85 +1010,55 @@ Available factors: {available_factors}
             "interest_clusters": parsed_clusters,
             "sel_factor": parsed_factor,
             "research_discussion_complete": True,
+            "current_analysis_step": 9,  # Reset for Steps 9-11 phase
             "messages": [
                 HumanMessage(content=actual_response1),
                 HumanMessage(content=actual_response2),
             ],
         }
 
-    # ===== Node 6: Run Analysis Steps 9-11 (MCP ReAct Agent) =====
+    # ===== Node 6: Run Single Analysis Step 9-11 (Loop Pattern) =====
 
-    async def run_analysis_9_11_node(
+    async def run_single_analysis_step_9_11_node(
         self, state: DeepInterpreterWrapperState, config: RunnableConfig
     ) -> dict:
-        """Execute targeted analysis Steps 9-11 via MCP ReAct agent.
+        """Execute ONE targeted analysis step per invocation (Steps 9-11).
 
-        Steps:
-        9. plot_liana_nmf - Quadrant plot with NMF factor analysis
-        10. plot_liana_spatial_interections - Spatial LR interaction plots
-        11. plot_liana_interections - Cluster-level LR interaction plots
+        Same loop pattern as Steps 1-8 but with different tool args
+        and dependency on HITL outputs (interest_clusters, sel_factor).
         """
+        current_step = state.get("current_analysis_step") or 9
+        step_idx = current_step - 9  # 0, 1, 2
+        step_config = self.ANALYSIS_STEPS_9_11[step_idx]
         save_path = state["data_directory"]
-        lrdata_path = f"{save_path}/lrdata.h5ad"
-        csv_path = f"{save_path}/sig_liana.csv"
-        cluster_key = state["cluster_key"]
-        sample_key = state.get("sample_key")
-        sel_interest_cluster = state["interest_clusters"]
+
+        # Validate sel_factor on first entry (step 9 only)
         sel_factor = state["sel_factor"]
+        if current_step == 9:
+            csv_path = f"{save_path}/sig_liana.csv"
+            try:
+                sig_headers = pd.read_csv(csv_path, index_col=0, nrows=0)
+                available = [c for c in sig_headers.columns if c.startswith("Factor")]
+                if sel_factor not in available and available:
+                    sel_factor = available[0]
+            except FileNotFoundError:
+                pass
 
-        # Validate sel_factor exists in the actual data
-        try:
-            sig_headers = pd.read_csv(csv_path, index_col=0, nrows=0)
-            available_factors = [c for c in sig_headers.columns if c.startswith("Factor")]
-            if sel_factor not in available_factors and available_factors:
-                sel_factor = available_factors[0]
-        except FileNotFoundError:
-            pass  # Let the MCP tool handle missing file
+        # Dependency check: Steps 10-11 need sel_interest_sig_liana.csv from Step 9
+        if current_step in (10, 11):
+            csv_path = f"{save_path}/sel_interest_sig_liana.csv"
+            if not os.path.exists(csv_path):
+                message_content = [{"type": "text",
+                    "text": f"**Step {current_step}/11: {step_config['desc']}** - SKIPPED (sel_interest_sig_liana.csv not found)"}]
+                is_last = current_step >= 11
+                return {
+                    "current_analysis_step": current_step + 1 if not is_last else current_step,
+                    "messages": [AIMessage(content=message_content)],
+                    **({"analysis_9_11_complete": True} if is_last else {}),
+                }
 
-        # Build system prompt for ReAct agent
-        analysis_prompt = f"""You are a spatial transcriptomics analysis executor.
-Execute the following 3 analysis steps IN ORDER using the available MCP tools.
-
-## Parameters
-- lrdata_path: {lrdata_path}
-- csv_path: {csv_path}
-- cluster_key: {cluster_key}
-- sample_key: {sample_key if sample_key else "None"}
-- sel_interest_cluster: {json.dumps(sel_interest_cluster)}
-- sel_factor: {sel_factor}
-- save_path: {save_path}
-
-## Execution Sequence
-
-**Step 9**: Call `plot_liana_nmf`
-  - lrdata_path="{lrdata_path}"
-  - csv_path="{csv_path}"
-  - cluster_key="{cluster_key}"
-  - sel_interest_cluster={json.dumps(sel_interest_cluster)}
-  - sel_factor="{sel_factor}"
-  - save_path="{save_path}"
-
-After Step 9 completes, read the file `{save_path}/sel_interest_sig_liana.csv` to extract the `interaction` column values. These will be used as `sel_interactions` for Steps 10-11.
-
-**Step 10**: Call `plot_liana_spatial_interections`
-  - filename="{lrdata_path}"
-  - sel_interactions=[extracted from Step 9 output CSV]
-  - cluster_key="{cluster_key}"
-  {f'- sample_key="{sample_key}"' if sample_key else ''}
-  - save_path="{save_path}"
-
-**Step 11**: Call `plot_liana_interections`
-  - filename="{lrdata_path}"
-  - cluster_key="{cluster_key}"
-  - sel_interactions=[same as Step 10]
-  - sel_interest_cluster={json.dumps(sel_interest_cluster)}
-  {f'- sample_key="{sample_key}"' if sample_key else ''}
-  - save_path="{save_path}"
-
-## Important
-- Step 9 internally creates sel_interest_sig_liana.csv - read it to get sel_interactions
-- The interaction column contains values like "GeneA^GeneB" - pass them as a list
-- Execute steps sequentially"""
+        # Build tool args
+        tool_args = self._build_step_args_9_11(current_step, state, sel_factor)
 
         # Get MCP server paths
         sp_python = os.getenv("SP_ENRICH_MCP_PYTHON")
@@ -937,55 +1070,46 @@ After Step 9 completes, read the file `{save_path}/sel_interest_sig_liana.csv` t
             )
 
         if self.is_debug:
-            print(f"Starting analysis Steps 9-11")
-            print(f"  sel_interest_cluster: {sel_interest_cluster}")
-            print(f"  sel_factor: {sel_factor}")
+            print(f"Step {current_step}/11: {step_config['desc']} - Starting")
 
-        # Initialize MCP client per-node
-        mcp_client = MultiServerMCPClient(
-            {
+        # Call MCP tool with safe lifecycle
+        try:
+            client = MultiServerMCPClient({
                 "sp-enrich-mcp": {
                     "command": sp_python,
                     "args": [f"{sp_server_path}/server.py"],
                     "transport": "stdio",
                 }
-            }
-        )
-        tools = await mcp_client.get_tools()
-
-        agent = create_react_agent(
-            model=self.model,
-            tools=tools,
-            prompt=analysis_prompt,
-            checkpointer=MemorySaver(),
-        )
-
-        react_config = {
-            "recursion_limit": 30,
-            "configurable": {
-                "thread_id": config.get("configurable", {}).get("thread_id", "analysis_9_11")
-            },
-        }
-
-        result = await agent.ainvoke(
-            {"messages": [HumanMessage(content="Execute Steps 9-11 now.")]},
-            config=react_config,
-        )
+            })
+            tools = await client.get_tools()
+            tool = next((t for t in tools if t.name == step_config["tool"]
+                         or t.name.endswith(f'__{step_config["tool"]}')), None)
+            if tool is None:
+                raise ValueError(f"Tool {step_config['tool']} not found")
+            result = await tool.ainvoke(tool_args)
+            status = "completed"
+            error_msg = None
+        except Exception as e:
+            status = "failed"
+            error_msg = str(e)
 
         if self.is_debug:
-            print("Steps 9-11 completed")
+            print(f"Step {current_step}/11: {step_config['desc']} - {status}")
 
-        result_messages = result.get("messages", [])
-        summary = "Targeted analysis Steps 9-11 completed."
-        for msg in reversed(result_messages):
-            if isinstance(msg, AIMessage) and msg.content:
-                summary = str(msg.content)
-                break
+        # Build multimodal message
+        message_content = self._build_step_message(
+            current_step, step_config, status, save_path, error_msg, total_steps=11
+        )
 
-        return {
-            "analysis_9_11_complete": True,
-            "messages": [AIMessage(content=summary)],
+        is_last = current_step >= 11
+        update = {
+            "current_analysis_step": current_step + 1 if not is_last else current_step,
+            "messages": [AIMessage(content=message_content)],
         }
+        if is_last:
+            update["analysis_9_11_complete"] = True
+
+        return update
 
     # ===== Node 7: Confirm Interpretation (HITL) =====
 
@@ -999,14 +1123,27 @@ After Step 9 completes, read the file `{save_path}/sel_interest_sig_liana.csv` t
         """
         save_path = state["data_directory"]
         prompt = (
-            f"모든 분석이 완료되었습니다 (Steps 1-11).\n"
-            f"결과 디렉토리: `{save_path}`\n\n"
-            f"본격적으로 결과를 해석하길 원하십니까?\n"
-            f"(Deep Interpreter가 문헌 검색 및 해석 리포트를 생성합니다)\n\n"
-            f"진행하려면 'yes'를 입력하세요."
+            f"All analyses are complete (Steps 1-11).\n"
+            f"Results directory: `{save_path}`\n\n"
+            f"Would you like to proceed with full interpretation?\n"
+            f"(Deep Interpreter will search literature and generate an interpretation report)\n\n"
+            f"Type 'yes' to proceed, or 'no'/'skip' to cancel."
         )
         response = interrupt(value={"message": prompt})
-        # Any response proceeds (the interrupt itself is the gate)
+
+        # Check if user wants to cancel
+        response_str = str(response).strip().lower()
+        if isinstance(response, dict):
+            response_str = response.get("response", response.get("message", str(response))).strip().lower()
+
+        cancel_keywords = {"no", "cancel", "skip", "아니오", "취소", "n"}
+        if response_str in cancel_keywords:
+            logger.info("User declined interpretation. Ending workflow.")
+            return {
+                "interpretation_confirmed": False,
+                "messages": [HumanMessage(content=str(response))],
+            }
+
         return {
             "interpretation_confirmed": True,
             "messages": [HumanMessage(content=str(response))],

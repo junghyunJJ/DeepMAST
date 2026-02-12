@@ -49,8 +49,8 @@ class PipelineExecutorAgent(BaseAgent):
 
     Each step is run via a dedicated MCP server resolved from
     :mod:`mcp_registry`. MCP client lifetime is scoped to a single step
-    using ``async with MultiServerMCPClient(...)`` to guarantee subprocess
-    cleanup.
+    using direct ``MultiServerMCPClient(...)`` instantiation (v0.1.0+ API;
+    context manager raises ``NotImplementedError``).
     """
 
     NODE_NAMES: ClassVar[dict[str, str]] = {
@@ -279,28 +279,28 @@ class PipelineExecutorAgent(BaseAgent):
             server_key, server_config = get_sc_reference_server_config()
             from langchain_mcp_adapters.client import MultiServerMCPClient
 
-            async with MultiServerMCPClient({server_key: server_config}) as client:
-                tools = await client.get_tools()
-                agent = create_react_agent(
-                    model=self.model,
-                    tools=tools,
-                    prompt=(
-                        f"Find single-cell reference datasets for "
-                        f"{state.get('species', 'human')} {state.get('disease', 'tissue')} "
-                        f"using {state.get('st_technology', 'spatial')} platform. "
-                        f"Return candidate dataset names and paths."
-                    ),
-                    checkpointer=MemorySaver(),
-                )
-                result = await agent.ainvoke(
-                    {"messages": [HumanMessage(content="Find SC reference datasets")]},
-                    config={"configurable": {"thread_id": "sc-ref-search"}},
-                )
-                # Parse candidates from result (best-effort)
-                for msg in reversed(result.get("messages", [])):
-                    if isinstance(msg, AIMessage) and msg.content:
-                        candidates.append({"name": "auto-recommended", "description": msg.content})
-                        break
+            client = MultiServerMCPClient({server_key: server_config})
+            tools = await client.get_tools()
+            agent = create_react_agent(
+                model=self.model,
+                tools=tools,
+                prompt=(
+                    f"Find single-cell reference datasets for "
+                    f"{state.get('species', 'human')} {state.get('disease', 'tissue')} "
+                    f"using {state.get('st_technology', 'spatial')} platform. "
+                    f"Return candidate dataset names and paths."
+                ),
+                checkpointer=MemorySaver(),
+            )
+            result = await agent.ainvoke(
+                {"messages": [HumanMessage(content="Find SC reference datasets")]},
+                config={"configurable": {"thread_id": "sc-ref-search"}},
+            )
+            # Parse candidates from result (best-effort)
+            for msg in reversed(result.get("messages", [])):
+                if isinstance(msg, AIMessage) and msg.content:
+                    candidates.append({"name": "auto-recommended", "description": msg.content})
+                    break
         except Exception as e:
             if self.is_debug:
                 logger.warning("SC reference auto-recommendation failed: %s", e)
@@ -378,8 +378,8 @@ class PipelineExecutorAgent(BaseAgent):
     ) -> ExecutionStepResult:
         """Run a single pipeline step via its MCP server.
 
-        The MCP client is created and destroyed within this call via
-        ``async with`` to guarantee subprocess cleanup.
+        The MCP client is created directly (v0.1.0+ API; context manager
+        raises ``NotImplementedError``). Sessions are ephemeral.
         """
         try:
             server_key, server_config = get_mcp_server_config(step, method)
@@ -405,19 +405,19 @@ class PipelineExecutorAgent(BaseAgent):
         try:
             from langchain_mcp_adapters.client import MultiServerMCPClient
 
-            async with MultiServerMCPClient({server_key: server_config}) as client:
-                tools = await client.get_tools()
-                agent = create_react_agent(
-                    model=self.model,
-                    tools=tools,
-                    prompt=prompt,
-                    checkpointer=MemorySaver(),
-                )
-                thread_id = config.get("configurable", {}).get("thread_id", "default")
-                await agent.ainvoke(
-                    {"messages": [HumanMessage(content=f"Run {step}: {method}")]},
-                    config={"configurable": {"thread_id": f"{thread_id}-{step}"}},
-                )
+            client = MultiServerMCPClient({server_key: server_config})
+            tools = await client.get_tools()
+            agent = create_react_agent(
+                model=self.model,
+                tools=tools,
+                prompt=prompt,
+                checkpointer=MemorySaver(),
+            )
+            thread_id = config.get("configurable", {}).get("thread_id", "default")
+            await agent.ainvoke(
+                {"messages": [HumanMessage(content=f"Run {step}: {method}")]},
+                config={"configurable": {"thread_id": f"{thread_id}-{step}"}},
+            )
 
             return ExecutionStepResult(
                 step=step,

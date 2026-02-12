@@ -42,6 +42,8 @@ class DeepInterpreterWrapperState(TypedDict):
         interest_clusters: Selected cluster IDs from HITL
         interest_celltypes: Selected cell types from HITL
         sel_factor: Selected NMF factor (e.g. "Factor_3")
+        # Step-loop tracking
+        current_analysis_step: Current step index for loop-based execution (1-8 or 9-11)
         # Workflow control flags
         info_complete: Flag indicating all user info collected
         analysis_1_8_complete: Steps 1-8 execution flag
@@ -72,6 +74,9 @@ class DeepInterpreterWrapperState(TypedDict):
     interest_clusters: Optional[list[str]]
     interest_celltypes: Optional[list[str]]
     sel_factor: Optional[str]
+
+    # Step-loop tracking
+    current_analysis_step: Optional[int]
 
     # Workflow control flags
     info_complete: bool
@@ -105,6 +110,7 @@ def create_initial_state() -> DeepInterpreterWrapperState:
         interest_clusters=None,
         interest_celltypes=None,
         sel_factor=None,
+        current_analysis_step=None,
         info_complete=False,
         analysis_1_8_complete=False,
         research_discussion_complete=False,

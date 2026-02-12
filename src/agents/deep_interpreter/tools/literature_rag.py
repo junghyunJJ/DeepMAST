@@ -157,19 +157,32 @@ def _glob_files(directory: str, pattern: str) -> list[str]:
 
 
 # =============================================================================
-# Configuration
+# Configuration (lazy-loaded to support ASGI environments where .env
+# is loaded after module import)
 # =============================================================================
-# pubmed-download MCP (stdio transport)
-PUBMED_MCP_PYTHON = os.getenv("PUBMED_MCP_PYTHON")
-PUBMED_MCP_SERVER = os.getenv("PUBMED_MCP_SERVER")
-PUBMED_EMAIL = os.getenv("PUBMED_EMAIL")
-NCBI_API_KEY = os.getenv("NCBI_API_KEY")
-JINA_API_KEY = os.getenv("JINA_API_KEY")
+def _get_pubmed_mcp_python() -> str | None:
+    return os.getenv("PUBMED_MCP_PYTHON")
 
-# langconnect-rag MCP (stdio transport - same as st_pipeline_info_agent.py)
-CCI_RAG_PYTHON = os.getenv("CCI_RAG_PYTHON")
-CCI_RAG_SERVER = os.getenv("CCI_RAG_SERVER")
-CCI_RAG_BASE_URL = os.getenv("CCI_RAG_BASE_URL", "http://localhost:8888")
+def _get_pubmed_mcp_server() -> str | None:
+    return os.getenv("PUBMED_MCP_SERVER")
+
+def _get_pubmed_email() -> str | None:
+    return os.getenv("PUBMED_EMAIL")
+
+def _get_ncbi_api_key() -> str | None:
+    return os.getenv("NCBI_API_KEY")
+
+def _get_jina_api_key() -> str | None:
+    return os.getenv("JINA_API_KEY")
+
+def _get_cci_rag_python() -> str | None:
+    return os.getenv("CCI_RAG_PYTHON")
+
+def _get_cci_rag_server() -> str | None:
+    return os.getenv("CCI_RAG_SERVER")
+
+def _get_cci_rag_base_url() -> str:
+    return os.getenv("CCI_RAG_BASE_URL", "http://localhost:8888")
 
 RAG_COLLECTION_PREFIX = "deep_interpreter_"
 DEFAULT_PAPERS_DIR = "res/papers"
@@ -241,16 +254,18 @@ async def _get_cci_rag_tools() -> list:
     Raises:
         ValueError: If required environment variables are not set
     """
-    if not CCI_RAG_PYTHON or not CCI_RAG_SERVER:
+    cci_rag_python = _get_cci_rag_python()
+    cci_rag_server = _get_cci_rag_server()
+    if not cci_rag_python or not cci_rag_server:
         raise ValueError(
             "CCI_RAG_PYTHON and CCI_RAG_SERVER environment variables are required. "
             "Please set them in your .env file."
         )
 
     config = {
-        "command": CCI_RAG_PYTHON,
-        "args": [CCI_RAG_SERVER],
-        "env": {"API_BASE_URL": CCI_RAG_BASE_URL},
+        "command": cci_rag_python,
+        "args": [cci_rag_server],
+        "env": {"API_BASE_URL": _get_cci_rag_base_url()},
         "transport": "stdio",
     }
     return await _get_cached_tools("CCI-RAG", config)
@@ -265,22 +280,27 @@ async def _get_pubmed_download_tools() -> list:
     Raises:
         ValueError: If required environment variables are not set
     """
-    if not PUBMED_MCP_PYTHON or not PUBMED_MCP_SERVER:
+    pubmed_mcp_python = _get_pubmed_mcp_python()
+    pubmed_mcp_server = _get_pubmed_mcp_server()
+    if not pubmed_mcp_python or not pubmed_mcp_server:
         raise ValueError(
             "PUBMED_MCP_PYTHON and PUBMED_MCP_SERVER environment variables are required."
         )
 
     mcp_env = {}
-    if PUBMED_EMAIL:
-        mcp_env["PUBMED_EMAIL"] = PUBMED_EMAIL
-    if JINA_API_KEY:
-        mcp_env["JINA_API_KEY"] = JINA_API_KEY
-    if NCBI_API_KEY:
-        mcp_env["NCBI_API_KEY"] = NCBI_API_KEY
+    pubmed_email = _get_pubmed_email()
+    jina_api_key = _get_jina_api_key()
+    ncbi_api_key = _get_ncbi_api_key()
+    if pubmed_email:
+        mcp_env["PUBMED_EMAIL"] = pubmed_email
+    if jina_api_key:
+        mcp_env["JINA_API_KEY"] = jina_api_key
+    if ncbi_api_key:
+        mcp_env["NCBI_API_KEY"] = ncbi_api_key
 
     config = {
-        "command": PUBMED_MCP_PYTHON,
-        "args": [PUBMED_MCP_SERVER],
+        "command": pubmed_mcp_python,
+        "args": [pubmed_mcp_server],
         "env": mcp_env,
         "transport": "stdio",
     }
@@ -305,18 +325,20 @@ async def check_rag_availability() -> bool:
         return _RAG_STATE["available"]
 
     # Check if environment variables are set
-    if not CCI_RAG_PYTHON or not CCI_RAG_SERVER:
+    cci_rag_python = _get_cci_rag_python()
+    cci_rag_server = _get_cci_rag_server()
+    if not cci_rag_python or not cci_rag_server:
         logger.debug(f"check_rag_availability: CCI_RAG env vars not set")
-        logger.debug(f"  CCI_RAG_PYTHON={CCI_RAG_PYTHON}")
-        logger.debug(f"  CCI_RAG_SERVER={CCI_RAG_SERVER}")
+        logger.debug(f"  CCI_RAG_PYTHON={cci_rag_python}")
+        logger.debug(f"  CCI_RAG_SERVER={cci_rag_server}")
         logger.info("RAG not available: CCI_RAG_PYTHON or CCI_RAG_SERVER not set")
         _RAG_STATE["available"] = False
         return False
 
     logger.debug(f"check_rag_availability: using stdio transport")
-    logger.debug(f"  CCI_RAG_PYTHON={CCI_RAG_PYTHON}")
-    logger.debug(f"  CCI_RAG_SERVER={CCI_RAG_SERVER}")
-    logger.debug(f"  CCI_RAG_BASE_URL={CCI_RAG_BASE_URL}")
+    logger.debug(f"  CCI_RAG_PYTHON={cci_rag_python}")
+    logger.debug(f"  CCI_RAG_SERVER={cci_rag_server}")
+    logger.debug(f"  CCI_RAG_BASE_URL={_get_cci_rag_base_url()}")
 
     try:
         tools = await _get_cci_rag_tools()
@@ -403,10 +425,12 @@ async def download_papers_for_rag(
     results = {}
 
     # Check if environment variables are set
-    if not PUBMED_MCP_PYTHON or not PUBMED_MCP_SERVER:
+    pubmed_mcp_python = _get_pubmed_mcp_python()
+    pubmed_mcp_server = _get_pubmed_mcp_server()
+    if not pubmed_mcp_python or not pubmed_mcp_server:
         logger.debug(f"download_papers_for_rag: PUBMED_MCP env vars not set")
-        logger.debug(f"  PUBMED_MCP_PYTHON={PUBMED_MCP_PYTHON}")
-        logger.debug(f"  PUBMED_MCP_SERVER={PUBMED_MCP_SERVER}")
+        logger.debug(f"  PUBMED_MCP_PYTHON={pubmed_mcp_python}")
+        logger.debug(f"  PUBMED_MCP_SERVER={pubmed_mcp_server}")
         logger.warning("pubmed-download MCP not configured: PUBMED_MCP_PYTHON or PUBMED_MCP_SERVER not set")
         return results
 

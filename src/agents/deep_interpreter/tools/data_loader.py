@@ -239,20 +239,20 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     # Files that contain actual gene names (ligand/receptor columns)
     LIANA_FILES = {"sig_liana.csv", "anno_sig_liana.csv", "interest_sig_liana.csv"}
 
-    for analysis_name, config in ANALYSIS_FILES.items():
-        figure_path = data_path / config["figure"]
+    for analysis_name, file_config in ANALYSIS_FILES.items():
+        figure_path = data_path / file_config["figure"]
         has_figure = figure_path.exists()
 
         has_data = True
         data_path_str = None
-        if "data" in config:
-            data_file = data_path / config["data"]
+        if "data" in file_config:
+            data_file = data_path / file_config["data"]
             has_data = data_file.exists()
             if has_data:
                 data_path_str = str(data_file)
                 # Extract clusters and celltypes from CSV files
                 # Only extract genes from LIANA files (which have ligand/receptor columns)
-                extract_genes = config["data"] in LIANA_FILES
+                extract_genes = file_config["data"] in LIANA_FILES
                 _extract_metadata_from_csv(
                     data_file, clusters, celltypes, genes if extract_genes else None
                 )

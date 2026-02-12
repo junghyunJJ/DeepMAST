@@ -81,8 +81,8 @@ class MCPClientManager:
 
     Usage:
         manager = MCPClientManager()
-        async with manager.get_client() as client:
-            tools = await client.get_tools()
+        client = await manager.get_client()
+        tools = await client.get_tools()
     """
 
     _instance: Optional["MCPClientManager"] = None
@@ -164,23 +164,23 @@ class MCPClientManager:
         Returns:
             Tool result
         """
-        async with await self.get_client() as client:
-            tools = await client.get_tools()
+        client = await self.get_client()
+        tools = await client.get_tools()
 
-            # Find the tool by name
-            target_tool = None
-            for tool in tools:
-                # Tool names are typically formatted as "server_name__tool_name"
-                if tool.name == f"{server_name}__{tool_name}" or tool.name == tool_name:
-                    target_tool = tool
-                    break
+        # Find the tool by name
+        target_tool = None
+        for tool in tools:
+            # Tool names are typically formatted as "server_name__tool_name"
+            if tool.name == f"{server_name}__{tool_name}" or tool.name == tool_name:
+                target_tool = tool
+                break
 
-            if target_tool is None:
-                raise ValueError(f"Tool '{tool_name}' not found in server '{server_name}'")
+        if target_tool is None:
+            raise ValueError(f"Tool '{tool_name}' not found in server '{server_name}'")
 
-            # Invoke the tool
-            result = await target_tool.ainvoke(arguments)
-            return result
+        # Invoke the tool
+        result = await target_tool.ainvoke(arguments)
+        return result
 
 
 # =============================================================================

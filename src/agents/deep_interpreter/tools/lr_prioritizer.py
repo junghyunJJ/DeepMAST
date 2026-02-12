@@ -367,7 +367,7 @@ class HybridLRPrioritizer:
             "overlap_count": len(overlap),
             "hybrid_unique": list(hybrid_only),
             "baseline_unique": list(baseline_only),
-            "jaccard_similarity": len(overlap) / len(hybrid_pairs | baseline_pairs),
+            "jaccard_similarity": len(overlap) / len(hybrid_pairs | baseline_pairs) if len(hybrid_pairs | baseline_pairs) > 0 else 0.0,
         }
 
 

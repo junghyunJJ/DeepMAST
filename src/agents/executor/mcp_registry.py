@@ -2,8 +2,9 @@
 
 Maps pipeline methods (normalization, celltype_analysis, spatial_clustering)
 to their corresponding MCP server configurations. Config-only — never creates
-MultiServerMCPClient instances. Actual client lifecycle is managed by the
-executor agent via ``async with MultiServerMCPClient(...)`` per step.
+MultiServerMCPClient instances. The executor agent creates clients directly
+via ``MultiServerMCPClient(...)`` per step (v0.1.0+ API; context manager
+raises ``NotImplementedError``).
 """
 
 from __future__ import annotations
