@@ -1,11 +1,13 @@
 """model - Create Language Models for different providers"""
 import os
 from typing import Optional
+
 from langchain_anthropic import ChatAnthropic
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.runnables import RunnableConfig
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
-from langchain_core.language_models.chat_models import BaseChatModel
 
 
 def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
@@ -132,4 +134,19 @@ def create_kimi_llm(**kwargs) -> ChatOpenAI:
         api_key=os.getenv("OPENROUTER_API_KEY"),
         temperature=temperature,
     )
+
+
+def create_llm_from_config(
+    config: RunnableConfig | None = None,
+    fallback_provider: str | None = None,
+) -> BaseChatModel:
+    """Create LLM from RunnableConfig.configurable, with env var fallback.
+
+    Resolution order: configurable.llm_provider -> fallback_provider -> env var -> "kimi"
+    """
+    configurable = (config or {}).get("configurable", {})
+    provider = configurable.get("llm_provider", "").strip() or fallback_provider
+    model_name = configurable.get("llm_model", "").strip() or None
+    kwargs = {"model": model_name} if model_name else {}
+    return create_llm(provider=provider, **kwargs)
 

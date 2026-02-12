@@ -82,7 +82,17 @@ class BaseAgent:
         if key not in self.NODE_NAMES:
             raise ValueError(f"Node name key '{key}' is not defined.")
         return self.NODE_NAMES.get(key, "DEFAULT")
-    
+
+    def get_model(self, config=None):
+        """Get LLM, checking runtime config first, falling back to init-time model."""
+        if config:
+            configurable = config.get("configurable", {})
+            if configurable.get("llm_provider", "").strip():
+                from src.agents.model import create_llm_from_config
+
+                return create_llm_from_config(config)
+        return self.model
+
     def init_nodes(self, graph: StateGraph):
         """
         Initialize graph nodes.
@@ -111,9 +121,13 @@ class BaseAgent:
             Compiled StateGraph
         """
         # Create state graph with the provided schema
+        from src.agents.llm_config import LLMConfigSchema
+
+        effective_config_schema = self.config_schema or LLMConfigSchema
+
         _graph = StateGraph(
             state_schema=self.state_schema,
-            config_schema=self.config_schema,
+            config_schema=effective_config_schema,
             input_schema=self.input_schema,
             output_schema=self.output_schema,
         )

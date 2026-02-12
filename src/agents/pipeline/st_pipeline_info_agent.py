@@ -479,17 +479,17 @@ Assistant: "What species?" ← WRONG! "patient" clearly means human
         return [SystemMessage(content=self.SYSTEM_TEMPLATE)] + messages
 
     async def info_collection_node(
-        self, state: STPipelineBuilderState, config: RunnableConfig  # noqa: ARG002
+        self, state: STPipelineBuilderState, config: RunnableConfig
     ) -> dict:
-        """정보 수집 노드 - 사용자로부터 ST 파이프라인 구축에 필요한 정보 수집
-
-        Note: config parameter is required by LangGraph but not used in this implementation.
-        """
+        """정보 수집 노드 - 사용자로부터 ST 파이프라인 구축에 필요한 정보 수집"""
         try:
             # 상태에서 메시지 정보를 가져와 시스템 메시지와 결합
             messages = self.get_messages_with_system(state["messages"])
+            # Re-bind tools at runtime with config-aware model
+            model = self.get_model(config)
+            llm_with_tool = model.bind_tools([STPipelineInfoExtraction])
             # LLM을 호출하여 응답 생성
-            response = await self.llm_with_tool.ainvoke(messages)
+            response = await llm_with_tool.ainvoke(messages)
 
             # 생성된 응답을 메시지 목록으로 반환
             return {"messages": [response]}
@@ -1022,7 +1022,7 @@ Your customized pipeline is ready to use!
         # Create ReAct agent for intelligent RAG interaction
         try:
             agent = create_react_agent(
-                model=self.model,
+                model=self.get_model(config),
                 tools=tools,
                 prompt=react_prompt,
                 checkpointer=MemorySaver()
@@ -1170,16 +1170,12 @@ Your customized pipeline is ready to use!
 
 
     async def pipeline_summary_node(
-        self, state: STPipelineBuilderState, config: RunnableConfig  # noqa: ARG002
+        self, state: STPipelineBuilderState, config: RunnableConfig
     ) -> dict:
-        """Generate the final ST analysis pipeline based on collected information and search results.
-
-        Note: config parameter is required by LangGraph but not used in this implementation.
-        """
-        del config  # Explicitly mark as intentionally unused for type checkers
+        """Generate the final ST analysis pipeline based on collected information and search results."""
         pipeline_prompt = create_pipeline_prompt(state)
 
-        response = await self.model.ainvoke([SystemMessage(content=pipeline_prompt)] + state["messages"])
+        response = await self.get_model(config).ainvoke([SystemMessage(content=pipeline_prompt)] + state["messages"])
         return {
             "messages": [response],
             "pipeline_summary": True,

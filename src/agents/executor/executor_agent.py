@@ -282,7 +282,7 @@ class PipelineExecutorAgent(BaseAgent):
             client = MultiServerMCPClient({server_key: server_config})
             tools = await client.get_tools()
             agent = create_react_agent(
-                model=self.model,
+                model=self.get_model(config),
                 tools=tools,
                 prompt=(
                     f"Find single-cell reference datasets for "
@@ -408,7 +408,7 @@ class PipelineExecutorAgent(BaseAgent):
             client = MultiServerMCPClient({server_key: server_config})
             tools = await client.get_tools()
             agent = create_react_agent(
-                model=self.model,
+                model=self.get_model(config),
                 tools=tools,
                 prompt=prompt,
                 checkpointer=MemorySaver(),

@@ -205,7 +205,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
 
     # ===== Helper Methods =====
 
-    def get_deep_agent(self, data_directory: str):
+    def get_deep_agent(self, data_directory: str, provider_override: str | None = None):
         """Get or create the Deep Agent instance with correct data_dir.
 
         Creates a fresh Deep Agent with per-invocation config to avoid
@@ -213,6 +213,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
 
         Args:
             data_directory: Path to analysis results directory
+            provider_override: Optional LLM provider from runtime config
 
         Returns:
             Compiled Deep Agent runnable
@@ -226,9 +227,14 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             # Create a copy to avoid mutating shared config
             config_copy = deepcopy(self.deep_agent_config)
             config_copy.data_dir = str(data_directory)
+            if provider_override:
+                config_copy.provider = provider_override
             return create_deep_interpreter_agent(config_copy)
         else:
-            config = DeepInterpreterConfig(data_dir=str(data_directory))
+            kwargs = {"data_dir": str(data_directory)}
+            if provider_override:
+                kwargs["provider"] = provider_override
+            config = DeepInterpreterConfig(**kwargs)
             return create_deep_interpreter_agent(config)
 
     def _build_research_summary(
@@ -645,12 +651,14 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         return [SystemMessage(content=system_content)] + messages
 
     async def info_collection_node(
-        self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
+        self, state: DeepInterpreterWrapperState, config: RunnableConfig
     ) -> dict:
         """Collect Deep Interpreter analysis information from user."""
         try:
             messages = self.get_messages_with_system(state["messages"], state)
-            response = await self.llm_with_tool.ainvoke(messages)
+            model = self.get_model(config)
+            llm_with_tool = model.bind_tools([DeepInterpreterInfoExtraction])
+            response = await llm_with_tool.ainvoke(messages)
             return {"messages": [response]}
         except Exception as e:
             if self.is_debug:
@@ -878,7 +886,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
     # ===== Node 5: Research Discussion (HITL with 2x interrupt()) =====
 
     async def research_discussion_node(
-        self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
+        self, state: DeepInterpreterWrapperState, config: RunnableConfig
     ) -> dict:
         """HITL research discussion with 2 sequential interrupt() calls.
 
@@ -906,7 +914,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
 
         # LLM suggests interest_clusters and interest_celltypes based on disease context
         disease = state.get("disease", "unknown")
-        llm_suggestion = await self.model.ainvoke([
+        llm_suggestion = await self.get_model(config).ainvoke([
             SystemMessage(content=(
                 f"You are analyzing {disease} spatial transcriptomics data. "
                 "Based on the analysis summary below, suggest which clusters and cell types "
@@ -944,7 +952,7 @@ Please provide your selections as JSON or natural language."""
             actual_response1 = str(response1)
 
         # Use LLM to extract structured data from user response
-        parse_result1 = await self.model.ainvoke([
+        parse_result1 = await self.get_model(config).ainvoke([
             SystemMessage(content=(
                 "Extract interest_celltypes and interest_clusters from the user's response. "
                 "Return ONLY valid JSON: {\"interest_celltypes\": [...], \"interest_clusters\": [...]}\n"
@@ -1167,7 +1175,9 @@ Available factors: {available_factors}
             print(f"Invoking Deep Agent for: {data_directory}")
 
         # Get or create Deep Agent with per-invocation config
-        deep_agent = self.get_deep_agent(data_directory)
+        configurable = (config or {}).get("configurable", {})
+        provider_override = configurable.get("llm_provider", "").strip() or None
+        deep_agent = self.get_deep_agent(data_directory, provider_override=provider_override)
 
         # Build initial message with embedded targets
         targets_content = {

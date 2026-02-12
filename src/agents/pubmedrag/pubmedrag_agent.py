@@ -445,7 +445,7 @@ If the documents are tangentially related, outdated, or lack depth, mark as insu
 Respond with your judgment."""
 
         # Use structured output
-        structured_model = self.model.with_structured_output(RelevanceJudgmentOutput)
+        structured_model = self.get_model(config).with_structured_output(RelevanceJudgmentOutput)
 
         try:
             judgment_output = await structured_model.ainvoke([HumanMessage(content=prompt)])
@@ -509,7 +509,7 @@ Example queries:
 
 Generate optimized queries for the given question."""
 
-        structured_model = self.model.with_structured_output(MultiQueryOutput)
+        structured_model = self.get_model(config).with_structured_output(MultiQueryOutput)
 
         try:
             output = await structured_model.ainvoke([HumanMessage(content=prompt)])
@@ -635,7 +635,7 @@ Consider:
 
 Return the PMIDs of your top 5 selections."""
 
-        structured_model = self.model.with_structured_output(PaperSelectionOutput)
+        structured_model = self.get_model(config).with_structured_output(PaperSelectionOutput)
 
         try:
             output = await structured_model.ainvoke([HumanMessage(content=prompt)])
@@ -974,7 +974,7 @@ Generate your answer with proper PMID citations inline."""
 
 Generate your final answer now."""
 
-        structured_model = self.model.with_structured_output(AnswerOutput)
+        structured_model = self.get_model(config).with_structured_output(AnswerOutput)
 
         try:
             output = await structured_model.ainvoke([HumanMessage(content=final_prompt)])
@@ -993,7 +993,7 @@ Generate your final answer now."""
                 print(f"Error generating structured answer: {e}")
 
             # Fallback to unstructured generation
-            fallback_response = await self.model.ainvoke([HumanMessage(content=final_prompt)])
+            fallback_response = await self.get_model(config).ainvoke([HumanMessage(content=final_prompt)])
 
             return {
                 "answer": fallback_response.content,
