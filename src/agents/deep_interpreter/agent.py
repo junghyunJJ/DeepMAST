@@ -64,8 +64,8 @@ class DeepInterpreterConfig:
     """Configuration for Deep Interpreter Agent.
 
     Attributes:
-        provider: LLM provider ('openai', 'google', 'ollama', 'claude').
-                  Uses LLM_PROVIDER env var if not specified.
+        provider: LLM provider ('openai', 'google', 'ollama', 'claude', 'kimi').
+                  Defaults to 'kimi'. Uses LLM_PROVIDER env var if not specified.
         data_dir: Directory for CCI analysis results and agent workspace
         max_iterations: Maximum quality refinement iterations per part (default: 3)
         quality_threshold: Minimum quality score to pass (default: 0.7)
@@ -83,7 +83,7 @@ class DeepInterpreterConfig:
         - OLLAMA_MODEL (default: gpt-oss:20b)
         - ANTHROPIC_MODEL (default: claude-haiku-4-5-20251001)
     """
-    provider: Literal["openai", "google", "ollama", "claude"] = "openai"
+    provider: Literal["openai", "google", "ollama", "claude", "kimi"] = "kimi"
     data_dir: str = "/tmp/deep_interpreter_workspace"
     max_iterations: int = 3
     quality_threshold: float = 0.7
@@ -230,7 +230,7 @@ def interpret_analysis(
     analysis_mode: str = "cluster_to_celltype",
     targets: Optional[list[str]] = None,
     output_path: Optional[str] = None,
-    provider: Literal["openai", "google", "ollama", "claude"] = "ollama",
+    provider: Literal["openai", "google", "ollama", "claude", "kimi"] = "ollama",
     thread_id: Optional[str] = None,
     use_checkpointer: bool = False,
 ) -> dict:

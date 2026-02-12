@@ -1,14 +1,14 @@
 """State schema for Deep Interpreter Wrapper Agent.
 
-This module defines the state used by the wrapper agent that collects
-information BEFORE invoking the Deep Agent. This pattern resolves the
-HITL issues with Deep Agents' subagent-level interrupt_on.
+This module defines the state used by the wrapper agent that manages
+the full spatial analysis pipeline before invoking the Deep Agent.
 
 Workflow:
-1. Wrapper collects data_directory, analysis_mode, clusters/celltypes from user
-2. Wrapper writes /targets.json to filesystem
-3. Wrapper invokes Deep Agent with readonly planner subagent
-4. Deep Agent proceeds without HITL for target selection
+1. Collect user info (h5ad files, cluster_key, sample_key, data_directory) + shared state from Supervisor
+2. Execute spatial analysis Steps 1-8 via MCP (basic plots, pathway enrichment, LIANA+ CCI, NMF)
+3. HITL research discussion using interrupt() to extract interest_clusters, interest_celltypes, sel_factor
+4. Execute targeted analysis Steps 9-11 via MCP (quadrant plot, spatial/cluster LR visualization)
+5. Invoke Deep Agent for interpretation/report generation
 """
 
 from typing import Annotated, Literal, Optional
@@ -20,32 +20,65 @@ from typing_extensions import TypedDict
 class DeepInterpreterWrapperState(TypedDict):
     """State schema for Deep Interpreter Wrapper Agent.
 
-    This state tracks the information collection phase before
-    invoking the Deep Agent for actual interpretation.
+    This state tracks the full spatial analysis pipeline including
+    MCP-based analysis execution, HITL research discussion, and
+    Deep Agent invocation.
 
     Attributes:
         messages: Conversation history with add_messages reducer
-        data_directory: Path to analysis results (res/ folder)
-        analysis_mode: Selected analysis mode (cluster_to_celltype or celltype_to_cluster)
-        interest_clusters: Selected clusters for Mode A
-        interest_celltypes: Selected cell types for Mode B
-        info_complete: Flag indicating all info collected
-        targets_written: Flag indicating /targets.json written
-        deep_agent_result: Output from Deep Agent invocation
+        # Shared fields (pre-populated by Supervisor from STPipelineBuilderAgent)
+        st_technology: ST platform (Visium, MERFISH, etc.)
+        disease: Disease/phenotype being studied
+        species: Organism species
+        sample_count: Number of samples in dataset
+        # User-collected fields
+        h5ad_files: Path(s) to .h5ad file(s)
+        cluster_key: Column name in adata.obs for cluster assignments
+        celltype_key: Column name in adata.obs for cell type annotations
+        sample_key: Column name for sample ID (required when sample_count > 1)
+        interest_sample: Specific sample to analyze in multi-sample datasets
+        data_directory: Path to results output folder
+        # Research discussion outputs
+        interest_clusters: Selected cluster IDs from HITL
+        interest_celltypes: Selected cell types from HITL
+        sel_factor: Selected NMF factor (e.g. "Factor_3")
+        # Workflow control flags
+        info_complete: Flag indicating all user info collected
+        analysis_1_8_complete: Steps 1-8 execution flag
+        research_discussion_complete: Research HITL flag
+        analysis_9_11_complete: Steps 9-11 execution flag
+        # Deep Agent output
+        deep_agent_result: Output from Deep Agent invocation (JSON string)
     """
 
     # Conversation messages (required for LangGraph)
     messages: Annotated[list, add_messages]
 
-    # Collected information from user
+    # Shared fields (pre-populated by Supervisor from STPipelineBuilderAgent)
+    st_technology: Optional[str]
+    disease: Optional[str]
+    species: Optional[Literal["human", "mouse"]]
+    sample_count: Optional[int]
+
+    # User-collected fields
+    h5ad_files: Optional[list[str]]
+    cluster_key: Optional[str]
+    celltype_key: Optional[str]
+    sample_key: Optional[str]
+    interest_sample: Optional[str]
     data_directory: Optional[str]
-    analysis_mode: Optional[Literal["cluster_to_celltype", "celltype_to_cluster"]]
+
+    # Research discussion outputs (from HITL interrupt)
     interest_clusters: Optional[list[str]]
     interest_celltypes: Optional[list[str]]
+    sel_factor: Optional[str]
 
     # Workflow control flags
     info_complete: bool
-    targets_written: bool
+    analysis_1_8_complete: bool
+    research_discussion_complete: bool
+    analysis_9_11_complete: bool
+    interpretation_confirmed: bool
 
     # Deep Agent output (JSON string for checkpoint serialization safety)
     deep_agent_result: Optional[str]
@@ -59,12 +92,24 @@ def create_initial_state() -> DeepInterpreterWrapperState:
     """
     return DeepInterpreterWrapperState(
         messages=[],
+        st_technology=None,
+        disease=None,
+        species=None,
+        sample_count=None,
+        h5ad_files=None,
+        cluster_key=None,
+        celltype_key=None,
+        sample_key=None,
+        interest_sample=None,
         data_directory=None,
-        analysis_mode=None,
         interest_clusters=None,
         interest_celltypes=None,
+        sel_factor=None,
         info_complete=False,
-        targets_written=False,
+        analysis_1_8_complete=False,
+        research_discussion_complete=False,
+        analysis_9_11_complete=False,
+        interpretation_confirmed=False,
         deep_agent_result=None,
     )
 

@@ -31,7 +31,7 @@ from src.agents.model import create_llm  # noqa: E402
 
 
 def create_deep_interpreter_graph(
-    provider: Literal["openai", "google", "ollama", "claude"] = "ollama",
+    provider: Literal["openai", "google", "ollama", "claude", "kimi"] = "ollama",
     data_dir: str = "/tmp/deep_interpreter_workspace",
     use_checkpointer: bool = True,
     is_debug: bool = False,
@@ -93,7 +93,7 @@ def _get_deep_interpreter_graph() -> Runnable:
 
 
 def create_deep_interpreter_graph_wrapped(
-    provider: Literal["openai", "google", "ollama", "claude"] = "ollama",
+    provider: Literal["openai", "google", "ollama", "claude", "kimi"] = "ollama",
     data_dir: str = "/tmp/deep_interpreter_workspace",
     use_checkpointer: bool = False,
     is_debug: bool = False,
@@ -101,10 +101,11 @@ def create_deep_interpreter_graph_wrapped(
     """Create wrapped Deep Interpreter graph with HITL target collection.
 
     This variant uses the wrapper agent pattern where:
-    1. Wrapper collects data_directory, analysis_mode, clusters/celltypes from user (HITL)
-    2. Wrapper validates the selection using Pydantic model
-    3. Wrapper writes /targets.json to filesystem
-    4. Wrapper invokes Deep Agent with readonly planner subagent
+    1. Wrapper collects h5ad_files, cluster_key, data_directory from user (HITL)
+    2. Wrapper executes spatial analysis Steps 1-8 via MCP
+    3. Wrapper runs HITL research discussion (interest_clusters, celltypes, factor)
+    4. Wrapper executes targeted analysis Steps 9-11 via MCP
+    5. Wrapper invokes Deep Agent for interpretation/report generation
 
     This is the RECOMMENDED variant for interactive use.
 
@@ -188,7 +189,7 @@ deep_interpreter_wrapped_graph = _get_deep_interpreter_graph_wrapped()
 
 def create_subagent_graph(
     subagent_name: Literal["planner", "searcher", "interpreter", "reporter"],
-    provider: Literal["openai", "google", "ollama", "claude"] = "openai",
+    provider: Literal["openai", "google", "ollama", "claude", "kimi"] = "openai",
 ) -> Runnable:
     """Create standalone subagent graph for testing.
 

@@ -34,12 +34,14 @@ pnpm lint       # Run linter
 ## Environment Configuration
 
 ### Backend (.env)
-- `LLM_PROVIDER`: `openai` (default), `google`, `ollama`, or `claude`
+- `LLM_PROVIDER`: `openai` (default), `google`, `ollama`, `claude`, or `kimi`
 - `OPENAI_MODEL`: Default `gpt-4.1-mini`
 - `GOOGLE_MODEL`: Default `gemini-2.0-flash`
 - `OLLAMA_MODEL`: Default `gpt-oss:20b`
 - `OLLAMA_BASE_URL`: Default `http://localhost:6000`
 - `ANTHROPIC_MODEL`: Default `claude-haiku-4-5-20251001`
+- `KIMI_MODEL`: Default `moonshotai/kimi-k2.5` (via OpenRouter)
+- `OPENROUTER_API_KEY`: API key for OpenRouter (required for `kimi` provider)
 - `DEEP_INTERPRETER_DATA_DIR`: Directory for CCI analysis results
 
 ### Frontend (agent-chat-ui/.env)
@@ -138,7 +140,7 @@ def routing_function(self, state, config) -> str:  # Sync, not async
 ### LLM Provider Abstraction
 
 `src/agents/model.py` provides `create_llm(provider)` factory:
-- OpenAI (default), Google Gemini, Ollama, Claude (Anthropic)
+- OpenAI (default), Google Gemini, Ollama, Claude (Anthropic), Kimi (via OpenRouter)
 - Provider determined by `LLM_PROVIDER` env var or explicit parameter
 
 ### Async Environment Loading

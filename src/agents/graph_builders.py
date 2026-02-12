@@ -6,6 +6,7 @@ for the LangGraph CLI. These graphs are exported for use with `langgraph dev`.
 Exported graphs:
     - graph: STPipelineBuilderAgent for ST pipeline construction
     - pubmed_rag_graph: PubMedRAGAgent for literature-based Q&A
+    - executor_graph: PipelineExecutorAgent for running the ST pipeline
     - deep_interpreter_graph: DeepInterpreterAgent (DeepAgents framework)
     - deep_interpreter_wrapped_graph: DeepInterpreterWrapperAgent with HITL (recommended)
 
@@ -187,6 +188,61 @@ def _get_pubmed_rag_graph() -> CompiledStateGraph:
 
 # LangGraph CLI export for PubMed RAG agent
 pubmed_rag_graph = _get_pubmed_rag_graph()
+
+
+# ==============================================================================
+# Pipeline Executor Agent
+# ==============================================================================
+
+async def create_executor_graph(
+    llm_provider: str = DEFAULT_LLM_PROVIDER,
+    is_debug: bool = True,
+    recursion_limit: int = 80,
+    use_checkpointer: bool = True
+) -> CompiledStateGraph:
+    """Create Pipeline Executor agent graph for running ST pipelines via MCP.
+
+    The executor takes a PipelineConfig from the Pipeline Builder, dynamically
+    loads MCP servers for each step, handles SC reference resolution, and
+    cascades h5ad outputs between steps.
+
+    Args:
+        llm_provider: LLM provider to use
+        is_debug: Enable debug mode
+        recursion_limit: Maximum recursion depth (higher due to hub pattern)
+        use_checkpointer: If True, use MemorySaver checkpointer
+
+    Returns:
+        Compiled state graph for the executor agent
+    """
+    from src.base.async_env import load_env_async
+    await load_env_async(override=True)
+
+    from src.agents.executor.executor_agent import PipelineExecutorAgent
+    from src.agents.executor.executor_state import PipelineExecutorState
+
+    llm = _create_llm_for_graph(llm_provider)
+    checkpointer = MemorySaver() if use_checkpointer else None
+
+    agent = PipelineExecutorAgent(
+        model=llm,
+        state_schema=PipelineExecutorState,
+        checkpointer=checkpointer,
+        is_debug=is_debug,
+    )
+
+    return agent.graph.with_config({"recursion_limit": recursion_limit})
+
+
+def _get_executor_graph() -> CompiledStateGraph:
+    """Pipeline Executor graph (sync wrapper) - for LangGraph CLI"""
+    return _run_async_safely(
+        create_executor_graph(use_checkpointer=False, is_debug=False)
+    )
+
+
+# LangGraph CLI export for Pipeline Executor agent
+executor_graph = _get_executor_graph()
 
 
 # ==============================================================================
