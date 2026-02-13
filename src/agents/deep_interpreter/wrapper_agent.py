@@ -3,15 +3,20 @@
 This module implements a wrapper agent that manages the complete spatial
 analysis pipeline before invoking the Deep Agent for interpretation.
 
-Architecture (8-node graph):
-1. check_state: Route to next incomplete phase
-2. info_collection: Collect h5ad files, keys, directories from user
-3. info_validation: Validate collected information
-4. run_single_analysis_step: Execute spatial analysis Steps 1-8 via MCP (one step per loop iteration)
-5. research_discussion: HITL with 2x interrupt() for cluster/celltype/factor selection
-6. run_single_analysis_step_9_11: Execute targeted analysis Steps 9-11 via MCP (one step per loop iteration)
-7. confirm_interpretation: HITL confirmation before expensive Deep Agent invocation
-8. invoke_deep_agent: Invoke Deep Agent for interpretation/report generation
+Architecture (10-node graph):
+1.  check_state: Route to next incomplete phase
+2.  info_collection: Collect h5ad files, keys, directories from user
+3.  info_validation: Validate collected information
+4.  run_single_analysis_step: Execute spatial analysis Steps 1-8 via MCP (one step per loop iteration)
+5a. prepare_research_summary: CSV reads + LLM suggestion (no interrupt, runs ONCE)
+5b. collect_clusters: 1x interrupt() for cluster/celltype selection (re-prompts if empty)
+5c. collect_factor: 1x interrupt() for NMF factor selection
+6.  run_single_analysis_step_9_11: Execute targeted analysis Steps 9-11 via MCP (one step per loop iteration)
+7.  confirm_interpretation: HITL confirmation before expensive Deep Agent invocation
+8.  invoke_deep_agent: Invoke Deep Agent for interpretation/report generation
+
+Each interrupt() is in its own node to prevent re-execution of expensive
+CSV reads and LLM calls on resume.
 
 MCP Server: sp-enrich-mcp (FastMCP, stdio transport)
 Pattern Reference: STPipelineBuilderAgent (st_pipeline_info_agent.py)
@@ -37,6 +42,7 @@ from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
 
 from src.base import BaseAgent
+from src.base.util import CANCEL_KEYWORDS
 from src.agents.deep_interpreter.info_extraction import DeepInterpreterInfoExtraction
 from src.agents.deep_interpreter.wrapper_state import DeepInterpreterWrapperState
 
@@ -46,7 +52,7 @@ logger = logging.getLogger(__name__)
 class DeepInterpreterWrapperAgent(BaseAgent):
     """Wrapper agent for Deep Interpreter with full spatial analysis pipeline.
 
-    Graph Flow:
+    Graph Flow (10 nodes):
         START → check_state
           ├─(need_info)──→ info_collection ←─┐
           │                     ↓              │
@@ -56,7 +62,11 @@ class DeepInterpreterWrapperAgent(BaseAgent):
           │                          ↓ (loop)               │
           │                     route_after_step ────────────┘
           │                          ↓ (done)
-          ├─(analysis done)──→ research_discussion (2x interrupt() HITL)
+          ├─(analysis done)──→ prepare_research_summary (no interrupt, runs ONCE)
+          │                          ↓
+          │                    collect_clusters (1x interrupt, re-prompts if empty)
+          │                          ↓
+          │                    collect_factor (1x interrupt)
           │                          ↓
           ├─(research done)──→ run_single_analysis_step_9_11 ←──┐
           │                          ↓ (loop)                    │
@@ -72,7 +82,9 @@ class DeepInterpreterWrapperAgent(BaseAgent):
         "INFO_COL": "info_collection",
         "INFO_VAL": "info_validation",
         "RUN_SINGLE_STEP": "run_single_analysis_step",
-        "RESEARCH_DISCUSSION": "research_discussion",
+        "PREPARE_RESEARCH": "prepare_research_summary",
+        "COLLECT_CLUSTERS": "collect_clusters",
+        "COLLECT_FACTOR": "collect_factor",
         "RUN_SINGLE_STEP_9_11": "run_single_analysis_step_9_11",
         "CONFIRM_INTERP": "confirm_interpretation",
         "INVOKE_DEEP": "invoke_deep_agent",
@@ -238,7 +250,15 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             return create_deep_interpreter_agent(config)
 
     def _build_research_summary(
-        self, celltype_csv: pd.DataFrame, factor_csv: pd.DataFrame, state: dict
+        self,
+        celltype_csv: pd.DataFrame,
+        factor_csv: pd.DataFrame,
+        state: dict,
+        nhood_csv: pd.DataFrame | None = None,
+        pathway_csv: pd.DataFrame | None = None,
+        misty_csv: pd.DataFrame | None = None,
+        pathway_factor_csv: pd.DataFrame | None = None,
+        liana_summary: str | None = None,
     ) -> str:
         """Build a summary of analysis results for research discussion.
 
@@ -246,6 +266,11 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             celltype_csv: DataFrame from sig_clusterwithcelltyp.csv
             factor_csv: DataFrame from res_liana_cluster_factor.csv
             state: Current wrapper state
+            nhood_csv: DataFrame from res_nhood_enrichment.csv (optional)
+            pathway_csv: DataFrame from sig_PathwayEnrich_decoupler.csv (optional)
+            misty_csv: DataFrame from res_SpatialRelationship_MISTy.csv (optional)
+            pathway_factor_csv: DataFrame from sig_liana_pathway_factor.csv (optional)
+            liana_summary: Compact summary string from sig_liana.csv (optional)
 
         Returns:
             Formatted summary string
@@ -261,9 +286,38 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         summary_parts.append("\n## Cluster-Cell Type Mapping")
         summary_parts.append(celltype_csv.to_string(index=False))
 
+        # Neighborhood enrichment (spatial co-localization)
+        if nhood_csv is not None:
+            summary_parts.append("\n## Neighborhood Enrichment (Spatial Co-localization)")
+            summary_parts.append("Which cluster pairs are spatially proximal (z-scores):")
+            summary_parts.append(nhood_csv.to_string(index=False))
+
+        # Pathway enrichment per cluster
+        if pathway_csv is not None:
+            summary_parts.append("\n## Pathway Enrichment per Cluster")
+            summary_parts.append("Active pathways per cluster (e.g., NFkB, EGFR, Hypoxia):")
+            summary_parts.append(pathway_csv.to_string(index=False))
+
+        # Spatial pathway-celltype relationships (MISTy)
+        if misty_csv is not None:
+            summary_parts.append("\n## Spatial Pathway-Cell Type Relationships (MISTy)")
+            summary_parts.append("Which pathways spatially predict which cell types:")
+            summary_parts.append(misty_csv.to_string(index=False))
+
         # Factor scores
         summary_parts.append("\n## NMF Factor-Cluster Scores")
         summary_parts.append(factor_csv.to_string(index=False))
+
+        # NMF factor-pathway associations
+        if pathway_factor_csv is not None:
+            summary_parts.append("\n## NMF Factor-Pathway Associations")
+            summary_parts.append("Which pathways drive each NMF factor:")
+            summary_parts.append(pathway_factor_csv.to_string(index=False))
+
+        # L-R interaction landscape summary
+        if liana_summary is not None:
+            summary_parts.append("\n## L-R Interaction Landscape (Summary)")
+            summary_parts.append(liana_summary)
 
         return "\n".join(summary_parts)
 
@@ -300,6 +354,85 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         # Compute mean score per factor across interest clusters
         means = filtered[factor_cols].mean()
         return str(means.idxmax())
+
+    def _resolve_celltype_cluster_mapping(
+        self,
+        save_path: str,
+        parsed_celltypes: list[str],
+        parsed_clusters: list[str],
+        max_clusters_per_celltype: int = 5,
+    ) -> tuple[list[str], list[str]]:
+        """Bidirectional celltype<->cluster mapping using sig_clusterwithcelltyp.csv.
+
+        - If celltypes provided but no clusters: fuzzy substring match -> extract cluster IDs
+        - If clusters provided but no celltypes: look up dominant celltypes per cluster
+        - If both provided or both empty: pass through unchanged
+
+        Args:
+            save_path: Path to results directory containing sig_clusterwithcelltyp.csv
+            parsed_celltypes: User-provided celltype names (may be partial, e.g. "tumor")
+            parsed_clusters: User-provided cluster IDs (numeric strings)
+            max_clusters_per_celltype: Max clusters to return per matched celltype
+
+        Returns:
+            Tuple of (resolved_clusters, resolved_celltypes)
+        """
+        try:
+            ct_csv = pd.read_csv(f"{save_path}/sig_clusterwithcelltyp.csv")
+        except FileNotFoundError:
+            logger.warning("sig_clusterwithcelltyp.csv not found, skipping celltype<->cluster mapping")
+            return parsed_clusters, parsed_celltypes
+
+        # Validate required columns and non-empty
+        required_cols = {"cluster", "celltype", "cluster_medians"}
+        missing = required_cols - set(ct_csv.columns)
+        if missing or ct_csv.empty:
+            logger.warning(
+                "sig_clusterwithcelltyp.csv missing columns %s or empty, skipping mapping. Available: %s",
+                missing, list(ct_csv.columns),
+            )
+            return parsed_clusters, parsed_celltypes
+
+        resolved_clusters = list(parsed_clusters)
+        resolved_celltypes = list(parsed_celltypes)
+
+        # Direction 1: celltypes -> clusters (when user gave celltypes but no cluster IDs)
+        if not resolved_clusters and resolved_celltypes:
+            # Build combined mask (single filter pass, avoids O(n^2) concat)
+            masks = []
+            for ct_query in resolved_celltypes:
+                escaped = re.escape(ct_query)  # Safety for special chars like "T Cell & Tumor"
+                masks.append(ct_csv["celltype"].str.contains(escaped, case=False, na=False))
+            combined_mask = pd.concat(masks, axis=1).any(axis=1) if masks else pd.Series([False] * len(ct_csv))
+            matched_rows = ct_csv[combined_mask]
+
+            if not matched_rows.empty:
+                matched_rows = matched_rows.drop_duplicates(subset=["cluster", "celltype"])
+                matched_rows = matched_rows.sort_values("cluster_medians", ascending=False)
+                resolved_clusters = [
+                    str(c) for c in matched_rows["cluster"].unique()[:max_clusters_per_celltype]
+                ]
+                resolved_celltypes = list(matched_rows["celltype"].unique())
+                logger.info(
+                    "Auto-mapped celltypes %s -> clusters %s (matched: %s)",
+                    parsed_celltypes, resolved_clusters, resolved_celltypes,
+                )
+
+        # Direction 2: clusters -> celltypes (when user gave cluster IDs but no celltypes)
+        elif not resolved_celltypes and resolved_clusters:
+            ct_csv_copy = ct_csv.copy()
+            ct_csv_copy["cluster"] = ct_csv_copy["cluster"].astype(str)
+            matched = ct_csv_copy[ct_csv_copy["cluster"].isin(resolved_clusters)]
+            if not matched.empty:
+                dominant = matched.sort_values("cluster_medians", ascending=False)
+                dominant = dominant.drop_duplicates(subset=["cluster"], keep="first")
+                resolved_celltypes = list(dominant["celltype"].unique())
+                logger.info(
+                    "Auto-mapped clusters %s -> celltypes %s",
+                    parsed_clusters, resolved_celltypes,
+                )
+
+        return resolved_clusters, resolved_celltypes
 
     def _build_step_args(self, step: int, state: dict) -> dict:
         """Build MCP tool arguments for Steps 1-8."""
@@ -483,7 +616,9 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         graph.add_node(self.get_node_name("INFO_COL"), self.info_collection_node)
         graph.add_node(self.get_node_name("INFO_VAL"), self.info_validation_node)
         graph.add_node(self.get_node_name("RUN_SINGLE_STEP"), self.run_single_analysis_step_node)
-        graph.add_node(self.get_node_name("RESEARCH_DISCUSSION"), self.research_discussion_node)
+        graph.add_node(self.get_node_name("PREPARE_RESEARCH"), self.prepare_research_summary_node)
+        graph.add_node(self.get_node_name("COLLECT_CLUSTERS"), self.collect_clusters_node)
+        graph.add_node(self.get_node_name("COLLECT_FACTOR"), self.collect_factor_node)
         graph.add_node(self.get_node_name("RUN_SINGLE_STEP_9_11"), self.run_single_analysis_step_9_11_node)
         graph.add_node(self.get_node_name("CONFIRM_INTERP"), self.confirm_interpretation_node)
         graph.add_node(self.get_node_name("INVOKE_DEEP"), self.invoke_deep_agent_node)
@@ -494,7 +629,9 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         info_col = self.get_node_name("INFO_COL")
         info_val = self.get_node_name("INFO_VAL")
         run_single_step = self.get_node_name("RUN_SINGLE_STEP")
-        research = self.get_node_name("RESEARCH_DISCUSSION")
+        prepare_research = self.get_node_name("PREPARE_RESEARCH")
+        collect_clusters = self.get_node_name("COLLECT_CLUSTERS")
+        collect_factor = self.get_node_name("COLLECT_FACTOR")
         run_single_step_9_11 = self.get_node_name("RUN_SINGLE_STEP_9_11")
         confirm_interp = self.get_node_name("CONFIRM_INTERP")
         invoke_deep = self.get_node_name("INVOKE_DEEP")
@@ -506,7 +643,8 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         graph.add_conditional_edges(
             check_state,
             self.route_after_check,
-            [info_col, run_single_step, research, run_single_step_9_11, confirm_interp, invoke_deep],
+            [info_col, run_single_step, prepare_research, collect_clusters,
+             collect_factor, run_single_step_9_11, confirm_interp, invoke_deep],
         )
 
         # info_collection → [END | info_validation | info_collection]
@@ -523,15 +661,27 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             [info_col, run_single_step],
         )
 
-        # run_single_step → loop or proceed to research
+        # run_single_step → loop or proceed to prepare_research
         graph.add_conditional_edges(
             run_single_step,
             self.route_after_step,
-            [run_single_step, research],
+            [run_single_step, prepare_research],
         )
 
-        # research_discussion → run_single_step_9_11
-        graph.add_edge(research, run_single_step_9_11)
+        # prepare_research → collect_clusters (always)
+        graph.add_edge(prepare_research, collect_clusters)
+
+        # collect_clusters → self-loop (re-prompt), collect_factor, OR END (if user cancels)
+        graph.add_conditional_edges(
+            collect_clusters, self.route_after_clusters,
+            [collect_clusters, collect_factor, END],
+        )
+
+        # collect_factor → run_single_step_9_11 OR END (if user cancels)
+        graph.add_conditional_edges(
+            collect_factor, self.route_after_factor,
+            [run_single_step_9_11, END],
+        )
 
         # run_single_step_9_11 → loop or proceed to confirm
         graph.add_conditional_edges(
@@ -560,8 +710,13 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             return self.get_node_name("INFO_COL")
         if not state.get("analysis_1_8_complete"):
             return self.get_node_name("RUN_SINGLE_STEP")
+        # Research discussion sub-phase routing
+        if not state.get("research_summary_prepared"):
+            return self.get_node_name("PREPARE_RESEARCH")
+        if not state.get("clusters_collected"):
+            return self.get_node_name("COLLECT_CLUSTERS")
         if not state.get("research_discussion_complete"):
-            return self.get_node_name("RESEARCH_DISCUSSION")
+            return self.get_node_name("COLLECT_FACTOR")
         if not state.get("analysis_9_11_complete"):
             return self.get_node_name("RUN_SINGLE_STEP_9_11")
         if not state.get("interpretation_confirmed"):
@@ -593,9 +748,9 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
     def route_after_step(
         self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
     ) -> str:
-        """Route after single analysis step: loop or proceed to research."""
+        """Route after single analysis step: loop or proceed to prepare_research."""
         if state.get("analysis_1_8_complete"):
-            return self.get_node_name("RESEARCH_DISCUSSION")
+            return self.get_node_name("PREPARE_RESEARCH")
         return self.get_node_name("RUN_SINGLE_STEP")
 
     def route_after_step_9_11(
@@ -604,6 +759,24 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         """Route after single analysis step 9-11: loop or proceed to confirm."""
         if state.get("analysis_9_11_complete"):
             return self.get_node_name("CONFIRM_INTERP")
+        return self.get_node_name("RUN_SINGLE_STEP_9_11")
+
+    def route_after_clusters(
+        self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
+    ) -> str:
+        """Route after cluster collection: self-loop, proceed to factor, or end if cancelled."""
+        if state.get("research_discussion_complete"):
+            return END
+        if not state.get("clusters_collected"):
+            return self.get_node_name("COLLECT_CLUSTERS")  # self-loop for re-prompt
+        return self.get_node_name("COLLECT_FACTOR")
+
+    def route_after_factor(
+        self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
+    ) -> str:
+        """Route after factor collection: proceed to steps 9-11 or end if cancelled."""
+        if state.get("analysis_9_11_complete"):
+            return END
         return self.get_node_name("RUN_SINGLE_STEP_9_11")
 
     def route_after_confirmation(
@@ -883,20 +1056,19 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
 
         return update
 
-    # ===== Node 5: Research Discussion (HITL with 2x interrupt()) =====
+    # ===== Node 5a: Prepare Research Summary (no interrupt, runs ONCE) =====
 
-    async def research_discussion_node(
+    async def prepare_research_summary_node(
         self, state: DeepInterpreterWrapperState, config: RunnableConfig
     ) -> dict:
-        """HITL research discussion with 2 sequential interrupt() calls.
+        """Read CSVs and generate LLM suggestion. No interrupt — runs once.
 
-        Phase A: LLM reads CSVs and prepares summary
-        Phase B: interrupt() #1 - Confirm interest_celltypes + interest_clusters
-        Phase C: interrupt() #2 - Confirm sel_factor
+        Stores llm_suggestion in state so collect_clusters can use it
+        without re-running this expensive work on resume.
         """
         save_path = state["data_directory"]
 
-        # Phase A: Read analysis outputs and build summary
+        # Read analysis outputs — required CSVs
         try:
             celltype_csv = pd.read_csv(f"{save_path}/sig_clusterwithcelltyp.csv")
         except FileNotFoundError:
@@ -910,30 +1082,128 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
                 "Steps 1-8 may not have completed successfully."
             )
 
-        summary = self._build_research_summary(celltype_csv, factor_csv, state)
+        # Read additional CSVs — all optional, gracefully skip if missing
+        nhood_csv = None
+        try:
+            nhood_csv = pd.read_csv(f"{save_path}/res_nhood_enrichment.csv")
+        except FileNotFoundError:
+            logger.debug("res_nhood_enrichment.csv not found — skipping neighborhood enrichment context")
+
+        pathway_csv = None
+        try:
+            pathway_csv = pd.read_csv(f"{save_path}/sig_PathwayEnrich_decoupler.csv")
+        except FileNotFoundError:
+            logger.debug("sig_PathwayEnrich_decoupler.csv not found — skipping pathway enrichment context")
+
+        misty_csv = None
+        try:
+            misty_csv = pd.read_csv(f"{save_path}/res_SpatialRelationship_MISTy.csv")
+        except FileNotFoundError:
+            logger.debug("res_SpatialRelationship_MISTy.csv not found — skipping MISTy context")
+
+        pathway_factor_csv = None
+        try:
+            pathway_factor_csv = pd.read_csv(f"{save_path}/sig_liana_pathway_factor.csv")
+        except FileNotFoundError:
+            logger.debug("sig_liana_pathway_factor.csv not found — skipping factor-pathway context")
+
+        # sig_liana.csv — summarize only (can be 1000+ rows)
+        liana_summary = None
+        try:
+            liana_df = pd.read_csv(f"{save_path}/sig_liana.csv")
+            summary_lines = []
+            # Count of significant L-R pairs per factor
+            factor_cols_liana = [c for c in liana_df.columns if c.startswith("Factor")]
+            if factor_cols_liana:
+                # Each factor column has scores; count non-null entries per factor
+                pair_counts = {f: int(liana_df[f].notna().sum()) for f in factor_cols_liana}
+                summary_lines.append(f"Significant L-R pairs per factor: {pair_counts}")
+            # Top 5 L-R pairs by Moran's R score (if column exists)
+            morans_col = None
+            for candidate in ["morans_r", "MoransR", "morans_R", "Morans_R"]:
+                if candidate in liana_df.columns:
+                    morans_col = candidate
+                    break
+            if morans_col:
+                top5 = liana_df.nlargest(5, morans_col)
+                interaction_col = "interaction" if "interaction" in top5.columns else top5.columns[0]
+                top5_str = top5[[interaction_col, morans_col]].to_string(index=False)
+                summary_lines.append(f"Top 5 L-R pairs by Moran's R:\n{top5_str}")
+            # Unique pathway count
+            pathway_col = None
+            for candidate in ["pathway", "Pathway", "pathway_name"]:
+                if candidate in liana_df.columns:
+                    pathway_col = candidate
+                    break
+            if pathway_col:
+                n_pathways = liana_df[pathway_col].nunique()
+                summary_lines.append(f"Unique pathways represented: {n_pathways}")
+            summary_lines.append(f"Total significant L-R pairs: {len(liana_df)}")
+            liana_summary = "\n".join(summary_lines)
+        except FileNotFoundError:
+            logger.debug("sig_liana.csv not found — skipping L-R landscape summary")
+
+        summary = self._build_research_summary(
+            celltype_csv, factor_csv, state,
+            nhood_csv=nhood_csv,
+            pathway_csv=pathway_csv,
+            misty_csv=misty_csv,
+            pathway_factor_csv=pathway_factor_csv,
+            liana_summary=liana_summary,
+        )
 
         # LLM suggests interest_clusters and interest_celltypes based on disease context
         disease = state.get("disease", "unknown")
-        llm_suggestion = await self.get_model(config).ainvoke([
+        llm_result = await self.get_model(config).ainvoke([
             SystemMessage(content=(
                 f"You are analyzing {disease} spatial transcriptomics data. "
-                "Based on the analysis summary below, suggest which clusters and cell types "
-                "are most relevant for investigating cell-cell interactions in this disease context. "
+                "Based on the comprehensive analysis summary below, suggest which clusters "
+                "and cell types are most relevant for investigating cell-cell interactions. "
+                "Consider ALL evidence: cell type composition, spatial co-localization, "
+                "active pathways, spatial relationships, and NMF factor-pathway associations. "
+                "Also suggest the most informative NMF factor based on pathway enrichments. "
                 "Be specific about WHY each cluster/celltype is interesting."
             )),
             HumanMessage(content=f"Analysis results:\n{summary}\n\nSuggest interest clusters and cell types."),
         ])
 
-        # Phase B: interrupt() #1 - Confirm interest_celltypes + interest_clusters
-        # User-facing prompt omits CSV tables (LLM suggestion already used full summary above)
+        if self.is_debug:
+            print("Research summary prepared and LLM suggestion cached.")
+
+        return {
+            "research_summary_prepared": True,
+            "llm_suggestion": llm_result.content,
+        }
+
+    # ===== Node 5b: Collect Clusters (single interrupt, self-loop for re-prompt) =====
+
+    async def collect_clusters_node(
+        self, state: DeepInterpreterWrapperState, config: RunnableConfig
+    ) -> dict:
+        """HITL cluster/celltype selection with exactly ONE interrupt() per invocation.
+
+        Uses cluster_attempt state to decide prompt text:
+          attempt=0 → full AI suggestion prompt
+          attempt>=1 → re-prompt asking specifically for cluster IDs
+
+        On empty clusters: returns clusters_collected=False so route_after_clusters
+        loops back to this node (self-loop pattern). Max 2 re-prompts before
+        proceeding with empty clusters to prevent infinite loops.
+        """
+        attempt = state.get("cluster_attempt") or 0
+        save_path = state["data_directory"]
         disease = state.get("disease", "unknown")
         st_tech = state.get("st_technology", "unknown")
-        prompt1 = f"""## Analysis Context
+
+        # Build prompt based on attempt number
+        if attempt == 0:
+            llm_suggestion_text = state.get("llm_suggestion", "No suggestion available.")
+            prompt = f"""## Analysis Context
 - Disease: {disease}
 - Platform: {st_tech}
 
 ## AI Suggestion
-{llm_suggestion.content}
+{llm_suggestion_text}
 
 Please review the image at: `{save_path}/2.celltype_heatmap_analysis.png`
 
@@ -942,40 +1212,120 @@ Please review the image at: `{save_path}/2.celltype_heatmap_analysis.png`
 - interest_clusters: (e.g., ["4", "16", "17"])
 
 Please provide your selections as JSON or natural language."""
-
-        response1 = interrupt(value={"message": prompt1})
-
-        # Parse response1
-        if isinstance(response1, dict):
-            actual_response1 = response1.get("response", response1.get("message", str(response1)))
         else:
-            actual_response1 = str(response1)
+            prompt = (
+                "**No clusters were detected in your response.** "
+                "Steps 9-11 require at least one cluster.\n\n"
+                "Please provide interest_clusters as a list of cluster IDs "
+                "(e.g., [\"4\", \"16\", \"17\"] or just: 4, 16, 17)."
+            )
+
+        # Single unconditional interrupt — always reached
+        response = interrupt(value={"message": prompt})
+
+        # Parse response
+        if isinstance(response, dict):
+            actual_response = response.get("response", response.get("message", str(response)))
+        else:
+            actual_response = str(response)
+
+        # Check for cancel/skip
+        if actual_response.lower().strip() in CANCEL_KEYWORDS:
+            logger.info("User cancelled at cluster selection (attempt %d). Ending workflow.", attempt)
+            return {
+                "clusters_collected": True,
+                "research_discussion_complete": True,
+                "analysis_9_11_complete": True,
+                "interpretation_confirmed": False,
+                "messages": [AIMessage(content="Research discussion cancelled by user.")],
+            }
 
         # Use LLM to extract structured data from user response
-        parse_result1 = await self.get_model(config).ainvoke([
+        parse_result = await self.get_model(config).ainvoke([
             SystemMessage(content=(
                 "Extract interest_celltypes and interest_clusters from the user's response. "
                 "Return ONLY valid JSON: {\"interest_celltypes\": [...], \"interest_clusters\": [...]}\n"
                 "Cluster IDs must be strings (e.g. \"4\" not 4)."
             )),
-            HumanMessage(content=actual_response1),
+            HumanMessage(content=actual_response),
         ])
 
         try:
-            parsed1 = json.loads(parse_result1.content)
-            parsed_celltypes = parsed1.get("interest_celltypes", [])
-            parsed_clusters = parsed1.get("interest_clusters", [])
+            raw_content = parse_result.content.strip()
+            # Strip markdown fences (LLMs often wrap JSON in ```json ... ```)
+            if raw_content.startswith("```"):
+                raw_content = re.sub(r'^```(?:json)?\s*', '', raw_content)
+                raw_content = re.sub(r'\s*```$', '', raw_content)
+            parsed = json.loads(raw_content)
+            parsed_celltypes = parsed.get("interest_celltypes", [])
+            parsed_clusters = parsed.get("interest_clusters", [])
         except (json.JSONDecodeError, AttributeError) as e:
-            logger.warning(f"JSON parse failed: {e}. Raw: {parse_result1.content[:200]}")
-            # Regex fallback: extract cluster numbers and quoted cell type strings
-            cluster_match = re.findall(r'\b(\d+)\b', actual_response1)
+            logger.warning(f"JSON parse failed: {e}. Raw: {parse_result.content[:200]}")
+            # Regex fallback: extract cluster numbers and quoted/single-quoted cell type strings
+            cluster_match = re.findall(r'\b(\d+)\b', actual_response)
             parsed_clusters = cluster_match[:10] if cluster_match else []
-            celltype_match = re.findall(r'"([^"]+)"', actual_response1)
-            parsed_celltypes = celltype_match if celltype_match else []
-            if not parsed_clusters:
-                logger.error("Could not extract interest_clusters - Steps 9-11 may produce empty results")
+            celltype_match = re.findall(
+                r'"([^"]+)"|\'([^\']+)\'|(?:^|,)\s*([A-Z][a-zA-Z\s]+?)(?=\s*,|\s*$)',
+                actual_response,
+            )
+            # Flatten regex groups (each match is a tuple of 3 groups, only one is non-empty)
+            parsed_celltypes = [g for groups in celltype_match for g in groups if g] if celltype_match else []
 
-        # Phase C: interrupt() #2 - Confirm sel_factor
+        # Bidirectional celltype<->cluster auto-mapping
+        parsed_clusters, parsed_celltypes = self._resolve_celltype_cluster_mapping(
+            save_path, parsed_celltypes, parsed_clusters,
+        )
+
+        # If clusters empty: self-loop for re-prompt (up to 2 re-prompts)
+        if not parsed_clusters:
+            if attempt >= 2:
+                logger.error("Still no clusters after %d re-prompts. Proceeding with empty clusters.", attempt)
+            else:
+                logger.warning("Empty cluster selection (attempt %d). Will re-prompt.", attempt)
+                # Preserve celltypes from first attempt if we got some
+                update = {
+                    "cluster_attempt": attempt + 1,
+                    "clusters_collected": False,  # triggers self-loop via route_after_clusters
+                    "messages": [HumanMessage(content=actual_response)],
+                }
+                if parsed_celltypes:
+                    update["interest_celltypes"] = parsed_celltypes
+                return update
+
+        if self.is_debug:
+            print(f"Clusters collected: {parsed_clusters}, celltypes: {parsed_celltypes}")
+
+        # Merge celltypes: use newly parsed ones, or fall back to state (from previous attempt)
+        final_celltypes = parsed_celltypes or state.get("interest_celltypes") or []
+
+        return {
+            "interest_celltypes": final_celltypes,
+            "interest_clusters": parsed_clusters,
+            "clusters_collected": True,
+            "messages": [HumanMessage(content=actual_response)],
+        }
+
+    # ===== Node 5c: Collect Factor (1x interrupt) =====
+
+    async def collect_factor_node(
+        self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
+    ) -> dict:
+        """HITL factor selection with single interrupt().
+
+        Reads interest_clusters from state to compute best factor suggestion.
+        """
+        save_path = state["data_directory"]
+        parsed_clusters = state.get("interest_clusters") or []
+
+        # Read factor CSV for suggestion computation
+        try:
+            factor_csv = pd.read_csv(f"{save_path}/res_liana_cluster_factor.csv")
+        except FileNotFoundError:
+            raise ValueError(
+                f"res_liana_cluster_factor.csv not found in {save_path}. "
+                "Steps 1-8 may not have completed successfully."
+            )
+
         sel_factor_suggestion = self._suggest_factor(factor_csv, parsed_clusters)
         available_factors = [c for c in factor_csv.columns if c.startswith("Factor")]
 
@@ -993,36 +1343,43 @@ Available factors: {available_factors}
         else:
             actual_response2 = str(response2)
 
+        # Check for cancel/skip
+        if actual_response2.lower().strip() in CANCEL_KEYWORDS:
+            logger.info("User cancelled at factor selection. Ending workflow.")
+            return {
+                "research_discussion_complete": True,
+                "analysis_9_11_complete": True,
+                "interpretation_confirmed": False,
+                "messages": [AIMessage(content="Factor selection cancelled by user.")],
+            }
+
         # Parse factor selection
         parsed_factor = sel_factor_suggestion  # default
         response2_lower = actual_response2.lower().strip()
         if "factor" in response2_lower:
-            # Extract factor name (e.g. "Factor_3")
             match = re.search(r"factor[_\s]?(\d+)", response2_lower)
             if match:
                 candidate = f"Factor_{match.group(1)}"
                 if candidate in available_factors:
                     parsed_factor = candidate
-                # else: keep sel_factor_suggestion (auto-detected best factor)
+                else:
+                    logger.warning(
+                        f"User selected {candidate} but not in available: {available_factors}. "
+                        f"Using suggestion: {sel_factor_suggestion}"
+                    )
         elif response2_lower in ("yes", "ok", "confirm", "y", "sure", "accepted"):
             parsed_factor = sel_factor_suggestion
 
         if self.is_debug:
             print(f"Research discussion complete:")
-            print(f"  interest_celltypes: {parsed_celltypes}")
             print(f"  interest_clusters: {parsed_clusters}")
             print(f"  sel_factor: {parsed_factor}")
 
         return {
-            "interest_celltypes": parsed_celltypes,
-            "interest_clusters": parsed_clusters,
             "sel_factor": parsed_factor,
             "research_discussion_complete": True,
             "current_analysis_step": 9,  # Reset for Steps 9-11 phase
-            "messages": [
-                HumanMessage(content=actual_response1),
-                HumanMessage(content=actual_response2),
-            ],
+            "messages": [HumanMessage(content=actual_response2)],
         }
 
     # ===== Node 6: Run Single Analysis Step 9-11 (Loop Pattern) =====
@@ -1144,8 +1501,7 @@ Available factors: {available_factors}
         if isinstance(response, dict):
             response_str = response.get("response", response.get("message", str(response))).strip().lower()
 
-        cancel_keywords = {"no", "cancel", "skip", "아니오", "취소", "n"}
-        if response_str in cancel_keywords:
+        if not response_str or response_str in CANCEL_KEYWORDS:
             logger.info("User declined interpretation. Ending workflow.")
             return {
                 "interpretation_confirmed": False,

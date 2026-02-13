@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1770919920528,
+  "lastScanned": 1771006484941,
   "projectRoot": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST",
   "techStack": {
     "languages": [
@@ -49,7 +49,7 @@
       "path": "agent-chat-ui",
       "purpose": null,
       "fileCount": 24,
-      "lastAccessed": 1770919920520,
+      "lastAccessed": 1771006484932,
       "keyFiles": [
         "LICENSE",
         "Makefile",
@@ -62,7 +62,7 @@
       "path": "agent_architecture",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1770919920520,
+      "lastAccessed": 1771006484932,
       "keyFiles": [
         "1.pipeline_builder.mermaid",
         "1.pipeline_builder.png",
@@ -75,27 +75,27 @@
       "path": "docker",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1770919920521,
+      "lastAccessed": 1771006484932,
       "keyFiles": []
     },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 18,
-      "lastAccessed": 1770919920521,
+      "fileCount": 19,
+      "lastAccessed": 1771006484932,
       "keyFiles": [
+        "DeepMAST Evaluation.md",
         "HypoGeniC.pdf",
         "Untitled",
         "biomedical_thinking_mcp_server.md",
-        "deep_interpreter_architecture.md",
-        "deep_interpreter_overview.md"
+        "deep_interpreter_architecture.md"
       ]
     },
     "notebook": {
       "path": "notebook",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1770919920521,
+      "lastAccessed": 1771006484932,
       "keyFiles": [
         "test_interpreter_steps.ipynb",
         "test_load_analysis_data.ipynb"
@@ -105,7 +105,7 @@
       "path": "old",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1770919920521,
+      "lastAccessed": 1771006484933,
       "keyFiles": [
         "st_pipeline_info_agent copy.py"
       ]
@@ -113,21 +113,21 @@
     "order": {
       "path": "order",
       "purpose": null,
-      "fileCount": 7,
-      "lastAccessed": 1770919920522,
+      "fileCount": 9,
+      "lastAccessed": 1771006484933,
       "keyFiles": [
+        "order_HITL",
         "order_deepagent",
         "order_executor",
         "order_html",
-        "order_interpreotr",
-        "order_pubmedrag_agnet"
+        "order_interpreotr"
       ]
     },
     "res": {
       "path": "res",
       "purpose": null,
       "fileCount": 39,
-      "lastAccessed": 1770919920522,
+      "lastAccessed": 1771006484933,
       "keyFiles": [
         "1.spatial.png",
         "10.spatial_plot_interections.png",
@@ -139,28 +139,28 @@
     "res_bc": {
       "path": "res_bc",
       "purpose": null,
-      "fileCount": 17,
-      "lastAccessed": 1770919920522,
+      "fileCount": 21,
+      "lastAccessed": 1771006484933,
       "keyFiles": [
         "1.cluster_spatial.png",
-        "1.spatial.png",
+        "10.spatial_plot_interections.png",
+        "11.lr_interections.png",
         "2.celltype_heatmap_analysis.png",
-        "3.neighborhood_enrichment_squidpy.png",
-        "4.spatial_enrich_decoupler.png"
+        "3.neighborhood_enrichment_squidpy.png"
       ]
     },
     "skills": {
       "path": "skills",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1770919920522,
+      "lastAccessed": 1771006484933,
       "keyFiles": []
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1770919920523,
+      "lastAccessed": 1771006484933,
       "keyFiles": [
         "__init__.py"
       ]
@@ -169,7 +169,7 @@
       "path": "tests",
       "purpose": "Test files",
       "fileCount": 5,
-      "lastAccessed": 1770919920523,
+      "lastAccessed": 1771006484933,
       "keyFiles": [
         "__init__.py",
         "test_openrouter_kimi.ipynb",

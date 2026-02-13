@@ -4,6 +4,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+# Shared cancel/skip keywords used across all agents for consistent HITL handling
+CANCEL_KEYWORDS: frozenset[str] = frozenset({
+    "skip", "no", "reject", "cancel", "n", "아니오", "취소",
+})
+
 from langchain_core.messages import (
     AIMessage,
     convert_to_messages,

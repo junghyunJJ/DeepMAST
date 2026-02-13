@@ -20,6 +20,7 @@ from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
 
 from src.base import BaseAgent
+from src.base.util import CANCEL_KEYWORDS
 from src.agents.supervisor.supervisor_state import SupervisorState
 
 logger = logging.getLogger(__name__)
@@ -204,7 +205,7 @@ class SupervisorAgent(BaseAgent):
 
         actual = str(response.get("response", response) if isinstance(response, dict) else response)
 
-        if actual.lower().strip() in ("skip", "no", "reject", "cancel"):
+        if actual.lower().strip() in CANCEL_KEYWORDS:
             if self.is_debug:
                 print("User skipped Pipeline Builder")
             return {
@@ -238,7 +239,7 @@ class SupervisorAgent(BaseAgent):
 
         actual = str(response.get("response", response) if isinstance(response, dict) else response)
 
-        if actual.lower().strip() in ("skip", "no", "reject", "cancel"):
+        if actual.lower().strip() in CANCEL_KEYWORDS:
             if self.is_debug:
                 print("User skipped Pipeline Executor")
             return {
@@ -272,7 +273,7 @@ class SupervisorAgent(BaseAgent):
 
         actual = str(response.get("response", response) if isinstance(response, dict) else response)
 
-        if actual.lower().strip() in ("skip", "no", "reject", "cancel"):
+        if actual.lower().strip() in CANCEL_KEYWORDS:
             if self.is_debug:
                 print("User skipped Deep Interpreter")
             return {

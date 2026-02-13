@@ -47,7 +47,10 @@ class DeepInterpreterWrapperState(TypedDict):
         # Workflow control flags
         info_complete: Flag indicating all user info collected
         analysis_1_8_complete: Steps 1-8 execution flag
-        research_discussion_complete: Research HITL flag
+        research_summary_prepared: Phase A done (CSV reads + LLM suggestion cached)
+        llm_suggestion: Cached LLM suggestion text from prepare_research_summary
+        clusters_collected: Phase B done (cluster/celltype selection confirmed)
+        research_discussion_complete: Research HITL flag (all 3 sub-phases done)
         analysis_9_11_complete: Steps 9-11 execution flag
         # Deep Agent output
         deep_agent_result: Output from Deep Agent invocation (JSON string)
@@ -81,6 +84,10 @@ class DeepInterpreterWrapperState(TypedDict):
     # Workflow control flags
     info_complete: bool
     analysis_1_8_complete: bool
+    research_summary_prepared: bool       # Phase A done (CSV + LLM suggestion)
+    llm_suggestion: Optional[str]         # Cached LLM suggestion text
+    cluster_attempt: Optional[int]        # Re-prompt counter for cluster selection (0=first, 1+=re-prompt)
+    clusters_collected: bool              # Phase B done (clusters selected)
     research_discussion_complete: bool
     analysis_9_11_complete: bool
     interpretation_confirmed: bool
@@ -113,6 +120,10 @@ def create_initial_state() -> DeepInterpreterWrapperState:
         current_analysis_step=None,
         info_complete=False,
         analysis_1_8_complete=False,
+        research_summary_prepared=False,
+        llm_suggestion=None,
+        cluster_attempt=0,
+        clusters_collected=False,
         research_discussion_complete=False,
         analysis_9_11_complete=False,
         interpretation_confirmed=False,
