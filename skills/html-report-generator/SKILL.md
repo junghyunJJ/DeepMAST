@@ -52,8 +52,12 @@ skills/html-report-generator/
 │   ├── theme.css               # Full CSS with :root variables
 │   └── interactive.js          # Tab navigation and pagination
 └── examples/
-    └── reference_report.html   # Minimal shareable example (200-300 lines)
+    └── reference_report.html   # Comprehensive reference with real Visium breast cancer data
 ```
+
+**Note**: The reference example uses `<link>` to external CSS/JS files for maintainability,
+while actual generated reports embed CSS/JS inline for self-contained distribution.
+Both approaches are valid; see `report.py` for the inline embedding logic.
 
 ---
 
@@ -92,6 +96,21 @@ skills/html-report-generator/
 | `.highlight-cluster` | Yellow (`#ffd166`) | `<span class="highlight-cluster">Cluster 5</span>` |
 | `.highlight-pathway` | Pink (`#ff6b9d`) | `<span class="highlight-pathway">TGFb signaling</span>` |
 | `.highlight-celltype` | Cyan (`#64ffda`) | `<span class="highlight-celltype">Macrophages</span>` |
+
+### Light Theme
+
+The report supports a light theme via the `data-theme="light"` HTML attribute, toggled by the theme button.
+
+| Color | Hex Code | CSS Variable | Usage |
+|-------|----------|--------------|-------|
+| **Blue** | `#0066cc` | `--color-primary` | Titles, links, cell type highlights |
+| **Dark Gold** | `#b8860b` | `--color-secondary` | H3 headings, cluster highlights |
+| **Dark Pink** | `#cc3366` | `--color-accent` | H4 headings, pathway highlights |
+| **Light Gray** | `#f8f9fa` | `--bg-primary` | Body background |
+| **White** | `#ffffff` | `--bg-secondary` | Secondary background |
+| **Dark Text** | `#2c3e50` | `--text-primary` | Main body text |
+
+Toggle via JavaScript: `toggleTheme()` switches between `data-theme="dark"` and `data-theme="light"`.
 
 ---
 
@@ -305,6 +324,10 @@ Centered container for embedded figures.
 ---
 
 ## Tool Reference
+
+**Note**: The REPORTER agent also has access to `read_file` and `write_file` functions
+provided by the DeepAgents FilesystemBackend middleware. These are not listed in the
+explicit tool configuration but are always available for reading/writing virtual filesystem files.
 
 ### generate_html_report()
 
@@ -520,9 +543,9 @@ generate_html_report(
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Step 1: Gather Interpretations                                  │
-│  - Read Part 1 interpretation from /interpretations/part1.md    │
-│  - Read Part 2 interpretation from /interpretations/part2.md    │
-│  - Read Part 3 interpretation from /interpretations/part3.md    │
+│  - Read Part 1 interpretation from /part1_final.md              │
+│  - Read Part 2 interpretation from /part2_final.md              │
+│  - Read Part 3 interpretation from /part3_final.md              │
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -558,9 +581,9 @@ generate_html_report(
 | File | Purpose |
 |------|---------|
 | `/data_path.txt` | Real data directory path |
-| `/interpretations/part1.md` | Part 1 interpretation text |
-| `/interpretations/part2.md` | Part 2 interpretation text |
-| `/interpretations/part3.md` | Part 3 interpretation text |
+| `/part1_final.md` | Part 1 interpretation text |
+| `/part2_final.md` | Part 2 interpretation text |
+| `/part3_final.md` | Part 3 interpretation text |
 | `/part1_papers.json` | Part 1 literature references |
 | `/liana_papers.json` | Part 2+3 literature references |
 
@@ -579,7 +602,7 @@ biomedical-literature-search
         │
         │ Write Part interpretation with citations
         ▼
-    /interpretations/partN.md
+    /partN_final.md
         │
         │ (After all parts complete)
         ▼
@@ -596,7 +619,7 @@ html-report-generator
 ```python
 {
     "papers": [
-        {"pmid": "28930663", "title": "The TREM2-APOE...", "authors": "Krasemann S"}
+        {"pmid": "28930663", "title": "The TREM2-APOE...", "authors": "Krasemann S", "year": "2017"}
     ]
 }
 ```
@@ -605,7 +628,7 @@ html-report-generator
 ```python
 {
     "references": [
-        {"pmid": "28930663", "title": "The TREM2-APOE Pathway..."}
+        {"pmid": "28930663", "title": "The TREM2-APOE Pathway...", "authors": "Krasemann S", "year": "2017"}
     ]
 }
 ```
@@ -685,6 +708,7 @@ html-report-generator
 |----------|---------|-------|
 | `openTab(event, tabId)` | Switch tabs | `onclick="openTab(event, 'part1')"` |
 | `showPage(pageNum)` | Switch pages | `onclick="showPage(1)"` |
+| `toggleTheme()` | Toggle dark/light theme | `onclick="toggleTheme()"` |
 
 ### Tool Quick Reference
 
@@ -724,9 +748,9 @@ generate_html_report(
 
 ### Step 1: Read Interpretations
 ```python
-part1_text = read_file("/interpretations/part1.md")
-part2_text = read_file("/interpretations/part2.md")
-part3_text = read_file("/interpretations/part3.md")
+part1_text = read_file("/part1_final.md")
+part2_text = read_file("/part2_final.md")
+part3_text = read_file("/part3_final.md")
 ```
 
 ### Step 2: Collect References

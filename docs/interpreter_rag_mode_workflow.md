@@ -1,3 +1,6 @@
+> **DEPRECATED**: 종합 레퍼런스는 [interpreter_subagent_reference.md](interpreter_subagent_reference.md)를 참조하세요.
+> 이 문서는 RAG 구현 디버깅용 상세 정보를 위해 보존됩니다.
+
 # INTERPRETER Subagent RAG Mode Workflow
 
 > Full-text 기반 문헌 검증을 통한 고정확도 해석 생성 워크플로우

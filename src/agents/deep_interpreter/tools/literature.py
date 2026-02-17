@@ -10,6 +10,7 @@ LLM-powered dynamic query generation (search_literature_dynamic).
 import asyncio
 import json
 import logging
+import os
 import re
 import threading
 from typing import Any
@@ -388,6 +389,9 @@ def _parse_pmids(result: Any) -> list[str]:
     return pmids
 
 
+MAX_ABSTRACT_LENGTH = 1500  # ~200 words, sufficient for coverage matching
+
+
 def _parse_article(pmid: str, result: Any) -> dict:
     """Parse article details from BioMCP article_getter result.
 
@@ -395,6 +399,8 @@ def _parse_article(pmid: str, result: Any) -> dict:
     [{'type': 'text', 'text': '[{"pmid": 12345, "title": "...", "abstract": "..."}]'}]
 
     The 'text' field contains JSON with article details.
+    Abstracts are truncated to MAX_ABSTRACT_LENGTH characters to prevent
+    context window overflow when many papers are loaded.
     """
     article = {
         "pmid": pmid,
@@ -418,7 +424,8 @@ def _parse_article(pmid: str, result: Any) -> dict:
                         article_data = data[0]
                         if isinstance(article_data, dict):
                             article["title"] = article_data.get("title", article["title"])
-                            article["abstract"] = article_data.get("abstract", "")
+                            abstract = article_data.get("abstract", "")
+                            article["abstract"] = abstract[:MAX_ABSTRACT_LENGTH] if len(abstract) > MAX_ABSTRACT_LENGTH else abstract
                             # Also capture additional fields if available
                             if "authors" in article_data:
                                 article["authors"] = article_data["authors"]
@@ -428,7 +435,8 @@ def _parse_article(pmid: str, result: Any) -> dict:
                                 article["date"] = article_data["date"]
                     elif isinstance(data, dict):
                         article["title"] = data.get("title", article["title"])
-                        article["abstract"] = data.get("abstract", "")
+                        abstract = data.get("abstract", "")
+                        article["abstract"] = abstract[:MAX_ABSTRACT_LENGTH] if len(abstract) > MAX_ABSTRACT_LENGTH else abstract
                 except json.JSONDecodeError:
                     # Fallback: extract using regex patterns
                     title_match = re.search(r'"title"[:\s]+"([^"]+)"', text)
@@ -444,20 +452,23 @@ def _parse_article(pmid: str, result: Any) -> dict:
             data = json.loads(result)
             if isinstance(data, dict):
                 article["title"] = data.get("title", article["title"])
-                article["abstract"] = data.get("abstract", "")
+                abstract = data.get("abstract", "")
+                article["abstract"] = abstract[:MAX_ABSTRACT_LENGTH] if len(abstract) > MAX_ABSTRACT_LENGTH else abstract
             elif isinstance(data, list) and len(data) > 0:
                 article_data = data[0]
                 if isinstance(article_data, dict):
                     article["title"] = article_data.get("title", article["title"])
-                    article["abstract"] = article_data.get("abstract", "")
+                    abstract = article_data.get("abstract", "")
+                    article["abstract"] = abstract[:MAX_ABSTRACT_LENGTH] if len(abstract) > MAX_ABSTRACT_LENGTH else abstract
         except json.JSONDecodeError:
             if len(result) > 100:
-                article["abstract"] = result
+                article["abstract"] = result[:MAX_ABSTRACT_LENGTH] if len(result) > MAX_ABSTRACT_LENGTH else result
         return article
 
     if isinstance(result, dict):
         article["title"] = result.get("title", article["title"])
-        article["abstract"] = result.get("abstract", "")
+        abstract = result.get("abstract", "")
+        article["abstract"] = abstract[:MAX_ABSTRACT_LENGTH] if len(abstract) > MAX_ABSTRACT_LENGTH else abstract
         return article
 
     return article
@@ -1349,6 +1360,8 @@ def search_literature_dynamic(
     target_gene_coverage: float = 0.6,
     target_pathway_coverage: float = 0.5,
     max_iterations: int = 3,
+    output_path: str = "",
+    data_dir: str = "",
 ) -> dict:
     """LLM-powered dynamic literature search with ITERATIVE coverage improvement.
 
@@ -1370,15 +1383,18 @@ def search_literature_dynamic(
         target_gene_coverage: Target gene coverage percentage (default 0.6 = 60%)
         target_pathway_coverage: Target pathway coverage percentage (default 0.5 = 50%)
         max_iterations: Maximum search iterations (default 3)
+        output_path: If provided (e.g., "part1_papers.json"), saves complete results
+            to data_dir/output_path. If data_dir is empty, falls back to
+            DEEP_INTERPRETER_DATA_DIR env var. Returns compact summary.
+        data_dir: Directory for saving output files. Takes priority over
+            DEEP_INTERPRETER_DATA_DIR env var. SEARCHER should read this from
+            /data_path.txt (written by PLANNER).
 
     Returns:
-        Dictionary with:
-        - papers: List of relevant papers with pmid, title, abstract
-        - generated_queries: All LLM-generated query structures
-        - coverage: Final coverage metrics including percentages
-        - think_success: Whether BioMCP think was successful
-        - iterations: Number of iterations performed
-        - coverage_history: Coverage at each iteration
+        If output_path is empty: Dictionary with papers, generated_queries, coverage,
+        think_success, iterations, coverage_history.
+        If output_path is provided: Compact summary with saved_to, total_papers,
+        coverage, paper_titles (first 10), and a message.
     """
     return run_async(
         search_literature_dynamic_async(
@@ -1390,6 +1406,8 @@ def search_literature_dynamic(
             target_gene_coverage=target_gene_coverage,
             target_pathway_coverage=target_pathway_coverage,
             max_iterations=max_iterations,
+            output_path=output_path,
+            data_dir=data_dir,
         ),
         timeout=300,
     )
@@ -1405,6 +1423,8 @@ async def search_literature_dynamic_async(
     target_pathway_coverage: float = 0.5,
     max_iterations: int = 3,
     biomcp_url: str = DEFAULT_BIOMCP_URL,
+    output_path: str = "",
+    data_dir: str = "",
 ) -> dict:
     """Async version of search_literature_dynamic with ITERATIVE coverage improvement.
 
@@ -1420,10 +1440,12 @@ async def search_literature_dynamic_async(
         target_pathway_coverage: Target pathway coverage percentage (default 0.5)
         max_iterations: Maximum search iterations (default 3)
         biomcp_url: BioMCP server URL
+        output_path: If provided, saves full results to file and returns compact summary
+        data_dir: Explicit data directory for auto-save (priority over env var)
 
     Returns:
-        Dictionary with papers, generated_queries, coverage, think_success,
-        iterations, and coverage_history
+        If output_path is empty: full results dict.
+        If output_path is provided: compact summary dict.
     """
     # Initialize tracking variables
     all_papers = []
@@ -1626,7 +1648,7 @@ async def search_literature_dynamic_async(
         "pathway_coverage": final_coverage.get("pathways_coverage_pct", 0) / 100,
     })
 
-    return {
+    full_result = {
         "papers": final_papers,
         "generated_queries": all_queries,
         "coverage": final_coverage,
@@ -1635,3 +1657,44 @@ async def search_literature_dynamic_async(
         "iterations": len(coverage_history) - 1,
         "coverage_history": coverage_history,
     }
+
+    # Auto-save: write full results to file, return compact summary to LLM
+    if output_path:
+        save_dir = data_dir or os.environ.get("DEEP_INTERPRETER_DATA_DIR", "")
+        if save_dir:
+            real_path = os.path.join(save_dir, output_path)
+            try:
+                os.makedirs(save_dir, exist_ok=True)
+                with open(real_path, "w") as f:
+                    json.dump(full_result, f, indent=2, ensure_ascii=False)
+                logger.info(
+                    f"Auto-saved {len(final_papers)} papers to {real_path}"
+                )
+                return {
+                    "saved_to": real_path,
+                    "output_path": output_path,
+                    "total_papers": len(final_papers),
+                    "coverage": final_coverage,
+                    "paper_titles": [
+                        p.get("title", "")[:100] for p in final_papers[:10]
+                    ],
+                    "search_method": "search_literature_dynamic",
+                    "think_success": think_result.get("success", False),
+                    "iterations": len(coverage_history) - 1,
+                    "message": (
+                        f"Full results ({len(final_papers)} papers) saved to "
+                        f"{output_path}. Use read_file('/{output_path}') to "
+                        f"access complete data."
+                    ),
+                }
+            except Exception as e:
+                logger.warning(f"Auto-save to {real_path} failed: {e}")
+                # Fall through to return full_result
+        else:
+            logger.warning(
+                "output_path='%s' specified but neither data_dir parameter nor "
+                "DEEP_INTERPRETER_DATA_DIR env var set. Auto-save SKIPPED.",
+                output_path,
+            )
+
+    return full_result

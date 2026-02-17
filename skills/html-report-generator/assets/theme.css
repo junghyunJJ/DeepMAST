@@ -500,3 +500,296 @@ tr:hover {
 .mb-1 { margin-bottom: 10px; }
 .mb-2 { margin-bottom: 20px; }
 .mb-3 { margin-bottom: 30px; }
+
+/* ==========================================================================
+   Figure Placeholder (for reference examples without real images)
+   ========================================================================== */
+
+.figure-placeholder {
+  background: rgba(100, 255, 218, 0.1);
+  border: 2px dashed var(--color-primary);
+  padding: 60px 40px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ==========================================================================
+   Theme Toggle Button
+   ========================================================================== */
+
+.theme-toggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: var(--bg-section);
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  font-size: 1.4em;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle:hover {
+  background: rgba(100, 255, 218, 0.2);
+  transform: scale(1.1);
+}
+
+/* ==========================================================================
+   Light Theme Override
+   ========================================================================== */
+
+:root[data-theme="light"] {
+  /* Primary Colors */
+  --color-primary: #0066cc;
+  --color-secondary: #b8860b;
+  --color-accent: #cc3366;
+
+  /* Background Colors */
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #e9ecef;
+  --bg-container: rgba(255, 255, 255, 0.98);
+  --bg-section: rgba(240, 242, 245, 0.8);
+  --bg-figure: rgba(245, 245, 245, 0.8);
+  --bg-dark: rgba(230, 232, 235, 0.8);
+
+  /* Text Colors */
+  --text-primary: #2c3e50;
+  --text-secondary: #666;
+  --text-muted: #999;
+
+  /* Semantic Colors */
+  --highlight-cluster: #b8860b;
+  --highlight-pathway: #cc3366;
+  --highlight-celltype: #0066cc;
+
+  /* Component Colors */
+  --border-primary: #0066cc;
+  --border-secondary: rgba(0, 102, 204, 0.3);
+  --border-muted: rgba(0, 102, 204, 0.1);
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  --gradient-summary: linear-gradient(135deg, rgba(0, 102, 204, 0.05) 0%, rgba(204, 51, 102, 0.05) 100%);
+  --gradient-confidence: linear-gradient(90deg, #cc3366, #0066cc);
+
+  /* Shadows */
+  --shadow-container: 0 4px 20px rgba(0, 0, 0, 0.1);
+  --shadow-figure: 0 2px 10px rgba(0, 0, 0, 0.1);
+  --shadow-title: none;
+}
+
+:root[data-theme="light"] .interpretation {
+  background: rgba(0, 102, 204, 0.05);
+}
+
+:root[data-theme="light"] .key-findings {
+  background: rgba(204, 51, 102, 0.05);
+}
+
+:root[data-theme="light"] .pathway-box {
+  background: rgba(184, 134, 11, 0.05);
+}
+
+:root[data-theme="light"] .tab-button {
+  background: rgba(240, 242, 245, 0.8);
+}
+
+:root[data-theme="light"] .tab-button.active {
+  color: #ffffff;
+}
+
+:root[data-theme="light"] .page-button {
+  background: rgba(0, 102, 204, 0.1);
+}
+
+:root[data-theme="light"] .page-button.active {
+  color: #ffffff;
+}
+
+:root[data-theme="light"] .score-high {
+  background: rgba(0, 102, 204, 0.15);
+}
+
+:root[data-theme="light"] .score-medium {
+  background: rgba(184, 134, 11, 0.15);
+}
+
+:root[data-theme="light"] .score-low {
+  background: rgba(204, 51, 102, 0.15);
+}
+
+:root[data-theme="light"] th {
+  background: rgba(0, 102, 204, 0.1);
+}
+
+:root[data-theme="light"] tr:hover {
+  background: rgba(0, 102, 204, 0.03);
+}
+
+:root[data-theme="light"] .figure-placeholder {
+  background: rgba(0, 102, 204, 0.05);
+  border-color: var(--color-primary);
+}
+
+/* ==========================================================================
+   Print Styles (Journal-Ready)
+   ========================================================================== */
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    font-size: 11pt;
+  }
+
+  .container {
+    box-shadow: none !important;
+    max-width: 100% !important;
+    padding: 20px !important;
+    background: white !important;
+    border-radius: 0 !important;
+  }
+
+  .tabs, .tab-button, .pagination, .page-button, .theme-toggle {
+    display: none !important;
+  }
+
+  .tab-content {
+    display: block !important;
+    page-break-inside: avoid;
+  }
+
+  .tab-content::before {
+    content: none;
+  }
+
+  .analysis-section {
+    page-break-inside: avoid;
+    border-left-color: #333 !important;
+    background: none !important;
+  }
+
+  .figure-container {
+    page-break-inside: avoid;
+    background: none !important;
+  }
+
+  .figure-container img {
+    max-width: 90% !important;
+    box-shadow: none !important;
+  }
+
+  h1, h2, h3, h4 {
+    color: black !important;
+    text-shadow: none !important;
+  }
+
+  .highlight-cluster, .highlight-pathway, .highlight-celltype {
+    color: black !important;
+    font-weight: bold;
+  }
+
+  .summary-box, .interpretation, .key-findings, .pathway-box {
+    background: none !important;
+    border: 1px solid #ccc !important;
+  }
+
+  .paper-card {
+    background: none !important;
+    border: 1px solid #ccc !important;
+  }
+
+  .paper-title a {
+    color: black !important;
+  }
+
+  .reference {
+    color: black !important;
+  }
+
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+  }
+
+  .metadata {
+    border-top: 1px solid #ccc !important;
+    color: #666 !important;
+  }
+
+  table {
+    background: none !important;
+  }
+
+  th {
+    background: #f0f0f0 !important;
+    color: black !important;
+    border-bottom: 2px solid black !important;
+  }
+
+  td {
+    border-bottom: 1px solid #ccc !important;
+  }
+}
+
+/* ==========================================================================
+   Responsive / Mobile Styles
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  :root {
+    --container-padding: 15px;
+    --font-size-h1: 1.8em;
+    --font-size-h2: 1.5em;
+    --font-size-h3: 1.2em;
+    --font-size-h4: 1.1em;
+  }
+
+  .container {
+    border-radius: 8px;
+  }
+
+  .tabs {
+    flex-direction: column;
+  }
+
+  .tab-button {
+    width: 100%;
+    text-align: center;
+    border-radius: var(--radius-small);
+  }
+
+  .figure-container img {
+    max-width: 100%;
+  }
+
+  table {
+    font-size: 0.85em;
+  }
+
+  th, td {
+    padding: 8px 6px;
+  }
+
+  .theme-toggle {
+    top: 10px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+    font-size: 1.1em;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
+  }
+}

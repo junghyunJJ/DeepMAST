@@ -131,6 +131,14 @@ You must collect the following information:
 6. **data_directory**: Output directory for results (res/ folder)
    - Example: "/path/to/results/res"
 
+7. **interest_celltypes** (optional):
+   - Cell types to focus CCI analysis on, if the user mentions them
+   - Example: ["Macrophage", "Fibroblast", "Invasive Tumor"]
+
+8. **interest_clusters** (optional):
+   - Cluster IDs to focus CCI analysis on, if the user mentions them
+   - Example: ["4", "16", "17"]
+
 ## Pre-populated Fields (from Supervisor)
 The following may already be available - only ask if missing:
 - st_technology: ST platform type
@@ -144,6 +152,7 @@ The following may already be available - only ask if missing:
 - Then ask for data_directory
 - If sample_count > 1, ask for sample_key and optionally interest_sample
 - For single-cell platforms (MERFISH, Xenium, CosMx, seqFISH), require celltype_key
+- If the user mentions specific clusters or cell types of interest, include them as interest_clusters/interest_celltypes
 - Accept various input formats flexibly
 
 ## CRITICAL RULES
@@ -164,6 +173,14 @@ Assistant: [Calls DeepInterpreterInfoExtraction with:
   data_directory="/data/res",
   disease="breast cancer",
   st_technology="Visium"]
+
+User: "Analyze /data/n_adata.h5ad with cluster_key='leiden', save to /data/res. Focus on clusters 4 and 16, especially Macrophage and Fibroblast interactions."
+Assistant: [Calls DeepInterpreterInfoExtraction with:
+  h5ad_files=["/data/n_adata.h5ad"],
+  cluster_key="leiden",
+  data_directory="/data/res",
+  interest_clusters=["4", "16"],
+  interest_celltypes=["Macrophage", "Fibroblast"]]
 
 After you have confirmed ALL required information, call the DeepInterpreterInfoExtraction tool."""
 
@@ -322,38 +339,96 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         return "\n".join(summary_parts)
 
     def _suggest_factor(
-        self, factor_csv: pd.DataFrame, interest_clusters: list[str]
-    ) -> str:
-        """Suggest the best NMF factor for the selected interest clusters.
+        self,
+        factor_csv: pd.DataFrame,
+        interest_clusters: list[str],
+        detailed: bool = False,
+    ) -> str | tuple[str, str]:
+        """Suggest the best NMF factor using specificity-aware combined scoring.
 
-        Computes mean factor score across interest_clusters and returns
-        the factor with highest mean.
+        Algorithm ported from sp-enrich-mcp sel_factor():
+        1. Compute mean factor scores for interest clusters
+        2. Compute fold change vs other clusters
+        3. Compute Z-score specificity
+        4. Combined score = 0.5 * Z-score + 0.5 * (fold_change - 1)
 
         Args:
             factor_csv: DataFrame from res_liana_cluster_factor.csv
             interest_clusters: List of cluster IDs selected by user
+            detailed: If True, return (best_factor, analysis_summary) tuple
 
         Returns:
-            Factor name with highest mean (e.g. "Factor_3")
+            Factor name (e.g. "Factor3"), or tuple of (factor_name, analysis_text)
+            if detailed=True
         """
-        # Filter to interest clusters
-        cluster_col = factor_csv.columns[0]  # First column is cluster ID
+        cluster_col = factor_csv.columns[0]
         factor_cols = [c for c in factor_csv.columns if c.startswith("Factor")]
 
         if not factor_cols:
-            return "Factor_0"
+            return ("Factor_0", "No factor columns found.") if detailed else "Factor_0"
 
-        # Convert cluster column to string for matching (copy to avoid mutating input)
         df = factor_csv.copy()
         df[cluster_col] = df[cluster_col].astype(str)
         filtered = df[df[cluster_col].isin(interest_clusters)]
 
         if filtered.empty:
-            return factor_cols[0]
+            logger.debug(
+                "No matching clusters in factor CSV. interest=%s, available=%s",
+                interest_clusters, df[cluster_col].unique().tolist(),
+            )
+            fallback = factor_cols[0]
+            return (fallback, "No matching clusters found.") if detailed else fallback
 
-        # Compute mean score per factor across interest clusters
-        means = filtered[factor_cols].mean()
-        return str(means.idxmax())
+        # Per-cluster means (already aggregated in CSV)
+        df_grouped = df.set_index(cluster_col)[factor_cols]
+        interest_means = df_grouped.loc[
+            df_grouped.index.isin(interest_clusters)
+        ].mean()
+
+        other_clusters = [c for c in df_grouped.index if c not in interest_clusters]
+        if not other_clusters:
+            best = str(interest_means.idxmax())
+            summary = f"Only interest clusters present. Best by mean: {best}"
+            return (best, summary) if detailed else best
+
+        other_means = df_grouped.loc[other_clusters].mean()
+
+        # Fold change (interest / others)
+        fold_change = interest_means / other_means.clip(lower=1e-10)
+
+        # Z-score specificity
+        global_mean = df_grouped.mean()
+        global_std = df_grouped.std()
+        z_scores = (df_grouped - global_mean) / global_std.replace(0, float("nan"))
+        interest_z = z_scores.loc[z_scores.index.isin(interest_clusters)].mean()
+
+        # Combined score (same weights as sel_factor)
+        combined = interest_z * 0.5 + (fold_change - 1) * 0.5
+        if combined.isna().all():
+            best_factor = str(interest_means.idxmax())
+            if detailed:
+                return best_factor, "All factors have identical scores; selected by highest raw mean."
+            return best_factor
+        combined = combined.fillna(-float("inf"))
+        best_factor = str(combined.idxmax())
+
+        if not detailed:
+            return best_factor
+
+        # Build analysis summary for prompt injection
+        fold_display = fold_change.fillna(0.0)
+        z_display = interest_z.fillna(0.0)
+        combined_display = combined.replace(-float("inf"), 0.0)
+        lines = [f"Factor specificity analysis for clusters {interest_clusters}:"]
+        for f in factor_cols:
+            lines.append(
+                f"  {f}: mean={interest_means[f]:.3f}, "
+                f"fold_change={fold_display[f]:.2f}x, "
+                f"z_score={z_display[f]:.3f}, "
+                f"combined={combined_display[f]:.3f}"
+            )
+        lines.append(f"Best factor: {best_factor} (highest combined specificity score)")
+        return best_factor, "\n".join(lines)
 
     def _resolve_celltype_cluster_mapping(
         self,
@@ -705,7 +780,12 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
     def route_after_check(
         self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
     ) -> str:
-        """Route from check_state to the next incomplete phase."""
+        """Route from check_state to the next incomplete phase.
+
+        NOTE: On happy path, only the first branch (info_complete) is reached
+        from START. Other branches document phase order and enable future
+        skip-ahead (e.g., Supervisor pre-populating info_complete=True).
+        """
         if not state.get("info_complete"):
             return self.get_node_name("INFO_COL")
         if not state.get("analysis_1_8_complete"):
@@ -764,17 +844,23 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
     def route_after_clusters(
         self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
     ) -> str:
-        """Route after cluster collection: self-loop, proceed to factor, or end if cancelled."""
+        """Route after cluster collection: self-loop, proceed to factor, or check_state if cancelled."""
+        cc = state.get("clusters_collected")
+        if self.is_debug:
+            print(f"route_after_clusters: clusters_collected={cc}, research_discussion_complete={state.get('research_discussion_complete')}")
+        if not cc:
+            return self.get_node_name("COLLECT_CLUSTERS")  # self-loop for re-prompt
+        # If cancelled during cluster collection, research_discussion_complete
+        # and interpretation_confirmed=False are already set by the node.
+        # Route directly to END to avoid double-ask via confirm_interpretation.
         if state.get("research_discussion_complete"):
             return END
-        if not state.get("clusters_collected"):
-            return self.get_node_name("COLLECT_CLUSTERS")  # self-loop for re-prompt
         return self.get_node_name("COLLECT_FACTOR")
 
     def route_after_factor(
         self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
     ) -> str:
-        """Route after factor collection: proceed to steps 9-11 or end if cancelled."""
+        """Route after factor collection: proceed to steps 9-11 or END if cancelled."""
         if state.get("analysis_9_11_complete"):
             return END
         return self.get_node_name("RUN_SINGLE_STEP_9_11")
@@ -792,9 +878,15 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
     async def check_state_node(
         self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
     ) -> dict:
-        """Check current state and route to next incomplete phase.
+        """Entry-point router: routes to the first incomplete phase on graph start.
 
-        This is a pass-through node; routing logic is in route_after_check.
+        NOTE: This node is entered exactly once (from START) on the happy path.
+        It is NOT re-entered during normal execution. The routing table in
+        route_after_check() documents the phase ordering; actual phase
+        transitions are handled by dedicated route_after_* functions.
+
+        Preserved for: (a) consistency with Executor/Supervisor hub pattern,
+        (b) readable routing table, (c) future Supervisor skip-ahead option.
         """
         return {}
 
@@ -926,6 +1018,8 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         celltype_key = tool_args.get("celltype_key")
         sample_key = tool_args.get("sample_key")
         interest_sample = tool_args.get("interest_sample")
+        interest_celltypes = tool_args.get("interest_celltypes")
+        interest_clusters = tool_args.get("interest_clusters")
 
         # Validate sample_key for multi-sample
         if sample_count and sample_count > 1 and not sample_key:
@@ -966,6 +1060,8 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             "celltype_key": celltype_key,
             "sample_key": sample_key,
             "interest_sample": interest_sample,
+            **({"interest_celltypes": interest_celltypes} if interest_celltypes else {}),
+            **({"interest_clusters": interest_clusters} if interest_clusters else {}),
             "data_directory": str(data_path),
             "st_technology": st_technology,
             "disease": disease,
@@ -1152,20 +1248,86 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             liana_summary=liana_summary,
         )
 
+        # Resolve pre-populated interest targets for LLM prompt enrichment
+        pre_celltypes = state.get("interest_celltypes") or []
+        pre_clusters = state.get("interest_clusters") or []
+        user_preference_context = ""
+        resolved_clusters: list[str] = []
+
+        if pre_celltypes or pre_clusters:
+            resolved_clusters, resolved_celltypes = self._resolve_celltype_cluster_mapping(
+                save_path, pre_celltypes, pre_clusters,
+            )
+            # Build context string for LLM prompt
+            parts = []
+            if pre_celltypes:
+                parts.append(f"- Pre-selected cell types: {pre_celltypes}")
+            if pre_clusters:
+                parts.append(f"- Pre-selected clusters: {pre_clusters}")
+            if resolved_clusters and resolved_clusters != pre_clusters:
+                parts.append(f"- Auto-resolved clusters (from cell types): {resolved_clusters}")
+            if resolved_celltypes and resolved_celltypes != pre_celltypes:
+                parts.append(f"- Auto-resolved cell types (from clusters): {resolved_celltypes}")
+            user_preference_context = "\n".join(parts)
+
+            if self.is_debug:
+                print(f"Pre-populated targets resolved: clusters={resolved_clusters}, celltypes={resolved_celltypes}")
+
+        # Compute data-driven factor suggestion when pre-populated clusters available
+        computed_factor_hint = ""
+        if pre_clusters or (pre_celltypes and resolved_clusters):
+            effective_clusters = resolved_clusters if resolved_clusters else pre_clusters
+            best_factor, factor_analysis = self._suggest_factor(
+                factor_csv, [str(c) for c in effective_clusters], detailed=True,
+            )
+            computed_factor_hint = (
+                f"\n\nDATA-DRIVEN FACTOR ANALYSIS:\n{factor_analysis}\n"
+                "Use this mathematical analysis to recommend the correct NMF factor. "
+                "Do NOT override this with pathway narrative alone."
+            )
+
+            if self.is_debug:
+                print(f"Computed factor: {best_factor}\n{factor_analysis}")
+
         # LLM suggests interest_clusters and interest_celltypes based on disease context
         disease = state.get("disease", "unknown")
-        llm_result = await self.get_model(config).ainvoke([
-            SystemMessage(content=(
-                f"You are analyzing {disease} spatial transcriptomics data. "
-                "Based on the comprehensive analysis summary below, suggest which clusters "
-                "and cell types are most relevant for investigating cell-cell interactions. "
-                "Consider ALL evidence: cell type composition, spatial co-localization, "
-                "active pathways, spatial relationships, and NMF factor-pathway associations. "
-                "Also suggest the most informative NMF factor based on pathway enrichments. "
-                "Be specific about WHY each cluster/celltype is interesting."
-            )),
-            HumanMessage(content=f"Analysis results:\n{summary}\n\nSuggest interest clusters and cell types."),
-        ])
+        system_content = (
+            f"You are analyzing {disease} spatial transcriptomics data. "
+            "Based on the comprehensive analysis summary below, suggest which clusters "
+            "and cell types are most relevant for investigating cell-cell interactions. "
+            "Consider ALL evidence: cell type composition, spatial co-localization, "
+            "active pathways, spatial relationships, and NMF factor-pathway associations. "
+            "Also suggest the most informative NMF factor. Choose the factor with the highest "
+            "mean score across your suggested clusters in the NMF Factor-Cluster Scores table — "
+            "a factor specific to interest clusters (high fold-change vs others) is more informative "
+            "than one that is high across all clusters. "
+            "Be specific about WHY each cluster/celltype is interesting."
+        )
+
+        if user_preference_context:
+            system_content += (
+                "\n\nIMPORTANT: The user has pre-selected targets of interest. "
+                "Prioritize these in your suggestion and explain how the analysis data "
+                "supports or challenges each selection:\n"
+                + user_preference_context
+            )
+
+        if computed_factor_hint:
+            system_content += computed_factor_hint
+
+        try:
+            llm_result = await asyncio.wait_for(
+                self.get_model(config).ainvoke([
+                    SystemMessage(content=system_content),
+                    HumanMessage(content=f"Analysis results:\n{summary}\n\nSuggest interest clusters and cell types."),
+                ]),
+                timeout=60.0,
+            )
+        except asyncio.TimeoutError:
+            logger.error("LLM suggestion timed out after 60s. Using fallback.")
+            llm_result = type('obj', (object,), {
+                'content': 'Suggestion unavailable (LLM timeout). Please select clusters based on the heatmap above.'
+            })()
 
         if self.is_debug:
             print("Research summary prepared and LLM suggestion cached.")
@@ -1198,18 +1360,36 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         # Build prompt based on attempt number
         if attempt == 0:
             llm_suggestion_text = state.get("llm_suggestion", "No suggestion available.")
+
+            # Check for pre-populated values from initial user message
+            pre_celltypes = state.get("interest_celltypes")
+            pre_clusters = state.get("interest_clusters")
+
+            if pre_celltypes or pre_clusters:
+                pre_pop_section = "\n## Your Initial Selections (from your first message)\n"
+                if pre_celltypes:
+                    pre_pop_section += f"- interest_celltypes: {json.dumps(pre_celltypes)}\n"
+                if pre_clusters:
+                    pre_pop_section += f"- interest_clusters: {json.dumps(pre_clusters)}\n"
+                pre_pop_section += "\nThese are pre-filled below. Confirm or modify as needed.\n"
+            else:
+                pre_pop_section = ""
+
+            celltypes_default = json.dumps(pre_celltypes) if pre_celltypes else '(e.g., ["Invasive Tumor", "Fibroblast", "Macrophage"])'
+            clusters_default = json.dumps(pre_clusters) if pre_clusters else '(e.g., ["4", "16", "17"])'
+
             prompt = f"""## Analysis Context
 - Disease: {disease}
 - Platform: {st_tech}
 
 ## AI Suggestion
 {llm_suggestion_text}
-
+{pre_pop_section}
 Please review the image at: `{save_path}/2.celltype_heatmap_analysis.png`
 
 **Confirm or modify:**
-- interest_celltypes: (e.g., ["Invasive Tumor", "Fibroblast", "Macrophage"])
-- interest_clusters: (e.g., ["4", "16", "17"])
+- interest_celltypes: {celltypes_default}
+- interest_clusters: {clusters_default}
 
 Please provide your selections as JSON or natural language."""
         else:
@@ -1229,6 +1409,8 @@ Please provide your selections as JSON or natural language."""
         else:
             actual_response = str(response)
 
+        logger.info("collect_clusters: raw=%r, parsed=%r", response, actual_response)
+
         # Check for cancel/skip
         if actual_response.lower().strip() in CANCEL_KEYWORDS:
             logger.info("User cancelled at cluster selection (attempt %d). Ending workflow.", attempt)
@@ -1240,38 +1422,83 @@ Please provide your selections as JSON or natural language."""
                 "messages": [AIMessage(content="Research discussion cancelled by user.")],
             }
 
-        # Use LLM to extract structured data from user response
-        parse_result = await self.get_model(config).ainvoke([
-            SystemMessage(content=(
-                "Extract interest_celltypes and interest_clusters from the user's response. "
-                "Return ONLY valid JSON: {\"interest_celltypes\": [...], \"interest_clusters\": [...]}\n"
-                "Cluster IDs must be strings (e.g. \"4\" not 4)."
-            )),
-            HumanMessage(content=actual_response),
-        ])
-
+        # Phase 1: Try direct JSON parse (no LLM needed for structured input like '["4","16","17"]')
+        parsed_celltypes = []
+        parsed_clusters = []
         try:
-            raw_content = parse_result.content.strip()
-            # Strip markdown fences (LLMs often wrap JSON in ```json ... ```)
-            if raw_content.startswith("```"):
-                raw_content = re.sub(r'^```(?:json)?\s*', '', raw_content)
-                raw_content = re.sub(r'\s*```$', '', raw_content)
-            parsed = json.loads(raw_content)
-            parsed_celltypes = parsed.get("interest_celltypes", [])
-            parsed_clusters = parsed.get("interest_clusters", [])
-        except (json.JSONDecodeError, AttributeError) as e:
-            logger.warning(f"JSON parse failed: {e}. Raw: {parse_result.content[:200]}")
-            # Regex fallback: extract cluster numbers and quoted/single-quoted cell type strings
-            cluster_match = re.findall(r'\b(\d+)\b', actual_response)
-            parsed_clusters = cluster_match[:10] if cluster_match else []
-            celltype_match = re.findall(
-                r'"([^"]+)"|\'([^\']+)\'|(?:^|,)\s*([A-Z][a-zA-Z\s]+?)(?=\s*,|\s*$)',
-                actual_response,
-            )
-            # Flatten regex groups (each match is a tuple of 3 groups, only one is non-empty)
-            parsed_celltypes = [g for groups in celltype_match for g in groups if g] if celltype_match else []
+            direct_parsed = json.loads(actual_response)
+            if isinstance(direct_parsed, list):
+                # Separate numeric cluster IDs from non-numeric cell type names
+                for item in direct_parsed:
+                    s = str(item).strip()
+                    if s.isdigit():
+                        parsed_clusters.append(s)
+                    else:
+                        parsed_celltypes.append(s)
+            elif isinstance(direct_parsed, dict):
+                parsed_clusters = [str(x) for x in direct_parsed.get("interest_clusters", [])]
+                parsed_celltypes = direct_parsed.get("interest_celltypes", [])
+            if self.is_debug:
+                print(f"Direct JSON parse succeeded: clusters={parsed_clusters}, celltypes={parsed_celltypes}")
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass  # Not valid JSON — fall through to LLM parsing
 
-        # Bidirectional celltype<->cluster auto-mapping
+        # Phase 2: LLM parsing with timeout (only for natural language input)
+        if not parsed_clusters and not parsed_celltypes:
+            try:
+                parse_result = await asyncio.wait_for(
+                    self.get_model(config).ainvoke([
+                        SystemMessage(content=(
+                            "Extract interest_celltypes and interest_clusters from the user's response. "
+                            "Return ONLY valid JSON: {\"interest_celltypes\": [...], \"interest_clusters\": [...]}\n"
+                            "Cluster IDs must be strings (e.g. \"4\" not 4)."
+                        )),
+                        HumanMessage(content=actual_response),
+                    ]),
+                    timeout=30.0,
+                )
+
+                try:
+                    raw_content = parse_result.content.strip()
+                    # Strip markdown fences (LLMs often wrap JSON in ```json ... ```)
+                    if raw_content.startswith("```"):
+                        raw_content = re.sub(r'^```(?:json)?\s*', '', raw_content)
+                        raw_content = re.sub(r'\s*```$', '', raw_content)
+                    parsed = json.loads(raw_content)
+                    parsed_celltypes = parsed.get("interest_celltypes", [])
+                    parsed_clusters = parsed.get("interest_clusters", [])
+                except (json.JSONDecodeError, AttributeError) as e:
+                    logger.warning(f"JSON parse failed: {e}. Raw: {parse_result.content[:200]}")
+                    # Regex fallback: extract cluster numbers and quoted/single-quoted cell type strings
+                    cluster_match = re.findall(r'\b(\d+)\b', actual_response)
+                    parsed_clusters = cluster_match[:10] if cluster_match else []
+                    celltype_match = re.findall(
+                        r'"([^"]+)"|\'([^\']+)\'|(?:^|,)\s*([A-Z][a-zA-Z\s]+?)(?=\s*,|\s*$)',
+                        actual_response,
+                    )
+                    # Flatten regex groups (each match is a tuple of 3 groups, only one is non-empty)
+                    parsed_celltypes = [g for groups in celltype_match for g in groups if g] if celltype_match else []
+            except asyncio.TimeoutError:
+                logger.error("LLM parsing timed out after 30s. Falling back to regex extraction.")
+                cluster_match = re.findall(r'\b(\d+)\b', actual_response)
+                parsed_clusters = cluster_match[:10] if cluster_match else []
+                celltype_match = re.findall(
+                    r'"([^"]+)"|\'([^\']+)\'|(?:^|,)\s*([A-Z][a-zA-Z\s]+?)(?=\s*,|\s*$)',
+                    actual_response,
+                )
+                parsed_celltypes = [g for groups in celltype_match for g in groups if g] if celltype_match else []
+            except Exception as e:
+                logger.error(f"LLM parsing call failed: {e}. Falling back to regex extraction.")
+                cluster_match = re.findall(r'\b(\d+)\b', actual_response)
+                parsed_clusters = cluster_match[:10] if cluster_match else []
+                celltype_match = re.findall(
+                    r'"([^"]+)"|\'([^\']+)\'|(?:^|,)\s*([A-Z][a-zA-Z\s]+?)(?=\s*,|\s*$)',
+                    actual_response,
+                )
+                parsed_celltypes = [g for groups in celltype_match for g in groups if g] if celltype_match else []
+
+        # Authoritative resolution (post-HITL) — distinct from prompt-enrichment
+        # resolution in prepare_research_summary_node
         parsed_clusters, parsed_celltypes = self._resolve_celltype_cluster_mapping(
             save_path, parsed_celltypes, parsed_clusters,
         )
@@ -1280,13 +1507,17 @@ Please provide your selections as JSON or natural language."""
         if not parsed_clusters:
             if attempt >= 2:
                 logger.error("Still no clusters after %d re-prompts. Proceeding with empty clusters.", attempt)
+                # Fall through to success path with empty clusters (don't loop forever)
             else:
                 logger.warning("Empty cluster selection (attempt %d). Will re-prompt.", attempt)
                 # Preserve celltypes from first attempt if we got some
                 update = {
                     "cluster_attempt": attempt + 1,
                     "clusters_collected": False,  # triggers self-loop via route_after_clusters
-                    "messages": [HumanMessage(content=actual_response)],
+                    "messages": [
+                        HumanMessage(content=actual_response),
+                        AIMessage(content="No clusters detected in your response. Let me ask again..."),
+                    ],
                 }
                 if parsed_celltypes:
                     update["interest_celltypes"] = parsed_celltypes
@@ -1302,7 +1533,10 @@ Please provide your selections as JSON or natural language."""
             "interest_celltypes": final_celltypes,
             "interest_clusters": parsed_clusters,
             "clusters_collected": True,
-            "messages": [HumanMessage(content=actual_response)],
+            "messages": [
+                HumanMessage(content=actual_response),
+                AIMessage(content=f"Selected clusters: {parsed_clusters}, cell types: {final_celltypes}. Proceeding to NMF factor selection..."),
+            ],
         }
 
     # ===== Node 5c: Collect Factor (1x interrupt) =====
@@ -1321,10 +1555,52 @@ Please provide your selections as JSON or natural language."""
         try:
             factor_csv = pd.read_csv(f"{save_path}/res_liana_cluster_factor.csv")
         except FileNotFoundError:
-            raise ValueError(
-                f"res_liana_cluster_factor.csv not found in {save_path}. "
-                "Steps 1-8 may not have completed successfully."
+            logger.warning(
+                "res_liana_cluster_factor.csv not found in %s. "
+                "Using default factor. Steps 1-8 may not have completed.",
+                save_path,
             )
+            sel_factor_suggestion = "Factor_0"
+            available_factors = ["Factor_0"]
+            # Skip CSV-based suggestion, jump to interrupt with defaults
+            prompt2 = f"""Please review the image at: `{save_path}/7.factor_spatial_NMF.png`
+
+**Note:** Factor CSV not found — defaulting to {sel_factor_suggestion}.
+
+Available factors: {available_factors}
+**Confirm or modify sel_factor:**"""
+
+            response2 = interrupt(value={"message": prompt2})
+
+            if isinstance(response2, dict):
+                actual_response2 = response2.get("response", response2.get("message", str(response2)))
+            else:
+                actual_response2 = str(response2)
+
+            logger.info("collect_factor (fallback): raw=%r, parsed=%r", response2, actual_response2)
+
+            if actual_response2.lower().strip() in CANCEL_KEYWORDS:
+                logger.info("User cancelled at factor selection. Ending workflow.")
+                return {
+                    "research_discussion_complete": True,
+                    "analysis_9_11_complete": True,
+                    "interpretation_confirmed": False,
+                    "messages": [AIMessage(content="Factor selection cancelled by user.")],
+                }
+
+            parsed_factor = sel_factor_suggestion
+            response2_lower = actual_response2.lower().strip()
+            if "factor" in response2_lower:
+                match = re.search(r"factor[_\s]?(\d+)", response2_lower)
+                if match:
+                    parsed_factor = f"Factor_{match.group(1)}"
+
+            return {
+                "sel_factor": parsed_factor,
+                "research_discussion_complete": True,
+                "current_analysis_step": 9,
+                "messages": [HumanMessage(content=actual_response2)],
+            }
 
         sel_factor_suggestion = self._suggest_factor(factor_csv, parsed_clusters)
         available_factors = [c for c in factor_csv.columns if c.startswith("Factor")]
@@ -1342,6 +1618,8 @@ Available factors: {available_factors}
             actual_response2 = response2.get("response", response2.get("message", str(response2)))
         else:
             actual_response2 = str(response2)
+
+        logger.info("collect_factor: raw=%r, parsed=%r", response2, actual_response2)
 
         # Check for cancel/skip
         if actual_response2.lower().strip() in CANCEL_KEYWORDS:

@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 # HTML template with placeholders for CSS and JS
 HTML_TEMPLATE = """<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -191,6 +191,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
     <div class="container">
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark theme">&#9681;</button>
         <h1>{title}</h1>
         <p class="subtitle">{subtitle}</p>
 
@@ -331,7 +332,8 @@ def _generate_references_html(references: list[dict]) -> str:
     """Generate HTML for references section.
 
     Args:
-        references: List of reference dictionaries with pmid, title
+        references: List of reference dictionaries with pmid, title,
+            and optional authors, year fields
 
     Returns:
         HTML string
@@ -344,16 +346,27 @@ def _generate_references_html(references: list[dict]) -> str:
         return ""
 
     cards = []
-    for ref in references[:5]:
+    for ref in references:
         # Skip non-dict entries
         if not isinstance(ref, dict):
             continue
         pmid = ref.get("pmid", "")
         title = ref.get("title", f"Article {pmid}")
+        authors = ref.get("authors", "")
+        year = ref.get("year", "")
+
+        # Format display: "Author et al. (Year) - Title" or just "Title"
+        if authors and year:
+            display_text = f"{authors} ({year}) - {title}"
+        elif authors:
+            display_text = f"{authors} - {title}"
+        else:
+            display_text = title
+
         cards.append(f"""
         <div class="paper-card">
             <div class="paper-title">
-                <a href="https://pubmed.ncbi.nlm.nih.gov/{pmid}/" target="_blank">{title}</a>
+                <a href="https://pubmed.ncbi.nlm.nih.gov/{pmid}/" target="_blank">{display_text}</a>
             </div>
         </div>
         """)
@@ -438,6 +451,14 @@ def _generate_html_report_impl(
     subtitle = parts.get("subtitle", "Comprehensive Cell-Cell Interaction Analysis")
     executive_summary = parts.get("executive_summary", "")
     analysis_config = parts.get("analysis_config", "")
+
+    # Convert dict analysis_config to HTML table
+    if isinstance(analysis_config, dict):
+        rows = "".join(
+            f"<tr><td><strong>{k}</strong></td><td>{v}</td></tr>"
+            for k, v in analysis_config.items()
+        )
+        analysis_config = f'<table class="analysis-config-table">{rows}</table>'
 
     # Validate part1, part2, part3 are dicts
     part1 = parts.get("part1", {})
@@ -568,6 +589,7 @@ def _generate_html_report_impl(
 def generate_html_report(
     parts: dict,
     output_path: str,
+    data_dir: str = "",
 ) -> str:
     """Generate a comprehensive HTML report for CCI analysis.
 
@@ -610,10 +632,18 @@ def generate_html_report(
             - summary_html: Complete HTML for Summary tab (overrides synthesis)
 
         output_path: Path to save the HTML report
+        data_dir: Directory for saving the report. If output_path is relative,
+            resolves to data_dir/output_path. Falls back to DEEP_INTERPRETER_DATA_DIR
+            env var. Read from /data_path.txt (written by PLANNER).
 
     Returns:
         String with report generation status and output path
     """
+    # Resolve output_path with data_dir
+    if not os.path.isabs(output_path):
+        save_dir = data_dir or os.environ.get("DEEP_INTERPRETER_DATA_DIR", "")
+        if save_dir:
+            output_path = os.path.join(save_dir, output_path)
     return _generate_html_report_impl(parts=parts, output_path=output_path)
 
 

@@ -15,58 +15,69 @@ from langchain_core.tools import tool
 ANALYSIS_FILES = {
     # Part 1: Spatial & Pathway
     "1_1_spatial": {
-        "figure": "1.spatial.png",
+        "figure": "1.cluster_spatial.png",
+        "display_name": "1-1 Spatial Clustering",
         "description": "Spatial distribution of clusters",
     },
     "1_2_celltype": {
         "figure": "2.celltype_heatmap_analysis.png",
         "data": "sig_clusterwithcelltyp.csv",
+        "display_name": "1-2 Cell Type Composition",
         "description": "Cell type composition by cluster",
     },
     "1_3_nhood": {
         "figure": "3.neighborhood_enrichment_squidpy.png",
         "data": "res_nhood_enrichment.csv",
+        "display_name": "1-3 Neighborhood Enrichment",
         "description": "Neighborhood enrichment analysis",
     },
     "1_4_decoupler": {
         "figure": "4.spatial_enrich_decoupler.png",
         "data": "sig_PathwayEnrich_decoupler.csv",
+        "display_name": "1-4 Decoupler Pathway",
         "description": "Spatial pathway enrichment (Decoupler)",
     },
     "1_5_misty": {
         "figure": "5.spatial_relation_MISTy.png",
         "data": "res_SpatialRelationship_MISTy.csv",
+        "display_name": "1-5 MISTy",
         "description": "Pathway-celltype relationship (MISTy)",
     },
     # Part 2: CCI & NMF
     "2_6_morans": {
         "figure": "6.liana_MoransR.png",
         "data": "sig_liana.csv",
+        "display_name": "2-6 LIANA Moran's R",
         "description": "LIANA Moran's R analysis",
     },
     "2_7_nmf": {
         "figure": "7.factor_spatial_NMF.png",
         "data": "res_liana_cluster_factor.csv",
+        "display_name": "2-7 NMF Factor",
         "description": "NMF factor spatial distribution",
     },
     "2_8_pathway_factor": {
         "figure": "8.pathway_factor_heatmap.png",
         "data": "sig_liana_pathway_factor.csv",
+        "display_name": "2-8 Pathway-Factor",
         "description": "Pathway-factor enrichment",
     },
-    "2_9_ctsvg": {
+    "3_9_quadrant_genept": {
         "figure": "9.quadrant_analysis.png",
         "data": "interest_sig_liana.csv",
-        "description": "ctSVG quadrant analysis",
+        "display_name": "3-9 NMF Quadrant + GenePT",
+        "description": "NMF Quadrant + GenePT analysis",
     },
     # Part 3: L-R Interactions
     "3_10_spatial_lr": {
         "figure": "10.spatial_plot_interections.png",
+        "display_name": "3-10 Spatial L-R",
         "description": "Spatial L-R expression patterns",
     },
     "3_11_lr_summary": {
         "figure": "11.lr_interections.png",
-        "data": "anno_sig_liana.csv",
+        "data": "sel_interest_sig_liana.csv",
+        "display_name": "3-11 L-R Summary",
         "description": "L-R interaction summary",
     },
 }
@@ -190,9 +201,8 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     and returns a structured summary of available analyses, figures, data,
     AND extracted clusters/cell types for target selection.
 
-    **IMPORTANT**: This tool automatically writes the analysis summary to:
-    - /analysis_summary.md - Full summary for subagents to read
-    - /data_path.txt - Data directory path
+    **IMPORTANT**: This tool returns content for mandatory write:
+    - /data_path.txt - Data directory path (MUST be written via write_file)
 
     Subagents (like planner, searcher) will use read_file to access these files.
 
@@ -237,7 +247,7 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     genes = set()  # Actual gene names from LIANA ligand/receptor columns
 
     # Files that contain actual gene names (ligand/receptor columns)
-    LIANA_FILES = {"sig_liana.csv", "anno_sig_liana.csv", "interest_sig_liana.csv"}
+    LIANA_FILES = {"sig_liana.csv", "sel_interest_sig_liana.csv", "interest_sig_liana.csv"}
 
     for analysis_name, file_config in ANALYSIS_FILES.items():
         figure_path = data_path / file_config["figure"]
@@ -307,24 +317,27 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
 
     for name in ["1_1_spatial", "1_2_celltype", "1_3_nhood", "1_4_decoupler", "1_5_misty"]:
         status = "[OK]" if name in available_analyses else "[MISSING]"
+        display = ANALYSIS_FILES[name].get("display_name", name)
         desc = ANALYSIS_FILES[name]["description"]
-        summary_lines.append(f"  {status} {name}: {desc}")
+        summary_lines.append(f"  {status} {display}: {desc}")
 
     summary_lines.append("")
     summary_lines.append("Part 2 - CCI & NMF:")
 
-    for name in ["2_6_morans", "2_7_nmf", "2_8_pathway_factor", "2_9_ctsvg"]:
+    for name in ["2_6_morans", "2_7_nmf", "2_8_pathway_factor"]:
         status = "[OK]" if name in available_analyses else "[MISSING]"
+        display = ANALYSIS_FILES[name].get("display_name", name)
         desc = ANALYSIS_FILES[name]["description"]
-        summary_lines.append(f"  {status} {name}: {desc}")
+        summary_lines.append(f"  {status} {display}: {desc}")
 
     summary_lines.append("")
     summary_lines.append("Part 3 - L-R Interactions:")
 
-    for name in ["3_10_spatial_lr", "3_11_lr_summary"]:
+    for name in ["3_9_quadrant_genept", "3_10_spatial_lr", "3_11_lr_summary"]:
         status = "[OK]" if name in available_analyses else "[MISSING]"
+        display = ANALYSIS_FILES[name].get("display_name", name)
         desc = ANALYSIS_FILES[name]["description"]
-        summary_lines.append(f"  {status} {name}: {desc}")
+        summary_lines.append(f"  {status} {display}: {desc}")
 
     # Get recommended targets for auto-selection
     recommendations = get_recommended_targets(data_dir)
@@ -338,39 +351,6 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     spatial_search_context = _extract_search_context(data_path, context_type="spatial")
     lr_search_context = _extract_search_context(data_path, context_type="lr_interaction")
 
-    # Build the full summary markdown for subagents
-    full_summary_md = f"""# CCI Analysis Data Summary
-
-## Data Directory
-{data_path}
-
-## Available Clusters ({len(clusters_list)})
-{', '.join(clusters_list) if clusters_list else '(No clusters found)'}
-
-## Available Cell Types ({len(celltypes_list)})
-{chr(10).join(f'- {ct}' for ct in celltypes_list) if celltypes_list else '(No cell types found)'}
-
-## Recommended Defaults
-- **Recommended Clusters**: {', '.join(recommendations['recommended_clusters']) if recommendations['recommended_clusters'] else 'None'}
-- **Recommended Cell Types**: {', '.join(recommendations['recommended_celltypes']) if recommendations['recommended_celltypes'] else 'None'}
-- **Recommended Mode**: {recommendations['recommended_mode']}
-- **Rationale**: {recommendations['rationale']}
-
-## Analysis Status
-
-### Part 1 - Spatial & Pathway
-{chr(10).join(f"- {'[OK]' if name in available_analyses else '[MISSING]'} {name}: {ANALYSIS_FILES[name]['description']}" for name in ['1_1_spatial', '1_2_celltype', '1_3_nhood', '1_4_decoupler', '1_5_misty'])}
-
-### Part 2 - CCI & NMF
-{chr(10).join(f"- {'[OK]' if name in available_analyses else '[MISSING]'} {name}: {ANALYSIS_FILES[name]['description']}" for name in ['2_6_morans', '2_7_nmf', '2_8_pathway_factor', '2_9_ctsvg'])}
-
-### Part 3 - L-R Interactions
-{chr(10).join(f"- {'[OK]' if name in available_analyses else '[MISSING]'} {name}: {ANALYSIS_FILES[name]['description']}" for name in ['3_10_spatial_lr', '3_11_lr_summary'])}
-"""
-
-    # Track files written
-    files_written = []
-
     # Try to write files to the Deep Agents filesystem
     # Deep Agents stores files in the agent state, accessible via read_file/write_file tools
     # We'll return instructions for the orchestrator to write these files
@@ -382,6 +362,10 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
         "figures": figures,
         "data": data_files,
         "missing_analyses": missing_analyses,
+        "display_names": {
+            name: ANALYSIS_FILES[name].get("display_name", name)
+            for name in available_analyses
+        },
         "summary": "\n".join(summary_lines),
         "clusters": clusters_list,
         "celltypes": celltypes_list,
@@ -404,13 +388,12 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
         "lr_search_context": lr_search_context,
         # Pre-formatted content for write_file - orchestrator MUST write these
         "_MUST_WRITE_FILES": {
-            "/analysis_summary.md": full_summary_md,
             "/data_path.txt": str(data_path),
         },
         "_INSTRUCTION": (
-            "CRITICAL: You MUST use write_file tool to save the files in _MUST_WRITE_FILES. "
-            "Subagents cannot see this tool's output - they can ONLY read files. "
-            "Call write_file('/analysis_summary.md', <content>) and write_file('/data_path.txt', <content>) NOW."
+            "CRITICAL: You MUST use write_file tool to save /data_path.txt from _MUST_WRITE_FILES. "
+            "Subagents need this file to locate the data directory. "
+            "Call write_file('/data_path.txt', <content>) NOW."
         ),
     }
 
@@ -512,8 +495,9 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
     celltypes = set()
 
     # Priority: interest_sig_liana.csv (pre-filtered important pairs)
-    liana_files = ['interest_sig_liana.csv', 'sig_liana.csv', 'anno_sig_liana.csv']
+    liana_files = ['interest_sig_liana.csv', 'sig_liana.csv', 'sel_interest_sig_liana.csv']
     source_file = None
+    liana_df = None
 
     for fname in liana_files:
         csv_path = data_path / fname
@@ -539,6 +523,7 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
                             celltypes.update([ct.strip() for ct in str(val).split(';') if ct.strip()])
 
                 source_file = fname
+                liana_df = df
                 if fname == 'interest_sig_liana.csv':
                     break  # Use interest file if available (most filtered)
             except Exception:
@@ -548,9 +533,9 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
     decoupler_path = data_path / 'sig_PathwayEnrich_decoupler.csv'
     if decoupler_path.exists():
         try:
-            df = pd.read_csv(decoupler_path)
-            if 'name' in df.columns:
-                pathways.update(df['name'].dropna().unique())
+            df_decoupler = pd.read_csv(decoupler_path)
+            if 'name' in df_decoupler.columns:
+                pathways.update(df_decoupler['name'].dropna().unique())
         except Exception:
             pass
 
@@ -558,10 +543,10 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
     celltype_path = data_path / 'sig_clusterwithcelltyp.csv'
     if celltype_path.exists():
         try:
-            df = pd.read_csv(celltype_path)
+            df_celltype = pd.read_csv(celltype_path)
             for col in ['celltype', 'CellType', 'cell_type']:
-                if col in df.columns:
-                    celltypes.update(df[col].dropna().unique())
+                if col in df_celltype.columns:
+                    celltypes.update(df_celltype[col].dropna().unique())
         except Exception:
             pass
 
@@ -586,18 +571,43 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
         }
     elif context_type == "lr_interaction":
         # Part 2 & 3: LIANA L-R analysis - includes genes
-        # Use frequency-ranked top N genes for effective search coverage
+        # Use hybrid-ranked top N genes for effective search coverage
         MAX_SEARCH_GENES = 30
         all_genes_sorted = sorted(list(genes))
 
-        # Rank by frequency (most frequent L-R pairs are most important)
-        if gene_counts:
+        # Hybrid ranking: 0.7 × max_combinedscore_norm + 0.3 × freq_norm
+        # combinedscore = 0.4×Factor + 0.4×Moran's R + 0.2×GenePT
+        # freq_norm captures hub genes (appearing in many L-R pairs)
+        if liana_df is not None and 'combinedscore' in liana_df.columns and gene_counts:
+            # Step 1: max combinedscore per gene
+            gene_max_scores = {}
+            for col in ['ligand', 'receptor']:
+                if col in liana_df.columns:
+                    for _, row in liana_df[[col, 'combinedscore']].dropna().iterrows():
+                        gene = row[col]
+                        score = row['combinedscore']
+                        gene_max_scores[gene] = max(gene_max_scores.get(gene, 0), score)
+
+            # Step 2: normalize both signals to 0-1
+            max_score = max(gene_max_scores.values()) if gene_max_scores else 1.0
+            max_freq = gene_counts.most_common(1)[0][1] if gene_counts else 1
+
+            # Step 3: compute hybrid score for each gene
+            gene_hybrid = {}
+            for gene in gene_max_scores:
+                score_norm = gene_max_scores[gene] / max_score
+                freq_norm = gene_counts.get(gene, 0) / max_freq
+                gene_hybrid[gene] = 0.7 * score_norm + 0.3 * freq_norm
+
+            top_genes = [g for g, _ in sorted(gene_hybrid.items(), key=lambda x: x[1], reverse=True)[:MAX_SEARCH_GENES]]
+        elif gene_counts:
+            # Fallback: frequency only (combinedscore column missing)
             top_genes = [g for g, _ in gene_counts.most_common(MAX_SEARCH_GENES)]
         else:
             top_genes = all_genes_sorted[:MAX_SEARCH_GENES]
 
         return {
-            "genes": top_genes,  # Top N by frequency for search
+            "genes": top_genes,  # Top N by hybrid score for search
             "all_genes": all_genes_sorted,  # Full list for reference
             "pathways": sorted(list(pathways)),
             "celltypes": sorted(list(celltypes)),
@@ -605,7 +615,7 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
             "context_type": "lr_interaction",
             "applicable_parts": [2, 3],
             "note": (
-                f"Top {len(top_genes)} genes by L-R frequency from {source_file or 'LIANA files'}. "
+                f"Top {len(top_genes)} genes by hybrid score (0.7×max_combinedscore + 0.3×freq) from {source_file or 'LIANA files'}. "
                 f"Full gene set: {len(all_genes_sorted)} unique genes. "
                 "Use 'genes' for search, 'all_genes' for complete reference."
             ),
@@ -658,7 +668,7 @@ def get_recommended_search_terms(data_dir: str, max_genes: int = 15) -> dict:
     gene_counts = Counter()
 
     # Priority: LIANA files contain actual L-R gene pairs
-    liana_files = ['sig_liana.csv', 'anno_sig_liana.csv', 'interest_sig_liana.csv']
+    liana_files = ['sig_liana.csv', 'sel_interest_sig_liana.csv', 'interest_sig_liana.csv']
 
     for fname in liana_files:
         csv_path = data_path / fname

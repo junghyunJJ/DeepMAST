@@ -457,7 +457,7 @@ async def refine_search_strategy(
 ### 6.3 Integration with DeepMAST Deep Interpreter
 
 **Current tools in subagents**:
-- PLANNER: `load_analysis_data, generate_biomedical_context, search_pubmed_advanced, think_tool`
+- PLANNER: `load_analysis_data, generate_biomedical_context, search_literature_dynamic, search_pubmed_advanced`
 - SEARCHER: `load_analysis_data, search_literature_dynamic, search_literature, search_pubmed_advanced, think_tool`
 - INTERPRETER: `load_analysis_data, validate_claim_literature, validate_quality, think_tool, prepare_rag_literature, search_literature_fulltext, validate_claim_fulltext, prioritize_top_lr_pairs`
 - REPORTER: `load_analysis_data, generate_html_report, search_literature_dynamic, search_literature, prepare_rag_literature, validate_claim_fulltext, think_tool`

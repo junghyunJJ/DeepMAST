@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1771006484941,
+  "lastScanned": 1771319385329,
   "projectRoot": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST",
   "techStack": {
     "languages": [
@@ -49,7 +49,7 @@
       "path": "agent-chat-ui",
       "purpose": null,
       "fileCount": 24,
-      "lastAccessed": 1771006484932,
+      "lastAccessed": 1771319385319,
       "keyFiles": [
         "LICENSE",
         "Makefile",
@@ -62,7 +62,7 @@
       "path": "agent_architecture",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1771006484932,
+      "lastAccessed": 1771319385321,
       "keyFiles": [
         "1.pipeline_builder.mermaid",
         "1.pipeline_builder.png",
@@ -75,27 +75,27 @@
       "path": "docker",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1771006484932,
+      "lastAccessed": 1771319385322,
       "keyFiles": []
     },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 19,
-      "lastAccessed": 1771006484932,
+      "fileCount": 20,
+      "lastAccessed": 1771319385322,
       "keyFiles": [
-        "DeepMAST Evaluation.md",
+        "Auto-save papers in search_literature_dynamic.md",
         "HypoGeniC.pdf",
-        "Untitled",
         "biomedical_thinking_mcp_server.md",
-        "deep_interpreter_architecture.md"
+        "deep_interpreter_architecture.md",
+        "deep_interpreter_overview.md"
       ]
     },
     "notebook": {
       "path": "notebook",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1771006484932,
+      "lastAccessed": 1771319385323,
       "keyFiles": [
         "test_interpreter_steps.ipynb",
         "test_load_analysis_data.ipynb"
@@ -105,7 +105,7 @@
       "path": "old",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1771006484933,
+      "lastAccessed": 1771319385323,
       "keyFiles": [
         "st_pipeline_info_agent copy.py"
       ]
@@ -114,7 +114,7 @@
       "path": "order",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1771006484933,
+      "lastAccessed": 1771319385324,
       "keyFiles": [
         "order_HITL",
         "order_deepagent",
@@ -127,7 +127,7 @@
       "path": "res",
       "purpose": null,
       "fileCount": 39,
-      "lastAccessed": 1771006484933,
+      "lastAccessed": 1771319385324,
       "keyFiles": [
         "1.spatial.png",
         "10.spatial_plot_interections.png",
@@ -139,8 +139,8 @@
     "res_bc": {
       "path": "res_bc",
       "purpose": null,
-      "fileCount": 21,
-      "lastAccessed": 1771006484933,
+      "fileCount": 23,
+      "lastAccessed": 1771319385324,
       "keyFiles": [
         "1.cluster_spatial.png",
         "10.spatial_plot_interections.png",
@@ -152,15 +152,15 @@
     "skills": {
       "path": "skills",
       "purpose": null,
-      "fileCount": 0,
-      "lastAccessed": 1771006484933,
+      "fileCount": 1,
+      "lastAccessed": 1771319385325,
       "keyFiles": []
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1771006484933,
+      "lastAccessed": 1771319385325,
       "keyFiles": [
         "__init__.py"
       ]
@@ -168,17 +168,270 @@
     "tests": {
       "path": "tests",
       "purpose": "Test files",
-      "fileCount": 5,
-      "lastAccessed": 1771006484933,
+      "fileCount": 7,
+      "lastAccessed": 1771319385325,
       "keyFiles": [
         "__init__.py",
+        "test_literature_rag_integration.ipynb",
         "test_openrouter_kimi.ipynb",
         "test_planner_workflow.py",
-        "test_rag_path_resolution.py",
-        "test_reporter_phase45.py"
+        "test_rag_path_resolution.py"
       ]
     }
   },
-  "hotPaths": [],
+  "hotPaths": [
+    {
+      "path": "src/agents/deep_interpreter/subagents/prompts.py",
+      "accessCount": 74,
+      "lastAccessed": 1771327411093,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools/literature_rag.py",
+      "accessCount": 47,
+      "lastAccessed": 1771327392391,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools/literature.py",
+      "accessCount": 40,
+      "lastAccessed": 1771327005935,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter",
+      "accessCount": 24,
+      "lastAccessed": 1771327194978,
+      "type": "directory"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools/data_loader.py",
+      "accessCount": 21,
+      "lastAccessed": 1771327192815,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools/report.py",
+      "accessCount": 21,
+      "lastAccessed": 1771327393214,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/agent.py",
+      "accessCount": 20,
+      "lastAccessed": 1771327193702,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/subagents/configs.py",
+      "accessCount": 19,
+      "lastAccessed": 1771326991788,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/wrapper_agent.py",
+      "accessCount": 18,
+      "lastAccessed": 1771326792438,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools/__init__.py",
+      "accessCount": 18,
+      "lastAccessed": 1771326992369,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools/standalone_fs.py",
+      "accessCount": 14,
+      "lastAccessed": 1771326791224,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools",
+      "accessCount": 6,
+      "lastAccessed": 1771326000208,
+      "type": "directory"
+    },
+    {
+      "path": "src/agents/deep_interpreter/prompts.py",
+      "accessCount": 6,
+      "lastAccessed": 1771326810530,
+      "type": "file"
+    },
+    {
+      "path": "skills/biomedical-literature-search/SKILL.md",
+      "accessCount": 5,
+      "lastAccessed": 1771322598619,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 4,
+      "lastAccessed": 1771323267841,
+      "type": "directory"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools/think.py",
+      "accessCount": 4,
+      "lastAccessed": 1771325995556,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents/graph.py",
+      "accessCount": 3,
+      "lastAccessed": 1771320031280,
+      "type": "file"
+    },
+    {
+      "path": "docs/des_arch/SEARCHER_subagent.md",
+      "accessCount": 3,
+      "lastAccessed": 1771320063525,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents/middleware/filesystem.py",
+      "accessCount": 3,
+      "lastAccessed": 1771320167286,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/info_extraction.py",
+      "accessCount": 3,
+      "lastAccessed": 1771325993119,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools/pubmed_eutils.py",
+      "accessCount": 3,
+      "lastAccessed": 1771325996177,
+      "type": "directory"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools/quality.py",
+      "accessCount": 3,
+      "lastAccessed": 1771325997321,
+      "type": "directory"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools/lr_prioritizer.py",
+      "accessCount": 3,
+      "lastAccessed": 1771326810062,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/model.py",
+      "accessCount": 2,
+      "lastAccessed": 1771319433642,
+      "type": "directory"
+    },
+    {
+      "path": "docs/des_arch/PLANNER_subagent.md",
+      "accessCount": 2,
+      "lastAccessed": 1771319775630,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents/backends/filesystem.py",
+      "accessCount": 2,
+      "lastAccessed": 1771320030951,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents",
+      "accessCount": 2,
+      "lastAccessed": 1771320163036,
+      "type": "directory"
+    },
+    {
+      "path": "src",
+      "accessCount": 2,
+      "lastAccessed": 1771322486233,
+      "type": "directory"
+    },
+    {
+      "path": "langgraph.json",
+      "accessCount": 2,
+      "lastAccessed": 1771323268121,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents/middleware/subagents.py",
+      "accessCount": 1,
+      "lastAccessed": 1771319423981,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents/middleware/summarization.py",
+      "accessCount": 1,
+      "lastAccessed": 1771319424618,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/middleware/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1771319810713,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/middleware/skills_middleware.py",
+      "accessCount": 1,
+      "lastAccessed": 1771319811003,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents/backends/composite.py",
+      "accessCount": 1,
+      "lastAccessed": 1771319821704,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents/backends/state.py",
+      "accessCount": 1,
+      "lastAccessed": 1771319822118,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/subagents/literature_searcher/agent.py",
+      "accessCount": 1,
+      "lastAccessed": 1771319826365,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents/backends/protocol.py",
+      "accessCount": 1,
+      "lastAccessed": 1771319846042,
+      "type": "file"
+    },
+    {
+      "path": ".venv",
+      "accessCount": 1,
+      "lastAccessed": 1771320148338,
+      "type": "directory"
+    },
+    {
+      "path": "src/agents/llm_config.py",
+      "accessCount": 1,
+      "lastAccessed": 1771322251375,
+      "type": "file"
+    },
+    {
+      "path": "src/base/base_agent.py",
+      "accessCount": 1,
+      "lastAccessed": 1771322251900,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/wrapper_state.py",
+      "accessCount": 1,
+      "lastAccessed": 1771322267164,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/subagents",
+      "accessCount": 1,
+      "lastAccessed": 1771327200559,
+      "type": "directory"
+    }
+  ],
   "userDirectives": []
 }

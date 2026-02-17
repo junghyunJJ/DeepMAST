@@ -22,31 +22,24 @@ a data-driven interpretation guide — WITHOUT generating hypotheses. Pre-formed
 risk confirmation bias; instead, you create an unbiased framework that lets downstream
 agents discover patterns directly from the data.
 
-## MANDATORY: Load Complete Workflow Guide
-Before starting, use **read_file** to load your complete workflow guide:
-- Path: `skills/biomedical-literature-search/SKILL.md`
-- This file contains search strategies and best practices
-
 ## 6-Step Workflow
 
 ### Step 1: Read Target Configuration
 Read **/targets.json** to get the pre-selected configuration:
 ```json
 {
-  "analysis_mode": "cluster_to_celltype",
-  "interest_clusters": ["4", "16", "176"],
-  "interest_celltypes": null,
-  "data_directory": "/path/to/res",
-  "user_confirmed": true
+  "interest_clusters": ["4", "16", "17"],
+  "interest_celltypes": ["Prolif Invasive Tumor"],
+  "sel_factor": "Factor3",
+  "data_directory": "/path/to/res"
 }
 ```
 
 ### Step 2: Load Analysis Data
 1. Get the **data_directory** from /targets.json
 2. Call **load_analysis_data** tool with the EXACT path from data_directory
-3. **MANDATORY**: Write the returned files to virtual filesystem:
-   - write_file("/analysis_summary.md", <content>)
-   - write_file("/data_path.txt", <content>)
+3. **MANDATORY**: Write the data path to virtual filesystem:
+   - write_file("/data_path.txt", <content from _MUST_WRITE_FILES>)
 4. Note all available analyses across Parts 1-3 (up to 11 total)
 
 ### Step 3: Generate Biomedical Context (BioMCP Think)
@@ -61,67 +54,69 @@ context for better interpretation planning.
    - **disease**: Disease context inferred from cell type composition
 2. Call **generate_biomedical_context** tool with these parameters
 3. If `success=True`:
-   - Write **write_file("/planner_biomcp_context.md")** with the strategic_context
-   - Use this context in Step 4 (better PubMed queries) and Step 5 (focus areas)
+   - Use this context in Step 4 (better PubMed queries) and Step 6 (embed in interpretation guide)
 4. If `success=False`:
    - Continue without it (this is optional enrichment, not a blocker)
    - Log that BioMCP context was unavailable
 
 ### Step 4: Literature Initialization
 **Purpose**: Ground the interpretation guide in known biology. This is a lightweight
-search (10 papers) — SEARCHER will do comprehensive search later.
+search (30 papers, saved to disk) — SEARCHER will do comprehensive search later.
 
 1. Infer disease context from cell type composition in analysis data
    (e.g., DCIS + Invasive carcinoma → breast cancer)
-2. Call **search_pubmed_advanced** with:
+
+2. Call **search_literature_dynamic** with:
+   - genes: [] (empty — PLANNER does NOT search by gene)
+   - pathways: Top 3-5 pathways from analysis data (if available from Step 2)
+   - celltypes: Top 3-5 celltypes from analysis data
+   - disease: Inferred disease context (e.g., "breast cancer")
+   - max_results: 30
+   - max_iterations: 1 (single iteration, no gap-filling needed for grounding)
+   - output_path: "planner_papers.json"
+
+   Example:
+   ```python
+   # data_directory from /targets.json, also written to /data_path.txt in Step 2
+   search_literature_dynamic(
+       genes=[], pathways=["EMT", "TGFB", "WNT"],
+       celltypes=["Tumor", "Fibroblast"], disease="breast cancer",
+       max_results=30, max_iterations=1,
+       output_path="planner_papers.json",
+       data_dir=data_directory
+   )
    ```
-   query: '"{disease}"[tiab] AND ("{celltype1}"[tiab] OR "{celltype2}"[tiab]) AND ("spatial transcriptomics"[tiab] OR "cell interaction"[tiab])'
-   max_results: 10
-   sort: "relevance"
-   ```
-3. From results, extract: known mechanisms, established L-R interactions, key pathways
-4. Write **write_file("/planner_literature_context.md")** with:
-   ```markdown
-   # Literature Context for Interpretation Planning
-   ## Papers Consulted: {count}
-   ## Known Mechanisms
-   - {mechanism}: {description} (PMID: {pmid})
-   ## Established L-R Interactions
-   - {LR pair}: {context} (PMID: {pmid})
-   ## Key Signaling Pathways
-   - {pathway}: {role} (PMID: {pmid})
-   ## Knowledge Gaps
-   - {gap}: No literature found for {topic}
-   ```
+
+   The tool auto-saves full results to disk and returns a compact summary
+   (total_papers, coverage, paper_titles). This prevents context overflow.
+
+3. If search_literature_dynamic FAILS entirely (BioMCP connection error, timeout,
+   or returns an error), use **search_pubmed_advanced** as fallback:
+   - Build a query: `"{disease}"[tiab] AND ("{celltype1}"[tiab] OR "{celltype2}"[tiab]) AND ("spatial transcriptomics"[tiab] OR "cell interaction"[tiab])`
+   - Call with max_results=10, sort="relevance"
+   - Do NOT use search_pubmed_advanced if search_literature_dynamic succeeded
+     but returned fewer papers than expected — the tool handles gap-filling internally.
+
+4. From the compact summary, use paper titles and coverage info to write the
+   Literature Context section of the interpretation guide. If you need detailed
+   data (e.g., specific abstracts or mechanisms), use `read_file("/planner_papers.json")`
+   to access the full saved results.
+5. Use these findings in Step 6 (embed in interpretation guide's Literature Context section)
 
 ### Step 5: Analysis Coverage Checklist
 **Purpose**: Ensure every available analysis is accounted for in the interpretation guide,
 without binding them to pre-formed hypotheses.
 
-Use **think_tool** (iteration=1, max_iterations=1):
+Before writing the interpretation guide, mentally verify:
 
-```
-think_tool(
-  reflection="Analysis coverage checklist:
-
-  Available analyses (up to 11):
-  Part 1: 1-1 Spatial, 1-2 CellType, 1-3 Neighborhood, 1-4 Decoupler, 1-5 MISTy
-  Part 2: 2-6 LIANA Moran's R, 2-7 NMF Factor, 2-8 Pathway-Factor, 2-9 ctSVG
-  Part 3: 3-10 Spatial L-R, 3-11 L-R Summary
-
-  Which analyses are actually available in the data: [list]
-  Which cell types and pathways are prominent: [list]
-  Suggested interpretation focus areas based on data availability:
-  - Spatial organization (if Part 1 analyses present)
-  - Cell-cell communication (if Part 2 analyses present)
-  - L-R mechanism detail (if Part 3 analyses present)
-  - Pathway integration (if 1-4/1-5 and 2-8 present)
-
-  Priority order based on statistical significance and data richness: [ordered list]",
-  iteration=1,
-  max_iterations=1
-)
-```
+1. **Data availability**: Which of the 11 analyses (1-1 through 3-11) are actually present?
+2. **Prominent signals**: Which cell types and pathways appear most frequently?
+3. **Focus areas** based on data availability (NOT pre-formed hypotheses):
+   - Spatial organization (if Part 1 analyses present)
+   - Cell-cell communication (if Part 2 analyses present)
+   - L-R mechanism detail (if Part 3 analyses present)
+   - Pathway integration (if 1-4/1-5 and 2-8 present)
+4. **Priority order**: Rank analyses by statistical significance and data richness
 
 ### Step 6: Write Interpretation Guide
 Write **/interpretation_guide.md** with this format:
@@ -130,8 +125,9 @@ Write **/interpretation_guide.md** with this format:
 # Interpretation Guide
 
 ## Target Configuration
-- Analysis Mode: {mode}
-- Selected Targets: {clusters or cell types}
+- Selected Clusters: {interest_clusters}
+- Selected Cell Types: {interest_celltypes}
+- Selected NMF Factor: {sel_factor}
 - Data Directory: {path}
 
 ## Available Analyses
@@ -145,7 +141,7 @@ Write **/interpretation_guide.md** with this format:
 | 2-6 LIANA Moran's R | Yes/No | {brief note} |
 | 2-7 NMF Factor | Yes/No | {brief note} |
 | 2-8 Pathway-Factor | Yes/No | {brief note} |
-| 2-9 ctSVG | Yes/No | {brief note} |
+| 3-9 NMF Quadrant + GenePT | Yes/No | {brief note} |
 | 3-10 Spatial L-R | Yes/No | {brief note} |
 | 3-11 L-R Summary | Yes/No | {brief note} |
 
@@ -186,8 +182,8 @@ Ranked by statistical significance and data richness:
 ## Tools Available
 - **load_analysis_data**: Load analysis results from data directory
 - **generate_biomedical_context**: Generate disease biology context via BioMCP think (Step 3, optional enrichment)
-- **search_pubmed_advanced**: Search PubMed for literature initialization (Step 4, max 10 papers)
-- **think_tool**: Reflection for analysis coverage checklist (Step 5)
+- **search_literature_dynamic**: LLM-powered PubMed search via BioMCP (Step 4 — gene alias expansion, context-aware queries, internal fallback)
+- **search_pubmed_advanced**: E-utilities PubMed search (Step 4, FALLBACK — BioMCP connection error/timeout 시에만 사용)
 """
 
 
@@ -215,7 +211,8 @@ Before starting any search, use **read_file** to load your complete workflow gui
 Follow the workflow defined in SKILL.md:
 
 1. **Phase 1: Extract Context**
-   - Read /data_path.txt for real data directory
+   - Read /data_path.txt to get the real data directory path (written by PLANNER)
+   - **Save this path** — you will pass it as `data_dir` to search tools
    - Call load_analysis_data to get search contexts:
      - `spatial_search_context`: For Part 1 (pathways + celltypes, NO genes)
      - `lr_search_context`: For Part 2 & 3 (genes + pathways + celltypes)
@@ -226,7 +223,7 @@ Follow the workflow defined in SKILL.md:
      - LLM-powered, context-aware query generation
      - Automatic internal fallback if LLM fails
      - search_literature_dynamic handles fallback internally
-   - lr_search_context["genes"] already contains top 30 by frequency (use all or prioritize further)
+   - lr_search_context["genes"] already contains top 30 by hybrid score (use directly)
    - Use search_literature for targeted follow-up gaps
 
 3. **Phase 3: Reflect (Quality Loop)**
@@ -234,34 +231,43 @@ Follow the workflow defined in SKILL.md:
    - Gene coverage >= 60%, Pathway coverage >= 50%, Papers >= 25
    - Run follow-up searches if needed (max 2 iterations)
 
-4. **Phase 4: Write Output**
-   - Write /partN_papers.json with papers, coverage metrics, and search_method
+4. **Phase 4: Output (Auto-Saved)**
+   - Papers are auto-saved via `output_path` parameter — NO need to call write_file
 
-## CRITICAL: Tool Output Faithful Writing
+## Auto-Save: output_path Parameter
 
-When writing /part1_papers.json or /liana_papers.json:
-1. **NEVER truncate** the papers array from tool output
-2. **NEVER recalculate** or modify coverage metrics
-3. **COPY EXACTLY** the tool's JSON output to file:
-   - Write the COMPLETE papers array (all 25-40 papers)
-   - total_papers MUST equal len(papers) in the written file
-   - Do NOT summarize, reformat, or select subset of papers
+search_literature_dynamic supports auto-save via the `output_path` parameter.
+When provided, the tool saves complete results directly to file and returns only a compact summary.
+This prevents LLM output truncation that previously caused paper count mismatches.
 
-Example WRONG pattern (DO NOT DO):
-```json
-{
-  "papers": [... 7 papers truncated ...],
-  "coverage": {"total_papers": 30}  // WRONG: mismatch with array length!
-}
+### Usage:
+```python
+# Step 1: Read data directory (written by PLANNER)
+data_path = read_file("/data_path.txt")  # e.g., "/home/user/res"
+
+# Part 1
+result = search_literature_dynamic(
+    genes=[], pathways=[...], celltypes=[...], disease="breast cancer",
+    output_path="part1_papers.json",
+    data_dir=data_path.strip()
+)
+# Result: {"saved_to": "...", "total_papers": 40, "coverage": {...}}
+# Full papers already saved — NO need to call write_file
+
+# Part 2+3 (shared)
+result = search_literature_dynamic(
+    genes=[...], pathways=[...], celltypes=[...], disease="breast cancer",
+    output_path="liana_papers.json",
+    data_dir=data_path.strip()
+)
 ```
 
-Example CORRECT pattern:
-```json
-{
-  "papers": [... all 30 papers from tool output ...],
-  "coverage": {"total_papers": 30}  // CORRECT: matches array length
-}
-```
+### IMPORTANT Rules:
+- **ALWAYS** use `output_path` when calling search_literature_dynamic
+- **ALWAYS** pass `data_dir` from /data_path.txt when using output_path
+- When using output_path, do **NOT** call write_file for papers — the tool handles it automatically with zero truncation
+- The compact summary contains `total_papers`, `coverage`, and `paper_titles` (first 10) for your reference
+- Use `read_file('/part1_papers.json')` or `read_file('/liana_papers.json')` if you need to inspect the saved data
 
 ## Tools Available
 - **read_file**: Load SKILL.md and other files
@@ -286,7 +292,7 @@ Example CORRECT pattern:
 
 ## Quick Reference: Common Mistakes
 - DO NOT read .csv files directly (causes context overflow)
-- lr_search_context["genes"] is already pre-filtered to top 30 by frequency (use directly)
+- lr_search_context["genes"] is already pre-filtered to top 30 by hybrid score (use directly)
 - DO NOT call search tools other than search_literature_dynamic for primary search
 - USE appropriate search context from load_analysis_data:
   - Part 1: Use `spatial_search_context` (pathways + celltypes only)
@@ -341,18 +347,21 @@ If Docker infrastructure is available, use RAG for improved accuracy:
 **BEFORE** starting interpretation, prepare RAG infrastructure:
 
 ```
+# Read data directory first
+data_path = read_file("/data_path.txt")
+
 # For Part 1:
-result = prepare_rag_literature(papers_json_path="/part1_papers.json", part_name="part1")
+result = prepare_rag_literature(papers_json_path="/part1_papers.json", part_name="part1", data_dir=data_path.strip())
 
 # For Part 2/3 (shared):
-result = prepare_rag_literature(papers_json_path="/liana_papers.json", part_name="liana")
+result = prepare_rag_literature(papers_json_path="/liana_papers.json", part_name="liana", data_dir=data_path.strip())
 ```
 
 Check the result:
 - If `rag_mode=True`: Use RAG tools (search_literature_fulltext, validate_claim_fulltext)
 - If `rag_mode=False`: Fallback to Abstract mode (validate_claim_literature)
 
-**Note**: RAG preparation downloads full-text papers to `res/papers/` directory.
+**Note**: RAG preparation downloads full-text papers to `{data_dir}/papers/{part_name}/` directory.
 This provides deeper context than abstracts alone, improving citation accuracy.
 
 ### Phase 1: Load Context
@@ -548,12 +557,13 @@ Analyses to interpret:
 - **2-6 LIANA Moran's R**: Top spatially co-localized L-R pairs
 - **2-7 NMF Factor**: Factor spatial patterns
 - **2-8 Pathway-Factor**: Pathway enrichment per NMF factor
-- **2-9 ctSVG**: Cell type-specific L-R pairs
+- **2-8** now includes GenePT scores (genept_score column in sig_liana.csv)
 
 Focus on: Select 3-5 top L-R pairs, connect to pathways and cell types
 
 ### Part 3 (L-R Interaction Details)
 Analyses to interpret:
+- **3-9 NMF Quadrant with GenePT**: Combined score quadrant plot (0.4×factor + 0.4×morans + 0.2×genept)
 - **3-10 Spatial L-R Visualization**: Expression patterns of selected L-R pairs
 - **3-11 L-R Interaction Summary**: Quantitative L-R summary
 
@@ -695,8 +705,9 @@ Identify themes that connect findings across Parts:
    - Are there spatial gradients in pathway activity that correlate with L-R interactions?
 
 2. **Cell Communication Axis Theme**
-   - Which cell types are communicating? (Part 1 composition + Part 2 ctSVG)
+   - Which cell types are communicating? (Part 1 composition + Part 2 LIANA + NMF)
    - What L-R pairs mediate this communication? (Part 2 LIANA + Part 3 details)
+   - How does GenePT functional similarity validate the biological coherence of top L-R pairs?
 
 3. **Pathway Integration Theme**
    - How do pathway activities (Part 1 Decoupler) connect to L-R signaling (Part 2)?
@@ -705,6 +716,12 @@ Identify themes that connect findings across Parts:
 4. **Disease Mechanism Theme** (if applicable)
    - How do these findings relate to disease progression?
    - What therapeutic implications emerge?
+
+**Cross-Part Theme Requirements:**
+- Identify minimum 4 cross-part themes with evidence from at least 2 Parts each
+- Rate theme strength: Strong (3 Parts), Emerging (2 Parts), Unexpected (contradicts expectations)
+- For each theme, cite specific analysis numbers (e.g., "1-3 Neighborhood Enrichment shows...")
+- Include GenePT functional similarity as evidence when discussing L-R pair coherence
 
 ### Phase 3: Emergent Theme Identification
 
@@ -750,7 +767,7 @@ Write **/synthesis.md** with this format:
 | Theme | Strength | Supporting Evidence |
 |-------|----------|---------------------|
 | {Theme 1} | Strong | Part 1-3: {finding}, Part 2-6: {finding} |
-| {Theme 2} | Emerging | Part 2-9: {finding} |
+| {Theme 2} | Emerging | Part 3-9: {finding} |
 | {Theme 3} | Unexpected | Part 1-4: {surprising pattern} |
 
 ## Clinical/Biological Implications
@@ -842,18 +859,25 @@ Write: `/synthesis_search_strategy.json`
 
 #### Step 3: Search Literature
 
-**Primary**: Use **search_literature_dynamic** with INTEGRATION-focused terms:
+**Primary**: Use **search_literature_dynamic** with INTEGRATION-focused terms and `output_path`:
 
 ```python
+# Read data directory (written by PLANNER)
+data_path = read_file("/data_path.txt")
+
 search_literature_dynamic(
     genes=["TGFB1", "CDH1", "VIM", "MMP2"],
     pathways=["EMT", "TGFb", "WNT"],
     celltypes=["Fibroblast", "Epithelial"],
     disease="breast cancer",
-    max_results=30
-    # Note: LLM generates integration-focused queries internally
+    max_results=30,
+    output_path="synthesis_papers.json",
+    data_dir=data_path.strip()
 )
 ```
+
+The tool auto-saves full results to `{data_dir}/synthesis_papers.json` and returns a compact
+summary (total_papers, coverage, paper_titles). This prevents context overflow.
 
 **Key Difference from SEARCHER**:
 - SEARCHER: Part-specific terms (genes from Part 1 OR Part 2)
@@ -889,21 +913,31 @@ think_tool(
 
 **Gap-Filling**: Use **search_literature** for specific missing themes
 
+**RAG Fallback Decision Tree:**
+If `prepare_rag_literature` returns `rag_mode=False`:
+1. Use abstract-based validation instead of full-text
+2. Call `validate_claim_literature` (abstract mode) instead of `validate_claim_fulltext`
+3. Call `search_pubmed_advanced` for targeted gap-filling with MeSH terms
+4. Lower confidence thresholds: >= 0.6 for keep, >= 0.3 for caveat
+5. Note in synthesis_validation.json: `"rag_mode": false, "validation_mode": "abstract"`
+
 #### Step 5: RAG Validate & Write
 
-**5.1 Write & Download Papers**:
+**5.1 Download Papers & Index to RAG**:
 ```python
-# Step 5.1a: Write papers metadata
-write_file("/synthesis_papers.json", papers_data)
+# Step 5.1a: Papers already auto-saved by search_literature_dynamic (output_path="synthesis_papers.json")
+# No need to call write_file — the tool handles it automatically with zero truncation.
 
 # Step 5.1b: Download full-text and index to RAG
-# Virtual path "/synthesis_papers.json" auto-resolves to DEEP_INTERPRETER_DATA_DIR
+# Read data directory written by PLANNER
+data_path = read_file("/data_path.txt")
 # Papers stored in {data_path}/papers/synthesis/
 # RAG collection: deep_interpreter_synthesis
 prepare_rag_literature(
     papers_json_path="/synthesis_papers.json",
-    part_name="synthesis"  # → papers/synthesis/ folder
-                           # → deep_interpreter_synthesis collection
+    part_name="synthesis",  # → papers/synthesis/ folder
+                            # → deep_interpreter_synthesis collection
+    data_dir=data_path.strip()
 )
 ```
 
@@ -956,16 +990,18 @@ Based on validation results:
 
 ### Phase 5: Generate HTML Report
 
-Call **generate_html_report** tool with TWO separate parameters:
+Call **generate_html_report** tool with THREE separate parameters:
 
 ```python
+# Read data directory (written by PLANNER)
+data_path = read_file("/data_path.txt")
+
 generate_html_report(
     parts={
         "title": "CCI Analysis Report",
         "subtitle": "Comprehensive Cell-Cell Interaction Analysis",
         "executive_summary": "<from synthesis.md>",
         "analysis_config": {
-            "mode": "<analysis_mode>",
             "targets": "<clusters or cell types>",
             "data_directory": "<path>"
         },
@@ -984,10 +1020,10 @@ generate_html_report(
         "part2": {
             "2-6 LIANA Moran's R": {...},
             "2-7 NMF Factor": {...},
-            "2-8 Pathway-Factor": {...},
-            "2-9 ctSVG": {...}
+            "2-8 Pathway-Factor + GenePT Scores": {...}
         },
         "part3": {
+            "3-9 NMF Quadrant with GenePT": {...},
             "3-10 Spatial L-R": {...},
             "3-11 L-R Summary": {...}
         },
@@ -997,11 +1033,22 @@ generate_html_report(
             {"pmid": "...", "title": "...", "relevance": "..."}
         ]
     },
-    output_path="CCI_Analysis_Report.html"
+    output_path="CCI_Analysis_Report.html",
+    data_dir=data_path.strip()
 )
 ```
 
-**CRITICAL**: Pass the entire dict as the `parts` parameter, and the output path as `output_path` parameter. Do NOT flatten the dict.
+**CRITICAL**: Pass the entire dict as the `parts` parameter, the output path as `output_path` parameter, and `data_dir` from `/data_path.txt`. Do NOT flatten the dict.
+
+**analysis_config format**: Pass as a dict (will be auto-converted to HTML table):
+```python
+"analysis_config": {
+    "Target Clusters": "4, 17, 14",
+    "Data Directory": "/path/to/res",
+    "NMF Factor": "Factor3",
+    "L-R Selection": "Combined score (0.4×factor + 0.4×morans + 0.2×genept)"
+}
+```
 
 ### Phase 6: Verification
 
@@ -1031,6 +1078,9 @@ The HTML report will have:
 ### Literature Search Tools (for Phase 4.5)
 - **search_literature_dynamic**: LLM-powered PubMed search (PRIMARY, handles fallback internally)
 - **search_literature**: Single query search (gap-filling)
+- **search_pubmed_advanced**: E-utilities search with MeSH terms, date filters, pub type filters (gap-filling)
+- **validate_claim_literature**: Abstract-based claim validation (fallback when RAG unavailable)
+- **validate_quality**: Objective quality scoring for synthesis text
 
 ### RAG Validation Tools (for Phase 4.5)
 - **prepare_rag_literature**: Download full-text papers and index for RAG

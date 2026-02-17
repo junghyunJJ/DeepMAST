@@ -227,8 +227,9 @@ def create_deep_interpreter_graph():
 # Convenience function for quick usage
 def interpret_analysis(
     data_dir: str = './res',
-    analysis_mode: str = "cluster_to_celltype",
-    targets: Optional[list[str]] = None,
+    interest_clusters: Optional[list[str]] = None,
+    interest_celltypes: Optional[list[str]] = None,
+    sel_factor: Optional[str] = None,
     output_path: Optional[str] = None,
     provider: Literal["openai", "google", "ollama", "claude", "kimi"] = "ollama",
     thread_id: Optional[str] = None,
@@ -242,8 +243,9 @@ def interpret_analysis(
 
     Args:
         data_dir: Path to directory containing CCI analysis results
-        analysis_mode: 'cluster_to_celltype' (Mode A) or 'celltype_to_cluster' (Mode B)
-        targets: List of cluster IDs (Mode A) or cell type names (Mode B)
+        interest_clusters: List of cluster IDs to analyze
+        interest_celltypes: List of cell type names to analyze
+        sel_factor: Selected NMF factor (e.g., "Factor3")
         output_path: Output path for HTML report (default: {data_dir}/CCI_Analysis_Report.html)
         provider: LLM provider ('openai', 'google', 'ollama', 'claude')
         thread_id: Optional thread ID for checkpointer. Auto-generated if not provided.
@@ -257,9 +259,6 @@ def interpret_analysis(
     if output_path is None:
         output_path = f"{data_dir}/CCI_Analysis_Report.html"
 
-    if targets is None:
-        targets = []
-
     config = DeepInterpreterConfig(
         provider=provider,
         data_dir=data_dir,
@@ -271,11 +270,10 @@ def interpret_analysis(
 
     # Build targets content
     targets_content = {
-        "analysis_mode": analysis_mode,
-        "interest_clusters": targets if analysis_mode == "cluster_to_celltype" else None,
-        "interest_celltypes": targets if analysis_mode == "celltype_to_cluster" else None,
+        "interest_clusters": interest_clusters,
+        "interest_celltypes": interest_celltypes,
+        "sel_factor": sel_factor,
         "data_directory": data_dir,
-        "user_confirmed": True,
     }
 
     # Build initial message with embedded targets

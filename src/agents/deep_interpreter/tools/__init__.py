@@ -55,6 +55,10 @@ from src.agents.deep_interpreter.tools.pubmed_eutils import (
     search_pubmed_advanced,
     build_pubmed_query,
 )
+from src.agents.deep_interpreter.tools.standalone_fs import (
+    write_file as standalone_write_file,
+    read_file as standalone_read_file,
+)
 
 __all__ = [
     # Think tool (think_tool used by subagents; others exported for orchestrator-level use)
@@ -101,4 +105,7 @@ __all__ = [
     # PubMed E-utilities
     "search_pubmed_advanced",
     "build_pubmed_query",
+    # Standalone filesystem tools
+    "standalone_write_file",
+    "standalone_read_file",
 ]

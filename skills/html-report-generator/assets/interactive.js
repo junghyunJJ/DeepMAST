@@ -88,6 +88,22 @@ function showPage(pageNum) {
 }
 
 /**
+ * Theme Toggle Function
+ *
+ * Switches between dark and light themes by toggling the data-theme
+ * attribute on the root HTML element.
+ *
+ * Usage in HTML:
+ * <button class="theme-toggle" onclick="toggleTheme()">&#9681;</button>
+ */
+function toggleTheme() {
+    var html = document.documentElement;
+    var currentTheme = html.getAttribute('data-theme') || 'dark';
+    var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', newTheme);
+}
+
+/**
  * Initialize report on page load
  *
  * - Opens the first tab (Part 1) by default

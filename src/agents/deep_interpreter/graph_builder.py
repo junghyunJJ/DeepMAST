@@ -199,7 +199,7 @@ def create_subagent_graph(
     Subagent Descriptions:
     - **planner**: Target confirmation + data assessment + interpretation guide
       - Reads /targets.json, loads analysis data
-      - Outputs: /interpretation_guide.md, /analysis_summary.md, /data_path.txt
+      - Outputs: /interpretation_guide.md, /data_path.txt
 
     - **searcher**: Context extraction + literature search
       - For Part 1: outputs /part1_papers.json
@@ -224,6 +224,7 @@ def create_subagent_graph(
     """
     from src.agents.deep_interpreter.subagents.configs import SUBAGENT_CONFIGS
     from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
+    from src.agents.deep_interpreter.tools.standalone_fs import write_file, read_file
 
     # Get subagent config
     config = SUBAGENT_CONFIGS[subagent_name]
@@ -231,8 +232,9 @@ def create_subagent_graph(
     # Create LLM
     llm = create_llm(provider=provider)
 
-    # Get tools from config
-    tools = config["tools"]
+    # Get tools from config + standalone filesystem tools
+    # (In embedded mode, FilesystemMiddleware injects these; standalone needs them explicitly)
+    tools = list(config["tools"]) + [write_file, read_file]
 
     # Get system prompt
     system_prompt = SUBAGENT_PROMPTS[subagent_name]

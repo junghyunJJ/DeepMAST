@@ -88,7 +88,7 @@ The load_analysis_data tool returns pre-extracted search context fields:
 **Example lr_search_context (Part 2 & 3):**
 ```json
 {
-  "genes": ["ITGB1", "CD44", "APP", "FYN", "ITGAV", "FN1", "TGFB1", "...top 30 by frequency"],
+  "genes": ["ITGB1", "CD44", "APP", "FYN", "ITGAV", "FN1", "TGFB1", "...top 30 by hybrid score (0.7×combinedscore + 0.3×freq)"],
   "all_genes": ["ACKR3", "ADAM10", "ADAM17", "...all 352 unique genes sorted"],
   "pathways": ["Androgen", "EGFR", "Estrogen", "Hypoxia", "NFkB", "TGFb", "MAPK", "PI3K"],
   "celltypes": ["B cells", "Endothelial", "Invasive Tumor", "Stromal", "Macrophages"],
@@ -98,7 +98,7 @@ The load_analysis_data tool returns pre-extracted search context fields:
   "stats": {"total_genes": 352, "search_genes": 30, "total_pathways": 64, "total_celltypes": 13}
 }
 ```
-**Note:** `genes` contains top 30 by L-R frequency (used for search). `all_genes` has the full set for reference.
+**Note:** `genes` contains top 30 by hybrid score (0.7×max_combinedscore + 0.3×freq; combinedscore = 0.4×Factor + 0.4×Moran's R + 0.2×GenePT). `all_genes` has the full set for reference.
 
 ### Step 1.4: Write Context File
 Write extracted context to **/partN_search_context.json**:
@@ -119,7 +119,7 @@ Write extracted context to **/partN_search_context.json**:
 
 ### Step 2.1: Execute LLM-Powered Dynamic Search (Primary)
 Use **search_literature_dynamic** tool for context-aware, LLM-generated queries:
-- genes: lr_search_context["genes"] (pre-filtered top 30 by frequency, use directly)
+- genes: lr_search_context["genes"] (pre-filtered top 30 by hybrid score, use directly)
 - pathways: Priority pathways from search strategy
 - celltypes: Relevant cell types for this Part
 - disease: Disease context (e.g., "breast cancer")
@@ -130,7 +130,8 @@ search_literature_dynamic(
     pathways=["EMT", "TGFB", "WNT", "Hypoxia"],
     celltypes=["Tumor", "Fibroblast", "Macrophages"],
     disease="breast cancer",
-    max_results=20
+    max_results=20,
+    output_path="part1_papers.json"  # Auto-saves full results to file
 )
 ```
 
@@ -143,7 +144,7 @@ search_literature_dynamic(
 
 After `search_literature_dynamic`, if coverage gaps remain in specific areas,
 use `search_pubmed_advanced` for targeted precision searches.
-Use lr_search_context["genes"] (already top 30 by frequency) for Part 2/3:
+Use lr_search_context["genes"] (already top 30 by hybrid score) for Part 2/3:
 
 **When to use:**
 - Gene coverage < 60% after Phase 3.1: Search missing genes with MeSH terms
@@ -275,14 +276,42 @@ search_literature(
 
 ---
 
-## Phase 4: Write Output
+## Phase 4: Output (Auto-Saved via output_path)
 
-### Write Papers File
-Write the appropriate papers file:
-- Part 1: **/part1_papers.json**
-- Part 2+3: **/liana_papers.json** (shared, generate ONCE)
+### Papers Are Auto-Saved
+When you call `search_literature_dynamic` with the `output_path` parameter, the tool
+saves complete results (all papers with full abstracts) directly to file. You do **NOT**
+need to call `write_file` for papers — the tool handles it automatically with zero truncation.
 
-Format:
+### How to Use output_path
+```python
+# Part 1: auto-saves to DEEP_INTERPRETER_DATA_DIR/part1_papers.json
+result = search_literature_dynamic(
+    genes=[], pathways=[...], celltypes=[...], disease="breast cancer",
+    max_results=40,
+    output_path="part1_papers.json"
+)
+# result = {"saved_to": "/path/to/part1_papers.json", "total_papers": 38, "coverage": {...}, ...}
+
+# Part 2+3 (shared): auto-saves to DEEP_INTERPRETER_DATA_DIR/liana_papers.json
+result = search_literature_dynamic(
+    genes=[...], pathways=[...], celltypes=[...], disease="breast cancer",
+    max_results=40,
+    output_path="liana_papers.json"
+)
+```
+
+### What the Tool Returns (Compact Summary)
+When `output_path` is provided, the tool returns a compact summary instead of full results:
+- `saved_to`: Absolute path where the file was saved
+- `output_path`: The filename you specified
+- `total_papers`: Number of papers saved
+- `coverage`: Full coverage metrics (genes/pathways percentages)
+- `paper_titles`: First 10 paper titles for quick reference
+- `message`: Confirmation message
+
+### Saved File Format
+The auto-saved file contains the complete data:
 ```json
 {
   "papers": [
@@ -308,6 +337,13 @@ Format:
     "\"CDH1\"[Gene] AND \"breast cancer\"[Title/Abstract]"
   ]
 }
+```
+
+### Important
+- **ALWAYS** use `output_path` when calling search_literature_dynamic
+- Do **NOT** call `write_file` for papers when using `output_path`
+- The saved file is guaranteed to have `total_papers == len(papers)` (no truncation)
+- Use `read_file('/part1_papers.json')` or `read_file('/liana_papers.json')` to inspect saved data
 ```
 
 ---
@@ -355,15 +391,26 @@ search_literature_dynamic(
     pathways=["EMT", "TGFB", "WNT"],
     celltypes=["Tumor", "Fibroblast"],
     disease="breast cancer",
-    max_results=20
+    max_results=20,
+    output_path="part1_papers.json"  # Auto-saves full results to file
 )
 ```
 
-**Returns**:
+**Parameters**:
+- `output_path` (optional): When provided, saves complete results to `DEEP_INTERPRETER_DATA_DIR/{output_path}` and returns a compact summary. **SEARCHER should always use this.**
+
+**Returns (without output_path)**:
 - `papers`: List of found papers with PMIDs
 - `generated_queries`: LLM-generated query structures
 - `coverage`: Detailed coverage metrics with percentages
 - `think_success`: Whether think_tool succeeded
+
+**Returns (with output_path)**:
+- `saved_to`: Absolute path where file was saved
+- `total_papers`: Number of papers saved
+- `coverage`: Coverage metrics
+- `paper_titles`: First 10 titles for quick reference
+- `message`: Confirmation message
 
 **Use when**:
 - Primary tool for all literature searches
@@ -487,10 +534,11 @@ result = search_literature_dynamic(
     pathways=["TREM2 signaling", "microglial activation"],
     celltypes=["Microglia"],
     disease="Alzheimer disease",
-    max_results=20
+    max_results=20,
+    output_path="liana_papers.json"  # Auto-saves full results to file
 )
 # Fallback is handled internally — no manual fallback needed
-# Check result["think_success"] to see which path was taken
+# Papers auto-saved; result contains compact summary with total_papers, coverage
 ```
 
 **Dynamic search benefits in this example:**
@@ -510,16 +558,12 @@ iteration=1, max_iterations=1)
 - Pathways covered: ["TREM2 signaling"] (50%) (pass)
 - think_success: True (no fallback needed)
 
-### Phase 4: Write Output
+### Phase 4: Output (Auto-Saved)
 ```python
-# For Part 2+3: write to shared liana_papers.json (generate ONCE, not twice)
-write_file("/liana_papers.json", json.dumps({
-    "papers": [...],
-    "coverage": {"genes_coverage_pct": 100, "pathways_coverage_pct": 50, "total_papers": 28},
-    "search_iterations": 1,
-    "search_method": "dynamic",  # "dynamic" if LLM succeeded, "fallback" if internal fallback used
-    "think_success": True
-}))
+# Papers already auto-saved via output_path in Phase 2 — no write_file needed
+# result = {"saved_to": "/path/to/liana_papers.json", "total_papers": 28, "coverage": {...}}
+# Use read_file("/liana_papers.json") if you need to inspect the saved data
+```
 ```
 
 ### Generated Interpretation

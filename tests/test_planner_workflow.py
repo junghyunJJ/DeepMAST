@@ -4,7 +4,7 @@ Tests:
 1. Tool registration - PLANNER config has exactly 4 tools
 2. Prompt content - PLANNER_PROMPT contains 6-step workflow
 3. generate_biomedical_context tool signature and mock invocation
-4. search_pubmed_advanced tool signature and mock invocation
+4. search_pubmed_advanced (BioMCP-down fallback) tool signature and mock invocation
 5. Output file expectations in prompt
 6. Graph builder creates PLANNER subagent graph
 """
@@ -23,8 +23,8 @@ def test_planner_has_correct_tools():
     from src.agents.deep_interpreter.tools import (
         load_analysis_data,
         generate_biomedical_context,
+        search_literature_dynamic,
         search_pubmed_advanced,
-        think_tool,
     )
 
     planner_config = SUBAGENT_CONFIGS["planner"]
@@ -33,8 +33,8 @@ def test_planner_has_correct_tools():
     required_tools = [
         load_analysis_data,
         generate_biomedical_context,
+        search_literature_dynamic,
         search_pubmed_advanced,
-        think_tool,
     ]
 
     for tool in required_tools:
@@ -91,8 +91,8 @@ def test_planner_prompt_references_tools():
     tool_references = [
         "load_analysis_data",
         "generate_biomedical_context",
+        "search_literature_dynamic",
         "search_pubmed_advanced",
-        "think_tool",
     ]
 
     for ref in tool_references:
@@ -109,10 +109,7 @@ def test_planner_prompt_output_files():
 
     output_files = [
         "/interpretation_guide.md",
-        "/analysis_summary.md",
         "/data_path.txt",
-        "/planner_literature_context.md",
-        "/planner_biomcp_context.md",
     ]
 
     for f in output_files:
@@ -253,7 +250,32 @@ def test_planner_subagent_via_factory():
 
 
 # =============================================================================
-# Test 7: Workflow Chain - PLANNER outputs consumed by downstream
+# Test 7: Fallback Guard - search_pubmed_advanced only for infrastructure failure
+# =============================================================================
+
+
+def test_planner_prompt_fallback_condition_is_infrastructure_failure():
+    """Verify Step 4 fallback is triggered by BioMCP failure, not low result count."""
+    from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
+
+    planner_prompt = SUBAGENT_PROMPTS["planner"]
+
+    # Fallback should mention infrastructure failure conditions
+    assert "connection error" in planner_prompt or "timeout" in planner_prompt, (
+        "Fallback condition must reference infrastructure failure (connection error/timeout)"
+    )
+
+    # Fallback should NOT be triggered by low result count
+    assert "fewer than" not in planner_prompt, (
+        "Fallback should not trigger on low result count — "
+        "search_literature_dynamic handles gap-filling internally"
+    )
+
+    print("PLANNER fallback correctly guards on infrastructure failure only")
+
+
+# =============================================================================
+# Test 8: Workflow Chain - PLANNER outputs consumed by downstream
 # =============================================================================
 
 
@@ -331,7 +353,10 @@ if __name__ == "__main__":
     test_planner_subagent_graph_creation()
     test_planner_subagent_via_factory()
 
-    print("\n--- Test 7: Workflow Chain ---")
+    print("\n--- Test 7: Fallback Guard ---")
+    test_planner_prompt_fallback_condition_is_infrastructure_failure()
+
+    print("\n--- Test 8: Workflow Chain ---")
     test_planner_outputs_referenced_by_searcher()
     test_planner_outputs_referenced_by_interpreter()
     test_planner_outputs_referenced_by_reporter()

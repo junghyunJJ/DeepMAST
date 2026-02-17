@@ -7,159 +7,59 @@
     <!--
     DeepMAST HTML Report Reference Example
 
-    This is a minimal, shareable example showing the complete structure
-    of a CCI Analysis Report. Use this as a template for understanding:
+    This is a FULL-CONTENT reference showing the complete structure of a
+    CCI Analysis Report with real breast cancer analysis data.
+
+    Key differences from actual generated reports:
+    - External CSS/JS instead of inline (theme.css + interactive.js)
+    - Figure placeholders instead of Base64-embedded images
+    - L-R tables include GenePT functional similarity scores
+
+    Use this as a template for understanding:
     - Tab navigation structure
     - Section layouts and CSS classes
     - Figure and interpretation formatting
     - Pagination for L-R interaction tables
-    - Reference citation format
-
-    All content uses generalized placeholders for sharing.
+    - Reference citation format with real PMIDs
     -->
+    <link rel="stylesheet" href="../assets/theme.css">
     <style>
-        /* Inline CSS for self-contained sharing - see assets/theme.css for full version */
-        :root {
-            --color-primary: #64ffda;
-            --color-secondary: #ffd166;
-            --color-accent: #ff6b9d;
-            --bg-primary: #1a1a2e;
-            --bg-secondary: #16213e;
-            --text-primary: #e4e4e4;
-            --text-secondary: #aaa;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-            color: var(--text-primary);
-            line-height: 1.6;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: rgba(26, 26, 46, 0.95);
-            border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-            padding: 40px;
-        }
-        h1 { color: var(--color-primary); font-size: 2.5em; text-align: center; margin-bottom: 10px; text-shadow: 0 0 10px rgba(100, 255, 218, 0.5); }
-        .subtitle { text-align: center; color: var(--text-secondary); font-size: 1.2em; margin-bottom: 40px; font-style: italic; }
-        h2 { color: var(--color-primary); font-size: 2em; margin: 40px 0 20px; border-bottom: 2px solid var(--color-primary); padding-bottom: 10px; }
-        h3 { color: var(--color-secondary); font-size: 1.5em; margin: 30px 0 15px; }
-        h4 { color: var(--color-accent); font-size: 1.2em; margin: 20px 0 10px; }
-
-        .summary-box {
-            background: linear-gradient(135deg, rgba(100, 255, 218, 0.1) 0%, rgba(255, 107, 157, 0.1) 100%);
-            padding: 25px; border-radius: 10px; margin: 30px 0;
-            border: 2px solid rgba(100, 255, 218, 0.3);
-        }
-        .analysis-section {
-            background: rgba(35, 35, 60, 0.6);
-            padding: 25px; border-radius: 10px; margin-bottom: 30px;
-            border-left: 4px solid var(--color-primary);
-        }
-        .interpretation {
-            background: rgba(100, 255, 218, 0.1);
-            padding: 20px; border-left: 4px solid var(--color-primary);
-            border-radius: 5px; margin: 20px 0;
-        }
-        .interpretation h4 { color: var(--color-primary); margin-bottom: 10px; }
-        .key-findings {
-            background: rgba(255, 107, 157, 0.1);
-            padding: 20px; border-radius: 5px; margin: 20px 0;
-        }
-        .key-findings ul { list-style-position: inside; margin-left: 20px; }
-        .key-findings li { margin: 10px 0; }
-        .pathway-box {
-            background: rgba(255, 209, 102, 0.1);
-            padding: 15px; border-radius: 5px; margin: 10px 0;
-            border-left: 4px solid var(--color-secondary);
-        }
-        .figure-container {
-            text-align: center; margin: 30px 0;
-            background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 10px;
-        }
+        /* Reference-only: figure placeholders (actual reports embed Base64 images) */
         .figure-placeholder {
             background: rgba(100, 255, 218, 0.1);
             border: 2px dashed var(--color-primary);
             padding: 60px 40px; border-radius: 8px;
             color: var(--text-secondary);
+            text-align: center;
         }
-        .figure-caption { color: var(--text-secondary); font-style: italic; margin-top: 15px; font-size: 0.95em; }
-
-        /* Tabs */
-        .tabs { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; border-bottom: 2px solid var(--color-primary); padding-bottom: 10px; }
-        .tab-button {
-            background: rgba(35, 35, 60, 0.8); color: var(--color-primary);
-            border: 2px solid var(--color-primary); padding: 12px 24px;
-            cursor: pointer; border-radius: 5px 5px 0 0; transition: all 0.3s ease;
-            font-size: 1.1em; font-weight: 500;
-        }
-        .tab-button:hover { background: rgba(100, 255, 218, 0.2); transform: translateY(-2px); }
-        .tab-button.active { background: var(--color-primary); color: var(--bg-primary); font-weight: bold; }
-        .tab-content { display: none; animation: fadeIn 0.5s; }
-        .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        /* Tables */
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: rgba(35, 35, 60, 0.6); border-radius: 8px; overflow: hidden; }
-        th { background: rgba(100, 255, 218, 0.2); color: var(--color-primary); padding: 12px; text-align: left; border-bottom: 2px solid var(--color-primary); }
-        td { padding: 10px 12px; border-bottom: 1px solid rgba(100, 255, 218, 0.1); }
-        tr:hover { background: rgba(100, 255, 218, 0.05); }
-
-        /* Pagination */
-        .pagination { display: flex; justify-content: center; gap: 10px; margin: 20px 0; }
-        .page-button {
-            background: rgba(100, 255, 218, 0.2); color: var(--color-primary);
-            border: 1px solid var(--color-primary); padding: 8px 16px;
-            cursor: pointer; border-radius: 5px; transition: all 0.3s ease;
-        }
-        .page-button:hover { background: rgba(100, 255, 218, 0.4); }
-        .page-button.active { background: var(--color-primary); color: var(--bg-primary); font-weight: bold; }
-        .interactions-page { display: none; }
-        .interactions-page.active { display: block; }
-
-        /* Badges & Scores */
-        .score-badge { display: inline-block; padding: 3px 10px; border-radius: 15px; font-size: 0.85em; margin-left: 10px; }
-        .score-high { background: rgba(100, 255, 218, 0.3); color: var(--color-primary); }
-        .score-medium { background: rgba(255, 209, 102, 0.3); color: var(--color-secondary); }
-        .confidence-bar { background: rgba(100, 100, 100, 0.3); border-radius: 10px; height: 10px; margin: 5px 0; overflow: hidden; }
-        .confidence-fill { height: 100%; background: linear-gradient(90deg, var(--color-accent), var(--color-primary)); border-radius: 10px; }
-
-        /* References */
-        .reference { color: var(--color-primary); text-decoration: none; font-weight: bold; }
-        .reference:hover { text-decoration: underline; }
-        .paper-card { background: rgba(30, 30, 50, 0.8); border-radius: 8px; padding: 15px; margin: 10px 0; border-left: 3px solid var(--color-primary); }
-        .paper-title a { color: var(--color-primary); text-decoration: none; }
-        .paper-title a:hover { text-decoration: underline; }
-
-        /* Semantic Highlights */
-        .highlight-cluster { color: var(--color-secondary); font-weight: bold; }
-        .highlight-pathway { color: var(--color-accent); font-weight: bold; }
-        .highlight-celltype { color: var(--color-primary); font-weight: bold; }
-
-        /* Metadata */
-        .metadata { color: #666; font-size: 0.9em; text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(100, 255, 218, 0.2); }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Cell-Cell Interaction Analysis Report</h1>
-        <p class="subtitle">Comprehensive Spatial Transcriptomics Analysis - [Sample Name]</p>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark theme">&#9681;</button>
 
-        <!-- Executive Summary -->
+        <h1>Comprehensive Analysis of Cell-Cell Interactions in Human Breast Cancer</h1>
+        <p class="subtitle">Spatial Transcriptomics Analysis using Visium Technology - Focus on Invasive Tumor Regions</p>
+
+        <!-- ============================================ -->
+        <!-- SECTION: Executive Summary                    -->
+        <!-- Contains: summary-box with key-findings list  -->
+        <!-- ============================================ -->
         <div class="summary-box">
             <h3>Executive Summary</h3>
-            <p>This report presents a comprehensive analysis of cell-cell interactions in [tissue type] spatial transcriptomics data. Key findings include identification of [N] spatially significant ligand-receptor pairs, with <span class="highlight-pathway">TGFb signaling</span> emerging as a dominant communication axis between <span class="highlight-celltype">stromal cells</span> and <span class="highlight-celltype">tumor cells</span>.</p>
+            <p>This report presents a comprehensive cell-cell interaction (CCI) analysis of human breast cancer tissue using Visium spatial transcriptomics technology. The analysis systematically identified invasive tumor regions, characterized their molecular signatures, and uncovered critical ligand-receptor interactions driving tumor progression in the breast cancer microenvironment.</p>
+
             <div class="key-findings">
-                <h4>Quality Metrics</h4>
+                <h4>Key Findings:</h4>
                 <ul>
-                    <li><strong>Quality Score:</strong> <span class="score-badge score-high">0.85</span></li>
-                    <li><strong>Spatial Coverage:</strong> 95% of tissue regions analyzed</li>
-                    <li><strong>L-R Pairs Identified:</strong> 127 significant interactions</li>
+                    <li><strong>Primary Tumor Clusters:</strong> Clusters 4, 17, and 14 show the highest enrichment of <span class="highlight-celltype">Invasive Tumor</span> and <span class="highlight-celltype">Prolif Invasive Tumor</span> cell types with exceptional statistical significance (FDR < 10<sup>-20</sup>)</li>
+                    <li><strong>Dominant Pathway Activation:</strong> <span class="highlight-pathway">MAPK pathway</span> shows extreme hyperactivation (stat=47.86) in invasive regions, followed by <span class="highlight-pathway">PI3K</span> (stat=33.05)</li>
+                    <li><strong>Hypoxia-Proliferation Axis:</strong> Strong <span class="highlight-pathway">hypoxia</span> signature drives proliferative invasive tumor phenotype (MISTy importance=0.764)</li>
+                    <li><strong>p53 Pathway Activation:</strong> Elevated p53 signaling associated with invasive phenotypes (MISTy importance=0.474)</li>
+                    <li><strong>Spatial Organization:</strong> Invasive tumor clusters show preferential spatial co-localization with Cluster 6 (enrichment score=54.37)</li>
+                    <li><strong>CCI Pattern (Factor3):</strong> Identified dominant intercellular communication pattern (Factor3) enriched in all invasive tumor regions</li>
+                    <li><strong>Critical L-R Interactions:</strong> 19 significant ligand-receptor pairs identified, with <strong>CDH1^ERBB3</strong> showing highest significance (Moran's R=0.477, Factor3=1.197)</li>
+                    <li><strong>Microenvironment Components:</strong> Perivascular-Like cells and T Cell & Tumor Hybrid populations co-localize with invasive tumor regions</li>
                 </ul>
             </div>
         </div>
@@ -169,254 +69,807 @@
             <h3>Analysis Configuration</h3>
             <table>
                 <tr><th>Parameter</th><th>Value</th></tr>
-                <tr><td>Target Cluster</td><td><span class="highlight-cluster">Cluster 5</span> (Invasive Tumor)</td></tr>
-                <tr><td>Reference Clusters</td><td>Clusters 0, 1, 2 (Stromal, Immune, Epithelial)</td></tr>
-                <tr><td>Analysis Mode</td><td>Cluster-to-CellType (Mode A)</td></tr>
-                <tr><td>Significance Threshold</td><td>FDR < 0.05, Moran's R > 0.3</td></tr>
+                <tr><td>Target Clusters</td><td><span class="highlight-cluster">Clusters 4, 17, 14</span> (Invasive Tumor)</td></tr>
+                <tr><td>Supportive Cluster</td><td>Cluster 6 (Microenvironmental Niche)</td></tr>
+                <tr><td>Selected Factor</td><td>Factor3 (Invasive Tumor Communication Signature)</td></tr>
+                <tr><td>Platform</td><td>10x Visium Spatial Transcriptomics</td></tr>
+                <tr><td>CCI Method</td><td>LIANA+ with Moran's R spatial filtering</td></tr>
             </table>
         </div>
 
-        <!-- Tab Navigation -->
+        <!-- ============================================ -->
+        <!-- SECTION: Tab Navigation                       -->
+        <!-- Contains: 4 tab buttons for Parts 1-3 + Summary -->
+        <!-- ============================================ -->
         <div class="tabs">
-            <button class="tab-button active" onclick="openTab(event, 'part1')">Part 1: Spatial & Pathway</button>
-            <button class="tab-button" onclick="openTab(event, 'part2')">Part 2: CCI & NMF</button>
+            <button class="tab-button active" onclick="openTab(event, 'part1')">Part 1: Spatial & Pathway Analysis</button>
+            <button class="tab-button" onclick="openTab(event, 'part2')">Part 2: CCI & NMF Analysis</button>
             <button class="tab-button" onclick="openTab(event, 'part3')">Part 3: L-R Interactions</button>
             <button class="tab-button" onclick="openTab(event, 'summary')">Comprehensive Summary</button>
         </div>
 
-        <!-- Part 1 Content -->
+        <!-- ============================================ -->
+        <!-- SECTION: Part 1 - Spatial & Pathway Analysis  -->
+        <!-- Contains: 5 analyses (spatial, celltype,      -->
+        <!--   neighborhood, pathway/decoupler, MISTy)     -->
+        <!-- ============================================ -->
         <div id="part1" class="tab-content active">
-            <h2>Part 1: Spatial Distribution & Pathway Analysis</h2>
+            <h2>Part 1: Spatial Organization and Pathway Analysis</h2>
+            <p>This section presents the foundational spatial transcriptomics analysis identifying tumor regions, cell type compositions, spatial relationships, and pathway activities in the breast cancer microenvironment.</p>
 
+            <!-- Step 1: Spatial Clustering -->
             <div class="analysis-section">
-                <h3>1.1 Spatial Distribution Analysis</h3>
+                <h3>1. Spatial Clustering Analysis</h3>
                 <div class="figure-container">
                     <div class="figure-placeholder">
-                        [Spatial plot showing cluster distribution across tissue sections]<br>
-                        <small>Figure embedded as Base64 in actual reports</small>
+                        [Figure 1: Spatial distribution of tissue clusters across the breast cancer sample]<br>
+                        <small>In actual reports, figures are embedded as Base64-encoded images from MCP analysis output</small>
                     </div>
-                    <p class="figure-caption">Figure 1.1: Spatial distribution of cell clusters in [tissue type]. <span class="highlight-cluster">Cluster 5</span> (orange) shows enrichment in the invasive tumor margin.</p>
+                    <p class="figure-caption">Figure 1: Spatial distribution of tissue clusters across the breast cancer sample. The tissue demonstrates heterogeneous spatial organization with distinct tumor, stromal, and immune-enriched regions.</p>
                 </div>
                 <div class="interpretation">
-                    <h4>Biological Interpretation</h4>
-                    <p><span class="highlight-cluster">Cluster 5</span> exhibits a distinct spatial localization pattern at the tumor-stroma interface, suggesting active intercellular communication. This finding is consistent with previous reports demonstrating that invasive tumor margins are characterized by increased cell-cell signaling (Smith et al., 2023; PMID: 12345678).</p>
+                    <h4>Biological Interpretation:</h4>
+                    <p>The spatial clustering reveals distinct tumor architectures within the breast cancer tissue. This spatial heterogeneity is a hallmark characteristic of breast cancer and reflects the complex microenvironmental interactions that drive tumor progression. The tissue demonstrates clear delineation between different functional regions, each with unique molecular signatures and cellular compositions.</p>
+                    <p>Spatial transcriptomics has revolutionized our understanding of tumor heterogeneity by enabling simultaneous measurement of gene expression and spatial location. This approach reveals how tumor cells organize themselves and interact with their surrounding microenvironment, providing insights that are impossible to obtain from traditional bulk sequencing methods <a href="https://pubmed.ncbi.nlm.nih.gov/39703753/" class="reference" target="_blank">(PMID: 39703753)</a>.</p>
                 </div>
             </div>
 
+            <!-- Step 2: Cell Type Composition -->
             <div class="analysis-section">
-                <h3>1.4 Pathway Enrichment (Decoupler)</h3>
-                <div class="pathway-box">
-                    <h4>Top Enriched Pathways in <span class="highlight-cluster">Cluster 5</span></h4>
-                    <ul>
-                        <li><span class="highlight-pathway">TGFb signaling</span> (Activity score: 2.3, p < 0.001)</li>
-                        <li><span class="highlight-pathway">Hypoxia response</span> (Activity score: 1.8, p < 0.01)</li>
-                        <li><span class="highlight-pathway">EMT (Epithelial-Mesenchymal Transition)</span> (Activity score: 1.5, p < 0.05)</li>
-                    </ul>
+                <h3>2. Cell Type Composition Analysis</h3>
+                <div class="figure-container">
+                    <div class="figure-placeholder">
+                        [Figure 2: Heatmap of scaled median cell-type compositions within each spatial cluster]<br>
+                        <small>In actual reports, figures are embedded as Base64-encoded images from MCP analysis output</small>
+                    </div>
+                    <p class="figure-caption">Figure 2: Heatmap showing scaled median cell-type compositions within each spatial cluster. Asterisks indicate significantly increased composition (Wilcoxon rank sum test, FDR < 0.05). Color intensity represents enrichment levels.</p>
                 </div>
-                <div class="interpretation">
-                    <h4>Biological Interpretation</h4>
-                    <p>The enrichment of <span class="highlight-pathway">TGFb signaling</span> and <span class="highlight-pathway">EMT</span> pathways in <span class="highlight-cluster">Cluster 5</span> suggests active tumor invasion processes. These pathways are known drivers of epithelial plasticity and metastatic potential in [cancer type] (Jones et al., 2022; PMID: 23456789).</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Part 2 Content -->
-        <div id="part2" class="tab-content">
-            <h2>Part 2: Cell-Cell Interaction & NMF Analysis</h2>
-
-            <div class="analysis-section">
-                <h3>2.6 LIANA Analysis (Moran's R Filtered)</h3>
-                <p>Spatially significant ligand-receptor pairs identified between <span class="highlight-cluster">Cluster 5</span> and neighboring cell types:</p>
-                <table>
-                    <tr>
-                        <th>Ligand</th>
-                        <th>Receptor</th>
-                        <th>Source</th>
-                        <th>Target</th>
-                        <th>Moran's R</th>
-                    </tr>
-                    <tr>
-                        <td>TGFB1</td>
-                        <td>TGFBR2</td>
-                        <td><span class="highlight-celltype">Stromal</span></td>
-                        <td><span class="highlight-cluster">Cluster 5</span></td>
-                        <td>0.45</td>
-                    </tr>
-                    <tr>
-                        <td>VEGFA</td>
-                        <td>KDR</td>
-                        <td><span class="highlight-cluster">Cluster 5</span></td>
-                        <td><span class="highlight-celltype">Endothelial</span></td>
-                        <td>0.38</td>
-                    </tr>
-                </table>
-                <div class="interpretation">
-                    <h4>Biological Interpretation</h4>
-                    <p>The TGFB1-TGFBR2 axis shows the highest spatial correlation (Moran's R = 0.45), indicating coordinated expression between <span class="highlight-celltype">stromal cells</span> and <span class="highlight-cluster">Cluster 5</span>. This supports the role of stromal-derived TGFb in promoting tumor invasion (Wang et al., 2021; PMID: 34567890).</p>
-                </div>
-            </div>
-
-            <div class="analysis-section">
-                <h3>2.7 NMF Factor Analysis</h3>
-                <p>Non-negative matrix factorization reveals [N] spatial programs:</p>
                 <div class="key-findings">
-                    <h4>Factor 3: Invasion Program</h4>
+                    <h4>Key Cellular Compositions in Invasive Tumor Regions:</h4>
+                    <table>
+                        <tr>
+                            <th>Cluster</th>
+                            <th>Cell Type</th>
+                            <th>Median Composition</th>
+                            <th>FDR (Adjusted P-value)</th>
+                            <th>Biological Significance</th>
+                        </tr>
+                        <tr>
+                            <td rowspan="4"><strong class="highlight-cluster">Cluster 4</strong></td>
+                            <td class="highlight-celltype">Prolif Invasive Tumor</td>
+                            <td>0.184</td>
+                            <td>2.47 x 10<sup>-244</sup></td>
+                            <td>Primary proliferative invasive region</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight-celltype">Invasive Tumor</td>
+                            <td>0.132</td>
+                            <td>7.74 x 10<sup>-237</sup></td>
+                            <td>Core invasive tumor mass</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight-celltype">Perivascular-Like</td>
+                            <td>0.072</td>
+                            <td>6.38 x 10<sup>-195</sup></td>
+                            <td>Vascular support cells</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight-celltype">T Cell & Tumor Hybrid</td>
+                            <td>0.071</td>
+                            <td>6.63 x 10<sup>-236</sup></td>
+                            <td>Immune-tumor interaction zone</td>
+                        </tr>
+                        <tr>
+                            <td rowspan="3"><strong class="highlight-cluster">Cluster 17</strong></td>
+                            <td class="highlight-celltype">Prolif Invasive Tumor</td>
+                            <td>0.200</td>
+                            <td>3.21 x 10<sup>-22</sup></td>
+                            <td>Highest proliferation rate</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight-celltype">Invasive Tumor</td>
+                            <td>0.193</td>
+                            <td>2.46 x 10<sup>-24</sup></td>
+                            <td>Secondary invasive focus</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight-celltype">T Cell & Tumor Hybrid</td>
+                            <td>0.084</td>
+                            <td>6.54 x 10<sup>-23</sup></td>
+                            <td>Active immune-tumor interface</td>
+                        </tr>
+                        <tr>
+                            <td rowspan="3"><strong class="highlight-cluster">Cluster 14</strong></td>
+                            <td class="highlight-celltype">Prolif Invasive Tumor</td>
+                            <td>0.135</td>
+                            <td>2.37 x 10<sup>-57</sup></td>
+                            <td>Tertiary invasive region</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight-celltype">Invasive Tumor</td>
+                            <td>0.108</td>
+                            <td>3.22 x 10<sup>-58</sup></td>
+                            <td>Invasive tumor expansion</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight-celltype">Perivascular-Like</td>
+                            <td>0.072</td>
+                            <td>1.86 x 10<sup>-52</sup></td>
+                            <td>Angiogenic support</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="interpretation">
+                    <h4>Biological Interpretation:</h4>
+                    <p><strong>Invasive and Proliferative Tumor Regions:</strong> Clusters 4, 17, and 14 demonstrate the highest enrichment of invasive and proliferative tumor cell types. The exceptional statistical significance (FDR < 10<sup>-20</sup>) confirms these are robust biological features representing the core invasive tumor regions.</p>
+                    <p><strong>Tumor-Immune Hybrids:</strong> The presence of "T Cell & Tumor Hybrid" populations across all three invasive clusters is particularly intriguing. These hybrid states may represent transitional phenotypes or spatially co-localized regions where tumor and immune cells are in intimate contact <a href="https://pubmed.ncbi.nlm.nih.gov/39981232/" class="reference" target="_blank">(PMID: 39981232)</a>.</p>
+                    <p><strong>Perivascular-Like Cell Enrichment:</strong> The significant enrichment of Perivascular-Like cells in Clusters 4 and 14 suggests active angiogenic processes supporting tumor growth, indicating ongoing neovascularization to meet the metabolic demands of rapidly proliferating tumor cells.</p>
+                </div>
+            </div>
+
+            <!-- Step 3: Neighborhood Enrichment -->
+            <div class="analysis-section">
+                <h3>3. Neighborhood Enrichment Analysis (Squidpy)</h3>
+                <div class="figure-container">
+                    <div class="figure-placeholder">
+                        [Figure 3: Neighborhood enrichment heatmap showing spatial co-localization patterns between clusters]<br>
+                        <small>In actual reports, figures are embedded as Base64-encoded images from MCP analysis output</small>
+                    </div>
+                    <p class="figure-caption">Figure 3: Neighborhood enrichment heatmap showing spatial co-localization patterns between clusters. High positive values (red) indicate clusters frequently found adjacent to each other (enriched), while negative values (blue) indicate spatial separation (depleted). Analysis based on permutation testing.</p>
+                </div>
+                <div class="key-findings">
+                    <h4>Significant Spatial Associations:</h4>
+                    <table>
+                        <tr>
+                            <th>Cluster Pair</th>
+                            <th>Enrichment Score</th>
+                            <th>Interpretation</th>
+                        </tr>
+                        <tr>
+                            <td><strong class="highlight-cluster">Cluster 4-6</strong></td>
+                            <td><strong>54.37</strong></td>
+                            <td>Strongest spatial association in entire tissue</td>
+                        </tr>
+                        <tr>
+                            <td>Cluster 11-12</td>
+                            <td>35.49</td>
+                            <td>Strong spatial co-localization</td>
+                        </tr>
+                        <tr>
+                            <td><strong class="highlight-cluster">Cluster 6-17</strong></td>
+                            <td>32.32</td>
+                            <td>Strong spatial association with Cluster 17</td>
+                        </tr>
+                        <tr>
+                            <td><strong class="highlight-cluster">Cluster 6-14</strong></td>
+                            <td>28.29</td>
+                            <td>Strong spatial association with Cluster 14</td>
+                        </tr>
+                        <tr>
+                            <td><strong class="highlight-cluster">Cluster 4-17</strong></td>
+                            <td>11.25</td>
+                            <td>Invasive tumor regions co-localize</td>
+                        </tr>
+                        <tr>
+                            <td><strong class="highlight-cluster">Cluster 4-14</strong></td>
+                            <td>9.51</td>
+                            <td>Primary and tertiary invasive foci connection</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="interpretation">
+                    <h4>Biological Interpretation:</h4>
+                    <p><strong>Cluster 4-6 Interaction (Score=54.37):</strong> This represents the strongest neighborhood enrichment in the entire tissue. Cluster 6's strong spatial association with the primary invasive tumor region (Cluster 4) suggests it plays a critical supportive role in tumor progression. Similarly, Cluster 6 shows strong associations with Clusters 17 (score=32.32) and 14 (score=28.29), indicating it forms a consistent microenvironmental niche around all invasive tumor regions.</p>
+                    <p><strong>Tumor-Tumor Spatial Organization:</strong> The spatial enrichment between invasive tumor clusters (4-17: 11.25, 4-14: 9.51) indicates these tumor regions tend to be spatially connected, suggesting coordinated tumor expansion <a href="https://pubmed.ncbi.nlm.nih.gov/39382177/" class="reference" target="_blank">(PMID: 39382177)</a>.</p>
+                </div>
+            </div>
+
+            <!-- Step 4: Pathway Enrichment (Decoupler) -->
+            <div class="analysis-section">
+                <h3>4. Spatial Pathway Enrichment Analysis (Decoupler with PROGENy)</h3>
+                <div class="figure-container">
+                    <div class="figure-placeholder">
+                        [Figure 4: Spatial pathway enrichment heatmap using PROGENy gene sets across tissue clusters]<br>
+                        <small>In actual reports, figures are embedded as Base64-encoded images from MCP analysis output</small>
+                    </div>
+                    <p class="figure-caption">Figure 4: Spatial pathway enrichment analysis using PROGENy gene sets across tissue clusters. The heatmap displays pathway activity scores, with red indicating activation and blue indicating suppression.</p>
+                </div>
+                <div class="pathway-box">
+                    <h4>PROGENy Pathway Descriptions:</h4>
                     <ul>
-                        <li>Dominant genes: <strong>VIM, MMP2, SNAI1, CDH2</strong></li>
-                        <li>Associated cell types: <span class="highlight-celltype">Invasive Tumor</span>, <span class="highlight-celltype">CAF</span></li>
-                        <li>Pathway enrichment: EMT (p < 0.001), ECM remodeling (p < 0.01)</li>
+                        <li><strong>MAPK:</strong> Integrates external signals and promotes cell growth and proliferation</li>
+                        <li><strong>PI3K:</strong> Promotes growth and proliferation</li>
+                        <li><strong>Hypoxia:</strong> Promotes angiogenesis and metabolic reprogramming when O2 levels are low</li>
+                        <li><strong>p53:</strong> Regulates cell cycle, apoptosis, DNA repair and tumor suppression</li>
+                        <li><strong>VEGF:</strong> Mediates angiogenesis, vascular permeability, and cell migration</li>
+                        <li><strong>TGFb:</strong> Involved in development, homeostasis, and tissue repair</li>
+                    </ul>
+                </div>
+                <div class="key-findings">
+                    <h4>Pathway Activation in Invasive Tumor Clusters:</h4>
+                    <table>
+                        <tr>
+                            <th>Cluster</th>
+                            <th>Pathway</th>
+                            <th>Statistic</th>
+                            <th>Mean Change</th>
+                            <th>FDR</th>
+                        </tr>
+                        <tr>
+                            <td rowspan="3"><strong class="highlight-cluster">Cluster 4</strong></td>
+                            <td><strong class="highlight-pathway">MAPK</strong></td>
+                            <td><strong>47.86</strong></td>
+                            <td>5.63</td>
+                            <td>6.19 x 10<sup>-204</sup></td>
+                        </tr>
+                        <tr>
+                            <td><strong class="highlight-pathway">PI3K</strong></td>
+                            <td><strong>33.05</strong></td>
+                            <td>3.72</td>
+                            <td>1.04 x 10<sup>-127</sup></td>
+                        </tr>
+                        <tr>
+                            <td>Androgen</td>
+                            <td>17.87</td>
+                            <td>0.96</td>
+                            <td>7.94 x 10<sup>-58</sup></td>
+                        </tr>
+                        <tr>
+                            <td rowspan="2"><strong class="highlight-cluster">Cluster 17</strong></td>
+                            <td><strong class="highlight-pathway">MAPK</strong></td>
+                            <td>10.45</td>
+                            <td>4.69</td>
+                            <td>3.08 x 10<sup>-13</sup></td>
+                        </tr>
+                        <tr>
+                            <td><strong class="highlight-pathway">PI3K</strong></td>
+                            <td>7.47</td>
+                            <td>3.02</td>
+                            <td>3.10 x 10<sup>-9</sup></td>
+                        </tr>
+                        <tr>
+                            <td rowspan="2"><strong class="highlight-cluster">Cluster 14</strong></td>
+                            <td><strong class="highlight-pathway">MAPK</strong></td>
+                            <td>18.55</td>
+                            <td>4.89</td>
+                            <td>3.51 x 10<sup>-44</sup></td>
+                        </tr>
+                        <tr>
+                            <td><strong class="highlight-pathway">VEGF</strong></td>
+                            <td>9.21</td>
+                            <td>1.63</td>
+                            <td>3.42 x 10<sup>-16</sup></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="interpretation">
+                    <h4>Biological Interpretation:</h4>
+                    <p><strong>MAPK Pathway Hyperactivation:</strong> The MAPK pathway shows extreme hyperactivation across all invasive tumor clusters, with Cluster 4 displaying the most dramatic activation (stat=47.86, FDR=6.19x10<sup>-204</sup>). The MAPK/ERK pathway is a critical driver of breast cancer cell invasion and proliferation <a href="https://pubmed.ncbi.nlm.nih.gov/40390063/" class="reference" target="_blank">(PMID: 40390063)</a>.</p>
+                    <p><strong>PI3K/AKT Signaling:</strong> The PI3K pathway shows consistent strong activation across invasive clusters (Cluster 4: stat=33.05). The co-activation of both MAPK and PI3K pathways suggests convergent oncogenic signaling that drives aggressive tumor behavior <a href="https://pubmed.ncbi.nlm.nih.gov/39382177/" class="reference" target="_blank">(PMID: 39382177)</a>.</p>
+                    <p><strong>VEGF and Angiogenesis:</strong> VEGF pathway enrichment in Cluster 14 (stat=9.21) indicates active angiogenic signaling, consistent with the vascular requirements of rapidly growing invasive tumor masses.</p>
+                </div>
+            </div>
+
+            <!-- Step 5: MISTy Spatial Relationships -->
+            <div class="analysis-section">
+                <h3>5. Spatial Pathway Enrichment Analysis (MISTy)</h3>
+                <div class="figure-container">
+                    <div class="figure-placeholder">
+                        [Figure 5: MISTy analysis showing target(cell type)-predictor(pathway) relationships]<br>
+                        <small>In actual reports, figures are embedded as Base64-encoded images from MCP analysis output</small>
+                    </div>
+                    <p class="figure-caption">Figure 5: MISTy analysis showing target(cell type)-predictor(pathway) relationships. Feature importances indicate how pathway activities predict cell type spatial distributions. Higher values indicate stronger predictive relationships.</p>
+                </div>
+                <div class="key-findings">
+                    <h4>Top MISTy Importance Scores (Juxtacrine View):</h4>
+                    <table>
+                        <tr>
+                            <th>Target Cell Type</th>
+                            <th>Predictor Pathway</th>
+                            <th>Importance</th>
+                            <th>Interpretation</th>
+                        </tr>
+                        <tr style="background: rgba(100, 255, 218, 0.15);">
+                            <td class="highlight-celltype">Prolif Invasive Tumor</td>
+                            <td class="highlight-pathway">Hypoxia</td>
+                            <td><strong>0.764</strong></td>
+                            <td>Hypoxia strongly predicts proliferative tumor distribution</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight-celltype">Invasive Tumor</td>
+                            <td class="highlight-pathway">p53</td>
+                            <td><strong>0.474</strong></td>
+                            <td>p53 pathway associated with invasion</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight-celltype">Invasive Tumor</td>
+                            <td class="highlight-pathway">Hypoxia</td>
+                            <td>0.260</td>
+                            <td>Hypoxia also predicts invasive tumor</td>
+                        </tr>
+                        <tr>
+                            <td>Perivascular-Like</td>
+                            <td>Hypoxia</td>
+                            <td>0.574</td>
+                            <td>Hypoxia-driven vascular remodeling</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="interpretation">
+                    <h4>Biological Interpretation:</h4>
+                    <p><strong>Hypoxia-Proliferation Axis (Importance=0.764):</strong> The strongest predictor relationship in the entire analysis is between hypoxia and Prolif Invasive Tumor distribution. This reveals that hypoxic microenvironments are preferentially occupied by the most proliferative invasive tumor cells, reflecting the Warburg effect and adaptation to hypoxic stress <a href="https://pubmed.ncbi.nlm.nih.gov/38236337/" class="reference" target="_blank">(PMID: 38236337)</a>, <a href="https://pubmed.ncbi.nlm.nih.gov/36226050/" class="reference" target="_blank">(PMID: 36226050)</a>.</p>
+                    <p><strong>p53-Invasion Connection (Importance=0.474):</strong> The strong association between p53 pathway activity and Invasive Tumor distribution is particularly noteworthy. In breast cancer, p53 pathway activation can paradoxically promote invasion through regulation of EMT and cell migration.</p>
+                    <p><strong>Hypoxia-Perivascular Relationship (Importance=0.574):</strong> The high importance of hypoxia for Perivascular-Like cell distribution highlights the dynamic interplay between hypoxia, angiogenesis, and vascular remodeling in the tumor microenvironment <a href="https://pubmed.ncbi.nlm.nih.gov/36140753/" class="reference" target="_blank">(PMID: 36140753)</a>.</p>
+                </div>
+
+                <div class="summary-box">
+                    <h4>Part 1 Summary: Integrated Findings</h4>
+                    <p><strong>Selected Tumor Regions:</strong> Clusters 4, 17, and 14 represent the primary invasive tumor mass with distinct molecular and spatial characteristics.</p>
+                    <p><strong>Dominant Pathways:</strong></p>
+                    <ul style="margin-left: 40px; margin-top: 10px;">
+                        <li><span class="highlight-pathway">MAPK</span> - Extreme hyperactivation driving proliferation and invasion</li>
+                        <li><span class="highlight-pathway">PI3K</span> - Strong activation supporting survival and growth</li>
+                        <li><span class="highlight-pathway">Hypoxia</span> - Critical driver of proliferative invasive phenotype</li>
+                        <li><span class="highlight-pathway">p53</span> - Associated with invasive tumor behavior</li>
                     </ul>
                 </div>
             </div>
         </div>
 
-        <!-- Part 3 Content -->
-        <div id="part3" class="tab-content">
-            <h2>Part 3: Ligand-Receptor Interaction Details</h2>
+        <!-- ============================================ -->
+        <!-- SECTION: Part 2 - CCI & NMF Analysis          -->
+        <!-- Contains: 4 analyses (LIANA, NMF Factor,      -->
+        <!--   Pathway-Factor, Quadrant/GenePT)            -->
+        <!-- ============================================ -->
+        <div id="part2" class="tab-content">
+            <h2>Part 2: Cell-Cell Interaction and Intercellular Pattern Analysis</h2>
+            <p>This section presents the cell-cell interaction (CCI) analysis using LIANA+, identification of spatially variable ligand-receptor pairs, and discovery of intercellular communication patterns through Non-negative Matrix Factorization (NMF).</p>
 
+            <!-- Step 6: LIANA -->
             <div class="analysis-section">
-                <h3>3.10 L-R Interaction Visualization</h3>
+                <h3>6. Ligand-Receptor Interaction Screening (LIANA with Moran's R)</h3>
+                <div class="figure-container">
+                    <div class="figure-placeholder">
+                        [Figure 6: Scatter plot of Moran's R spatial autocorrelation values for ligand-receptor pairs]<br>
+                        <small>In actual reports, figures are embedded as Base64-encoded images from MCP analysis output</small>
+                    </div>
+                    <p class="figure-caption">Figure 6: Scatter plot showing Moran's R spatial autocorrelation values for ligand-receptor pairs. Red dots indicate spatially significant pairs (Moran's R > 0, p < 0.05), representing ligand-receptor interactions with spatial co-localization patterns.</p>
+                </div>
+                <div class="interpretation">
+                    <h4>Biological Interpretation:</h4>
+                    <p><strong>Spatial Cell-Cell Interaction Screening:</strong> Moran's R bivariate analysis identifies ligand-receptor pairs where the ligand and receptor show spatial co-clustering, indicating potential functional cell-cell communication. Positive Moran's R values indicate that spots expressing high levels of ligand are spatially proximal to spots expressing high levels of receptor -- a prerequisite for paracrine or juxtacrine signaling.</p>
+                </div>
+            </div>
 
-                <!-- Pagination Example -->
-                <div class="pagination">
-                    <button class="page-button active" onclick="showPage(1)">1</button>
-                    <button class="page-button" onclick="showPage(2)">2</button>
+            <!-- Step 7: NMF Factor Scores -->
+            <div class="analysis-section">
+                <h3>7. Intercellular Communication Patterns (NMF Factor Analysis)</h3>
+                <div class="figure-container">
+                    <div class="figure-placeholder">
+                        [Figure 7: Spatial distribution of NMF factor scores across the tissue]<br>
+                        <small>In actual reports, figures are embedded as Base64-encoded images from MCP analysis output</small>
+                    </div>
+                    <p class="figure-caption">Figure 7: Spatial distribution of NMF factor scores across the tissue. Each factor represents a distinct intercellular communication pattern characterized by specific combinations of ligand-receptor interactions.</p>
+                </div>
+                <div class="key-findings">
+                    <h4>Factor Scores by Cluster (Focus on Invasive Tumor Regions):</h4>
+                    <table>
+                        <tr>
+                            <th>Cluster</th>
+                            <th>Factor1</th>
+                            <th>Factor2</th>
+                            <th>Factor3</th>
+                            <th>Dominant Pattern</th>
+                        </tr>
+                        <tr style="background: rgba(100, 255, 218, 0.15);">
+                            <td><strong class="highlight-cluster">Cluster 4</strong></td>
+                            <td>0.168</td>
+                            <td>0.227</td>
+                            <td><strong>0.739</strong></td>
+                            <td class="highlight-pathway">Factor3</td>
+                        </tr>
+                        <tr style="background: rgba(100, 255, 218, 0.1);">
+                            <td><strong class="highlight-cluster">Cluster 17</strong></td>
+                            <td>0.190</td>
+                            <td>0.224</td>
+                            <td><strong>0.662</strong></td>
+                            <td class="highlight-pathway">Factor3</td>
+                        </tr>
+                        <tr style="background: rgba(100, 255, 218, 0.05);">
+                            <td><strong class="highlight-cluster">Cluster 14</strong></td>
+                            <td>0.224</td>
+                            <td>0.218</td>
+                            <td><strong>0.625</strong></td>
+                            <td class="highlight-pathway">Factor3</td>
+                        </tr>
+                        <tr>
+                            <td>Cluster 6</td>
+                            <td>0.230</td>
+                            <td>0.221</td>
+                            <td><strong>0.571</strong></td>
+                            <td class="highlight-pathway">Factor3</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="interpretation">
+                    <h4>Biological Interpretation:</h4>
+                    <p><strong>Factor3 as Invasive Tumor Communication Signature:</strong> Factor3 shows the highest scores across all invasive tumor clusters (4, 17, 14) and their supportive microenvironment (Cluster 6). This factor represents a specific combination of ligand-receptor interactions that characterize invasive tumor regions. The consistent dominance of Factor3 across spatially distinct but biologically similar regions confirms it captures the core intercellular communication program driving invasive tumor behavior.</p>
+                </div>
+            </div>
+
+            <!-- Step 8: Pathway-Factor Heatmap -->
+            <div class="analysis-section">
+                <h3>8. Pathway Enrichment of Intercellular Patterns</h3>
+                <div class="figure-container">
+                    <div class="figure-placeholder">
+                        [Figure 8: Heatmap showing pathway enrichment within each NMF factor based on L-R loadings]<br>
+                        <small>In actual reports, figures are embedded as Base64-encoded images from MCP analysis output</small>
+                    </div>
+                    <p class="figure-caption">Figure 8: Heatmap showing pathway enrichment within each NMF factor based on ligand-receptor loadings. This reveals which biological pathways are represented in each intercellular communication pattern.</p>
+                </div>
+                <div class="key-findings">
+                    <h4>Factor-Pathway Associations (Significant Results):</h4>
+                    <table>
+                        <tr>
+                            <th>Factor</th>
+                            <th>Pathway</th>
+                            <th>Estimate</th>
+                            <th>P-value</th>
+                            <th>Adj. P-value</th>
+                        </tr>
+                        <tr>
+                            <td>Factor2</td>
+                            <td><strong class="highlight-pathway">Hypoxia</strong></td>
+                            <td><strong>+7.00</strong></td>
+                            <td>3.78 x 10<sup>-12</sup></td>
+                            <td>1.36 x 10<sup>-10</sup></td>
+                        </tr>
+                        <tr style="background: rgba(100, 255, 218, 0.1);">
+                            <td><strong>Factor3</strong></td>
+                            <td><strong class="highlight-pathway">Hypoxia</strong></td>
+                            <td><strong>+3.95</strong></td>
+                            <td>8.13 x 10<sup>-5</sup></td>
+                            <td>7.32 x 10<sup>-4</sup></td>
+                        </tr>
+                        <tr style="background: rgba(100, 255, 218, 0.1);">
+                            <td><strong>Factor3</strong></td>
+                            <td><strong class="highlight-pathway">TGFb</strong></td>
+                            <td>+3.44</td>
+                            <td>5.90 x 10<sup>-4</sup></td>
+                            <td>3.34 x 10<sup>-3</sup></td>
+                        </tr>
+                        <tr style="background: rgba(255, 107, 157, 0.1);">
+                            <td><strong>Factor3</strong></td>
+                            <td>Estrogen</td>
+                            <td><strong>-5.81</strong></td>
+                            <td>7.47 x 10<sup>-9</sup></td>
+                            <td>1.35 x 10<sup>-7</sup></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="interpretation">
+                    <h4>Biological Interpretation:</h4>
+                    <p><strong>Factor3-Hypoxia Association:</strong> The positive association between Factor3 and hypoxia pathway (estimate=+3.95) confirms that the invasive tumor communication pattern is enriched in hypoxia-related ligand-receptor interactions, aligning with Part 1 findings.</p>
+                    <p><strong>Factor3-TGFb Association:</strong> The positive association with TGFb pathway (estimate=+3.44) suggests that Factor3 encompasses TGF-b-mediated cell-cell communication, promoting EMT, invasion, and immunosuppression <a href="https://pubmed.ncbi.nlm.nih.gov/39981232/" class="reference" target="_blank">(PMID: 39981232)</a>.</p>
+                    <p><strong>Factor3-Estrogen Negative Association:</strong> The strong negative association with estrogen signaling (estimate=-5.81) indicates the invasive tumor communication pattern is depleted of estrogen-related interactions, reflecting hormone-independent growth mechanisms characteristic of aggressive breast cancer.</p>
+                </div>
+            </div>
+
+            <!-- Step 9: NMF Quadrant Analysis with GenePT -->
+            <div class="analysis-section">
+                <h3>9. NMF Quadrant Analysis with GenePT Functional Scoring</h3>
+                <div class="figure-container">
+                    <div class="figure-placeholder">
+                        [Figure 9: Quadrant analysis plotting Moran's R vs NMF Factor loading, colored by GenePT score]<br>
+                        <small>In actual reports, figures are embedded as Base64-encoded images from MCP analysis output</small>
+                    </div>
+                    <p class="figure-caption">Figure 9: Quadrant analysis plotting Moran's R (spatial autocorrelation) vs NMF Factor loading for each ligand-receptor pair, colored by GenePT functional similarity score (viridis colormap). Upper-right quadrant contains high-priority interactions.</p>
+                </div>
+                <div class="interpretation">
+                    <h4>Biological Interpretation:</h4>
+                    <p><strong>Integrated Prioritization with GenePT:</strong> The quadrant analysis integrates three orthogonal scoring dimensions: (1) spatial co-localization of ligand and receptor (Moran's R), indicating cells expressing these molecules are spatially proximal, (2) NMF Factor loading, indicating the interaction is part of the invasive tumor communication signature, and (3) GenePT functional similarity (viridis coloring), reflecting how functionally related the ligand-receptor gene pair is based on gene embedding vectors.</p>
+                    <p><strong>Combined Score Ranking:</strong> Ligand-receptor pairs are ranked by a combined score (0.4 x normalized Factor + 0.4 x normalized Moran's R + 0.2 x normalized GenePT score). This hybrid scoring ensures top-ranked pairs are spatially organized, functionally important in the tumor communication program, AND biologically coherent based on gene function similarity. The top 20 pairs by combined score are saved to <code>sel_interest_sig_liana.csv</code> for downstream visualization in Steps 10-11.</p>
+                    <p><strong>Final L-R Selection:</strong> From the top 20 ranked pairs, 3 representative ligand-receptor interactions are selected for detailed spatial and cluster-level visualization (Steps 10-11), chosen to maximize pathway diversity and biological interpretability.</p>
+                </div>
+            </div>
+
+            <div class="summary-box">
+                <h4>Part 2 Summary: CCI and NMF Analysis</h4>
+                <p><strong>Selected Factor:</strong> Factor3 identified as the dominant intercellular communication pattern specific to invasive tumor regions</p>
+                <p><strong>Factor3 Characteristics:</strong></p>
+                <ul style="margin-left: 40px; margin-top: 10px;">
+                    <li>Positive association with <span class="highlight-pathway">Hypoxia</span> (estimate=+3.95) and <span class="highlight-pathway">TGFb</span> (estimate=+3.44)</li>
+                    <li>Strong negative association with <span class="highlight-pathway">Estrogen</span> signaling (estimate=-5.81)</li>
+                    <li>Highest scores in invasive tumor clusters: Cluster 4 (0.739), Cluster 17 (0.662), Cluster 14 (0.625)</li>
+                </ul>
+                <p style="margin-top: 10px;"><strong>Key Insight:</strong> The invasive tumor communication program is characterized by hypoxia-adapted, TGFb-mediated, and hormone-independent signaling networks.</p>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- SECTION: Part 3 - L-R Interactions            -->
+        <!-- Contains: 2 analyses (spatial L-R plot,       -->
+        <!--   quantitative L-R with paginated tables)     -->
+        <!-- ============================================ -->
+        <div id="part3" class="tab-content">
+            <h2>Part 3: Critical Ligand-Receptor Interactions in Invasive Tumor Regions</h2>
+            <p>This section presents the detailed characterization of prioritized ligand-receptor interactions identified through integrated spatial, statistical, and pathway-based analyses.</p>
+
+            <!-- Step 10: Spatial L-R Visualization -->
+            <div class="analysis-section">
+                <h3>10. Spatial Visualization of Key Ligand-Receptor Pairs</h3>
+                <div class="figure-container">
+                    <div class="figure-placeholder">
+                        [Figure 10: Spatial expression patterns of selected ligand-receptor pairs across the tissue]<br>
+                        <small>In actual reports, figures are embedded as Base64-encoded images from MCP analysis output</small>
+                    </div>
+                    <p class="figure-caption">Figure 10: Spatial expression patterns of selected ligand-receptor pairs across the tissue. For each pair, ligand expression (left) and receptor expression (right) are shown, revealing co-localization patterns in invasive tumor regions.</p>
+                </div>
+            </div>
+
+            <!-- Step 11: Quantitative L-R Analysis -->
+            <div class="analysis-section">
+                <h3>11. Quantitative Analysis of Ligand-Receptor Interactions</h3>
+                <div class="figure-container">
+                    <div class="figure-placeholder">
+                        [Figure 11: Box plots showing expression levels and statistical significance of selected L-R pairs]<br>
+                        <small>In actual reports, figures are embedded as Base64-encoded images from MCP analysis output</small>
+                    </div>
+                    <p class="figure-caption">Figure 11: Box plots showing expression levels and statistical significance of selected ligand-receptor pairs across different spatial contexts.</p>
                 </div>
 
-                <div id="interactions-page-1" class="interactions-page active">
-                    <h4>TGFB1 - TGFBR2 Interaction</h4>
-                    <div class="figure-container">
-                        <div class="figure-placeholder">
-                            [Spatial co-localization plot for TGFB1-TGFBR2]
+                <div class="key-findings">
+                    <h4>Top Prioritized Ligand-Receptor Interactions (by Combined Score):</h4>
+                    <div style="margin: 20px 0;">
+                        <p><strong>Pagination:</strong> Showing top 10 interactions ranked by combined score</p>
+                        <div class="pagination">
+                            <button class="page-button active" onclick="showPage(1)">1-5</button>
+                            <button class="page-button" onclick="showPage(2)">6-10</button>
                         </div>
-                        <p class="figure-caption">Figure 3.10a: Spatial co-expression of TGFB1 (ligand) and TGFBR2 (receptor).</p>
                     </div>
-                    <div class="interpretation">
-                        <h4>Mechanism</h4>
-                        <p>TGFB1 secreted by <span class="highlight-celltype">stromal fibroblasts</span> binds to TGFBR2 on <span class="highlight-cluster">Cluster 5</span> cells, activating downstream SMAD signaling that promotes EMT and invasion capabilities.</p>
+
+                    <div id="interactions-page-1" class="interactions-page active">
+                        <table>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Interaction</th>
+                                <th>Moran's R</th>
+                                <th>Factor Score</th>
+                                <th>GenePT Score</th>
+                                <th>Combined Score</th>
+                                <th>Pathways</th>
+                            </tr>
+                            <tr style="background: rgba(100, 255, 218, 0.15);">
+                                <td><strong>1</strong></td>
+                                <td><strong>CDH1^ERBB3</strong></td>
+                                <td><strong>0.477</strong></td>
+                                <td><strong>1.197</strong></td>
+                                <td>0.72</td>
+                                <td><strong>0.87</strong></td>
+                                <td><span class="highlight-pathway">MAPK, PI3K</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>2</strong></td>
+                                <td><strong>LRIG1^ERBB3</strong></td>
+                                <td><strong>0.363</strong></td>
+                                <td><strong>1.172</strong></td>
+                                <td>0.68</td>
+                                <td><strong>0.82</strong></td>
+                                <td><span class="highlight-pathway">EGFR</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>3</strong></td>
+                                <td><strong>RET^PTPRF</strong></td>
+                                <td><strong>0.257</strong></td>
+                                <td><strong>1.162</strong></td>
+                                <td>0.45</td>
+                                <td><strong>0.71</strong></td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>VEGFA^RET</td>
+                                <td>0.257</td>
+                                <td>1.158</td>
+                                <td>0.61</td>
+                                <td><strong>0.76</strong></td>
+                                <td><span class="highlight-pathway">VEGF</span></td>
+                            </tr>
+                            <tr>
+                                <td>5</td>
+                                <td>CDH1^PTPRF</td>
+                                <td>0.375</td>
+                                <td>1.112</td>
+                                <td>0.52</td>
+                                <td><strong>0.77</strong></td>
+                                <td><span class="highlight-pathway">MAPK</span></td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div id="interactions-page-2" class="interactions-page">
+                        <table>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Interaction</th>
+                                <th>Moran's R</th>
+                                <th>Factor Score</th>
+                                <th>GenePT Score</th>
+                                <th>Combined Score</th>
+                                <th>Pathways</th>
+                            </tr>
+                            <tr>
+                                <td>6</td>
+                                <td>BAMBI^ACVR2B</td>
+                                <td>0.203</td>
+                                <td>1.085</td>
+                                <td>0.58</td>
+                                <td><strong>0.70</strong></td>
+                                <td><span class="highlight-pathway">EGFR</span></td>
+                            </tr>
+                            <tr>
+                                <td>7</td>
+                                <td>LAMA5^ITGB4</td>
+                                <td>0.162</td>
+                                <td>1.083</td>
+                                <td>0.71</td>
+                                <td><strong>0.72</strong></td>
+                                <td><span class="highlight-pathway">PI3K, TNFa</span></td>
+                            </tr>
+                            <tr>
+                                <td>8</td>
+                                <td>BAMBI^ACVR2A</td>
+                                <td>0.026</td>
+                                <td>1.040</td>
+                                <td>0.55</td>
+                                <td><strong>0.56</strong></td>
+                                <td><span class="highlight-pathway">EGFR, TGFb</span></td>
+                            </tr>
+                            <tr>
+                                <td>9</td>
+                                <td>ECM1^ITGB4</td>
+                                <td>0.162</td>
+                                <td>1.035</td>
+                                <td>0.63</td>
+                                <td><strong>0.69</strong></td>
+                                <td><span class="highlight-pathway">Hypoxia, PI3K</span></td>
+                            </tr>
+                            <tr>
+                                <td>10</td>
+                                <td>CDH1^CDH2</td>
+                                <td>0.378</td>
+                                <td>1.015</td>
+                                <td>0.41</td>
+                                <td><strong>0.71</strong></td>
+                                <td><span class="highlight-pathway">MAPK</span></td>
+                            </tr>
+                        </table>
                     </div>
                 </div>
 
-                <div id="interactions-page-2" class="interactions-page">
-                    <h4>VEGFA - KDR Interaction</h4>
-                    <div class="figure-container">
-                        <div class="figure-placeholder">
-                            [Spatial co-localization plot for VEGFA-KDR]
-                        </div>
-                        <p class="figure-caption">Figure 3.10b: Spatial co-expression of VEGFA (ligand) and KDR (receptor).</p>
-                    </div>
-                    <div class="interpretation">
-                        <h4>Mechanism</h4>
-                        <p>Tumor-derived VEGFA from <span class="highlight-cluster">Cluster 5</span> promotes angiogenesis by binding KDR on <span class="highlight-celltype">endothelial cells</span>, facilitating nutrient supply and potential metastatic routes.</p>
-                    </div>
+                <div class="interpretation">
+                    <h4>Detailed Biological Interpretation of Top 3 Interactions:</h4>
+
+                    <p><strong>1. CDH1^ERBB3 (E-cadherin -> HER3):</strong> This interaction represents the highest priority target with exceptional spatial co-localization (Moran's R=0.477) and Factor3 loading (1.197). CDH1 (E-cadherin) is a classical cell adhesion molecule whose loss is a hallmark of invasive lobular carcinoma and EMT. E-cadherin can interact with ERBB family receptors to modulate their signaling. Desmocollin-1 (DSC1) pull-down experiments identified interactions with CDH1, CDH3, HER2, and HER3 in luminal A breast cancer <a href="https://pubmed.ncbi.nlm.nih.gov/37620794/" class="reference" target="_blank">(PMID: 37620794)</a>. The association with both MAPK and PI3K pathways indicates this interaction drives proliferative signaling <a href="https://pubmed.ncbi.nlm.nih.gov/36691073/" class="reference" target="_blank">(PMID: 36691073)</a>, <a href="https://pubmed.ncbi.nlm.nih.gov/34359596/" class="reference" target="_blank">(PMID: 34359596)</a>.</p>
+
+                    <p><strong>2. LRIG1^ERBB3:</strong> LRIG1 (Leucine Rich Repeats And Immunoglobulin Like Domains 1) is a negative regulator of EGFR family signaling. Its interaction with ERBB3 may represent a feedback regulation mechanism. The high Factor3 loading (1.172) and spatial co-localization (Moran's R=0.363) suggest this regulatory interaction is spatially organized in invasive regions.</p>
+
+                    <p><strong>3. RET^PTPRF / VEGFA^RET:</strong> These interactions (Factor3=1.162 and 1.158) highlight the importance of RET proto-oncogene signaling in invasive tumor communication. VEGFA-RET interaction is particularly significant given the presence of Perivascular-Like cells in invasive regions. PTPRF (Protein Tyrosine Phosphatase Receptor Type F) involvement suggests regulation of phosphorylation-dependent signaling cascades.</p>
+                </div>
+
+                <div class="summary-box">
+                    <h4>Part 3 Summary: Critical Ligand-Receptor Interactions</h4>
+                    <p><strong>Top Priority Target:</strong> <span class="highlight-pathway">CDH1^ERBB3</span> (Combined Score=0.87, Moran's R=0.477, Factor3=1.197) - highest significance across all metrics</p>
+                    <p><strong>Therapeutic Implications:</strong></p>
+                    <ul style="margin-left: 40px; margin-top: 10px;">
+                        <li><span class="highlight-pathway">HER3-targeted therapies</span> - Multiple ERBB3 interactions identified (CDH1^ERBB3, LRIG1^ERBB3)</li>
+                        <li><span class="highlight-pathway">RET inhibitors</span> - RET^PTPRF and VEGFA^RET interactions show high Factor3 loading</li>
+                        <li><span class="highlight-pathway">ECM-integrin targeting</span> - ECM1^ITGB4 and LAMA5^ITGB4 show Hypoxia/PI3K associations</li>
+                    </ul>
                 </div>
             </div>
         </div>
 
-        <!-- Summary Content -->
+        <!-- ============================================ -->
+        <!-- SECTION: Comprehensive Summary                -->
+        <!-- Contains: integrated findings, clinical       -->
+        <!--   implications, references                    -->
+        <!-- ============================================ -->
         <div id="summary" class="tab-content">
-            <h2>Comprehensive Summary</h2>
+            <h2>Comprehensive Summary: Integrated Multi-Scale Analysis</h2>
 
-            <div class="analysis-section">
-                <h3>Integrated Biological Narrative</h3>
-                <div class="interpretation">
-                    <p>This comprehensive spatial transcriptomics analysis reveals a complex cell-cell communication network centered on <span class="highlight-cluster">Cluster 5</span> (Invasive Tumor). The dominant signaling axes involve:</p>
-                    <ol>
-                        <li><strong>TGFb signaling</strong>: Stromal-to-tumor communication promoting EMT</li>
-                        <li><strong>VEGF signaling</strong>: Tumor-to-endothelial communication driving angiogenesis</li>
-                        <li><strong>Hypoxia response</strong>: Spatial organization reflecting microenvironmental gradients</li>
-                    </ol>
-                </div>
+            <div class="summary-box">
+                <h3>Overall Biological Model</h3>
+                <p>This comprehensive spatial transcriptomics analysis reveals a hierarchically organized breast cancer tumor microenvironment centered on invasive and proliferative tumor regions. Three spatially distinct but molecularly similar tumor clusters (4, 17, 14) form the core of the invasive tumor mass, characterized by extreme MAPK/PI3K pathway activation, hypoxia-driven proliferation, and organized intercellular communication networks.</p>
             </div>
 
             <div class="analysis-section">
-                <h3>Quality Assessment</h3>
-                <div class="summary-box">
-                    <h4>Overall Quality Score: <span class="score-badge score-high">0.85</span></h4>
-                    <div class="confidence-bar">
-                        <div class="confidence-fill" style="width: 85%"></div>
-                    </div>
-                </div>
+                <h3>Integrated Findings Across All Analyses</h3>
+
+                <h4>1. Spatial Architecture of Invasive Regions</h4>
+                <p>The tumor demonstrates organized spatial structure rather than random distribution. Primary invasive region (Cluster 4) shows the strongest molecular signatures and serves as the probable origin of tumor spread. Cluster 6 forms a consistent supportive microenvironment around all invasive regions (enrichment scores: 54.37, 32.32, 28.29).</p>
+
+                <h4>2. Convergent Oncogenic Signaling</h4>
+                <p><strong>MAPK Dominance:</strong> Extreme MAPK pathway hyperactivation (stat=47.86 in Cluster 4) represents the most powerful molecular signal across the entire dataset.</p>
+                <p><strong>PI3K Co-activation:</strong> Concurrent PI3K activation (stat=33.05) provides complementary survival and metabolic signals, creating redundant pro-tumorigenic pathways.</p>
+                <p><strong>Hypoxia-Proliferation Axis:</strong> Hypoxia signaling shows the strongest predictive relationship with proliferative invasive tumor distribution (MISTy importance=0.764).</p>
+
+                <h4>3. Intercellular Communication Networks</h4>
+                <p><strong>Factor3 as Invasive Signature:</strong> Factor3 represents the dominant intercellular communication pattern specific to invasive tumor regions (scores: 0.739, 0.662, 0.625 in Clusters 4, 17, 14). This factor is enriched in hypoxia and TGFb-related interactions while depleted of estrogen-related signaling.</p>
+                <p><strong>Cadherin-ERBB3 Axis:</strong> Multiple cadherin-ERBB3 interactions dominate the top-ranked ligand-receptor pairs, suggesting E-cadherin plays complex roles beyond simple cell adhesion -- consistent with partial EMT or epithelial-mesenchymal plasticity.</p>
+
+                <h4>4. Tumor-Immune Landscape</h4>
+                <p>T Cell & Tumor Hybrid populations are consistently enriched across all invasive clusters, suggesting active tumor-immune interfaces that may represent immune evasion mechanisms rather than effective anti-tumor immunity <a href="https://pubmed.ncbi.nlm.nih.gov/39981232/" class="reference" target="_blank">(PMID: 39981232)</a>.</p>
+
+                <h4>5. Vascular and Stromal Support</h4>
+                <p>Perivascular-Like cell enrichment in hypoxic invasive regions (MISTy importance=0.574) indicates active angiogenic remodeling and organized construction of tumor-supportive niches.</p>
+            </div>
+
+            <div class="analysis-section">
+                <h3>Clinical and Therapeutic Implications</h3>
+
+                <h4>Pathway-Based Therapeutic Opportunities</h4>
+                <ul style="margin-left: 40px;">
+                    <li><strong>Dual MAPK/PI3K Inhibition:</strong> The concurrent extreme activation of both pathways suggests combination therapy may be more effective than single-agent approaches.</li>
+                    <li><strong>Hypoxia Targeting:</strong> The central role of hypoxia suggests hypoxia-activated prodrugs or HIF-1a inhibitors may preferentially target the most aggressive tumor regions.</li>
+                    <li><strong>ERBB3-Targeted Therapies:</strong> The dominance of ERBB3-containing interactions identifies HER3 as a high-priority therapeutic target. HER3-directed antibody-drug conjugates may disrupt multiple critical communication pathways simultaneously <a href="https://pubmed.ncbi.nlm.nih.gov/38441358/" class="reference" target="_blank">(PMID: 38441358)</a>.</li>
+                    <li><strong>Anti-Angiogenic Approaches:</strong> VEGF pathway activation and perivascular cell enrichment suggest anti-angiogenic therapy may disrupt vascular support for invasive regions.</li>
+                </ul>
+
+                <h4>Biomarker Potential</h4>
+                <ul style="margin-left: 40px;">
+                    <li><strong>Spatial Biomarkers:</strong> Factor3 score distribution could serve as a spatial biomarker identifying invasive tumor regions with highest risk for progression.</li>
+                    <li><strong>Pathway Activation Signatures:</strong> MAPK/PI3K co-activation status may predict response to targeted therapies.</li>
+                    <li><strong>CDH1-ERBB3 Axis:</strong> Expression and co-localization of E-cadherin and HER3 may serve as predictive biomarkers for HER3-targeted therapies.</li>
+                </ul>
+
+                <h4>Spatial Heterogeneity Considerations</h4>
+                <p>The existence of multiple invasive tumor foci with similar but not identical molecular profiles emphasizes intratumoral heterogeneity. Multi-region sampling or spatial profiling may be necessary for accurate biomarker assessment and treatment planning <a href="https://pubmed.ncbi.nlm.nih.gov/39703753/" class="reference" target="_blank">(PMID: 39703753)</a>.</p>
+            </div>
+
+            <div class="summary-box">
+                <h3>Conclusions</h3>
+                <p>This comprehensive spatial transcriptomics analysis reveals breast cancer as a spatially organized disease with hierarchical tumor regions, convergent oncogenic signaling, and organized intercellular communication networks. The extreme MAPK/PI3K activation, hypoxia-driven proliferation, and cadherin-ERBB3 signaling axis represent high-priority therapeutic targets.</p>
+                <p><strong>Key Targetable Vulnerabilities Identified:</strong></p>
+                <ul style="margin-left: 40px; margin-top: 10px;">
+                    <li>CDH1^ERBB3 signaling axis (highest priority)</li>
+                    <li>Dual MAPK/PI3K pathway activation</li>
+                    <li>Hypoxia-driven proliferation program</li>
+                    <li>Factor3 intercellular communication network</li>
+                    <li>Perivascular support system</li>
+                </ul>
             </div>
 
             <div class="analysis-section">
                 <h3>References</h3>
-                <div class="key-findings">
-                    <h4>Supporting Literature</h4>
-                    <div class="paper-card">
-                        <div class="paper-title">
-                            <a href="https://pubmed.ncbi.nlm.nih.gov/12345678/" target="_blank">Smith et al. (2023) - Cell-cell communication at tumor margins</a>
-                        </div>
-                    </div>
-                    <div class="paper-card">
-                        <div class="paper-title">
-                            <a href="https://pubmed.ncbi.nlm.nih.gov/23456789/" target="_blank">Jones et al. (2022) - TGFb signaling in EMT</a>
-                        </div>
-                    </div>
-                    <div class="paper-card">
-                        <div class="paper-title">
-                            <a href="https://pubmed.ncbi.nlm.nih.gov/34567890/" target="_blank">Wang et al. (2021) - Stromal-tumor interactions</a>
-                        </div>
-                    </div>
-                </div>
+                <ul style="margin-left: 20px; line-height: 2;">
+                    <li><a href="https://pubmed.ncbi.nlm.nih.gov/39703753/" class="reference" target="_blank">PMID: 39703753</a> - Spatial transcriptomics reveals TME-driven drug responses and clonal therapeutic heterogeneity in breast cancer</li>
+                    <li><a href="https://pubmed.ncbi.nlm.nih.gov/39382177/" class="reference" target="_blank">PMID: 39382177</a> - STAGUE framework identifies PI3K/AKT signaling activation in specific breast cancer sub-regions</li>
+                    <li><a href="https://pubmed.ncbi.nlm.nih.gov/38570490/" class="reference" target="_blank">PMID: 38570490</a> - Review of DCIS-IDC progression using spatial transcriptomics</li>
+                    <li><a href="https://pubmed.ncbi.nlm.nih.gov/37620794/" class="reference" target="_blank">PMID: 37620794</a> - Desmocollin-1 and cell-cell interactions in luminal A breast cancer</li>
+                    <li><a href="https://pubmed.ncbi.nlm.nih.gov/36691073/" class="reference" target="_blank">PMID: 36691073</a> - GRHL2-controlled gene expression networks and ErbB3 in luminal breast cancer</li>
+                    <li><a href="https://pubmed.ncbi.nlm.nih.gov/34359596/" class="reference" target="_blank">PMID: 34359596</a> - Lobular Breast Cancer: Histomorphology and E-cadherin loss</li>
+                    <li><a href="https://pubmed.ncbi.nlm.nih.gov/38236337/" class="reference" target="_blank">PMID: 38236337</a> - Breast cancer cells and adipocytes in hypoxia: metabolism regulation</li>
+                    <li><a href="https://pubmed.ncbi.nlm.nih.gov/36226050/" class="reference" target="_blank">PMID: 36226050</a> - Conducive target range of breast cancer: Hypoxic tumor microenvironment</li>
+                    <li><a href="https://pubmed.ncbi.nlm.nih.gov/36140753/" class="reference" target="_blank">PMID: 36140753</a> - Crosstalk between Hypoxia and Extracellular Matrix in the Tumor Microenvironment</li>
+                    <li><a href="https://pubmed.ncbi.nlm.nih.gov/39981232/" class="reference" target="_blank">PMID: 39981232</a> - CSCs engage with TAMs via multiple pathways including PI3K/AKT/MTOR, MAPK</li>
+                    <li><a href="https://pubmed.ncbi.nlm.nih.gov/40390063/" class="reference" target="_blank">PMID: 40390063</a> - Spatial transcriptomics reveals PI3K/AKT pathway alterations in aggressive tumors</li>
+                    <li><a href="https://pubmed.ncbi.nlm.nih.gov/38441358/" class="reference" target="_blank">PMID: 38441358</a> - HER3-targeted therapies in breast cancer</li>
+                </ul>
             </div>
         </div>
 
-        <!-- Metadata -->
+        <!-- ============================================ -->
+        <!-- SECTION: Metadata Footer                      -->
+        <!-- Contains: generation info and timestamp       -->
+        <!-- ============================================ -->
         <div class="metadata">
             <p>Generated by DeepMAST Deep Interpreter (DeepAgents Framework)</p>
             <p>Date: [Generation Date]</p>
-            <p><em>This is a reference example for the html-report-generator skill.</em></p>
+            <p><em>This is a reference example for the html-report-generator skill. CSS and JS are externalized to assets/.</em></p>
         </div>
     </div>
 
-    <script>
-        /* Tab navigation and pagination - see assets/interactive.js for full version */
-        function openTab(evt, tabName) {
-            var i, tabcontent, tabbuttons;
-            tabcontent = document.getElementsByClassName("tab-content");
-            for (i = 0; i < tabcontent.length; i++) {
-                tabcontent[i].style.display = "none";
-                tabcontent[i].classList.remove("active");
-            }
-            tabbuttons = document.getElementsByClassName("tab-button");
-            for (i = 0; i < tabbuttons.length; i++) {
-                tabbuttons[i].classList.remove("active");
-            }
-            document.getElementById(tabName).style.display = "block";
-            document.getElementById(tabName).classList.add("active");
-            if (evt) {
-                evt.currentTarget.classList.add("active");
-            }
-        }
-
-        function showPage(pageNum) {
-            var i, pages, buttons;
-            pages = document.getElementsByClassName("interactions-page");
-            for (i = 0; i < pages.length; i++) {
-                pages[i].style.display = "none";
-                pages[i].classList.remove("active");
-            }
-            buttons = document.getElementsByClassName("page-button");
-            for (i = 0; i < buttons.length; i++) {
-                buttons[i].classList.remove("active");
-            }
-            var targetPage = document.getElementById("interactions-page-" + pageNum);
-            if (targetPage) {
-                targetPage.style.display = "block";
-                targetPage.classList.add("active");
-            }
-            if (buttons[pageNum - 1]) {
-                buttons[pageNum - 1].classList.add("active");
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            openTab(null, 'part1');
-            if (document.getElementById("interactions-page-1")) {
-                showPage(1);
-            }
-        });
-    </script>
+    <script src="../assets/interactive.js"></script>
 </body>
 </html>

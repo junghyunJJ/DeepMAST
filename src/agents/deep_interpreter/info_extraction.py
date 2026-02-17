@@ -90,6 +90,22 @@ class DeepInterpreterInfoExtraction(BaseModel):
             "Example: 'sample_1', 'tumor_A'"
         ),
     )
+    interest_celltypes: Optional[list[str]] = Field(
+        default=None,
+        description=(
+            "Cell types the user wants to focus on for CCI analysis. "
+            "Optional - only extract if the user explicitly mentions specific cell types of interest. "
+            "Example: ['Macrophage', 'Fibroblast', 'Invasive Tumor']"
+        ),
+    )
+    interest_clusters: Optional[list[str]] = Field(
+        default=None,
+        description=(
+            "Cluster IDs the user wants to focus on for CCI analysis. "
+            "Optional - only extract if the user explicitly mentions specific cluster numbers. "
+            "Cluster IDs must be strings. Example: ['4', '16', '17']"
+        ),
+    )
     data_directory: str = Field(
         description=(
             "Output directory for analysis results (res/ folder). "

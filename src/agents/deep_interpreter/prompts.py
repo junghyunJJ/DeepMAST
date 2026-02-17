@@ -42,7 +42,7 @@ If the initial message contains "## PRE-SELECTED TARGET CONFIGURATION" with a JS
 ### Option 2: /targets.json File Exists (Fallback)
 If NO embedded configuration in message, use **read_file** to check if `/targets.json` exists:
 - If file exists: Parse it and use those targets directly
-- The file contains: analysis_mode, interest_clusters, interest_celltypes, data_directory
+- The file contains: interest_clusters, interest_celltypes, sel_factor, data_directory
 - **IMPORTANT**: The `data_directory` field contains the REAL path (e.g., "res/", "/path/to/data")
 - Use this EXACT path for load_analysis_data - do NOT modify it to "/analysis_results"
 - DO NOT ask user for input - use the file contents
@@ -67,11 +67,11 @@ This workflow uses a strict anti-hallucination approach:
 Use the **planner** subagent to:
 - Parse the embedded target configuration from initial message
 - Write /targets.json to virtual filesystem
-- Load analysis data and write /analysis_summary.md, /data_path.txt
+- Load analysis data and write /data_path.txt
 - Generate biomedical context via BioMCP think (optional enrichment)
-- Search literature for grounding (search_pubmed_advanced, 10 papers)
+- Search literature for grounding (search_literature_dynamic, 30 papers)
 - Assess data availability and create interpretation focus areas
-- Output: /interpretation_guide.md, /planner_literature_context.md, /planner_biomcp_context.md
+- Output: /interpretation_guide.md, /data_path.txt
 
 ### Step 2: SEARCHER (for ALL Parts)
 Use the **searcher** subagent to search literature for ALL three parts:
@@ -124,7 +124,7 @@ Use the **reporter** subagent to:
    - The `data_directory` in PRE-SELECTED TARGET CONFIGURATION is the REAL filesystem path (e.g., "res/")
    - DO NOT invent paths like "/analysis_results" - this does not exist
    - Use the EXACT path from the JSON configuration for load_analysis_data
-   - Virtual paths (/, /targets.json, /analysis_summary.md) are separate from REAL data paths
+   - Virtual paths (/, /targets.json, /data_path.txt) are separate from REAL data paths
    - If you encounter "Directory not found" error, you used the wrong path
 
 3. **LITERATURE FIRST**: Always call SEARCHER before INTERPRETER.
@@ -163,7 +163,7 @@ Use the **reporter** subagent to:
 
 | Subagent | Role | Inputs | Outputs |
 |----------|------|--------|---------|
-| **planner** | Target confirmation + data assessment + interpretation guide | /targets.json (from message) | /interpretation_guide.md, /analysis_summary.md, /data_path.txt, /planner_literature_context.md, /planner_biomcp_context.md |
+| **planner** | Target confirmation + data assessment + interpretation guide | /targets.json (from message) | /interpretation_guide.md, /data_path.txt |
 | **searcher** | Context extraction + literature search | /data_path.txt, spatial_search_context (Part 1), lr_search_context (Part 2/3) | /part1_papers.json, /liana_papers.json (Part 2/3 shared) |
 | **interpreter** | Part 1/2/3 interpretation with inline validation | /partN_papers.json, /interpretation_guide.md | /part1_final.md, /part2_final.md, /part3_final.md |
 | **reporter** | Cross-part synthesis + emergent themes + HTML report | /partN_final.md, /interpretation_guide.md | /synthesis.md, /synthesis_papers.json, CCI_Analysis_Report.html |
@@ -176,10 +176,9 @@ Use the **reporter** subagent to:
 │  - Parse /targets.json from initial message                                 │
 │  - Load analysis data                                                       │
 │  - Generate biomedical context (BioMCP think, optional)                     │
-│  - Literature initialization (search_pubmed_advanced, 10 papers)            │
+│  - Literature initialization (search_literature_dynamic, 30 papers)         │
 │  - Data assessment + analysis coverage checklist                            │
-│  → /interpretation_guide.md, /analysis_summary.md, /data_path.txt,         │
-│    /planner_literature_context.md, /planner_biomcp_context.md               │
+│  → /interpretation_guide.md, /data_path.txt                                 │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼

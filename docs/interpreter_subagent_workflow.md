@@ -1,3 +1,6 @@
+> **DEPRECATED**: 종합 레퍼런스는 [interpreter_subagent_reference.md](interpreter_subagent_reference.md)를 참조하세요.
+> 이 문서는 외부 참조 안전을 위해 보존됩니다.
+
 # INTERPRETER Subagent 상세 분석
 
 > 문헌 기반 해석 에이전트 — 인라인 검증 + 품질 루프 + RAG 지원

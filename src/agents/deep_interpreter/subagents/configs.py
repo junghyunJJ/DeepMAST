@@ -1,7 +1,7 @@
 """Subagent configurations for Deep Interpreter Agent.
 
 Simplified 4-Agent Architecture:
-- PLANNER: Target confirmation + data assessment + interpretation guide (load_analysis_data, generate_biomedical_context, search_pubmed_advanced, think_tool)
+- PLANNER: Target confirmation + data assessment + interpretation guide (load_analysis_data, generate_biomedical_context, search_literature_dynamic, search_pubmed_advanced)
 - SEARCHER: Context extraction + literature search (load_analysis_data, search_literature_dynamic, search_literature, search_pubmed_advanced, think_tool)
 - INTERPRETER: Part 1/2/3 interpretation with inline validation (load_analysis_data, validate_claim_literature, validate_quality, think_tool)
 - REPORTER: Cross-part synthesis + literature validation + HTML report
@@ -50,13 +50,19 @@ SUBAGENT_CONFIGS = {
         "description": (
             "Strategic planning agent. Reads /targets.json, loads analysis data, "
             "generates biomedical context via BioMCP think (disease biology context), "
-            "searches literature for grounding (10 papers), assesses data availability, "
+            "searches literature for grounding (30 papers, saved to planner_papers.json via output_path), "
+            "assesses data availability, "
             "and creates a data-driven interpretation guide with focus areas and priorities. "
-            "Outputs /interpretation_guide.md, /planner_literature_context.md, /planner_biomcp_context.md. "
+            "Outputs /interpretation_guide.md, /data_path.txt, /planner_papers.json. "
             "Use this FIRST to establish the interpretation strategy."
         ),
         "system_prompt": SUBAGENT_PROMPTS["planner"],
-        "tools": [load_analysis_data, generate_biomedical_context, search_pubmed_advanced, think_tool],
+        "tools": [
+            load_analysis_data,
+            generate_biomedical_context,
+            search_literature_dynamic,  # PRIMARY: BioMCP (gene alias 확장, LLM 쿼리 생성, 내부 fallback 포함)
+            search_pubmed_advanced,     # FALLBACK: BioMCP connection error/timeout 시에만 사용
+        ],
     },
     "searcher": {
         "name": "searcher",
@@ -108,9 +114,11 @@ SUBAGENT_CONFIGS = {
         "name": "reporter",
         "description": (
             "Synthesis and report generation agent. Reads all /partN_final.md files, "
-            "identifies cross-part themes, validates synthesis claims with NEW literature search "
+            "identifies cross-part themes (including GenePT functional similarity evidence), "
+            "validates synthesis claims with NEW literature search "
             "(following biomedical-literature-search workflow), and generates final HTML report. "
             "Phase 4.5 validates integration claims against independent literature sources. "
+            "Falls back to abstract-based validation when RAG infrastructure unavailable. "
             "Outputs /synthesis.md, /synthesis_papers.json, /synthesis_validation.json, "
             "and CCI_Analysis_Report.html."
         ),
@@ -122,6 +130,10 @@ SUBAGENT_CONFIGS = {
             # Literature search tools (reuse from SEARCHER for synthesis validation)
             search_literature_dynamic,
             search_literature,
+            search_pubmed_advanced,      # MeSH/date-restricted for gap-filling
+            # Claim validation tools
+            validate_claim_literature,   # Abstract-based fallback when RAG unavailable
+            validate_quality,            # Objective quality scoring for synthesis
             # RAG validation tools
             prepare_rag_literature,
             validate_claim_fulltext,
@@ -207,11 +219,11 @@ Deep Interpreter 4-Agent Workflow:
    - Reads /targets.json
    - Loads analysis data
    - Generates biomedical context via BioMCP think (optional enrichment)
-   - Literature initialization via search_pubmed_advanced (10 papers for grounding)
-   - Data assessment + analysis coverage checklist via think_tool
+   - Literature initialization via search_literature_dynamic (30 papers for grounding, internal fallback)
+   - Fallback: search_pubmed_advanced (BioMCP connection error/timeout 시에만 사용)
+   - Data assessment + analysis coverage checklist (inline reasoning)
    - Creates data-driven interpretation guide with focus areas and priorities
-   - Outputs: /interpretation_guide.md, /analysis_summary.md, /data_path.txt,
-     /planner_literature_context.md, /planner_biomcp_context.md
+   - Outputs: /interpretation_guide.md, /data_path.txt
 
 2. SEARCHER (context-analyzer + literature-searcher consolidated)
    - For Part 1:
