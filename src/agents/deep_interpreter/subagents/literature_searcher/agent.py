@@ -101,7 +101,7 @@ Write comprehensive /partN_papers.json with:
 ```
 
 ## Quality Criteria
-- Aim for >= 25 papers per part
+- Aim for >= 15 papers per part
 - Gene coverage >= 60%
 - Pathway coverage >= 50%
 - Papers should have substantial abstracts

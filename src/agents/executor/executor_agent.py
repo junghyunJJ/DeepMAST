@@ -4,16 +4,15 @@ Takes a ``PipelineConfig`` (from pipeline_builder), dynamically loads the
 correct MCP server for each step, handles SC reference resolution for
 spot-based platforms, and cascades h5ad outputs between steps.
 
-Graph (8-node hub pattern):
-    START -> check_state
-      |--(not inputs_validated)-----> validate_inputs
-      |       |--(h5ad missing)-----> collect_h5ad_info -> validate_inputs
-      |       |--(valid)------------> check_state
-      |--(not sc_resolved)----------> resolve_sc_reference -> check_state
-      |--(not norm_complete)--------> execute_normalization -> check_state
-      |--(not celltype_complete)----> execute_celltype_analysis -> check_state
-      |--(not clustering_complete)--> execute_spatial_clustering -> check_state
-      |--(all complete)-------------> save_results -> END
+Graph (7-node sequential):
+    START → validate_inputs
+              ├─(no pipeline_config)──────────────────────→ save_results → END
+              ├─(h5ad missing)→ collect_h5ad → validate_inputs
+              └─(valid)→ resolve_sc_reference → execute_normalization
+                                                  ├─(celltype skipped)→ execute_spatial_clustering
+                                                  └─(normal)→ execute_celltype_analysis
+                                                                → execute_spatial_clustering
+                                                                    → save_results → END
 """
 
 from __future__ import annotations
@@ -54,7 +53,6 @@ class PipelineExecutorAgent(BaseAgent):
     """
 
     NODE_NAMES: ClassVar[dict[str, str]] = {
-        "CHECK_STATE": "check_state",
         "VALIDATE_INPUTS": "validate_inputs",
         "COLLECT_H5AD": "collect_h5ad_info",
         "RESOLVE_SC_REF": "resolve_sc_reference",
@@ -95,7 +93,6 @@ class PipelineExecutorAgent(BaseAgent):
     # ================================================================
 
     def init_nodes(self, graph: StateGraph):
-        graph.add_node(self.get_node_name("CHECK_STATE"), self.check_state_node)
         graph.add_node(self.get_node_name("VALIDATE_INPUTS"), self.validate_inputs_node)
         graph.add_node(self.get_node_name("COLLECT_H5AD"), self.collect_h5ad_info_node)
         graph.add_node(self.get_node_name("RESOLVE_SC_REF"), self.resolve_sc_reference_node)
@@ -105,7 +102,6 @@ class PipelineExecutorAgent(BaseAgent):
         graph.add_node(self.get_node_name("SAVE_RESULTS"), self.save_results_node)
 
     def init_edges(self, graph: StateGraph):
-        check = self.get_node_name("CHECK_STATE")
         validate = self.get_node_name("VALIDATE_INPUTS")
         collect = self.get_node_name("COLLECT_H5AD")
         sc_ref = self.get_node_name("RESOLVE_SC_REF")
@@ -114,72 +110,60 @@ class PipelineExecutorAgent(BaseAgent):
         clustering = self.get_node_name("EXEC_CLUSTERING")
         save = self.get_node_name("SAVE_RESULTS")
 
-        # START -> check_state
-        graph.add_edge(START, check)
+        # START → validate_inputs
+        graph.add_edge(START, validate)
 
-        # Hub: check_state routes to the next incomplete step
-        graph.add_conditional_edges(
-            check,
-            self.route_after_check,
-            [validate, sc_ref, norm, celltype, clustering, save],
-        )
-
-        # validate_inputs -> collect_h5ad OR check_state
+        # validate_inputs → 3-way conditional
         graph.add_conditional_edges(
             validate,
             self.route_after_validate,
-            [collect, check],
+            [save, collect, sc_ref],
         )
 
-        # collect_h5ad -> validate_inputs (re-validate after user provides path)
+        # collect_h5ad → validate_inputs (re-validate after user provides path)
         graph.add_edge(collect, validate)
 
-        # All execution nodes route back to the hub
-        graph.add_edge(sc_ref, check)
-        graph.add_edge(norm, check)
-        graph.add_edge(celltype, check)
-        graph.add_edge(clustering, check)
+        # resolve_sc_reference → normalization
+        graph.add_edge(sc_ref, norm)
 
-        # Terminal
+        # normalization → conditional (celltype or skip to clustering)
+        graph.add_conditional_edges(
+            norm,
+            self.route_after_normalization,
+            [celltype, clustering],
+        )
+
+        # celltype → clustering
+        graph.add_edge(celltype, clustering)
+
+        # clustering → save_results
+        graph.add_edge(clustering, save)
+
+        # save_results → END
         graph.add_edge(save, END)
 
     # ================================================================
     # Routing (sync — required by LangGraph)
     # ================================================================
 
-    def route_after_check(
-        self, state: PipelineExecutorState, config: RunnableConfig,  # noqa: ARG002
-    ) -> str:
-        """Hub routing: find the first incomplete phase and route there."""
-        if not state.get("inputs_validated"):
-            return self.get_node_name("VALIDATE_INPUTS")
-        if not state.get("sc_reference_resolved"):
-            return self.get_node_name("RESOLVE_SC_REF")
-        if not state.get("normalization_complete"):
-            return self.get_node_name("EXEC_NORM")
-        if not state.get("celltype_complete"):
-            return self.get_node_name("EXEC_CELLTYPE")
-        if not state.get("clustering_complete"):
-            return self.get_node_name("EXEC_CLUSTERING")
-        return self.get_node_name("SAVE_RESULTS")
-
     def route_after_validate(
         self, state: PipelineExecutorState, config: RunnableConfig,  # noqa: ARG002
     ) -> str:
-        """After validation: if h5ad missing go collect, else back to hub."""
+        """After validation: no config → save, no h5ad → collect, else → sc_ref."""
+        if not state.get("pipeline_config"):
+            return self.get_node_name("SAVE_RESULTS")
         if not state.get("h5ad_input_path"):
             return self.get_node_name("COLLECT_H5AD")
-        return self.get_node_name("CHECK_STATE")
+        return self.get_node_name("RESOLVE_SC_REF")
 
-    # ================================================================
-    # Node implementations
-    # ================================================================
-
-    async def check_state_node(
+    def route_after_normalization(
         self, state: PipelineExecutorState, config: RunnableConfig,  # noqa: ARG002
-    ) -> dict:
-        """Pass-through hub node — routing logic lives in ``route_after_check``."""
-        return {}
+    ) -> str:
+        """After normalization: skip celltype if already marked skipped."""
+        for r in state.get("step_results", []):
+            if r.get("step") == "celltype_analysis" and r.get("status") == "skipped":
+                return self.get_node_name("EXEC_CLUSTERING")
+        return self.get_node_name("EXEC_CELLTYPE")
 
     # ---- validate_inputs ----
 
@@ -191,11 +175,6 @@ class PipelineExecutorAgent(BaseAgent):
         if not pc:
             return {
                 "messages": [AIMessage(content="Error: No pipeline_config provided.")],
-                "inputs_validated": True,
-                "sc_reference_resolved": True,
-                "normalization_complete": True,
-                "celltype_complete": True,
-                "clustering_complete": True,
             }
 
         h5ad_path = state.get("h5ad_input_path")
@@ -220,11 +199,7 @@ class PipelineExecutorAgent(BaseAgent):
         }
 
         if h5ad_path:
-            updates["inputs_validated"] = True
             updates["output_directory"] = output_dir
-            # If SC ref not needed, mark resolved immediately
-            if not sc_needed:
-                updates["sc_reference_resolved"] = True
             updates["messages"] = [
                 AIMessage(content=f"Inputs validated. h5ad: {h5ad_path}, SC ref needed: {sc_needed}")
             ]
@@ -271,7 +246,7 @@ class PipelineExecutorAgent(BaseAgent):
         auto-skip the celltype step entirely.
         """
         if not state.get("sc_reference_needed"):
-            return {"sc_reference_resolved": True}
+            return {}
 
         # Try auto-recommendation via MCP
         candidates: list[dict] = []
@@ -330,7 +305,6 @@ class PipelineExecutorAgent(BaseAgent):
             celltype_method = pc.get("celltype_analysis", "")
 
             updates: dict[str, Any] = {
-                "sc_reference_resolved": True,
                 "sc_reference_path": None,
                 "messages": [HumanMessage(content="User skipped SC reference.")],
             }
@@ -344,7 +318,6 @@ class PipelineExecutorAgent(BaseAgent):
                 )
                 current_results = list(state.get("step_results") or [])
                 current_results.append(skip_result.model_dump())
-                updates["celltype_complete"] = True
                 updates["step_results"] = current_results
                 updates["messages"] = [
                     HumanMessage(content="SC reference skipped — celltype analysis auto-skipped (deconvolution requires SC ref).")
@@ -359,7 +332,6 @@ class PipelineExecutorAgent(BaseAgent):
         sc_info = SCReferenceInfo(name="user-provided", path=sc_path, source="user")
 
         return {
-            "sc_reference_resolved": True,
             "sc_reference_path": sc_path,
             "sc_reference_candidates": [sc_info.model_dump()],
             "messages": [HumanMessage(content=f"SC reference: {sc_path}")],
@@ -462,7 +434,6 @@ class PipelineExecutorAgent(BaseAgent):
         current_results.append(result.model_dump())
 
         updates: dict[str, Any] = {
-            "normalization_complete": True,
             "step_results": current_results,
             "current_step": "normalization",
             "messages": [AIMessage(content=f"Normalization ({method}): {result.status}")],
@@ -499,7 +470,6 @@ class PipelineExecutorAgent(BaseAgent):
         current_results.append(result.model_dump())
 
         updates: dict[str, Any] = {
-            "celltype_complete": True,
             "step_results": current_results,
             "current_step": "celltype_analysis",
             "messages": [AIMessage(content=f"Cell type analysis ({method}): {result.status}")],
@@ -531,7 +501,6 @@ class PipelineExecutorAgent(BaseAgent):
         current_results.append(result.model_dump())
 
         updates: dict[str, Any] = {
-            "clustering_complete": True,
             "step_results": current_results,
             "current_step": "spatial_clustering",
             "messages": [AIMessage(content=f"Spatial clustering ({method}): {result.status}")],

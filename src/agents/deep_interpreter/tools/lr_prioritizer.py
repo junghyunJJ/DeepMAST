@@ -17,6 +17,7 @@ Example:
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -412,44 +413,128 @@ def prioritize_lr_pairs(
     return prioritizer.prioritize(lr_df, top_k=top_k)
 
 
+def _find_liana_file(data_path: Path) -> Path | None:
+    """Find LIANA results CSV in a directory.
+
+    Args:
+        data_path: Directory to search in
+
+    Returns:
+        Path to the LIANA CSV file, or None if not found.
+    """
+    for fname in ("interest_sig_liana.csv", "sig_liana.csv"):
+        candidate = data_path / fname
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _load_top_search_genes(data_path: Path) -> list[str] | None:
+    """Load pre-computed top search genes from JSON file.
+
+    Written by data_loader._extract_search_context() during PLANNER phase.
+
+    Returns:
+        List of gene symbols, or None if file not found.
+    """
+    top_genes_file = data_path / "top_search_genes.json"
+    if not top_genes_file.exists():
+        return None
+    try:
+        with open(top_genes_file) as f:
+            genes = json.load(f)
+        if isinstance(genes, list) and genes:
+            return genes
+    except Exception:
+        pass
+    return None
+
+
+def _exclude_well_known_pairs(
+    lr_df: pd.DataFrame,
+    top_genes: list[str],
+    ligands: pd.Series,
+    receptors: pd.Series,
+    min_remaining: int = 5,
+) -> tuple[pd.DataFrame, int, str]:
+    """Exclude L-R pairs where BOTH genes are well-known (in top gene list).
+
+    Uses graduated relaxation: top-30 → top-20 → top-10 → no exclusion.
+
+    Returns:
+        (filtered_df, excluded_count, exclusion_level description)
+    """
+    for n in [30, 20, 10]:
+        gene_set = set(top_genes[:n])
+        both_in_top = (ligands.isin(gene_set)) & (receptors.isin(gene_set))
+        remaining = lr_df[~both_in_top]
+        if len(remaining) >= min_remaining:
+            excluded = both_in_top.sum()
+            logger.info(
+                f"Excluded {excluded} pairs where both genes in top-{n}; "
+                f"{len(remaining)} candidates remain"
+            )
+            return remaining.copy(), int(excluded), f"both_in_top_{n}"
+
+    # No exclusion if all thresholds leave too few candidates
+    logger.warning(
+        f"Graduated exclusion left <{min_remaining} pairs at all levels; "
+        "skipping exclusion"
+    )
+    return lr_df.copy(), 0, "none"
+
+
 @tool
 def prioritize_top_lr_pairs(
     data_dir: str,
-    top_k: int = 3,
+    candidate_count: int = 15,
     spatial_weight: float = 0.6,
     genept_weight: float = 0.4,
 ) -> str:
-    """Prioritize L-R pairs using hybrid GenePT + Moran's R scoring.
+    """Get candidate L-R pairs for LLM-based novel interaction selection.
 
-    This tool combines spatial autocorrelation (Moran's R) with GenePT semantic
-    similarity to select the most biologically relevant L-R pairs for detailed
-    interpretation in Part 3 analysis.
+    This tool filters out well-known L-R pairs (where both ligand and receptor
+    are among the top-30 most-studied genes) and returns candidate pairs for
+    the LLM to select the most novel and interesting interactions.
 
-    The hybrid approach balances:
-    - Spatial relevance (60%): Moran's R captures spatially co-localized interactions
-    - Biological relevance (40%): GenePT captures functional gene relationships
+    The workflow:
+    1. Load interest_sig_liana.csv (pre-filtered for interest clusters)
+    2. Exclude pairs where BOTH genes are well-known hub genes (top-30)
+    3. Compute advisory hybrid scores (Moran's R + GenePT) for reference
+    4. Return up to candidate_count candidates for LLM selection
 
     Args:
         data_dir: Path to the analysis directory containing interest_sig_liana.csv
-        top_k: Number of top L-R pairs to select (default: 3)
-        spatial_weight: Weight for Moran's R score (default: 0.6)
-        genept_weight: Weight for GenePT similarity (default: 0.4)
+        candidate_count: Max number of candidate pairs to return (default: 15)
+        spatial_weight: Weight for Moran's R advisory score (default: 0.6)
+        genept_weight: Weight for GenePT advisory score (default: 0.4)
 
     Returns:
-        JSON string with selected L-R pairs and selection rationale
+        JSON string with candidate L-R pairs for LLM selection
     """
     data_path = Path(data_dir)
 
     # Find the LIANA results file
-    liana_file = data_path / "interest_sig_liana.csv"
-    if not liana_file.exists():
-        # Try alternative name
-        liana_file = data_path / "sig_liana.csv"
+    liana_file = _find_liana_file(data_path)
 
-    if not liana_file.exists():
+    # Defense-in-depth: fall back to DEEP_INTERPRETER_DATA_DIR env var
+    if liana_file is None:
+        env_dir = os.environ.get("DEEP_INTERPRETER_DATA_DIR")
+        if env_dir and env_dir != str(data_path):
+            logger.warning(
+                f"LIANA files not found in {data_dir}, "
+                f"falling back to DEEP_INTERPRETER_DATA_DIR={env_dir}"
+            )
+            fallback_path = Path(env_dir)
+            liana_file = _find_liana_file(fallback_path)
+            if liana_file is not None:
+                data_path = fallback_path
+
+    if liana_file is None:
         return json.dumps({
             "error": f"LIANA results file not found in {data_dir}",
             "searched": ["interest_sig_liana.csv", "sig_liana.csv"],
+            "hint": "Ensure data_dir points to the analysis results directory (e.g., res_bc/), not the project root.",
         })
 
     try:
@@ -458,40 +543,82 @@ def prioritize_top_lr_pairs(
     except Exception as e:
         return json.dumps({"error": f"Failed to load LIANA results: {e}"})
 
-    # Create prioritizer and select top pairs
+    total_pairs = len(lr_df)
+
+    # --- Novelty filtering: exclude well-known hub-gene pairs ---
+    excluded_count = 0
+    exclusion_level = "none"
+
+    top_genes = _load_top_search_genes(data_path)
+    if top_genes:
+        try:
+            prioritizer_tmp = HybridLRPrioritizer(spatial_weight=spatial_weight, genept_weight=genept_weight)
+            ligands, receptors = prioritizer_tmp._extract_ligand_receptor(lr_df)
+            lr_df, excluded_count, exclusion_level = _exclude_well_known_pairs(
+                lr_df, top_genes, ligands, receptors,
+            )
+        except ValueError:
+            logger.warning("Could not extract ligand/receptor columns for exclusion; skipping")
+    else:
+        logger.info("top_search_genes.json not found; skipping novelty exclusion")
+
+    if lr_df.empty:
+        return json.dumps({
+            "error": "No L-R pairs remaining after filtering",
+            "total_pairs": total_pairs,
+            "excluded_count": excluded_count,
+        })
+
+    # --- Compute advisory hybrid scores ---
     try:
         prioritizer = HybridLRPrioritizer(
             spatial_weight=spatial_weight,
             genept_weight=genept_weight,
         )
-        top_pairs = prioritizer.prioritize(lr_df, top_k=top_k)
-    except FileNotFoundError as e:
-        return json.dumps({
-            "error": str(e),
-            "suggestion": "Ensure sig_liana.csv was generated with GenePT scoring enabled in MCP pipeline",
-        })
+        scored_df = prioritizer.prioritize(lr_df, top_k=len(lr_df))
     except Exception as e:
-        return json.dumps({"error": f"Prioritization failed: {e}"})
+        return json.dumps({"error": f"Scoring failed: {e}"})
+
+    # --- Select candidates ---
+    # If more than candidate_count: prefer combinedscore if available, else hybrid_score
+    if len(scored_df) > candidate_count:
+        if "combinedscore" in scored_df.columns:
+            scored_df = scored_df.nlargest(candidate_count, "combinedscore")
+        else:
+            scored_df = scored_df.head(candidate_count)
+    # Re-rank after selection
+    scored_df = scored_df.sort_values("hybrid_score", ascending=False)
+    scored_df["rank"] = range(1, len(scored_df) + 1)
 
     # Generate rationale
-    rationale = prioritizer.get_selection_rationale(top_pairs)
+    rationale = prioritizer.get_selection_rationale(scored_df)
 
     # Extract key columns for output
     output_columns = [
         "ligand", "receptor", "interaction",
-        "morans_r", "morans_R", "Morans_R", "global_r",  # Various Moran's R column names
-        "genept_score", "hybrid_score", "rank",
+        "morans_r", "morans_R", "Morans_R", "global_r",
+        "genept_score", "combinedscore", "hybrid_score", "rank",
     ]
-    available_columns = [c for c in output_columns if c in top_pairs.columns]
+    available_columns = [c for c in output_columns if c in scored_df.columns]
 
-    # Build result
     result = {
-        "selected_pairs": top_pairs[available_columns].to_dict(orient="records"),
-        "total_pairs_analyzed": len(lr_df),
-        "selection_criteria": {
+        "selection_mode": "llm_candidate_list",
+        "instruction": (
+            "These are CANDIDATE L-R pairs with well-known hub-gene pairs excluded. "
+            "YOU must select the TOP 3 most interesting pairs for detailed Part 3 interpretation. "
+            "Prioritize: (1) biological novelty, (2) spatial significance (high Moran's R), "
+            "(3) mechanistic plausibility in the tissue context. "
+            "Write your selection reasoning BEFORE interpreting."
+        ),
+        "candidate_pairs": scored_df[available_columns].to_dict(orient="records"),
+        "total_pairs_in_file": total_pairs,
+        "excluded_count": excluded_count,
+        "exclusion_level": exclusion_level,
+        "candidates_returned": len(scored_df),
+        "advisory_scores": {
             "spatial_weight": spatial_weight,
             "genept_weight": genept_weight,
-            "top_k": top_k,
+            "note": "hybrid_score is advisory only — use biological reasoning for final selection",
         },
         "rationale": rationale,
     }

@@ -88,7 +88,7 @@ async def create_st_pipeline_graph(
     """Create Spatial Transcriptomics Pipeline Builder agent graph with HITL support
 
     Args:
-        llm_provider: LLM provider to use ("google", "kimi", "openai", "ollama")
+        llm_provider: LLM provider to use ("google", "openrouter", "openai", "ollama")
         is_debug: Enable debug mode
         recursion_limit: Maximum recursion depth for graph execution
         use_checkpointer: If True, use MemorySaver checkpointer. If False, use None (for LangGraph CLI)
@@ -197,7 +197,7 @@ pubmed_rag_graph = _get_pubmed_rag_graph()
 async def create_executor_graph(
     llm_provider: str = DEFAULT_LLM_PROVIDER,
     is_debug: bool = True,
-    recursion_limit: int = 80,
+    recursion_limit: int = 30,
     use_checkpointer: bool = True
 ) -> CompiledStateGraph:
     """Create Pipeline Executor agent graph for running ST pipelines via MCP.
@@ -209,7 +209,7 @@ async def create_executor_graph(
     Args:
         llm_provider: LLM provider to use
         is_debug: Enable debug mode
-        recursion_limit: Maximum recursion depth (higher due to hub pattern)
+        recursion_limit: Maximum recursion depth for graph execution
         use_checkpointer: If True, use MemorySaver checkpointer
 
     Returns:

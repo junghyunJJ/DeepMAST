@@ -201,10 +201,8 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     and returns a structured summary of available analyses, figures, data,
     AND extracted clusters/cell types for target selection.
 
-    **IMPORTANT**: This tool returns content for mandatory write:
-    - /data_path.txt - Data directory path (MUST be written via write_file)
-
-    Subagents (like planner, searcher) will use read_file to access these files.
+    **NOTE**: /data_path.txt is pre-written automatically by the agent framework.
+    Subagents can read it via read_file("/data_path.txt") without any manual write.
 
     Args:
         data_dir: Path to the directory containing analysis results
@@ -386,15 +384,11 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
         # Note: Part 2 & 3 merged to eliminate redundancy (identical data)
         "spatial_search_context": spatial_search_context,
         "lr_search_context": lr_search_context,
-        # Pre-formatted content for write_file - orchestrator MUST write these
-        "_MUST_WRITE_FILES": {
-            "/data_path.txt": str(data_path),
+        # Informational: /data_path.txt is pre-written by the agent framework.
+        "_DATA_PATH_INFO": {
+            "data_path_txt": str(data_path),
+            "note": "/data_path.txt is pre-written automatically. No manual write_file needed.",
         },
-        "_INSTRUCTION": (
-            "CRITICAL: You MUST use write_file tool to save /data_path.txt from _MUST_WRITE_FILES. "
-            "Subagents need this file to locate the data directory. "
-            "Call write_file('/data_path.txt', <content>) NOW."
-        ),
     }
 
 
@@ -605,6 +599,15 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
             top_genes = [g for g, _ in gene_counts.most_common(MAX_SEARCH_GENES)]
         else:
             top_genes = all_genes_sorted[:MAX_SEARCH_GENES]
+
+        # Persist top search genes for downstream use (e.g., LR pair novelty filtering)
+        try:
+            import json as _json
+            top_genes_file = data_path / "top_search_genes.json"
+            with open(top_genes_file, "w") as f:
+                _json.dump(top_genes, f)
+        except Exception:
+            pass  # Non-critical: prioritizer falls back to no exclusion
 
         return {
             "genes": top_genes,  # Top N by hybrid score for search

@@ -30,7 +30,7 @@ Note on HITL behavior:
 
 Backend Configuration:
 - Workspace location: Dynamic based on user's data_dir
-- Virtual mode: Enabled (files stored in-memory, flushed on completion)
+- Virtual mode: Enabled (paths sandboxed to root_dir; files written to real disk)
 """
 
 import uuid
@@ -39,10 +39,14 @@ from typing import Callable, Literal, Optional, Sequence
 
 from deepagents import create_deep_agent
 from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend
+from deepagents.backends.protocol import WriteResult
 from langchain.tools import ToolRuntime
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import MemorySaver
+
+import os
+from pathlib import Path
 
 from src.agents.model import create_llm
 from src.agents.deep_interpreter.middleware import SkillsMiddleware
@@ -59,18 +63,33 @@ from src.agents.deep_interpreter.tools import (
 )
 
 
+class OverwriteFilesystemBackend(FilesystemBackend):
+    """FilesystemBackend that overwrites existing files on write().
+
+    The base FilesystemBackend.write() rejects existing files (create-only).
+    This subclass deletes the existing file and retries, enabling overwrites
+    during re-runs, retries, and quality iteration loops.
+    """
+
+    def write(self, file_path: str, content: str) -> WriteResult:
+        resolved_path = self._resolve_path(file_path)
+        if resolved_path.exists():
+            resolved_path.unlink()
+        return super().write(file_path, content)
+
+
 @dataclass
 class DeepInterpreterConfig:
     """Configuration for Deep Interpreter Agent.
 
     Attributes:
-        provider: LLM provider ('openai', 'google', 'ollama', 'claude', 'kimi').
-                  Defaults to 'kimi'. Uses LLM_PROVIDER env var if not specified.
+        provider: LLM provider ('openai', 'google', 'ollama', 'claude', 'openrouter').
+                  Defaults to 'openrouter'. Uses LLM_PROVIDER env var if not specified.
         data_dir: Directory for CCI analysis results and agent workspace
         max_iterations: Maximum quality refinement iterations per part (default: 3)
         quality_threshold: Minimum quality score to pass (default: 0.7)
         use_checkpointer: Whether to use memory checkpointer (default: False)
-        virtual_mode: If True, files stored in-memory first, flushed on completion
+        virtual_mode: If True, all file paths are sandboxed to data_dir (written to real disk)
         max_file_size_mb: Maximum file size for filesystem backend (default: 20MB)
         custom_tools: Additional tools to include
         custom_subagents: Additional subagents to include
@@ -83,8 +102,12 @@ class DeepInterpreterConfig:
         - OLLAMA_MODEL (default: gpt-oss:20b)
         - ANTHROPIC_MODEL (default: claude-haiku-4-5-20251001)
     """
-    provider: Literal["openai", "google", "ollama", "claude", "kimi"] = "kimi"
-    data_dir: str = "/tmp/deep_interpreter_workspace"
+    provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "openrouter"
+    data_dir: str = field(
+        default_factory=lambda: os.getenv(
+            "DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace"
+        )
+    )
     max_iterations: int = 3
     quality_threshold: float = 0.7
     use_checkpointer: bool = False  # Requires thread_id in config when True
@@ -111,7 +134,7 @@ def _create_backend_factory(
         Tuple of (backend_factory function, fs_backend instance)
         The fs_backend is returned for sharing with subagents
     """
-    fs_backend = FilesystemBackend(
+    fs_backend = OverwriteFilesystemBackend(
         root_dir=config.data_dir,
         virtual_mode=config.virtual_mode,
         max_file_size_mb=config.max_file_size_mb,
@@ -153,12 +176,24 @@ def create_deep_interpreter_agent(
     if config is None:
         config = DeepInterpreterConfig()
 
+    # Set data_dir in env for tool fallback (process-wide, works across threads).
+    # NOTE: os.environ is process-global. Concurrent ASGI requests may overwrite
+    # each other's data_dir. This is a known limitation for multi-tenant deployment.
+    # For now, single-user dev server usage is safe.
+    os.environ["DEEP_INTERPRETER_DATA_DIR"] = str(Path(config.data_dir).expanduser().resolve())
+
     # Create LLM using the unified model factory
     # Respects environment variables: LLM_PROVIDER, OPENAI_MODEL, GOOGLE_MODEL, OLLAMA_MODEL
     llm = create_llm(provider=config.provider)
 
     # Create backend factory for file system operations
     backend_factory, _fs_backend = _create_backend_factory(config)
+
+    # Pre-write /data_path.txt deterministically so subagents never get a wrong path.
+    # Previously the planner LLM wrote this manually via write_file, which was
+    # non-deterministic and could write the project root instead of the data dir.
+    resolved_data_dir = str(Path(config.data_dir).expanduser().resolve())
+    _fs_backend.write("/data_path.txt", resolved_data_dir)
 
     # Build tools list (all tools available to orchestrator)
     tools = [
@@ -231,7 +266,7 @@ def interpret_analysis(
     interest_celltypes: Optional[list[str]] = None,
     sel_factor: Optional[str] = None,
     output_path: Optional[str] = None,
-    provider: Literal["openai", "google", "ollama", "claude", "kimi"] = "ollama",
+    provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "ollama",
     thread_id: Optional[str] = None,
     use_checkpointer: bool = False,
 ) -> dict:

@@ -78,7 +78,7 @@ def _count_keyword_matches(text: str, keywords: list[str]) -> int:
     return sum(1 for kw in keywords if kw.lower() in text_lower)
 
 
-def _calculate_basic_score(interpretation: str, references: list[dict]) -> dict:
+def _calculate_basic_score(interpretation: str, references: list[dict] | None = None) -> dict:
     """Calculate a basic quality score without LLM.
 
     Args:
@@ -151,7 +151,7 @@ def _calculate_basic_score(interpretation: str, references: list[dict]) -> dict:
 
 async def _validate_with_reflection_tool(
     interpretation: str,
-    references: list[dict],
+    references: list[dict] | None = None,
 ) -> Optional[dict]:
     """Validate interpretation using reflection-tool MCP server.
 
@@ -235,7 +235,7 @@ def _parse_reflection_result(result: str) -> dict:
 @tool
 def validate_quality(
     interpretation: str,
-    references: list[dict],
+    references: list[dict] | None = None,
     use_llm: bool = True,
 ) -> dict:
     """Validate the quality of a CCI interpretation.
@@ -250,7 +250,7 @@ def validate_quality(
 
     Args:
         interpretation: The interpretation text to validate
-        references: List of reference dictionaries with PMIDs
+        references: Optional list of reference dictionaries with PMIDs
         use_llm: Whether to use LLM validation via reflection-tool (default True)
 
     Returns:

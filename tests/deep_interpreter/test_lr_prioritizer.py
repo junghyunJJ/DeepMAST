@@ -4,10 +4,8 @@ These tests verify the hybrid scoring logic combining Moran's R and GenePT score
 """
 
 import json
-import pickle
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 import numpy as np
 import pandas as pd
@@ -18,61 +16,24 @@ class TestHybridLRPrioritizer:
     """Tests for HybridLRPrioritizer class."""
 
     @pytest.fixture
-    def mock_embeddings(self):
-        """Create mock embeddings for testing."""
-        return {
-            "MDK": np.array([0.8, 0.6, 0.0, 0.0]),
-            "SDC1": np.array([0.7, 0.7, 0.1, 0.0]),
-            "ECM1": np.array([0.5, 0.5, 0.5, 0.0]),
-            "ITGB4": np.array([0.4, 0.5, 0.6, 0.0]),
-            "CALR": np.array([0.3, 0.3, 0.3, 0.7]),
-            "ITGA3": np.array([0.2, 0.3, 0.4, 0.6]),
-            "COL1A1": np.array([0.1, 0.1, 0.1, 0.1]),
-            "DDR1": np.array([0.9, 0.1, 0.1, 0.1]),
-        }
-
-    @pytest.fixture
-    def temp_embeddings_file(self, mock_embeddings):
-        """Create a temporary embeddings file."""
-        with tempfile.NamedTemporaryFile(suffix=".pickle", delete=False) as f:
-            pickle.dump(mock_embeddings, f)
-            return Path(f.name)
-
-    @pytest.fixture
     def sample_liana_df(self):
-        """Create sample LIANA results DataFrame."""
+        """Create sample LIANA results DataFrame with pre-computed genept_score."""
         return pd.DataFrame({
             "ligand": ["MDK", "ECM1", "CALR", "COL1A1"],
             "receptor": ["SDC1", "ITGB4", "ITGA3", "DDR1"],
             "interaction": ["MDK^SDC1", "ECM1^ITGB4", "CALR^ITGA3", "COL1A1^DDR1"],
             "morans_r": [0.170, 0.162, 0.161, 0.150],
+            "genept_score": [0.85, 0.72, 0.60, 0.45],
             "source": ["Cancer", "Cancer", "Fibroblast", "Fibroblast"],
             "target": ["Stroma", "Stroma", "Cancer", "Cancer"],
         })
 
     @pytest.fixture
-    def prioritizer(self, temp_embeddings_file):
-        """Create a prioritizer with mock embeddings."""
-        from src.agents.deep_interpreter.tools.genept_scorer import GenePTScorer
+    def prioritizer(self):
+        """Create a prioritizer (reads genept_score from DataFrame column)."""
         from src.agents.deep_interpreter.tools.lr_prioritizer import HybridLRPrioritizer
 
-        # Reset singleton state
-        GenePTScorer._instance = None
-        GenePTScorer._initialized = False
-
-        scorer = GenePTScorer(embeddings_path=temp_embeddings_file)
-        prioritizer = HybridLRPrioritizer(
-            spatial_weight=0.6,
-            genept_weight=0.4,
-            genept_scorer=scorer,
-        )
-
-        yield prioritizer
-
-        # Cleanup
-        GenePTScorer._instance = None
-        GenePTScorer._initialized = False
-        temp_embeddings_file.unlink(missing_ok=True)
+        return HybridLRPrioritizer(spatial_weight=0.6, genept_weight=0.4)
 
     def test_default_weights(self):
         """Test default weight values."""
@@ -221,75 +182,47 @@ class TestPrioritizeTool:
     """Tests for the LangChain tool wrapper."""
 
     @pytest.fixture
-    def mock_embeddings(self):
-        """Create mock embeddings."""
-        return {
-            "MDK": np.array([0.8, 0.6, 0.0, 0.0]),
-            "SDC1": np.array([0.7, 0.7, 0.1, 0.0]),
-        }
-
-    @pytest.fixture
-    def temp_data_dir(self, mock_embeddings):
-        """Create temp directory with test data."""
-        import tempfile
+    def temp_data_dir(self):
+        """Create temp directory with test data (genept_score pre-computed in CSV)."""
         import shutil
 
-        # Create temp directories
         temp_dir = Path(tempfile.mkdtemp())
-        embeddings_dir = temp_dir / "embeddings"
-        embeddings_dir.mkdir()
 
-        # Save mock embeddings
-        embeddings_path = embeddings_dir / "embeddings.pickle"
-        with open(embeddings_path, "wb") as f:
-            pickle.dump(mock_embeddings, f)
-
-        # Create LIANA results
+        # Create LIANA results with genept_score column
         liana_df = pd.DataFrame({
             "ligand": ["MDK"],
             "receptor": ["SDC1"],
             "interaction": ["MDK^SDC1"],
             "morans_r": [0.17],
+            "genept_score": [0.85],
         })
         liana_df.to_csv(temp_dir / "interest_sig_liana.csv", index=False)
 
-        yield temp_dir, embeddings_path
+        yield temp_dir
 
-        # Cleanup
         shutil.rmtree(temp_dir)
 
     def test_tool_returns_json(self, temp_data_dir):
         """Test that tool returns valid JSON."""
-        from src.agents.deep_interpreter.tools.genept_scorer import GenePTScorer
         from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
 
-        temp_dir, embeddings_path = temp_data_dir
-
-        # Reset and configure scorer
-        GenePTScorer._instance = None
-        GenePTScorer._initialized = False
-        GenePTScorer(embeddings_path=embeddings_path)
-
         result = prioritize_top_lr_pairs.invoke({
-            "data_dir": str(temp_dir),
-            "top_k": 1,
+            "data_dir": str(temp_data_dir),
+            "candidate_count": 1,
         })
 
-        # Should be valid JSON
         parsed = json.loads(result)
-        assert "selected_pairs" in parsed or "error" in parsed
+        assert "candidate_pairs" in parsed or "error" in parsed
 
-        # Cleanup
-        GenePTScorer._instance = None
-        GenePTScorer._initialized = False
-
-    def test_tool_missing_file_error(self):
+    def test_tool_missing_file_error(self, monkeypatch):
         """Test tool handles missing file gracefully."""
         from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
 
+        monkeypatch.delenv("DEEP_INTERPRETER_DATA_DIR", raising=False)
+
         result = prioritize_top_lr_pairs.invoke({
             "data_dir": "/nonexistent/path",
-            "top_k": 3,
+            "candidate_count": 3,
         })
 
         parsed = json.loads(result)
@@ -308,39 +241,17 @@ class TestConvenienceFunctions:
         assert prioritizer.spatial_weight == 0.7
         assert prioritizer.genept_weight == 0.3
 
-    def test_prioritize_lr_pairs_function(self, mock_embeddings, temp_embeddings_file):
-        """Test convenience function."""
-        from src.agents.deep_interpreter.tools.genept_scorer import GenePTScorer
+    def test_prioritize_lr_pairs_function(self):
+        """Test convenience function (genept_score read from DataFrame column)."""
         from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_lr_pairs
-
-        # Reset and configure scorer
-        GenePTScorer._instance = None
-        GenePTScorer._initialized = False
-        GenePTScorer(embeddings_path=temp_embeddings_file)
 
         df = pd.DataFrame({
             "ligand": ["MDK"],
             "receptor": ["SDC1"],
             "morans_r": [0.17],
+            "genept_score": [0.85],
         })
 
         result = prioritize_lr_pairs(df, top_k=1)
         assert len(result) == 1
         assert "hybrid_score" in result.columns
-
-        # Cleanup
-        GenePTScorer._instance = None
-        GenePTScorer._initialized = False
-
-    @pytest.fixture
-    def mock_embeddings(self):
-        return {
-            "MDK": np.array([0.8, 0.6, 0.0, 0.0]),
-            "SDC1": np.array([0.7, 0.7, 0.1, 0.0]),
-        }
-
-    @pytest.fixture
-    def temp_embeddings_file(self, mock_embeddings):
-        with tempfile.NamedTemporaryFile(suffix=".pickle", delete=False) as f:
-            pickle.dump(mock_embeddings, f)
-            return Path(f.name)

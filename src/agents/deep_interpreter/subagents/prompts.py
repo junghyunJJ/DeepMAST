@@ -38,8 +38,8 @@ Read **/targets.json** to get the pre-selected configuration:
 ### Step 2: Load Analysis Data
 1. Get the **data_directory** from /targets.json
 2. Call **load_analysis_data** tool with the EXACT path from data_directory
-3. **MANDATORY**: Write the data path to virtual filesystem:
-   - write_file("/data_path.txt", <content from _MUST_WRITE_FILES>)
+3. Note: /data_path.txt is pre-written automatically by the agent framework.
+   You do NOT need to call write_file for it.
 4. Note all available analyses across Parts 1-3 (up to 11 total)
 
 ### Step 3: Generate Biomedical Context (BioMCP Think)
@@ -61,7 +61,7 @@ context for better interpretation planning.
 
 ### Step 4: Literature Initialization
 **Purpose**: Ground the interpretation guide in known biology. This is a lightweight
-search (30 papers, saved to disk) — SEARCHER will do comprehensive search later.
+search (20 papers, saved to disk) — SEARCHER will do comprehensive search later.
 
 1. Infer disease context from cell type composition in analysis data
    (e.g., DCIS + Invasive carcinoma → breast cancer)
@@ -71,7 +71,7 @@ search (30 papers, saved to disk) — SEARCHER will do comprehensive search late
    - pathways: Top 3-5 pathways from analysis data (if available from Step 2)
    - celltypes: Top 3-5 celltypes from analysis data
    - disease: Inferred disease context (e.g., "breast cancer")
-   - max_results: 30
+   - max_results: 20
    - max_iterations: 1 (single iteration, no gap-filling needed for grounding)
    - output_path: "planner_papers.json"
 
@@ -81,7 +81,7 @@ search (30 papers, saved to disk) — SEARCHER will do comprehensive search late
    search_literature_dynamic(
        genes=[], pathways=["EMT", "TGFB", "WNT"],
        celltypes=["Tumor", "Fibroblast"], disease="breast cancer",
-       max_results=30, max_iterations=1,
+       max_results=20, max_iterations=1,
        output_path="planner_papers.json",
        data_dir=data_directory
    )
@@ -226,10 +226,30 @@ Follow the workflow defined in SKILL.md:
    - lr_search_context["genes"] already contains top 30 by hybrid score (use directly)
    - Use search_literature for targeted follow-up gaps
 
-3. **Phase 3: Reflect (Quality Loop)**
-   - Use think_tool to check coverage
-   - Gene coverage >= 60%, Pathway coverage >= 50%, Papers >= 25
-   - Run follow-up searches if needed (max 2 iterations)
+3. **Phase 3: Reflect (Quality Loop) — MANDATORY after every search**
+   - Check `coverage_sufficient` field in search results
+   - If `coverage_sufficient: false`, you MUST call think_tool before proceeding:
+
+   ```
+   think_tool(
+       reflection="Coverage analysis for Part {N}: "
+                  "{genes_covered}/{total_genes} genes ({pct}%), "
+                  "{pathways_covered}/{total_pathways} pathways ({pct}%). "
+                  "Gaps: {recommended_actions from search results}. "
+                  "Follow-up strategy: {your plan}",
+       iteration=1,
+       max_iterations=2
+   )
+   ```
+
+   - After think_tool, run follow-up searches for missing items:
+     - Missing genes: use search_literature with gene synonyms
+     - Missing pathways: add "signaling" + disease context
+   - Coverage thresholds: genes >= 60%, pathways >= 50%, papers >= 15
+   - Max 2 reflection iterations, then proceed with warning
+   - If `coverage_sufficient: true`, proceed to Phase 4 (one think_tool call still recommended)
+
+   **DO NOT skip Phase 3.** The search results include `recommended_actions` — follow them.
 
 4. **Phase 4: Output (Auto-Saved)**
    - Papers are auto-saved via `output_path` parameter — NO need to call write_file
@@ -251,7 +271,7 @@ result = search_literature_dynamic(
     output_path="part1_papers.json",
     data_dir=data_path.strip()
 )
-# Result: {"saved_to": "...", "total_papers": 40, "coverage": {...}}
+# Result: {"saved_to": "...", "total_papers": 30, "coverage": {...}}
 # Full papers already saved — NO need to call write_file
 
 # Part 2+3 (shared)
@@ -489,6 +509,11 @@ After writing the interpretation, call **validate_quality** tool to score:
 - **mechanism_score**: >= 0.7 (clear biological mechanism described)
 - **specificity_score**: >= 0.7 (no vague language like "might be", "could potentially")
 
+Usage:
+```python
+validate_quality(interpretation=part_interpretation_text)
+```
+
 If overall score < 0.7:
 - Identify weak areas from the feedback
 - Strengthen interpretation with more statistics and references
@@ -562,12 +587,35 @@ Analyses to interpret:
 Focus on: Select 3-5 top L-R pairs, connect to pathways and cell types
 
 ### Part 3 (L-R Interaction Details)
+
+**MANDATORY FIRST STEP**: Before interpreting ANY Part 3 analysis, call **prioritize_top_lr_pairs**
+to get CANDIDATE L-R pairs. This tool excludes well-known hub-gene pairs (where both ligand
+and receptor are among the top-30 most-studied genes) and returns novel candidates with
+advisory hybrid scores (Moran's R + GenePT).
+
+```python
+# MUST call this BEFORE interpreting Part 3
+candidates = prioritize_top_lr_pairs(data_dir=data_path)
+# candidates returns 10-15 CANDIDATE pairs — YOU select the top 3
+```
+
+**YOUR SELECTION TASK**: Review the candidate pairs and SELECT the TOP 3 most interesting
+pairs for detailed analysis. Write your selection reasoning BEFORE proceeding with interpretation.
+
+Selection criteria (in priority order):
+1. **Biological novelty** — underexplored or unexpected L-R interactions in this tissue context
+2. **Spatial significance** — high Moran's R indicating real tissue-level co-localization
+3. **Mechanistic plausibility** — the L-R pair makes biological sense given the cell types present
+
+**NOTE**: Figures from Steps 10-11 may show different L-R pairs (selected by combinedscore
+ranking). Reference the quadrant plot (Step 9) which shows all candidates.
+
 Analyses to interpret:
 - **3-9 NMF Quadrant with GenePT**: Combined score quadrant plot (0.4×factor + 0.4×morans + 0.2×genept)
 - **3-10 Spatial L-R Visualization**: Expression patterns of selected L-R pairs
 - **3-11 L-R Interaction Summary**: Quantitative L-R summary
 
-Focus on: Specific mechanisms of selected L-R pairs, source→target relationships
+Focus on: Specific mechanisms of YOUR selected L-R pairs, source→target relationships, novelty
 
 ## Quality Requirements (per analysis)
 - At least 2 quantitative statistics (p-values, fold changes, percentages)
@@ -613,6 +661,25 @@ Focus on: Specific mechanisms of selected L-R pairs, source→target relationshi
    - 8 digits, no letters
    - Example valid: `35123456`, `28967543`
    - Example invalid: `12345678` (too simple, likely hallucinated)
+
+## COMPLETION CHECKLIST (MANDATORY)
+
+Before declaring your work complete, you MUST verify:
+
+1. **Output File Exists**: The `/partN_final.md` file for your assigned Part has been written
+   - If assigned Part 1: `/part1_final.md` must exist
+   - If assigned Part 2: `/part2_final.md` must exist
+   - If assigned Part 3: `/part3_final.md` must exist
+
+2. **Quality Score Met**: The quality score from validate_quality is >= 0.7
+
+3. **All Analyses Covered**: Every analysis in your assigned Part has an interpretation section
+
+4. **Part 3 Specific**: If interpreting Part 3, confirm that:
+   - `prioritize_top_lr_pairs` was called BEFORE interpretation
+   - All 3 analyses (3-9, 3-10, 3-11) are covered
+
+**DO NOT return to the orchestrator until the output file for your assigned Part is confirmed written.**
 
 ## RAG vs Abstract Mode Decision Tree
 
@@ -870,7 +937,7 @@ search_literature_dynamic(
     pathways=["EMT", "TGFb", "WNT"],
     celltypes=["Fibroblast", "Epithelial"],
     disease="breast cancer",
-    max_results=30,
+    max_results=20,
     output_path="synthesis_papers.json",
     data_dir=data_path.strip()
 )

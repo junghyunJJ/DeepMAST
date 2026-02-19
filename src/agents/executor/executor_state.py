@@ -73,12 +73,7 @@ class PipelineExecutorState(TypedDict):
         output_h5ad_path: Path to the latest output h5ad (cascading).
         output_directory: Directory where outputs are written.
 
-        # Completion flags (hub-pattern routing)
-        inputs_validated: True after validate_inputs succeeds.
-        sc_reference_resolved: True after SC reference resolved/skipped.
-        normalization_complete: True after normalization step finishes.
-        celltype_complete: True after celltype step finishes.
-        clustering_complete: True after clustering step finishes.
+        # Completion flag
         execution_complete: True after save_results (terminal).
     """
 
@@ -107,12 +102,7 @@ class PipelineExecutorState(TypedDict):
     output_h5ad_path: Optional[str]
     output_directory: Optional[str]
 
-    # Completion flags
-    inputs_validated: bool
-    sc_reference_resolved: bool
-    normalization_complete: bool
-    celltype_complete: bool
-    clustering_complete: bool
+    # Completion flag
     execution_complete: bool
 
 

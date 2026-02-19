@@ -10,6 +10,7 @@ Graph variants available:
 """
 
 import os
+from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
@@ -17,7 +18,7 @@ from langchain_core.runnables import Runnable
 from langgraph.prebuilt import create_react_agent
 
 # Load .env file before any os.getenv() calls
-# This ensures DEEP_INTERPRETER_DATA_DIR is available at module import time
+# This ensures environment variables are available at module import time
 load_dotenv()
 
 from src.agents.deep_interpreter.agent import (  # noqa: E402
@@ -31,8 +32,8 @@ from src.agents.model import create_llm  # noqa: E402
 
 
 def create_deep_interpreter_graph(
-    provider: Literal["openai", "google", "ollama", "claude", "kimi"] = "ollama",
-    data_dir: str = "/tmp/deep_interpreter_workspace",
+    provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "ollama",
+    data_dir: str = "",
     use_checkpointer: bool = True,
     is_debug: bool = False,
 ) -> Runnable:
@@ -50,13 +51,17 @@ def create_deep_interpreter_graph(
 
     Args:
         provider: LLM provider ('openai', 'google', 'ollama')
-        data_dir: Directory for CCI analysis results and agent workspace
+        data_dir: Directory for CCI analysis results and agent workspace.
+                  Falls back to DEEP_INTERPRETER_DATA_DIR env var, then /tmp/deep_interpreter_workspace.
         use_checkpointer: Whether to use memory checkpointer
         is_debug: Enable debug mode
 
     Returns:
         Compiled Deep Agent runnable
     """
+    if not data_dir:
+        data_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace")
+
     config = DeepInterpreterConfig(
         provider=provider,
         data_dir=data_dir,
@@ -74,16 +79,12 @@ def _get_deep_interpreter_graph() -> Runnable:
 
     Uses environment variables:
     - LLM_PROVIDER: LLM provider (default: "openai")
-    - DEEP_INTERPRETER_DATA_DIR: Data directory path
 
     Returns:
         Compiled Deep Agent runnable
     """
     provider = os.getenv("LLM_PROVIDER", "openai")
-    data_dir = os.getenv(
-        "DEEP_INTERPRETER_DATA_DIR",
-        "/tmp/deep_interpreter_workspace"
-    )
+    data_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace")
     return create_deep_interpreter_graph(
         provider=provider,
         data_dir=data_dir,
@@ -93,8 +94,8 @@ def _get_deep_interpreter_graph() -> Runnable:
 
 
 def create_deep_interpreter_graph_wrapped(
-    provider: Literal["openai", "google", "ollama", "claude", "kimi"] = "ollama",
-    data_dir: str = "/tmp/deep_interpreter_workspace",
+    provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "ollama",
+    data_dir: str = "",
     use_checkpointer: bool = False,
     is_debug: bool = False,
 ) -> Runnable:
@@ -114,13 +115,16 @@ def create_deep_interpreter_graph_wrapped(
 
     Args:
         provider: LLM provider ('openai', 'google', 'ollama')
-        data_dir: Default directory for CCI analysis results and agent workspace
+        data_dir: Default directory for CCI analysis results and agent workspace.
+                  Falls back to DEEP_INTERPRETER_DATA_DIR env var, then /tmp/deep_interpreter_workspace.
         use_checkpointer: Whether to use memory checkpointer
         is_debug: Enable debug mode
 
     Returns:
         Compiled Wrapper Agent runnable
     """
+    if not data_dir:
+        data_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace")
     # Create LLM using the model factory (uses environment variables)
     llm = create_llm(provider=provider)
 
@@ -151,18 +155,13 @@ def _get_deep_interpreter_graph_wrapped() -> Runnable:
 
     Uses environment variables:
     - LLM_PROVIDER: LLM provider (default: "openai")
-    - DEEP_INTERPRETER_DATA_DIR: Default data directory path
-    Note: Wrapper may override with user-provided path during HITL.
+    Note: Wrapper overrides data_dir with user-provided path during HITL.
 
     Returns:
         Compiled Wrapper Agent runnable
     """
     provider = os.getenv("LLM_PROVIDER", "openai")
-
-    data_dir = os.getenv(
-        "DEEP_INTERPRETER_DATA_DIR",
-        "/tmp/deep_interpreter_workspace"
-    )
+    data_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace")
     return create_deep_interpreter_graph_wrapped(
         provider=provider,
         data_dir=data_dir,
@@ -189,7 +188,7 @@ deep_interpreter_wrapped_graph = _get_deep_interpreter_graph_wrapped()
 
 def create_subagent_graph(
     subagent_name: Literal["planner", "searcher", "interpreter", "reporter"],
-    provider: Literal["openai", "google", "ollama", "claude", "kimi"] = "openai",
+    provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "openai",
 ) -> Runnable:
     """Create standalone subagent graph for testing.
 
@@ -225,6 +224,19 @@ def create_subagent_graph(
     from src.agents.deep_interpreter.subagents.configs import SUBAGENT_CONFIGS
     from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
     from src.agents.deep_interpreter.tools.standalone_fs import write_file, read_file
+
+    # Ensure DEEP_INTERPRETER_DATA_DIR is absolute for tool fallback.
+    # In embedded mode, agent.py:182 normalizes this. In standalone mode, we must do it here.
+    _standalone_data_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "")
+    if _standalone_data_dir:
+        os.environ["DEEP_INTERPRETER_DATA_DIR"] = str(Path(_standalone_data_dir).expanduser().resolve())
+    else:
+        import warnings
+        warnings.warn(
+            "DEEP_INTERPRETER_DATA_DIR not set. Standalone subagent will use "
+            "/tmp/deep_interpreter_workspace. Set this in .env for proper file resolution.",
+            UserWarning, stacklevel=2,
+        )
 
     # Get subagent config
     config = SUBAGENT_CONFIGS[subagent_name]

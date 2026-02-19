@@ -633,16 +633,17 @@ def generate_html_report(
 
         output_path: Path to save the HTML report
         data_dir: Directory for saving the report. If output_path is relative,
-            resolves to data_dir/output_path. Falls back to DEEP_INTERPRETER_DATA_DIR
-            env var. Read from /data_path.txt (written by PLANNER).
+            resolves to data_dir/output_path. Read from /data_path.txt (written by PLANNER).
+            Falls back to contextvars if empty.
 
     Returns:
         String with report generation status and output path
     """
-    # Resolve output_path with data_dir
+    # Resolve output_path with data_dir (fallback to context var)
     if not os.path.isabs(output_path):
-        save_dir = data_dir or os.environ.get("DEEP_INTERPRETER_DATA_DIR", "")
+        save_dir = data_dir or os.getenv("DEEP_INTERPRETER_DATA_DIR", "")
         if save_dir:
+            save_dir = str(Path(save_dir).expanduser().resolve())
             output_path = os.path.join(save_dir, output_path)
     return _generate_html_report_impl(parts=parts, output_path=output_path)
 

@@ -21,6 +21,7 @@ Architecture:
 """
 
 import asyncio
+import logging
 from pathlib import Path
 from typing import Any, Callable, Awaitable
 
@@ -32,6 +33,8 @@ from langchain.agents.middleware.types import (
 from langchain_core.messages import SystemMessage
 
 from src.agents.deep_interpreter.middleware.load import SkillMetadata, list_skills
+
+logger = logging.getLogger(__name__)
 
 
 def _find_project_root() -> Path:
@@ -136,6 +139,12 @@ class SkillsMiddleware(AgentMiddleware):
             self._skills_cache = await asyncio.to_thread(
                 list_skills, project_skills_dir=self.skills_dir
             )
+            if not self._skills_cache:
+                logger.warning(
+                    "No skills found in %s. "
+                    "SEARCHER may lack workflow guidance.",
+                    self.skills_dir,
+                )
         return None
 
     def _format_skills_list(self, skills: list[SkillMetadata]) -> str:

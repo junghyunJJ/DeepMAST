@@ -13,6 +13,7 @@ import logging
 import os
 import re
 import threading
+from pathlib import Path
 from typing import Any
 
 from langchain_core.messages import HumanMessage
@@ -34,6 +35,13 @@ from src.agents.deep_interpreter.tools.mcp_clients import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _sync_save_json(dir_path: str, file_path: str, data: dict) -> None:
+    """Sync helper for saving JSON to disk (used via asyncio.to_thread)."""
+    os.makedirs(dir_path, exist_ok=True)
+    with open(file_path, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 
 # =============================================================================
@@ -1356,7 +1364,7 @@ def search_literature_dynamic(
     pathways: list[str],
     celltypes: list[str],
     disease: str,
-    max_results: int = 40,
+    max_results: int = 30,
     target_gene_coverage: float = 0.6,
     target_pathway_coverage: float = 0.5,
     max_iterations: int = 3,
@@ -1379,16 +1387,14 @@ def search_literature_dynamic(
         pathways: List of pathways identified (e.g., ["EMT", "TGFB", "WNT"])
         celltypes: List of cell types in analysis (e.g., ["Tumor", "Fibroblast"])
         disease: Disease context (e.g., "breast cancer")
-        max_results: Maximum number of papers to return (default 40)
+        max_results: Maximum number of papers to return (default 30)
         target_gene_coverage: Target gene coverage percentage (default 0.6 = 60%)
         target_pathway_coverage: Target pathway coverage percentage (default 0.5 = 50%)
         max_iterations: Maximum search iterations (default 3)
         output_path: If provided (e.g., "part1_papers.json"), saves complete results
-            to data_dir/output_path. If data_dir is empty, falls back to
-            DEEP_INTERPRETER_DATA_DIR env var. Returns compact summary.
-        data_dir: Directory for saving output files. Takes priority over
-            DEEP_INTERPRETER_DATA_DIR env var. SEARCHER should read this from
-            /data_path.txt (written by PLANNER).
+            to data_dir/output_path. Returns compact summary.
+        data_dir: Directory for saving output files. SEARCHER should read this from
+            /data_path.txt (written by PLANNER). Falls back to contextvars if empty.
 
     Returns:
         If output_path is empty: Dictionary with papers, generated_queries, coverage,
@@ -1418,7 +1424,7 @@ async def search_literature_dynamic_async(
     pathways: list[str],
     celltypes: list[str],
     disease: str,
-    max_results: int = 40,
+    max_results: int = 30,
     target_gene_coverage: float = 0.6,
     target_pathway_coverage: float = 0.5,
     max_iterations: int = 3,
@@ -1435,7 +1441,7 @@ async def search_literature_dynamic_async(
         pathways: List of pathways identified
         celltypes: List of cell types in analysis
         disease: Disease context
-        max_results: Maximum papers to return (default 40)
+        max_results: Maximum papers to return (default 30)
         target_gene_coverage: Target gene coverage percentage (default 0.6)
         target_pathway_coverage: Target pathway coverage percentage (default 0.5)
         max_iterations: Maximum search iterations (default 3)
@@ -1648,6 +1654,35 @@ async def search_literature_dynamic_async(
         "pathway_coverage": final_coverage.get("pathways_coverage_pct", 0) / 100,
     })
 
+    # Post-search reflection guidance: determine if coverage is sufficient
+    gene_pct = final_coverage.get("genes_coverage_pct", 0)
+    pathway_pct = final_coverage.get("pathways_coverage_pct", 0)
+    coverage_sufficient = (
+        gene_pct >= target_gene_coverage * 100
+        and pathway_pct >= target_pathway_coverage * 100
+        and len(final_papers) >= 15
+    )
+
+    recommended_actions: list[str] = []
+    if not coverage_sufficient:
+        if gene_pct < target_gene_coverage * 100:
+            missing = final_coverage.get("genes_missing", [])[:5]
+            recommended_actions.append(
+                f"Gene coverage {gene_pct:.0f}% < {target_gene_coverage*100:.0f}% target. "
+                f"Missing: {missing}. Use search_literature for targeted follow-up."
+            )
+        if pathway_pct < target_pathway_coverage * 100:
+            missing = final_coverage.get("pathways_missing", [])[:3]
+            recommended_actions.append(
+                f"Pathway coverage {pathway_pct:.0f}% < {target_pathway_coverage*100:.0f}% target. "
+                f"Missing: {missing}. Search with 'signaling' + disease context."
+            )
+        if len(final_papers) < 15:
+            recommended_actions.append(
+                f"Only {len(final_papers)} papers found (target: 15+). Broaden disease context."
+            )
+        recommended_actions.append("Use think_tool to reflect on gaps before proceeding.")
+
     full_result = {
         "papers": final_papers,
         "generated_queries": all_queries,
@@ -1656,17 +1691,18 @@ async def search_literature_dynamic_async(
         "think_success": think_result.get("success", False),
         "iterations": len(coverage_history) - 1,
         "coverage_history": coverage_history,
+        "coverage_sufficient": coverage_sufficient,
+        "recommended_actions": recommended_actions,
     }
 
     # Auto-save: write full results to file, return compact summary to LLM
     if output_path:
-        save_dir = data_dir or os.environ.get("DEEP_INTERPRETER_DATA_DIR", "")
+        save_dir = data_dir or os.getenv("DEEP_INTERPRETER_DATA_DIR", "")
         if save_dir:
+            save_dir = str(Path(save_dir).expanduser().resolve())
             real_path = os.path.join(save_dir, output_path)
             try:
-                os.makedirs(save_dir, exist_ok=True)
-                with open(real_path, "w") as f:
-                    json.dump(full_result, f, indent=2, ensure_ascii=False)
+                await asyncio.to_thread(_sync_save_json, save_dir, real_path, full_result)
                 logger.info(
                     f"Auto-saved {len(final_papers)} papers to {real_path}"
                 )
@@ -1681,6 +1717,8 @@ async def search_literature_dynamic_async(
                     "search_method": "search_literature_dynamic",
                     "think_success": think_result.get("success", False),
                     "iterations": len(coverage_history) - 1,
+                    "coverage_sufficient": coverage_sufficient,
+                    "recommended_actions": recommended_actions,
                     "message": (
                         f"Full results ({len(final_papers)} papers) saved to "
                         f"{output_path}. Use read_file('/{output_path}') to "
@@ -1692,9 +1730,18 @@ async def search_literature_dynamic_async(
                 # Fall through to return full_result
         else:
             logger.warning(
-                "output_path='%s' specified but neither data_dir parameter nor "
-                "DEEP_INTERPRETER_DATA_DIR env var set. Auto-save SKIPPED.",
+                "output_path='%s' specified but data_dir not set "
+                "(param or DEEP_INTERPRETER_DATA_DIR env). Auto-save SKIPPED.",
                 output_path,
             )
+            return {
+                **full_result,
+                "error": "AUTO_SAVE_FAILED",
+                "auto_save": False,
+                "error_detail": (
+                    f"output_path='{output_path}' specified but data_dir not available. "
+                    f"Set DEEP_INTERPRETER_DATA_DIR env var or pass data_dir parameter."
+                ),
+            }
 
     return full_result

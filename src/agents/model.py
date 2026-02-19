@@ -12,18 +12,18 @@ from langchain_openai import ChatOpenAI
 
 def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
     """
-    Create LLM based on provider (default: kimi with moonshotai/kimi-k2.5)
+    Create LLM based on provider (default: openrouter with moonshotai/kimi-k2.5)
 
     Args:
-        provider: LLM provider ('openai', 'google', 'ollama', 'claude', 'kimi').
-                 If None, uses LLM_PROVIDER env var or defaults to 'kimi'
+        provider: LLM provider ('openai', 'google', 'ollama', 'claude', 'openrouter').
+                 If None, uses LLM_PROVIDER env var or defaults to 'openrouter'
         **kwargs: Provider-specific arguments
 
     Returns:
         BaseChatModel instance
     """
     if provider is None:
-        provider = os.getenv("LLM_PROVIDER", "kimi")
+        provider = os.getenv("LLM_PROVIDER", "openrouter")
     
     provider = provider.lower()
     
@@ -35,8 +35,8 @@ def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
         return create_openai_llm(**kwargs)
     elif provider == "claude":
         return create_claude_llm(**kwargs)
-    elif provider == "kimi":
-        return create_kimi_llm(**kwargs)
+    elif provider == "openrouter":
+        return create_openrouter_llm(**kwargs)
     else:
         raise ValueError(f"Unknown LLM provider: {provider}")
 
@@ -99,14 +99,16 @@ def create_google_llm(**kwargs) -> ChatGoogleGenerativeAI:
 
 def create_ollama_llm(**kwargs) -> ChatOllama:
     """
-    Create Ollama LLM instance (default: gpt-oss:20b at localhost:6000)
+    Create Ollama LLM instance (default: qwen3:30b at localhost:6000)
     
     Args:
-        model: Model name (default: gpt-oss:20b)
+        model: Model name (default: qwen3:30b)
         base_url: Ollama server URL (default: http://localhost:6000)
         temperature: Temperature setting (default: 0)
     """
-    model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "gpt-oss:20b"))
+    # model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "gpt-oss:20b"))
+    model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3:30b"))
+
     base_url = kwargs.get("base_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:6000"))
     temperature = kwargs.get("temperature", 0)
     
@@ -117,15 +119,15 @@ def create_ollama_llm(**kwargs) -> ChatOllama:
     )
 
 
-def create_kimi_llm(**kwargs) -> ChatOpenAI:
+def create_openrouter_llm(**kwargs) -> ChatOpenAI:
     """
-    Create Kimi K2.5 LLM instance via OpenRouter's OpenAI-compatible API
+    Create OpenRouter LLM instance via OpenRouter's OpenAI-compatible API
 
     Args:
         model: Model name (default: moonshotai/kimi-k2.5)
         temperature: Temperature setting (default: 0)
     """
-    model = kwargs.get("model", os.getenv("KIMI_MODEL", "moonshotai/kimi-k2.5"))
+    model = kwargs.get("model", os.getenv("OPENROUTER_MODEL", "moonshotai/kimi-k2.5"))
     temperature = kwargs.get("temperature", 0)
 
     return ChatOpenAI(
@@ -142,11 +144,11 @@ def create_llm_from_config(
 ) -> BaseChatModel:
     """Create LLM from RunnableConfig.configurable, with env var fallback.
 
-    Resolution order: configurable.llm_provider -> fallback_provider -> env var -> "kimi"
+    Resolution order: configurable.llm_provider -> fallback_provider -> env var -> "openrouter"
     """
     configurable = (config or {}).get("configurable", {})
-    provider = configurable.get("llm_provider", "").strip() or fallback_provider
-    model_name = configurable.get("llm_model", "").strip() or None
+    provider = (configurable.get("llm_provider") or "").strip() or fallback_provider
+    model_name = (configurable.get("llm_model") or "").strip() or None
     kwargs = {"model": model_name} if model_name else {}
     return create_llm(provider=provider, **kwargs)
 

@@ -50,7 +50,7 @@ SUBAGENT_CONFIGS = {
         "description": (
             "Strategic planning agent. Reads /targets.json, loads analysis data, "
             "generates biomedical context via BioMCP think (disease biology context), "
-            "searches literature for grounding (30 papers, saved to planner_papers.json via output_path), "
+            "searches literature for grounding (20 papers, saved to planner_papers.json via output_path), "
             "assesses data availability, "
             "and creates a data-driven interpretation guide with focus areas and priorities. "
             "Outputs /interpretation_guide.md, /data_path.txt, /planner_papers.json. "
@@ -90,8 +90,9 @@ SUBAGENT_CONFIGS = {
             "generates literature-grounded interpretation with full-text context, "
             "validates each claim against cited papers (using full-text if available), "
             "and ensures quality score >= 0.7. "
-            "For Part 3: uses prioritize_top_lr_pairs to select top L-R pairs via hybrid "
-            "GenePT + Moran's R scoring (spatial 60% + semantic 40%). "
+            "For Part 3: uses prioritize_top_lr_pairs to get novel candidate L-R pairs "
+            "(well-known hub-gene pairs excluded), then selects top 3 based on biological "
+            "novelty, spatial significance, and mechanistic plausibility. "
             "Every claim must cite PMID or be marked (Novel Finding). "
             "Outputs /partN_final.md. Maximum 3 quality iterations per part. "
             "Falls back to Abstract mode if RAG infrastructure unavailable."
@@ -219,7 +220,7 @@ Deep Interpreter 4-Agent Workflow:
    - Reads /targets.json
    - Loads analysis data
    - Generates biomedical context via BioMCP think (optional enrichment)
-   - Literature initialization via search_literature_dynamic (30 papers for grounding, internal fallback)
+   - Literature initialization via search_literature_dynamic (20 papers for grounding, internal fallback)
    - Fallback: search_pubmed_advanced (BioMCP connection error/timeout 시에만 사용)
    - Data assessment + analysis coverage checklist (inline reasoning)
    - Creates data-driven interpretation guide with focus areas and priorities
@@ -229,12 +230,12 @@ Deep Interpreter 4-Agent Workflow:
    - For Part 1:
      a. Extract context using spatial_search_context (pathways + celltypes, NO genes)
      b. Search PubMed proactively (BEFORE interpretation)
-     c. Ensure coverage: >= 50% pathways, >= 25 papers
+     c. Ensure coverage: >= 50% pathways, >= 15 papers
      d. Output: /part1_papers.json
    - For Part 2+3 (SHARED - identical lr_search_context):
      a. Extract context using lr_search_context (genes + pathways + celltypes)
      b. Search PubMed ONCE for both parts (saves API calls)
-     c. Ensure coverage: >= 60% genes, >= 50% pathways, >= 25 papers
+     c. Ensure coverage: >= 60% genes, >= 50% pathways, >= 15 papers
      d. Output: /liana_papers.json (shared by Part 2 and Part 3)
    - Total Outputs: /part1_papers.json, /liana_papers.json (2 files, not 3)
 

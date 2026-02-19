@@ -61,12 +61,12 @@ def _resolve_papers_path(path: str, data_dir: str = "") -> str:
     Resolution order:
     1. If path exists as-is → use directly
     2. If data_dir provided → try data_dir/{basename}
-    3. If DEEP_INTERPRETER_DATA_DIR set → try env_dir/{basename}
+    3. If contextvars data_dir set → try context_data_dir/{basename}
     4. Fallback → CWD resolution
 
     Args:
         path: Virtual, relative, or absolute path to papers JSON
-        data_dir: Explicit data directory (priority over env var)
+        data_dir: Explicit data directory
 
     Returns:
         Resolved absolute path to the file
@@ -82,13 +82,14 @@ def _resolve_papers_path(path: str, data_dir: str = "") -> str:
             logger.debug(f"_resolve_papers_path: resolved '{path}' -> '{candidate}' (data_dir)")
             return str(candidate.resolve())
 
-    # 3. Try env var as fallback
-    env_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR")
-    if env_dir:
-        candidate = Path(env_dir) / Path(path).name
-        if candidate.exists():
-            logger.debug(f"_resolve_papers_path: resolved '{path}' -> '{candidate}' (env)")
-            return str(candidate.resolve())
+    # 3. Try env var data_dir fallback
+    if not data_dir:
+        env_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "")
+        if env_dir:
+            candidate = Path(env_dir) / Path(path).name
+            if candidate.exists():
+                logger.debug(f"_resolve_papers_path: resolved '{path}' -> '{candidate}' (env_var)")
+                return str(candidate.resolve())
 
     # 4. Fallback: CWD resolution
     resolved = Path(path).resolve()
@@ -1237,7 +1238,7 @@ async def prepare_rag_for_interpretation(
         papers_json_path: Path to res/part*_papers.json
         part_name: "part1", "part2", "part3", or "liana"
         data_dir: Explicit data directory for paper downloads. Falls back
-            to DEEP_INTERPRETER_DATA_DIR env var, then DEFAULT_PAPERS_DIR.
+            to DEFAULT_PAPERS_DIR.
 
     Returns:
         {
@@ -1325,14 +1326,13 @@ async def prepare_rag_for_interpretation(
         }
 
     # Resolve download directory: data_dir/papers/{part_name}/ or fallback
+    if not data_dir:
+        data_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "")
     if data_dir:
+        data_dir = str(Path(data_dir).expanduser().resolve())
         papers_output_dir = os.path.join(data_dir, "papers", part_name)
     else:
-        env_dir = os.environ.get("DEEP_INTERPRETER_DATA_DIR", "")
-        if env_dir:
-            papers_output_dir = os.path.join(env_dir, "papers", part_name)
-        else:
-            papers_output_dir = DEFAULT_PAPERS_DIR
+        papers_output_dir = DEFAULT_PAPERS_DIR
 
     # Download papers
     logger.debug(f"Downloading {len(pmids)} papers to {papers_output_dir}...")
@@ -1403,9 +1403,8 @@ def prepare_rag_literature(
     Args:
         papers_json_path: Path to papers JSON (e.g., "res/part1_papers.json")
         part_name: Part identifier ("part1", "part2", "part3", "liana", "synthesis")
-        data_dir: Explicit data directory for resolving papers path. Takes
-            priority over DEEP_INTERPRETER_DATA_DIR env var. Read from
-            /data_path.txt (written by PLANNER).
+        data_dir: Explicit data directory for resolving papers path. Read from
+            /data_path.txt (written by PLANNER). Falls back to contextvars if empty.
 
     Returns:
         RAG preparation result with:

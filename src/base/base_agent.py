@@ -87,7 +87,8 @@ class BaseAgent:
         """Get LLM, checking runtime config first, falling back to init-time model."""
         if config:
             configurable = config.get("configurable", {})
-            if configurable.get("llm_provider", "").strip():
+            provider = configurable.get("llm_provider")
+            if provider and provider.strip():
                 from src.agents.model import create_llm_from_config
 
                 return create_llm_from_config(config)

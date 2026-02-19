@@ -36,17 +36,16 @@ pnpm lint       # Run linter
 ### Backend (.env)
 
 **LLM Provider:**
-- `LLM_PROVIDER`: `kimi` (default in `model.py`), `openai`, `google`, `ollama`, or `claude`
+- `LLM_PROVIDER`: `openrouter` (default in `model.py`), `openai`, `google`, `ollama`, or `claude`
 - `OPENAI_MODEL`: Default `gpt-4.1-mini`
 - `GOOGLE_MODEL`: Default `gemini-2.0-flash`
 - `OLLAMA_MODEL`: Default `gpt-oss:20b`
 - `OLLAMA_BASE_URL`: Default `http://localhost:6000`
 - `ANTHROPIC_MODEL`: Default `claude-haiku-4-5-20251001`
-- `KIMI_MODEL`: Default `moonshotai/kimi-k2.5` (via OpenRouter)
-- `OPENROUTER_API_KEY`: Required for `kimi` provider
+- `OPENROUTER_MODEL`: Default `moonshotai/kimi-k2.5` (via OpenRouter)
+- `OPENROUTER_API_KEY`: Required for `openrouter` provider
 
 **Deep Interpreter / Wrapper Agent:**
-- `DEEP_INTERPRETER_DATA_DIR`: Directory for CCI analysis results
 - `SP_ENRICH_MCP_PYTHON`: Python path for sp-enrich-mcp server (required for wrapper's 11-step analysis)
 - `SP_ENRICH_MCP_SERVER_PATH`: Path to sp-enrich-mcp server.py directory
 
@@ -172,7 +171,7 @@ START → check_state
 
 The inner Deep Agent (`src/agents/deep_interpreter/agent.py`) uses 4 specialized subagents:
 
-1. **PLANNER**: Reads `/targets.json`, loads analysis data, generates biomedical context via BioMCP think, searches literature (10 papers for grounding) → outputs `/interpretation_guide.md`
+1. **PLANNER**: Reads `/targets.json`, loads analysis data (note: `/data_path.txt` is pre-written by the framework — planner does NOT need to write it), generates biomedical context via BioMCP think, searches literature (10 papers for grounding) → outputs `/interpretation_guide.md`
 2. **SEARCHER**: Part 1 → `/part1_papers.json` (spatial context, NO genes); Part 2+3 → `/liana_papers.json` (shared, searched ONCE). Uses `search_literature_dynamic` with automatic fallback
 3. **INTERPRETER**: For each Part, reads `/partN_papers.json`, generates literature-grounded interpretation, validates claims inline, max 3 quality iterations (threshold ≥ 0.7). For Part 3, uses `prioritize_top_lr_pairs` (hybrid GenePT + Moran's R scoring). Supports RAG full-text mode with fallback to Abstract mode → outputs `/partN_final.md`
 4. **REPORTER**: Cross-part synthesis, Phase 4.5 validates integration claims with independent literature search, generates HTML report → outputs `/synthesis.md`, `CCI_Analysis_Report.html`
@@ -230,9 +229,9 @@ def routing_function(self, state, config) -> str:  # Sync, not async
 ### LLM Provider Abstraction
 
 `src/agents/model.py` provides `create_llm(provider)` factory:
-- Kimi (default via OpenRouter), OpenAI, Google Gemini, Ollama, Claude (Anthropic)
+- OpenRouter (default), OpenAI, Google Gemini, Ollama, Claude (Anthropic)
 - Provider determined by `LLM_PROVIDER` env var or explicit parameter
-- Note: `model.py` defaults to `kimi` but some graph builders default to `openai` — check `LLM_PROVIDER` env var
+- Note: `model.py` defaults to `openrouter` but some graph builders default to `openai` — check `LLM_PROVIDER` env var
 
 ### Async Environment Loading
 

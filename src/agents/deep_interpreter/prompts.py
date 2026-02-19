@@ -67,11 +67,11 @@ This workflow uses a strict anti-hallucination approach:
 Use the **planner** subagent to:
 - Parse the embedded target configuration from initial message
 - Write /targets.json to virtual filesystem
-- Load analysis data and write /data_path.txt
+- Load analysis data (data_path.txt is pre-written)
 - Generate biomedical context via BioMCP think (optional enrichment)
-- Search literature for grounding (search_literature_dynamic, 30 papers)
+- Search literature for grounding (search_literature_dynamic, 20 papers)
 - Assess data availability and create interpretation focus areas
-- Output: /interpretation_guide.md, /data_path.txt
+- Output: /interpretation_guide.md
 
 ### Step 2: SEARCHER (for ALL Parts)
 Use the **searcher** subagent to search literature for ALL three parts:
@@ -92,19 +92,76 @@ For Part 2+3 (shared search):
 
 **CRITICAL**: Both /part1_papers.json and /liana_papers.json must exist BEFORE calling interpreter.
 
-### Step 3: INTERPRETER (for ALL Parts)
-Use the **interpreter** subagent to interpret ALL three parts:
+### Step 3a: INTERPRETER (Part 1 - Spatial & Pathway)
+Use the **interpreter** subagent to interpret Part 1 ONLY:
 
 ```
-For Part 1, Part 2, Part 3:
-  1. Read /partN_papers.json (ONLY citation source)
-  2. Generate literature-grounded interpretation
+Part 1:
+  1. Read /part1_papers.json (ONLY citation source)
+  2. Generate literature-grounded interpretation for Part 1 analyses (1-1 through 1-5)
   3. Inline claim validation (every PMID checked)
   4. Inline quality check (score >= 0.7, max 3 iterations)
-  5. Output: /partN_final.md
+  5. Output: /part1_final.md
 ```
 
-**CRITICAL**: Every claim must cite PMID from /partN_papers.json OR be marked (Novel Finding).
+**CRITICAL**: Every claim must cite PMID from /part1_papers.json OR be marked (Novel Finding).
+Tell the interpreter: "Interpret Part 1 ONLY. Output /part1_final.md."
+
+### Step 3b: INTERPRETER (Part 2 - CCI & NMF)
+Use the **interpreter** subagent to interpret Part 2 ONLY:
+
+```
+Part 2:
+  1. Read /liana_papers.json (ONLY citation source)
+  2. Generate literature-grounded interpretation for Part 2 analyses (2-6 through 2-8)
+  3. Inline claim validation (every PMID checked)
+  4. Inline quality check (score >= 0.7, max 3 iterations)
+  5. Output: /part2_final.md
+```
+
+**CRITICAL**: Every claim must cite PMID from /liana_papers.json OR be marked (Novel Finding).
+Tell the interpreter: "Interpret Part 2 ONLY. Output /part2_final.md."
+
+### Step 3c: INTERPRETER (Part 3 - L-R Interaction Details)
+Use the **interpreter** subagent to interpret Part 3 ONLY:
+
+```
+Part 3:
+  1. FIRST call prioritize_top_lr_pairs to get novel CANDIDATE L-R pairs
+     (well-known hub-gene pairs are excluded; returns 10-15 candidates)
+  2. SELECT the top 3 most interesting pairs based on novelty, spatial significance,
+     and mechanistic plausibility — write selection reasoning
+  3. Read /liana_papers.json (ONLY citation source)
+  4. Generate literature-grounded interpretation for Part 3 analyses (3-9 through 3-11)
+  5. Inline claim validation (every PMID checked)
+  6. Inline quality check (score >= 0.7, max 3 iterations)
+  7. Output: /part3_final.md
+```
+
+**CRITICAL**: Every claim must cite PMID from /liana_papers.json OR be marked (Novel Finding).
+Tell the interpreter: "Interpret Part 3 ONLY. FIRST call prioritize_top_lr_pairs to get candidates, then select top 3 novel pairs with reasoning, then interpret. Output /part3_final.md."
+
+**WHY 3 SEPARATE CALLS**: Each Part is called as a separate task() invocation so each gets a fresh
+context window. This prevents SummarizationMiddleware from truncating Part 3 instructions after
+Parts 1-2 consume most of the context budget.
+
+### Step 3.5: VERIFY ALL INTERPRETATIONS EXIST
+Before calling REPORTER, verify that ALL three interpretation files exist:
+
+```
+Required files:
+  - /part1_final.md (from Step 3a)
+  - /part2_final.md (from Step 3b)
+  - /part3_final.md (from Step 3c)
+```
+
+Use **read_file** to check each file exists and is non-empty.
+If any file is MISSING or EMPTY:
+  - Re-invoke the **interpreter** subagent for ONLY the missing Part
+  - Do NOT re-run Parts that already have valid output files
+  - After re-run, verify the missing file now exists before proceeding
+
+**DO NOT proceed to Step 4 until all three /partN_final.md files are confirmed to exist.**
 
 ### Step 4: REPORTER
 Use the **reporter** subagent to:
@@ -163,7 +220,7 @@ Use the **reporter** subagent to:
 
 | Subagent | Role | Inputs | Outputs |
 |----------|------|--------|---------|
-| **planner** | Target confirmation + data assessment + interpretation guide | /targets.json (from message) | /interpretation_guide.md, /data_path.txt |
+| **planner** | Target confirmation + data assessment + interpretation guide | /targets.json (from message) | /interpretation_guide.md |
 | **searcher** | Context extraction + literature search | /data_path.txt, spatial_search_context (Part 1), lr_search_context (Part 2/3) | /part1_papers.json, /liana_papers.json (Part 2/3 shared) |
 | **interpreter** | Part 1/2/3 interpretation with inline validation | /partN_papers.json, /interpretation_guide.md | /part1_final.md, /part2_final.md, /part3_final.md |
 | **reporter** | Cross-part synthesis + emergent themes + HTML report | /partN_final.md, /interpretation_guide.md | /synthesis.md, /synthesis_papers.json, CCI_Analysis_Report.html |
@@ -176,9 +233,9 @@ Use the **reporter** subagent to:
 │  - Parse /targets.json from initial message                                 │
 │  - Load analysis data                                                       │
 │  - Generate biomedical context (BioMCP think, optional)                     │
-│  - Literature initialization (search_literature_dynamic, 30 papers)         │
+│  - Literature initialization (search_literature_dynamic, 20 papers)         │
 │  - Data assessment + analysis coverage checklist                            │
-│  → /interpretation_guide.md, /data_path.txt                                 │
+│  → /interpretation_guide.md (data_path.txt is pre-written by framework)      │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -186,19 +243,28 @@ Use the **reporter** subagent to:
 │ SEARCHER (for Part 1, 2, 3)                                                 │
 │  - Extract context (genes, pathways, cell types)                            │
 │  - Search PubMed proactively                                                │
-│  - Quality loop: coverage >= 60% genes, >= 50% pathways, >= 25 papers       │
+│  - Quality loop: coverage >= 60% genes, >= 50% pathways, >= 15 papers       │
 │  → /part1_search_context.json, /part1_papers.json (Part 1)                  │
 │  → /lr_search_context.json, /liana_papers.json (Part 2/3 shared)            │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ INTERPRETER (for Part 1, 2, 3)                                              │
-│  - Read /partN_papers.json (ONLY citation source)                           │
-│  - Generate literature-grounded interpretation                              │
-│  - Inline claim validation (every PMID checked)                             │
-│  - Quality loop: score >= 0.7, max 3 iterations                             │
-│  → /partN_final.md                                                          │
+│ INTERPRETER × 3 (separate task() calls to avoid context truncation)         │
+│                                                                             │
+│  Part 1: Read /part1_papers.json → interpret 1-1..1-5 → /part1_final.md     │
+│  Part 2: Read /liana_papers.json → interpret 2-6..2-8 → /part2_final.md     │
+│  Part 3: prioritize_top_lr_pairs → Read /liana_papers.json                  │
+│           → interpret 3-9..3-11 → /part3_final.md                           │
+│                                                                             │
+│  Each: inline claim validation + quality loop (score >= 0.7, max 3 iter)    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ VERIFY (Step 3.5)                                                           │
+│  - Check /part1_final.md, /part2_final.md, /part3_final.md all exist        │
+│  - Re-run missing Parts only if needed                                      │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -216,7 +282,10 @@ Use the **reporter** subagent to:
 
 1. Call **planner** subagent
 2. Call **searcher** subagent (handles all 3 parts)
-3. Call **interpreter** subagent (handles all 3 parts)
+3a. Call **interpreter** subagent (Part 1 ONLY)
+3b. Call **interpreter** subagent (Part 2 ONLY)
+3c. Call **interpreter** subagent (Part 3 ONLY)
+3.5. Verify all 3 /partN_final.md files exist (re-run missing Parts if needed)
 4. Call **reporter** subagent
 5. Return final report path to user
 """

@@ -4,7 +4,6 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -34,29 +33,77 @@ class TestResolvePathDirect:
 
 
 class TestResolvePathVirtual:
-    """Test virtual path resolution via DEEP_INTERPRETER_DATA_DIR."""
+    """Test virtual path resolution via data_dir parameter."""
 
     def test_virtual_path_resolves_to_data_dir(self, tmp_path):
         f = tmp_path / "part1_papers.json"
         f.write_text("{}")
-        with patch.dict(os.environ, {"DEEP_INTERPRETER_DATA_DIR": str(tmp_path)}):
-            result = _resolve_papers_path("/part1_papers.json")
+        result = _resolve_papers_path("/part1_papers.json", data_dir=str(tmp_path))
         assert result == str(f.resolve())
 
     def test_virtual_path_synthesis(self, tmp_path):
         f = tmp_path / "synthesis_papers.json"
         f.write_text("{}")
-        with patch.dict(os.environ, {"DEEP_INTERPRETER_DATA_DIR": str(tmp_path)}):
-            result = _resolve_papers_path("/synthesis_papers.json")
+        result = _resolve_papers_path("/synthesis_papers.json", data_dir=str(tmp_path))
         assert result == str(f.resolve())
 
     def test_virtual_path_with_subdirectory(self, tmp_path):
         """Virtual path strips directory component and uses basename."""
         f = tmp_path / "liana_papers.json"
         f.write_text("{}")
-        with patch.dict(os.environ, {"DEEP_INTERPRETER_DATA_DIR": str(tmp_path)}):
-            result = _resolve_papers_path("/some/deep/liana_papers.json")
+        result = _resolve_papers_path("/some/deep/liana_papers.json", data_dir=str(tmp_path))
         assert result == str(f.resolve())
+
+
+class TestResolvePathEnvVar:
+    """Test virtual path resolution via DEEP_INTERPRETER_DATA_DIR env var fallback."""
+
+    def test_env_var_fallback_resolves_path(self, tmp_path, monkeypatch):
+        """When data_dir param is empty, _resolve_papers_path uses env var."""
+        f = tmp_path / "part1_papers.json"
+        f.write_text("{}")
+        monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", str(tmp_path))
+        result = _resolve_papers_path("/part1_papers.json")
+        assert result == str(f.resolve())
+
+    def test_explicit_data_dir_takes_priority_over_env(self, tmp_path, monkeypatch):
+        """Explicit data_dir param should be used even if env var is set."""
+        explicit_dir = tmp_path / "explicit"
+        explicit_dir.mkdir()
+        env_dir = tmp_path / "envdir"
+        env_dir.mkdir()
+
+        f = explicit_dir / "papers.json"
+        f.write_text("{}")
+
+        monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", str(env_dir))
+        result = _resolve_papers_path("/papers.json", data_dir=str(explicit_dir))
+        assert result == str(f.resolve())
+
+    def test_env_var_not_used_when_file_exists_directly(self, tmp_path, monkeypatch):
+        """Direct path match (step 1) should take priority over env var."""
+        f = tmp_path / "papers.json"
+        f.write_text("{}")
+        monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", "/some/other/dir")
+        result = _resolve_papers_path(str(f))
+        assert result == str(f.resolve())
+
+
+class TestDataDirEnvVarIsolation:
+    """Test DEEP_INTERPRETER_DATA_DIR env var set/get isolation."""
+
+    def test_set_and_get(self, monkeypatch):
+        monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", "/tmp/test_dir")
+        assert os.getenv("DEEP_INTERPRETER_DATA_DIR") == "/tmp/test_dir"
+
+    def test_default_is_empty(self, monkeypatch):
+        monkeypatch.delenv("DEEP_INTERPRETER_DATA_DIR", raising=False)
+        assert os.getenv("DEEP_INTERPRETER_DATA_DIR", "") == ""
+
+    def test_overwrite(self, monkeypatch):
+        monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", "/first")
+        monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", "/second")
+        assert os.getenv("DEEP_INTERPRETER_DATA_DIR") == "/second"
 
 
 class TestResolvePathFallback:
@@ -64,15 +111,13 @@ class TestResolvePathFallback:
 
     def test_fallback_when_no_data_dir(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("DEEP_INTERPRETER_DATA_DIR", None)
-            result = _resolve_papers_path("/nonexistent.json")
+        monkeypatch.delenv("DEEP_INTERPRETER_DATA_DIR", raising=False)
+        result = _resolve_papers_path("/nonexistent.json")
         # Should still return a resolved absolute path (even if file doesn't exist)
         assert Path(result).is_absolute()
 
     def test_fallback_when_file_not_in_data_dir(self, tmp_path):
-        with patch.dict(os.environ, {"DEEP_INTERPRETER_DATA_DIR": str(tmp_path)}):
-            result = _resolve_papers_path("/missing_file.json")
+        result = _resolve_papers_path("/missing_file.json", data_dir=str(tmp_path))
         assert Path(result).is_absolute()
 
 

@@ -11,19 +11,18 @@ from pathlib import Path
 from deepagents.backends import FilesystemBackend
 from langchain_core.tools import tool
 
-# Singleton backend, lazy-initialized (recreated if env var changes)
+# Singleton backend, lazy-initialized
 _backend: FilesystemBackend | None = None
-_backend_data_dir: str | None = None
+
+_DEFAULT_DATA_DIR = "/tmp/deep_interpreter_workspace"
 
 
 def _get_backend() -> FilesystemBackend:
-    global _backend, _backend_data_dir
-    data_dir = os.getenv(
-        "DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace"
-    )
-    if _backend is None or _backend_data_dir != data_dir:
-        _backend = FilesystemBackend(root_dir=data_dir, virtual_mode=True)
-        _backend_data_dir = data_dir
+    global _backend
+    current_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", _DEFAULT_DATA_DIR)
+    resolved_dir = str(Path(current_dir).expanduser().resolve())
+    if _backend is None or str(_backend.cwd) != resolved_dir:
+        _backend = FilesystemBackend(root_dir=resolved_dir, virtual_mode=True)
     return _backend
 
 

@@ -91,20 +91,32 @@ class DeepInterpreterWrapperAgent(BaseAgent):
     }
 
     ANALYSIS_STEPS = [
-        {"step": 1, "tool": "plot_cluster", "desc": "Spatial clustering", "figures": ["1.cluster_spatial.png"]},
-        {"step": 2, "tool": "runplot_clusterwithcelltyp", "desc": "Cluster-celltype heatmap", "figures": ["2.celltype_heatmap_analysis.png"]},
-        {"step": 3, "tool": "plot_neighborhood_enrichment", "desc": "Neighborhood enrichment", "figures": ["3.neighborhood_enrichment_squidpy.png"]},
-        {"step": 4, "tool": "runplot_pathway_enrich", "desc": "Pathway enrichment", "figures": ["4.spatial_enrich_decoupler.png"]},
-        {"step": 5, "tool": "runplot_spatial_relationship", "desc": "Spatial relationships (MISTy)", "figures": ["5.spatial_relation_MISTy.png"]},
-        {"step": 6, "tool": "run_lianap", "desc": "LIANA+ CCI analysis (10+ min)", "figures": ["6.liana_MoransR.png"]},
-        {"step": 7, "tool": "runplot_liana_factorscore", "desc": "NMF factor scores", "figures": []},  # Figure deferred to step 8
-        {"step": 8, "tool": "runplot_liana_loadings", "desc": "NMF loadings", "figures": ["7.factor_spatial_NMF.png", "8.pathway_factor_heatmap.png"]},
+        {"step": 1, "tool": "plot_cluster", "desc": "Spatial clustering",
+         "figures": ["1.cluster_spatial.png"], "data_files": []},
+        {"step": 2, "tool": "runplot_clusterwithcelltyp", "desc": "Cluster-celltype heatmap",
+         "figures": ["2.celltype_heatmap_analysis.png"], "data_files": ["sig_clusterwithcelltyp.csv"]},
+        {"step": 3, "tool": "plot_neighborhood_enrichment", "desc": "Neighborhood enrichment",
+         "figures": ["3.neighborhood_enrichment_squidpy.png"], "data_files": ["res_nhood_enrichment.csv"]},
+        {"step": 4, "tool": "runplot_pathway_enrich", "desc": "Pathway enrichment",
+         "figures": ["4.spatial_enrich_decoupler.png"], "data_files": ["sig_PathwayEnrich_decoupler.csv"]},
+        {"step": 5, "tool": "runplot_spatial_relationship", "desc": "Spatial relationships (MISTy)",
+         "figures": ["5.spatial_relation_MISTy.png"], "data_files": ["res_SpatialRelationship_MISTy.csv"]},
+        {"step": 6, "tool": "run_lianap", "desc": "LIANA+ CCI analysis (10+ min)",
+         "figures": ["6.liana_MoransR.png"], "data_files": ["sig_liana.csv", "lrdata.h5ad"]},
+        {"step": 7, "tool": "runplot_liana_factorscore", "desc": "NMF factor scores",
+         "figures": [], "data_files": ["res_liana_cluster_factor.csv"]},
+        {"step": 8, "tool": "runplot_liana_loadings", "desc": "NMF loadings",
+         "figures": ["7.factor_spatial_NMF.png", "8.pathway_factor_heatmap.png"],
+         "data_files": ["sig_liana_pathway_factor.csv"]},
     ]
 
     ANALYSIS_STEPS_9_11 = [
-        {"step": 9, "tool": "plot_liana_nmf", "desc": "NMF quadrant plot", "figures": ["9.quadrant_analysis.png"]},
-        {"step": 10, "tool": "plot_liana_spatial_interections", "desc": "Spatial LR interactions", "figures": ["10.spatial_plot_interections.png"]},
-        {"step": 11, "tool": "plot_liana_interections", "desc": "Cluster-level LR interactions", "figures": ["11.lr_interections.png"]},
+        {"step": 9, "tool": "plot_liana_nmf", "desc": "NMF quadrant plot",
+         "figures": ["9.quadrant_analysis.png"], "data_files": ["sel_interest_sig_liana.csv"]},
+        {"step": 10, "tool": "plot_liana_spatial_interections", "desc": "Spatial LR interactions",
+         "figures": ["10.spatial_plot_interections.png"], "data_files": []},
+        {"step": 11, "tool": "plot_liana_interections", "desc": "Cluster-level LR interactions",
+         "figures": ["11.lr_interections.png"], "data_files": []},
     ]
 
     SYSTEM_TEMPLATE: ClassVar[str] = """You are a Deep Interpreter assistant for spatial transcriptomics analysis.
@@ -638,11 +650,16 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         # Text progress
         bar = "=" * step + "." * (total_steps - step)
         text = f"**Step {step}/{total_steps}: {step_config['desc']}** [{bar}]\n"
-        text += "Completed successfully" if status == "completed" else f"Failed: {error_msg}"
+        if status == "completed":
+            text += "Completed successfully"
+        elif status == "skipped":
+            text += "Skipped (output files already exist)"
+        else:
+            text += f"Failed: {error_msg}"
         content_parts.append({"type": "text", "text": text})
 
         # Image(s) using Base64ContentBlock format
-        if status == "completed":
+        if status in ("completed", "skipped"):
             for fig_name in step_config["figures"]:
                 fig_path = f"{save_path}/{fig_name}"
                 if os.path.exists(fig_path):
@@ -682,6 +699,17 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             # PIL unavailable or failed — return raw bytes as fallback
             with open(fig_path, "rb") as f:
                 return f.read()
+
+    def _check_step_outputs_exist(self, step_config: dict, save_path: str) -> bool:
+        """Check if ALL expected output files for a step exist on disk.
+
+        Uses data_files as canonical indicator. For figure-only steps (no data_files),
+        falls back to checking figures.
+        """
+        expected = step_config.get("data_files", []) or step_config.get("figures", [])
+        if not expected:
+            return False  # No outputs defined — cannot skip
+        return all(os.path.exists(f"{save_path}/{f}") for f in expected)
 
     # ===== Node Initialization =====
 
@@ -1097,6 +1125,25 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
                     "messages": [AIMessage(content=message_content)],
                     **({"analysis_1_8_complete": True} if is_last else {}),
                 }
+
+        # Skip check: if all output files already exist, skip MCP call
+        configurable = (config or {}).get("configurable", {})
+        force_rerun = configurable.get("force_rerun", False)
+
+        if not force_rerun and self._check_step_outputs_exist(step_config, save_path):
+            if self.is_debug:
+                print(f"Step {current_step}/8: {step_config['desc']} - SKIPPED (cached)")
+            message_content = self._build_step_message(
+                current_step, step_config, "skipped", save_path, None
+            )
+            is_last = current_step >= 8
+            update = {
+                "current_analysis_step": current_step + 1 if not is_last else current_step,
+                "messages": [AIMessage(content=message_content)],
+            }
+            if is_last:
+                update["analysis_1_8_complete"] = True
+            return update
 
         # Build tool args
         tool_args = self._build_step_args(current_step, state)
@@ -1700,6 +1747,25 @@ Available factors: {available_factors}
                     **({"analysis_9_11_complete": True} if is_last else {}),
                 }
 
+        # Skip check: if all output files already exist, skip MCP call
+        configurable = (config or {}).get("configurable", {})
+        force_rerun = configurable.get("force_rerun", False)
+
+        if not force_rerun and self._check_step_outputs_exist(step_config, save_path):
+            if self.is_debug:
+                print(f"Step {current_step}/11: {step_config['desc']} - SKIPPED (cached)")
+            message_content = self._build_step_message(
+                current_step, step_config, "skipped", save_path, None, total_steps=11
+            )
+            is_last = current_step >= 11
+            update = {
+                "current_analysis_step": current_step + 1 if not is_last else current_step,
+                "messages": [AIMessage(content=message_content)],
+            }
+            if is_last:
+                update["analysis_9_11_complete"] = True
+            return update
+
         # Build tool args
         tool_args = self._build_step_args_9_11(current_step, state, sel_factor)
 
@@ -1810,7 +1876,7 @@ Available factors: {available_factors}
 
         # Get or create Deep Agent with per-invocation config
         configurable = (config or {}).get("configurable", {})
-        provider_override = configurable.get("llm_provider", "").strip() or None
+        provider_override = (configurable.get("llm_provider") or "").strip() or None
         deep_agent = self.get_deep_agent(data_directory, provider_override=provider_override)
 
         # Build initial message with embedded targets
