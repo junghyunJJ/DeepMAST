@@ -127,6 +127,17 @@ tr:hover { background: rgba(100, 255, 218, 0.05); }
 .interactions-page { display: none; }
 .interactions-page.active { display: block; }
 .metadata { color: #666; font-size: 0.9em; text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(100, 255, 218, 0.2); }
+.drug-card { background: rgba(100, 200, 255, 0.1); border-left: 4px solid #64b5f6; border-radius: 8px; padding: 15px; margin: 10px 0; }
+.drug-card h4 { color: #64b5f6; margin-bottom: 8px; }
+.tractability-high { color: #64ffda; font-weight: bold; }
+.tractability-low { color: #ff6b9d; font-style: italic; }
+.drug-phase { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; margin-left: 8px; }
+.drug-phase-4 { background: rgba(100, 255, 218, 0.3); color: var(--color-primary); }
+.drug-phase-3 { background: rgba(255, 209, 102, 0.3); color: var(--color-secondary); }
+.drug-phase-2 { background: rgba(255, 107, 157, 0.2); color: var(--color-accent); }
+.drug-phase-1 { background: rgba(150, 150, 150, 0.2); color: var(--text-secondary); }
+.target-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; margin: 20px 0; }
+.novel-badge { display: inline-block; background: rgba(255, 209, 102, 0.3); color: var(--color-secondary); padding: 2px 10px; border-radius: 12px; font-size: 0.8em; margin-left: 8px; }
 """
 
 # Fallback JavaScript (embedded for when external file is not available)
@@ -213,6 +224,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <button class="tab-button" onclick="openTab(event, 'part2')">Part 2: CCI & NMF</button>
             <button class="tab-button" onclick="openTab(event, 'part3')">Part 3: L-R Interactions</button>
             <button class="tab-button" onclick="openTab(event, 'summary')">Comprehensive Summary</button>
+            <button class="tab-button" onclick="openTab(event, 'therapeutic')">Therapeutic Implications</button>
         </div>
 
         <!-- Part 1 Content -->
@@ -233,6 +245,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <!-- Summary Content -->
         <div id="summary" class="tab-content">
             {summary_content}
+        </div>
+
+        <!-- Therapeutic Implications Content -->
+        <div id="therapeutic" class="tab-content">
+            {therapeutic_content}
         </div>
 
         <!-- Metadata -->
@@ -492,6 +509,7 @@ def _generate_html_report_impl(
     part2_html = parts.get("part2_html")
     part3_html = parts.get("part3_html")
     summary_html = parts.get("summary_html")
+    therapeutic_html = parts.get("therapeutic_html")
 
     # Build executive summary HTML
     # If executive_summary already contains HTML tags, use it directly
@@ -552,6 +570,105 @@ def _generate_html_report_impl(
         {_generate_references_html(references)}
         """
 
+    # Build therapeutic content: HTML override or structured data or empty
+    if therapeutic_html:
+        therapeutic_content = therapeutic_html
+    else:
+        therapeutic_data = parts.get("therapeutic")
+        if therapeutic_data and isinstance(therapeutic_data, dict):
+            # Build from structured therapeutic data
+            druggable = therapeutic_data.get("druggable_targets", [])
+            drugs = therapeutic_data.get("known_drugs", [])
+            novel = therapeutic_data.get("novel_targets", [])
+            summary = therapeutic_data.get("summary", {})
+
+            druggable_html = ""
+            if druggable:
+                cards = []
+                for t in druggable[:10]:
+                    tract = t.get("tractability", {})
+                    modalities = ", ".join(
+                        f"{k}: {', '.join(v)}" for k, v in tract.items() if v
+                    )
+                    assoc = t.get("association_score", 0)
+                    score_cls = "tractability-high" if assoc > 0.5 else "tractability-low"
+                    cards.append(f"""
+                    <div class="drug-card">
+                        <h4>{t.get('gene', '')} <small>({t.get('name', '')})</small></h4>
+                        <p><strong>Association Score:</strong> <span class="{score_cls}">{assoc:.3f}</span></p>
+                        <p><strong>Tractability:</strong> {modalities or 'N/A'}</p>
+                        <p><strong>Evidence Count:</strong> {t.get('evidence_count', 0)}</p>
+                        <p><strong>Safety Concerns:</strong> {t.get('safety_concerns', 0)}</p>
+                        <p><strong>L-R Frequency:</strong> {t.get('lr_frequency', 0)} (roles: {', '.join(t.get('lr_roles', []))})</p>
+                    </div>
+                    """)
+                druggable_html = f"""
+                <div class="analysis-section">
+                    <h3>Druggable Targets ({len(druggable)} found)</h3>
+                    <div class="target-grid">{''.join(cards)}</div>
+                </div>
+                """
+
+            drugs_html = ""
+            if drugs:
+                rows = []
+                for d in drugs[:20]:
+                    phase = d.get("phase", 0)
+                    phase_cls = f"drug-phase-{min(phase, 4)}"
+                    rows.append(f"""
+                    <tr>
+                        <td>{d.get('drug_name', '')}</td>
+                        <td><span class="drug-phase {phase_cls}">Phase {phase}</span></td>
+                        <td>{d.get('mechanism_of_action', 'N/A')}</td>
+                        <td>{', '.join(d.get('target_genes', []))}</td>
+                        <td>{d.get('status', '')}</td>
+                    </tr>
+                    """)
+                drugs_html = f"""
+                <div class="analysis-section">
+                    <h3>Known Drugs ({len(drugs)} found)</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>Drug</th><th>Phase</th><th>Mechanism</th><th>Targets</th><th>Status</th></tr></thead>
+                            <tbody>{''.join(rows)}</tbody>
+                        </table>
+                    </div>
+                </div>
+                """
+
+            novel_html = ""
+            if novel:
+                items = "".join(
+                    f"<li><strong>{t.get('gene', '')}</strong> ({t.get('name', '')})"
+                    f" <span class='novel-badge'>Novel</span>"
+                    f" - L-R frequency: {t.get('lr_frequency', 0)}</li>"
+                    for t in novel[:10]
+                )
+                novel_html = f"""
+                <div class="analysis-section">
+                    <h3>Novel Drug Target Candidates <span class="novel-badge">{len(novel)} found</span></h3>
+                    <p>These genes are druggable but lack known disease associations — potential repurposing or novel target opportunities.</p>
+                    <ul class="key-findings">{items}</ul>
+                </div>
+                """
+
+            therapeutic_content = f"""
+            <div class="summary-box">
+                <h3>Therapeutic Potential Summary</h3>
+                <p><strong>Genes Evaluated:</strong> {summary.get('total_genes_evaluated', 0)} |
+                   <strong>Druggable:</strong> {summary.get('druggable_count', 0)} |
+                   <strong>Known Drugs:</strong> {summary.get('known_drugs_count', 0)} |
+                   <strong>Novel Targets:</strong> {summary.get('novel_target_count', 0)}</p>
+            </div>
+            {druggable_html}
+            {drugs_html}
+            {novel_html}
+            """
+        elif therapeutic_data and isinstance(therapeutic_data, str):
+            therapeutic_content = f'<div class="analysis-section"><div class="interpretation"><div>{therapeutic_data}</div></div></div>'
+        else:
+            therapeutic_content = '<div class="analysis-section"><p style="color: #888;">No therapeutic analysis available. Run the Drug Target Assessment phase to populate this section.</p></div>'
+
     # Load CSS and JavaScript (from external files or fallback)
     css_content = _load_css()
     js_content = _load_js()
@@ -568,6 +685,7 @@ def _generate_html_report_impl(
         part2_content=part2_content,
         part3_content=part3_content,
         summary_content=summary_content,
+        therapeutic_content=therapeutic_content,
         generation_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     )
 
@@ -630,6 +748,8 @@ def generate_html_report(
             - part2_html: Complete HTML for Part 2 tab (overrides part2)
             - part3_html: Complete HTML for Part 3 tab (overrides part3)
             - summary_html: Complete HTML for Summary tab (overrides synthesis)
+            - therapeutic_html: Complete HTML for Therapeutic Implications tab
+            - therapeutic: Dict with druggable_targets, known_drugs, novel_targets, summary
 
         output_path: Path to save the HTML report
         data_dir: Directory for saving the report. If output_path is relative,
@@ -679,6 +799,8 @@ def generate_simple_report(
         "part2_html": content.get("part2_html"),
         "part3_html": content.get("part3_html"),
         "summary_html": content.get("summary_html"),
+        "therapeutic_html": content.get("therapeutic_html"),
+        "therapeutic": content.get("therapeutic"),
     }
 
     return _generate_html_report_impl(parts=parts, output_path=output_path)

@@ -1,7 +1,7 @@
 """Subagent configurations for Deep Interpreter Agent.
 
 Simplified 4-Agent Architecture:
-- PLANNER: Target confirmation + data assessment + interpretation guide (load_analysis_data, generate_biomedical_context, search_literature_dynamic, search_pubmed_advanced)
+- PLANNER: Target confirmation + data assessment + interpretation guide (load_analysis_data, search_literature_dynamic, search_pubmed_advanced)
 - SEARCHER: Context extraction + literature search (load_analysis_data, search_literature_dynamic, search_literature, search_pubmed_advanced, think_tool)
 - INTERPRETER: Part 1/2/3 interpretation with inline validation (load_analysis_data, validate_claim_literature, validate_quality, think_tool)
 - REPORTER: Cross-part synthesis + literature validation + HTML report
@@ -17,7 +17,6 @@ from langchain_core.tools import BaseTool
 from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
 from src.agents.deep_interpreter.tools import (
     load_analysis_data,
-    generate_biomedical_context,
     search_literature,
     search_literature_dynamic,
     search_pubmed_advanced,
@@ -31,6 +30,11 @@ from src.agents.deep_interpreter.tools import (
     validate_claim_fulltext,
 )
 from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+from src.agents.deep_interpreter.tools.drug_targets import (
+    assess_therapeutic_potential,
+    search_drug_targets,
+    search_known_drugs,
+)
 
 __all__ = [
     "get_subagents",
@@ -49,7 +53,6 @@ SUBAGENT_CONFIGS = {
         "name": "planner",
         "description": (
             "Strategic planning agent. Reads /targets.json, loads analysis data, "
-            "generates biomedical context via BioMCP think (disease biology context), "
             "searches literature for grounding (20 papers, saved to planner_papers.json via output_path), "
             "assesses data availability, "
             "and creates a data-driven interpretation guide with focus areas and priorities. "
@@ -59,7 +62,6 @@ SUBAGENT_CONFIGS = {
         "system_prompt": SUBAGENT_PROMPTS["planner"],
         "tools": [
             load_analysis_data,
-            generate_biomedical_context,
             search_literature_dynamic,  # PRIMARY: BioMCP (gene alias 확장, LLM 쿼리 생성, 내부 fallback 포함)
             search_pubmed_advanced,     # FALLBACK: BioMCP connection error/timeout 시에만 사용
         ],
@@ -119,9 +121,11 @@ SUBAGENT_CONFIGS = {
             "validates synthesis claims with NEW literature search "
             "(following biomedical-literature-search workflow), and generates final HTML report. "
             "Phase 4.5 validates integration claims against independent literature sources. "
+            "Phase 4.7 assesses therapeutic potential of key CCI genes using OpenTargets Platform. "
             "Falls back to abstract-based validation when RAG infrastructure unavailable. "
             "Outputs /synthesis.md, /synthesis_papers.json, /synthesis_validation.json, "
-            "and CCI_Analysis_Report.html."
+            "/therapeutic_targets.json, /synthesis_targets.json, "
+            "and CCI_Analysis_Report.html (with Therapeutic Implications tab)."
         ),
         "system_prompt": SUBAGENT_PROMPTS["reporter"],
         "tools": [
@@ -140,6 +144,10 @@ SUBAGENT_CONFIGS = {
             validate_claim_fulltext,
             # Think tool for strategic planning and reflection
             think_tool,
+            # Drug target discovery tools (Phase 4.7)
+            assess_therapeutic_potential,
+            search_drug_targets,
+            search_known_drugs,
         ],
     },
 }
@@ -247,7 +255,7 @@ Deep Interpreter 4-Agent Workflow:
      d. Inline quality check (score >= 0.7, max 3 iterations)
    - Outputs: /part1_final.md, /part2_final.md, /part3_final.md
 
-4. REPORTER (synthesizer + report-generator consolidated + synthesis validation)
+4. REPORTER (synthesizer + report-generator consolidated + synthesis validation + drug targets)
    - Read all /partN_final.md files
    - Identify emergent cross-part themes
    - **Phase 4.5: Validate synthesis claims with independent literature search**
@@ -256,8 +264,14 @@ Deep Interpreter 4-Agent Workflow:
      c. Search literature (search_literature_dynamic with integration-focused terms)
      d. Quality reflection (theme coverage, gap-filling)
      e. RAG validate & write (prepare_rag_literature, validate_claim_fulltext)
-   - Generate HTML report
-   - Outputs: /synthesis.md, /synthesis_papers.json, /synthesis_validation.json, CCI_Analysis_Report.html
+   - **Phase 4.7: Drug Target Assessment (OpenTargets Platform)**
+     a. assess_therapeutic_potential (extracts L-R genes, queries OpenTargets)
+     b. Interpret druggability findings (think_tool)
+     c. Write Therapeutic Implications section to /synthesis.md
+     d. Write /synthesis_targets.json for HTML report
+   - Generate HTML report (with Therapeutic Implications tab)
+   - Outputs: /synthesis.md, /synthesis_papers.json, /synthesis_validation.json,
+     /therapeutic_targets.json, /synthesis_targets.json, CCI_Analysis_Report.html
    - Papers stored in: {data_path}/papers/synthesis/ (separate from Part papers)
 
 Hallucination Prevention (maintained):

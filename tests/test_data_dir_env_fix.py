@@ -128,9 +128,6 @@ class TestAutoSaveErrorSignal:
             search_literature_dynamic_async,
         )
 
-        async def mock_think_coro(*args, **kwargs):
-            return {"strategic_context": "", "success": False}
-
         # Mock LLM ainvoke as async
         mock_response = type("R", (), {"content": json.dumps([
             {"genes": ["CDH1"], "diseases": ["cancer"], "keywords": ["EMT"]}
@@ -143,7 +140,7 @@ class TestAutoSaveErrorSignal:
             return [{"pmid": "12345678", "title": "Test Paper", "abstract": "Test abstract"}]
 
         # Mock all external calls to isolate auto-save logic
-        with patch("src.agents.deep_interpreter.tools.literature._think_with_biomcp", side_effect=mock_think_coro), \
+        with patch("src.agents.deep_interpreter.tools.literature.os.getenv", return_value=""), \
              patch("src.agents.deep_interpreter.tools.literature.create_llm") as mock_llm, \
              patch("src.agents.deep_interpreter.tools.literature._search_with_biomcp", side_effect=mock_search_coro):
 
@@ -164,6 +161,43 @@ class TestAutoSaveErrorSignal:
             assert result.get("auto_save") is False
             assert "papers" in result  # full_result should still be included
             assert "error_detail" in result
+
+    @pytest.mark.asyncio
+    async def test_dynamic_search_skips_biomcp_think_step(self):
+        """search_literature_dynamic_async should not depend on _think_with_biomcp."""
+        from src.agents.deep_interpreter.tools.literature import (
+            search_literature_dynamic_async,
+        )
+
+        mock_response = type("R", (), {"content": json.dumps([
+            {"genes": ["BRCA1"], "diseases": ["breast cancer"], "keywords": ["AKT pathway"]}
+        ])})()
+
+        async def mock_ainvoke(*args, **kwargs):
+            return mock_response
+
+        async def mock_search_coro(*args, **kwargs):
+            return [{"pmid": "12345678", "title": "BRCA1 AKT in breast cancer", "abstract": "Test abstract"}]
+
+        with patch("src.agents.deep_interpreter.tools.literature._think_with_biomcp") as mock_think, \
+             patch("src.agents.deep_interpreter.tools.literature.create_llm") as mock_llm, \
+             patch("src.agents.deep_interpreter.tools.literature._search_with_biomcp", side_effect=mock_search_coro):
+
+            mock_think.side_effect = AssertionError("_think_with_biomcp must not be called")
+            mock_llm.return_value.ainvoke = mock_ainvoke
+
+            result = await search_literature_dynamic_async(
+                genes=["BRCA1"],
+                pathways=["AKT Signaling Pathway"],
+                celltypes=["Epithelial Cells"],
+                disease="Breast Cancer",
+                max_results=5,
+                max_iterations=1,
+            )
+
+            assert "papers" in result
+            assert result.get("think_success") is True
+            mock_think.assert_not_called()
 
 
 class TestReaderSites:

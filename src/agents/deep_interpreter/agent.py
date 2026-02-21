@@ -109,7 +109,7 @@ class DeepInterpreterConfig:
         )
     )
     max_iterations: int = 3
-    quality_threshold: float = 0.7
+    quality_threshold: float = 0.8
     use_checkpointer: bool = False  # Requires thread_id in config when True
     virtual_mode: bool = True
     max_file_size_mb: int = 20

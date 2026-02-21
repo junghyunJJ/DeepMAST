@@ -100,7 +100,7 @@ Part 1:
   1. Read /part1_papers.json (ONLY citation source)
   2. Generate literature-grounded interpretation for Part 1 analyses (1-1 through 1-5)
   3. Inline claim validation (every PMID checked)
-  4. Inline quality check (score >= 0.7, max 3 iterations)
+  4. Inline quality check (score >= 0.8, max 3 iterations)
   5. Output: /part1_final.md
 ```
 
@@ -115,12 +115,12 @@ Part 2:
   1. Read /liana_papers.json (ONLY citation source)
   2. Generate literature-grounded interpretation for Part 2 analyses (2-6 through 2-8)
   3. Inline claim validation (every PMID checked)
-  4. Inline quality check (score >= 0.7, max 3 iterations)
+  4. Inline quality check (score >= 0.8, max 3 iterations)
   5. Output: /part2_final.md
 ```
 
 **CRITICAL**: Every claim must cite PMID from /liana_papers.json OR be marked (Novel Finding).
-Tell the interpreter: "Interpret Part 2 ONLY. Output /part2_final.md."
+Tell the interpreter: "Interpret Part 2 ONLY. Connect CCI findings to Part 1 spatial patterns — reference relevant spatial clusters and pathways from Part 1. Output /part2_final.md."
 
 ### Step 3c: INTERPRETER (Part 3 - L-R Interaction Details)
 Use the **interpreter** subagent to interpret Part 3 ONLY:
@@ -134,12 +134,12 @@ Part 3:
   3. Read /liana_papers.json (ONLY citation source)
   4. Generate literature-grounded interpretation for Part 3 analyses (3-9 through 3-11)
   5. Inline claim validation (every PMID checked)
-  6. Inline quality check (score >= 0.7, max 3 iterations)
+  6. Inline quality check (score >= 0.8, max 3 iterations)
   7. Output: /part3_final.md
 ```
 
 **CRITICAL**: Every claim must cite PMID from /liana_papers.json OR be marked (Novel Finding).
-Tell the interpreter: "Interpret Part 3 ONLY. FIRST call prioritize_top_lr_pairs to get candidates, then select top 3 novel pairs with reasoning, then interpret. Output /part3_final.md."
+Tell the interpreter: "Interpret Part 3 ONLY. FIRST call prioritize_top_lr_pairs to get candidates, then select top 3 novel pairs with reasoning, then interpret. Connect L-R pair analysis back to both Part 1 spatial patterns and Part 2 NMF/pathway results. Output /part3_final.md."
 
 **WHY 3 SEPARATE CALLS**: Each Part is called as a separate task() invocation so each gets a fresh
 context window. This prevents SummarizationMiddleware from truncating Part 3 instructions after
@@ -195,13 +195,16 @@ Use the **reporter** subagent to:
    - Literature-grounded interpretation
    - Inline claim validation
    - Quality review with score
-   - Refinement if score < 0.7 (max 3 iterations)
+   - Refinement if score < 0.8 (max 3 iterations)
 
 6. **Evidence Requirements**: Each interpretation should include:
-   - At least 2 quantitative statistics per analysis
-   - At least 2 literature references (PMIDs from pre-searched papers)
-   - Clear biological mechanism
+   - At least 4 quantitative statistics per analysis (p-values, fold changes, percentages, spatial scores)
+   - At least 4 literature references (PMIDs from pre-searched papers) with specific evidence
+   - 3 paragraphs of biological interpretation (mechanism, spatial context, clinical relevance)
+   - Cross-analysis connections to at least 1 other analysis in the same Part
+   - Required sections: Figure Description, Quantitative Findings, Biological Interpretation, Cross-Analysis Connections, References
    - Specific, concrete language (no vague statements)
+   - Minimum 150 words per analysis section
 
 7. **Emergent Themes**: Let themes emerge from data interpretation rather than
    testing pre-formed hypotheses. Document cross-part patterns in synthesis.
@@ -301,8 +304,6 @@ Given the analysis context below, generate optimal PubMed search queries that ca
 - **Cell types**: {celltypes}
 - **Disease**: {disease}
 {gene_aliases}
-## Strategic Context from BioMCP Analysis
-{strategic_context}
 
 ## Query Generation Guidelines
 

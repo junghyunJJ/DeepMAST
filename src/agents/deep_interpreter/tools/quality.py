@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 # Quality criteria weights
 QUALITY_CRITERIA = {
     "statistics": {
-        "weight": 0.25,
-        "description": "Includes at least 2 quantitative statistics",
+        "weight": 0.20,
+        "description": "Includes at least 4 quantitative statistics",
         "check_patterns": [
             r"\d+\.?\d*%",  # Percentages
             r"p\s*[<>=]\s*\d+\.?\d*",  # P-values
@@ -32,8 +32,8 @@ QUALITY_CRITERIA = {
         ],
     },
     "references": {
-        "weight": 0.25,
-        "description": "Includes at least 2 literature references (PMIDs)",
+        "weight": 0.20,
+        "description": "Includes at least 4 literature references (PMIDs)",
         "check_patterns": [
             r"PMID[:\s]*\d+",
             r"pubmed.*?\d+",
@@ -41,8 +41,8 @@ QUALITY_CRITERIA = {
         ],
     },
     "mechanism": {
-        "weight": 0.25,
-        "description": "Describes a clear biological mechanism",
+        "weight": 0.20,
+        "description": "Describes clear biological mechanisms",
         "keywords": [
             "signaling", "pathway", "interaction", "receptor",
             "ligand", "activation", "inhibition", "expression",
@@ -50,7 +50,7 @@ QUALITY_CRITERIA = {
         ],
     },
     "specificity": {
-        "weight": 0.25,
+        "weight": 0.15,
         "description": "Avoids vague or generic statements",
         "negative_patterns": [
             r"might\s+be",
@@ -58,6 +58,24 @@ QUALITY_CRITERIA = {
             r"further\s+research\s+is\s+needed",
             r"interestingly",
             r"it\s+is\s+important\s+to\s+note",
+        ],
+    },
+    "depth": {
+        "weight": 0.15,
+        "description": "Sufficient interpretation depth per analysis section",
+        "min_words_per_section": 150,
+        "min_sections": 3,
+    },
+    "structure": {
+        "weight": 0.10,
+        "description": "Follows required markdown template structure",
+        "required_headings": [
+            r"### Figure Description",
+            r"### Quantitative Findings",
+            r"### Biological Interpretation",
+            r"### Cross-Analysis Connections",
+            r"### References",
+            r"## Part \d+ Summary",
         ],
     },
 }
@@ -90,27 +108,27 @@ def _calculate_basic_score(interpretation: str, references: list[dict] | None = 
     """
     scores = {}
 
-    # Statistics check
+    # Statistics check (need 4 for full score)
     stats_count = _count_pattern_matches(
         interpretation,
         QUALITY_CRITERIA["statistics"]["check_patterns"]
     )
-    scores["statistics_score"] = min(stats_count / 2, 1.0)
+    scores["statistics_score"] = min(stats_count / 4, 1.0)
 
-    # References check
+    # References check (need 4 for full score)
     ref_count = len(references) if references else 0
     ref_patterns = _count_pattern_matches(
         interpretation,
         QUALITY_CRITERIA["references"]["check_patterns"]
     )
-    scores["references_score"] = min((ref_count + ref_patterns) / 2, 1.0)
+    scores["references_score"] = min((ref_count + ref_patterns) / 4, 1.0)
 
-    # Mechanism check
+    # Mechanism check (need 5 keywords for full score)
     mechanism_count = _count_keyword_matches(
         interpretation,
         QUALITY_CRITERIA["mechanism"]["keywords"]
     )
-    scores["mechanism_score"] = min(mechanism_count / 3, 1.0)
+    scores["mechanism_score"] = min(mechanism_count / 5, 1.0)
 
     # Specificity check (negative patterns reduce score)
     negative_count = _count_pattern_matches(
@@ -119,24 +137,48 @@ def _calculate_basic_score(interpretation: str, references: list[dict] | None = 
     )
     scores["specificity_score"] = max(1.0 - (negative_count * 0.2), 0.0)
 
+    # Depth check: average words per analysis section
+    sections = re.split(r"## Analysis \d", interpretation)
+    # Filter out empty sections and the header before first analysis
+    analysis_sections = [s for s in sections if len(s.strip()) > 50]
+    if analysis_sections:
+        avg_words = sum(len(s.split()) for s in analysis_sections) / len(analysis_sections)
+        scores["depth_score"] = min(avg_words / 150, 1.0)
+    else:
+        scores["depth_score"] = 0.0
+
+    # Structure check: count matched required headings
+    required_headings = QUALITY_CRITERIA["structure"]["required_headings"]
+    matched_headings = sum(
+        1 for heading in required_headings
+        if re.search(heading, interpretation)
+    )
+    scores["structure_score"] = matched_headings / len(required_headings) if required_headings else 1.0
+
     # Calculate weighted total
     total_score = (
         scores["statistics_score"] * QUALITY_CRITERIA["statistics"]["weight"] +
         scores["references_score"] * QUALITY_CRITERIA["references"]["weight"] +
         scores["mechanism_score"] * QUALITY_CRITERIA["mechanism"]["weight"] +
-        scores["specificity_score"] * QUALITY_CRITERIA["specificity"]["weight"]
+        scores["specificity_score"] * QUALITY_CRITERIA["specificity"]["weight"] +
+        scores["depth_score"] * QUALITY_CRITERIA["depth"]["weight"] +
+        scores["structure_score"] * QUALITY_CRITERIA["structure"]["weight"]
     )
 
     # Generate feedback
     feedback_parts = []
-    if scores["statistics_score"] < 0.5:
-        feedback_parts.append("Add more quantitative statistics (p-values, percentages)")
-    if scores["references_score"] < 0.5:
-        feedback_parts.append("Include more literature references with PMIDs")
-    if scores["mechanism_score"] < 0.5:
-        feedback_parts.append("Clarify the biological mechanism being described")
+    if scores["statistics_score"] < 0.7:
+        feedback_parts.append("Need at least 4 quantitative statistics (p-values, fold changes, percentages, counts)")
+    if scores["references_score"] < 0.7:
+        feedback_parts.append("Need at least 4 PMID citations with specific supporting evidence")
+    if scores["mechanism_score"] < 0.7:
+        feedback_parts.append("Describe biological mechanisms in detail: signaling cascades, pathway interactions, receptor-ligand dynamics")
     if scores["specificity_score"] < 0.7:
-        feedback_parts.append("Make claims more specific and concrete")
+        feedback_parts.append("Replace hedging language with definitive, evidence-based statements")
+    if scores["depth_score"] < 0.7:
+        feedback_parts.append("Each analysis section needs at least 150 words with 3+ paragraphs covering mechanism, spatial context, and clinical relevance")
+    if scores["structure_score"] < 0.7:
+        feedback_parts.append("Missing required sections: ensure Figure Description, Quantitative Findings, Biological Interpretation, Cross-Analysis Connections, and References are present")
 
     return {
         "score": round(total_score, 3),
@@ -144,8 +186,10 @@ def _calculate_basic_score(interpretation: str, references: list[dict] | None = 
         "references_score": round(scores["references_score"], 3),
         "mechanism_score": round(scores["mechanism_score"], 3),
         "specificity_score": round(scores["specificity_score"], 3),
+        "depth_score": round(scores["depth_score"], 3),
+        "structure_score": round(scores["structure_score"], 3),
         "feedback": " | ".join(feedback_parts) if feedback_parts else "Quality criteria met.",
-        "passed": total_score >= 0.7,
+        "passed": total_score >= 0.8,
     }
 
 
@@ -173,23 +217,27 @@ async def _validate_with_reflection_tool(
 **References**: {ref_summary}
 
 **Quality Criteria**:
-1. Statistics: Has at least 2 quantitative statistics (p-values, fold changes, percentages)
-2. References: Has at least 2 literature citations (PMIDs)
-3. Mechanism: Describes a clear biological mechanism
+1. Statistics: Has at least 4 quantitative statistics (p-values, fold changes, percentages, counts)
+2. References: Has at least 4 literature citations (PMIDs) with specific evidence
+3. Mechanism: Describes clear biological mechanisms (signaling cascades, pathways)
 4. Specificity: Avoids vague language, makes concrete claims
+5. Depth: At least 150 words per analysis section with 3+ paragraphs
+6. Structure: Required headings present (Figure Description, Quantitative Findings, Biological Interpretation, Cross-Analysis Connections, References)
 
 **Learned**:
 - Statistics present: [count]
 - References present: [count]
 - Mechanism clarity: [clear/unclear]
 - Specificity: [high/medium/low]
+- Depth: [sufficient/insufficient]
+- Structure: [complete/incomplete]
 
 **Gap**:
 - What is missing or weak?
 
 **Next**:
 - Overall Score: [0.0-1.0]
-- Passed: [yes/no] (threshold: 0.7)
+- Passed: [yes/no] (threshold: 0.8)
 - Recommendations: [specific improvements]"""
 
         # Invoke reflection tool via shared client
@@ -241,12 +289,14 @@ def validate_quality(
     """Validate the quality of a CCI interpretation.
 
     This tool evaluates an interpretation against quality criteria:
-    - Statistics: At least 2 quantitative statistics
-    - References: At least 2 literature references (PMIDs)
-    - Mechanism: Clear biological mechanism described
+    - Statistics: At least 4 quantitative statistics (p-values, fold changes, percentages, counts)
+    - References: At least 4 literature references (PMIDs) with specific evidence
+    - Mechanism: Clear biological mechanisms described (signaling cascades, pathways)
     - Specificity: Avoids vague or generic statements
+    - Depth: At least 150 words per analysis section with 3+ paragraphs
+    - Structure: Required markdown headings present (Figure Description, Quantitative Findings, etc.)
 
-    A score >= 0.7 is considered passing quality.
+    A score >= 0.8 is considered passing quality.
 
     Args:
         interpretation: The interpretation text to validate
@@ -260,8 +310,10 @@ def validate_quality(
         - references_score: References criteria score
         - mechanism_score: Mechanism clarity score
         - specificity_score: Specificity score
+        - depth_score: Interpretation depth score
+        - structure_score: Template structure compliance score
         - feedback: Specific improvement suggestions
-        - passed: Whether score >= 0.7 threshold
+        - passed: Whether score >= 0.8 threshold
     """
     # Calculate basic score
     result = _calculate_basic_score(interpretation, references)
@@ -283,7 +335,7 @@ def validate_quality(
                     result["score"] = round(
                         (result["score"] + llm_result["llm_score"]) / 2, 3
                     )
-                    result["passed"] = result["score"] >= 0.7
+                    result["passed"] = result["score"] >= 0.8
 
         except Exception:
             # LLM validation failed, use basic score only
@@ -303,21 +355,23 @@ def get_improvement_suggestions(validation_result: dict) -> list[str]:
     """
     suggestions = []
 
-    if validation_result.get("statistics_score", 0) < 0.5:
+    if validation_result.get("statistics_score", 0) < 0.7:
         suggestions.extend([
             "Add p-values for significant findings",
             "Include percentages for composition changes",
             "Report fold changes for differential expression",
+            "Include spatial autocorrelation or enrichment scores",
         ])
 
-    if validation_result.get("references_score", 0) < 0.5:
+    if validation_result.get("references_score", 0) < 0.7:
         suggestions.extend([
             "Search PubMed for supporting literature",
-            "Add PMID citations for key claims",
+            "Add PMID citations for key claims (need at least 4)",
             "Reference established pathway databases",
+            "Include specific evidence description for each PMID",
         ])
 
-    if validation_result.get("mechanism_score", 0) < 0.5:
+    if validation_result.get("mechanism_score", 0) < 0.7:
         suggestions.extend([
             "Describe the signaling cascade involved",
             "Explain ligand-receptor binding dynamics",
@@ -329,6 +383,20 @@ def get_improvement_suggestions(validation_result: dict) -> list[str]:
             "Replace 'might be' with definitive statements",
             "Remove hedging language ('potentially', 'could')",
             "State specific cell types and interactions",
+        ])
+
+    if validation_result.get("depth_score", 0) < 0.7:
+        suggestions.extend([
+            "Write at least 3 paragraphs per analysis (mechanism, spatial context, clinical relevance)",
+            "Expand each analysis section to at least 150 words",
+            "Add spatial context explaining WHY patterns appear in specific tissue regions",
+        ])
+
+    if validation_result.get("structure_score", 0) < 0.7:
+        suggestions.extend([
+            "Add missing 'Figure Description' sections",
+            "Add 'Cross-Analysis Connections' sections linking analyses within the Part",
+            "Ensure 'Part N Summary' section is present with Key Findings and Cross-Part Connections",
         ])
 
     return suggestions

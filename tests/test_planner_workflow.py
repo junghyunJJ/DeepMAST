@@ -1,12 +1,11 @@
 """Unit tests for PLANNER subagent workflow.
 
 Tests:
-1. Tool registration - PLANNER config has exactly 4 tools
-2. Prompt content - PLANNER_PROMPT contains 6-step workflow
-3. generate_biomedical_context tool signature and mock invocation
-4. search_pubmed_advanced (BioMCP-down fallback) tool signature and mock invocation
-5. Output file expectations in prompt
-6. Graph builder creates PLANNER subagent graph
+1. Tool registration - PLANNER config has exactly 3 tools
+2. Prompt content - PLANNER_PROMPT contains 5-step workflow
+3. search_pubmed_advanced (BioMCP-down fallback) tool signature and mock invocation
+4. Output file expectations in prompt
+5. Graph builder creates PLANNER subagent graph
 """
 
 import pytest
@@ -18,11 +17,10 @@ import pytest
 
 
 def test_planner_has_correct_tools():
-    """Verify PLANNER config includes exactly the 4 expected tools."""
+    """Verify PLANNER config includes exactly the 3 expected tools."""
     from src.agents.deep_interpreter.subagents.configs import SUBAGENT_CONFIGS
     from src.agents.deep_interpreter.tools import (
         load_analysis_data,
-        generate_biomedical_context,
         search_literature_dynamic,
         search_pubmed_advanced,
     )
@@ -32,7 +30,6 @@ def test_planner_has_correct_tools():
 
     required_tools = [
         load_analysis_data,
-        generate_biomedical_context,
         search_literature_dynamic,
         search_pubmed_advanced,
     ]
@@ -44,25 +41,25 @@ def test_planner_has_correct_tools():
 
 
 def test_planner_tool_count():
-    """Verify PLANNER has exactly 4 tools."""
+    """Verify PLANNER has exactly 3 tools."""
     from src.agents.deep_interpreter.subagents.configs import SUBAGENT_CONFIGS
 
     planner_config = SUBAGENT_CONFIGS["planner"]
     tools = planner_config["tools"]
 
-    assert len(tools) == 4, f"Expected 4 tools, got {len(tools)}"
+    assert len(tools) == 3, f"Expected 3 tools, got {len(tools)}"
 
     tool_names = [t.__name__ if hasattr(t, "__name__") else str(t) for t in tools]
     print(f"PLANNER tools ({len(tools)}): {tool_names}")
 
 
 # =============================================================================
-# Test 2: Prompt Content - 6-Step Workflow
+# Test 2: Prompt Content - 5-Step Workflow
 # =============================================================================
 
 
-def test_planner_prompt_has_6_steps():
-    """Verify PLANNER_PROMPT contains all 6 steps."""
+def test_planner_prompt_has_5_steps():
+    """Verify PLANNER_PROMPT contains all 5 steps."""
     from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
 
     planner_prompt = SUBAGENT_PROMPTS["planner"]
@@ -70,27 +67,25 @@ def test_planner_prompt_has_6_steps():
     steps = [
         "Step 1: Read Target Configuration",
         "Step 2: Load Analysis Data",
-        "Step 3: Generate Biomedical Context",
-        "Step 4: Literature Initialization",
-        "Step 5: Analysis Coverage Checklist",
-        "Step 6: Write Interpretation Guide",
+        "Step 3: Literature Initialization",
+        "Step 4: Analysis Coverage Checklist",
+        "Step 5: Write Interpretation Guide",
     ]
 
     for step in steps:
         assert step in planner_prompt, f"Missing step: {step}"
 
-    print(f"PLANNER prompt contains all 6 workflow steps")
+    print(f"PLANNER prompt contains all 5 workflow steps")
 
 
 def test_planner_prompt_references_tools():
-    """Verify PLANNER_PROMPT references all 4 tools."""
+    """Verify PLANNER_PROMPT references all 3 tools."""
     from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
 
     planner_prompt = SUBAGENT_PROMPTS["planner"]
 
     tool_references = [
         "load_analysis_data",
-        "generate_biomedical_context",
         "search_literature_dynamic",
         "search_pubmed_advanced",
     ]
@@ -98,7 +93,7 @@ def test_planner_prompt_references_tools():
     for ref in tool_references:
         assert ref in planner_prompt, f"Missing tool reference: {ref}"
 
-    print("PLANNER prompt references all 4 tools")
+    print("PLANNER prompt references all 3 tools")
 
 
 def test_planner_prompt_output_files():
@@ -132,57 +127,7 @@ def test_planner_prompt_no_strategic_plan():
 
 
 # =============================================================================
-# Test 3: generate_biomedical_context Tool Signature
-# =============================================================================
-
-
-def test_generate_biomedical_context_signature():
-    """Verify generate_biomedical_context tool accepts expected parameters."""
-    from src.agents.deep_interpreter.tools.literature import generate_biomedical_context
-
-    assert hasattr(generate_biomedical_context, "invoke") or hasattr(
-        generate_biomedical_context, "ainvoke"
-    )
-
-    # Check the tool's input schema matches expected parameters
-    schema = generate_biomedical_context.args_schema.model_json_schema()
-    properties = schema.get("properties", {})
-
-    expected_params = ["celltypes", "pathways", "available_analyses", "disease"]
-    for param in expected_params:
-        assert param in properties, (
-            f"Missing parameter '{param}' in generate_biomedical_context schema. "
-            f"Found: {list(properties.keys())}"
-        )
-
-    print(f"generate_biomedical_context has correct parameters: {expected_params}")
-
-
-def test_generate_biomedical_context_returns_dict():
-    """Verify generate_biomedical_context returns expected structure on failure."""
-    from src.agents.deep_interpreter.tools.literature import generate_biomedical_context
-
-    # Call with minimal input - should return gracefully even without BioMCP
-    result = generate_biomedical_context.invoke({
-        "celltypes": ["Fibroblast", "Epithelial"],
-        "pathways": ["EMT", "TGFb"],
-        "available_analyses": "Part 1: spatial, Part 2: CCI",
-        "disease": "breast cancer",
-    })
-
-    assert result is not None
-    # Result should be a dict (or string representation) with success field
-    if isinstance(result, dict):
-        assert "success" in result, f"Missing 'success' key in result: {result.keys()}"
-        print(f"generate_biomedical_context returned dict with success={result['success']}")
-    else:
-        # Tool may return string - just verify it's not empty
-        assert len(str(result)) > 0
-        print(f"generate_biomedical_context returned: {str(result)[:100]}...")
-
-
-# =============================================================================
-# Test 4: search_pubmed_advanced Tool Signature
+# Test 3: search_pubmed_advanced Tool Signature
 # =============================================================================
 
 
@@ -210,7 +155,7 @@ def test_search_pubmed_advanced_signature():
 
 
 # =============================================================================
-# Test 5: PLANNER Config Description
+# Test 4: PLANNER Config Description
 # =============================================================================
 
 
@@ -222,13 +167,15 @@ def test_planner_config_description():
     description = planner_config["description"]
 
     assert "interpretation_guide.md" in description, "Missing interpretation_guide.md in description"
-    assert "biomedical context" in description.lower(), "Missing biomedical context in description"
+    assert "searches literature for grounding" in description.lower(), (
+        "Missing literature grounding in description"
+    )
 
     print(f"PLANNER description mentions key outputs")
 
 
 # =============================================================================
-# Test 6: Graph Builder Creates PLANNER Subagent
+# Test 5: Graph Builder Creates PLANNER Subagent
 # =============================================================================
 
 
@@ -250,7 +197,7 @@ def test_planner_subagent_via_factory():
 
 
 # =============================================================================
-# Test 7: Fallback Guard - search_pubmed_advanced only for infrastructure failure
+# Test 6: Fallback Guard - search_pubmed_advanced only for infrastructure failure
 # =============================================================================
 
 
@@ -275,7 +222,7 @@ def test_planner_prompt_fallback_condition_is_infrastructure_failure():
 
 
 # =============================================================================
-# Test 8: Workflow Chain - PLANNER outputs consumed by downstream
+# Test 7: Workflow Chain - PLANNER outputs consumed by downstream
 # =============================================================================
 
 
@@ -334,29 +281,25 @@ if __name__ == "__main__":
     test_planner_tool_count()
 
     print("\n--- Test 2: Prompt Content ---")
-    test_planner_prompt_has_6_steps()
+    test_planner_prompt_has_5_steps()
     test_planner_prompt_references_tools()
     test_planner_prompt_output_files()
     test_planner_prompt_no_strategic_plan()
 
-    print("\n--- Test 3: generate_biomedical_context ---")
-    test_generate_biomedical_context_signature()
-    test_generate_biomedical_context_returns_dict()
-
-    print("\n--- Test 4: search_pubmed_advanced ---")
+    print("\n--- Test 3: search_pubmed_advanced ---")
     test_search_pubmed_advanced_signature()
 
-    print("\n--- Test 5: Config Description ---")
+    print("\n--- Test 4: Config Description ---")
     test_planner_config_description()
 
-    print("\n--- Test 6: Graph Builder ---")
+    print("\n--- Test 5: Graph Builder ---")
     test_planner_subagent_graph_creation()
     test_planner_subagent_via_factory()
 
-    print("\n--- Test 7: Fallback Guard ---")
+    print("\n--- Test 6: Fallback Guard ---")
     test_planner_prompt_fallback_condition_is_infrastructure_failure()
 
-    print("\n--- Test 8: Workflow Chain ---")
+    print("\n--- Test 7: Workflow Chain ---")
     test_planner_outputs_referenced_by_searcher()
     test_planner_outputs_referenced_by_interpreter()
     test_planner_outputs_referenced_by_reporter()

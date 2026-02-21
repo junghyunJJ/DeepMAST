@@ -107,6 +107,8 @@ def create_ollama_llm(**kwargs) -> ChatOllama:
         temperature: Temperature setting (default: 0)
     """
     # model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "gpt-oss:20b"))
+    # model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3:30b"))
+    
     model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3:30b"))
 
     base_url = kwargs.get("base_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:6000"))

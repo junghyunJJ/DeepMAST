@@ -13,6 +13,8 @@ import logging
 import os
 import re
 import threading
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +53,10 @@ def _sync_save_json(dir_path: str, file_path: str, data: dict) -> None:
 # This avoids repeated API calls for the same gene
 _GENE_ALIAS_CACHE: dict[str, list[str]] = {}
 _GENE_ALIAS_CACHE_LOCK = threading.Lock()
+
+# Session-level cache for disease synonyms fetched from BioMCP + rule-based expansion
+_DISEASE_SYNONYM_CACHE: dict[str, list[str]] = {}
+_DISEASE_SYNONYM_CACHE_LOCK = threading.Lock()
 
 
 async def _fetch_gene_aliases_from_biomcp(
@@ -228,6 +234,11 @@ async def _search_with_biomcp(
     page_size: int = 20,
     include_preprints: bool = True,
     biomcp_url: str = DEFAULT_BIOMCP_URL,
+    enforce_disease_match: bool = False,
+    rerank_mode: str = "off",
+    rerank_top_n: int = 12,
+    rerank_min_confidence: float = 0.70,
+    rerank_stats: dict[str, int] | None = None,
 ) -> list[dict]:
     """Execute PubMed search via BioMCP article_searcher.
 
@@ -239,6 +250,11 @@ async def _search_with_biomcp(
         page_size: Number of results per page (default 10, max 100)
         include_preprints: Include bioRxiv/medRxiv preprints (default True)
         biomcp_url: URL of the BioMCP server
+        enforce_disease_match: When True, require title/abstract to match disease context
+        rerank_mode: "off" or "llm" for optional second-stage reranking
+        rerank_top_n: Maximum boundary papers to rerank via LLM
+        rerank_min_confidence: Minimum confidence threshold for rerank decisions
+        rerank_stats: Optional mutable counter dict for rerank telemetry aggregation
 
     Returns:
         List of article dictionaries with pmid, title, abstract
@@ -325,6 +341,53 @@ async def _search_with_biomcp(
         logger.error(f"BioMCP connection failed: {e}")
         invalidate_client(f"biomcp_{biomcp_url}")
 
+    normalized_rerank_mode = _normalize_rerank_mode(rerank_mode)
+
+    # Post-filter to reduce cross-disease retrieval noise
+    if enforce_disease_match and diseases:
+        disease_terms = [d for d in diseases if isinstance(d, str) and d.strip()]
+
+        # Mandatory pre-warming: fetch disease synonyms once per disease (async context)
+        # After this, get_disease_match_terms() inside _paper_matches_disease_context
+        # will hit the cache (pure dict lookup, no event loop blocking).
+        for d in disease_terms:
+            try:
+                await _get_disease_synonyms_async(d, biomcp_url)
+            except Exception:
+                pass  # Graceful degradation: rule-based terms still available
+
+        before_articles = list(articles)
+        articles = [a for a in before_articles if _paper_matches_disease_context(a, disease_terms)]
+        filtered = len(before_articles) - len(articles)
+        if filtered:
+            logger.debug(f"Filtered out {filtered} papers by disease context")
+
+        if normalized_rerank_mode == "llm":
+            kept_pmids = {str(a.get("pmid", "")) for a in articles}
+            removed_articles = [
+                a
+                for a in before_articles
+                if str(a.get("pmid", "")) and str(a.get("pmid", "")) not in kept_pmids
+            ]
+            articles, local_stats = await _rerank_disease_relevance_with_llm(
+                kept_articles=articles,
+                removed_articles=removed_articles,
+                diseases=disease_terms,
+                top_n=rerank_top_n,
+                min_confidence=rerank_min_confidence,
+            )
+            if rerank_stats is not None:
+                _merge_rerank_stats(rerank_stats, local_stats)
+            if local_stats.get("applied_count", 0):
+                logger.debug(
+                    "LLM rerank applied: %s",
+                    {
+                        "applied_count": local_stats.get("applied_count", 0),
+                        "dropped_count": local_stats.get("dropped_count", 0),
+                        "promoted_count": local_stats.get("promoted_count", 0),
+                    },
+                )
+
     return articles
 
 
@@ -395,6 +458,1042 @@ def _parse_pmids(result: Any) -> list[str]:
         return pmids
 
     return pmids
+
+
+def _normalize_for_filter(text: str) -> str:
+    """Normalize text for boolean matching in post-search filtering."""
+    normalized = (text or "").lower()
+    normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
+# Organ alias mapping: common name → medical/Latin terms (unidirectional)
+# Avoids false positives from reverse mapping (e.g., "cerebral palsy" → "brain palsy")
+_ORGAN_TO_MEDICAL: dict[str, list[str]] = {
+    "liver": ["hepatic", "hepatocellular"],
+    "kidney": ["renal"],
+    "lung": ["pulmonary"],
+    "brain": ["cerebral"],
+    "colon": ["colorectal"],
+    "stomach": ["gastric"],
+    "pancreas": ["pancreatic"],
+    "skin": ["cutaneous"],
+    "bone": ["osseous"],
+    "ovary": ["ovarian"],
+    "prostate": ["prostatic"],
+    "bladder": ["urothelial"],
+    "uterus": ["uterine", "endometrial"],
+    "breast": ["mammary"],
+}
+
+# --- UBERON Organ Synonym Cache ---
+_ORGAN_SYNONYM_CACHE: dict[str, list[str]] = {}
+_ORGAN_SYNONYM_CACHE_LOCK = threading.Lock()
+
+_UBERON_STOPWORDS = frozenset({
+    "gland", "body", "zone", "part", "pair", "lobe", "wall",
+    "area", "region", "left", "right", "upper", "lower",
+    "organ", "tissue", "system", "structure", "proper",
+})
+
+
+async def _resolve_uberon_organ_synonyms(organ: str) -> list[str]:
+    """Resolve organ synonyms via EBI OLS4 UBERON ontology lookup.
+
+    2-phase lookup:
+    - Phase 1 (Search): Find UBERON term, extract synonyms
+    - Phase 2 (Term detail): Extract relational adjectives (e.g., liver→hepatic)
+
+    Args:
+        organ: Organ name (e.g., "breast", "liver")
+
+    Returns:
+        List of synonym strings. Returns [] on failure WITHOUT caching.
+    """
+    encoded = urllib.parse.quote(organ)
+    search_url = f"https://www.ebi.ac.uk/ols4/api/search?q={encoded}&ontology=uberon&rows=3"
+
+    synonyms: list[str] = []
+    obo_id = None
+
+    try:
+        # Phase 1: Search for UBERON term
+        def _fetch_search():
+            req = urllib.request.Request(search_url, headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        data = await asyncio.to_thread(_fetch_search)
+        docs = data.get("response", {}).get("docs", [])
+
+        for doc in docs:
+            label = (doc.get("label") or "").lower()
+            if organ.lower() in label or label in organ.lower():
+                # Extract synonyms from search result
+                for field in ["synonym", "exact_synonym", "related_synonym"]:
+                    raw = doc.get(field, [])
+                    if isinstance(raw, list):
+                        synonyms.extend([s.lower() for s in raw if isinstance(s, str)])
+                    elif isinstance(raw, str):
+                        synonyms.append(raw.lower())
+                obo_id = doc.get("obo_id")
+                break
+
+        # Phase 2: Term detail for relational adjectives
+        if obo_id:
+            iri = urllib.parse.quote(urllib.parse.quote(
+                f"http://purl.obolibrary.org/obo/{obo_id.replace(':', '_')}",
+                safe="",
+            ))
+            term_url = f"https://www.ebi.ac.uk/ols4/api/ontologies/uberon/terms/{iri}"
+
+            def _fetch_term():
+                req = urllib.request.Request(term_url, headers={"Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+
+            try:
+                term_data = await asyncio.to_thread(_fetch_term)
+                annotation = term_data.get("annotation", {})
+                # Relational adjectives (e.g., liver→"hepatic", kidney→"renal")
+                adj_list = annotation.get("has_relational_adjective", [])
+                if isinstance(adj_list, list):
+                    synonyms.extend([a.lower() for a in adj_list if isinstance(a, str)])
+                elif isinstance(adj_list, str):
+                    synonyms.append(adj_list.lower())
+            except Exception:
+                pass  # Phase 2 failure is non-fatal
+
+        # Post-processing: extract single-word medical adjectives from multi-word synonyms
+        extracted: list[str] = []
+        for syn in synonyms:
+            words = syn.split()
+            if len(words) > 1:
+                # Keep multi-word synonym AND extract individual adjective-like words
+                for word in words:
+                    if len(word) > 5 and word != organ.lower() and word not in _UBERON_STOPWORDS:
+                        extracted.append(word)
+        synonyms.extend(extracted)
+
+        # Deduplicate and remove the organ itself
+        unique = []
+        organ_lower = organ.lower()
+        for s in synonyms:
+            s = s.strip()
+            if s and s != organ_lower and s not in unique:
+                unique.append(s)
+
+        logger.debug(f"UBERON synonyms for '{organ}': {unique[:8]}")
+        return unique
+
+    except Exception as e:
+        logger.debug(f"UBERON lookup failed for '{organ}': {e}")
+        return []
+
+
+async def _get_organ_synonyms_async(organ: str) -> list[str]:
+    """Get organ synonyms: cache → static dict → UBERON API → cache write.
+
+    Args:
+        organ: Organ name (lowercase, e.g., "breast")
+
+    Returns:
+        List of medical synonyms for the organ
+    """
+    organ_lower = organ.lower()
+
+    # Cache hit
+    with _ORGAN_SYNONYM_CACHE_LOCK:
+        if organ_lower in _ORGAN_SYNONYM_CACHE:
+            return list(_ORGAN_SYNONYM_CACHE[organ_lower])
+
+    # Start with static dict terms
+    static_terms = list(_ORGAN_TO_MEDICAL.get(organ_lower, []))
+
+    # Enrich with UBERON API
+    try:
+        uberon_synonyms = await _resolve_uberon_organ_synonyms(organ_lower)
+        for syn in uberon_synonyms:
+            if syn not in static_terms:
+                static_terms.append(syn)
+    except Exception:
+        pass  # Static terms are sufficient
+
+    # Cache write (including empty lists to avoid repeated UBERON timeouts)
+    with _ORGAN_SYNONYM_CACHE_LOCK:
+        _ORGAN_SYNONYM_CACHE[organ_lower] = static_terms
+
+    return static_terms
+
+
+def _get_organ_synonyms(organ: str) -> list[str]:
+    """Get organ synonyms (sync wrapper with cache fast path).
+
+    Args:
+        organ: Organ name (e.g., "breast")
+
+    Returns:
+        List of medical synonyms for the organ
+    """
+    organ_lower = organ.lower()
+
+    # Cache fast path
+    with _ORGAN_SYNONYM_CACHE_LOCK:
+        if organ_lower in _ORGAN_SYNONYM_CACHE:
+            return list(_ORGAN_SYNONYM_CACHE[organ_lower])
+
+    # Try async enrichment
+    try:
+        return run_async(_get_organ_synonyms_async(organ_lower), timeout=15)
+    except Exception:
+        # Fallback to static dict only
+        return list(_ORGAN_TO_MEDICAL.get(organ_lower, []))
+
+
+def _extract_organ_tokens(disease_normalized: str) -> list[str]:
+    """Extract known organ tokens from a normalized disease string.
+
+    Only matches against _ORGAN_TO_MEDICAL keys to avoid false positives
+    (e.g., won't match "iris" as an organ).
+
+    Args:
+        disease_normalized: Lowercase, normalized disease string
+
+    Returns:
+        List of organ tokens found in the string
+    """
+    return [organ for organ in _ORGAN_TO_MEDICAL
+            if re.search(rf'\b{re.escape(organ)}\b', disease_normalized)]
+
+
+# Bidirectional abbreviation ↔ expansion mapping
+_DISEASE_ABBREVIATIONS: dict[str, str] = {
+    "aml": "acute myeloid leukemia",
+    "cml": "chronic myeloid leukemia",
+    "cll": "chronic lymphocytic leukemia",
+    "all": "acute lymphoblastic leukemia",
+    "dlbcl": "diffuse large b cell lymphoma",
+    "nsclc": "non small cell lung cancer",
+    "sclc": "small cell lung cancer",
+    "hcc": "hepatocellular carcinoma",
+    "rcc": "renal cell carcinoma",
+    "gbm": "glioblastoma multiforme",
+    "ipf": "idiopathic pulmonary fibrosis",
+    "copd": "chronic obstructive pulmonary disease",
+    "ibd": "inflammatory bowel disease",
+    "sle": "systemic lupus erythematosus",
+    "ra": "rheumatoid arthritis",
+    "ms": "multiple sclerosis",
+    "ad": "alzheimer disease",
+    "pd": "parkinson disease",
+    "t1d": "type 1 diabetes",
+    "t2d": "type 2 diabetes",
+    "tnbc": "triple negative breast cancer",
+    "crc": "colorectal cancer",
+    "uc": "ulcerative colitis",
+    "nash": "non alcoholic steatohepatitis",
+    "nafld": "non alcoholic fatty liver disease",
+}
+# Build reverse mapping: expansion → abbreviation
+_DISEASE_EXPANSION_TO_ABBREV: dict[str, str] = {v: k for k, v in _DISEASE_ABBREVIATIONS.items()}
+
+_NEURO_ABBREVS: dict[str, str] = {"alzheimer": "ad", "parkinson": "pd", "huntington": "hd"}
+
+# Safe-mode generic terms that are too broad to use as standalone disease filters.
+_DISEASE_GENERIC_EXACT_TERMS: set[str] = {
+    "disease",
+    "disorder",
+    "syndrome",
+    "cancer",
+    "tumor",
+    "tumour",
+    "neoplasm",
+    "neoplasms",
+    "malignancy",
+    "malignant",
+    "carcinoma",
+    "acute",
+    "chronic",
+    "progressive",
+    "advanced",
+    "metastatic",
+    "invasive",
+}
+
+# Generic modifier tokens (used for "all tokens are generic" pruning).
+_DISEASE_GENERIC_TOKENS: set[str] = {
+    "disease",
+    "disorder",
+    "syndrome",
+    "cancer",
+    "tumor",
+    "tumour",
+    "neoplasm",
+    "neoplasms",
+    "malignancy",
+    "malignant",
+    "carcinoma",
+    "acute",
+    "chronic",
+    "progressive",
+    "advanced",
+    "metastatic",
+    "invasive",
+    "primary",
+    "secondary",
+    "idiopathic",
+}
+
+
+def _is_anchor_candidate(token: str) -> bool:
+    """Return whether token can act as a disease anchor in safe mode."""
+    if not token:
+        return False
+    # Keep known abbreviations even when short (e.g., AML, UC, AD, PD).
+    if token in _DISEASE_ABBREVIATIONS:
+        return True
+    # Drop generic tokens and very short fragments.
+    if token in _DISEASE_GENERIC_TOKENS:
+        return False
+    return len(token) >= 3
+
+
+def _build_disease_anchor_tokens(disease: str) -> set[str]:
+    """Build disease anchor tokens for safe-mode filtering.
+
+    Anchors represent disease-specific tokens (e.g., "breast", "mammary",
+    "myeloid") used to prevent broad terms (e.g., "malignant") from matching
+    unrelated papers.
+    """
+    normalized = _normalize_for_filter(disease)
+    if not normalized:
+        return set()
+
+    anchors: set[str] = set()
+    disease_tokens = [t for t in normalized.split() if t]
+
+    # Base anchors from disease text.
+    for token in disease_tokens:
+        if _is_anchor_candidate(token):
+            anchors.add(token)
+
+    # If disease string is an abbreviation, add anchors from its expansion.
+    if normalized in _DISEASE_ABBREVIATIONS:
+        expansion = _DISEASE_ABBREVIATIONS[normalized]
+        for token in _normalize_for_filter(expansion).split():
+            if _is_anchor_candidate(token):
+                anchors.add(token)
+        anchors.add(normalized)
+
+    # If disease string is a known expansion, include abbreviation anchor.
+    if normalized in _DISEASE_EXPANSION_TO_ABBREV:
+        anchors.add(_DISEASE_EXPANSION_TO_ABBREV[normalized])
+
+    # Add organ alias anchors in both directions (e.g., breast <-> mammary).
+    expanded_anchors = set(anchors)
+    for anchor in list(anchors):
+        if anchor in _ORGAN_TO_MEDICAL:
+            for alias in _ORGAN_TO_MEDICAL[anchor]:
+                for token in _normalize_for_filter(alias).split():
+                    if _is_anchor_candidate(token):
+                        expanded_anchors.add(token)
+        for organ, aliases in _ORGAN_TO_MEDICAL.items():
+            if anchor in aliases and _is_anchor_candidate(organ):
+                expanded_anchors.add(organ)
+
+    return expanded_anchors
+
+
+def _sanitize_disease_match_terms(terms: list[str], disease: str) -> list[str]:
+    """Apply safe-mode sanitization to disease terms.
+
+    Rules:
+    1) Remove exact generic terms (e.g., "malignant", "disease").
+    2) Remove terms where all tokens are generic modifiers.
+    3) Require overlap with disease anchor tokens (unless exact disease term).
+    """
+    normalized_disease = _normalize_for_filter(disease)
+    if not normalized_disease:
+        return []
+
+    anchors = _build_disease_anchor_tokens(disease)
+    unique_terms: list[str] = []
+
+    for term in terms:
+        term_norm = _normalize_for_filter(term)
+        if not term_norm:
+            continue
+
+        # Always keep the canonical input disease string.
+        if term_norm == normalized_disease:
+            if term_norm not in unique_terms:
+                unique_terms.append(term_norm)
+            continue
+
+        if term_norm in _DISEASE_GENERIC_EXACT_TERMS:
+            continue
+
+        tokens = [t for t in term_norm.split() if t]
+        if not tokens:
+            continue
+
+        # Drop terms composed only of generic modifiers.
+        if all(t in _DISEASE_GENERIC_TOKENS for t in tokens):
+            continue
+
+        # Safe mode: require at least one disease anchor token.
+        if anchors and not any(t in anchors for t in tokens):
+            continue
+
+        if term_norm not in unique_terms:
+            unique_terms.append(term_norm)
+
+    # Never return an empty list; keep canonical term as minimum.
+    if not unique_terms:
+        return [normalized_disease]
+
+    return unique_terms
+
+
+def _paper_has_anchor_match(
+    normalized_text: str, original_text: str, anchors: set[str]
+) -> bool:
+    """Return True if paper text contains at least one disease anchor token."""
+    if not anchors:
+        return True
+
+    for anchor in anchors:
+        if len(anchor) <= 4:
+            if re.search(rf"\b{re.escape(anchor.upper())}\b", original_text):
+                return True
+        elif anchor in normalized_text:
+            return True
+    return False
+
+
+def _generate_disease_match_terms(disease: str) -> list[str]:
+    """Generate disease-matching terms for stricter post-filtering.
+
+    Universal disease synonym generation supporting:
+    - Cancer variants (carcinoma, neoplasm, tumor/tumour, malignancy)
+    - Organ aliases (common → medical term, unidirectional)
+    - Leukemia/leukaemia US/UK spelling
+    - Neurodegenerative possessive variants (alzheimer's/alzheimers/alzheimer)
+    - Fibrosis ↔ fibrotic
+    - 25+ abbreviation expansions (bidirectional)
+    - Inflammatory/autoimmune disease patterns
+    """
+    normalized = _normalize_for_filter(disease)
+    if not normalized:
+        return []
+
+    terms: list[str] = [normalized]
+
+    # --- 3a. Cancer variants (backward-compatible) ---
+    if "cancer" in normalized:
+        base = normalized.replace(" cancer", "").strip()
+        if base:
+            for suffix in ["carcinoma", "neoplasm", "neoplasms", "tumor", "tumour", "malignancy"]:
+                terms.append(f"{base} {suffix}")
+            terms.append(base)
+    if "carcinoma" in normalized:
+        base = normalized.replace(" carcinoma", "").replace("carcinoma", "").strip()
+        if base:
+            for suffix in ["cancer", "neoplasm", "tumor", "tumour"]:
+                terms.append(f"{base} {suffix}")
+    if "neoplasm" in normalized or "neoplasms" in normalized:
+        base = normalized.replace(" neoplasms", "").replace(" neoplasm", "").strip()
+        if base:
+            terms.append(f"{base} cancer")
+            terms.append(f"{base} tumor")
+    if "tumor" in normalized or "tumour" in normalized:
+        base = normalized.replace(" tumor", "").replace(" tumour", "").strip()
+        if base:
+            terms.append(f"{base} cancer")
+            # US/UK tumor ↔ tumour
+            if "tumor" in normalized:
+                terms.append(normalized.replace("tumor", "tumour"))
+            elif "tumour" in normalized:
+                terms.append(normalized.replace("tumour", "tumor"))
+
+    # --- 3b. Organ aliases (cross-product with ALL accumulated terms) ---
+    terms_snapshot = list(terms)  # Snapshot to avoid mutation during iteration
+    organ_expanded: list[str] = []
+    for organ, medical_terms in _ORGAN_TO_MEDICAL.items():
+        # Forward: common → medical on ALL terms
+        for existing_term in terms_snapshot:
+            if re.search(rf'\b{re.escape(organ)}\b', existing_term):
+                for med in medical_terms:
+                    new_term = existing_term.replace(organ, med)
+                    if new_term not in terms and new_term not in organ_expanded:
+                        organ_expanded.append(new_term)
+        # Reverse: medical → common on ALL terms
+        for med in medical_terms:
+            for existing_term in terms_snapshot:
+                if re.search(rf'\b{re.escape(med)}\b', existing_term):
+                    new_term = existing_term.replace(med, organ)
+                    if new_term not in terms and new_term not in organ_expanded:
+                        organ_expanded.append(new_term)
+        if len(terms) + len(organ_expanded) > 200:  # Size guard
+            break
+    terms.extend(organ_expanded)
+
+    # --- 3c. Leukemia/leukaemia US/UK ---
+    if "leukemia" in normalized:
+        terms.append(normalized.replace("leukemia", "leukaemia"))
+    elif "leukaemia" in normalized:
+        terms.append(normalized.replace("leukaemia", "leukemia"))
+
+    # --- 3d. Neurodegenerative possessive variants ---
+    # Handle: alzheimer's → alzheimer, alzheimers; parkinson's → parkinson, parkinsons
+    for neuro, abbrev in _NEURO_ABBREVS.items():
+        if neuro in normalized:
+            terms.append(neuro)
+            terms.append(f"{neuro}s")
+            terms.append(f"{neuro} disease")
+            terms.append(f"{neuro}s disease")
+            terms.append(abbrev)
+
+    # --- 3e. Fibrosis ↔ fibrotic ---
+    if "fibrosis" in normalized:
+        terms.append(normalized.replace("fibrosis", "fibrotic"))
+    elif "fibrotic" in normalized:
+        terms.append(normalized.replace("fibrotic", "fibrosis"))
+
+    # --- 3f. Abbreviation expansions (bidirectional) ---
+    # Also try without possessive 's' (e.g., "alzheimer s disease" → "alzheimer disease")
+    normalized_no_poss = re.sub(r"\b(\w+)\s+s\b", r"\1", normalized)
+    for lookup in {normalized, normalized_no_poss}:
+        if lookup in _DISEASE_ABBREVIATIONS:
+            expansion = _DISEASE_ABBREVIATIONS[lookup]
+            terms.append(expansion)
+            if "leukemia" in expansion:
+                terms.append(expansion.replace("leukemia", "leukaemia"))
+        if lookup in _DISEASE_EXPANSION_TO_ABBREV:
+            terms.append(_DISEASE_EXPANSION_TO_ABBREV[lookup])
+
+    # --- 3g. Inflammatory/autoimmune patterns ---
+    if "crohn" in normalized:
+        terms.extend(["crohn disease", "crohns disease", "crohn s disease"])
+    if "colitis" in normalized and "ulcerative" in normalized:
+        terms.extend(["uc", "ulcerative colitis"])
+    if "lupus" in normalized:
+        terms.extend(["sle", "systemic lupus erythematosus", "lupus"])
+    if "rheumatoid" in normalized:
+        terms.extend(["ra", "rheumatoid arthritis"])
+
+    # --- Lymphoma variants ---
+    if "lymphoma" in normalized:
+        base = normalized.replace(" lymphoma", "").strip()
+        if base:
+            terms.append(base)
+
+    # Remove duplicates and keep deterministic order
+    unique_terms: list[str] = []
+    for term in terms:
+        cleaned = term.strip()
+        if cleaned and cleaned not in unique_terms:
+            unique_terms.append(cleaned)
+    return unique_terms
+
+
+async def _resolve_mondo_id(disease_name: str) -> str | None:
+    """Resolve a disease name to a MONDO ontology ID via EBI OLS4 API.
+
+    Args:
+        disease_name: Human-readable disease name (e.g., "breast cancer")
+
+    Returns:
+        MONDO ID string (e.g., "MONDO:0007254") or None if not found.
+        Network errors return None without caching (allows retry).
+    """
+    encoded = urllib.parse.quote(disease_name)
+    url = f"https://www.ebi.ac.uk/ols4/api/search?q={encoded}&ontology=mondo&rows=5"
+
+    try:
+        def _fetch():
+            req = urllib.request.Request(url, headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        data = await asyncio.to_thread(_fetch)
+
+        docs = data.get("response", {}).get("docs", [])
+        for doc in docs:
+            obo_id = doc.get("obo_id", "")
+            if obo_id.startswith("MONDO:"):
+                logger.debug(f"Resolved '{disease_name}' → {obo_id}")
+                return obo_id
+
+    except Exception as e:
+        logger.debug(f"EBI OLS4 lookup failed for '{disease_name}': {e}")
+
+    return None
+
+
+def _parse_disease_synonyms(result: Any) -> list[str]:
+    """Parse disease synonyms from BioMCP disease_getter result.
+
+    BioMCP returns results in markdown format similar to gene_getter:
+    [{'type': 'text', 'text': '# Disease\\nName: ...\\nSynonym: term1, term2\\n...'}]
+
+    Args:
+        result: Raw result from disease_getter
+
+    Returns:
+        List of synonym strings
+    """
+    synonyms = []
+
+    if result is None:
+        return synonyms
+
+    if isinstance(result, list):
+        for item in result:
+            if isinstance(item, dict) and "text" in item:
+                text = item["text"]
+
+                # Parse "Synonym:" lines (BioMCP markdown format)
+                for match in re.finditer(r"Synonym[s]?:\s*([^\n]+)", text, re.IGNORECASE):
+                    line = match.group(1).strip()
+                    for syn in line.split(","):
+                        syn_clean = syn.strip().strip('"').strip("'")
+                        if syn_clean and syn_clean not in synonyms:
+                            synonyms.append(syn_clean)
+
+                # Also extract Name field
+                name_match = re.search(r"Name:\s*([^\n]+)", text)
+                if name_match:
+                    name = name_match.group(1).strip()
+                    if name and name not in synonyms:
+                        synonyms.append(name)
+
+                # JSON fallback
+                if not synonyms:
+                    try:
+                        data = json.loads(text)
+                        if isinstance(data, list) and len(data) > 0:
+                            data = data[0]
+                        if isinstance(data, dict):
+                            for field in ["synonym", "synonyms", "aliases"]:
+                                if field in data:
+                                    val = data[field]
+                                    if isinstance(val, list):
+                                        synonyms.extend([str(s) for s in val])
+                                    elif isinstance(val, str):
+                                        synonyms.extend(val.split(","))
+                    except json.JSONDecodeError:
+                        pass
+                break
+
+    return list(set(synonyms))
+
+
+async def _fetch_disease_synonyms_from_biomcp(
+    disease_id_or_name: str,
+    biomcp_url: str = DEFAULT_BIOMCP_URL,
+) -> list[str]:
+    """Fetch disease synonyms from BioMCP disease_getter (MyDisease.info).
+
+    Args:
+        disease_id_or_name: Disease name or MONDO ID (e.g., "MONDO:0007254")
+        biomcp_url: BioMCP server URL
+
+    Returns:
+        List of synonym strings (empty list if fetch fails)
+    """
+    try:
+        tools = await get_biomcp_tools(biomcp_url)
+        disease_getter = find_tool_by_name(tools, "disease_getter")
+
+        if disease_getter is None:
+            logger.debug("disease_getter tool not found, skipping synonym fetch")
+            return []
+
+        result = await disease_getter.ainvoke({"disease_id_or_name": disease_id_or_name})
+        synonyms = _parse_disease_synonyms(result)
+        logger.debug(f"Fetched synonyms for {disease_id_or_name}: {synonyms[:5]}...")
+        return synonyms
+
+    except Exception as e:
+        logger.debug(f"Failed to fetch disease synonyms for {disease_id_or_name}: {e}")
+        invalidate_client(f"biomcp_{biomcp_url}")
+        return []
+
+
+async def _get_disease_synonyms_async(
+    disease: str,
+    biomcp_url: str = DEFAULT_BIOMCP_URL,
+) -> list[str]:
+    """Get comprehensive disease match terms: rule-based + BioMCP API.
+
+    Orchestrates the hybrid approach:
+    1. Check cache (fast path)
+    2. Generate rule-based terms via _generate_disease_match_terms()
+    3. Try EBI OLS4 → MONDO ID → BioMCP disease_getter chain
+    4. Merge and cache results
+
+    Network errors do NOT cache (allows retry on next call).
+
+    Args:
+        disease: Disease name string
+        biomcp_url: BioMCP server URL
+
+    Returns:
+        Deduplicated list of disease match terms
+    """
+    normalized = _normalize_for_filter(disease)
+    if not normalized:
+        return []
+
+    # Cache hit → immediate return
+    with _DISEASE_SYNONYM_CACHE_LOCK:
+        if normalized in _DISEASE_SYNONYM_CACHE:
+            return list(_DISEASE_SYNONYM_CACHE[normalized])
+
+    # Rule-based terms (always available)
+    terms = _generate_disease_match_terms(disease)
+
+    # Try BioMCP API enrichment
+    api_succeeded = False
+    try:
+        # Step 1: Try disease name directly with disease_getter
+        api_synonyms = await _fetch_disease_synonyms_from_biomcp(disease, biomcp_url)
+
+        # Step 2: If few results, try resolving MONDO ID first
+        if len(api_synonyms) < 3:
+            mondo_id = await _resolve_mondo_id(disease)
+            if mondo_id:
+                mondo_synonyms = await _fetch_disease_synonyms_from_biomcp(mondo_id, biomcp_url)
+                api_synonyms.extend(mondo_synonyms)
+
+        # Merge API synonyms into terms
+        for syn in api_synonyms:
+            syn_normalized = _normalize_for_filter(syn)
+            if syn_normalized and syn_normalized not in terms:
+                terms.append(syn_normalized)
+
+        api_succeeded = True
+
+    except Exception as e:
+        logger.debug(f"BioMCP disease synonym enrichment failed for '{disease}': {e}")
+
+    # UBERON organ synonym enrichment (cross-product with accumulated terms)
+    organ_tokens = _extract_organ_tokens(normalized)
+    for organ_token in organ_tokens:
+        try:
+            uberon_synonyms = await _get_organ_synonyms_async(organ_token)
+            for existing_term in list(terms):  # Snapshot
+                if organ_token in existing_term:
+                    for syn in uberon_synonyms:
+                        replacement = existing_term.replace(organ_token, syn)
+                        if replacement not in terms:
+                            terms.append(replacement)
+            if len(terms) > 300:
+                break
+        except Exception:
+            pass  # Static dict terms already applied in rule-based step
+
+    # Safe-mode sanitization: remove broad terms and keep anchor-bound terms only.
+    terms = _sanitize_disease_match_terms(terms, disease)
+
+    # Cache result only if API succeeded or we have rule-based terms
+    if api_succeeded or len(terms) > 1:
+        with _DISEASE_SYNONYM_CACHE_LOCK:
+            _DISEASE_SYNONYM_CACHE[normalized] = terms
+
+    return terms
+
+
+def get_disease_match_terms(disease: str) -> list[str]:
+    """Get disease match terms (sync wrapper with cache fast path).
+
+    If the cache is pre-warmed (via _get_disease_synonyms_async in
+    _search_with_biomcp), this is a pure dict lookup with no event loop blocking.
+
+    Falls back to rule-based terms only if async call fails.
+
+    Args:
+        disease: Disease name string
+
+    Returns:
+        List of disease match terms
+    """
+    normalized = _normalize_for_filter(disease)
+    if not normalized:
+        return []
+
+    # Cache fast path (dict lookup, no thread)
+    with _DISEASE_SYNONYM_CACHE_LOCK:
+        if normalized in _DISEASE_SYNONYM_CACHE:
+            return _sanitize_disease_match_terms(
+                list(_DISEASE_SYNONYM_CACHE[normalized]),
+                disease,
+            )
+
+    # Try async enrichment
+    try:
+        return run_async(_get_disease_synonyms_async(disease), timeout=30)
+    except Exception:
+        # Graceful degradation: rule-based only
+        return _sanitize_disease_match_terms(
+            _generate_disease_match_terms(disease),
+            disease,
+        )
+
+
+def _paper_matches_disease_context(paper: dict[str, Any], diseases: list[str]) -> bool:
+    """Return whether paper title/abstract matches at least one target disease context.
+
+    Uses get_disease_match_terms() which returns cached results if pre-warmed
+    by _search_with_biomcp(), otherwise falls back to rule-based terms.
+    """
+    text = _normalize_for_filter(paper.get("title", "") + " " + paper.get("abstract", ""))
+    if not text:
+        return False
+
+    original_text = paper.get("title", "") + " " + paper.get("abstract", "")
+
+    for disease in diseases:
+        anchors = _build_disease_anchor_tokens(disease)
+        if not _paper_has_anchor_match(text, original_text, anchors):
+            continue
+
+        for term in get_disease_match_terms(disease):
+            if term:
+                if len(term) <= 4:
+                    # Case-sensitive uppercase word boundary for short terms —
+                    # disease abbreviations (ALL, AML, PD, AD) are uppercase in papers.
+                    # Prevents false positives from common English words ("all", "ms").
+                    if re.search(rf'\b{re.escape(term.upper())}\b', original_text):
+                        return True
+                elif term in text:
+                    return True
+
+    return False
+
+
+def _normalize_rerank_mode(mode: str | None) -> str:
+    """Normalize rerank mode string."""
+    if not mode:
+        return "off"
+    mode_norm = str(mode).strip().lower()
+    if mode_norm in {"llm", "off"}:
+        return mode_norm
+    return "off"
+
+
+def _merge_rerank_stats(target: dict[str, int], delta: dict[str, int]) -> None:
+    """Merge rerank counters into mutable target dict."""
+    for key in ("applied_count", "promoted_count", "dropped_count"):
+        target[key] = int(target.get(key, 0)) + int(delta.get(key, 0))
+
+
+def _strip_code_fence(text: str) -> str:
+    """Strip optional markdown code fences from LLM text."""
+    cleaned = (text or "").strip()
+    if "```json" in cleaned:
+        start = cleaned.find("```json") + 7
+        end = cleaned.find("```", start)
+        if end > start:
+            cleaned = cleaned[start:end].strip()
+    elif "```" in cleaned:
+        start = cleaned.find("```") + 3
+        end = cleaned.find("```", start)
+        if end > start:
+            cleaned = cleaned[start:end].strip()
+    return cleaned
+
+
+def _contains_canonical_disease_phrase(paper: dict[str, Any], diseases: list[str]) -> bool:
+    """Return True when paper text contains explicit canonical disease phrase."""
+    text = _normalize_for_filter(
+        (paper.get("title", "") or "") + " " + (paper.get("abstract", "") or "")
+    )
+    if not text:
+        return False
+    canonical_terms = [
+        _normalize_for_filter(d)
+        for d in diseases
+        if isinstance(d, str) and _normalize_for_filter(d)
+    ]
+    return any(term in text for term in canonical_terms)
+
+
+def _select_rerank_candidates(
+    kept_articles: list[dict[str, Any]],
+    removed_articles: list[dict[str, Any]],
+    diseases: list[str],
+    top_n: int,
+) -> list[dict[str, Any]]:
+    """Select boundary candidates for LLM rerank.
+
+    Precision-first selection:
+    - kept without canonical phrase -> possible demotion candidate
+    - removed with canonical phrase -> possible promotion candidate
+    """
+    if top_n <= 0:
+        return []
+
+    candidates: list[dict[str, Any]] = []
+
+    for paper in kept_articles:
+        pmid = str(paper.get("pmid", "")).strip()
+        if not pmid:
+            continue
+        if not _contains_canonical_disease_phrase(paper, diseases):
+            candidates.append(
+                {"source": "kept", "priority": 0, "pmid": pmid, "paper": paper}
+            )
+
+    for paper in removed_articles:
+        pmid = str(paper.get("pmid", "")).strip()
+        if not pmid:
+            continue
+        if _contains_canonical_disease_phrase(paper, diseases):
+            candidates.append(
+                {"source": "removed", "priority": 1, "pmid": pmid, "paper": paper}
+            )
+
+    candidates.sort(key=lambda x: (x["priority"], x["pmid"]))
+    return candidates[:top_n]
+
+
+def _parse_rerank_judgments(response_text: str) -> dict[tuple[str, str], tuple[str, float]]:
+    """Parse LLM rerank JSON response.
+
+    Returns:
+        Mapping (source, pmid) -> (verdict, confidence)
+    """
+    text = _strip_code_fence(response_text)
+    if "[" in text and "]" in text:
+        start = text.find("[")
+        end = text.rfind("]") + 1
+        text = text[start:end]
+
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+
+    if isinstance(parsed, dict):
+        parsed = [parsed]
+    if not isinstance(parsed, list):
+        return {}
+
+    verdicts: dict[tuple[str, str], tuple[str, float]] = {}
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        pmid = str(item.get("pmid", "")).strip()
+        source = str(item.get("source", "")).strip().lower()
+        verdict = str(item.get("verdict", "")).strip().lower()
+
+        conf_raw = item.get("confidence", 0.0)
+        try:
+            confidence = float(conf_raw)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        confidence = max(0.0, min(1.0, confidence))
+
+        if not pmid or source not in {"kept", "removed"}:
+            continue
+        if verdict not in {"relevant", "uncertain", "irrelevant"}:
+            continue
+        verdicts[(source, pmid)] = (verdict, confidence)
+
+    return verdicts
+
+
+def _build_rerank_prompt(diseases: list[str], candidates: list[dict[str, Any]]) -> str:
+    """Build precision-first rerank prompt for boundary papers."""
+    compact_candidates = []
+    for c in candidates:
+        paper = c["paper"]
+        compact_candidates.append(
+            {
+                "source": c["source"],
+                "pmid": c["pmid"],
+                "title": (paper.get("title", "") or "")[:240],
+                "abstract": (paper.get("abstract", "") or "")[:800],
+            }
+        )
+
+    return (
+        "You are a strict biomedical relevance judge.\n"
+        "Task: determine whether each paper is relevant to the target disease context.\n\n"
+        f"Target diseases: {diseases}\n"
+        "Policy (precision-first):\n"
+        "- relevant: clearly about the target disease context\n"
+        "- uncertain: ambiguous or indirect\n"
+        "- irrelevant: not about target disease context\n"
+        "- Be conservative. Prefer 'irrelevant' over false positives.\n\n"
+        "Return ONLY JSON array with objects:\n"
+        '[{"source":"kept|removed","pmid":"string","verdict":"relevant|uncertain|irrelevant","confidence":0.0-1.0}]\n\n'
+        f"Candidates:\n{json.dumps(compact_candidates, ensure_ascii=False)}"
+    )
+
+
+async def _rerank_disease_relevance_with_llm(
+    kept_articles: list[dict[str, Any]],
+    removed_articles: list[dict[str, Any]],
+    diseases: list[str],
+    top_n: int = 12,
+    min_confidence: float = 0.70,
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Optional second-stage reranking for precision-first disease relevance."""
+    stats = {"applied_count": 0, "promoted_count": 0, "dropped_count": 0}
+    candidates = _select_rerank_candidates(
+        kept_articles=kept_articles,
+        removed_articles=removed_articles,
+        diseases=diseases,
+        top_n=top_n,
+    )
+    if not candidates:
+        return kept_articles, stats
+
+    try:
+        llm = create_llm()
+        prompt = _build_rerank_prompt(diseases, candidates)
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        response_text = response.content if hasattr(response, "content") else str(response)
+        judgments = _parse_rerank_judgments(response_text)
+    except Exception as e:
+        logger.debug(f"LLM rerank skipped due to error: {e}")
+        return kept_articles, stats
+
+    if not judgments:
+        return kept_articles, stats
+
+    kept_map = {str(p.get("pmid", "")): p for p in kept_articles if str(p.get("pmid", ""))}
+    removed_map = {str(p.get("pmid", "")): p for p in removed_articles if str(p.get("pmid", ""))}
+
+    drop_pmids: set[str] = set()
+    promote_pmids: set[str] = set()
+
+    for (source, pmid), (verdict, confidence) in judgments.items():
+        if confidence < min_confidence:
+            continue
+        stats["applied_count"] += 1
+
+        if source == "kept" and pmid in kept_map:
+            if verdict in {"irrelevant", "uncertain"}:
+                drop_pmids.add(pmid)
+                stats["dropped_count"] += 1
+        elif source == "removed" and pmid in removed_map:
+            if verdict == "relevant":
+                promote_pmids.add(pmid)
+                stats["promoted_count"] += 1
+
+    reranked = [p for p in kept_articles if str(p.get("pmid", "")) not in drop_pmids]
+    seen = {str(p.get("pmid", "")) for p in reranked if str(p.get("pmid", ""))}
+    for pmid in sorted(promote_pmids):
+        if pmid in removed_map and pmid not in seen:
+            reranked.append(removed_map[pmid])
+            seen.add(pmid)
+
+    return reranked, stats
 
 
 MAX_ABSTRACT_LENGTH = 1500  # ~200 words, sufficient for coverage matching
@@ -488,6 +1587,9 @@ def search_literature(
     disease: str,
     keywords: list[str],
     max_results: int = 15,
+    rerank_mode: str = "off",
+    rerank_top_n: int = 12,
+    rerank_min_confidence: float = 0.70,
 ) -> list[dict]:
     """Search PubMed via BioMCP for supporting literature.
 
@@ -499,6 +1601,9 @@ def search_literature(
         disease: Disease context (e.g., "breast cancer")
         keywords: Additional keywords (e.g., ["EMT", "spatial transcriptomics"])
         max_results: Maximum number of results to return (default 15)
+        rerank_mode: "off" or "llm" for optional second-stage rerank
+        rerank_top_n: Max boundary candidates reranked by LLM
+        rerank_min_confidence: Minimum confidence threshold for rerank decision
 
     Returns:
         List of article dictionaries with:
@@ -529,6 +1634,10 @@ def search_literature(
                 diseases=diseases_list,
                 keywords=keywords_list,
                 page_size=max_results,
+                enforce_disease_match=bool(disease and isinstance(disease, str) and disease.strip()),
+                rerank_mode=rerank_mode,
+                rerank_top_n=rerank_top_n,
+                rerank_min_confidence=rerank_min_confidence,
             ),
             timeout=60,
         )
@@ -543,6 +1652,9 @@ async def search_literature_async(
     keywords: list[str],
     max_results: int = 15,
     biomcp_url: str = DEFAULT_BIOMCP_URL,
+    rerank_mode: str = "off",
+    rerank_top_n: int = 12,
+    rerank_min_confidence: float = 0.70,
 ) -> list[dict]:
     """Async version of search_literature.
 
@@ -554,6 +1666,9 @@ async def search_literature_async(
         keywords: Additional keywords
         max_results: Maximum results to return
         biomcp_url: BioMCP server URL
+        rerank_mode: "off" or "llm" for optional second-stage rerank
+        rerank_top_n: Max boundary candidates reranked by LLM
+        rerank_min_confidence: Minimum confidence threshold for rerank decision
 
     Returns:
         List of article dictionaries
@@ -579,7 +1694,11 @@ async def search_literature_async(
         diseases=diseases_list,
         keywords=keywords_list,
         page_size=max_results,
+        enforce_disease_match=bool(disease and isinstance(disease, str) and disease.strip()),
         biomcp_url=biomcp_url,
+        rerank_mode=rerank_mode,
+        rerank_top_n=rerank_top_n,
+        rerank_min_confidence=rerank_min_confidence,
     )
 
 
@@ -645,6 +1764,10 @@ async def _execute_fixed_strategy_search_async(
     disease: str,
     max_results: int = 20,
     biomcp_url: str = DEFAULT_BIOMCP_URL,
+    rerank_mode: str = "off",
+    rerank_top_n: int = 12,
+    rerank_min_confidence: float = 0.70,
+    rerank_stats: dict[str, int] | None = None,
 ) -> dict:
     """Async fixed-strategy search function (used as fallback).
 
@@ -659,6 +1782,10 @@ async def _execute_fixed_strategy_search_async(
         disease: Disease context
         max_results: Maximum papers to return
         biomcp_url: BioMCP server URL
+        rerank_mode: "off" or "llm" for optional second-stage rerank
+        rerank_top_n: Max boundary candidates reranked by LLM
+        rerank_min_confidence: Minimum confidence threshold for rerank decision
+        rerank_stats: Optional mutable counter dict for rerank telemetry aggregation
 
     Returns:
         Dictionary with papers, search_queries, coverage, and search_method
@@ -720,6 +1847,11 @@ async def _execute_fixed_strategy_search_async(
                 keywords=sq.get("keywords"),
                 page_size=results_per_query,
                 biomcp_url=biomcp_url,
+                enforce_disease_match=True,
+                rerank_mode=rerank_mode,
+                rerank_top_n=rerank_top_n,
+                rerank_min_confidence=rerank_min_confidence,
+                rerank_stats=rerank_stats,
             )
             for paper in results:
                 pmid = paper.get("pmid", "")
@@ -736,6 +1868,17 @@ async def _execute_fixed_strategy_search_async(
     # Use unified coverage calculation (same as search_literature_dynamic)
     coverage = _calculate_coverage(papers, genes, pathways, celltypes)
 
+    rerank_telemetry = rerank_stats or {
+        "applied_count": 0,
+        "promoted_count": 0,
+        "dropped_count": 0,
+    }
+    filter_stage = (
+        "hybrid_2stage"
+        if _normalize_rerank_mode(rerank_mode) == "llm"
+        else "deterministic_only"
+    )
+
     return {
         "papers": papers,
         "search_queries": [
@@ -749,6 +1892,10 @@ async def _execute_fixed_strategy_search_async(
         ],
         "coverage": coverage,
         "search_method": "fixed_strategy_fallback",
+        "filter_stage": filter_stage,
+        "rerank_applied_count": int(rerank_telemetry.get("applied_count", 0)),
+        "rerank_promoted_count": int(rerank_telemetry.get("promoted_count", 0)),
+        "rerank_dropped_count": int(rerank_telemetry.get("dropped_count", 0)),
     }
 
 
@@ -1370,6 +2517,9 @@ def search_literature_dynamic(
     max_iterations: int = 3,
     output_path: str = "",
     data_dir: str = "",
+    rerank_mode: str = "off",
+    rerank_top_n: int = 12,
+    rerank_min_confidence: float = 0.70,
 ) -> dict:
     """LLM-powered dynamic literature search with ITERATIVE coverage improvement.
 
@@ -1395,6 +2545,9 @@ def search_literature_dynamic(
             to data_dir/output_path. Returns compact summary.
         data_dir: Directory for saving output files. SEARCHER should read this from
             /data_path.txt (written by PLANNER). Falls back to contextvars if empty.
+        rerank_mode: "off" or "llm" for optional second-stage rerank
+        rerank_top_n: Max boundary candidates reranked by LLM
+        rerank_min_confidence: Minimum confidence threshold for rerank decision
 
     Returns:
         If output_path is empty: Dictionary with papers, generated_queries, coverage,
@@ -1414,6 +2567,9 @@ def search_literature_dynamic(
             max_iterations=max_iterations,
             output_path=output_path,
             data_dir=data_dir,
+            rerank_mode=rerank_mode,
+            rerank_top_n=rerank_top_n,
+            rerank_min_confidence=rerank_min_confidence,
         ),
         timeout=300,
     )
@@ -1431,6 +2587,9 @@ async def search_literature_dynamic_async(
     biomcp_url: str = DEFAULT_BIOMCP_URL,
     output_path: str = "",
     data_dir: str = "",
+    rerank_mode: str = "off",
+    rerank_top_n: int = 12,
+    rerank_min_confidence: float = 0.70,
 ) -> dict:
     """Async version of search_literature_dynamic with ITERATIVE coverage improvement.
 
@@ -1448,6 +2607,9 @@ async def search_literature_dynamic_async(
         biomcp_url: BioMCP server URL
         output_path: If provided, saves full results to file and returns compact summary
         data_dir: Explicit data directory for auto-save (priority over env var)
+        rerank_mode: "off" or "llm" for optional second-stage rerank
+        rerank_top_n: Max boundary candidates reranked by LLM
+        rerank_min_confidence: Minimum confidence threshold for rerank decision
 
     Returns:
         If output_path is empty: full results dict.
@@ -1458,12 +2620,13 @@ async def search_literature_dynamic_async(
     all_queries = []
     seen_pmids = set()
     coverage_history = []
+    normalized_rerank_mode = _normalize_rerank_mode(rerank_mode)
+    rerank_totals = {"applied_count": 0, "promoted_count": 0, "dropped_count": 0}
 
-    # Step 0: BioMCP think for strategic planning (once)
-    think_result = await _think_with_biomcp(genes, pathways, celltypes, disease, biomcp_url)
-    strategic_context = think_result.get("strategic_context", "")
+    # Keep output schema backward-compatible even though strategic think is skipped.
+    think_success = True
 
-    # Note: Step 0.5 (pre-fetch aliases) removed - BioMCP article_searcher
+    # Note: pre-fetch aliases removed - BioMCP article_searcher
     # automatically handles gene aliases internally (e.g., ACKR3 -> CXCR7)
 
     llm = create_llm()
@@ -1505,7 +2668,6 @@ async def search_literature_dynamic_async(
                 celltypes=", ".join(celltypes) if celltypes else "None",
                 disease=disease or "Not specified",
                 gene_aliases="",  # BioMCP article_searcher handles aliases internally
-                strategic_context=strategic_context,
             )
         else:
             # Gap-filling search for missing genes/pathways
@@ -1540,6 +2702,10 @@ async def search_literature_dynamic_async(
                     disease=disease,
                     max_results=max_results,
                     biomcp_url=biomcp_url,
+                    rerank_mode=normalized_rerank_mode,
+                    rerank_top_n=rerank_top_n,
+                    rerank_min_confidence=rerank_min_confidence,
+                    rerank_stats=rerank_totals,
                 )
             break
 
@@ -1557,6 +2723,10 @@ async def search_literature_dynamic_async(
                     disease=disease,
                     max_results=max_results,
                     biomcp_url=biomcp_url,
+                    rerank_mode=normalized_rerank_mode,
+                    rerank_top_n=rerank_top_n,
+                    rerank_min_confidence=rerank_min_confidence,
+                    rerank_stats=rerank_totals,
                 )
             logger.warning(f"No valid queries at iteration {iteration}, stopping")
             break
@@ -1587,12 +2757,21 @@ async def search_literature_dynamic_async(
                 break
 
             try:
+                query_diseases = query.get("diseases")
+                if not query_diseases and disease:
+                    query_diseases = [disease]
+
                 results = await _search_with_biomcp(
                     genes=query.get("genes"),
-                    diseases=query.get("diseases"),
+                    diseases=query_diseases,
                     keywords=query.get("keywords"),
                     page_size=gene_results_per_query,
                     biomcp_url=biomcp_url,
+                    enforce_disease_match=True,
+                    rerank_mode=normalized_rerank_mode,
+                    rerank_top_n=rerank_top_n,
+                    rerank_min_confidence=rerank_min_confidence,
+                    rerank_stats=rerank_totals,
                 )
 
                 new_papers = 0
@@ -1618,12 +2797,21 @@ async def search_literature_dynamic_async(
                 break
 
             try:
+                query_diseases = query.get("diseases")
+                if not query_diseases and disease:
+                    query_diseases = [disease]
+
                 results = await _search_with_biomcp(
                     genes=query.get("genes"),
-                    diseases=query.get("diseases"),
+                    diseases=query_diseases,
                     keywords=query.get("keywords"),
                     page_size=pathway_results_per_query,
                     biomcp_url=biomcp_url,
+                    enforce_disease_match=True,
+                    rerank_mode=normalized_rerank_mode,
+                    rerank_top_n=rerank_top_n,
+                    rerank_min_confidence=rerank_min_confidence,
+                    rerank_stats=rerank_totals,
                 )
 
                 new_papers = 0
@@ -1683,16 +2871,24 @@ async def search_literature_dynamic_async(
             )
         recommended_actions.append("Use think_tool to reflect on gaps before proceeding.")
 
+    filter_stage = (
+        "hybrid_2stage" if normalized_rerank_mode == "llm" else "deterministic_only"
+    )
+
     full_result = {
         "papers": final_papers,
         "generated_queries": all_queries,
         "coverage": final_coverage,
         "search_method": "search_literature_dynamic",
-        "think_success": think_result.get("success", False),
+        "think_success": think_success,
         "iterations": len(coverage_history) - 1,
         "coverage_history": coverage_history,
         "coverage_sufficient": coverage_sufficient,
         "recommended_actions": recommended_actions,
+        "filter_stage": filter_stage,
+        "rerank_applied_count": int(rerank_totals.get("applied_count", 0)),
+        "rerank_promoted_count": int(rerank_totals.get("promoted_count", 0)),
+        "rerank_dropped_count": int(rerank_totals.get("dropped_count", 0)),
     }
 
     # Auto-save: write full results to file, return compact summary to LLM
@@ -1715,10 +2911,14 @@ async def search_literature_dynamic_async(
                         p.get("title", "")[:100] for p in final_papers[:10]
                     ],
                     "search_method": "search_literature_dynamic",
-                    "think_success": think_result.get("success", False),
+                    "think_success": think_success,
                     "iterations": len(coverage_history) - 1,
                     "coverage_sufficient": coverage_sufficient,
                     "recommended_actions": recommended_actions,
+                    "filter_stage": filter_stage,
+                    "rerank_applied_count": int(rerank_totals.get("applied_count", 0)),
+                    "rerank_promoted_count": int(rerank_totals.get("promoted_count", 0)),
+                    "rerank_dropped_count": int(rerank_totals.get("dropped_count", 0)),
                     "message": (
                         f"Full results ({len(final_papers)} papers) saved to "
                         f"{output_path}. Use read_file('/{output_path}') to "
