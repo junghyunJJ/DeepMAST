@@ -914,12 +914,16 @@ def _generate_html_report_impl(
                 for d in drugs[:20]:
                     phase = d.get("phase", 0)
                     phase_cls = f"drug-phase-{min(phase, 4)}"
+                    ct_count = int(d.get("clinical_trials_total_count", 0) or 0)
+                    db_count = int(d.get("drugbank_match_count", 0) or 0)
                     rows.append(f"""
                     <tr>
                         <td>{d.get('drug_name', '')}</td>
                         <td><span class="drug-phase {phase_cls}">Phase {phase}</span></td>
                         <td>{d.get('mechanism_of_action', 'N/A')}</td>
                         <td>{', '.join(d.get('target_genes', []))}</td>
+                        <td>{ct_count}</td>
+                        <td>{db_count}</td>
                         <td>{d.get('status', '')}</td>
                     </tr>
                     """)
@@ -928,7 +932,7 @@ def _generate_html_report_impl(
                     <h3>Known Drugs ({len(drugs)} found)</h3>
                     <div class="table-container">
                         <table>
-                            <thead><tr><th>Drug</th><th>Phase</th><th>Mechanism</th><th>Targets</th><th>Status</th></tr></thead>
+                            <thead><tr><th>Drug</th><th>Phase</th><th>Mechanism</th><th>Targets</th><th>Trials (CT.gov)</th><th>DrugBank Match</th><th>Status</th></tr></thead>
                             <tbody>{''.join(rows)}</tbody>
                         </table>
                     </div>
@@ -955,11 +959,24 @@ def _generate_html_report_impl(
             if "validated_pass_count" in summary or "exploratory_pass_count" in summary:
                 top_validated = ", ".join(summary.get("top_validated_genes", [])[:5]) or "N/A"
                 top_exploratory = ", ".join(summary.get("top_exploratory_genes", [])[:5]) or "N/A"
+                gwas_direct_status = summary.get("gwas_direct_status", "unknown")
+                gwas_direct_genes = summary.get("genes_with_gwas_direct_signal", 0)
+                multi_source = summary.get("multi_source_status", {}) or {}
+                chembl_status = multi_source.get("chembl", "unknown")
+                clinicaltrials_status = multi_source.get("clinicaltrials", "unknown")
+                drugbank_status = multi_source.get("drugbank", "unknown")
                 track_summary_html = f"""
                 <p><strong>Validated Pass:</strong> {summary.get('validated_pass_count', 0)} |
                    <strong>Exploratory Pass:</strong> {summary.get('exploratory_pass_count', 0)}</p>
                 <p><strong>Top Validated Genes:</strong> {top_validated}</p>
                 <p><strong>Top Exploratory Genes:</strong> {top_exploratory}</p>
+                <p><strong>GWAS Direct:</strong> {gwas_direct_status} |
+                   <strong>Genes with Direct Signal:</strong> {gwas_direct_genes}</p>
+                <p><strong>Multi-source Status:</strong>
+                   ChEMBL={chembl_status}, ClinicalTrials={clinicaltrials_status}, DrugBank={drugbank_status}</p>
+                <p><strong>Genes with ChEMBL Support:</strong> {summary.get('genes_with_chembl_target_support', 0)} |
+                   <strong>Drugs with ClinicalTrials:</strong> {summary.get('drugs_with_clinical_trials', 0)} |
+                   <strong>Drugs with DrugBank Match:</strong> {summary.get('drugs_with_drugbank_match', 0)}</p>
                 """
 
             therapeutic_content = f"""

@@ -16,6 +16,14 @@ from typing import Optional
 import pandas as pd
 from langchain_core.tools import tool
 
+from src.agents.deep_interpreter.tools.gwas_adapter import (
+    GwasDirectAdapterError,
+    fetch_gwas_direct_gene_scores,
+)
+from src.agents.deep_interpreter.tools.multi_source_evidence import (
+    collect_multi_source_evidence,
+)
+
 # Add the skills script directory to sys.path so we can import query_opentargets
 _SKILLS_SCRIPT_DIR = str(
     Path(__file__).resolve().parent.parent.parent.parent.parent
@@ -327,6 +335,116 @@ def _compute_gwas_proxy_scores(
     }
 
 
+def _compute_weighted_gwas_score(
+    reported_score: float,
+    nearest_score: float,
+    reported_weight: float = 1.0,
+    nearest_weight: float = 0.6,
+) -> float:
+    """Compute weighted GWAS combined score from reported/nearest signals."""
+    denom = float(reported_weight) + float(nearest_weight)
+    if denom <= 0:
+        return 0.0
+    combined = (
+        (float(reported_weight) * float(reported_score))
+        + (float(nearest_weight) * float(nearest_score))
+    ) / denom
+    return max(0.0, min(1.0, float(combined)))
+
+
+def _merge_gwas_hybrid_scores(
+    proxy_scores: dict,
+    direct_scores: Optional[dict],
+    consistency_delta: float = 0.35,
+) -> dict:
+    """Merge OpenTargets GWAS proxy and direct GWAS adapter signals.
+
+    Policy:
+    - If direct GWAS data exists for a gene, blend proxy + direct signals
+      at reported/nearest dimensions (simple mean of non-empty sources).
+    - If direct data is unavailable, fall back to proxy-only values.
+    """
+    reported_weight = float(
+        (proxy_scores.get("gwas_weights") or {}).get("reported_gene", 1.0)
+    )
+    nearest_weight = float(
+        (proxy_scores.get("gwas_weights") or {}).get("nearest_gene", 0.6)
+    )
+
+    proxy_reported_hits = int(proxy_scores.get("gwas_reported_hits_count", 0) or 0)
+    proxy_nearest_hits = int(proxy_scores.get("gwas_nearest_hits_count", 0) or 0)
+    proxy_reported_score = float(proxy_scores.get("gwas_reported_score", 0.0) or 0.0)
+    proxy_nearest_score = float(proxy_scores.get("gwas_nearest_score", 0.0) or 0.0)
+
+    direct_payload = direct_scores or {}
+    direct_reported_hits = int(direct_payload.get("reported_hits_count", 0) or 0)
+    direct_nearest_hits = int(direct_payload.get("nearest_hits_count", 0) or 0)
+    direct_reported_score = float(direct_payload.get("reported_signal", 0.0) or 0.0)
+    direct_nearest_score = float(direct_payload.get("nearest_signal", 0.0) or 0.0)
+    has_direct_signal = (direct_reported_hits + direct_nearest_hits) > 0
+
+    reported_sources: list[float] = []
+    nearest_sources: list[float] = []
+    if proxy_reported_hits > 0:
+        reported_sources.append(proxy_reported_score)
+    if direct_reported_hits > 0:
+        reported_sources.append(direct_reported_score)
+    if proxy_nearest_hits > 0:
+        nearest_sources.append(proxy_nearest_score)
+    if direct_nearest_hits > 0:
+        nearest_sources.append(direct_nearest_score)
+
+    merged_reported_score = (
+        sum(reported_sources) / len(reported_sources) if reported_sources else 0.0
+    )
+    merged_nearest_score = (
+        sum(nearest_sources) / len(nearest_sources) if nearest_sources else 0.0
+    )
+
+    merged_reported_hits = proxy_reported_hits + direct_reported_hits
+    merged_nearest_hits = proxy_nearest_hits + direct_nearest_hits
+    merged_combined = _compute_weighted_gwas_score(
+        reported_score=merged_reported_score,
+        nearest_score=merged_nearest_score,
+        reported_weight=reported_weight,
+        nearest_weight=nearest_weight,
+    )
+
+    ot_genetic_association_score = float(
+        proxy_scores.get("ot_genetic_association_score", 0.0) or 0.0
+    )
+    has_signal = ot_genetic_association_score > 0 or merged_combined > 0
+    genetic_consistency_flag = (
+        has_signal
+        and abs(ot_genetic_association_score - merged_combined) >= consistency_delta
+    )
+
+    return {
+        "gwas_mapping_policy": "reported_plus_nearest_weighted",
+        "gwas_weights": {
+            "reported_gene": reported_weight,
+            "nearest_gene": nearest_weight,
+        },
+        "ot_genetic_association_score": ot_genetic_association_score,
+        "gwas_reported_hits_count": int(merged_reported_hits),
+        "gwas_nearest_hits_count": int(merged_nearest_hits),
+        "gwas_reported_score": float(merged_reported_score),
+        "gwas_nearest_score": float(merged_nearest_score),
+        "gwas_combined_score": float(merged_combined),
+        "genetic_consistency_flag": bool(genetic_consistency_flag),
+        "gwas_signal_source": (
+            "hybrid_open_targets_plus_gwas_database"
+            if has_direct_signal
+            else "opentargets_proxy_only"
+        ),
+        "gwas_direct_used": bool(has_direct_signal),
+        "gwas_direct_reported_hits_count": int(direct_reported_hits),
+        "gwas_direct_nearest_hits_count": int(direct_nearest_hits),
+        "gwas_direct_reported_score": float(direct_reported_score),
+        "gwas_direct_nearest_score": float(direct_nearest_score),
+    }
+
+
 def _index_known_drugs_by_gene(
     known_drugs: list[dict],
     genes: list[str],
@@ -360,20 +478,36 @@ def _compute_validated_score(
     # L-R candidate genes are treated as mechanism-relevant in v1.
     mechanism_relevance = 1.0 if from_lr_candidates else 0.0
     safety_penalty = 1.0 if len(target.get("safety_liabilities", [])) > 0 else 0.0
+    max_clinical_trials_count = max(
+        (int(d.get("clinical_trials_total_count", 0) or 0) for d in gene_drugs),
+        default=0,
+    )
+    # Log scaling keeps broad trial-count ranges stable.
+    clinical_trials_signal = min(math.log10(max_clinical_trials_count + 1) / 3.0, 1.0)
+    drugbank_support = 1.0 if any(
+        int(d.get("drugbank_match_count", 0) or 0) > 0 for d in gene_drugs
+    ) else 0.0
 
     score = (
-        0.45 * known_drug_clinical
-        + 0.25 * clinical_phase_status
-        + 0.15 * ot_known_drug_signal
-        + 0.10 * mechanism_relevance
+        0.40 * known_drug_clinical
+        + 0.20 * clinical_phase_status
+        + 0.12 * ot_known_drug_signal
+        + 0.08 * mechanism_relevance
+        + 0.12 * clinical_trials_signal
+        + 0.08 * drugbank_support
         - 0.05 * safety_penalty
     )
     validated_score = max(0.0, min(1.0, float(score)))
 
     known_drug_signal_strong = known_drug_clinical >= 1.0 or ot_known_drug_signal >= 0.67
     clinical_support_present = max_phase >= 1
+    multi_source_clinical_support = (
+        clinical_trials_signal >= 0.5 or drugbank_support > 0
+    )
     validated_pass = (max_phase >= 2) or (
         known_drug_signal_strong and clinical_support_present
+    ) or (
+        len(gene_drugs) > 0 and multi_source_clinical_support
     )
 
     return {
@@ -383,8 +517,11 @@ def _compute_validated_score(
         "clinical_phase_status": clinical_phase_status,
         "ot_known_drug_signal": ot_known_drug_signal,
         "mechanism_relevance": mechanism_relevance,
+        "clinical_trials_signal": clinical_trials_signal,
+        "drugbank_support": drugbank_support,
         "safety_penalty_applied": bool(safety_penalty),
         "max_clinical_phase": int(max_phase),
+        "max_clinical_trials_count": int(max_clinical_trials_count),
         "known_drug_hits": len(gene_drugs),
     }
 
@@ -392,6 +529,8 @@ def _compute_validated_score(
 def _compute_exploratory_score(
     target: dict,
     from_lr_candidates: bool,
+    chembl_target_hits_count: int = 0,
+    chembl_exact_symbol_match: bool = False,
 ) -> dict:
     """Compute exploratory (genetic/biology-centric) score."""
     gwas_combined_score = float(target.get("gwas_combined_score", 0.0) or 0.0)
@@ -410,13 +549,22 @@ def _compute_exploratory_score(
     pathway_context_match = 1.0 if from_lr_candidates else 0.0
     evidence_count = float(target.get("evidence_count", 0) or 0.0)
     literature_support = min(evidence_count / 20.0, 1.0)
+    chembl_target_support = min(max(float(chembl_target_hits_count), 0.0) / 3.0, 1.0)
+    if chembl_exact_symbol_match:
+        chembl_target_support = min(1.0, chembl_target_support + 0.2)
+    gwas_direct_hits_count = int(
+        target.get("gwas_direct_reported_hits_count", 0) or 0
+    ) + int(target.get("gwas_direct_nearest_hits_count", 0) or 0)
+    gwas_direct_support = min(gwas_direct_hits_count / 3.0, 1.0)
 
     exploratory_score = (
-        0.35 * gwas_combined_score
-        + 0.30 * ot_genetic_association
-        + 0.15 * tractability_signal
-        + 0.10 * pathway_context_match
-        + 0.10 * literature_support
+        0.32 * gwas_combined_score
+        + 0.28 * ot_genetic_association
+        + 0.12 * tractability_signal
+        + 0.08 * pathway_context_match
+        + 0.08 * literature_support
+        + 0.07 * chembl_target_support
+        + 0.05 * gwas_direct_support
     )
     exploratory_score = max(0.0, min(1.0, float(exploratory_score)))
 
@@ -427,6 +575,8 @@ def _compute_exploratory_score(
         "tractability_signal": tractability_signal,
         "pathway_context_match": pathway_context_match,
         "literature_support": literature_support,
+        "chembl_target_support": chembl_target_support,
+        "gwas_direct_support": gwas_direct_support,
     }
 
 
@@ -458,6 +608,24 @@ def search_drug_targets(
 
     results = {}
     failed_genes = []
+    gwas_direct_scores_by_gene: dict[str, dict] = {}
+    gwas_direct_status = "not_requested"
+    gwas_direct_error = ""
+    try:
+        gwas_direct_scores_by_gene = fetch_gwas_direct_gene_scores(
+            disease=disease,
+            genes=gene_symbols,
+            efo_id=efo_id,
+        )
+        gwas_direct_status = "ok"
+    except GwasDirectAdapterError as e:
+        gwas_direct_status = "degraded"
+        gwas_direct_error = str(e)
+        logger.warning("GWAS direct adapter unavailable: %s", e)
+    except Exception as e:
+        gwas_direct_status = "degraded"
+        gwas_direct_error = str(e)
+        logger.warning("Unexpected GWAS direct adapter failure: %s", e)
 
     for gene in gene_symbols:
         try:
@@ -510,6 +678,15 @@ def search_drug_targets(
                 approved_symbol=approved_symbol,
                 ot_genetic_association_score=ot_genetic_association_score,
             )
+            gwas_direct = (
+                gwas_direct_scores_by_gene.get(gene)
+                or gwas_direct_scores_by_gene.get(approved_symbol)
+                or {}
+            )
+            gwas_hybrid = _merge_gwas_hybrid_scores(
+                proxy_scores=gwas_proxy,
+                direct_scores=gwas_direct,
+            )
 
             results[gene] = {
                 "ensembl_id": ensembl_id,
@@ -527,7 +704,7 @@ def search_drug_targets(
                 "disease_association_score": association_score,
                 "evidence_count": len(evidence),
                 "evidence_types": evidence_types,
-                **gwas_proxy,
+                **gwas_hybrid,
             }
         except Exception as e:
             logger.warning(f"Error querying OpenTargets for {gene}: {e}")
@@ -538,6 +715,8 @@ def search_drug_targets(
         "efo_id": efo_id,
         "genes_found": len(results),
         "genes_failed": failed_genes,
+        "gwas_direct_status": gwas_direct_status,
+        "gwas_direct_error": gwas_direct_error,
         "targets": results,
     }, indent=2)
 
@@ -779,15 +958,42 @@ def assess_therapeutic_potential(
         "disease": disease,
         "gene_symbols": gene_list,
     }))
+    multi_source = collect_multi_source_evidence(
+        disease=disease,
+        gene_symbols=gene_list,
+        known_drugs=drugs_result.get("drugs", []),
+    )
+
+    # Enrich known-drug rows with ClinicalTrials/DrugBank evidence.
+    for drug_row in drugs_result.get("drugs", []):
+        drug_name = str(drug_row.get("drug_name", "") or "").strip()
+        drug_key = drug_name.upper()
+        ct_payload = (multi_source.get("clinicaltrials_by_drug") or {}).get(drug_key, {})
+        db_payload = (multi_source.get("drugbank_by_drug") or {}).get(drug_key, {})
+        drug_row["clinical_trials_total_count"] = int(
+            ct_payload.get("clinical_trials_total_count", 0) or 0
+        )
+        drug_row["drugbank_match_count"] = int(
+            db_payload.get("drugbank_match_count", 0) or 0
+        )
+        drug_row["drugbank_ids"] = list(db_payload.get("drugbank_ids", []) or [])
 
     # Combine results
     therapeutic_assessment = {
         "disease": disease,
         "efo_id": targets_result.get("efo_id", ""),
+        "gwas_direct_status": targets_result.get("gwas_direct_status", "unknown"),
+        "gwas_direct_error": targets_result.get("gwas_direct_error", ""),
         "gene_source": gene_source,
         "hub_genes_count": len(hub_genes),
         "novel_lr_genes_count": len(novel_genes),
         "lr_candidates_genes_count": len(candidate_genes),
+        "multi_source_status": {
+            "chembl": multi_source.get("chembl_status", "unknown"),
+            "clinicaltrials": multi_source.get("clinicaltrials_status", "unknown"),
+            "drugbank": multi_source.get("drugbank_status", "unknown"),
+        },
+        "multi_source_errors": multi_source.get("errors", {}),
         "gene_ranking": {
             gene: {
                 "druggability": targets_result.get("targets", {}).get(gene, {}),
@@ -826,6 +1032,7 @@ def assess_therapeutic_potential(
             len(modalities) > 0 for modalities in tractability.values()
         )
         assoc_score = target.get("disease_association_score", 0.0)
+        chembl_payload = (multi_source.get("chembl_by_gene") or {}).get(gene, {})
         validated = _compute_validated_score(
             target=target,
             gene_drugs=known_drugs_by_gene.get(gene, []),
@@ -834,6 +1041,12 @@ def assess_therapeutic_potential(
         exploratory = _compute_exploratory_score(
             target=target,
             from_lr_candidates=gene in lr_candidates_set,
+            chembl_target_hits_count=int(
+                chembl_payload.get("chembl_target_hits_count", 0) or 0
+            ),
+            chembl_exact_symbol_match=bool(
+                chembl_payload.get("chembl_exact_symbol_match", False)
+            ),
         )
 
         entry = {
@@ -855,9 +1068,25 @@ def assess_therapeutic_potential(
             "gwas_nearest_score": target.get("gwas_nearest_score", 0.0),
             "gwas_combined_score": target.get("gwas_combined_score", 0.0),
             "genetic_consistency_flag": target.get("genetic_consistency_flag", False),
+            "gwas_signal_source": target.get("gwas_signal_source", "opentargets_proxy_only"),
+            "gwas_direct_used": target.get("gwas_direct_used", False),
+            "gwas_direct_reported_hits_count": target.get("gwas_direct_reported_hits_count", 0),
+            "gwas_direct_nearest_hits_count": target.get("gwas_direct_nearest_hits_count", 0),
+            "gwas_direct_reported_score": target.get("gwas_direct_reported_score", 0.0),
+            "gwas_direct_nearest_score": target.get("gwas_direct_nearest_score", 0.0),
+            "chembl_target_hits_count": int(chembl_payload.get("chembl_target_hits_count", 0) or 0),
+            "chembl_target_ids": list(chembl_payload.get("chembl_target_ids", []) or []),
+            "chembl_exact_symbol_match": bool(
+                chembl_payload.get("chembl_exact_symbol_match", False)
+            ),
             "validated_score": validated["validated_score"],
             "validated_pass": validated["validated_pass"],
+            "clinical_trials_signal": validated["clinical_trials_signal"],
+            "drugbank_support": validated["drugbank_support"],
+            "max_clinical_trials_count": validated["max_clinical_trials_count"],
             "exploratory_score": exploratory["exploratory_score"],
+            "chembl_target_support": exploratory["chembl_target_support"],
+            "gwas_direct_support": exploratory["gwas_direct_support"],
             "exploratory_pass": False,  # filled after global ranking gate
         }
         validated_track_rows.append({
@@ -866,6 +1095,8 @@ def assess_therapeutic_potential(
             "validated_pass": validated["validated_pass"],
             "max_clinical_phase": validated["max_clinical_phase"],
             "known_drug_hits": validated["known_drug_hits"],
+            "clinical_trials_signal": validated["clinical_trials_signal"],
+            "drugbank_support": validated["drugbank_support"],
             "association_score": assoc_score,
             "from_lr_candidates": gene in lr_candidates_set,
             "gwas_combined_score": target.get("gwas_combined_score", 0.0),
@@ -879,6 +1110,11 @@ def assess_therapeutic_potential(
             "tractability_signal": exploratory["tractability_signal"],
             "from_lr_candidates": gene in lr_candidates_set,
             "genetic_consistency_flag": target.get("genetic_consistency_flag", False),
+            "gwas_signal_source": target.get("gwas_signal_source", "opentargets_proxy_only"),
+            "gwas_direct_used": target.get("gwas_direct_used", False),
+            "chembl_target_hits_count": int(chembl_payload.get("chembl_target_hits_count", 0) or 0),
+            "chembl_target_support": exploratory["chembl_target_support"],
+            "gwas_direct_support": exploratory["gwas_direct_support"],
         })
 
         if has_tractability:
@@ -959,6 +1195,33 @@ def assess_therapeutic_potential(
         for g in gene_list
         if bool((targets_data.get(g, {}) or {}).get("genetic_consistency_flag", False))
     )
+    genes_with_gwas_direct_signal = sum(
+        1
+        for g in gene_list
+        if bool((targets_data.get(g, {}) or {}).get("gwas_direct_used", False))
+    )
+    genes_with_chembl_target_support = sum(
+        1
+        for g in gene_list
+        if int(
+            ((multi_source.get("chembl_by_gene") or {}).get(g, {}) or {}).get(
+                "chembl_target_hits_count",
+                0,
+            )
+            or 0
+        )
+        > 0
+    )
+    drugs_with_clinical_trials = sum(
+        1
+        for row in therapeutic_assessment.get("known_drugs", [])
+        if int(row.get("clinical_trials_total_count", 0) or 0) > 0
+    )
+    drugs_with_drugbank_match = sum(
+        1
+        for row in therapeutic_assessment.get("known_drugs", [])
+        if int(row.get("drugbank_match_count", 0) or 0) > 0
+    )
     validated_pass_count = sum(
         1 for row in validated_track_rows if row.get("validated_pass", False)
     )
@@ -973,6 +1236,8 @@ def assess_therapeutic_potential(
         "gene_source": gene_source,
         "genes_found_in_opentargets": targets_result.get("genes_found", 0),
         "genes_failed": targets_result.get("genes_failed", []),
+        "gwas_direct_status": targets_result.get("gwas_direct_status", "unknown"),
+        "gwas_direct_error": targets_result.get("gwas_direct_error", ""),
         "druggable_count": len(therapeutic_assessment["druggable_targets"]),
         "non_druggable_count": len(therapeutic_assessment["non_druggable_targets"]),
         "novel_target_count": len(therapeutic_assessment["novel_targets"]),
@@ -982,7 +1247,12 @@ def assess_therapeutic_potential(
         "gwas_reported_hits_total": gwas_reported_hits_total,
         "gwas_nearest_hits_total": gwas_nearest_hits_total,
         "genes_with_gwas_signal": genes_with_gwas_signal,
+        "genes_with_gwas_direct_signal": genes_with_gwas_direct_signal,
+        "genes_with_chembl_target_support": genes_with_chembl_target_support,
         "genes_with_genetic_conflict": genes_with_genetic_conflict,
+        "multi_source_status": therapeutic_assessment.get("multi_source_status", {}),
+        "drugs_with_clinical_trials": drugs_with_clinical_trials,
+        "drugs_with_drugbank_match": drugs_with_drugbank_match,
         "validated_pass_count": validated_pass_count,
         "exploratory_pass_count": exploratory_pass_count,
         "top_validated_genes": [r["gene"] for r in validated_track_rows[:5]],
@@ -1022,6 +1292,12 @@ def assess_therapeutic_potential(
             "gwas_nearest_score": target.get("gwas_nearest_score", 0.0),
             "gwas_combined_score": target.get("gwas_combined_score", 0.0),
             "genetic_consistency_flag": target.get("genetic_consistency_flag", False),
+            "gwas_signal_source": target.get("gwas_signal_source", "opentargets_proxy_only"),
+            "gwas_direct_used": target.get("gwas_direct_used", False),
+            "gwas_direct_reported_hits_count": target.get("gwas_direct_reported_hits_count", 0),
+            "gwas_direct_nearest_hits_count": target.get("gwas_direct_nearest_hits_count", 0),
+            "gwas_direct_reported_score": target.get("gwas_direct_reported_score", 0.0),
+            "gwas_direct_nearest_score": target.get("gwas_direct_nearest_score", 0.0),
             "from_novel_lr_selection": gene in novel_lr_set,
             "from_lr_candidates": gene in lr_candidates_set,
         })
@@ -1031,11 +1307,16 @@ def assess_therapeutic_potential(
         "efo_id": targets_result.get("efo_id", ""),
         "mapping_policy": "reported_plus_nearest_weighted",
         "weights": {"reported_gene": 1.0, "nearest_gene": 0.6},
+        "gwas_direct_status": targets_result.get("gwas_direct_status", "unknown"),
+        "gwas_direct_error": targets_result.get("gwas_direct_error", ""),
+        "multi_source_status": therapeutic_assessment.get("multi_source_status", {}),
         "summary": {
             "total_genes_evaluated": len(gene_list),
             "gwas_reported_hits_total": gwas_reported_hits_total,
             "gwas_nearest_hits_total": gwas_nearest_hits_total,
             "genes_with_gwas_signal": genes_with_gwas_signal,
+            "genes_with_gwas_direct_signal": genes_with_gwas_direct_signal,
+            "genes_with_chembl_target_support": genes_with_chembl_target_support,
             "genes_with_genetic_conflict": genes_with_genetic_conflict,
         },
         "genes": gwas_genes,
@@ -1044,6 +1325,9 @@ def assess_therapeutic_potential(
         "disease": disease,
         "mapping_policy": "reported_plus_nearest_weighted",
         "weights": {"reported_gene": 1.0, "nearest_gene": 0.6},
+        "gwas_direct_status": targets_result.get("gwas_direct_status", "unknown"),
+        "gwas_direct_error": targets_result.get("gwas_direct_error", ""),
+        "multi_source_status": therapeutic_assessment.get("multi_source_status", {}),
         "summary": gwas_detail_payload["summary"],
         "top_genes_by_gwas": sorted(
             [

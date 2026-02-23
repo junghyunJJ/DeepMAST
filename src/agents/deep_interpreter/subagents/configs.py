@@ -269,7 +269,7 @@ Deep Interpreter 4-Agent Workflow:
      d. Quality reflection (theme coverage, gap-filling)
      e. RAG validate & write (prepare_rag_literature, validate_claim_fulltext)
    - **Phase 4.7: Drug Target Assessment (OpenTargets Platform)**
-     a. assess_therapeutic_potential (uses lr_candidates.json top-15 as primary L-R genes, queries OpenTargets)
+     a. assess_therapeutic_potential (uses lr_candidates.json top-15 as primary L-R genes, queries OpenTargets, merges GWAS direct+proxy, adds ChEMBL/ClinicalTrials/DrugBank fail-soft evidence)
      b. Interpret druggability findings (think_tool)
      c. Write Therapeutic Implications section to /synthesis.md
      d. Write /synthesis_targets.json for HTML report

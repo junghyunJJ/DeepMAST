@@ -1165,11 +1165,16 @@ This tool will:
 2. Use candidate genes as the **primary Phase 4.7 input list**
 3. Query OpenTargets for each gene's druggability (tractability, safety, evidence)
 4. Find existing drugs for the disease that target these genes
-5. Score targets in **two tracks**:
+5. Collect fail-soft multi-source evidence:
+   - ChEMBL target hints (gene-level)
+   - ClinicalTrials.gov disease+drug trial counts
+   - DrugBank local lookup (if available)
+6. Score targets in **two tracks**:
    - `Validated`: clinical-evidence centric
    - `Exploratory`: genetic/biology-evidence centric
-6. Save complete results to `{data_dir}/therapeutic_targets.json`
-7. Save GWAS-focused outputs to `{data_dir}/therapeutic_targets_gwas.json` and `{data_dir}/synthesis_gwas.json`
+7. Save complete results to `{data_dir}/therapeutic_targets.json`
+8. Save GWAS-focused outputs to `{data_dir}/therapeutic_targets_gwas.json` and `{data_dir}/synthesis_gwas.json`
+9. Include `gwas_direct_status` + `multi_source_status` in summary payload
 
 **Fallback**: If `lr_candidates.json` is missing/empty, the tool falls back to
 `top_search_genes.json` + `selected_top3_lr.json`. If those are also unavailable, it
@@ -1448,7 +1453,7 @@ The HTML report will have:
 - **think_tool**: Strategic planning (Step 2) and quality reflection (Step 4)
 
 ### Drug Target Discovery Tools (for Phase 4.7)
-- **assess_therapeutic_potential**: One-stop comprehensive assessment — uses `lr_candidates.json` (top 15 pairs) as primary input, queries OpenTargets, computes Validated/Exploratory tracks, finds drugs, and writes therapeutic_targets.json + GWAS outputs
+- **assess_therapeutic_potential**: One-stop comprehensive assessment — uses `lr_candidates.json` (top 15 pairs) as primary input, queries OpenTargets, merges GWAS direct+proxy, adds multi-source evidence (ChEMBL/ClinicalTrials/DrugBank fail-soft), computes Validated/Exploratory tracks, and writes therapeutic_targets.json + GWAS outputs
 - **search_drug_targets**: Query OpenTargets for specific genes' druggability (tractability, safety, evidence)
 - **search_known_drugs**: Find known drugs for a disease, optionally filtered by target genes
 
@@ -1462,7 +1467,7 @@ The HTML report will have:
 | Phase 4.5 | /synthesis_papers.json | Papers for synthesis validation |
 | Phase 4.5 | /synthesis_validation.json | Detailed validation results |
 | Phase 4.5 | /synthesis.md (updated) | Revised with validation |
-| Phase 4.7 | {data_dir}/therapeutic_targets.json | OpenTargets results per gene |
+| Phase 4.7 | {data_dir}/therapeutic_targets.json | OpenTargets + GWAS + multi-source results per gene |
 | Phase 4.7 | {data_dir}/therapeutic_targets_gwas.json | GWAS-focused per-gene genetic evidence summary |
 | Phase 4.7 | {data_dir}/synthesis_gwas.json | GWAS summary payload for synthesis/reporting |
 | Phase 4.7 | /synthesis_targets.json | Structured results for HTML report |
