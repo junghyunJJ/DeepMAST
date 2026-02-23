@@ -769,6 +769,16 @@ class TestAssessTherapeuticPotentialGeneSelection:
                     "safety_liabilities": [],
                     "disease_association_score": 0.0,
                     "evidence_count": 0,
+                    "evidence_types": {},
+                    "ot_genetic_association_score": 0.2,
+                    "gwas_mapping_policy": "reported_plus_nearest_weighted",
+                    "gwas_weights": {"reported_gene": 1.0, "nearest_gene": 0.6},
+                    "gwas_reported_hits_count": 1,
+                    "gwas_nearest_hits_count": 0,
+                    "gwas_reported_score": 0.2,
+                    "gwas_nearest_score": 0.0,
+                    "gwas_combined_score": 0.2,
+                    "genetic_consistency_flag": False,
                 }
             return json.dumps({
                 "disease": input_dict["disease"],
@@ -864,8 +874,8 @@ class TestAssessTherapeuticPotentialGeneSelection:
             assert result["novel_lr_genes_count"] == 2
             assert set(result["gene_ranking"].keys()) == {"L1", "R1"}
 
-    def test_uses_hybrid_top3_candidates_hub_sources(self, _mock_opentargets):
-        """When all JSON files exist, include genes from top3 + lr_candidates + hub genes."""
+    def test_uses_lr_candidates_only_when_candidates_exist(self, _mock_opentargets):
+        """When lr_candidates.json exists, use only top-15 candidate genes as primary input."""
         from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -891,10 +901,13 @@ class TestAssessTherapeuticPotentialGeneSelection:
                 "disease": "test cancer",
             }))
 
-            assert result["gene_source"] == "selected_top3+lr_candidates+top_search"
+            assert result["gene_source"] == "lr_candidates_top15_primary"
             assert set(result["gene_ranking"].keys()) == {
-                "HUB1", "TOP3_L", "TOP3_R", "CAND_L", "CAND_R"
+                "CAND_L", "CAND_R"
             }
+            assert result["hub_genes_count"] == 1
+            assert result["novel_lr_genes_count"] == 2
+            assert result["lr_candidates_genes_count"] == 2
 
     def test_fallback_to_liana_csv(self, _mock_opentargets):
         """When no JSON files exist, falls back to LIANA CSV."""
@@ -1014,6 +1027,44 @@ class TestAssessTherapeuticPotentialGeneSelection:
             assert gwas_detail["disease"] == "test cancer"
             assert "summary" in gwas_detail
             assert "genes" in gwas_detail
+
+    def test_outputs_validated_and_exploratory_tracks(self, _mock_opentargets):
+        """Output payload includes 2-track results and summary counts."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "lr_candidates.json", "w") as f:
+                json.dump({
+                    "candidate_pairs": [
+                        {"rank": 1, "ligand": "L1", "receptor": "R1"},
+                        {"rank": 2, "ligand": "L2", "receptor": "R2"},
+                    ]
+                }, f)
+
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            assert "validated_track" in result
+            assert "exploratory_track" in result
+            assert len(result["validated_track"]) == 4
+            assert len(result["exploratory_track"]) == 4
+
+            first_validated = result["validated_track"][0]
+            first_exploratory = result["exploratory_track"][0]
+            assert "validated_score" in first_validated
+            assert "validated_pass" in first_validated
+            assert "rank" in first_validated
+            assert "exploratory_score" in first_exploratory
+            assert "exploratory_pass" in first_exploratory
+            assert "rank" in first_exploratory
+
+            summary = result["summary"]
+            assert "validated_pass_count" in summary
+            assert "exploratory_pass_count" in summary
+            assert "top_validated_genes" in summary
+            assert "top_exploratory_genes" in summary
 
 
 # ---------------------------------------------------------------------------

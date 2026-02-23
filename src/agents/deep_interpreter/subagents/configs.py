@@ -269,11 +269,12 @@ Deep Interpreter 4-Agent Workflow:
      d. Quality reflection (theme coverage, gap-filling)
      e. RAG validate & write (prepare_rag_literature, validate_claim_fulltext)
    - **Phase 4.7: Drug Target Assessment (OpenTargets Platform)**
-     a. assess_therapeutic_potential (extracts L-R genes, queries OpenTargets)
+     a. assess_therapeutic_potential (uses lr_candidates.json top-15 as primary L-R genes, queries OpenTargets)
      b. Interpret druggability findings (think_tool)
      c. Write Therapeutic Implications section to /synthesis.md
      d. Write /synthesis_targets.json for HTML report
      e. Write GWAS-focused outputs /therapeutic_targets_gwas.json and /synthesis_gwas.json
+     f. Include Validated/Exploratory 2-track summaries in therapeutic outputs
    - Generate HTML report (with Therapeutic Implications tab)
    - Outputs: /synthesis.md, /synthesis_papers.json, /synthesis_validation.json,
      /therapeutic_targets.json, /therapeutic_targets_gwas.json, /synthesis_gwas.json,

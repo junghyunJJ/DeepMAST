@@ -951,6 +951,17 @@ def _generate_html_report_impl(
                 </div>
                 """
 
+            track_summary_html = ""
+            if "validated_pass_count" in summary or "exploratory_pass_count" in summary:
+                top_validated = ", ".join(summary.get("top_validated_genes", [])[:5]) or "N/A"
+                top_exploratory = ", ".join(summary.get("top_exploratory_genes", [])[:5]) or "N/A"
+                track_summary_html = f"""
+                <p><strong>Validated Pass:</strong> {summary.get('validated_pass_count', 0)} |
+                   <strong>Exploratory Pass:</strong> {summary.get('exploratory_pass_count', 0)}</p>
+                <p><strong>Top Validated Genes:</strong> {top_validated}</p>
+                <p><strong>Top Exploratory Genes:</strong> {top_exploratory}</p>
+                """
+
             therapeutic_content = f"""
             <div class="summary-box">
                 <h3>Therapeutic Potential Summary</h3>
@@ -958,6 +969,7 @@ def _generate_html_report_impl(
                    <strong>Druggable:</strong> {summary.get('druggable_count', 0)} |
                    <strong>Known Drugs:</strong> {summary.get('known_drugs_count', 0)} |
                    <strong>Novel Targets:</strong> {summary.get('novel_target_count', 0)}</p>
+                {track_summary_html}
             </div>
             {druggable_html}
             {drugs_html}

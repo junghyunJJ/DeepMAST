@@ -7,6 +7,7 @@ REPORTER subagent to assess druggability of genes identified in CCI analysis.
 
 import json
 import logging
+import math
 import os
 import sys
 from pathlib import Path
@@ -326,6 +327,109 @@ def _compute_gwas_proxy_scores(
     }
 
 
+def _index_known_drugs_by_gene(
+    known_drugs: list[dict],
+    genes: list[str],
+) -> dict[str, list[dict]]:
+    """Index known-drug rows by gene symbol for validated-track scoring."""
+    symbol_lookup = {g.upper(): g for g in genes}
+    index: dict[str, list[dict]] = {g: [] for g in genes}
+
+    for drug in known_drugs:
+        for target_gene in drug.get("target_genes", []) or []:
+            canonical = symbol_lookup.get(str(target_gene).upper())
+            if canonical:
+                index[canonical].append(drug)
+    return index
+
+
+def _compute_validated_score(
+    target: dict,
+    gene_drugs: list[dict],
+    from_lr_candidates: bool,
+) -> dict:
+    """Compute validated (clinical-evidence-centric) score and pass flag."""
+    max_phase = max((int(d.get("phase", 0) or 0) for d in gene_drugs), default=0)
+    known_drug_clinical = 1.0 if max_phase >= 2 else (0.5 if max_phase == 1 else 0.0)
+    clinical_phase_status = min(max_phase / 4.0, 1.0)
+
+    evidence_types = target.get("evidence_types", {}) or {}
+    known_drug_evidence = float(evidence_types.get("known_drug", 0) or 0.0)
+    ot_known_drug_signal = min(known_drug_evidence / 3.0, 1.0)
+
+    # L-R candidate genes are treated as mechanism-relevant in v1.
+    mechanism_relevance = 1.0 if from_lr_candidates else 0.0
+    safety_penalty = 1.0 if len(target.get("safety_liabilities", [])) > 0 else 0.0
+
+    score = (
+        0.45 * known_drug_clinical
+        + 0.25 * clinical_phase_status
+        + 0.15 * ot_known_drug_signal
+        + 0.10 * mechanism_relevance
+        - 0.05 * safety_penalty
+    )
+    validated_score = max(0.0, min(1.0, float(score)))
+
+    known_drug_signal_strong = known_drug_clinical >= 1.0 or ot_known_drug_signal >= 0.67
+    clinical_support_present = max_phase >= 1
+    validated_pass = (max_phase >= 2) or (
+        known_drug_signal_strong and clinical_support_present
+    )
+
+    return {
+        "validated_score": validated_score,
+        "validated_pass": bool(validated_pass),
+        "known_drug_clinical": known_drug_clinical,
+        "clinical_phase_status": clinical_phase_status,
+        "ot_known_drug_signal": ot_known_drug_signal,
+        "mechanism_relevance": mechanism_relevance,
+        "safety_penalty_applied": bool(safety_penalty),
+        "max_clinical_phase": int(max_phase),
+        "known_drug_hits": len(gene_drugs),
+    }
+
+
+def _compute_exploratory_score(
+    target: dict,
+    from_lr_candidates: bool,
+) -> dict:
+    """Compute exploratory (genetic/biology-centric) score."""
+    gwas_combined_score = float(target.get("gwas_combined_score", 0.0) or 0.0)
+    ot_genetic_association = float(
+        target.get("ot_genetic_association_score", 0.0) or 0.0
+    )
+
+    tractability = target.get("tractability", {}) or {}
+    tractability_labels = 0
+    if isinstance(tractability, dict):
+        tractability_labels = sum(
+            len(v) for v in tractability.values() if isinstance(v, list)
+        )
+    tractability_signal = min(tractability_labels / 3.0, 1.0)
+
+    pathway_context_match = 1.0 if from_lr_candidates else 0.0
+    evidence_count = float(target.get("evidence_count", 0) or 0.0)
+    literature_support = min(evidence_count / 20.0, 1.0)
+
+    exploratory_score = (
+        0.35 * gwas_combined_score
+        + 0.30 * ot_genetic_association
+        + 0.15 * tractability_signal
+        + 0.10 * pathway_context_match
+        + 0.10 * literature_support
+    )
+    exploratory_score = max(0.0, min(1.0, float(exploratory_score)))
+
+    return {
+        "exploratory_score": exploratory_score,
+        "gwas_combined_score": gwas_combined_score,
+        "ot_genetic_association": ot_genetic_association,
+        "tractability_signal": tractability_signal,
+        "pathway_context_match": pathway_context_match,
+        "literature_support": literature_support,
+    }
+
+
 @tool
 def search_drug_targets(
     gene_symbols: list[str],
@@ -553,11 +657,10 @@ def assess_therapeutic_potential(
 ) -> str:
     """Comprehensive therapeutic potential assessment for CCI analysis genes.
 
-    One-stop tool that evaluates hub genes (from top_search_genes.json),
-    selected novel L-R pair genes (from selected_top3_lr.json), and top
-    candidate L-R genes (from lr_candidates.json) for druggability via
-    the Open Targets Platform. Falls back to LIANA CSV ranking if no gene
-    source file is available.
+    One-stop tool that evaluates candidate L-R genes (from lr_candidates.json,
+    top-15 pairs) for druggability via the Open Targets Platform. If
+    lr_candidates.json is unavailable, it falls back to top_search/selected
+    genes, then to LIANA CSV ranking.
 
     Args:
         data_dir: Path to the analysis data directory
@@ -576,20 +679,14 @@ def assess_therapeutic_potential(
     novel_lr_set = set(novel_genes)
     lr_candidates_set = set(candidate_genes)
 
-    # Source priority: selected_top3 -> lr_candidates(top15) -> top_search hub genes
-    gene_list: list[str] = []
-    seen: set[str] = set()
-    for source_genes in (novel_genes, candidate_genes, hub_genes):
-        for gene in source_genes:
-            if gene not in seen:
-                seen.add(gene)
-                gene_list.append(gene)
-
-    gene_source = (
-        "selected_top3+lr_candidates+top_search"
-        if candidate_genes
-        else "top_search_genes+selected_top3_lr"
-    )
+    # Primary source policy for Phase 4.7:
+    # use candidate genes from lr_candidates.json (top-15 pairs) when available.
+    if candidate_genes:
+        gene_list = list(candidate_genes)
+        gene_source = "lr_candidates_top15_primary"
+    else:
+        gene_list = hub_genes + [g for g in novel_genes if g not in hub_set]
+        gene_source = "top_search_genes+selected_top3_lr"
 
     # Fallback: if both files missing, use LIANA CSV ranking
     if not gene_list:
@@ -704,11 +801,21 @@ def assess_therapeutic_potential(
         "non_druggable_targets": [],
         "known_drugs": drugs_result.get("drugs", []),
         "novel_targets": [],
+        "validated_track": [],
+        "exploratory_track": [],
         "summary": {},
     }
 
     # Classify targets
     targets_data = targets_result.get("targets", {})
+    known_drugs_by_gene = _index_known_drugs_by_gene(
+        therapeutic_assessment["known_drugs"],
+        gene_list,
+    )
+    exploratory_floor = 0.05
+    validated_track_rows = []
+    exploratory_track_rows = []
+
     for gene in gene_list:
         target = targets_data.get(gene)
         if not target:
@@ -719,6 +826,15 @@ def assess_therapeutic_potential(
             len(modalities) > 0 for modalities in tractability.values()
         )
         assoc_score = target.get("disease_association_score", 0.0)
+        validated = _compute_validated_score(
+            target=target,
+            gene_drugs=known_drugs_by_gene.get(gene, []),
+            from_lr_candidates=gene in lr_candidates_set,
+        )
+        exploratory = _compute_exploratory_score(
+            target=target,
+            from_lr_candidates=gene in lr_candidates_set,
+        )
 
         entry = {
             "gene": gene,
@@ -739,7 +855,31 @@ def assess_therapeutic_potential(
             "gwas_nearest_score": target.get("gwas_nearest_score", 0.0),
             "gwas_combined_score": target.get("gwas_combined_score", 0.0),
             "genetic_consistency_flag": target.get("genetic_consistency_flag", False),
+            "validated_score": validated["validated_score"],
+            "validated_pass": validated["validated_pass"],
+            "exploratory_score": exploratory["exploratory_score"],
+            "exploratory_pass": False,  # filled after global ranking gate
         }
+        validated_track_rows.append({
+            "gene": gene,
+            "validated_score": validated["validated_score"],
+            "validated_pass": validated["validated_pass"],
+            "max_clinical_phase": validated["max_clinical_phase"],
+            "known_drug_hits": validated["known_drug_hits"],
+            "association_score": assoc_score,
+            "from_lr_candidates": gene in lr_candidates_set,
+            "gwas_combined_score": target.get("gwas_combined_score", 0.0),
+        })
+        exploratory_track_rows.append({
+            "gene": gene,
+            "exploratory_score": exploratory["exploratory_score"],
+            "exploratory_pass": False,  # filled after global ranking gate
+            "gwas_combined_score": exploratory["gwas_combined_score"],
+            "ot_genetic_association_score": target.get("ot_genetic_association_score", 0.0),
+            "tractability_signal": exploratory["tractability_signal"],
+            "from_lr_candidates": gene in lr_candidates_set,
+            "genetic_consistency_flag": target.get("genetic_consistency_flag", False),
+        })
 
         if has_tractability:
             therapeutic_assessment["druggable_targets"].append(entry)
@@ -755,6 +895,50 @@ def assess_therapeutic_potential(
     therapeutic_assessment["druggable_targets"].sort(
         key=lambda x: x["association_score"], reverse=True
     )
+    therapeutic_assessment["non_druggable_targets"].sort(
+        key=lambda x: x["association_score"], reverse=True
+    )
+
+    # Rank 2-track outputs
+    validated_track_rows.sort(
+        key=lambda x: (x["validated_score"], x["max_clinical_phase"], x["association_score"]),
+        reverse=True,
+    )
+    for idx, row in enumerate(validated_track_rows, start=1):
+        row["rank"] = idx
+
+    exploratory_track_rows.sort(
+        key=lambda x: (
+            x["exploratory_score"],
+            x["gwas_combined_score"],
+            x["ot_genetic_association_score"],
+        ),
+        reverse=True,
+    )
+    exploratory_top_n = (
+        max(1, math.ceil(len(exploratory_track_rows) * 0.3))
+        if exploratory_track_rows
+        else 0
+    )
+    exploratory_pass_by_gene: dict[str, bool] = {}
+    for idx, row in enumerate(exploratory_track_rows, start=1):
+        row["rank"] = idx
+        row["exploratory_pass"] = (
+            idx <= exploratory_top_n
+            and float(row.get("gwas_combined_score", 0.0) or 0.0) > exploratory_floor
+        )
+        exploratory_pass_by_gene[row["gene"]] = row["exploratory_pass"]
+
+    # Propagate exploratory pass flags to target entries.
+    for bucket in ("druggable_targets", "non_druggable_targets", "novel_targets"):
+        for row in therapeutic_assessment.get(bucket, []):
+            row["exploratory_pass"] = exploratory_pass_by_gene.get(
+                row.get("gene", ""),
+                False,
+            )
+
+    therapeutic_assessment["validated_track"] = validated_track_rows
+    therapeutic_assessment["exploratory_track"] = exploratory_track_rows
 
     # Summary statistics
     gwas_reported_hits_total = sum(
@@ -775,6 +959,12 @@ def assess_therapeutic_potential(
         for g in gene_list
         if bool((targets_data.get(g, {}) or {}).get("genetic_consistency_flag", False))
     )
+    validated_pass_count = sum(
+        1 for row in validated_track_rows if row.get("validated_pass", False)
+    )
+    exploratory_pass_count = sum(
+        1 for row in exploratory_track_rows if row.get("exploratory_pass", False)
+    )
     therapeutic_assessment["summary"] = {
         "total_genes_evaluated": len(gene_list),
         "hub_genes_count": len(hub_genes),
@@ -793,6 +983,11 @@ def assess_therapeutic_potential(
         "gwas_nearest_hits_total": gwas_nearest_hits_total,
         "genes_with_gwas_signal": genes_with_gwas_signal,
         "genes_with_genetic_conflict": genes_with_genetic_conflict,
+        "validated_pass_count": validated_pass_count,
+        "exploratory_pass_count": exploratory_pass_count,
+        "top_validated_genes": [r["gene"] for r in validated_track_rows[:5]],
+        "top_exploratory_genes": [r["gene"] for r in exploratory_track_rows[:5]],
+        "exploratory_floor": exploratory_floor,
         "top_druggable_genes": [
             t["gene"] for t in therapeutic_assessment["druggable_targets"][:5]
         ],

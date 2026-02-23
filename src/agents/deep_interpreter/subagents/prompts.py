@@ -1161,16 +1161,18 @@ assess_therapeutic_potential(
 ```
 
 This tool will:
-1. Load **hub genes** from `top_search_genes.json` (written by PLANNER, up to 30 genes)
-2. Load **novel L-R pair genes** from `selected_top3_lr.json` (written by INTERPRETER, up to 6 genes)
-3. Load **candidate L-R pair genes** from `lr_candidates.json` (written by INTERPRETER, top 15 pairs)
-4. Merge all lists (deduplicated; priority: selected_top3 → lr_candidates → hub genes) for evaluation
-5. Query OpenTargets for each gene's druggability (tractability, safety, evidence)
-6. Find existing drugs for the disease that target these genes
-7. Classify novel targets: druggable genes with no known disease association OR from novel L-R selection
-8. Save complete results to `{data_dir}/therapeutic_targets.json`
+1. Load **candidate L-R pair genes** from `lr_candidates.json` (written by INTERPRETER, top 15 pairs)
+2. Use candidate genes as the **primary Phase 4.7 input list**
+3. Query OpenTargets for each gene's druggability (tractability, safety, evidence)
+4. Find existing drugs for the disease that target these genes
+5. Score targets in **two tracks**:
+   - `Validated`: clinical-evidence centric
+   - `Exploratory`: genetic/biology-evidence centric
+6. Save complete results to `{data_dir}/therapeutic_targets.json`
+7. Save GWAS-focused outputs to `{data_dir}/therapeutic_targets_gwas.json` and `{data_dir}/synthesis_gwas.json`
 
-**Fallback**: If `top_search_genes.json`, `selected_top3_lr.json`, and `lr_candidates.json` are all missing, the tool
+**Fallback**: If `lr_candidates.json` is missing/empty, the tool falls back to
+`top_search_genes.json` + `selected_top3_lr.json`. If those are also unavailable, it
 falls back to extracting genes from `interest_sig_liana.csv` ranked by frequency × combined score.
 
 #### Step 2: Interpret Results (think_tool)
@@ -1446,7 +1448,7 @@ The HTML report will have:
 - **think_tool**: Strategic planning (Step 2) and quality reflection (Step 4)
 
 ### Drug Target Discovery Tools (for Phase 4.7)
-- **assess_therapeutic_potential**: One-stop comprehensive assessment — reads genes from selected_top3_lr.json + lr_candidates.json (top 15 pairs) + top_search_genes.json, queries OpenTargets, finds drugs, and writes therapeutic_targets.json + GWAS outputs
+- **assess_therapeutic_potential**: One-stop comprehensive assessment — uses `lr_candidates.json` (top 15 pairs) as primary input, queries OpenTargets, computes Validated/Exploratory tracks, finds drugs, and writes therapeutic_targets.json + GWAS outputs
 - **search_drug_targets**: Query OpenTargets for specific genes' druggability (tractability, safety, evidence)
 - **search_known_drugs**: Find known drugs for a disease, optionally filtered by target genes
 
