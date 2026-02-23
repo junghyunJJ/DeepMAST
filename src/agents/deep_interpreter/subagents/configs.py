@@ -273,9 +273,11 @@ Deep Interpreter 4-Agent Workflow:
      b. Interpret druggability findings (think_tool)
      c. Write Therapeutic Implications section to /synthesis.md
      d. Write /synthesis_targets.json for HTML report
+     e. Write GWAS-focused outputs /therapeutic_targets_gwas.json and /synthesis_gwas.json
    - Generate HTML report (with Therapeutic Implications tab)
    - Outputs: /synthesis.md, /synthesis_papers.json, /synthesis_validation.json,
-     /therapeutic_targets.json, /synthesis_targets.json, CCI_Analysis_Report.html
+     /therapeutic_targets.json, /therapeutic_targets_gwas.json, /synthesis_gwas.json,
+     /synthesis_targets.json, CCI_Analysis_Report.html
    - Papers stored in: {data_path}/papers/synthesis/ (separate from Part papers)
 
 Hallucination Prevention (maintained):

@@ -1163,13 +1163,14 @@ assess_therapeutic_potential(
 This tool will:
 1. Load **hub genes** from `top_search_genes.json` (written by PLANNER, up to 30 genes)
 2. Load **novel L-R pair genes** from `selected_top3_lr.json` (written by INTERPRETER, up to 6 genes)
-3. Merge both lists (deduplicated) for evaluation
-4. Query OpenTargets for each gene's druggability (tractability, safety, evidence)
-5. Find existing drugs for the disease that target these genes
-6. Classify novel targets: druggable genes with no known disease association OR from novel L-R selection
-7. Save complete results to `{data_dir}/therapeutic_targets.json`
+3. Load **candidate L-R pair genes** from `lr_candidates.json` (written by INTERPRETER, top 15 pairs)
+4. Merge all lists (deduplicated; priority: selected_top3 → lr_candidates → hub genes) for evaluation
+5. Query OpenTargets for each gene's druggability (tractability, safety, evidence)
+6. Find existing drugs for the disease that target these genes
+7. Classify novel targets: druggable genes with no known disease association OR from novel L-R selection
+8. Save complete results to `{data_dir}/therapeutic_targets.json`
 
-**Fallback**: If neither `top_search_genes.json` nor `selected_top3_lr.json` exists, the tool
+**Fallback**: If `top_search_genes.json`, `selected_top3_lr.json`, and `lr_candidates.json` are all missing, the tool
 falls back to extracting genes from `interest_sig_liana.csv` ranked by frequency × combined score.
 
 #### Step 2: Interpret Results (think_tool)
@@ -1445,7 +1446,7 @@ The HTML report will have:
 - **think_tool**: Strategic planning (Step 2) and quality reflection (Step 4)
 
 ### Drug Target Discovery Tools (for Phase 4.7)
-- **assess_therapeutic_potential**: One-stop comprehensive assessment — reads hub genes from top_search_genes.json + novel L-R genes from selected_top3_lr.json, queries OpenTargets, finds drugs, saves results
+- **assess_therapeutic_potential**: One-stop comprehensive assessment — reads genes from selected_top3_lr.json + lr_candidates.json (top 15 pairs) + top_search_genes.json, queries OpenTargets, finds drugs, and writes therapeutic_targets.json + GWAS outputs
 - **search_drug_targets**: Query OpenTargets for specific genes' druggability (tractability, safety, evidence)
 - **search_known_drugs**: Find known drugs for a disease, optionally filtered by target genes
 
@@ -1460,6 +1461,8 @@ The HTML report will have:
 | Phase 4.5 | /synthesis_validation.json | Detailed validation results |
 | Phase 4.5 | /synthesis.md (updated) | Revised with validation |
 | Phase 4.7 | {data_dir}/therapeutic_targets.json | OpenTargets results per gene |
+| Phase 4.7 | {data_dir}/therapeutic_targets_gwas.json | GWAS-focused per-gene genetic evidence summary |
+| Phase 4.7 | {data_dir}/synthesis_gwas.json | GWAS summary payload for synthesis/reporting |
 | Phase 4.7 | /synthesis_targets.json | Structured results for HTML report |
 | Phase 4.7 | /synthesis.md (updated) | Therapeutic Implications section added |
 | Phase 5 | CCI_Analysis_Report.html | Final HTML report (with Therapeutic tab) |

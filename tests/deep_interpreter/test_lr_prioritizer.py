@@ -661,6 +661,88 @@ class TestDrugTargetsLoadSelectedTop3LR:
             assert genes == []
 
 
+class TestDrugTargetsLoadLrCandidates:
+    """Tests for drug_targets._load_lr_candidates_genes helper."""
+
+    def test_loads_top15_candidate_genes_only(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _load_lr_candidates_genes
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            candidate_pairs = []
+            for idx in range(1, 18):  # 17 pairs, but helper should keep top 15
+                candidate_pairs.append({
+                    "rank": idx,
+                    "ligand": f"L{idx}",
+                    "receptor": f"R{idx}",
+                })
+
+            with open(Path(tmpdir) / "lr_candidates.json", "w") as f:
+                json.dump({"candidate_pairs": candidate_pairs}, f)
+
+            genes = _load_lr_candidates_genes(tmpdir, top_k_pairs=15)
+            assert len(genes) == 30
+            assert "L15" in genes and "R15" in genes
+            assert "L16" not in genes and "R16" not in genes
+
+    def test_deduplicates_lr_candidate_genes(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _load_lr_candidates_genes
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "lr_candidates.json", "w") as f:
+                json.dump({
+                    "candidate_pairs": [
+                        {"rank": 1, "ligand": "MDK", "receptor": "SDC1"},
+                        {"rank": 2, "ligand": "MDK", "receptor": "ITGB4"},
+                    ]
+                }, f)
+
+            genes = _load_lr_candidates_genes(tmpdir, top_k_pairs=15)
+            assert genes == ["MDK", "SDC1", "ITGB4"]
+
+
+class TestDrugTargetsGwasScoring:
+    """Tests for GWAS proxy scoring helper in drug_targets."""
+
+    def test_compute_gwas_proxy_scores_reported_plus_nearest_weighted(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _compute_gwas_proxy_scores
+
+        evidence = [
+            {
+                "datatypeId": "genetic_association",
+                "datasourceId": "gwas_catalog",
+                "score": 0.9,
+                "targetFromSourceId": "EGFR",
+            },
+            {
+                "datatypeId": "genetic_association",
+                "datasourceId": "gwas_catalog",
+                "score": 0.3,
+                "targetFromSourceId": "LOC1000",
+            },
+            {
+                "datatypeId": "known_drug",
+                "datasourceId": "chembl",
+                "score": 1.0,
+                "targetFromSourceId": "EGFR",
+            },
+        ]
+
+        gwas = _compute_gwas_proxy_scores(
+            evidence=evidence,
+            approved_symbol="EGFR",
+            ot_genetic_association_score=0.2,
+        )
+
+        assert gwas["gwas_mapping_policy"] == "reported_plus_nearest_weighted"
+        assert gwas["gwas_weights"] == {"reported_gene": 1.0, "nearest_gene": 0.6}
+        assert gwas["gwas_reported_hits_count"] == 1
+        assert gwas["gwas_nearest_hits_count"] == 1
+        assert gwas["gwas_reported_score"] == pytest.approx(0.9)
+        assert gwas["gwas_nearest_score"] == pytest.approx(0.3)
+        assert gwas["gwas_combined_score"] == pytest.approx((0.9 + 0.3 * 0.6) / 1.6)
+        assert gwas["genetic_consistency_flag"] is True
+
+
 class TestAssessTherapeuticPotentialGeneSelection:
     """Tests for assess_therapeutic_potential gene selection logic.
 
@@ -782,6 +864,38 @@ class TestAssessTherapeuticPotentialGeneSelection:
             assert result["novel_lr_genes_count"] == 2
             assert set(result["gene_ranking"].keys()) == {"L1", "R1"}
 
+    def test_uses_hybrid_top3_candidates_hub_sources(self, _mock_opentargets):
+        """When all JSON files exist, include genes from top3 + lr_candidates + hub genes."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "top_search_genes.json", "w") as f:
+                json.dump(["HUB1"], f)
+            with open(Path(tmpdir) / "selected_top3_lr.json", "w") as f:
+                json.dump({
+                    "version": 1,
+                    "selected_pairs": [
+                        {"ligand": "TOP3_L", "receptor": "TOP3_R", "reasoning": "x"},
+                    ],
+                    "count": 1,
+                }, f)
+            with open(Path(tmpdir) / "lr_candidates.json", "w") as f:
+                json.dump({
+                    "candidate_pairs": [
+                        {"rank": 1, "ligand": "CAND_L", "receptor": "CAND_R"},
+                    ]
+                }, f)
+
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            assert result["gene_source"] == "selected_top3+lr_candidates+top_search"
+            assert set(result["gene_ranking"].keys()) == {
+                "HUB1", "TOP3_L", "TOP3_R", "CAND_L", "CAND_R"
+            }
+
     def test_fallback_to_liana_csv(self, _mock_opentargets):
         """When no JSON files exist, falls back to LIANA CSV."""
         from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
@@ -868,6 +982,38 @@ class TestAssessTherapeuticPotentialGeneSelection:
             gene_keys = list(result["gene_ranking"].keys())
             assert gene_keys.count("SHARED") == 1
             assert set(gene_keys) == {"SHARED", "HUB_ONLY", "NOV_ONLY"}
+
+    def test_writes_dual_gwas_output_files(self, _mock_opentargets):
+        """Writes therapeutic_targets_gwas.json and synthesis_gwas.json."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "top_search_genes.json", "w") as f:
+                json.dump(["HUB1"], f)
+            with open(Path(tmpdir) / "selected_top3_lr.json", "w") as f:
+                json.dump({
+                    "version": 1,
+                    "selected_pairs": [
+                        {"ligand": "NOV_L", "receptor": "NOV_R", "reasoning": "novel"},
+                    ],
+                    "count": 1,
+                }, f)
+
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            gwas_detail_file = Path(tmpdir) / "therapeutic_targets_gwas.json"
+            gwas_summary_file = Path(tmpdir) / "synthesis_gwas.json"
+            assert gwas_detail_file.exists()
+            assert gwas_summary_file.exists()
+            assert "gwas_files" in result
+
+            gwas_detail = json.loads(gwas_detail_file.read_text())
+            assert gwas_detail["disease"] == "test cancer"
+            assert "summary" in gwas_detail
+            assert "genes" in gwas_detail
 
 
 # ---------------------------------------------------------------------------
