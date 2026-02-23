@@ -1,0 +1,443 @@
+{# ===========================================================================
+   DeepMAST CCI Analysis Report — Jinja2 Template
+
+   Derived from: skills/html-report-generator/examples/reference_report.html
+   CSS classes: skills/html-report-generator/assets/theme.css
+   JS functions: skills/html-report-generator/assets/interactive.js
+
+   Context variables expected:
+     title, subtitle, css, js, generation_date,
+     interest_clusters, config, executive_summary,
+     part1, part2, part3, summary_tab, therapeutic_tab, papers
+   =========================================================================== #}
+
+{# ===== Formatting Macros ===== #}
+
+{% macro fdr(val) -%}
+{%- if val is number and val == 0 -%}0
+{%- elif val is number and val >= 0.01 -%}{{ "%.4f"|format(val) }}
+{%- elif val is number and val > 0 -%}{{ val|fdr_fmt }}
+{%- else -%}{{ val }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro pmid_link(pmid) -%}
+<a href="https://pubmed.ncbi.nlm.nih.gov/{{ pmid }}/" class="reference" target="_blank">(PMID:&nbsp;{{ pmid }})</a>
+{%- endmacro %}
+
+{# ===== Component Macros ===== #}
+
+{% macro figure(filename, caption) %}
+<div class="figure-container">
+    <img src="{{ filename }}" alt="{{ caption }}">
+    <p class="figure-caption">{{ caption }}</p>
+</div>
+{% endmacro %}
+
+{% macro interpretation_block(text) %}
+<div class="interpretation">
+    <h4>Biological Interpretation</h4>
+    {{ text }}
+</div>
+{% endmacro %}
+
+{% macro pathway_box_macro(pathways) %}
+<div class="pathway-box">
+    <h4>Top Enriched Pathways (PROGENy)</h4>
+    <ul>
+    {% for pw in pathways %}
+        <li><span class="highlight-pathway">{{ pw.name }}</span>{% if pw.description %}: {{ pw.description }}{% endif %}</li>
+    {% endfor %}
+    </ul>
+</div>
+{% endmacro %}
+
+{% macro summary_box_macro(title, findings, note="") %}
+<div class="summary-box">
+    <h4>{{ title }}</h4>
+    <ul style="margin-left: 20px; margin-top: 10px;">
+    {% for f in findings %}
+        <li>{{ f|linkify_pmids }}</li>
+    {% endfor %}
+    </ul>
+    {% if note %}<p style="margin-top: 10px;"><strong>{{ note|linkify_pmids }}</strong></p>{% endif %}
+</div>
+{% endmacro %}
+
+{# ===== Table Macros ===== #}
+
+{% macro rowspan_table(rows, group_col, columns, fdr_cols=[], highlight_cols=[], top_n=5) %}
+{#- rows: list of dicts, group_col: key to group by,
+    columns: list of (key, header) tuples -#}
+<div class="table-container">
+    <table>
+        <thead><tr>
+            <th>Cluster</th>
+            {% for key, header in columns %}<th>{{ header }}</th>{% endfor %}
+        </tr></thead>
+        <tbody>
+        {%- set ns = namespace(prev_group=None) -%}
+        {%- set groups = rows|groupby(group_col) -%}
+        {%- for group in groups -%}
+            {%- set group_name = group.grouper -%}
+            {%- set group_rows = group.list[:top_n] -%}
+            {%- for row in group_rows %}
+            <tr{% if group_name|int in interest_clusters and loop.first %} style="background: rgba(129, 140, 248, 0.06);"{% endif %}>
+                {% if loop.first %}
+                <td rowspan="{{ group_rows|length }}" style="vertical-align:top;">
+                    <strong class="highlight-cluster">Cluster {{ group_name }}</strong>
+                </td>
+                {% endif %}
+                {% for key, header in columns %}
+                <td>
+                    {%- if key in fdr_cols -%}{{ fdr(row[key]) }}
+                    {%- elif key in highlight_cols -%}<span class="highlight-celltype">{{ row[key] }}</span>
+                    {%- elif row[key] is number -%}{{ "%.4f"|format(row[key]) }}
+                    {%- else -%}{{ row[key] }}
+                    {%- endif -%}
+                </td>
+                {% endfor %}
+            </tr>
+            {%- endfor -%}
+        {%- endfor %}
+        </tbody>
+    </table>
+</div>
+{% endmacro %}
+
+{% macro simple_table(rows, columns) %}
+<div class="table-container">
+    <table>
+        <thead><tr>
+            {% for key, header in columns %}<th>{{ header }}</th>{% endfor %}
+        </tr></thead>
+        <tbody>
+        {% for row in rows %}
+            <tr>
+            {% for key, header in columns %}
+                <td>
+                    {%- if row[key] is number -%}{{ "%.4f"|format(row[key]) }}
+                    {%- else -%}{{ row[key] }}
+                    {%- endif -%}
+                </td>
+            {% endfor %}
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endmacro %}
+
+{% macro fdr_table(rows, columns, fdr_cols=[]) %}
+{#- Simple table with FDR formatting for specified columns -#}
+<div class="table-container">
+    <table>
+        <thead><tr>
+            {% for key, header in columns %}<th>{{ header }}</th>{% endfor %}
+        </tr></thead>
+        <tbody>
+        {% for row in rows %}
+            <tr>
+            {% for key, header in columns %}
+                <td>
+                    {%- if key in fdr_cols -%}{{ fdr(row[key]) }}
+                    {%- elif row[key] is number -%}{{ "%.4f"|format(row[key]) }}
+                    {%- else -%}{{ row[key] }}
+                    {%- endif -%}
+                </td>
+            {% endfor %}
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endmacro %}
+
+{% macro paginated_table(rows, columns, page_size=5) %}
+{#- Paginated table with page buttons -#}
+{%- set total = rows|length -%}
+{%- set n_pages = ((total / page_size)|round(0, 'ceil'))|int -%}
+{%- if n_pages < 1 -%}{%- set n_pages = 1 -%}{%- endif -%}
+<div class="pagination">
+    {% for p in range(n_pages) %}
+    <button class="page-button{% if p == 0 %} active{% endif %}" onclick="showPage({{ p + 1 }})">Page {{ p + 1 }}</button>
+    {% endfor %}
+</div>
+{% for p in range(n_pages) %}
+<div id="interactions-page-{{ p + 1 }}" class="interactions-page{% if p == 0 %} active{% endif %}" {% if p > 0 %}style="display:none;"{% endif %}>
+    <div class="table-container">
+        <table>
+            <thead><tr>
+                {% for key, header in columns %}<th>{{ header }}</th>{% endfor %}
+            </tr></thead>
+            <tbody>
+            {%- set start = p * page_size -%}
+            {%- set end = [(p + 1) * page_size, total]|min -%}
+            {% for row in rows[start:end] %}
+            <tr>
+                {% for key, header in columns %}
+                <td>
+                    {%- if row[key] is number -%}{{ "%.4f"|format(row[key]) }}
+                    {%- else -%}{{ row[key] }}
+                    {%- endif -%}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+{% endmacro %}
+
+{# ===== Main Template Body ===== #}
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+{{ css }}
+    </style>
+</head>
+<body>
+<div class="container">
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark theme">&#9681;</button>
+    <h1>{{ title }}</h1>
+    <p class="subtitle">{{ subtitle }}</p>
+
+    {# ===== Executive Summary ===== #}
+    <div class="summary-box">
+        <h3>Executive Summary</h3>
+        {{ executive_summary.text }}
+        <div class="key-findings">
+            <h4>Key Findings</h4>
+            <ul>
+            {% for f in executive_summary.findings %}
+                <li>{{ f }}</li>
+            {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    {# ===== Analysis Configuration ===== #}
+    <div class="analysis-section">
+        <h3>Analysis Configuration</h3>
+        <table>
+            {% for key, val in config.items() %}
+            <tr><td><strong>{{ key }}</strong></td><td>{{ val }}</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    {# ===== Tab Navigation ===== #}
+    <div class="tabs">
+        <button class="tab-button active" onclick="openTab(event, 'part1')">Part 1: Spatial &amp; Pathway</button>
+        <button class="tab-button" onclick="openTab(event, 'part2')">Part 2: CCI &amp; NMF</button>
+        <button class="tab-button" onclick="openTab(event, 'part3')">Part 3: L-R Interactions</button>
+        <button class="tab-button" onclick="openTab(event, 'summary')">Comprehensive Summary</button>
+        <button class="tab-button" onclick="openTab(event, 'therapeutic')">Therapeutic Implications</button>
+    </div>
+
+    {# ===== Part 1: Spatial & Pathway Analysis ===== #}
+    <div id="part1" class="tab-content active">
+        <h2>Part 1: Spatial Organization and Pathway Analysis</h2>
+        {% for a in part1.analyses %}
+        <div class="analysis-section">
+            <h3>Analysis {{ a.num }}: {{ a.title }}</h3>
+            {{ figure(a.figure, a.caption) }}
+            {% if a.table_type == 'rowspan' %}
+                {{ rowspan_table(a.table_data, a.group_col, a.columns,
+                                 fdr_cols=a.get('fdr_cols', []),
+                                 highlight_cols=a.get('highlight_cols', []),
+                                 top_n=a.get('top_n', 5)) }}
+            {% elif a.table_type == 'simple' %}
+                {{ simple_table(a.table_data, a.columns) }}
+            {% endif %}
+            {% if a.pathway_box %}
+                {{ pathway_box_macro(a.pathway_box) }}
+            {% endif %}
+            {{ interpretation_block(a.interpretation) }}
+        </div>
+        {% endfor %}
+        {{ summary_box_macro(part1.summary.title, part1.summary.findings) }}
+    </div>
+
+    {# ===== Part 2: CCI & NMF Analysis ===== #}
+    <div id="part2" class="tab-content">
+        <h2>Part 2: Cell-Cell Interaction and NMF Analysis</h2>
+        {% for a in part2.analyses %}
+        <div class="analysis-section">
+            <h3>Analysis {{ a.num }}: {{ a.title }}</h3>
+            {{ figure(a.figure, a.caption) }}
+            {% if a.table_type == 'simple' %}
+                {{ simple_table(a.table_data, a.columns) }}
+            {% elif a.table_type == 'fdr' %}
+                {{ fdr_table(a.table_data, a.columns, fdr_cols=a.get('fdr_cols', [])) }}
+            {% endif %}
+            {{ interpretation_block(a.interpretation) }}
+        </div>
+        {% endfor %}
+        {{ summary_box_macro(part2.summary.title, part2.summary.findings) }}
+    </div>
+
+    {# ===== Part 3: L-R Interactions ===== #}
+    <div id="part3" class="tab-content">
+        <h2>Part 3: Critical Ligand-Receptor Interactions</h2>
+        {% for a in part3.analyses %}
+        <div class="analysis-section">
+            <h3>Analysis {{ a.num }}: {{ a.title }}</h3>
+            {{ figure(a.figure, a.caption) }}
+            {% if a.table_type == 'paginated' %}
+                {{ paginated_table(a.table_data, a.columns, page_size=5) }}
+            {% elif a.table_type == 'simple' %}
+                {{ simple_table(a.table_data, a.columns) }}
+            {% endif %}
+            {{ interpretation_block(a.interpretation) }}
+        </div>
+        {% endfor %}
+        {{ summary_box_macro(part3.summary.title, part3.summary.findings) }}
+    </div>
+
+    {# ===== Summary Tab ===== #}
+    <div id="summary" class="tab-content">
+        <h2>Comprehensive Summary</h2>
+        <div class="summary-box">
+            <h3>Overall Biological Model</h3>
+            {{ summary_tab.model_text }}
+        </div>
+
+        {% if summary_tab.themes %}
+        <div class="analysis-section">
+            <h3>Integrated Findings &mdash; Cross-Part Themes</h3>
+            {% for theme in summary_tab.themes %}
+            <h4>{{ loop.index }}. {{ theme.title }}</h4>
+            {{ theme.content }}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if summary_tab.emergent_table %}
+        <div class="analysis-section">
+            <h3>Emergent Themes</h3>
+            <div class="table-container">
+                <table>
+                    <thead><tr>
+                        {% for h in summary_tab.emergent_table.headers %}<th>{{ h }}</th>{% endfor %}
+                    </tr></thead>
+                    <tbody>
+                    {% for row in summary_tab.emergent_table.rows %}
+                        <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if summary_tab.clinical %}
+        <div class="analysis-section">
+            <h3>Clinical &amp; Biological Implications</h3>
+            {{ summary_tab.clinical }}
+        </div>
+        {% endif %}
+
+        {% if summary_tab.novel_findings %}
+        <div class="summary-box">
+            <h3>Novel Findings</h3>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+            {% for f in summary_tab.novel_findings %}
+                <li>{{ f|linkify_pmids }}</li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if summary_tab.limitations %}
+        <div class="analysis-section">
+            <h3>Limitations</h3>
+            <ul>
+            {% for l in summary_tab.limitations %}
+                <li>{{ l }}</li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <div class="analysis-section">
+            <h3>References ({{ papers|length }} papers)</h3>
+            {% for p in papers %}
+            <div class="paper-card">
+                <div class="paper-title">
+                    <a href="https://pubmed.ncbi.nlm.nih.gov/{{ p.pmid }}/" target="_blank">{{ p.title }}</a>
+                </div>
+                {% if p.authors or p.journal %}
+                <p style="color: var(--text-secondary); font-size: 0.9em;">{{ p.authors }} &mdash; {{ p.journal }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# ===== Therapeutic Implications Tab ===== #}
+    <div id="therapeutic" class="tab-content">
+        <h2>Therapeutic Implications</h2>
+        <div class="summary-box">
+            <h3>Therapeutic Potential Summary</h3>
+            <p>{{ therapeutic_tab.summary_line }}</p>
+        </div>
+
+        {% if therapeutic_tab.druggable %}
+        <div class="analysis-section">
+            <h3>Druggable Targets ({{ therapeutic_tab.druggable|length }} found)</h3>
+            <div class="target-grid">
+            {% for t in therapeutic_tab.druggable %}
+            <div class="drug-card">
+                <h4>{{ t.gene }} <small>({{ t.name }})</small></h4>
+                <p><strong>Association Score:</strong>
+                    <span class="{{ 'tractability-high' if t.score > 0.5 else 'tractability-low' }}">{{ "%.3f"|format(t.score) }}</span>
+                </p>
+                <p><strong>Tractability:</strong> {{ t.tractability }}</p>
+                <p><strong>Evidence Count:</strong> {{ t.evidence_count }}</p>
+                <p><strong>Safety Concerns:</strong> {{ t.safety_concerns }}</p>
+                <p><strong>L-R Frequency:</strong> {{ t.lr_frequency }} (roles: {{ t.lr_roles }})</p>
+            </div>
+            {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% for section in therapeutic_tab.sections %}
+        <div class="analysis-section">
+            <h3>{{ section.title }}</h3>
+            {{ section.content }}
+        </div>
+        {% endfor %}
+
+        {% if therapeutic_tab.novel %}
+        <div class="analysis-section">
+            <h3>Novel Drug Target Candidates <span class="novel-badge">{{ therapeutic_tab.novel|length }} found</span></h3>
+            <p>These genes are druggable but lack known disease associations &mdash; potential repurposing or novel target opportunities.</p>
+            <ul class="key-findings">
+            {% for t in therapeutic_tab.novel %}
+                <li><strong>{{ t.gene }}</strong> ({{ t.name }})
+                    <span class="novel-badge">Novel</span>
+                    &mdash; L-R frequency: {{ t.lr_frequency }}</li>
+            {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="metadata">
+        <p>Generated by DeepMAST Deep Interpreter (DeepAgents Framework)</p>
+        <p>Date: {{ generation_date }}</p>
+    </div>
+</div>
+<script>
+{{ js }}
+</script>
+</body>
+</html>

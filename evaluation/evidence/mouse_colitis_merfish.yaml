@@ -1,0 +1,83 @@
+dataset_id: mouse_colitis_merfish
+gold_version: v1.1
+alignment_profile: deep_interpreter_part_aligned
+claims:
+  - claim_id: COLITIS_001
+    claim_text: "The dataset profiles pre-inflammation, early, peak, and recovery stages after DSS induction."
+    claim_type: spatial
+    deep_interpreter_part: part1
+    entities: ["pre", "early", "peak", "recovery", "DSS"]
+    direction: spans
+    pmid_primary: "38569542"
+    pmid_support: "31348891"
+    evidence_span_ref: "Cadinu 2024 cohort design"
+
+  - claim_id: COLITIS_002
+    claim_text: "Fibroblast state trajectories change from baseline to peak inflammation and remain detectable in recovery."
+    claim_type: mechanism
+    deep_interpreter_part: part2
+    entities: ["fibroblasts", "state trajectories", "baseline", "peak", "recovery"]
+    direction: changes_across
+    pmid_primary: "38569542"
+    pmid_support: "31348891"
+    evidence_span_ref: "Cadinu 2024 results: fibroblast trajectory analysis"
+
+  - claim_id: COLITIS_003
+    claim_text: "Immune and stromal remodeling patterns are coordinated across DSS time-course conditions."
+    claim_type: spatial
+    deep_interpreter_part: part1
+    entities: ["immune compartment", "stromal compartment", "DSS time-course"]
+    direction: coordinated_with
+    pmid_primary: "38569542"
+    pmid_support: "31348891"
+    evidence_span_ref: "Cadinu 2024 results: cross-compartment remodeling"
+
+  - claim_id: COLITIS_004
+    claim_text: "Fibroblast-to-immune signaling interactions are higher in inflamed stages than in baseline."
+    claim_type: lr
+    deep_interpreter_part: part3
+    entities: ["fibroblasts", "immune cells", "cell-cell signaling", "inflamed stages", "baseline"]
+    direction: higher_in
+    pmid_primary: "38569542"
+    pmid_support: "31348891"
+    evidence_span_ref: "Cadinu 2024 results: cell-cell communication analysis"
+
+  - claim_id: COLITIS_005
+    claim_text: "TGF-beta-related signaling is elevated in inflamed microenvironments."
+    claim_type: pathway
+    deep_interpreter_part: part2
+    entities: ["TGF-beta", "inflammatory microenvironment"]
+    direction: elevated_in
+    pmid_primary: "38569542"
+    pmid_support: "31348891"
+    evidence_span_ref: "Cadinu 2024 results: pathway-level interpretation"
+
+  - claim_id: COLITIS_006
+    claim_text: "IL11-associated fibroblast programs are linked to fibrosis-like and chronic inflammation phenotypes."
+    claim_type: pathway
+    deep_interpreter_part: part2
+    entities: ["IL11", "fibroblasts", "fibrosis-like phenotype", "chronic inflammation phenotype"]
+    direction: linked_to
+    pmid_primary: "38569542"
+    pmid_support: "31348891"
+    evidence_span_ref: "Cadinu 2024 discussion/results: IL11-associated fibroblast context"
+
+  - claim_id: COLITIS_007
+    claim_text: "Peak inflammation sections show greater immune infiltration than pre-inflammation sections."
+    claim_type: spatial
+    deep_interpreter_part: part1
+    entities: ["peak inflammation", "immune infiltration", "pre-inflammation"]
+    direction: higher_than
+    pmid_primary: "38569542"
+    pmid_support: "31348891"
+    evidence_span_ref: "Cadinu 2024 results: condition-wise spatial comparison"
+
+  - claim_id: COLITIS_008
+    claim_text: "Recovery sections retain remodeling signatures after acute inflammatory burden decreases."
+    claim_type: mechanism
+    deep_interpreter_part: part3
+    entities: ["recovery", "remodeling signatures", "acute inflammation"]
+    direction: persists_after
+    pmid_primary: "38569542"
+    pmid_support: "31348891"
+    evidence_span_ref: "Recovery-phase interpretation"

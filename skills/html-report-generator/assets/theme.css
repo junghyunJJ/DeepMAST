@@ -1,8 +1,9 @@
 /**
- * DeepMAST HTML Report Theme
+ * DeepMAST HTML Report Theme — Premium Dark (Vercel/Stripe Style)
  *
- * Dark theme styling for CCI Analysis Reports
- * Compatible with Deep Interpreter Agent report generation
+ * Dark-first theme with indigo + amber + red accent palette.
+ * Glass morphism cards with backdrop-blur.
+ * Toggle: clean light version with same accent hues.
  *
  * Usage:
  * - Import via report.py tool (automatic)
@@ -11,47 +12,47 @@
  */
 
 /* ==========================================================================
-   CSS Variables (Customization Layer)
+   CSS Variables — Premium Dark (Default)
    ========================================================================== */
 
 :root {
   /* Primary Colors */
-  --color-primary: #64ffda;           /* Cyan - titles, accents, links, cell types */
-  --color-secondary: #ffd166;         /* Yellow - clusters, h3 headings, pathway boxes */
-  --color-accent: #ff6b9d;            /* Pink - pathways, h4 headings, key findings */
+  --color-primary: #818CF8;           /* Indigo-400 - titles, h2, links */
+  --color-secondary: #FBBF24;         /* Amber-400 - h3, cluster highlights */
+  --color-accent: #F87171;            /* Red-400 - h4, key findings */
 
   /* Background Colors */
-  --bg-primary: #1a1a2e;              /* Main body background (dark) */
-  --bg-secondary: #16213e;            /* Gradient end */
-  --bg-container: rgba(26, 26, 46, 0.95);  /* Container background */
-  --bg-section: rgba(35, 35, 60, 0.6);     /* Section background */
-  --bg-figure: rgba(0, 0, 0, 0.3);         /* Figure container */
-  --bg-dark: rgba(30, 30, 50, 0.8);        /* Paper cards, darker elements */
+  --bg-primary: #000000;              /* Pure black */
+  --bg-secondary: #0A0A0A;            /* Near-black */
+  --bg-container: rgba(17, 17, 17, 0.8);
+  --bg-section: rgba(24, 24, 27, 0.6);
+  --bg-figure: rgba(17, 17, 17, 0.5);
+  --bg-dark: rgba(24, 24, 27, 0.8);
 
   /* Text Colors */
-  --text-primary: #e4e4e4;            /* Main text */
-  --text-secondary: #aaa;             /* Subtitles, captions, muted text */
-  --text-muted: #666;                 /* Metadata, very muted text */
+  --text-primary: #EDEDED;            /* Off-white */
+  --text-secondary: #A1A1AA;          /* Zinc-400 */
+  --text-muted: #71717A;              /* Zinc-500 */
 
   /* Semantic Colors (matching highlight classes) */
-  --highlight-cluster: #ffd166;       /* .highlight-cluster */
-  --highlight-pathway: #ff6b9d;       /* .highlight-pathway */
-  --highlight-celltype: #64ffda;      /* .highlight-celltype */
+  --highlight-cluster: #FBBF24;       /* Amber-400 */
+  --highlight-pathway: #F87171;        /* Red-400 */
+  --highlight-celltype: #818CF8;       /* Indigo-400 */
 
   /* Component Colors */
-  --border-primary: #64ffda;          /* Primary borders */
-  --border-secondary: rgba(100, 255, 218, 0.3);  /* Subtle borders */
-  --border-muted: rgba(100, 255, 218, 0.1);      /* Very subtle borders */
+  --border-primary: #818CF8;           /* Indigo */
+  --border-secondary: rgba(129, 140, 248, 0.2);
+  --border-muted: rgba(255, 255, 255, 0.06);
 
   /* Gradient Colors */
-  --gradient-primary: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  --gradient-summary: linear-gradient(135deg, rgba(100, 255, 218, 0.1) 0%, rgba(255, 107, 157, 0.1) 100%);
-  --gradient-confidence: linear-gradient(90deg, #ff6b9d, #64ffda);
+  --gradient-primary: radial-gradient(ellipse at top, #0A0A0A 0%, #000000 70%);
+  --gradient-summary: linear-gradient(135deg, rgba(129, 140, 248, 0.08) 0%, rgba(248, 113, 113, 0.08) 100%);
+  --gradient-confidence: linear-gradient(90deg, #F87171, #818CF8);
 
   /* Shadow Colors */
-  --shadow-container: 0 10px 40px rgba(0, 0, 0, 0.5);
-  --shadow-figure: 0 5px 15px rgba(100, 255, 218, 0.3);
-  --shadow-title: 0 0 10px rgba(100, 255, 218, 0.5);
+  --shadow-container: 0 0 60px rgba(129, 140, 248, 0.05);
+  --shadow-figure: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --shadow-title: none;
 
   /* Spacing */
   --container-max-width: 1400px;
@@ -60,10 +61,10 @@
   --element-gap: 20px;
 
   /* Border Radius */
-  --radius-large: 15px;               /* Container */
-  --radius-medium: 10px;              /* Sections, figures */
-  --radius-small: 5px;                /* Buttons, small elements */
-  --radius-round: 15px;               /* Badges */
+  --radius-large: 12px;
+  --radius-medium: 10px;
+  --radius-small: 6px;
+  --radius-round: 12px;
 
   /* Typography */
   --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -103,13 +104,16 @@ body {
 }
 
 /* ==========================================================================
-   Layout Components
+   Layout Components — Glass Morphism
    ========================================================================== */
 
 .container {
   max-width: var(--container-max-width);
   margin: 0 auto;
   background: var(--bg-container);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-muted);
   border-radius: var(--radius-large);
   box-shadow: var(--shadow-container);
   padding: var(--container-padding);
@@ -124,7 +128,8 @@ h1 {
   font-size: var(--font-size-h1);
   margin-bottom: 10px;
   text-align: center;
-  text-shadow: var(--shadow-title);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
@@ -142,6 +147,8 @@ h2 {
   margin-bottom: 20px;
   padding-bottom: 10px;
   border-bottom: 2px solid var(--border-primary);
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 h3 {
@@ -149,6 +156,7 @@ h3 {
   font-size: var(--font-size-h3);
   margin-top: 30px;
   margin-bottom: 15px;
+  font-weight: 600;
 }
 
 h4 {
@@ -156,14 +164,18 @@ h4 {
   font-size: var(--font-size-h4);
   margin-top: 20px;
   margin-bottom: 10px;
+  font-weight: 600;
 }
 
 /* ==========================================================================
-   Section Components
+   Section Components — Glass Morphism
    ========================================================================== */
 
 .analysis-section {
   background: var(--bg-section);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-muted);
   padding: 25px;
   border-radius: var(--radius-medium);
   margin-bottom: var(--section-margin);
@@ -172,14 +184,16 @@ h4 {
 
 .summary-box {
   background: var(--gradient-summary);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(129, 140, 248, 0.15);
   padding: 25px;
   border-radius: var(--radius-medium);
   margin: var(--section-margin) 0;
-  border: 2px solid var(--border-secondary);
 }
 
 .interpretation {
-  background: rgba(100, 255, 218, 0.1);
+  background: rgba(129, 140, 248, 0.06);
   padding: var(--element-gap);
   border-left: 4px solid var(--border-primary);
   border-radius: var(--radius-small);
@@ -192,7 +206,7 @@ h4 {
 }
 
 .key-findings {
-  background: rgba(255, 107, 157, 0.1);
+  background: rgba(248, 113, 113, 0.06);
   padding: var(--element-gap);
   border-radius: var(--radius-small);
   margin: var(--element-gap) 0;
@@ -209,11 +223,11 @@ h4 {
 }
 
 .pathway-box {
-  background: rgba(255, 209, 102, 0.1);
+  background: rgba(251, 191, 36, 0.06);
   padding: 15px;
   border-radius: var(--radius-small);
   margin: 10px 0;
-  border-left: 4px solid var(--color-secondary);
+  border-left: 4px solid var(--highlight-cluster);
 }
 
 .pathway-box ul {
@@ -231,12 +245,13 @@ h4 {
   background: var(--bg-figure);
   padding: var(--element-gap);
   border-radius: var(--radius-medium);
+  border: 1px solid var(--border-muted);
 }
 
 .figure-container img {
   max-width: 100%;
   height: auto;
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   box-shadow: var(--shadow-figure);
 }
 
@@ -256,14 +271,14 @@ h4 {
   gap: 10px;
   margin: var(--element-gap) 0;
   flex-wrap: wrap;
-  border-bottom: 2px solid var(--border-primary);
+  border-bottom: 2px solid rgba(129, 140, 248, 0.2);
   padding-bottom: 10px;
 }
 
 .tab-button {
-  background: rgba(35, 35, 60, 0.8);
-  color: var(--color-primary);
-  border: 2px solid var(--border-primary);
+  background: rgba(24, 24, 27, 0.8);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-muted);
   padding: 12px 24px;
   cursor: pointer;
   border-radius: var(--radius-small) var(--radius-small) 0 0;
@@ -273,14 +288,16 @@ h4 {
 }
 
 .tab-button:hover {
-  background: rgba(100, 255, 218, 0.2);
+  background: rgba(129, 140, 248, 0.1);
+  color: var(--color-primary);
   transform: translateY(-2px);
 }
 
 .tab-button.active {
   background: var(--color-primary);
-  color: var(--bg-primary);
+  color: #000000;
   font-weight: bold;
+  border-color: var(--color-primary);
 }
 
 .tab-content {
@@ -310,17 +327,17 @@ table {
   border-collapse: collapse;
   margin: var(--element-gap) 0;
   background: var(--bg-section);
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   overflow: hidden;
 }
 
 th {
-  background: rgba(100, 255, 218, 0.2);
+  background: rgba(129, 140, 248, 0.08);
   color: var(--color-primary);
   padding: 12px;
   text-align: left;
   font-weight: bold;
-  border-bottom: 2px solid var(--border-primary);
+  border-bottom: 2px solid rgba(129, 140, 248, 0.2);
 }
 
 td {
@@ -329,7 +346,7 @@ td {
 }
 
 tr:hover {
-  background: rgba(100, 255, 218, 0.05);
+  background: rgba(129, 140, 248, 0.04);
 }
 
 /* ==========================================================================
@@ -344,9 +361,9 @@ tr:hover {
 }
 
 .page-button {
-  background: rgba(100, 255, 218, 0.2);
+  background: rgba(129, 140, 248, 0.08);
   color: var(--color-primary);
-  border: 1px solid var(--border-primary);
+  border: 1px solid rgba(129, 140, 248, 0.2);
   padding: 8px 16px;
   cursor: pointer;
   border-radius: var(--radius-small);
@@ -354,12 +371,12 @@ tr:hover {
 }
 
 .page-button:hover {
-  background: rgba(100, 255, 218, 0.4);
+  background: rgba(129, 140, 248, 0.15);
 }
 
 .page-button.active {
   background: var(--color-primary);
-  color: var(--bg-primary);
+  color: #000000;
   font-weight: bold;
 }
 
@@ -384,22 +401,22 @@ tr:hover {
 }
 
 .score-high {
-  background: rgba(100, 255, 218, 0.3);
+  background: rgba(129, 140, 248, 0.2);
   color: var(--color-primary);
 }
 
 .score-medium {
-  background: rgba(255, 209, 102, 0.3);
+  background: rgba(251, 191, 36, 0.2);
   color: var(--color-secondary);
 }
 
 .score-low {
-  background: rgba(255, 107, 157, 0.3);
+  background: rgba(248, 113, 113, 0.2);
   color: var(--color-accent);
 }
 
 .confidence-bar {
-  background: rgba(100, 100, 100, 0.3);
+  background: rgba(100, 100, 100, 0.15);
   border-radius: var(--radius-medium);
   height: 10px;
   margin: 5px 0;
@@ -428,9 +445,11 @@ tr:hover {
 
 .paper-card {
   background: var(--bg-dark);
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   padding: 15px;
   margin: 10px 0;
+  border-left: 3px solid var(--border-primary);
+  border: 1px solid var(--border-muted);
   border-left: 3px solid var(--border-primary);
 }
 
@@ -449,9 +468,9 @@ tr:hover {
 
 /**
  * Use these classes to highlight biological entities:
- * - .highlight-cluster: Yellow - for cluster names (e.g., "Cluster 0")
- * - .highlight-pathway: Pink - for pathway names (e.g., "NFkB signaling")
- * - .highlight-celltype: Cyan - for cell type names (e.g., "Macrophages")
+ * - .highlight-cluster: Amber - for cluster names (e.g., "Cluster 0")
+ * - .highlight-pathway: Red - for pathway names (e.g., "NFkB signaling")
+ * - .highlight-celltype: Indigo - for cell type names (e.g., "Macrophages")
  */
 
 .highlight-cluster {
@@ -467,6 +486,64 @@ tr:hover {
 .highlight-celltype {
   color: var(--highlight-celltype);
   font-weight: bold;
+}
+
+/* ==========================================================================
+   Drug Target Components
+   ========================================================================== */
+
+.drug-card {
+  background: rgba(129, 140, 248, 0.06);
+  border: 1px solid rgba(129, 140, 248, 0.15);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius-small);
+  padding: 15px;
+  margin: 10px 0;
+}
+
+.drug-card h4 {
+  color: var(--color-primary);
+  margin-bottom: 8px;
+}
+
+.tractability-high {
+  color: #34D399;
+  font-weight: bold;
+}
+
+.tractability-low {
+  color: var(--color-accent);
+  font-style: italic;
+}
+
+.drug-phase {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  margin-left: 8px;
+}
+
+.drug-phase-4 { background: rgba(52, 211, 153, 0.2); color: #34D399; }
+.drug-phase-3 { background: rgba(129, 140, 248, 0.15); color: var(--color-primary); }
+.drug-phase-2 { background: rgba(251, 191, 36, 0.15); color: var(--color-secondary); }
+.drug-phase-1 { background: rgba(113, 113, 122, 0.15); color: var(--text-secondary); }
+
+.target-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.novel-badge {
+  display: inline-block;
+  background: rgba(251, 191, 36, 0.2);
+  color: var(--color-secondary);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  margin-left: 8px;
 }
 
 /* ==========================================================================
@@ -502,14 +579,14 @@ tr:hover {
 .mb-3 { margin-bottom: 30px; }
 
 /* ==========================================================================
-   Figure Placeholder (for reference examples without real images)
+   Figure Placeholder
    ========================================================================== */
 
 .figure-placeholder {
-  background: rgba(100, 255, 218, 0.1);
-  border: 2px dashed var(--color-primary);
+  background: rgba(129, 140, 248, 0.04);
+  border: 2px dashed rgba(129, 140, 248, 0.3);
   padding: 60px 40px;
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   color: var(--text-secondary);
   text-align: center;
 }
@@ -523,9 +600,11 @@ tr:hover {
   top: 20px;
   right: 20px;
   z-index: 1000;
-  background: var(--bg-section);
+  background: rgba(24, 24, 27, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: var(--color-primary);
-  border: 2px solid var(--color-primary);
+  border: 1px solid var(--border-muted);
   border-radius: 50%;
   width: 44px;
   height: 44px;
@@ -538,7 +617,7 @@ tr:hover {
 }
 
 .theme-toggle:hover {
-  background: rgba(100, 255, 218, 0.2);
+  background: rgba(129, 140, 248, 0.1);
   transform: scale(1.1);
 }
 
@@ -548,95 +627,168 @@ tr:hover {
 
 :root[data-theme="light"] {
   /* Primary Colors */
-  --color-primary: #0066cc;
-  --color-secondary: #b8860b;
-  --color-accent: #cc3366;
+  --color-primary: #6366F1;           /* Indigo-500 (darker for light bg) */
+  --color-secondary: #D97706;         /* Amber-600 */
+  --color-accent: #DC2626;            /* Red-600 */
 
   /* Background Colors */
-  --bg-primary: #f8f9fa;
-  --bg-secondary: #e9ecef;
-  --bg-container: rgba(255, 255, 255, 0.98);
-  --bg-section: rgba(240, 242, 245, 0.8);
-  --bg-figure: rgba(245, 245, 245, 0.8);
-  --bg-dark: rgba(230, 232, 235, 0.8);
+  --bg-primary: #FAFAFA;
+  --bg-secondary: #F4F4F5;
+  --bg-container: rgba(255, 255, 255, 0.95);
+  --bg-section: rgba(244, 244, 245, 0.9);
+  --bg-figure: rgba(244, 244, 245, 0.8);
+  --bg-dark: rgba(228, 228, 231, 0.8);
 
   /* Text Colors */
-  --text-primary: #2c3e50;
-  --text-secondary: #666;
-  --text-muted: #999;
+  --text-primary: #18181B;            /* Zinc-900 */
+  --text-secondary: #52525B;          /* Zinc-600 */
+  --text-muted: #A1A1AA;             /* Zinc-400 */
 
   /* Semantic Colors */
-  --highlight-cluster: #b8860b;
-  --highlight-pathway: #cc3366;
-  --highlight-celltype: #0066cc;
+  --highlight-cluster: #B45309;       /* Amber-700 */
+  --highlight-pathway: #DC2626;       /* Red-600 */
+  --highlight-celltype: #4F46E5;      /* Indigo-600 */
 
   /* Component Colors */
-  --border-primary: #0066cc;
-  --border-secondary: rgba(0, 102, 204, 0.3);
-  --border-muted: rgba(0, 102, 204, 0.1);
+  --border-primary: #6366F1;
+  --border-secondary: rgba(99, 102, 241, 0.3);
+  --border-muted: rgba(0, 0, 0, 0.06);
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  --gradient-summary: linear-gradient(135deg, rgba(0, 102, 204, 0.05) 0%, rgba(204, 51, 102, 0.05) 100%);
-  --gradient-confidence: linear-gradient(90deg, #cc3366, #0066cc);
+  --gradient-primary: #FAFAFA;
+  --gradient-summary: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(220, 38, 38, 0.06) 100%);
+  --gradient-confidence: linear-gradient(90deg, #DC2626, #6366F1);
 
   /* Shadows */
-  --shadow-container: 0 4px 20px rgba(0, 0, 0, 0.1);
-  --shadow-figure: 0 2px 10px rgba(0, 0, 0, 0.1);
+  --shadow-container: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --shadow-figure: 0 2px 8px rgba(0, 0, 0, 0.06);
   --shadow-title: none;
 }
 
+/* Light theme: remove glass morphism, use solid backgrounds */
+:root[data-theme="light"] .container {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(255, 255, 255, 0.98);
+  border: none;
+}
+
+:root[data-theme="light"] .analysis-section {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  border-left: 4px solid var(--border-primary);
+}
+
+:root[data-theme="light"] .summary-box {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 2px solid var(--border-secondary);
+}
+
 :root[data-theme="light"] .interpretation {
-  background: rgba(0, 102, 204, 0.05);
+  background: rgba(99, 102, 241, 0.05);
 }
 
 :root[data-theme="light"] .key-findings {
-  background: rgba(204, 51, 102, 0.05);
+  background: rgba(220, 38, 38, 0.05);
 }
 
 :root[data-theme="light"] .pathway-box {
-  background: rgba(184, 134, 11, 0.05);
+  background: rgba(180, 83, 9, 0.05);
 }
 
 :root[data-theme="light"] .tab-button {
-  background: rgba(240, 242, 245, 0.8);
+  background: rgba(244, 244, 245, 0.9);
+  color: var(--color-primary);
+  border: 2px solid var(--border-primary);
 }
 
 :root[data-theme="light"] .tab-button.active {
+  background: var(--color-primary);
   color: #ffffff;
+}
+
+:root[data-theme="light"] .tab-button:hover {
+  background: rgba(99, 102, 241, 0.08);
 }
 
 :root[data-theme="light"] .page-button {
-  background: rgba(0, 102, 204, 0.1);
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 :root[data-theme="light"] .page-button.active {
+  background: var(--color-primary);
   color: #ffffff;
 }
 
-:root[data-theme="light"] .score-high {
-  background: rgba(0, 102, 204, 0.15);
-}
-
-:root[data-theme="light"] .score-medium {
-  background: rgba(184, 134, 11, 0.15);
-}
-
-:root[data-theme="light"] .score-low {
-  background: rgba(204, 51, 102, 0.15);
-}
-
 :root[data-theme="light"] th {
-  background: rgba(0, 102, 204, 0.1);
+  background: rgba(99, 102, 241, 0.08);
 }
 
 :root[data-theme="light"] tr:hover {
-  background: rgba(0, 102, 204, 0.03);
+  background: rgba(99, 102, 241, 0.03);
+}
+
+:root[data-theme="light"] .score-high {
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--color-primary);
+}
+
+:root[data-theme="light"] .score-medium {
+  background: rgba(180, 83, 9, 0.12);
+  color: var(--highlight-cluster);
+}
+
+:root[data-theme="light"] .score-low {
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--color-accent);
+}
+
+:root[data-theme="light"] .drug-card {
+  background: rgba(99, 102, 241, 0.04);
+  border: none;
+  border-left: 4px solid var(--color-primary);
+}
+
+:root[data-theme="light"] .tractability-high {
+  color: #059669;
+}
+
+:root[data-theme="light"] .drug-phase-4 { background: rgba(5, 150, 105, 0.15); color: #059669; }
+:root[data-theme="light"] .drug-phase-3 { background: rgba(99, 102, 241, 0.12); color: var(--color-primary); }
+:root[data-theme="light"] .drug-phase-2 { background: rgba(180, 83, 9, 0.12); color: var(--highlight-cluster); }
+
+:root[data-theme="light"] .novel-badge {
+  background: rgba(180, 83, 9, 0.15);
+  color: var(--highlight-cluster);
+}
+
+:root[data-theme="light"] .figure-container {
+  border: none;
 }
 
 :root[data-theme="light"] .figure-placeholder {
-  background: rgba(0, 102, 204, 0.05);
+  background: rgba(99, 102, 241, 0.04);
   border-color: var(--color-primary);
+}
+
+:root[data-theme="light"] .paper-card {
+  border: none;
+  border-left: 3px solid var(--border-primary);
+}
+
+:root[data-theme="light"] .theme-toggle {
+  background: rgba(244, 244, 245, 0.9);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 2px solid var(--color-primary);
+}
+
+:root[data-theme="light"] .theme-toggle:hover {
+  background: rgba(99, 102, 241, 0.08);
 }
 
 /* ==========================================================================
@@ -657,6 +809,9 @@ tr:hover {
     padding: 20px !important;
     background: white !important;
     border-radius: 0 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: none !important;
   }
 
   .tabs, .tab-button, .pagination, .page-button, .theme-toggle {
@@ -676,11 +831,16 @@ tr:hover {
     page-break-inside: avoid;
     border-left-color: #333 !important;
     background: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: none !important;
+    border-left: 4px solid #333 !important;
   }
 
   .figure-container {
     page-break-inside: avoid;
     background: none !important;
+    border: none !important;
   }
 
   .figure-container img {
@@ -690,7 +850,6 @@ tr:hover {
 
   h1, h2, h3, h4 {
     color: black !important;
-    text-shadow: none !important;
   }
 
   .highlight-cluster, .highlight-pathway, .highlight-celltype {
@@ -701,6 +860,8 @@ tr:hover {
   .summary-box, .interpretation, .key-findings, .pathway-box {
     background: none !important;
     border: 1px solid #ccc !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 
   .paper-card {
@@ -756,7 +917,7 @@ tr:hover {
   }
 
   .container {
-    border-radius: 8px;
+    border-radius: var(--radius-small);
   }
 
   .tabs {

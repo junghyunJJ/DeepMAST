@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1771609825256,
+  "lastScanned": 1771832070146,
   "projectRoot": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST",
   "techStack": {
     "languages": [
@@ -35,6 +35,7 @@
     "workspaces": [],
     "mainDirectories": [
       "docs",
+      "scripts",
       "src",
       "tests"
     ],
@@ -49,7 +50,7 @@
       "path": "agent-chat-ui",
       "purpose": null,
       "fileCount": 24,
-      "lastAccessed": 1771609825247,
+      "lastAccessed": 1771832070137,
       "keyFiles": [
         "LICENSE",
         "Makefile",
@@ -62,7 +63,7 @@
       "path": "agent_architecture",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1771609825247,
+      "lastAccessed": 1771832070138,
       "keyFiles": [
         "1.pipeline_builder.mermaid",
         "1.pipeline_builder.png",
@@ -75,14 +76,14 @@
       "path": "docker",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1771609825248,
+      "lastAccessed": 1771832070138,
       "keyFiles": []
     },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 12,
-      "lastAccessed": 1771609825248,
+      "fileCount": 13,
+      "lastAccessed": 1771832070138,
       "keyFiles": [
         "Auto-save papers in search_literature_dynamic.md",
         "biomcp_vs_eutils_comparison.md",
@@ -91,11 +92,24 @@
         "fig_des.md"
       ]
     },
+    "evaluation": {
+      "path": "evaluation",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1771832070138,
+      "keyFiles": [
+        "README.md",
+        "__init__.py",
+        "build_core_suite.py",
+        "check_pmids.py",
+        "schema.py"
+      ]
+    },
     "notebook": {
       "path": "notebook",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1771609825248,
+      "lastAccessed": 1771832070138,
       "keyFiles": [
         "test_interpreter_steps.ipynb",
         "test_load_analysis_data.ipynb"
@@ -105,7 +119,7 @@
       "path": "old",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1771609825248,
+      "lastAccessed": 1771832070139,
       "keyFiles": [
         "st_pipeline_info_agent copy.py"
       ]
@@ -114,7 +128,7 @@
       "path": "order",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1771609825249,
+      "lastAccessed": 1771832070139,
       "keyFiles": [
         "order_HITL",
         "order_deepagent",
@@ -126,8 +140,8 @@
     "res": {
       "path": "res",
       "purpose": null,
-      "fileCount": 40,
-      "lastAccessed": 1771609825250,
+      "fileCount": 41,
+      "lastAccessed": 1771832070140,
       "keyFiles": [
         "1.spatial.png",
         "10.spatial_plot_interections.png",
@@ -139,8 +153,8 @@
     "res_bc": {
       "path": "res_bc",
       "purpose": null,
-      "fileCount": 32,
-      "lastAccessed": 1771609825250,
+      "fileCount": 49,
+      "lastAccessed": 1771832070140,
       "keyFiles": [
         "1.cluster_spatial.png",
         "10.spatial_plot_interections.png",
@@ -149,18 +163,28 @@
         "3.neighborhood_enrichment_squidpy.png"
       ]
     },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 2,
+      "lastAccessed": 1771832070140,
+      "keyFiles": [
+        "__init__.py",
+        "regenerate_report.py"
+      ]
+    },
     "skills": {
       "path": "skills",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1771609825250,
+      "lastAccessed": 1771832070141,
       "keyFiles": []
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1771609825250,
+      "lastAccessed": 1771832070141,
       "keyFiles": [
         "__init__.py"
       ]
@@ -168,221 +192,182 @@
     "tests": {
       "path": "tests",
       "purpose": "Test files",
-      "fileCount": 10,
-      "lastAccessed": 1771609825250,
+      "fileCount": 17,
+      "lastAccessed": 1771832070141,
       "keyFiles": [
         "__init__.py",
         "test_data_dir_env_fix.py",
         "test_disease_synonyms.py",
-        "test_literature_rag_integration.ipynb",
-        "test_openrouter_kimi.ipynb"
+        "test_lit_benchmark_scripts.py",
+        "test_literature_dynamic_vs_baselines_smoke.ipynb"
+      ]
+    },
+    "evaluation/examples": {
+      "path": "evaluation/examples",
+      "purpose": "Example code",
+      "fileCount": 1,
+      "lastAccessed": 1771832070142,
+      "keyFiles": [
+        "post_hitl_sample.json"
       ]
     }
   },
   "hotPaths": [
     {
-      "path": "src/agents/deep_interpreter/tools/literature.py",
-      "accessCount": 80,
-      "lastAccessed": 1771617890952,
-      "type": "file"
-    },
-    {
       "path": "src/agents/deep_interpreter/subagents/prompts.py",
-      "accessCount": 21,
-      "lastAccessed": 1771629951050,
+      "accessCount": 28,
+      "lastAccessed": 1771839246575,
       "type": "file"
     },
     {
-      "path": "skills/opentargets-database/scripts/query_opentargets.py",
-      "accessCount": 14,
-      "lastAccessed": 1771631619891,
-      "type": "directory"
+      "path": "src/agents/deep_interpreter/tools/lr_prioritizer.py",
+      "accessCount": 24,
+      "lastAccessed": 1771839751467,
+      "type": "file"
     },
     {
-      "path": "src/agents/deep_interpreter/subagents/configs.py",
-      "accessCount": 9,
-      "lastAccessed": 1771629944484,
+      "path": "tests/deep_interpreter/test_lr_prioritizer.py",
+      "accessCount": 18,
+      "lastAccessed": 1771839025816,
       "type": "file"
     },
     {
       "path": "src/agents/deep_interpreter/tools/report.py",
-      "accessCount": 6,
-      "lastAccessed": 1771629951820,
+      "accessCount": 15,
+      "lastAccessed": 1771837546928,
+      "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 15,
+      "lastAccessed": 1771837567308,
+      "type": "directory"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools/drug_targets.py",
+      "accessCount": 14,
+      "lastAccessed": 1771839752788,
       "type": "file"
     },
     {
-      "path": "tests/test_disease_synonyms.py",
-      "accessCount": 5,
-      "lastAccessed": 1771610887720,
+      "path": "docs/lr_filtering_pipeline.md",
+      "accessCount": 12,
+      "lastAccessed": 1771839734238,
+      "type": "file"
+    },
+    {
+      "path": "skills/opentargets-database/scripts/query_opentargets.py",
+      "accessCount": 9,
+      "lastAccessed": 1771837566375,
+      "type": "file"
+    },
+    {
+      "path": "scripts/regenerate_report.py",
+      "accessCount": 7,
+      "lastAccessed": 1771837539799,
       "type": "file"
     },
     {
       "path": "src/agents/deep_interpreter/tools/__init__.py",
-      "accessCount": 5,
-      "lastAccessed": 1771617909723,
+      "accessCount": 6,
+      "lastAccessed": 1771837517184,
       "type": "file"
     },
     {
-      "path": "src/agents/deep_interpreter/tools/drug_targets.py",
-      "accessCount": 5,
-      "lastAccessed": 1771631607403,
+      "path": "src/agents/deep_interpreter/subagents/configs.py",
+      "accessCount": 6,
+      "lastAccessed": 1771837517807,
       "type": "file"
-    },
-    {
-      "path": "src/agents/deep_interpreter/tools/mcp_clients.py",
-      "accessCount": 4,
-      "lastAccessed": 1771611625024,
-      "type": "file"
-    },
-    {
-      "path": "src/agents/deep_interpreter",
-      "accessCount": 4,
-      "lastAccessed": 1771617911266,
-      "type": "directory"
-    },
-    {
-      "path": "src/agents/deep_interpreter/prompts.py",
-      "accessCount": 4,
-      "lastAccessed": 1771617921390,
-      "type": "directory"
-    },
-    {
-      "path": "res_bc/part1_final.md",
-      "accessCount": 4,
-      "lastAccessed": 1771629958775,
-      "type": "file"
-    },
-    {
-      "path": "res_bc/part2_final.md",
-      "accessCount": 4,
-      "lastAccessed": 1771629959433,
-      "type": "file"
-    },
-    {
-      "path": "res_bc/part3_final.md",
-      "accessCount": 3,
-      "lastAccessed": 1771629960045,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 2,
-      "lastAccessed": 1771611646845,
-      "type": "directory"
     },
     {
       "path": "src",
-      "accessCount": 2,
-      "lastAccessed": 1771617909268,
+      "accessCount": 3,
+      "lastAccessed": 1771837522003,
       "type": "directory"
     },
     {
-      "path": "src/agents/deep_interpreter/agent.py",
+      "path": "src/agents/deep_interpreter/tools/data_loader.py",
       "accessCount": 2,
-      "lastAccessed": 1771617911410,
+      "lastAccessed": 1771835513115,
+      "type": "file"
+    },
+    {
+      "path": "skills/opentargets-database/SKILL.md",
+      "accessCount": 2,
+      "lastAccessed": 1771836912467,
+      "type": "file"
+    },
+    {
+      "path": "skills/html-report-generator/SKILL.md",
+      "accessCount": 2,
+      "lastAccessed": 1771836917585,
+      "type": "file"
+    },
+    {
+      "path": "skills/html-report-generator/assets/theme.css",
+      "accessCount": 2,
+      "lastAccessed": 1771837528014,
       "type": "directory"
     },
     {
-      "path": "src/agents/deep_interpreter/tools/quality.py",
+      "path": "skills/html-report-generator/templates/report.html.j2",
       "accessCount": 2,
-      "lastAccessed": 1771620561486,
-      "type": "file"
+      "lastAccessed": 1771837546123,
+      "type": "directory"
     },
     {
-      "path": "tests/test_part3_interpreter.py",
-      "accessCount": 2,
-      "lastAccessed": 1771629943426,
-      "type": "file"
-    },
-    {
-      "path": "res_bc/interpretation_guide.md",
-      "accessCount": 2,
-      "lastAccessed": 1771629967526,
-      "type": "file"
-    },
-    {
-      "path": "res_bc/therapeutic_targets.json",
-      "accessCount": 2,
-      "lastAccessed": 1771658359762,
-      "type": "file"
-    },
-    {
-      "path": "res_bc/synthesis.md",
-      "accessCount": 2,
-      "lastAccessed": 1771658389194,
-      "type": "file"
-    },
-    {
-      "path": "src/agents/model.py",
+      "path": "src/agents/deep_interpreter",
       "accessCount": 1,
-      "lastAccessed": 1771611645119,
+      "lastAccessed": 1771835522077,
+      "type": "directory"
+    },
+    {
+      "path": "skills/opentargets-database/references/api_reference.md",
+      "accessCount": 1,
+      "lastAccessed": 1771835975206,
       "type": "file"
     },
     {
-      "path": "tests/test_part2_interpreter.py",
+      "path": "skills/opentargets-database/references/evidence_types.md",
       "accessCount": 1,
-      "lastAccessed": 1771620692714,
+      "lastAccessed": 1771835975856,
       "type": "file"
     },
     {
-      "path": "tests/test_part1_interpreter.py",
+      "path": "skills/opentargets-database/references/target_annotations.md",
       "accessCount": 1,
-      "lastAccessed": 1771620725465,
-      "type": "file"
-    },
-    {
-      "path": "res/synthesis.md",
-      "accessCount": 1,
-      "lastAccessed": 1771629135148,
-      "type": "file"
-    },
-    {
-      "path": "tests/test_reporter_phase45.py",
-      "accessCount": 1,
-      "lastAccessed": 1771629210228,
-      "type": "file"
-    },
-    {
-      "path": "src/agents/deep_interpreter/tools/standalone_fs.py",
-      "accessCount": 1,
-      "lastAccessed": 1771629960782,
-      "type": "file"
-    },
-    {
-      "path": "res_bc/targets.json",
-      "accessCount": 1,
-      "lastAccessed": 1771629966759,
-      "type": "file"
-    },
-    {
-      "path": "res_bc/data_path.txt",
-      "accessCount": 1,
-      "lastAccessed": 1771629968167,
-      "type": "file"
-    },
-    {
-      "path": "tests/test_reporter.py",
-      "accessCount": 1,
-      "lastAccessed": 1771630045513,
-      "type": "file"
-    },
-    {
-      "path": "res_bc/synthesis_validation.json",
-      "accessCount": 1,
-      "lastAccessed": 1771630685988,
+      "lastAccessed": 1771835976286,
       "type": "file"
     },
     {
       "path": "tests/test_reporter_phase5.py",
       "accessCount": 1,
-      "lastAccessed": 1771658441409,
+      "lastAccessed": 1771836909528,
       "type": "file"
     },
     {
-      "path": "res_bc/synthesis_updated.md",
+      "path": "tests/test_reporter.py",
       "accessCount": 1,
-      "lastAccessed": 1771658630996,
+      "lastAccessed": 1771836909762,
       "type": "file"
+    },
+    {
+      "path": "skills/scanpy/SKILL.md",
+      "accessCount": 1,
+      "lastAccessed": 1771836923297,
+      "type": "file"
+    },
+    {
+      "path": "skills/biomedical-literature-search/SKILL.md",
+      "accessCount": 1,
+      "lastAccessed": 1771836930503,
+      "type": "file"
+    },
+    {
+      "path": "skills",
+      "accessCount": 1,
+      "lastAccessed": 1771837523217,
+      "type": "directory"
     }
   ],
   "userDirectives": []

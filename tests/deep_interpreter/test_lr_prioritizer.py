@@ -183,18 +183,19 @@ class TestPrioritizeTool:
 
     @pytest.fixture
     def temp_data_dir(self):
-        """Create temp directory with test data (genept_score pre-computed in CSV)."""
+        """Create temp directory with test data (genept_score + combinedscore pre-computed in CSV)."""
         import shutil
 
         temp_dir = Path(tempfile.mkdtemp())
 
-        # Create LIANA results with genept_score column
+        # Create LIANA results with combinedscore column
         liana_df = pd.DataFrame({
             "ligand": ["MDK"],
             "receptor": ["SDC1"],
             "interaction": ["MDK^SDC1"],
             "morans_r": [0.17],
             "genept_score": [0.85],
+            "combinedscore": [0.72],
         })
         liana_df.to_csv(temp_dir / "interest_sig_liana.csv", index=False)
 
@@ -228,6 +229,291 @@ class TestPrioritizeTool:
         parsed = json.loads(result)
         assert "error" in parsed
 
+    def test_tool_prefilter_uses_combinedscore(self):
+        """Candidate trimming should follow combinedscore rank."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            pd.DataFrame({
+                "ligand": ["L1", "L2", "L3"],
+                "receptor": ["R1", "R2", "R3"],
+                "interaction": ["L1^R1", "L2^R2", "L3^R3"],
+                "morans_r": [1.0, 0.9, 0.0],
+                "genept_score": [1.0, 0.9, 0.0],
+                "combinedscore": [0.10, 0.20, 0.99],
+            }).to_csv(data_dir / "interest_sig_liana.csv", index=False)
+
+            result = prioritize_top_lr_pairs.invoke({
+                "data_dir": str(data_dir),
+                "candidate_count": 2,
+            })
+            parsed = json.loads(result)
+            interactions = [pair["interaction"] for pair in parsed["candidate_pairs"]]
+            # combinedscore ranking: L3 (0.99) > L2 (0.20) > L1 (0.10)
+            assert interactions == ["L3^R3", "L2^R2"]
+
+    def test_tool_missing_combinedscore_returns_error(self):
+        """When combinedscore column is absent, return informative error."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            pd.DataFrame({
+                "ligand": ["L1"],
+                "receptor": ["R1"],
+                "interaction": ["L1^R1"],
+                "morans_r": [0.5],
+                "genept_score": [0.8],
+            }).to_csv(data_dir / "interest_sig_liana.csv", index=False)
+
+            result = prioritize_top_lr_pairs.invoke({
+                "data_dir": str(data_dir),
+                "candidate_count": 5,
+            })
+            parsed = json.loads(result)
+            assert "error" in parsed
+            assert "combinedscore" in parsed["error"]
+            assert "available_columns" in parsed
+
+    def test_tool_scoring_metadata_uses_combinedscore(self):
+        """Result should include scoring metadata referencing combinedscore."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            pd.DataFrame({
+                "ligand": ["L1", "L2"],
+                "receptor": ["R1", "R2"],
+                "interaction": ["L1^R1", "L2^R2"],
+                "morans_r": [0.5, 0.3],
+                "genept_score": [0.8, 0.6],
+                "combinedscore": [0.9, 0.7],
+            }).to_csv(data_dir / "interest_sig_liana.csv", index=False)
+
+            result = prioritize_top_lr_pairs.invoke({
+                "data_dir": str(data_dir),
+                "candidate_count": 5,
+            })
+            parsed = json.loads(result)
+            assert parsed["scoring"]["method"] == "novelty_score"
+            assert "hub_penalty" in parsed["scoring"]
+            assert "combinedscore_formula" in parsed["scoring"]
+
+    def test_tool_reports_exclusion_mode_and_numeric_level(self):
+        """Selection metadata should expose exclusion mode and numeric level."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            pd.DataFrame({
+                "ligand": ["L1", "L2", "L3", "L4", "L5", "L6"],
+                "receptor": ["R1", "R2", "R3", "R4", "R5", "R6"],
+                "interaction": ["L1^R1", "L2^R2", "L3^R3", "L4^R4", "L5^R5", "L6^R6"],
+                "morans_r": [0.9, 0.8, 0.7, 0.6, 0.5, 0.4],
+                "genept_score": [0.9, 0.8, 0.7, 0.6, 0.5, 0.4],
+                "combinedscore": [0.9, 0.8, 0.7, 0.6, 0.5, 0.4],
+            }).to_csv(data_dir / "interest_sig_liana.csv", index=False)
+
+            with open(data_dir / "top_search_genes.json", "w") as f:
+                json.dump({
+                    "version": 2,
+                    "genes": ["L1", "R1"],
+                    "scores": [1.0, 1.0],
+                    "score_method": "test",
+                    "timestamp": "2026-02-21T00:00:00Z",
+                }, f)
+
+            result = prioritize_top_lr_pairs.invoke({
+                "data_dir": str(data_dir),
+                "candidate_count": 5,
+            })
+            parsed = json.loads(result)
+            assert parsed["selection_mode"] == "exclusion"
+            assert parsed["exclusion_level"] == 30
+            assert parsed["excluded_count"] == 1
+
+
+class TestTopSearchGenesFormatCompatibility:
+    """Tests for top_search_genes.json backward/forward compatibility."""
+
+    def test_load_top_search_genes_supports_legacy_list(self):
+        from src.agents.deep_interpreter.tools.lr_prioritizer import _load_top_search_genes
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            with open(data_dir / "top_search_genes.json", "w") as f:
+                json.dump(["TP53", "EGFR", "KRAS"], f)
+
+            genes = _load_top_search_genes(data_dir)
+            assert genes == ["TP53", "EGFR", "KRAS"]
+
+    def test_load_top_search_genes_supports_v2_object(self):
+        from src.agents.deep_interpreter.tools.lr_prioritizer import _load_top_search_genes
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            with open(data_dir / "top_search_genes.json", "w") as f:
+                json.dump({
+                    "version": 2,
+                    "genes": ["TP53", "EGFR", "KRAS"],
+                    "scores": [1.0, 0.9, 0.8],
+                    "score_method": "test",
+                    "timestamp": "2026-02-21T00:00:00Z",
+                }, f)
+
+            genes = _load_top_search_genes(data_dir)
+            assert genes == ["TP53", "EGFR", "KRAS"]
+
+    def test_load_top_search_genes_rejects_malformed_object(self):
+        from src.agents.deep_interpreter.tools.lr_prioritizer import _load_top_search_genes
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            with open(data_dir / "top_search_genes.json", "w") as f:
+                json.dump({"version": 2, "scores": [1.0]}, f)
+
+            genes = _load_top_search_genes(data_dir)
+            assert genes is None
+
+
+class TestTopSearchGenesFileWriting:
+    """Tests for v2 top_search_genes.json persistence from search context extraction."""
+
+    def test_extract_search_context_writes_v2_top_genes_payload(self):
+        from src.agents.deep_interpreter.tools.data_loader import _extract_search_context
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            pd.DataFrame({
+                "ligand": ["L1", "L2", "L3"],
+                "receptor": ["R1", "R2", "R3"],
+                "combinedscore": [0.9, 0.8, 0.7],
+            }).to_csv(data_dir / "interest_sig_liana.csv", index=False)
+
+            context = _extract_search_context(data_dir, context_type="lr_interaction")
+            assert context["genes"]  # sanity check
+
+            with open(data_dir / "top_search_genes.json") as f:
+                payload = json.load(f)
+
+            assert payload["version"] == 2
+            assert isinstance(payload["genes"], list)
+            assert isinstance(payload["scores"], list)
+            assert len(payload["genes"]) == len(payload["scores"])
+            assert payload["score_method"]
+            assert payload["timestamp"]
+
+
+class TestLRCandidatesJsonPersistence:
+    """Tests for lr_candidates.json auto-save in prioritize_top_lr_pairs."""
+
+    def test_tool_saves_lr_candidates_json(self):
+        """Verify lr_candidates.json is written to data_dir after tool call."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            pd.DataFrame({
+                "ligand": ["MDK", "ECM1"],
+                "receptor": ["SDC1", "ITGB4"],
+                "interaction": ["MDK^SDC1", "ECM1^ITGB4"],
+                "morans_r": [0.17, 0.16],
+                "genept_score": [0.85, 0.72],
+                "combinedscore": [0.75, 0.60],
+            }).to_csv(data_dir / "interest_sig_liana.csv", index=False)
+
+            prioritize_top_lr_pairs.invoke({
+                "data_dir": str(data_dir),
+                "candidate_count": 5,
+            })
+
+            candidates_file = data_dir / "lr_candidates.json"
+            assert candidates_file.exists(), "lr_candidates.json should be created"
+
+    def test_lr_candidates_json_contains_expected_fields(self):
+        """Verify saved file has candidate_pairs, selection_mode, exclusion_level."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            pd.DataFrame({
+                "ligand": ["MDK", "ECM1"],
+                "receptor": ["SDC1", "ITGB4"],
+                "interaction": ["MDK^SDC1", "ECM1^ITGB4"],
+                "morans_r": [0.17, 0.16],
+                "genept_score": [0.85, 0.72],
+                "combinedscore": [0.75, 0.60],
+            }).to_csv(data_dir / "interest_sig_liana.csv", index=False)
+
+            prioritize_top_lr_pairs.invoke({
+                "data_dir": str(data_dir),
+                "candidate_count": 5,
+            })
+
+            with open(data_dir / "lr_candidates.json") as f:
+                saved = json.load(f)
+
+            assert "candidate_pairs" in saved
+            assert "selection_mode" in saved
+            assert "exclusion_level" in saved
+            assert isinstance(saved["candidate_pairs"], list)
+
+
+class TestSaveSelectedLRPairs:
+    """Tests for the save_selected_lr_pairs tool."""
+
+    def test_save_selected_lr_pairs_creates_file(self):
+        """Verify selected_top3_lr.json is written."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import save_selected_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = save_selected_lr_pairs.invoke({
+                "data_dir": tmpdir,
+                "selected_pairs": [
+                    {"ligand": "MDK", "receptor": "SDC1", "reasoning": "Novel interaction"},
+                    {"ligand": "ECM1", "receptor": "ITGB4", "reasoning": "High Moran's R"},
+                    {"ligand": "CALR", "receptor": "ITGA3", "reasoning": "Mechanistic fit"},
+                ],
+            })
+
+            parsed = json.loads(result)
+            assert parsed["status"] == "saved"
+            assert Path(tmpdir, "selected_top3_lr.json").exists()
+
+    def test_save_selected_lr_pairs_content(self):
+        """Verify file content has version, selected_pairs, count, timestamp."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import save_selected_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pairs = [
+                {"ligand": "MDK", "receptor": "SDC1", "reasoning": "Test"},
+            ]
+            save_selected_lr_pairs.invoke({
+                "data_dir": tmpdir,
+                "selected_pairs": pairs,
+            })
+
+            with open(Path(tmpdir) / "selected_top3_lr.json") as f:
+                saved = json.load(f)
+
+            assert saved["version"] == 1
+            assert saved["count"] == 1
+            assert "timestamp" in saved
+            assert saved["selected_pairs"] == pairs
+
+    def test_save_selected_lr_pairs_invalid_dir(self):
+        """Graceful error on bad path."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import save_selected_lr_pairs
+
+        result = save_selected_lr_pairs.invoke({
+            "data_dir": "/nonexistent/path/that/does/not/exist",
+            "selected_pairs": [{"ligand": "A", "receptor": "B", "reasoning": "X"}],
+        })
+
+        parsed = json.loads(result)
+        assert "error" in parsed
+
 
 class TestConvenienceFunctions:
     """Tests for convenience functions."""
@@ -255,3 +541,545 @@ class TestConvenienceFunctions:
         result = prioritize_lr_pairs(df, top_k=1)
         assert len(result) == 1
         assert "hybrid_score" in result.columns
+
+
+# ---------------------------------------------------------------------------
+# Tests for drug_targets helper functions
+# ---------------------------------------------------------------------------
+
+class TestDrugTargetsLoadTopSearchGenes:
+    """Tests for drug_targets._load_top_search_genes helper."""
+
+    def test_load_v1_list_format(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _load_top_search_genes
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "top_search_genes.json", "w") as f:
+                json.dump(["TP53", "EGFR", "KRAS"], f)
+
+            genes = _load_top_search_genes(tmpdir)
+            assert genes == ["TP53", "EGFR", "KRAS"]
+
+    def test_load_v2_object_format(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _load_top_search_genes
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "top_search_genes.json", "w") as f:
+                json.dump({
+                    "version": 2,
+                    "genes": ["TP53", "EGFR"],
+                    "scores": [1.0, 0.9],
+                    "score_method": "hybrid",
+                    "timestamp": "2026-02-22T00:00:00Z",
+                }, f)
+
+            genes = _load_top_search_genes(tmpdir)
+            assert genes == ["TP53", "EGFR"]
+
+    def test_returns_empty_when_file_missing(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _load_top_search_genes
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            genes = _load_top_search_genes(tmpdir)
+            assert genes == []
+
+    def test_returns_empty_on_malformed_json(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _load_top_search_genes
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "top_search_genes.json", "w") as f:
+                json.dump({"version": 2, "scores": [1.0]}, f)  # missing "genes"
+
+            genes = _load_top_search_genes(tmpdir)
+            assert genes == []
+
+    def test_filters_non_string_entries(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _load_top_search_genes
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "top_search_genes.json", "w") as f:
+                json.dump(["TP53", None, "", 123, "EGFR"], f)
+
+            genes = _load_top_search_genes(tmpdir)
+            assert genes == ["TP53", "EGFR"]
+
+
+class TestDrugTargetsLoadSelectedTop3LR:
+    """Tests for drug_targets._load_selected_top3_lr helper."""
+
+    def test_load_valid_file(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _load_selected_top3_lr
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "selected_top3_lr.json", "w") as f:
+                json.dump({
+                    "version": 1,
+                    "selected_pairs": [
+                        {"ligand": "MDK", "receptor": "SDC1", "reasoning": "test"},
+                        {"ligand": "ECM1", "receptor": "ITGB4", "reasoning": "test"},
+                        {"ligand": "CALR", "receptor": "ITGA3", "reasoning": "test"},
+                    ],
+                    "count": 3,
+                    "timestamp": "2026-02-22T00:00:00Z",
+                }, f)
+
+            genes = _load_selected_top3_lr(tmpdir)
+            assert genes == ["MDK", "SDC1", "ECM1", "ITGB4", "CALR", "ITGA3"]
+
+    def test_deduplicates_genes(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _load_selected_top3_lr
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "selected_top3_lr.json", "w") as f:
+                json.dump({
+                    "version": 1,
+                    "selected_pairs": [
+                        {"ligand": "MDK", "receptor": "SDC1", "reasoning": "a"},
+                        {"ligand": "MDK", "receptor": "ITGB4", "reasoning": "b"},
+                    ],
+                    "count": 2,
+                }, f)
+
+            genes = _load_selected_top3_lr(tmpdir)
+            assert genes == ["MDK", "SDC1", "ITGB4"]
+
+    def test_returns_empty_when_file_missing(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _load_selected_top3_lr
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            genes = _load_selected_top3_lr(tmpdir)
+            assert genes == []
+
+    def test_returns_empty_on_empty_pairs(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _load_selected_top3_lr
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "selected_top3_lr.json", "w") as f:
+                json.dump({"version": 1, "selected_pairs": [], "count": 0}, f)
+
+            genes = _load_selected_top3_lr(tmpdir)
+            assert genes == []
+
+
+class TestAssessTherapeuticPotentialGeneSelection:
+    """Tests for assess_therapeutic_potential gene selection logic.
+
+    These tests mock the OpenTargets calls to focus on gene selection behavior.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _mock_opentargets(self, monkeypatch):
+        """Mock search_drug_targets and search_known_drugs to avoid API calls.
+
+        Patches the tool .invoke via object.__setattr__ to bypass Pydantic field validation.
+        """
+        from src.agents.deep_interpreter.tools import drug_targets
+
+        def fake_search_drug_targets(input_dict):
+            genes = input_dict["gene_symbols"]
+            targets = {}
+            for g in genes:
+                targets[g] = {
+                    "ensembl_id": f"ENSG_{g}",
+                    "approved_symbol": g,
+                    "approved_name": f"{g} protein",
+                    "tractability": {"SM": ["Clinical_Precedence"]},
+                    "safety_liabilities": [],
+                    "disease_association_score": 0.0,
+                    "evidence_count": 0,
+                }
+            return json.dumps({
+                "disease": input_dict["disease"],
+                "efo_id": "EFO_0000305",
+                "genes_found": len(genes),
+                "genes_failed": [],
+                "targets": targets,
+            })
+
+        def fake_search_known_drugs(input_dict):
+            return json.dumps({
+                "disease": input_dict["disease"],
+                "efo_id": "EFO_0000305",
+                "drugs_returned": 0,
+                "drugs": [],
+            })
+
+        # Save originals for teardown
+        orig_sdt = drug_targets.search_drug_targets.invoke
+        orig_skd = drug_targets.search_known_drugs.invoke
+        object.__setattr__(drug_targets.search_drug_targets, "invoke", fake_search_drug_targets)
+        object.__setattr__(drug_targets.search_known_drugs, "invoke", fake_search_known_drugs)
+        yield
+        object.__setattr__(drug_targets.search_drug_targets, "invoke", orig_sdt)
+        object.__setattr__(drug_targets.search_known_drugs, "invoke", orig_skd)
+
+    def test_uses_both_gene_files(self, _mock_opentargets):
+        """When both files exist, genes come from top_search_genes + selected_top3_lr."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "top_search_genes.json", "w") as f:
+                json.dump(["HUB1", "HUB2", "HUB3"], f)
+            with open(Path(tmpdir) / "selected_top3_lr.json", "w") as f:
+                json.dump({
+                    "version": 1,
+                    "selected_pairs": [
+                        {"ligand": "NOV_L", "receptor": "NOV_R", "reasoning": "novel"},
+                    ],
+                    "count": 1,
+                }, f)
+
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            assert result["gene_source"] == "top_search_genes+selected_top3_lr"
+            assert result["hub_genes_count"] == 3
+            assert result["novel_lr_genes_count"] == 2
+            evaluated = set(result["gene_ranking"].keys())
+            assert evaluated == {"HUB1", "HUB2", "HUB3", "NOV_L", "NOV_R"}
+
+    def test_uses_only_hub_genes(self, _mock_opentargets):
+        """When only top_search_genes.json exists."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "top_search_genes.json", "w") as f:
+                json.dump(["HUB1", "HUB2"], f)
+
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            assert result["gene_source"] == "top_search_genes+selected_top3_lr"
+            assert result["hub_genes_count"] == 2
+            assert result["novel_lr_genes_count"] == 0
+            assert set(result["gene_ranking"].keys()) == {"HUB1", "HUB2"}
+
+    def test_uses_only_novel_lr_genes(self, _mock_opentargets):
+        """When only selected_top3_lr.json exists."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "selected_top3_lr.json", "w") as f:
+                json.dump({
+                    "version": 1,
+                    "selected_pairs": [
+                        {"ligand": "L1", "receptor": "R1", "reasoning": "x"},
+                    ],
+                    "count": 1,
+                }, f)
+
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            assert result["gene_source"] == "top_search_genes+selected_top3_lr"
+            assert result["hub_genes_count"] == 0
+            assert result["novel_lr_genes_count"] == 2
+            assert set(result["gene_ranking"].keys()) == {"L1", "R1"}
+
+    def test_fallback_to_liana_csv(self, _mock_opentargets):
+        """When no JSON files exist, falls back to LIANA CSV."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pd.DataFrame({
+                "ligand": ["GENE_A", "GENE_B"],
+                "receptor": ["GENE_C", "GENE_D"],
+                "combinedscore": [0.9, 0.8],
+            }).to_csv(Path(tmpdir) / "interest_sig_liana.csv", index=False)
+
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            assert result["gene_source"] == "liana_csv_fallback"
+            assert set(result["gene_ranking"].keys()) == {"GENE_A", "GENE_B", "GENE_C", "GENE_D"}
+
+    def test_error_when_no_files_at_all(self):
+        """When no gene source files exist, returns error."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            assert "error" in result
+
+    def test_novel_lr_genes_flagged_in_classification(self, _mock_opentargets):
+        """Genes from selected_top3_lr.json should be flagged and classified as novel."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "top_search_genes.json", "w") as f:
+                json.dump(["HUB1"], f)
+            with open(Path(tmpdir) / "selected_top3_lr.json", "w") as f:
+                json.dump({
+                    "version": 1,
+                    "selected_pairs": [
+                        {"ligand": "NOV_L", "receptor": "NOV_R", "reasoning": "novel"},
+                    ],
+                    "count": 1,
+                }, f)
+
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            # All genes should be novel targets (assoc_score=0.0 from mock)
+            novel_genes_in_result = {t["gene"] for t in result["novel_targets"]}
+            assert "NOV_L" in novel_genes_in_result
+            assert "NOV_R" in novel_genes_in_result
+
+            # Check from_novel_lr_selection flag
+            novel_entries = [t for t in result["novel_targets"] if t.get("from_novel_lr_selection")]
+            novel_flagged = {t["gene"] for t in novel_entries}
+            assert novel_flagged == {"NOV_L", "NOV_R"}
+
+    def test_deduplicates_overlapping_genes(self, _mock_opentargets):
+        """Genes in both hub and novel lists should not be duplicated."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "top_search_genes.json", "w") as f:
+                json.dump(["SHARED", "HUB_ONLY"], f)
+            with open(Path(tmpdir) / "selected_top3_lr.json", "w") as f:
+                json.dump({
+                    "version": 1,
+                    "selected_pairs": [
+                        {"ligand": "SHARED", "receptor": "NOV_ONLY", "reasoning": "x"},
+                    ],
+                    "count": 1,
+                }, f)
+
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            gene_keys = list(result["gene_ranking"].keys())
+            assert gene_keys.count("SHARED") == 1
+            assert set(gene_keys) == {"SHARED", "HUB_ONLY", "NOV_ONLY"}
+
+
+# ---------------------------------------------------------------------------
+# Tests for hub gene penalty
+# ---------------------------------------------------------------------------
+
+class TestHubGenePenalty:
+    """Tests for _compute_hub_gene_count and novelty_score integration."""
+
+    def test_compute_hub_gene_count_no_hubs(self):
+        """All 0 when no genes match top_genes."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import _compute_hub_gene_count
+
+        df = pd.DataFrame({"ligand": ["A", "B"], "receptor": ["C", "D"]})
+        top_genes = [f"G{i}" for i in range(30)]
+        result = _compute_hub_gene_count(df, top_genes, df["ligand"], df["receptor"])
+        assert (result == 0).all()
+
+    def test_compute_hub_gene_count_one_hub(self):
+        """1 when one gene in the pair matches top_genes."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import _compute_hub_gene_count
+
+        df = pd.DataFrame({"ligand": ["TP53", "NOVEL"], "receptor": ["R1", "R2"]})
+        top_genes = ["TP53"] + [f"G{i}" for i in range(29)]
+        result = _compute_hub_gene_count(df, top_genes, df["ligand"], df["receptor"])
+        assert result.iloc[0] == 1  # TP53 is hub
+        assert result.iloc[1] == 0  # NOVEL is not
+
+    def test_tool_output_includes_hub_and_novelty(self):
+        """candidate_pairs should include hub_gene_count and novelty_score fields."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            pd.DataFrame({
+                "ligand": ["TP53", "NOVEL_L"],
+                "receptor": ["R1", "R2"],
+                "interaction": ["TP53^R1", "NOVEL_L^R2"],
+                "morans_r": [0.5, 0.45],
+                "genept_score": [0.5, 0.45],
+                "combinedscore": [0.50, 0.45],
+            }).to_csv(data_dir / "interest_sig_liana.csv", index=False)
+
+            with open(data_dir / "top_search_genes.json", "w") as f:
+                json.dump({
+                    "version": 2,
+                    "genes": ["TP53"] + [f"G{i}" for i in range(29)],
+                    "scores": [1.0] + [0.5] * 29,
+                    "score_method": "test",
+                    "timestamp": "2026-02-23",
+                }, f)
+
+            result = json.loads(prioritize_top_lr_pairs.invoke({
+                "data_dir": str(data_dir),
+                "candidate_count": 5,
+            }))
+            pairs = result["candidate_pairs"]
+            assert all("hub_gene_count" in p for p in pairs)
+            assert all("novelty_score" in p for p in pairs)
+
+    def test_novelty_score_reranks_candidates(self):
+        """Hub pair (combinedscore=0.50, hub=1→novelty=0.40) ranks below
+        novel pair (combinedscore=0.45, hub=0→novelty=0.45)."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            pd.DataFrame({
+                "ligand": ["TP53", "NOVEL_L", "OTHER"],
+                "receptor": ["R1", "R2", "R3"],
+                "interaction": ["TP53^R1", "NOVEL_L^R2", "OTHER^R3"],
+                "morans_r": [0.5, 0.45, 0.3],
+                "genept_score": [0.5, 0.45, 0.3],
+                "combinedscore": [0.50, 0.45, 0.30],
+            }).to_csv(data_dir / "interest_sig_liana.csv", index=False)
+
+            with open(data_dir / "top_search_genes.json", "w") as f:
+                json.dump({
+                    "version": 2,
+                    "genes": ["TP53"] + [f"G{i}" for i in range(29)],
+                    "scores": [1.0] + [0.5] * 29,
+                    "score_method": "test",
+                    "timestamp": "2026-02-23",
+                }, f)
+
+            result = json.loads(prioritize_top_lr_pairs.invoke({
+                "data_dir": str(data_dir),
+                "candidate_count": 10,
+            }))
+            pairs = result["candidate_pairs"]
+            # NOVEL_L^R2 (novelty=0.45) should rank above TP53^R1 (novelty=0.40)
+            assert pairs[0]["interaction"] == "NOVEL_L^R2"
+            assert pairs[0]["hub_gene_count"] == 0
+            assert pairs[1]["interaction"] == "TP53^R1"
+            assert pairs[1]["hub_gene_count"] == 1
+
+    def test_no_top_genes_defaults_zero(self):
+        """novelty_score == combinedscore when no top_genes file exists."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir)
+            pd.DataFrame({
+                "ligand": ["L1", "L2"],
+                "receptor": ["R1", "R2"],
+                "interaction": ["L1^R1", "L2^R2"],
+                "morans_r": [0.5, 0.3],
+                "genept_score": [0.8, 0.6],
+                "combinedscore": [0.9, 0.7],
+            }).to_csv(data_dir / "interest_sig_liana.csv", index=False)
+
+            result = json.loads(prioritize_top_lr_pairs.invoke({
+                "data_dir": str(data_dir),
+                "candidate_count": 5,
+            }))
+            for pair in result["candidate_pairs"]:
+                assert pair["hub_gene_count"] == 0
+                assert pair["novelty_score"] == pair["combinedscore"]
+
+
+# ---------------------------------------------------------------------------
+# Tests for structured rubric in save_selected_lr_pairs
+# ---------------------------------------------------------------------------
+
+class TestStructuredRubric:
+    """Tests for rubric support in save_selected_lr_pairs."""
+
+    def test_save_with_rubric_scores(self):
+        """version=2, rubric persisted, total computed."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import save_selected_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pairs = [
+                {"ligand": "L1", "receptor": "R1", "reasoning": "test",
+                 "rubric": {"novelty": 5, "spatial": 4, "mechanism": 3}},
+            ]
+            result = json.loads(save_selected_lr_pairs.invoke({
+                "data_dir": tmpdir,
+                "selected_pairs": pairs,
+            }))
+            assert result["has_rubric"] is True
+
+            with open(Path(tmpdir) / "selected_top3_lr.json") as f:
+                saved = json.load(f)
+
+            assert saved["version"] == 2
+            assert "rubric_dimensions" in saved
+            rubric = saved["selected_pairs"][0]["rubric"]
+            assert rubric["novelty"] == 5
+            assert rubric["spatial"] == 4
+            assert rubric["mechanism"] == 3
+            assert rubric["total"] == 12
+
+    def test_save_without_rubric_backward_compat(self):
+        """version=1, no rubric key when rubric not provided."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import save_selected_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pairs = [
+                {"ligand": "L1", "receptor": "R1", "reasoning": "test"},
+            ]
+            result = json.loads(save_selected_lr_pairs.invoke({
+                "data_dir": tmpdir,
+                "selected_pairs": pairs,
+            }))
+            assert result["has_rubric"] is False
+
+            with open(Path(tmpdir) / "selected_top3_lr.json") as f:
+                saved = json.load(f)
+
+            assert saved["version"] == 1
+            assert "rubric_dimensions" not in saved
+
+    def test_rubric_scores_clamped(self):
+        """Scores outside 1-5 are clamped: 0→1, 7→5."""
+        from src.agents.deep_interpreter.tools.lr_prioritizer import save_selected_lr_pairs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pairs = [
+                {"ligand": "L1", "receptor": "R1", "reasoning": "test",
+                 "rubric": {"novelty": 0, "spatial": 7, "mechanism": 3}},
+            ]
+            save_selected_lr_pairs.invoke({
+                "data_dir": tmpdir,
+                "selected_pairs": pairs,
+            })
+
+            with open(Path(tmpdir) / "selected_top3_lr.json") as f:
+                saved = json.load(f)
+
+            rubric = saved["selected_pairs"][0]["rubric"]
+            assert rubric["novelty"] == 1   # clamped from 0
+            assert rubric["spatial"] == 5   # clamped from 7
+            assert rubric["mechanism"] == 3
+            assert rubric["total"] == 9     # 1 + 5 + 3
+
+    def test_drug_targets_reads_rubric_file(self):
+        """_load_selected_top3_lr works with version=2 rubric files."""
+        from src.agents.deep_interpreter.tools.drug_targets import _load_selected_top3_lr
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "selected_top3_lr.json", "w") as f:
+                json.dump({
+                    "version": 2,
+                    "selected_pairs": [
+                        {"ligand": "MDK", "receptor": "SDC1", "reasoning": "test",
+                         "rubric": {"novelty": 5, "spatial": 4, "mechanism": 3, "total": 12}},
+                    ],
+                    "count": 1,
+                    "rubric_dimensions": ["novelty", "spatial", "mechanism"],
+                    "timestamp": "2026-02-23T00:00:00Z",
+                }, f)
+
+            genes = _load_selected_top3_lr(tmpdir)
+            assert genes == ["MDK", "SDC1"]

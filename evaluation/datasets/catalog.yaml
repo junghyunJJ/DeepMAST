@@ -1,0 +1,28 @@
+version: 1
+datasets:
+  - dataset_id: dlpfc_visium
+    modality: spatial_transcriptomics
+    platform: Visium
+    download_url: https://spatial.libd.org/spatialLIBD/
+    source_paper: "Maynard et al. Nature Neuroscience (2021)"
+    pmid_primary: "33558695"
+    license: "Source-specific terms"
+    local_path_hint: "res_bc/datasets/dlpfc_visium.h5ad"
+
+  - dataset_id: developing_heart_merfish
+    modality: spatial_transcriptomics
+    platform: MERFISH
+    download_url: https://www.nature.com/articles/s41586-024-07171-z
+    source_paper: "Farah et al. Nature (2024)"
+    pmid_primary: "38480880"
+    license: "Source-specific terms"
+    local_path_hint: "res_bc/datasets/developing_heart_merfish.h5ad"
+
+  - dataset_id: mouse_colitis_merfish
+    modality: spatial_transcriptomics
+    platform: MERFISH
+    download_url: https://datadryad.org/dataset/doi%3A10.5061/dryad.rjdfn2zh3
+    source_paper: "Cadinu et al. Cell (2024)"
+    pmid_primary: "38569542"
+    license: "CC0-1.0 (Dryad metadata), source-specific for derived files"
+    local_path_hint: "res_bc/datasets/mouse_colitis_merfish.h5ad"

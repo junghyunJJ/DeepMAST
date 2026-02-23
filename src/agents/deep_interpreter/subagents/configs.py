@@ -29,7 +29,10 @@ from src.agents.deep_interpreter.tools import (
     search_literature_fulltext,
     validate_claim_fulltext,
 )
-from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+from src.agents.deep_interpreter.tools.lr_prioritizer import (
+    prioritize_top_lr_pairs,
+    save_selected_lr_pairs,
+)
 from src.agents.deep_interpreter.tools.drug_targets import (
     assess_therapeutic_potential,
     search_drug_targets,
@@ -111,6 +114,7 @@ SUBAGENT_CONFIGS = {
             validate_claim_fulltext,
             # Hybrid L-R prioritization (GenePT + Moran's R)
             prioritize_top_lr_pairs,
+            save_selected_lr_pairs,
         ],
     },
     "reporter": {

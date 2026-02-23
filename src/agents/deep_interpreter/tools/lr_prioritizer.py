@@ -30,6 +30,43 @@ logger = logging.getLogger(__name__)
 # Default weights for hybrid scoring
 DEFAULT_SPATIAL_WEIGHT = 0.6
 DEFAULT_GENEPT_WEIGHT = 0.4
+DEFAULT_HUB_GENE_PENALTY = 0.10
+
+
+def _extract_ligand_receptor(
+    lr_df: pd.DataFrame,
+) -> tuple[pd.Series, pd.Series]:
+    """Extract ligand and receptor from various column formats.
+
+    Supports multiple LIANA output formats:
+    - 'ligand' and 'receptor' columns
+    - 'ligand_complex' and 'receptor_complex' columns
+    - 'interaction' column with 'L^R' format
+
+    Args:
+        lr_df: DataFrame with L-R pair information
+
+    Returns:
+        Tuple of (ligand_series, receptor_series)
+
+    Raises:
+        ValueError: If no recognizable L-R columns found
+    """
+    if "ligand" in lr_df.columns and "receptor" in lr_df.columns:
+        return lr_df["ligand"], lr_df["receptor"]
+
+    if "ligand_complex" in lr_df.columns and "receptor_complex" in lr_df.columns:
+        return lr_df["ligand_complex"], lr_df["receptor_complex"]
+
+    if "interaction" in lr_df.columns:
+        interactions = lr_df["interaction"].str.split("^", expand=True)
+        if interactions.shape[1] >= 2:
+            return interactions[0], interactions[1]
+
+    raise ValueError(
+        "Could not find L-R pair columns. Expected 'ligand'/'receptor', "
+        "'ligand_complex'/'receptor_complex', or 'interaction' column."
+    )
 
 
 class HybridLRPrioritizer:
@@ -104,38 +141,9 @@ class HybridLRPrioritizer:
     ) -> tuple[pd.Series, pd.Series]:
         """Extract ligand and receptor from various column formats.
 
-        Supports multiple LIANA output formats:
-        - 'ligand' and 'receptor' columns
-        - 'ligand_complex' and 'receptor_complex' columns
-        - 'interaction' column with 'L^R' format
-
-        Args:
-            lr_df: DataFrame with L-R pair information
-
-        Returns:
-            Tuple of (ligand_series, receptor_series)
-
-        Raises:
-            ValueError: If no recognizable L-R columns found
+        Delegates to module-level _extract_ligand_receptor().
         """
-        # Check for direct ligand/receptor columns
-        if "ligand" in lr_df.columns and "receptor" in lr_df.columns:
-            return lr_df["ligand"], lr_df["receptor"]
-
-        # Check for complex columns
-        if "ligand_complex" in lr_df.columns and "receptor_complex" in lr_df.columns:
-            return lr_df["ligand_complex"], lr_df["receptor_complex"]
-
-        # Check for interaction column (format: "LIGAND^RECEPTOR")
-        if "interaction" in lr_df.columns:
-            interactions = lr_df["interaction"].str.split("^", expand=True)
-            if interactions.shape[1] >= 2:
-                return interactions[0], interactions[1]
-
-        raise ValueError(
-            "Could not find L-R pair columns. Expected 'ligand'/'receptor', "
-            "'ligand_complex'/'receptor_complex', or 'interaction' column."
-        )
+        return _extract_ligand_receptor(lr_df)
 
     def _get_morans_r_column(self, lr_df: pd.DataFrame) -> str:
         """Find the Moran's R column in the DataFrame.
@@ -413,6 +421,86 @@ def prioritize_lr_pairs(
     return prioritizer.prioritize(lr_df, top_k=top_k)
 
 
+def _build_combinedscore_rationale(scored_df: pd.DataFrame) -> str:
+    """Generate a rationale table showing combinedscore and its components.
+
+    Args:
+        scored_df: DataFrame ranked by combinedscore with a 'rank' column.
+
+    Returns:
+        Formatted markdown string with scoring breakdown.
+    """
+    if scored_df.empty:
+        return "No L-R pairs selected."
+
+    try:
+        ligands, receptors = _extract_ligand_receptor(scored_df)
+    except ValueError:
+        return "Could not extract L-R pair identifiers for rationale."
+
+    # Detect Moran's R column name
+    morans_col = None
+    for col in ("morans_r", "morans_R", "Morans_R", "global_r"):
+        if col in scored_df.columns:
+            morans_col = col
+            break
+
+    has_hub = "hub_gene_count" in scored_df.columns and "novelty_score" in scored_df.columns
+
+    if has_hub:
+        lines = [
+            "## L-R Pair Selection Rationale",
+            "",
+            "**Scoring**: novelty_score = combinedscore - 0.1×hub_gene_count",
+            "  combinedscore = 0.4×Factor + 0.4×Moran's R + 0.2×GenePT",
+            "",
+            "| Rank | L-R Pair | Moran's R | GenePT | Combined | Hub# | Novelty |",
+            "|------|----------|-----------|--------|----------|------|---------|",
+        ]
+    else:
+        lines = [
+            "## L-R Pair Selection Rationale",
+            "",
+            "**Scoring**: combinedscore = 0.4×Factor + 0.4×Moran's R + 0.2×GenePT",
+            "",
+            "| Rank | L-R Pair | Moran's R | GenePT | Combined |",
+            "|------|----------|-----------|--------|----------|",
+        ]
+
+    for idx, row in scored_df.iterrows():
+        ligand = ligands.loc[idx] if hasattr(ligands, "loc") else ligands.iloc[scored_df.index.get_loc(idx)]
+        receptor = receptors.loc[idx] if hasattr(receptors, "loc") else receptors.iloc[scored_df.index.get_loc(idx)]
+
+        rank = int(row.get("rank", 0))
+        morans_r = f"{row[morans_col]:.3f}" if morans_col and morans_col in row.index else "N/A"
+        genept = f"{row['genept_score']:.3f}" if "genept_score" in row.index else "N/A"
+        combined = f"{row['combinedscore']:.3f}" if "combinedscore" in row.index else "N/A"
+
+        if has_hub:
+            hub = int(row["hub_gene_count"])
+            novelty = f"{row['novelty_score']:.3f}"
+            lines.append(
+                f"| {rank} | {ligand}^{receptor} | {morans_r} | {genept} | {combined} | {hub} | **{novelty}** |"
+            )
+        else:
+            lines.append(
+                f"| {rank} | {ligand}^{receptor} | {morans_r} | {genept} | **{combined}** |"
+            )
+
+    lines.extend([
+        "",
+        "**Interpretation**:",
+        "- combinedscore integrates Factor relevance, spatial co-localization, and functional similarity",
+        "- Higher scores indicate stronger multi-dimensional evidence for the L-R interaction",
+    ])
+    if has_hub:
+        lines.append("- hub_gene_count: 0=novel, 1=one hub gene (both-hub pairs excluded upstream)")
+        lines.append("- novelty_score penalizes hub genes to surface underexplored interactions")
+    lines.append("- Use biological reasoning — scores are advisory, not deterministic")
+
+    return "\n".join(lines)
+
+
 def _find_liana_file(data_path: Path) -> Path | None:
     """Find LIANA results CSV in a directory.
 
@@ -442,9 +530,19 @@ def _load_top_search_genes(data_path: Path) -> list[str] | None:
         return None
     try:
         with open(top_genes_file) as f:
-            genes = json.load(f)
-        if isinstance(genes, list) and genes:
-            return genes
+            payload = json.load(f)
+
+        # Legacy format (v1): ["TP53", "EGFR", ...]
+        if isinstance(payload, list):
+            genes = [g for g in payload if isinstance(g, str) and g]
+            return genes or None
+
+        # Current format (v2): {"version": 2, "genes": [...], ...}
+        if isinstance(payload, dict):
+            genes = payload.get("genes")
+            if isinstance(genes, list):
+                clean_genes = [g for g in genes if isinstance(g, str) and g]
+                return clean_genes or None
     except Exception:
         pass
     return None
@@ -456,13 +554,13 @@ def _exclude_well_known_pairs(
     ligands: pd.Series,
     receptors: pd.Series,
     min_remaining: int = 5,
-) -> tuple[pd.DataFrame, int, str]:
+) -> tuple[pd.DataFrame, int, int]:
     """Exclude L-R pairs where BOTH genes are well-known (in top gene list).
 
     Uses graduated relaxation: top-30 → top-20 → top-10 → no exclusion.
 
     Returns:
-        (filtered_df, excluded_count, exclusion_level description)
+        (filtered_df, excluded_count, exclusion_level)
     """
     for n in [30, 20, 10]:
         gene_set = set(top_genes[:n])
@@ -474,40 +572,48 @@ def _exclude_well_known_pairs(
                 f"Excluded {excluded} pairs where both genes in top-{n}; "
                 f"{len(remaining)} candidates remain"
             )
-            return remaining.copy(), int(excluded), f"both_in_top_{n}"
+            return remaining.copy(), int(excluded), n
 
     # No exclusion if all thresholds leave too few candidates
     logger.warning(
         f"Graduated exclusion left <{min_remaining} pairs at all levels; "
         "skipping exclusion"
     )
-    return lr_df.copy(), 0, "none"
+    return lr_df.copy(), 0, 0
+
+
+def _compute_hub_gene_count(
+    lr_df: pd.DataFrame,
+    top_genes: list[str],
+    ligands: pd.Series,
+    receptors: pd.Series,
+    hub_threshold: int = 30,
+) -> pd.Series:
+    """Count hub genes (0 or 1) per L-R pair. Both-hub (2) already excluded upstream."""
+    gene_set = set(top_genes[:hub_threshold])
+    return ligands.isin(gene_set).astype(int) + receptors.isin(gene_set).astype(int)
 
 
 @tool
 def prioritize_top_lr_pairs(
     data_dir: str,
     candidate_count: int = 15,
-    spatial_weight: float = 0.6,
-    genept_weight: float = 0.4,
 ) -> str:
     """Get candidate L-R pairs for LLM-based novel interaction selection.
 
     This tool filters out well-known L-R pairs (where both ligand and receptor
-    are among the top-30 most-studied genes) and returns candidate pairs for
-    the LLM to select the most novel and interesting interactions.
+    are among the top-30 most-studied genes) and returns candidate pairs ranked
+    by the pre-computed combinedscore (0.4×Factor + 0.4×Moran's R + 0.2×GenePT).
 
     The workflow:
     1. Load interest_sig_liana.csv (pre-filtered for interest clusters)
     2. Exclude pairs where BOTH genes are well-known hub genes (top-30)
-    3. Compute advisory hybrid scores (Moran's R + GenePT) for reference
+    3. Rank by combinedscore (advisory — LLM makes final selection)
     4. Return up to candidate_count candidates for LLM selection
 
     Args:
         data_dir: Path to the analysis directory containing interest_sig_liana.csv
         candidate_count: Max number of candidate pairs to return (default: 15)
-        spatial_weight: Weight for Moran's R advisory score (default: 0.6)
-        genept_weight: Weight for GenePT advisory score (default: 0.4)
 
     Returns:
         JSON string with candidate L-R pairs for LLM selection
@@ -547,16 +653,18 @@ def prioritize_top_lr_pairs(
 
     # --- Novelty filtering: exclude well-known hub-gene pairs ---
     excluded_count = 0
-    exclusion_level = "none"
+    exclusion_level = 0
+    selection_mode = "standard"
 
     top_genes = _load_top_search_genes(data_path)
     if top_genes:
         try:
-            prioritizer_tmp = HybridLRPrioritizer(spatial_weight=spatial_weight, genept_weight=genept_weight)
-            ligands, receptors = prioritizer_tmp._extract_ligand_receptor(lr_df)
+            ligands, receptors = _extract_ligand_receptor(lr_df)
             lr_df, excluded_count, exclusion_level = _exclude_well_known_pairs(
                 lr_df, top_genes, ligands, receptors,
             )
+            if exclusion_level > 0 and excluded_count > 0:
+                selection_mode = "exclusion"
         except ValueError:
             logger.warning("Could not extract ligand/receptor columns for exclusion; skipping")
     else:
@@ -569,58 +677,140 @@ def prioritize_top_lr_pairs(
             "excluded_count": excluded_count,
         })
 
-    # --- Compute advisory hybrid scores ---
-    try:
-        prioritizer = HybridLRPrioritizer(
-            spatial_weight=spatial_weight,
-            genept_weight=genept_weight,
-        )
-        scored_df = prioritizer.prioritize(lr_df, top_k=len(lr_df))
-    except Exception as e:
-        return json.dumps({"error": f"Scoring failed: {e}"})
+    # --- Rank by pre-computed combinedscore ---
+    if "combinedscore" not in lr_df.columns:
+        return json.dumps({
+            "error": "combinedscore column not found in LIANA results",
+            "hint": "Ensure interest_sig_liana.csv includes combinedscore column from Step 9 MCP pipeline.",
+            "available_columns": list(lr_df.columns),
+        })
 
-    # --- Select candidates ---
-    # If more than candidate_count: prefer combinedscore if available, else hybrid_score
+    # --- Hub gene penalty ---
+    if top_genes:
+        try:
+            ligands_f, receptors_f = _extract_ligand_receptor(lr_df)
+            lr_df = lr_df.copy()
+            lr_df["hub_gene_count"] = _compute_hub_gene_count(
+                lr_df, top_genes, ligands_f, receptors_f,
+            ).values
+        except ValueError:
+            lr_df["hub_gene_count"] = 0
+    else:
+        lr_df["hub_gene_count"] = 0
+
+    lr_df["novelty_score"] = lr_df["combinedscore"] - DEFAULT_HUB_GENE_PENALTY * lr_df["hub_gene_count"]
+    scored_df = lr_df.sort_values("novelty_score", ascending=False).copy()
     if len(scored_df) > candidate_count:
-        if "combinedscore" in scored_df.columns:
-            scored_df = scored_df.nlargest(candidate_count, "combinedscore")
-        else:
-            scored_df = scored_df.head(candidate_count)
-    # Re-rank after selection
-    scored_df = scored_df.sort_values("hybrid_score", ascending=False)
+        scored_df = scored_df.head(candidate_count)
     scored_df["rank"] = range(1, len(scored_df) + 1)
 
-    # Generate rationale
-    rationale = prioritizer.get_selection_rationale(scored_df)
+    # Generate rationale table
+    rationale = _build_combinedscore_rationale(scored_df)
 
     # Extract key columns for output
     output_columns = [
         "ligand", "receptor", "interaction",
         "morans_r", "morans_R", "Morans_R", "global_r",
-        "genept_score", "combinedscore", "hybrid_score", "rank",
+        "genept_score", "combinedscore",
+        "hub_gene_count", "novelty_score", "rank",
     ]
     available_columns = [c for c in output_columns if c in scored_df.columns]
 
     result = {
-        "selection_mode": "llm_candidate_list",
+        "selection_mode": selection_mode,
         "instruction": (
             "These are CANDIDATE L-R pairs with well-known hub-gene pairs excluded. "
-            "YOU must select the TOP 3 most interesting pairs for detailed Part 3 interpretation. "
-            "Prioritize: (1) biological novelty, (2) spatial significance (high Moran's R), "
-            "(3) mechanistic plausibility in the tissue context. "
-            "Write your selection reasoning BEFORE interpreting."
+            "hub_gene_count indicates how many genes in the pair are hub genes "
+            "(0=novel, 1=one hub gene; both-hub pairs already excluded). "
+            "novelty_score = combinedscore - 0.1×hub_gene_count (penalizes hub genes). "
+            "YOU must select the TOP 3 most interesting pairs using the STRUCTURED RUBRIC: "
+            "score each candidate on Novelty (1-5), Spatial (1-5), Mechanism (1-5). "
+            "Select top 3 by total score; break ties by lower hub_gene_count. "
+            "Write your rubric scores BEFORE interpreting. "
+            "After selecting your TOP 3, call save_selected_lr_pairs with rubric scores to persist your selection."
         ),
         "candidate_pairs": scored_df[available_columns].to_dict(orient="records"),
         "total_pairs_in_file": total_pairs,
         "excluded_count": excluded_count,
         "exclusion_level": exclusion_level,
         "candidates_returned": len(scored_df),
-        "advisory_scores": {
-            "spatial_weight": spatial_weight,
-            "genept_weight": genept_weight,
-            "note": "hybrid_score is advisory only — use biological reasoning for final selection",
+        "scoring": {
+            "method": "novelty_score",
+            "formula": "combinedscore - 0.1 * hub_gene_count",
+            "combinedscore_formula": "0.4*Factor + 0.4*Moran's_R + 0.2*GenePT",
+            "hub_penalty": DEFAULT_HUB_GENE_PENALTY,
+            "note": "hub_gene_count=0 (novel) or 1 (one hub gene). "
+                    "Both-hub pairs excluded upstream. Scores are advisory.",
         },
         "rationale": rationale,
     }
 
+    # Save candidates to disk for audit trail
+    try:
+        candidates_file = data_path / "lr_candidates.json"
+        with open(candidates_file, "w") as f:
+            json.dump(result, f, indent=2, default=str)
+        result["candidates_file"] = str(candidates_file)
+        logger.info(f"Saved {len(scored_df)} candidates to {candidates_file}")
+    except Exception as e:
+        logger.warning(f"Failed to save lr_candidates.json: {e}")
+
     return json.dumps(result, indent=2, default=str)
+
+
+@tool
+def save_selected_lr_pairs(
+    data_dir: str,
+    selected_pairs: list[dict],
+) -> str:
+    """Save the INTERPRETER's top 3 L-R pair selection with reasoning and optional rubric.
+
+    Call this AFTER selecting your top 3 pairs from the candidates returned by
+    prioritize_top_lr_pairs. Each pair dict should contain: ligand, receptor, reasoning.
+    Optionally include a rubric dict with novelty, spatial, mechanism scores (1-5 each).
+
+    Args:
+        data_dir: Analysis directory (same as prioritize_top_lr_pairs)
+        selected_pairs: List of dicts with keys: ligand, receptor, reasoning,
+            and optionally rubric: {novelty: int, spatial: int, mechanism: int}
+    """
+    from datetime import datetime, timezone
+
+    data_path = Path(data_dir)
+    if not data_path.is_dir():
+        return json.dumps({"error": f"Directory not found: {data_dir}"})
+
+    # Detect rubric presence and validate scores
+    has_rubric = any("rubric" in p for p in selected_pairs)
+    if has_rubric:
+        for pair in selected_pairs:
+            rubric = pair.get("rubric")
+            if rubric and isinstance(rubric, dict):
+                for dim in ("novelty", "spatial", "mechanism"):
+                    val = rubric.get(dim, 3)
+                    rubric[dim] = max(1, min(5, int(val)))
+                rubric["total"] = rubric["novelty"] + rubric["spatial"] + rubric["mechanism"]
+
+    output = {
+        "version": 2 if has_rubric else 1,
+        "selected_pairs": selected_pairs,
+        "count": len(selected_pairs),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    if has_rubric:
+        output["rubric_dimensions"] = ["novelty", "spatial", "mechanism"]
+
+    out_file = data_path / "selected_top3_lr.json"
+    try:
+        with open(out_file, "w") as f:
+            json.dump(output, f, indent=2, default=str)
+        logger.info(f"Saved {len(selected_pairs)} selected L-R pairs to {out_file}")
+    except Exception as e:
+        return json.dumps({"error": f"Failed to write {out_file}: {e}"})
+
+    return json.dumps({
+        "status": "saved",
+        "file": str(out_file),
+        "count": len(selected_pairs),
+        "has_rubric": has_rubric,
+    })

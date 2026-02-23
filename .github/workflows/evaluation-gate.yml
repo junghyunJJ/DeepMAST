@@ -1,0 +1,64 @@
+name: Evaluation Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  evaluation-gate:
+    name: evaluation-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install minimal dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pyyaml
+
+      - name: Regenerate core suite
+        run: |
+          python -m evaluation.build_core_suite \
+            --catalog evaluation/datasets/catalog.yaml \
+            --evidence evaluation/evidence \
+            --output evaluation/core_suite/tasks_v1.yaml
+
+      - name: Validate suite consistency
+        run: |
+          python -m evaluation.validate_specs \
+            --catalog evaluation/datasets/catalog.yaml \
+            --evidence evaluation/evidence \
+            --suite evaluation/core_suite/tasks_v1.yaml
+
+      - name: Verify PMIDs (strict, with retries)
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            echo "PMID strict check attempt ${attempt}"
+            if python -m evaluation.check_pmids --evidence evaluation/evidence --strict; then
+              exit 0
+            fi
+            if [ "${attempt}" -lt 3 ]; then
+              sleep $((attempt * 5))
+            fi
+          done
+          echo "PMID strict verification failed after retries"
+          exit 1
+
+      - name: Run evaluation tests
+        run: |
+          pytest tests/evaluation -v

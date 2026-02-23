@@ -66,78 +66,84 @@ def _load_js() -> str:
 # Fallback CSS (embedded for when external file is not available)
 _FALLBACK_CSS = """
 :root {
-    --color-primary: #64ffda;
-    --color-secondary: #ffd166;
-    --color-accent: #ff6b9d;
-    --bg-primary: #1a1a2e;
-    --bg-secondary: #16213e;
-    --text-primary: #e4e4e4;
-    --text-secondary: #aaa;
+    --color-primary: #818CF8;
+    --color-secondary: #FBBF24;
+    --color-accent: #F87171;
+    --bg-primary: #000000;
+    --bg-secondary: #0A0A0A;
+    --text-primary: #EDEDED;
+    --text-secondary: #A1A1AA;
+    --text-muted: #71717A;
+    --highlight-cluster: #FBBF24;
+    --highlight-pathway: #F87171;
+    --highlight-celltype: #818CF8;
+    --border-primary: #818CF8;
+    --border-muted: rgba(255, 255, 255, 0.06);
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%); color: var(--text-primary); line-height: 1.6; padding: 20px; }
-.container { max-width: 1400px; margin: 0 auto; background: rgba(26, 26, 46, 0.95); border-radius: 15px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); padding: 40px; }
-h1 { color: var(--color-primary); font-size: 2.5em; margin-bottom: 10px; text-align: center; text-shadow: 0 0 10px rgba(100, 255, 218, 0.5); }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: radial-gradient(ellipse at top, #0A0A0A 0%, #000000 70%); color: var(--text-primary); line-height: 1.6; padding: 20px; }
+.container { max-width: 1400px; margin: 0 auto; background: rgba(17, 17, 17, 0.8); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--border-muted); border-radius: 12px; box-shadow: 0 0 60px rgba(129, 140, 248, 0.05); padding: 40px; }
+h1 { color: var(--color-primary); font-size: 2.5em; margin-bottom: 10px; text-align: center; font-weight: 700; letter-spacing: -0.02em; }
 .subtitle { text-align: center; color: var(--text-secondary); font-size: 1.2em; margin-bottom: 40px; font-style: italic; }
-h2 { color: var(--color-primary); font-size: 2em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid var(--color-primary); }
-h3 { color: var(--color-secondary); font-size: 1.5em; margin-top: 30px; margin-bottom: 15px; }
-h4 { color: var(--color-accent); font-size: 1.2em; margin-top: 20px; margin-bottom: 10px; }
-.analysis-section { background: rgba(35, 35, 60, 0.6); padding: 25px; border-radius: 10px; margin-bottom: 30px; border-left: 4px solid var(--color-primary); }
-.figure-container { text-align: center; margin: 30px 0; background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 10px; }
-.figure-container img { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 5px 15px rgba(100, 255, 218, 0.3); }
+h2 { color: var(--color-primary); font-size: 2em; margin-top: 40px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid var(--border-primary); font-weight: 700; }
+h3 { color: var(--color-secondary); font-size: 1.5em; margin-top: 30px; margin-bottom: 15px; font-weight: 600; }
+h4 { color: var(--color-accent); font-size: 1.2em; margin-top: 20px; margin-bottom: 10px; font-weight: 600; }
+.analysis-section { background: rgba(24, 24, 27, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--border-muted); padding: 25px; border-radius: 10px; margin-bottom: 30px; border-left: 4px solid var(--border-primary); }
+.figure-container { text-align: center; margin: 30px 0; background: rgba(17, 17, 17, 0.5); padding: 20px; border-radius: 10px; border: 1px solid var(--border-muted); }
+.figure-container img { max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); }
 .figure-caption { color: var(--text-secondary); font-style: italic; margin-top: 15px; font-size: 0.95em; }
-.interpretation { background: rgba(100, 255, 218, 0.1); padding: 20px; border-left: 4px solid var(--color-primary); border-radius: 5px; margin: 20px 0; }
+.interpretation { background: rgba(129, 140, 248, 0.06); padding: 20px; border-left: 4px solid var(--border-primary); border-radius: 6px; margin: 20px 0; }
 .interpretation h4 { color: var(--color-primary); margin-bottom: 10px; }
-.key-findings { background: rgba(255, 107, 157, 0.1); padding: 20px; border-radius: 5px; margin: 20px 0; }
+.key-findings { background: rgba(248, 113, 113, 0.06); padding: 20px; border-radius: 6px; margin: 20px 0; }
 .key-findings ul { list-style-position: inside; margin-left: 20px; }
 .key-findings li { margin: 10px 0; color: var(--text-primary); }
-.summary-box { background: linear-gradient(135deg, rgba(100, 255, 218, 0.1) 0%, rgba(255, 107, 157, 0.1) 100%); padding: 25px; border-radius: 10px; margin: 30px 0; border: 2px solid rgba(100, 255, 218, 0.3); }
-.tabs { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; border-bottom: 2px solid var(--color-primary); padding-bottom: 10px; }
-.tab-button { background: rgba(35, 35, 60, 0.8); color: var(--color-primary); border: 2px solid var(--color-primary); padding: 12px 24px; cursor: pointer; border-radius: 5px 5px 0 0; transition: all 0.3s ease; font-size: 1.1em; font-weight: 500; }
-.tab-button:hover { background: rgba(100, 255, 218, 0.2); transform: translateY(-2px); }
-.tab-button.active { background: var(--color-primary); color: var(--bg-primary); font-weight: bold; }
+.summary-box { background: linear-gradient(135deg, rgba(129, 140, 248, 0.08) 0%, rgba(248, 113, 113, 0.08) 100%); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(129, 140, 248, 0.15); padding: 25px; border-radius: 10px; margin: 30px 0; }
+.tabs { display: flex; gap: 10px; margin: 20px 0; flex-wrap: wrap; border-bottom: 2px solid rgba(129, 140, 248, 0.2); padding-bottom: 10px; }
+.tab-button { background: rgba(24, 24, 27, 0.8); color: var(--text-secondary); border: 1px solid var(--border-muted); padding: 12px 24px; cursor: pointer; border-radius: 6px 6px 0 0; transition: all 0.3s ease; font-size: 1.1em; font-weight: 500; }
+.tab-button:hover { background: rgba(129, 140, 248, 0.1); color: var(--color-primary); transform: translateY(-2px); }
+.tab-button.active { background: var(--color-primary); color: #000000; font-weight: bold; border-color: var(--color-primary); }
 .tab-content { display: none; animation: fadeIn 0.5s; }
 .tab-content.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-.confidence-bar { background: rgba(100, 100, 100, 0.3); border-radius: 10px; height: 10px; margin: 5px 0; overflow: hidden; }
-.confidence-fill { height: 100%; background: linear-gradient(90deg, var(--color-accent), var(--color-primary)); border-radius: 10px; }
+.confidence-bar { background: rgba(100, 100, 100, 0.15); border-radius: 10px; height: 10px; margin: 5px 0; overflow: hidden; }
+.confidence-fill { height: 100%; background: linear-gradient(90deg, #F87171, #818CF8); border-radius: 10px; }
 .reference { color: var(--color-primary); text-decoration: none; font-weight: bold; }
 .reference:hover { text-decoration: underline; }
-table { width: 100%; border-collapse: collapse; margin: 20px 0; background: rgba(35, 35, 60, 0.6); border-radius: 8px; overflow: hidden; }
-th { background: rgba(100, 255, 218, 0.2); color: var(--color-primary); padding: 12px; text-align: left; font-weight: bold; border-bottom: 2px solid var(--color-primary); }
-td { padding: 10px 12px; border-bottom: 1px solid rgba(100, 255, 218, 0.1); }
-tr:hover { background: rgba(100, 255, 218, 0.05); }
+table { width: 100%; border-collapse: collapse; margin: 20px 0; background: rgba(24, 24, 27, 0.6); border-radius: 6px; overflow: hidden; }
+th { background: rgba(129, 140, 248, 0.08); color: var(--color-primary); padding: 12px; text-align: left; font-weight: bold; border-bottom: 2px solid rgba(129, 140, 248, 0.2); }
+td { padding: 10px 12px; border-bottom: 1px solid var(--border-muted); }
+tr:hover { background: rgba(129, 140, 248, 0.04); }
 .table-container { overflow-x: auto; }
-.score-badge { display: inline-block; padding: 3px 10px; border-radius: 15px; font-size: 0.85em; margin-left: 10px; }
-.score-high { background: rgba(100, 255, 218, 0.3); color: var(--color-primary); }
-.score-medium { background: rgba(255, 209, 102, 0.3); color: var(--color-secondary); }
-.score-low { background: rgba(255, 107, 157, 0.3); color: var(--color-accent); }
-.paper-card { background: rgba(30, 30, 50, 0.8); border-radius: 8px; padding: 15px; margin: 10px 0; border-left: 3px solid var(--color-primary); }
+.score-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.85em; margin-left: 10px; }
+.score-high { background: rgba(129, 140, 248, 0.2); color: var(--color-primary); }
+.score-medium { background: rgba(251, 191, 36, 0.2); color: var(--color-secondary); }
+.score-low { background: rgba(248, 113, 113, 0.2); color: var(--color-accent); }
+.paper-card { background: rgba(24, 24, 27, 0.8); border-radius: 6px; padding: 15px; margin: 10px 0; border: 1px solid var(--border-muted); border-left: 3px solid var(--border-primary); }
 .paper-title a { color: var(--color-primary); text-decoration: none; }
 .paper-title a:hover { text-decoration: underline; }
-.highlight-cluster { color: var(--color-secondary); font-weight: bold; }
-.highlight-pathway { color: var(--color-accent); font-weight: bold; }
-.highlight-celltype { color: var(--color-primary); font-weight: bold; }
-.pathway-box { background: rgba(255, 209, 102, 0.1); padding: 15px; border-radius: 5px; margin: 10px 0; border-left: 4px solid var(--color-secondary); }
+.highlight-cluster { color: var(--highlight-cluster); font-weight: bold; }
+.highlight-pathway { color: var(--highlight-pathway); font-weight: bold; }
+.highlight-celltype { color: var(--highlight-celltype); font-weight: bold; }
+.pathway-box { background: rgba(251, 191, 36, 0.06); padding: 15px; border-radius: 6px; margin: 10px 0; border-left: 4px solid var(--highlight-cluster); }
 .pathway-box ul { margin-left: 20px; margin-top: 10px; }
 .pagination { display: flex; justify-content: center; gap: 10px; margin: 20px 0; }
-.page-button { background: rgba(100, 255, 218, 0.2); color: var(--color-primary); border: 1px solid var(--color-primary); padding: 8px 16px; cursor: pointer; border-radius: 5px; transition: all 0.3s ease; }
-.page-button:hover { background: rgba(100, 255, 218, 0.4); }
-.page-button.active { background: var(--color-primary); color: var(--bg-primary); font-weight: bold; }
+.page-button { background: rgba(129, 140, 248, 0.08); color: var(--color-primary); border: 1px solid rgba(129, 140, 248, 0.2); padding: 8px 16px; cursor: pointer; border-radius: 6px; transition: all 0.3s ease; }
+.page-button:hover { background: rgba(129, 140, 248, 0.15); }
+.page-button.active { background: var(--color-primary); color: #000000; font-weight: bold; }
 .interactions-page { display: none; }
 .interactions-page.active { display: block; }
-.metadata { color: #666; font-size: 0.9em; text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(100, 255, 218, 0.2); }
-.drug-card { background: rgba(100, 200, 255, 0.1); border-left: 4px solid #64b5f6; border-radius: 8px; padding: 15px; margin: 10px 0; }
-.drug-card h4 { color: #64b5f6; margin-bottom: 8px; }
-.tractability-high { color: #64ffda; font-weight: bold; }
-.tractability-low { color: #ff6b9d; font-style: italic; }
+.metadata { color: var(--text-muted); font-size: 0.9em; text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(129, 140, 248, 0.2); }
+.drug-card { background: rgba(129, 140, 248, 0.06); border: 1px solid rgba(129, 140, 248, 0.15); border-left: 4px solid var(--color-primary); border-radius: 6px; padding: 15px; margin: 10px 0; }
+.drug-card h4 { color: var(--color-primary); margin-bottom: 8px; }
+.tractability-high { color: #34D399; font-weight: bold; }
+.tractability-low { color: var(--color-accent); font-style: italic; }
 .drug-phase { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; margin-left: 8px; }
-.drug-phase-4 { background: rgba(100, 255, 218, 0.3); color: var(--color-primary); }
-.drug-phase-3 { background: rgba(255, 209, 102, 0.3); color: var(--color-secondary); }
-.drug-phase-2 { background: rgba(255, 107, 157, 0.2); color: var(--color-accent); }
-.drug-phase-1 { background: rgba(150, 150, 150, 0.2); color: var(--text-secondary); }
+.drug-phase-4 { background: rgba(52, 211, 153, 0.2); color: #34D399; }
+.drug-phase-3 { background: rgba(129, 140, 248, 0.15); color: var(--color-primary); }
+.drug-phase-2 { background: rgba(251, 191, 36, 0.15); color: var(--color-secondary); }
+.drug-phase-1 { background: rgba(113, 113, 122, 0.15); color: var(--text-secondary); }
 .target-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; margin: 20px 0; }
-.novel-badge { display: inline-block; background: rgba(255, 209, 102, 0.3); color: var(--color-secondary); padding: 2px 10px; border-radius: 12px; font-size: 0.8em; margin-left: 8px; }
+.novel-badge { display: inline-block; background: rgba(251, 191, 36, 0.2); color: var(--color-secondary); padding: 2px 10px; border-radius: 12px; font-size: 0.8em; margin-left: 8px; }
 """
 
 # Fallback JavaScript (embedded for when external file is not available)
@@ -299,6 +305,39 @@ def _encode_image(image_path: str) -> Optional[str]:
         return None
 
 
+def _embed_figures_in_html(html_content: str, data_dir: str = "") -> str:
+    """Scan HTML for file-path img src and replace with base64 data URIs.
+
+    When the REPORTER generates HTML override content, img src attributes
+    may reference local file paths. This function finds those references
+    and replaces them with inline base64 data URIs so the report is
+    self-contained.
+
+    Args:
+        html_content: HTML string potentially containing file-path img tags
+        data_dir: Base directory for resolving relative paths
+
+    Returns:
+        HTML string with file-path img sources replaced by data URIs
+    """
+    import re
+
+    if not html_content:
+        return html_content
+
+    def _replace_src(match: re.Match) -> str:
+        src = match.group(1)
+        # Skip already-encoded data URIs
+        if src.startswith("data:"):
+            return match.group(0)
+        # Try absolute path first, then relative to data_dir
+        path = src if os.path.isabs(src) else os.path.join(data_dir, src) if data_dir else src
+        data_uri = _encode_image(path)
+        return f'src="{data_uri}"' if data_uri else match.group(0)
+
+    return re.sub(r'src="([^"]+\.(?:png|jpg|jpeg|gif|svg))"', _replace_src, html_content)
+
+
 def _generate_figure_html(figure_path: Optional[str], caption: str) -> str:
     """Generate HTML for a figure with Base64 embedding.
 
@@ -396,11 +435,223 @@ def _generate_references_html(references: list[dict]) -> str:
     """
 
 
+def _format_citations_html(text: str) -> str:
+    """Convert PMID references in text to clickable PubMed links.
+
+    Converts patterns like ``PMID: 12345678`` or ``(PMID: 12345678)`` into
+    ``<a href="..." class="reference" target="_blank">(PMID: 12345678)</a>``.
+
+    Args:
+        text: Text potentially containing PMID references
+
+    Returns:
+        Text with PMIDs converted to HTML links
+    """
+    import re
+
+    if not text:
+        return text
+
+    def _pmid_to_link(match: re.Match) -> str:
+        pmid = match.group(1)
+        return (
+            f'<a href="https://pubmed.ncbi.nlm.nih.gov/{pmid}/" '
+            f'class="reference" target="_blank">(PMID: {pmid})</a>'
+        )
+
+    # Match PMID patterns: "PMID: 12345678", "(PMID: 12345678)", "PMID:12345678"
+    return re.sub(r'\(?PMID:\s*(\d{7,8})\)?', _pmid_to_link, text)
+
+
+def _format_fdr_html(value: float) -> str:
+    """Format an FDR/p-value in scientific notation with superscript.
+
+    Example: 2.47e-244 -> ``2.47 × 10<sup>-244</sup>``
+
+    Args:
+        value: Numeric FDR value
+
+    Returns:
+        HTML-formatted string
+    """
+    try:
+        val = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+    if val == 0:
+        return "0"
+    if val >= 0.01:
+        return f"{val:.4f}"
+
+    import math
+    exponent = int(math.floor(math.log10(abs(val))))
+    mantissa = val / (10 ** exponent)
+    return f"{mantissa:.2f} × 10<sup>{exponent}</sup>"
+
+
+def _generate_key_findings_table_html(table_data: list[dict]) -> str:
+    """Generate a key-findings table with optional rowspan grouping and FDR formatting.
+
+    Each row dict can contain:
+    - group_key: Value for grouped rows (triggers rowspan)
+    - Any other keys become columns
+
+    Args:
+        table_data: List of row dictionaries. First row's keys define headers.
+
+    Returns:
+        HTML string for the key-findings table
+    """
+    if not table_data or not isinstance(table_data, list):
+        return ""
+
+    # Filter non-dict entries
+    rows = [r for r in table_data if isinstance(r, dict)]
+    if not rows:
+        return ""
+
+    # Determine columns (exclude group_key from display)
+    all_keys = []
+    for r in rows:
+        for k in r:
+            if k != "group_key" and k not in all_keys:
+                all_keys.append(k)
+
+    # Build header
+    headers = "".join(f"<th>{k}</th>" for k in all_keys)
+
+    # Build rows with rowspan for grouped entries
+    html_rows = []
+    prev_group = None
+    group_count = {}
+
+    # Pre-calculate rowspans
+    if any("group_key" in r for r in rows):
+        for r in rows:
+            gk = r.get("group_key", "")
+            group_count[gk] = group_count.get(gk, 0) + 1
+
+    seen_groups = set()
+    for r in rows:
+        gk = r.get("group_key")
+        cells = []
+        for k in all_keys:
+            val = r.get(k, "")
+            # Apply FDR formatting to columns with FDR/p-value in the name
+            if isinstance(val, (int, float)) and any(
+                term in k.lower() for term in ["fdr", "p-value", "p_value", "adj"]
+            ):
+                val = _format_fdr_html(val)
+            # Apply semantic highlighting
+            if isinstance(val, str):
+                val = _format_citations_html(val)
+
+            # Handle grouping with rowspan
+            if gk is not None and k == all_keys[0]:
+                if gk not in seen_groups:
+                    seen_groups.add(gk)
+                    span = group_count.get(gk, 1)
+                    cells.append(
+                        f'<td rowspan="{span}"><strong class="highlight-cluster">{val}</strong></td>'
+                    )
+                # else: skip this cell (covered by rowspan)
+            else:
+                cells.append(f"<td>{val}</td>")
+
+        html_rows.append(f"<tr>{''.join(cells)}</tr>")
+
+    return f"""
+    <div class="key-findings">
+        <table>
+            <thead><tr>{headers}</tr></thead>
+            <tbody>{''.join(html_rows)}</tbody>
+        </table>
+    </div>
+    """
+
+
+def _generate_pathway_box_html(pathways: list[dict]) -> str:
+    """Generate a pathway-box with pathway names and descriptions.
+
+    Args:
+        pathways: List of dicts with 'name' and optional 'description', 'activity' fields
+
+    Returns:
+        HTML string for the pathway box
+    """
+    if not pathways or not isinstance(pathways, list):
+        return ""
+
+    items = []
+    for p in pathways:
+        if not isinstance(p, dict):
+            continue
+        name = p.get("name", "")
+        desc = p.get("description", "")
+        activity = p.get("activity", "")
+        activity_str = f" (Activity: {activity})" if activity else ""
+        items.append(
+            f'<li><span class="highlight-pathway">{name}</span>{activity_str}'
+            f"{f': {desc}' if desc else ''}</li>"
+        )
+
+    if not items:
+        return ""
+
+    return f"""
+    <div class="pathway-box">
+        <h4>Top Enriched Pathways</h4>
+        <ul>
+            {''.join(items)}
+        </ul>
+    </div>
+    """
+
+
+def _generate_part_summary_html(summary_data: dict) -> str:
+    """Generate a summary box for the end of a Part tab.
+
+    Args:
+        summary_data: Dict with 'title', 'findings' (list of strings),
+            and optional 'note' (concluding remark)
+
+    Returns:
+        HTML string for the Part summary box
+    """
+    if not summary_data or not isinstance(summary_data, dict):
+        return ""
+
+    title = summary_data.get("title", "Part Summary")
+    findings = summary_data.get("findings", [])
+    note = summary_data.get("note", "")
+
+    if not findings:
+        return ""
+
+    items = "".join(f"<li>{_format_citations_html(str(f))}</li>" for f in findings)
+    note_html = f"<p style='margin-top: 10px;'><strong>{_format_citations_html(note)}</strong></p>" if note else ""
+
+    return f"""
+    <div class="summary-box">
+        <h4>{title}</h4>
+        <ul style="margin-left: 40px; margin-top: 10px;">
+            {items}
+        </ul>
+        {note_html}
+    </div>
+    """
+
+
 def _generate_part_content(part_data: dict) -> str:
     """Generate HTML content for a part section from structured data.
 
+    Supports both basic fields (figure_path, interpretation, caption, references)
+    and enriched fields (key_findings_table, pathway_descriptions, part_summary).
+
     Args:
-        part_data: Dictionary with analysis_name -> {figure_path, interpretation, caption, references}
+        part_data: Dictionary with analysis_name -> {figure_path, interpretation,
+            caption, references, key_findings_table, pathway_descriptions, part_summary}
 
     Returns:
         HTML string for the part content
@@ -409,7 +660,7 @@ def _generate_part_content(part_data: dict) -> str:
         return "<p>No content available</p>"
 
     sections = []
-    for analysis_name, analysis_data in part_data.items():
+    for idx, (analysis_name, analysis_data) in enumerate(part_data.items(), 1):
         # Ensure analysis_data is a dict
         if not isinstance(analysis_data, dict):
             analysis_data = {"interpretation": str(analysis_data) if analysis_data else ""}
@@ -420,14 +671,35 @@ def _generate_part_content(part_data: dict) -> str:
         if not isinstance(refs, list):
             refs = []
 
+        # Format citations in interpretation text
+        interpretation = _format_citations_html(interpretation)
+
+        # Build optional enriched sections
+        pathway_html = ""
+        pathways = analysis_data.get("pathway_descriptions")
+        if pathways:
+            pathway_html = _generate_pathway_box_html(pathways)
+
+        kf_html = ""
+        kf_table = analysis_data.get("key_findings_table")
+        if kf_table:
+            kf_html = _generate_key_findings_table_html(kf_table)
+
         sections.append(f"""
         <div class="analysis-section">
-            <h3>{analysis_name}</h3>
+            <h3>{idx}. {analysis_name}</h3>
             {_generate_figure_html(figure_path, caption)}
+            {pathway_html}
+            {kf_html}
             {_generate_interpretation_html(interpretation)}
             {_generate_references_html(refs)}
         </div>
         """)
+
+    # Append part summary if provided in the last analysis entry or as a special key
+    part_summary = part_data.get("__part_summary__")
+    if part_summary and isinstance(part_summary, dict):
+        sections.append(_generate_part_summary_html(part_summary))
 
     return "\n".join(sections) if sections else "<p>No content available</p>"
 
@@ -435,6 +707,7 @@ def _generate_part_content(part_data: dict) -> str:
 def _generate_html_report_impl(
     parts: dict,
     output_path: str,
+    data_dir: str = "",
 ) -> str:
     """Internal implementation for HTML report generation.
 
@@ -505,28 +778,54 @@ def _generate_html_report_impl(
         references = []
 
     # Check for LLM-generated HTML overrides (backward compatible)
+    # Embed figures (replace file-path img src with base64 data URIs)
     part1_html = parts.get("part1_html")
+    if part1_html:
+        part1_html = _embed_figures_in_html(part1_html, data_dir)
     part2_html = parts.get("part2_html")
+    if part2_html:
+        part2_html = _embed_figures_in_html(part2_html, data_dir)
     part3_html = parts.get("part3_html")
+    if part3_html:
+        part3_html = _embed_figures_in_html(part3_html, data_dir)
     summary_html = parts.get("summary_html")
+    if summary_html:
+        summary_html = _embed_figures_in_html(summary_html, data_dir)
     therapeutic_html = parts.get("therapeutic_html")
+    if therapeutic_html:
+        therapeutic_html = _embed_figures_in_html(therapeutic_html, data_dir)
 
     # Build executive summary HTML
     # If executive_summary already contains HTML tags, use it directly
     if "<" in executive_summary and ">" in executive_summary:
-        exec_summary_html = executive_summary
+        exec_summary_html = _format_citations_html(executive_summary)
     else:
-        # Generate from plain text
+        # Generate structured summary from plain text
         score_class = "score-high" if quality_score >= 0.7 else "score-medium" if quality_score >= 0.5 else "score-low"
-        exec_summary_html = f"""
-        <p>{executive_summary}</p>
-        <div class="key-findings">
-            <h4>Quality Metrics</h4>
-            <ul>
-                <li><strong>Quality Score:</strong> <span class="score-badge {score_class}">{quality_score:.2f}</span></li>
-            </ul>
-        </div>
-        """
+        # Split plain text into sentences for bullet points
+        summary_text = _format_citations_html(executive_summary)
+        sentences = [s.strip() for s in summary_text.split(". ") if s.strip()]
+        if len(sentences) > 1:
+            items = "".join(f"<li>{s}{'.' if not s.endswith('.') else ''}</li>" for s in sentences)
+            exec_summary_html = f"""
+            <p>{summary_text}</p>
+            <div class="key-findings">
+                <h4>Key Findings</h4>
+                <ul>
+                    {items}
+                </ul>
+            </div>
+            """
+        else:
+            exec_summary_html = f"""
+            <p>{summary_text}</p>
+            <div class="key-findings">
+                <h4>Quality Metrics</h4>
+                <ul>
+                    <li><strong>Quality Score:</strong> <span class="score-badge {score_class}">{quality_score:.2f}</span></li>
+                </ul>
+            </div>
+            """
 
     # Build Part 1 content: HTML override or structured data
     if part1_html:
@@ -760,12 +1059,13 @@ def generate_html_report(
         String with report generation status and output path
     """
     # Resolve output_path with data_dir (fallback to context var)
+    resolved_data_dir = data_dir or os.getenv("DEEP_INTERPRETER_DATA_DIR", "")
+    if resolved_data_dir:
+        resolved_data_dir = str(Path(resolved_data_dir).expanduser().resolve())
     if not os.path.isabs(output_path):
-        save_dir = data_dir or os.getenv("DEEP_INTERPRETER_DATA_DIR", "")
-        if save_dir:
-            save_dir = str(Path(save_dir).expanduser().resolve())
-            output_path = os.path.join(save_dir, output_path)
-    return _generate_html_report_impl(parts=parts, output_path=output_path)
+        if resolved_data_dir:
+            output_path = os.path.join(resolved_data_dir, output_path)
+    return _generate_html_report_impl(parts=parts, output_path=output_path, data_dir=resolved_data_dir)
 
 
 def generate_simple_report(

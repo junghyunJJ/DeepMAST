@@ -38,6 +38,67 @@ from query_opentargets import (
 logger = logging.getLogger(__name__)
 
 
+def _load_top_search_genes(data_dir: str) -> list[str]:
+    """Load pre-computed hub genes from top_search_genes.json.
+
+    Written by data_loader._extract_search_context() during PLANNER phase.
+    Supports v1 (plain list) and v2 (object with 'genes' key) formats.
+
+    Returns:
+        List of gene symbols, or empty list if file not found/malformed.
+    """
+    top_genes_file = os.path.join(data_dir, "top_search_genes.json")
+    if not os.path.exists(top_genes_file):
+        return []
+    try:
+        with open(top_genes_file) as f:
+            payload = json.load(f)
+
+        # Legacy format (v1): ["TP53", "EGFR", ...]
+        if isinstance(payload, list):
+            return [g for g in payload if isinstance(g, str) and g]
+
+        # Current format (v2): {"version": 2, "genes": [...], ...}
+        if isinstance(payload, dict):
+            genes = payload.get("genes")
+            if isinstance(genes, list):
+                return [g for g in genes if isinstance(g, str) and g]
+    except Exception as e:
+        logger.warning(f"Failed to load top_search_genes.json: {e}")
+    return []
+
+
+def _load_selected_top3_lr(data_dir: str) -> list[str]:
+    """Load unique gene symbols from selected_top3_lr.json.
+
+    Written by lr_prioritizer.save_selected_lr_pairs() during INTERPRETER phase.
+    Extracts unique ligand and receptor gene symbols from the selected pairs.
+
+    Returns:
+        List of unique gene symbols, or empty list if file not found/malformed.
+    """
+    lr_file = os.path.join(data_dir, "selected_top3_lr.json")
+    if not os.path.exists(lr_file):
+        return []
+    try:
+        with open(lr_file) as f:
+            payload = json.load(f)
+
+        selected_pairs = payload.get("selected_pairs", [])
+        seen: set[str] = set()
+        genes: list[str] = []
+        for pair in selected_pairs:
+            for key in ("ligand", "receptor"):
+                gene = pair.get(key, "")
+                if isinstance(gene, str) and gene and gene not in seen:
+                    seen.add(gene)
+                    genes.append(gene)
+        return genes
+    except Exception as e:
+        logger.warning(f"Failed to load selected_top3_lr.json: {e}")
+    return []
+
+
 def _resolve_gene_to_ensembl(gene_symbol: str) -> Optional[str]:
     """Resolve a gene symbol to its Ensembl ID via OpenTargets search.
 
@@ -333,95 +394,101 @@ def search_known_drugs(
 def assess_therapeutic_potential(
     data_dir: str,
     disease: str,
-    top_n: int = 20,
 ) -> str:
     """Comprehensive therapeutic potential assessment for CCI analysis genes.
 
-    One-stop tool that extracts L-R genes from LIANA results, queries
-    OpenTargets for druggability, and identifies existing drugs and
-    repurposing candidates.
+    One-stop tool that evaluates hub genes (from top_search_genes.json) and
+    novel L-R pair genes (from selected_top3_lr.json) for druggability via
+    the Open Targets Platform. Falls back to LIANA CSV ranking if neither
+    file is available.
 
     Args:
-        data_dir: Path to the analysis data directory containing
-            interest_sig_liana.csv
+        data_dir: Path to the analysis data directory
         disease: Disease context (e.g., "breast cancer")
-        top_n: Number of top genes to evaluate (default 20)
 
     Returns:
         JSON string with ranked therapeutic targets, known drugs,
         and the path to the saved results file
     """
-    # Load LIANA results
-    liana_path = os.path.join(data_dir, "interest_sig_liana.csv")
-    if not os.path.exists(liana_path):
-        return json.dumps({
-            "error": f"LIANA results not found at {liana_path}",
-            "suggestion": "Ensure the wrapper agent completed Steps 1-11 before invoking drug target assessment.",
-        })
+    # Load gene lists from upstream pipeline outputs
+    hub_genes = _load_top_search_genes(data_dir)
+    novel_genes = _load_selected_top3_lr(data_dir)
 
-    try:
-        df = pd.read_csv(liana_path)
-    except Exception as e:
-        return json.dumps({"error": f"Failed to read {liana_path}: {e}"})
+    hub_set = set(hub_genes)
+    gene_list = hub_genes + [g for g in novel_genes if g not in hub_set]
+    gene_source = "top_search_genes+selected_top3_lr"
 
-    # Extract unique ligand/receptor genes
-    ligand_col = "ligand" if "ligand" in df.columns else None
-    receptor_col = "receptor" if "receptor" in df.columns else None
+    # Fallback: if both files missing, use LIANA CSV ranking
+    if not gene_list:
+        gene_source = "liana_csv_fallback"
+        logger.info("No top_search_genes.json or selected_top3_lr.json found, falling back to LIANA CSV ranking")
+        liana_path = os.path.join(data_dir, "interest_sig_liana.csv")
+        if not os.path.exists(liana_path):
+            return json.dumps({
+                "error": f"No gene source files found. Checked top_search_genes.json, selected_top3_lr.json, and {liana_path}",
+                "suggestion": "Ensure the wrapper agent completed Steps 1-11 before invoking drug target assessment.",
+            })
 
-    if not ligand_col or not receptor_col:
-        # Try alternative column names
-        for col in df.columns:
-            if "ligand" in col.lower() and not ligand_col:
-                ligand_col = col
-            elif "receptor" in col.lower() and not receptor_col:
-                receptor_col = col
+        try:
+            df = pd.read_csv(liana_path)
+        except Exception as e:
+            return json.dumps({"error": f"Failed to read {liana_path}: {e}"})
 
-    if not ligand_col or not receptor_col:
-        return json.dumps({
-            "error": "Could not find ligand/receptor columns in LIANA data",
-            "columns": list(df.columns),
-        })
+        # Extract unique ligand/receptor genes
+        ligand_col = "ligand" if "ligand" in df.columns else None
+        receptor_col = "receptor" if "receptor" in df.columns else None
 
-    # Count gene frequency and get combined scores
-    gene_scores: dict[str, dict] = {}
+        if not ligand_col or not receptor_col:
+            for col in df.columns:
+                if "ligand" in col.lower() and not ligand_col:
+                    ligand_col = col
+                elif "receptor" in col.lower() and not receptor_col:
+                    receptor_col = col
 
-    for _, row in df.iterrows():
-        for col, role in [(ligand_col, "ligand"), (receptor_col, "receptor")]:
-            gene = str(row[col]).strip()
-            if not gene or gene == "nan":
-                continue
-            if gene not in gene_scores:
-                gene_scores[gene] = {
-                    "frequency": 0,
-                    "max_combinedscore": 0.0,
-                    "roles": set(),
-                }
-            gene_scores[gene]["frequency"] += 1
-            gene_scores[gene]["roles"].add(role)
+        if not ligand_col or not receptor_col:
+            return json.dumps({
+                "error": "Could not find ligand/receptor columns in LIANA data",
+                "columns": list(df.columns),
+            })
 
-            # Track max combined score
-            for score_col in ["combinedscore", "combined_score", "score"]:
-                if score_col in df.columns:
-                    try:
-                        score = float(row[score_col])
-                        if score > gene_scores[gene]["max_combinedscore"]:
-                            gene_scores[gene]["max_combinedscore"] = score
-                    except (ValueError, TypeError):
-                        pass
-                    break
+        # Count gene frequency and get combined scores
+        gene_scores: dict[str, dict] = {}
 
-    # Rank genes by frequency * max_combinedscore
-    for gene, info in gene_scores.items():
-        info["roles"] = list(info["roles"])  # Convert set for JSON
-        info["rank_score"] = info["frequency"] * (1 + info["max_combinedscore"])
+        for _, row in df.iterrows():
+            for col, role in [(ligand_col, "ligand"), (receptor_col, "receptor")]:
+                gene = str(row[col]).strip()
+                if not gene or gene == "nan":
+                    continue
+                if gene not in gene_scores:
+                    gene_scores[gene] = {
+                        "frequency": 0,
+                        "max_combinedscore": 0.0,
+                        "roles": set(),
+                    }
+                gene_scores[gene]["frequency"] += 1
+                gene_scores[gene]["roles"].add(role)
 
-    ranked_genes = sorted(
-        gene_scores.items(),
-        key=lambda x: x[1]["rank_score"],
-        reverse=True,
-    )[:top_n]
+                for score_col in ["combinedscore", "combined_score", "score"]:
+                    if score_col in df.columns:
+                        try:
+                            score = float(row[score_col])
+                            if score > gene_scores[gene]["max_combinedscore"]:
+                                gene_scores[gene]["max_combinedscore"] = score
+                        except (ValueError, TypeError):
+                            pass
+                        break
 
-    gene_list = [g[0] for g in ranked_genes]
+        for gene, info in gene_scores.items():
+            info["roles"] = list(info["roles"])
+            info["rank_score"] = info["frequency"] * (1 + info["max_combinedscore"])
+
+        ranked_genes = sorted(
+            gene_scores.items(),
+            key=lambda x: x[1]["rank_score"],
+            reverse=True,
+        )[:30]
+
+        gene_list = [g[0] for g in ranked_genes]
 
     # Query OpenTargets for drug targets
     logger.info(f"Querying OpenTargets for {len(gene_list)} genes...")
@@ -438,15 +505,18 @@ def assess_therapeutic_potential(
     }))
 
     # Combine results
+    novel_lr_set = set(novel_genes)
     therapeutic_assessment = {
         "disease": disease,
         "efo_id": targets_result.get("efo_id", ""),
-        "total_lr_genes": len(gene_scores),
-        "top_n_evaluated": top_n,
+        "gene_source": gene_source,
+        "hub_genes_count": len(hub_genes),
+        "novel_lr_genes_count": len(novel_genes),
         "gene_ranking": {
             gene: {
-                **gene_scores[gene],
                 "druggability": targets_result.get("targets", {}).get(gene, {}),
+                "from_hub_genes": gene in hub_set,
+                "from_novel_lr": gene in novel_lr_set,
             }
             for gene in gene_list
         },
@@ -478,8 +548,7 @@ def assess_therapeutic_potential(
             "association_score": assoc_score,
             "evidence_count": target.get("evidence_count", 0),
             "safety_concerns": len(target.get("safety_liabilities", [])),
-            "lr_frequency": gene_scores[gene]["frequency"],
-            "lr_roles": gene_scores[gene]["roles"],
+            "from_novel_lr_selection": gene in novel_lr_set,
         }
 
         if has_tractability:
@@ -487,8 +556,9 @@ def assess_therapeutic_potential(
         else:
             therapeutic_assessment["non_druggable_targets"].append(entry)
 
-        # Novel targets: druggable but no known disease association
-        if has_tractability and assoc_score == 0.0:
+        # Novel targets: druggable but no known disease association,
+        # OR from novel L-R selection (these are explicitly novel candidates)
+        if has_tractability and (assoc_score == 0.0 or gene in novel_lr_set):
             therapeutic_assessment["novel_targets"].append(entry)
 
     # Sort druggable targets by association score
@@ -499,6 +569,9 @@ def assess_therapeutic_potential(
     # Summary statistics
     therapeutic_assessment["summary"] = {
         "total_genes_evaluated": len(gene_list),
+        "hub_genes_count": len(hub_genes),
+        "novel_lr_genes_count": len(novel_genes),
+        "gene_source": gene_source,
         "genes_found_in_opentargets": targets_result.get("genes_found", 0),
         "genes_failed": targets_result.get("genes_failed", []),
         "druggable_count": len(therapeutic_assessment["druggable_targets"]),

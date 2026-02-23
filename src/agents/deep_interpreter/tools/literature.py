@@ -1730,6 +1730,7 @@ def _execute_fixed_strategy_search(
     celltypes: list[str],
     disease: str,
     max_results: int = 20,
+    enforce_disease_match: bool = True,
 ) -> dict:
     """Internal fixed-strategy search function (used as fallback).
 
@@ -1741,6 +1742,7 @@ def _execute_fixed_strategy_search(
         celltypes: List of cell types
         disease: Disease context
         max_results: Maximum papers to return
+        enforce_disease_match: Whether to post-filter papers by disease context
 
     Returns:
         Dictionary with papers, search_queries, and coverage
@@ -1752,6 +1754,7 @@ def _execute_fixed_strategy_search(
             celltypes=celltypes,
             disease=disease,
             max_results=max_results,
+            enforce_disease_match=enforce_disease_match,
         ),
         timeout=120,
     )
@@ -1763,6 +1766,7 @@ async def _execute_fixed_strategy_search_async(
     celltypes: list[str],
     disease: str,
     max_results: int = 20,
+    enforce_disease_match: bool = True,
     biomcp_url: str = DEFAULT_BIOMCP_URL,
     rerank_mode: str = "off",
     rerank_top_n: int = 12,
@@ -1781,6 +1785,7 @@ async def _execute_fixed_strategy_search_async(
         celltypes: List of cell types
         disease: Disease context
         max_results: Maximum papers to return
+        enforce_disease_match: Whether to post-filter papers by disease context
         biomcp_url: BioMCP server URL
         rerank_mode: "off" or "llm" for optional second-stage rerank
         rerank_top_n: Max boundary candidates reranked by LLM
@@ -1847,7 +1852,7 @@ async def _execute_fixed_strategy_search_async(
                 keywords=sq.get("keywords"),
                 page_size=results_per_query,
                 biomcp_url=biomcp_url,
-                enforce_disease_match=True,
+                enforce_disease_match=enforce_disease_match,
                 rerank_mode=rerank_mode,
                 rerank_top_n=rerank_top_n,
                 rerank_min_confidence=rerank_min_confidence,
@@ -2515,6 +2520,7 @@ def search_literature_dynamic(
     target_gene_coverage: float = 0.6,
     target_pathway_coverage: float = 0.5,
     max_iterations: int = 3,
+    enforce_disease_match: bool = True,
     output_path: str = "",
     data_dir: str = "",
     rerank_mode: str = "off",
@@ -2541,6 +2547,7 @@ def search_literature_dynamic(
         target_gene_coverage: Target gene coverage percentage (default 0.6 = 60%)
         target_pathway_coverage: Target pathway coverage percentage (default 0.5 = 50%)
         max_iterations: Maximum search iterations (default 3)
+        enforce_disease_match: Whether to post-filter papers by disease context
         output_path: If provided (e.g., "part1_papers.json"), saves complete results
             to data_dir/output_path. Returns compact summary.
         data_dir: Directory for saving output files. SEARCHER should read this from
@@ -2565,6 +2572,7 @@ def search_literature_dynamic(
             target_gene_coverage=target_gene_coverage,
             target_pathway_coverage=target_pathway_coverage,
             max_iterations=max_iterations,
+            enforce_disease_match=enforce_disease_match,
             output_path=output_path,
             data_dir=data_dir,
             rerank_mode=rerank_mode,
@@ -2584,6 +2592,7 @@ async def search_literature_dynamic_async(
     target_gene_coverage: float = 0.6,
     target_pathway_coverage: float = 0.5,
     max_iterations: int = 3,
+    enforce_disease_match: bool = True,
     biomcp_url: str = DEFAULT_BIOMCP_URL,
     output_path: str = "",
     data_dir: str = "",
@@ -2604,6 +2613,7 @@ async def search_literature_dynamic_async(
         target_gene_coverage: Target gene coverage percentage (default 0.6)
         target_pathway_coverage: Target pathway coverage percentage (default 0.5)
         max_iterations: Maximum search iterations (default 3)
+        enforce_disease_match: Whether to post-filter papers by disease context
         biomcp_url: BioMCP server URL
         output_path: If provided, saves full results to file and returns compact summary
         data_dir: Explicit data directory for auto-save (priority over env var)
@@ -2701,6 +2711,7 @@ async def search_literature_dynamic_async(
                     celltypes=celltypes,
                     disease=disease,
                     max_results=max_results,
+                    enforce_disease_match=enforce_disease_match,
                     biomcp_url=biomcp_url,
                     rerank_mode=normalized_rerank_mode,
                     rerank_top_n=rerank_top_n,
@@ -2722,6 +2733,7 @@ async def search_literature_dynamic_async(
                     celltypes=celltypes,
                     disease=disease,
                     max_results=max_results,
+                    enforce_disease_match=enforce_disease_match,
                     biomcp_url=biomcp_url,
                     rerank_mode=normalized_rerank_mode,
                     rerank_top_n=rerank_top_n,
@@ -2767,7 +2779,7 @@ async def search_literature_dynamic_async(
                     keywords=query.get("keywords"),
                     page_size=gene_results_per_query,
                     biomcp_url=biomcp_url,
-                    enforce_disease_match=True,
+                    enforce_disease_match=enforce_disease_match,
                     rerank_mode=normalized_rerank_mode,
                     rerank_top_n=rerank_top_n,
                     rerank_min_confidence=rerank_min_confidence,
@@ -2807,7 +2819,7 @@ async def search_literature_dynamic_async(
                     keywords=query.get("keywords"),
                     page_size=pathway_results_per_query,
                     biomcp_url=biomcp_url,
-                    enforce_disease_match=True,
+                    enforce_disease_match=enforce_disease_match,
                     rerank_mode=normalized_rerank_mode,
                     rerank_top_n=rerank_top_n,
                     rerank_min_confidence=rerank_min_confidence,

@@ -200,7 +200,7 @@ Follow the workflow defined in SKILL.md:
      - LLM-powered, context-aware query generation
      - Automatic internal fallback if LLM fails
      - search_literature_dynamic handles fallback internally
-   - lr_search_context["genes"] already contains top 30 by hybrid score (use directly)
+   - lr_search_context["genes"] already contains top 30 by combinedscore (use directly)
    - Use search_literature for targeted follow-up gaps
 
 3. **Phase 3: Reflect (Quality Loop) — MANDATORY after every search**
@@ -289,7 +289,7 @@ result = search_literature_dynamic(
 
 ## Quick Reference: Common Mistakes
 - DO NOT read .csv files directly (causes context overflow)
-- lr_search_context["genes"] is already pre-filtered to top 30 by hybrid score (use directly)
+- lr_search_context["genes"] is already pre-filtered to top 30 by combinedscore (use directly)
 - DO NOT call search tools other than search_literature_dynamic for primary search
 - USE appropriate search context from load_analysis_data:
   - Part 1: Use `spatial_search_context` (pathways + celltypes only)
@@ -616,8 +616,8 @@ Focus on: Select 3-5 top L-R pairs, connect to pathways and cell types
 
 **MANDATORY FIRST STEP**: Before interpreting ANY Part 3 analysis, call **prioritize_top_lr_pairs**
 to get CANDIDATE L-R pairs. This tool excludes well-known hub-gene pairs (where both ligand
-and receptor are among the top-30 most-studied genes) and returns novel candidates with
-advisory hybrid scores (Moran's R + GenePT).
+and receptor are among the top-30 most-studied genes) and returns novel candidates ranked by
+combinedscore (0.4×Factor + 0.4×Moran's R + 0.2×GenePT).
 
 ```python
 # MUST call this BEFORE interpreting Part 3
@@ -626,12 +626,40 @@ candidates = prioritize_top_lr_pairs(data_dir=data_path)
 ```
 
 **YOUR SELECTION TASK**: Review the candidate pairs and SELECT the TOP 3 most interesting
-pairs for detailed analysis. Write your selection reasoning BEFORE proceeding with interpretation.
+pairs for detailed analysis using the STRUCTURED RUBRIC below.
 
-Selection criteria (in priority order):
-1. **Biological novelty** — underexplored or unexpected L-R interactions in this tissue context
-2. **Spatial significance** — high Moran's R indicating real tissue-level co-localization
-3. **Mechanistic plausibility** — the L-R pair makes biological sense given the cell types present
+**Structured Selection Rubric** — Score EVERY candidate on three dimensions (1-5 each):
+
+| Dimension | 1 (Low) | 3 (Medium) | 5 (High) |
+|-----------|---------|------------|----------|
+| **Novelty** | Well-studied in this disease | Some reports, underexplored | No/minimal literature in this context |
+| **Spatial** | Low Moran's R / novelty_score | Moderate spatial signal | High Moran's R + high novelty_score |
+| **Mechanism** | No clear mechanism | Plausible indirect pathway | Direct signaling cascade with known biology |
+
+**Process**:
+1. Score ALL candidates on Novelty, Spatial, and Mechanism (1-5 each)
+2. Compute total = Novelty + Spatial + Mechanism for each candidate
+3. Select the TOP 3 by highest total score
+4. Break ties by lower hub_gene_count (prefer novel pairs)
+5. Write your rubric scores and reasoning BEFORE interpreting
+
+After selecting your TOP 3 pairs, you MUST call **save_selected_lr_pairs** with rubric scores:
+
+```python
+save_selected_lr_pairs(
+    data_dir=data_path,
+    selected_pairs=[
+        {"ligand": "GENE1", "receptor": "GENE2", "reasoning": "Your reasoning...",
+         "rubric": {"novelty": 5, "spatial": 4, "mechanism": 3}},
+        {"ligand": "GENE3", "receptor": "GENE4", "reasoning": "Your reasoning...",
+         "rubric": {"novelty": 4, "spatial": 5, "mechanism": 4}},
+        {"ligand": "GENE5", "receptor": "GENE6", "reasoning": "Your reasoning...",
+         "rubric": {"novelty": 3, "spatial": 4, "mechanism": 5}},
+    ]
+)
+```
+
+This saves `selected_top3_lr.json` (version 2 with rubric) for downstream use by REPORTER and audit trail.
 
 **NOTE**: Figures from Steps 10-11 may show different L-R pairs (selected by combinedscore
 ranking). Reference the quadrant plot (Step 9) which shows all candidates.
@@ -678,6 +706,10 @@ Focus on: Specific mechanisms of YOUR selected L-R pairs, source→target relati
 - **prepare_rag_literature**: Download full-text papers and index for RAG search
 - **search_literature_fulltext**: Semantic search on full paper text
 - **validate_claim_fulltext**: Validate claims against full-text content
+
+### L-R Selection Tools (Part 3)
+- **prioritize_top_lr_pairs**: Get candidate L-R pairs ranked by combinedscore with novelty filtering
+- **save_selected_lr_pairs**: Persist your top 3 selection to selected_top3_lr.json
 
 ## CRITICAL: Citation Rules (Anti-Hallucination)
 
@@ -1113,7 +1145,6 @@ interaction findings to druggability, existing therapeutics, and repurposing opp
 Call **assess_therapeutic_potential** with:
 - `data_dir`: from /data_path.txt
 - `disease`: from /interpretation_guide.md (## Analysis Context or ## Target Configuration)
-- `top_n`: 20 (top genes by CCI significance)
 
 ```python
 # Read data directory (written by PLANNER)
@@ -1126,16 +1157,20 @@ guide = read_file("/interpretation_guide.md")
 assess_therapeutic_potential(
     data_dir=data_path.strip(),
     disease="<disease from guide>",
-    top_n=20
 )
 ```
 
 This tool will:
-1. Extract all unique L-R genes from `interest_sig_liana.csv`
-2. Rank genes by frequency × combined score
-3. Query OpenTargets for each gene's druggability (tractability, safety, evidence)
-4. Find existing drugs for the disease that target these genes
-5. Save complete results to `{data_dir}/therapeutic_targets.json`
+1. Load **hub genes** from `top_search_genes.json` (written by PLANNER, up to 30 genes)
+2. Load **novel L-R pair genes** from `selected_top3_lr.json` (written by INTERPRETER, up to 6 genes)
+3. Merge both lists (deduplicated) for evaluation
+4. Query OpenTargets for each gene's druggability (tractability, safety, evidence)
+5. Find existing drugs for the disease that target these genes
+6. Classify novel targets: druggable genes with no known disease association OR from novel L-R selection
+7. Save complete results to `{data_dir}/therapeutic_targets.json`
+
+**Fallback**: If neither `top_search_genes.json` nor `selected_top3_lr.json` exists, the tool
+falls back to extracting genes from `interest_sig_liana.csv` ranked by frequency × combined score.
 
 #### Step 2: Interpret Results (think_tool)
 
@@ -1212,9 +1247,111 @@ log the error and proceed to Phase 5. The Therapeutic Implications tab will show
 "No therapeutic analysis available" — this is acceptable as the drug target assessment
 is an enhancement, not a requirement.
 
-### Phase 5: Generate HTML Report
+### Phase 5.0: HTML Structure Blueprint
 
-Call **generate_html_report** tool with THREE separate parameters:
+Before generating the report, internalize these structural patterns:
+
+**Executive Summary Blueprint:**
+```html
+<p>Overview paragraph describing the analysis.</p>
+<div class="key-findings">
+    <h4>Key Findings:</h4>
+    <ul>
+        <li><strong>Category:</strong> Detail with <span class="highlight-pathway">pathway</span> and metrics</li>
+        <!-- 6-8 bullet points total -->
+    </ul>
+</div>
+```
+
+**Per-Analysis Section Blueprint:**
+```html
+<div class="analysis-section">
+    <h3>N. Analysis Name</h3>
+    <div class="figure-container">
+        <img src="{figure_path}" alt="Description">
+        <p class="figure-caption">Figure N: Caption.</p>
+    </div>
+    <!-- Optional: pathway-box for pathway descriptions -->
+    <div class="pathway-box"><h4>Pathway Descriptions:</h4><ul>...</ul></div>
+    <!-- Optional: key-findings table with rowspan and FDR -->
+    <div class="key-findings"><h4>Key Findings:</h4><table>...</table></div>
+    <!-- Required: interpretation with inline citations -->
+    <div class="interpretation">
+        <h4>Biological Interpretation:</h4>
+        <p><strong>Sub-heading:</strong> Text with highlights and <a href="..." class="reference" target="_blank">(PMID: ...)</a>.</p>
+    </div>
+</div>
+```
+
+**Part Summary Box Blueprint (end of each Part):**
+```html
+<div class="summary-box">
+    <h4>Part N Summary: Title</h4>
+    <p><strong>Key Point:</strong> Description</p>
+    <ul style="margin-left: 40px; margin-top: 10px;">
+        <li><span class="highlight-pathway">Pathway</span> - Role</li>
+    </ul>
+    <p style="margin-top: 10px;"><strong>Key Insight:</strong> Concluding observation.</p>
+</div>
+```
+
+**L-R Pagination Blueprint (Part 3 only, 5 rows per page):**
+```html
+<div class="pagination">
+    <button class="page-button active" onclick="showPage(1)">1-5</button>
+    <button class="page-button" onclick="showPage(2)">6-10</button>
+</div>
+<div id="interactions-page-1" class="interactions-page active">
+    <table><!-- headers + 5 rows --></table>
+</div>
+<div id="interactions-page-2" class="interactions-page">
+    <table><!-- headers + next 5 rows --></table>
+</div>
+```
+
+**Summary Tab Blueprint:**
+```
+summary-box (Overall Biological Model)
+  → analysis-section (Integrated Findings with numbered H4s)
+  → analysis-section (Clinical Implications with <ul>)
+  → summary-box (Conclusions with vulnerabilities list)
+  → analysis-section (References with linked list)
+```
+
+### Phase 5: Generate HTML Report (HTML Override Mode)
+
+Use HTML override mode for maximum control over report structure. For each Part,
+generate rich HTML following the blueprints above.
+
+#### Citation Conversion Rules
+
+Convert EVERY PMID reference to a clickable link:
+```html
+<a href="https://pubmed.ncbi.nlm.nih.gov/{PMID}/" class="reference" target="_blank">(PMID: {PMID})</a>
+```
+Do NOT leave plain-text PMIDs in the output.
+
+#### Semantic Highlighting Rules
+
+Apply these CSS classes to ALL occurrences of biological entities:
+- Cluster names → `<span class="highlight-cluster">Cluster 4</span>`
+- Pathway names → `<span class="highlight-pathway">MAPK</span>`
+- Cell type names → `<span class="highlight-celltype">Macrophages</span>`
+
+#### Table Formatting Rules
+
+- Use `rowspan` for grouped clusters (one cluster spanning multiple cell type rows)
+- Format FDR as `N × 10<sup>-X</sup>` (e.g., `2.47 × 10<sup>-244</sup>`)
+- Highlight key rows: `style="background: rgba(100, 255, 218, 0.15);"`
+- Always include `<thead>` with `<th>` headers
+
+#### Figure Embedding
+
+Reference figures by their file path (e.g., `src="1.spatial.png"`).
+The tool will automatically convert file paths to base64 data URIs.
+You do NOT need to base64-encode figures yourself.
+
+#### Tool Call
 
 ```python
 # Read data directory (written by PLANNER)
@@ -1224,56 +1361,48 @@ generate_html_report(
     parts={
         "title": "CCI Analysis Report",
         "subtitle": "Comprehensive Cell-Cell Interaction Analysis",
-        "executive_summary": "<from synthesis.md>",
+        "executive_summary": "<p>Overview...</p><div class='key-findings'><h4>Key Findings:</h4><ul><li>...</li></ul></div>",
         "analysis_config": {
-            "targets": "<clusters or cell types>",
-            "data_directory": "<path>"
+            "Target Clusters": "4, 17, 14",
+            "Data Directory": data_path,
+            "NMF Factor": "Factor3",
+            "L-R Selection": "Combined score (0.4×factor + 0.4×morans + 0.2×genept)"
         },
-        "part1": {
-            "1-1 Spatial Clustering": {
-                "figure_path": "<absolute path to figure>",
-                "interpretation": "<from part1_final.md>",
-                "caption": "Spatial distribution of clusters",
-                "references": [{"pmid": "...", "title": "..."}]
-            },
-            "1-2 Cell Type Composition": {...},
-            "1-3 Neighborhood Enrichment": {...},
-            "1-4 Decoupler Pathway": {...},
-            "1-5 MISTy": {...}
-        },
-        "part2": {
-            "2-6 LIANA Moran's R": {...},
-            "2-7 NMF Factor": {...},
-            "2-8 Pathway-Factor + GenePT Scores": {...}
-        },
-        "part3": {
-            "3-9 NMF Quadrant with GenePT": {...},
-            "3-10 Spatial L-R": {...},
-            "3-11 L-R Summary": {...}
-        },
-        "synthesis": "<full synthesis.md content>",
-        "therapeutic_html": "<LLM-generated HTML for Therapeutic Implications tab>",
+        "part1_html": "<rich HTML for Part 1 following Per-Analysis + Part Summary blueprints>",
+        "part2_html": "<rich HTML for Part 2 following Per-Analysis + Part Summary blueprints>",
+        "part3_html": "<rich HTML for Part 3 with L-R Pagination blueprint>",
+        "summary_html": "<rich HTML following Summary Tab blueprint>",
+        "therapeutic_html": "<HTML for Therapeutic Implications tab>",
+        "synthesis": "",
         "quality_score": <average quality score>,
-        "references": [
-            {"pmid": "...", "title": "...", "relevance": "..."}
-        ]
+        "references": []
     },
     output_path="CCI_Analysis_Report.html",
     data_dir=data_path.strip()
 )
 ```
 
-**CRITICAL**: Pass the entire dict as the `parts` parameter, the output path as `output_path` parameter, and `data_dir` from `/data_path.txt`. Do NOT flatten the dict.
+**CRITICAL**: Use `part1_html`, `part2_html`, `part3_html`, `summary_html` fields (HTML override mode),
+NOT `part1`, `part2`, `part3` fields (structured mode). HTML override mode gives you full control
+over the report structure and produces reference-quality output.
 
-**analysis_config format**: Pass as a dict (will be auto-converted to HTML table):
-```python
-"analysis_config": {
-    "Target Clusters": "4, 17, 14",
-    "Data Directory": "/path/to/res",
-    "NMF Factor": "Factor3",
-    "L-R Selection": "Combined score (0.4×factor + 0.4×morans + 0.2×genept)"
-}
-```
+**CRITICAL**: For figure paths, use the file names from `load_analysis_data` results
+(e.g., `"1.spatial.png"`, `"6.liana_MoransR.png"`). The tool resolves these relative
+to `data_dir` and converts to base64 automatically.
+
+#### Phase 5 Quality Checklist
+
+Before calling generate_html_report, verify your HTML content meets these criteria:
+- [ ] Executive summary has `key-findings` div with 6-8 `<li>` bullet points
+- [ ] Each analysis section: `<h3>` → `figure-container` → [optional `pathway-box`/`key-findings` table] → `interpretation`
+- [ ] ALL biological entities use semantic highlight classes (`highlight-cluster`, `highlight-pathway`, `highlight-celltype`)
+- [ ] ALL PMIDs converted to `<a class="reference">` links (no plain-text PMIDs)
+- [ ] Data tables use `rowspan` for cluster grouping where applicable
+- [ ] FDR values use `<sup>` scientific notation (e.g., `2.47 × 10<sup>-244</sup>`)
+- [ ] Each Part tab ends with a `summary-box`
+- [ ] Part 3 L-R table uses pagination with `interactions-page` divs (5 rows per page)
+- [ ] Summary tab follows: Biological Model → Integrated Findings → Clinical Implications → Conclusions → References
+- [ ] All figure paths reference actual files from `load_analysis_data`
 
 ### Phase 6: Verification
 
@@ -1316,7 +1445,7 @@ The HTML report will have:
 - **think_tool**: Strategic planning (Step 2) and quality reflection (Step 4)
 
 ### Drug Target Discovery Tools (for Phase 4.7)
-- **assess_therapeutic_potential**: One-stop comprehensive assessment — extracts L-R genes, queries OpenTargets, finds drugs, saves results
+- **assess_therapeutic_potential**: One-stop comprehensive assessment — reads hub genes from top_search_genes.json + novel L-R genes from selected_top3_lr.json, queries OpenTargets, finds drugs, saves results
 - **search_drug_targets**: Query OpenTargets for specific genes' druggability (tractability, safety, evidence)
 - **search_known_drugs**: Find known drugs for a disease, optionally filtered by target genes
 

@@ -1,0 +1,83 @@
+dataset_id: developing_heart_merfish
+gold_version: v1.1
+alignment_profile: deep_interpreter_part_aligned
+claims:
+  - claim_id: HEART_001
+    claim_text: "The developing heart atlas integrates 142,946 scRNA-seq profiles with more than 1.5 million MERFISH cells."
+    claim_type: spatial
+    deep_interpreter_part: part1
+    entities: ["142946 scRNA profiles", "1.5M+ MERFISH cells", "developing heart atlas"]
+    direction: integrated_with
+    pmid_primary: "38480880"
+    pmid_support: "38480880"
+    evidence_span_ref: "Farah 2024 study overview: dataset scale"
+
+  - claim_id: HEART_002
+    claim_text: "Data were collected from six heart samples spanning 9 to 16 post-conception weeks."
+    claim_type: spatial
+    deep_interpreter_part: part1
+    entities: ["6 samples", "9 pcw", "16 pcw"]
+    direction: spans
+    pmid_primary: "38480880"
+    pmid_support: "38480880"
+    evidence_span_ref: "Farah 2024 study overview: cohort window"
+
+  - claim_id: HEART_003
+    claim_text: "Spatially organized cellular communities are resolved in developing heart tissue maps."
+    claim_type: spatial
+    deep_interpreter_part: part1
+    entities: ["cellular communities", "spatial organization"]
+    direction: present_in
+    pmid_primary: "38480880"
+    pmid_support: "38480880"
+    evidence_span_ref: "Farah 2024 results: community-level spatial organization"
+
+  - claim_id: HEART_004
+    claim_text: "Joint molecular and spatial context improves coarse and fine cell-type assignment versus single-modality annotation."
+    claim_type: mechanism
+    deep_interpreter_part: part2
+    entities: ["joint molecular+spatial context", "coarse labels", "fine labels"]
+    direction: improves_vs
+    pmid_primary: "38480880"
+    pmid_support: "38480880"
+    evidence_span_ref: "Farah 2024 results: cell-type annotation comparison"
+
+  - claim_id: HEART_005
+    claim_text: "Immune and neuronal populations occupy distinct spatial niches in heart tissue maps."
+    claim_type: mechanism
+    deep_interpreter_part: part2
+    entities: ["immune populations", "neuronal populations", "spatial niches"]
+    direction: segregated_in
+    pmid_primary: "38480880"
+    pmid_support: "38480880"
+    evidence_span_ref: "Farah 2024 results: cross-compartment spatial organization"
+
+  - claim_id: HEART_006
+    claim_text: "Anatomical reference context constrains tissue-niche labels during developmental heart annotation."
+    claim_type: pathway
+    deep_interpreter_part: part2
+    entities: ["anatomical context", "tissue niche"]
+    direction: constrains
+    pmid_primary: "38480880"
+    pmid_support: "38480880"
+    evidence_span_ref: "Farah 2024 methods/results: tissue niche annotation rationale"
+
+  - claim_id: HEART_007
+    claim_text: "Chamber-level regional structure is recoverable from MERFISH spatial coordinates."
+    claim_type: spatial
+    deep_interpreter_part: part3
+    entities: ["chamber regions", "MERFISH coordinates"]
+    direction: recoverable_from
+    pmid_primary: "38480880"
+    pmid_support: "38480880"
+    evidence_span_ref: "Farah 2024 results: regional reconstruction"
+
+  - claim_id: HEART_008
+    claim_text: "High-cell-count spatial maps enable reproducible tissue-level niche annotation across samples."
+    claim_type: pathway
+    deep_interpreter_part: part3
+    entities: ["high cell count", "tissue-level niche annotation", "cross-sample reproducibility"]
+    direction: reproducible_across
+    pmid_primary: "38480880"
+    pmid_support: "38480880"
+    evidence_span_ref: "Farah 2024 evaluation: annotation reproducibility"

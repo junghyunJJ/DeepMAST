@@ -1,0 +1,69 @@
+{
+  "schema_version": "post_hitl_eval_v1",
+  "run_meta": {
+    "run_id": "sample-run-001",
+    "dataset_id": "dlpfc_visium",
+    "agent_git_sha": "sample-sha",
+    "llm_provider": "openrouter",
+    "llm_model": "kimi-k2",
+    "started_at": "2026-02-22T00:00:00Z",
+    "finished_at": "2026-02-22T00:10:00Z"
+  },
+  "hitl_context": {
+    "hitl_completed": true,
+    "interpretation_approved": true,
+    "interest_clusters": ["3", "7"],
+    "interest_celltypes": ["Fibroblast"],
+    "sel_factor": "factor_2",
+    "hitl_packet_hash": "sha256:sample"
+  },
+  "artifacts": {
+    "part1_final": "/part1_final.md",
+    "part2_final": "/part2_final.md",
+    "part3_final": "/part3_final.md",
+    "part1_papers": "/part1_papers.json",
+    "part23_papers": "/liana_papers.json",
+    "final_report": "CCI_Analysis_Report.html"
+  },
+  "gold_binding": {
+    "gold_version": "v1.1",
+    "alignment_profile": "deep_interpreter_part_aligned",
+    "evidence_file": "evaluation/evidence/dlpfc_visium.yaml"
+  },
+  "predicted_claims": [
+    {
+      "pred_id": "P001",
+      "part": "part1",
+      "claim_text": "Layer structure is recovered.",
+      "claim_type": "spatial",
+      "entities": ["L1", "L2"],
+      "direction": "present_in",
+      "cited_pmids": ["33558695"],
+      "novelty_flag": false
+    }
+  ],
+  "matching": [
+    {
+      "pred_id": "P001",
+      "gold_claim_id": "DLPFC_001",
+      "status": "TP",
+      "entity_overlap": 1.0,
+      "direction_match": true,
+      "pmid_alignment": "strong"
+    }
+  ],
+  "scores": {
+    "part1": {"precision": 1.0, "recall": 1.0, "f1": 1.0},
+    "part2": {"precision": 0.8, "recall": 0.8, "f1": 0.8},
+    "part3": {"precision": 0.7, "recall": 0.7, "f1": 0.7},
+    "overall": {
+      "precision": 0.83,
+      "recall": 0.83,
+      "f1": 0.83,
+      "grounding_validity": 1.0,
+      "strong_alignment_rate": 0.9,
+      "hallucination_rate": 0.0
+    }
+  },
+  "eval_status": "ok"
+}

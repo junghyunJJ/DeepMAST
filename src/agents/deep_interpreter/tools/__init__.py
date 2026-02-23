@@ -50,6 +50,7 @@ from src.agents.deep_interpreter.tools.lr_prioritizer import (
     create_lr_prioritizer,
     prioritize_lr_pairs,
     prioritize_top_lr_pairs,
+    save_selected_lr_pairs,
 )
 from src.agents.deep_interpreter.tools.pubmed_eutils import (
     search_pubmed_advanced,
@@ -107,6 +108,7 @@ __all__ = [
     "create_lr_prioritizer",
     "prioritize_lr_pairs",
     "prioritize_top_lr_pairs",
+    "save_selected_lr_pairs",
     # PubMed E-utilities
     "search_pubmed_advanced",
     "build_pubmed_query",

@@ -4,7 +4,9 @@ This tool loads pre-computed CCI analysis results from a directory
 and returns a summary of available figures and data.
 """
 
+import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -568,6 +570,8 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
         # Use hybrid-ranked top N genes for effective search coverage
         MAX_SEARCH_GENES = 30
         all_genes_sorted = sorted(list(genes))
+        top_gene_scores: list[float] = []
+        score_method = "0.7*max_combinedscore_norm + 0.3*freq_norm"
 
         # Hybrid ranking: 0.7 × max_combinedscore_norm + 0.3 × freq_norm
         # combinedscore = 0.4×Factor + 0.4×Moran's R + 0.2×GenePT
@@ -593,19 +597,32 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
                 freq_norm = gene_counts.get(gene, 0) / max_freq
                 gene_hybrid[gene] = 0.7 * score_norm + 0.3 * freq_norm
 
-            top_genes = [g for g, _ in sorted(gene_hybrid.items(), key=lambda x: x[1], reverse=True)[:MAX_SEARCH_GENES]]
+            ranked_genes = sorted(gene_hybrid.items(), key=lambda x: x[1], reverse=True)
+            top_genes = [g for g, _ in ranked_genes[:MAX_SEARCH_GENES]]
+            top_gene_scores = [float(score) for _, score in ranked_genes[:MAX_SEARCH_GENES]]
         elif gene_counts:
             # Fallback: frequency only (combinedscore column missing)
-            top_genes = [g for g, _ in gene_counts.most_common(MAX_SEARCH_GENES)]
+            ranked_genes = gene_counts.most_common(MAX_SEARCH_GENES)
+            top_genes = [g for g, _ in ranked_genes]
+            max_freq = ranked_genes[0][1] if ranked_genes else 1
+            top_gene_scores = [float(freq / max_freq) for _, freq in ranked_genes] if max_freq else []
+            score_method = "frequency_norm"
         else:
             top_genes = all_genes_sorted[:MAX_SEARCH_GENES]
+            score_method = "alphabetical_fallback"
 
         # Persist top search genes for downstream use (e.g., LR pair novelty filtering)
         try:
-            import json as _json
             top_genes_file = data_path / "top_search_genes.json"
+            top_genes_payload = {
+                "version": 2,
+                "genes": top_genes,
+                "scores": top_gene_scores,
+                "score_method": score_method,
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            }
             with open(top_genes_file, "w") as f:
-                _json.dump(top_genes, f)
+                json.dump(top_genes_payload, f, indent=2)
         except Exception:
             pass  # Non-critical: prioritizer falls back to no exclusion
 
