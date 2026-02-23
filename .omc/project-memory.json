@@ -215,8 +215,8 @@
   "hotPaths": [
     {
       "path": "src/agents/deep_interpreter/subagents/prompts.py",
-      "accessCount": 28,
-      "lastAccessed": 1771839246575,
+      "accessCount": 33,
+      "lastAccessed": 1771847583926,
       "type": "file"
     },
     {
@@ -232,6 +232,12 @@
       "type": "file"
     },
     {
+      "path": "src/agents/deep_interpreter/tools/drug_targets.py",
+      "accessCount": 18,
+      "lastAccessed": 1771847571765,
+      "type": "file"
+    },
+    {
       "path": "src/agents/deep_interpreter/tools/report.py",
       "accessCount": 15,
       "lastAccessed": 1771837546928,
@@ -244,12 +250,6 @@
       "type": "directory"
     },
     {
-      "path": "src/agents/deep_interpreter/tools/drug_targets.py",
-      "accessCount": 14,
-      "lastAccessed": 1771839752788,
-      "type": "file"
-    },
-    {
       "path": "docs/lr_filtering_pipeline.md",
       "accessCount": 12,
       "lastAccessed": 1771839734238,
@@ -257,8 +257,14 @@
     },
     {
       "path": "skills/opentargets-database/scripts/query_opentargets.py",
-      "accessCount": 9,
-      "lastAccessed": 1771837566375,
+      "accessCount": 10,
+      "lastAccessed": 1771847546528,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/subagents/configs.py",
+      "accessCount": 8,
+      "lastAccessed": 1771847540994,
       "type": "file"
     },
     {
@@ -269,14 +275,8 @@
     },
     {
       "path": "src/agents/deep_interpreter/tools/__init__.py",
-      "accessCount": 6,
-      "lastAccessed": 1771837517184,
-      "type": "file"
-    },
-    {
-      "path": "src/agents/deep_interpreter/subagents/configs.py",
-      "accessCount": 6,
-      "lastAccessed": 1771837517807,
+      "accessCount": 7,
+      "lastAccessed": 1771847545602,
       "type": "file"
     },
     {
@@ -317,8 +317,8 @@
     },
     {
       "path": "src/agents/deep_interpreter",
-      "accessCount": 1,
-      "lastAccessed": 1771835522077,
+      "accessCount": 2,
+      "lastAccessed": 1771847572631,
       "type": "directory"
     },
     {
@@ -367,6 +367,12 @@
       "path": "skills",
       "accessCount": 1,
       "lastAccessed": 1771837523217,
+      "type": "directory"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools",
+      "accessCount": 1,
+      "lastAccessed": 1771847540471,
       "type": "directory"
     }
   ],

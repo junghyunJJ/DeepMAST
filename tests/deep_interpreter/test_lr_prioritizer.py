@@ -661,6 +661,405 @@ class TestDrugTargetsLoadSelectedTop3LR:
             assert genes == []
 
 
+class TestDrugTargetsLoadLrCandidates:
+    """Tests for drug_targets._load_lr_candidates_genes helper."""
+
+    def test_loads_top15_candidate_genes_only(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _load_lr_candidates_genes
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            candidate_pairs = []
+            for idx in range(1, 18):  # 17 pairs, but helper should keep top 15
+                candidate_pairs.append({
+                    "rank": idx,
+                    "ligand": f"L{idx}",
+                    "receptor": f"R{idx}",
+                })
+
+            with open(Path(tmpdir) / "lr_candidates.json", "w") as f:
+                json.dump({"candidate_pairs": candidate_pairs}, f)
+
+            genes = _load_lr_candidates_genes(tmpdir, top_k_pairs=15)
+            assert len(genes) == 30
+            assert "L15" in genes and "R15" in genes
+            assert "L16" not in genes and "R16" not in genes
+
+    def test_deduplicates_lr_candidate_genes(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _load_lr_candidates_genes
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "lr_candidates.json", "w") as f:
+                json.dump({
+                    "candidate_pairs": [
+                        {"rank": 1, "ligand": "MDK", "receptor": "SDC1"},
+                        {"rank": 2, "ligand": "MDK", "receptor": "ITGB4"},
+                    ]
+                }, f)
+
+            genes = _load_lr_candidates_genes(tmpdir, top_k_pairs=15)
+            assert genes == ["MDK", "SDC1", "ITGB4"]
+
+
+class TestDrugTargetsGwasScoring:
+    """Tests for GWAS proxy scoring helper in drug_targets."""
+
+    def test_compute_gwas_proxy_scores_reported_plus_nearest_weighted(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _compute_gwas_proxy_scores
+
+        evidence = [
+            {
+                "datatypeId": "genetic_association",
+                "datasourceId": "gwas_catalog",
+                "score": 0.9,
+                "targetFromSourceId": "EGFR",
+            },
+            {
+                "datatypeId": "genetic_association",
+                "datasourceId": "gwas_catalog",
+                "score": 0.3,
+                "targetFromSourceId": "LOC1000",
+            },
+            {
+                "datatypeId": "known_drug",
+                "datasourceId": "chembl",
+                "score": 1.0,
+                "targetFromSourceId": "EGFR",
+            },
+        ]
+
+        gwas = _compute_gwas_proxy_scores(
+            evidence=evidence,
+            approved_symbol="EGFR",
+            ot_genetic_association_score=0.2,
+        )
+
+        assert gwas["gwas_mapping_policy"] == "reported_plus_nearest_weighted"
+        assert gwas["gwas_weights"] == {"reported_gene": 1.0, "nearest_gene": 0.6}
+        assert gwas["gwas_reported_hits_count"] == 1
+        assert gwas["gwas_nearest_hits_count"] == 1
+        assert gwas["gwas_reported_score"] == pytest.approx(0.9)
+        assert gwas["gwas_nearest_score"] == pytest.approx(0.3)
+        assert gwas["gwas_combined_score"] == pytest.approx((0.9 + 0.3 * 0.6) / 1.6)
+        assert gwas["genetic_consistency_flag"] is True
+
+    def test_merge_gwas_hybrid_scores_with_direct_signal(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _merge_gwas_hybrid_scores
+
+        proxy = {
+            "gwas_mapping_policy": "reported_plus_nearest_weighted",
+            "gwas_weights": {"reported_gene": 1.0, "nearest_gene": 0.6},
+            "ot_genetic_association_score": 0.2,
+            "gwas_reported_hits_count": 1,
+            "gwas_nearest_hits_count": 0,
+            "gwas_reported_score": 0.2,
+            "gwas_nearest_score": 0.0,
+            "gwas_combined_score": 0.125,
+            "genetic_consistency_flag": False,
+        }
+        direct = {
+            "reported_signal": 0.8,
+            "nearest_signal": 0.1,
+            "reported_hits_count": 2,
+            "nearest_hits_count": 1,
+        }
+
+        merged = _merge_gwas_hybrid_scores(proxy_scores=proxy, direct_scores=direct)
+
+        assert merged["gwas_signal_source"] == "hybrid_open_targets_plus_gwas_database"
+        assert merged["gwas_direct_used"] is True
+        assert merged["gwas_direct_reported_hits_count"] == 2
+        assert merged["gwas_direct_nearest_hits_count"] == 1
+        assert merged["gwas_reported_hits_count"] == 3
+        assert merged["gwas_nearest_hits_count"] == 1
+        assert merged["gwas_reported_score"] == pytest.approx((0.2 + 0.8) / 2.0)
+        assert merged["gwas_nearest_score"] == pytest.approx(0.1)
+        assert merged["gwas_combined_score"] == pytest.approx(((0.5 * 1.0) + (0.1 * 0.6)) / 1.6)
+
+    def test_merge_gwas_hybrid_scores_proxy_only_fallback(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _merge_gwas_hybrid_scores
+
+        proxy = {
+            "gwas_mapping_policy": "reported_plus_nearest_weighted",
+            "gwas_weights": {"reported_gene": 1.0, "nearest_gene": 0.6},
+            "ot_genetic_association_score": 0.9,
+            "gwas_reported_hits_count": 1,
+            "gwas_nearest_hits_count": 1,
+            "gwas_reported_score": 0.7,
+            "gwas_nearest_score": 0.2,
+            "gwas_combined_score": (0.7 + 0.2 * 0.6) / 1.6,
+            "genetic_consistency_flag": False,
+        }
+
+        merged = _merge_gwas_hybrid_scores(proxy_scores=proxy, direct_scores={})
+
+        assert merged["gwas_signal_source"] == "opentargets_proxy_only"
+        assert merged["gwas_direct_used"] is False
+        assert merged["gwas_reported_hits_count"] == 1
+        assert merged["gwas_nearest_hits_count"] == 1
+        assert merged["gwas_reported_score"] == pytest.approx(0.7)
+        assert merged["gwas_nearest_score"] == pytest.approx(0.2)
+        assert merged["gwas_combined_score"] == pytest.approx((0.7 + 0.2 * 0.6) / 1.6)
+
+    def test_compute_validated_score_uses_clinicaltrials_and_drugbank(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _compute_validated_score
+
+        target = {
+            "evidence_types": {"known_drug": 0},
+            "safety_liabilities": [],
+        }
+        with_multi_source = _compute_validated_score(
+            target=target,
+            gene_drugs=[
+                {
+                    "phase": 0,
+                    "clinical_trials_total_count": 120,
+                    "drugbank_match_count": 1,
+                }
+            ],
+            from_lr_candidates=True,
+        )
+        without_multi_source = _compute_validated_score(
+            target=target,
+            gene_drugs=[],
+            from_lr_candidates=True,
+        )
+
+        assert with_multi_source["clinical_trials_signal"] > 0
+        assert with_multi_source["drugbank_support"] == 1.0
+        assert with_multi_source["validated_score"] > without_multi_source["validated_score"]
+        assert with_multi_source["validated_pass"] is True
+
+    def test_compute_exploratory_score_uses_chembl_and_gwas_direct(self):
+        from src.agents.deep_interpreter.tools.drug_targets import _compute_exploratory_score
+
+        target_with_direct = {
+            "gwas_combined_score": 0.1,
+            "ot_genetic_association_score": 0.1,
+            "tractability": {},
+            "evidence_count": 0,
+            "gwas_direct_reported_hits_count": 2,
+            "gwas_direct_nearest_hits_count": 1,
+        }
+        target_without_direct = {
+            **target_with_direct,
+            "gwas_direct_reported_hits_count": 0,
+            "gwas_direct_nearest_hits_count": 0,
+        }
+
+        with_signals = _compute_exploratory_score(
+            target=target_with_direct,
+            from_lr_candidates=True,
+            chembl_target_hits_count=3,
+            chembl_exact_symbol_match=True,
+        )
+        without_signals = _compute_exploratory_score(
+            target=target_without_direct,
+            from_lr_candidates=True,
+            chembl_target_hits_count=0,
+            chembl_exact_symbol_match=False,
+        )
+
+        assert with_signals["chembl_target_support"] > without_signals["chembl_target_support"]
+        assert with_signals["gwas_direct_support"] > without_signals["gwas_direct_support"]
+        assert with_signals["exploratory_score"] > without_signals["exploratory_score"]
+
+    def test_search_drug_targets_uses_direct_adapter_when_available(self, monkeypatch):
+        from src.agents.deep_interpreter.tools import drug_targets
+
+        monkeypatch.setattr(drug_targets, "_resolve_disease_to_efo", lambda disease: "EFO_0000305")
+        monkeypatch.setattr(drug_targets, "_resolve_gene_to_ensembl", lambda gene: f"ENSG_{gene}")
+        monkeypatch.setattr(
+            drug_targets,
+            "get_target_info",
+            lambda ensembl_id, include_diseases=True: {
+                "approvedSymbol": "EGFR",
+                "approvedName": "EGFR protein",
+                "biotype": "protein_coding",
+                "functionDescriptions": ["EGFR function"],
+                "tractability": [],
+                "safetyLiabilities": [],
+                "geneticConstraint": [],
+                "associatedDiseases": {
+                    "rows": [
+                        {
+                            "disease": {"id": "EFO_0000305"},
+                            "score": 0.4,
+                            "datatypeScores": [{"id": "genetic_association", "score": 0.2}],
+                        }
+                    ]
+                },
+            },
+        )
+        monkeypatch.setattr(
+            drug_targets,
+            "get_target_disease_evidence",
+            lambda ensembl_id, efo_id: [
+                {
+                    "datatypeId": "genetic_association",
+                    "datasourceId": "gwas_catalog",
+                    "score": 0.2,
+                    "targetFromSourceId": "EGFR",
+                }
+            ],
+        )
+        monkeypatch.setattr(
+            drug_targets,
+            "fetch_gwas_direct_gene_scores",
+            lambda disease, genes, efo_id: {
+                "EGFR": {
+                    "reported_signal": 0.8,
+                    "nearest_signal": 0.0,
+                    "reported_hits_count": 2,
+                    "nearest_hits_count": 0,
+                }
+            },
+        )
+
+        result = json.loads(drug_targets.search_drug_targets.invoke({
+            "gene_symbols": ["EGFR"],
+            "disease": "test cancer",
+        }))
+
+        egfr = result["targets"]["EGFR"]
+        assert result["gwas_direct_status"] == "ok"
+        assert egfr["gwas_signal_source"] == "hybrid_open_targets_plus_gwas_database"
+        assert egfr["gwas_direct_used"] is True
+        assert egfr["gwas_direct_reported_hits_count"] == 2
+        assert egfr["gwas_reported_score"] == pytest.approx((0.2 + 0.8) / 2.0)
+
+    def test_search_drug_targets_fallback_when_direct_adapter_fails(self, monkeypatch):
+        from src.agents.deep_interpreter.tools import drug_targets
+        from src.agents.deep_interpreter.tools.gwas_adapter import GwasDirectAdapterError
+
+        monkeypatch.setattr(drug_targets, "_resolve_disease_to_efo", lambda disease: "EFO_0000305")
+        monkeypatch.setattr(drug_targets, "_resolve_gene_to_ensembl", lambda gene: f"ENSG_{gene}")
+        monkeypatch.setattr(
+            drug_targets,
+            "get_target_info",
+            lambda ensembl_id, include_diseases=True: {
+                "approvedSymbol": "EGFR",
+                "approvedName": "EGFR protein",
+                "biotype": "protein_coding",
+                "functionDescriptions": ["EGFR function"],
+                "tractability": [],
+                "safetyLiabilities": [],
+                "geneticConstraint": [],
+                "associatedDiseases": {
+                    "rows": [
+                        {
+                            "disease": {"id": "EFO_0000305"},
+                            "score": 0.4,
+                            "datatypeScores": [{"id": "genetic_association", "score": 0.2}],
+                        }
+                    ]
+                },
+            },
+        )
+        monkeypatch.setattr(
+            drug_targets,
+            "get_target_disease_evidence",
+            lambda ensembl_id, efo_id: [
+                {
+                    "datatypeId": "genetic_association",
+                    "datasourceId": "gwas_catalog",
+                    "score": 0.2,
+                    "targetFromSourceId": "EGFR",
+                }
+            ],
+        )
+        monkeypatch.setattr(
+            drug_targets,
+            "fetch_gwas_direct_gene_scores",
+            lambda disease, genes, efo_id: (_ for _ in ()).throw(
+                GwasDirectAdapterError("gwascatalog unavailable")
+            ),
+        )
+
+        result = json.loads(drug_targets.search_drug_targets.invoke({
+            "gene_symbols": ["EGFR"],
+            "disease": "test cancer",
+        }))
+
+        egfr = result["targets"]["EGFR"]
+        assert result["gwas_direct_status"] == "degraded"
+        assert "unavailable" in result["gwas_direct_error"]
+        assert egfr["gwas_signal_source"] == "opentargets_proxy_only"
+        assert egfr["gwas_direct_used"] is False
+
+
+class TestGwasDirectAdapter:
+    """Tests for GWAS direct adapter trait resolution and aggregation."""
+
+    def test_normalize_trait_id_accepts_mondo_curie_and_uri(self):
+        from src.agents.deep_interpreter.tools.gwas_adapter import _normalize_efo_id
+
+        assert _normalize_efo_id("MONDO:0007254") == "MONDO_0007254"
+        assert (
+            _normalize_efo_id("http://purl.obolibrary.org/obo/MONDO_0007254")
+            == "MONDO_0007254"
+        )
+
+    def test_fetch_direct_scores_resolves_trait_from_disease_name(self, monkeypatch):
+        from src.agents.deep_interpreter.tools import gwas_adapter
+
+        calls = {"n": 0}
+
+        def fake_fetch_json(url, timeout=8.0):
+            calls["n"] += 1
+            if "findByEfoTrait" in url:
+                return {
+                    "_embedded": {
+                        "efoTraits": [
+                            {"trait": "breast cancer", "shortForm": "MONDO_0007254"}
+                        ]
+                    }
+                }
+            return {
+                "_embedded": {
+                    "associations": [
+                        {
+                            "score": 0.8,
+                            "authorReportedGenes": "EGFR",
+                            "mappedGenes": "LOC1000",
+                        }
+                    ]
+                }
+            }
+
+        monkeypatch.setattr(gwas_adapter, "_fetch_json", fake_fetch_json)
+
+        out = gwas_adapter.fetch_gwas_direct_gene_scores(
+            disease="breast cancer",
+            genes=["EGFR"],
+            efo_id="",
+            max_pages=1,
+        )
+        egfr = out["EGFR"]
+        assert calls["n"] >= 2
+        assert egfr["reported_hits_count"] == 1
+        assert egfr["nearest_hits_count"] == 0
+        assert egfr["reported_signal"] == pytest.approx(0.8)
+
+    def test_fetch_direct_scores_accepts_mondo_trait_id(self, monkeypatch):
+        from src.agents.deep_interpreter.tools import gwas_adapter
+
+        called_urls = []
+
+        def fake_fetch_json(url, timeout=8.0):
+            called_urls.append(url)
+            return {"_embedded": {"associations": []}}
+
+        monkeypatch.setattr(gwas_adapter, "_fetch_json", fake_fetch_json)
+
+        gwas_adapter.fetch_gwas_direct_gene_scores(
+            disease="breast cancer",
+            genes=["EGFR"],
+            efo_id="MONDO_0007254",
+            max_pages=1,
+        )
+        assert any("MONDO_0007254/associations" in u for u in called_urls)
+
+
 class TestAssessTherapeuticPotentialGeneSelection:
     """Tests for assess_therapeutic_potential gene selection logic.
 
@@ -687,6 +1086,16 @@ class TestAssessTherapeuticPotentialGeneSelection:
                     "safety_liabilities": [],
                     "disease_association_score": 0.0,
                     "evidence_count": 0,
+                    "evidence_types": {},
+                    "ot_genetic_association_score": 0.2,
+                    "gwas_mapping_policy": "reported_plus_nearest_weighted",
+                    "gwas_weights": {"reported_gene": 1.0, "nearest_gene": 0.6},
+                    "gwas_reported_hits_count": 1,
+                    "gwas_nearest_hits_count": 0,
+                    "gwas_reported_score": 0.2,
+                    "gwas_nearest_score": 0.0,
+                    "gwas_combined_score": 0.2,
+                    "genetic_consistency_flag": False,
                 }
             return json.dumps({
                 "disease": input_dict["disease"],
@@ -704,14 +1113,35 @@ class TestAssessTherapeuticPotentialGeneSelection:
                 "drugs": [],
             })
 
+        def fake_collect_multi_source_evidence(disease, gene_symbols, known_drugs):
+            return {
+                "chembl_status": "mocked",
+                "clinicaltrials_status": "mocked",
+                "drugbank_status": "mocked",
+                "chembl_by_gene": {
+                    g: {
+                        "chembl_target_hits_count": 0,
+                        "chembl_target_ids": [],
+                        "chembl_exact_symbol_match": False,
+                    }
+                    for g in gene_symbols
+                },
+                "clinicaltrials_by_drug": {},
+                "drugbank_by_drug": {},
+                "errors": {},
+            }
+
         # Save originals for teardown
         orig_sdt = drug_targets.search_drug_targets.invoke
         orig_skd = drug_targets.search_known_drugs.invoke
+        orig_mse = drug_targets.collect_multi_source_evidence
         object.__setattr__(drug_targets.search_drug_targets, "invoke", fake_search_drug_targets)
         object.__setattr__(drug_targets.search_known_drugs, "invoke", fake_search_known_drugs)
+        monkeypatch.setattr(drug_targets, "collect_multi_source_evidence", fake_collect_multi_source_evidence)
         yield
         object.__setattr__(drug_targets.search_drug_targets, "invoke", orig_sdt)
         object.__setattr__(drug_targets.search_known_drugs, "invoke", orig_skd)
+        monkeypatch.setattr(drug_targets, "collect_multi_source_evidence", orig_mse)
 
     def test_uses_both_gene_files(self, _mock_opentargets):
         """When both files exist, genes come from top_search_genes + selected_top3_lr."""
@@ -781,6 +1211,41 @@ class TestAssessTherapeuticPotentialGeneSelection:
             assert result["hub_genes_count"] == 0
             assert result["novel_lr_genes_count"] == 2
             assert set(result["gene_ranking"].keys()) == {"L1", "R1"}
+
+    def test_uses_lr_candidates_only_when_candidates_exist(self, _mock_opentargets):
+        """When lr_candidates.json exists, use only top-15 candidate genes as primary input."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "top_search_genes.json", "w") as f:
+                json.dump(["HUB1"], f)
+            with open(Path(tmpdir) / "selected_top3_lr.json", "w") as f:
+                json.dump({
+                    "version": 1,
+                    "selected_pairs": [
+                        {"ligand": "TOP3_L", "receptor": "TOP3_R", "reasoning": "x"},
+                    ],
+                    "count": 1,
+                }, f)
+            with open(Path(tmpdir) / "lr_candidates.json", "w") as f:
+                json.dump({
+                    "candidate_pairs": [
+                        {"rank": 1, "ligand": "CAND_L", "receptor": "CAND_R"},
+                    ]
+                }, f)
+
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            assert result["gene_source"] == "lr_candidates_top15_primary"
+            assert set(result["gene_ranking"].keys()) == {
+                "CAND_L", "CAND_R"
+            }
+            assert result["hub_genes_count"] == 1
+            assert result["novel_lr_genes_count"] == 2
+            assert result["lr_candidates_genes_count"] == 2
 
     def test_fallback_to_liana_csv(self, _mock_opentargets):
         """When no JSON files exist, falls back to LIANA CSV."""
@@ -868,6 +1333,108 @@ class TestAssessTherapeuticPotentialGeneSelection:
             gene_keys = list(result["gene_ranking"].keys())
             assert gene_keys.count("SHARED") == 1
             assert set(gene_keys) == {"SHARED", "HUB_ONLY", "NOV_ONLY"}
+
+    def test_writes_dual_gwas_output_files(self, _mock_opentargets):
+        """Writes therapeutic_targets_gwas.json and synthesis_gwas.json."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "top_search_genes.json", "w") as f:
+                json.dump(["HUB1"], f)
+            with open(Path(tmpdir) / "selected_top3_lr.json", "w") as f:
+                json.dump({
+                    "version": 1,
+                    "selected_pairs": [
+                        {"ligand": "NOV_L", "receptor": "NOV_R", "reasoning": "novel"},
+                    ],
+                    "count": 1,
+                }, f)
+
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            gwas_detail_file = Path(tmpdir) / "therapeutic_targets_gwas.json"
+            gwas_summary_file = Path(tmpdir) / "synthesis_gwas.json"
+            assert gwas_detail_file.exists()
+            assert gwas_summary_file.exists()
+            assert "gwas_files" in result
+
+            gwas_detail = json.loads(gwas_detail_file.read_text())
+            assert gwas_detail["disease"] == "test cancer"
+            assert "summary" in gwas_detail
+            assert "genes" in gwas_detail
+            assert "gwas_direct_status" in gwas_detail
+            assert "multi_source_status" in gwas_detail
+            assert "genes_with_chembl_target_support" in gwas_detail["summary"]
+
+    def test_outputs_validated_and_exploratory_tracks(self, _mock_opentargets):
+        """Output payload includes 2-track results and summary counts."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "lr_candidates.json", "w") as f:
+                json.dump({
+                    "candidate_pairs": [
+                        {"rank": 1, "ligand": "L1", "receptor": "R1"},
+                        {"rank": 2, "ligand": "L2", "receptor": "R2"},
+                    ]
+                }, f)
+
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            assert "validated_track" in result
+            assert "exploratory_track" in result
+            assert len(result["validated_track"]) == 4
+            assert len(result["exploratory_track"]) == 4
+
+            first_validated = result["validated_track"][0]
+            first_exploratory = result["exploratory_track"][0]
+            assert "validated_score" in first_validated
+            assert "validated_pass" in first_validated
+            assert "rank" in first_validated
+            assert "exploratory_score" in first_exploratory
+            assert "exploratory_pass" in first_exploratory
+            assert "rank" in first_exploratory
+
+            summary = result["summary"]
+            assert "validated_pass_count" in summary
+            assert "exploratory_pass_count" in summary
+            assert "top_validated_genes" in summary
+            assert "top_exploratory_genes" in summary
+
+    def test_outputs_multi_source_status_fields(self, _mock_opentargets):
+        """Output payload includes fail-soft multi-source status metadata."""
+        from src.agents.deep_interpreter.tools.drug_targets import assess_therapeutic_potential
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(Path(tmpdir) / "lr_candidates.json", "w") as f:
+                json.dump({
+                    "candidate_pairs": [
+                        {"rank": 1, "ligand": "L1", "receptor": "R1"},
+                    ]
+                }, f)
+
+            result = json.loads(assess_therapeutic_potential.invoke({
+                "data_dir": tmpdir,
+                "disease": "test cancer",
+            }))
+
+            assert "multi_source_status" in result
+            assert result["multi_source_status"]["chembl"] == "mocked"
+            assert result["multi_source_status"]["clinicaltrials"] == "mocked"
+            assert result["multi_source_status"]["drugbank"] == "mocked"
+
+            summary = result["summary"]
+            assert "multi_source_status" in summary
+            assert summary["multi_source_status"]["chembl"] == "mocked"
+            assert "genes_with_chembl_target_support" in summary
+            assert "drugs_with_clinical_trials" in summary
+            assert "drugs_with_drugbank_match" in summary
 
 
 # ---------------------------------------------------------------------------
