@@ -46,41 +46,12 @@ class ExecutionStepResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 class PipelineExecutorState(TypedDict):
-    """State schema for PipelineExecutorAgent.
-
-    Attributes:
-        messages: Conversation history with add_messages reducer.
-
-        # Input (from Supervisor / PipelineBuilder)
-        pipeline_config: Serialized PipelineConfig dict from pipeline_builder.
-        h5ad_input_path: Path to the user's input h5ad file.
-        platform_type: "spot-based" or "single-cell".
-        st_technology: ST platform name.
-        disease: Disease/phenotype being studied.
-        species: Organism species.
-
-        # SC Reference resolution
-        sc_reference_needed: Whether a SC reference is required.
-        sc_reference_candidates: List of candidate reference dicts.
-        sc_reference_selected: Index of selected candidate (or -1 for skip).
-        sc_reference_path: Final resolved path to SC reference h5ad.
-
-        # Step tracking
-        step_results: List of ExecutionStepResult dicts (append-only).
-        current_step: Name of the step currently executing.
-
-        # Output
-        output_h5ad_path: Path to the latest output h5ad (cascading).
-        output_directory: Directory where outputs are written.
-
-        # Completion flag
-        execution_complete: True after save_results (terminal).
-    """
+    """State schema for PipelineExecutorAgent (v2 — Two-Phase Linear)."""
 
     # Conversation messages
     messages: Annotated[list, add_messages]
 
-    # Input fields
+    # Input fields (from Supervisor / PipelineBuilder)
     pipeline_config: Optional[dict]
     h5ad_input_path: Optional[str]
     platform_type: Optional[Literal["spot-based", "single-cell"]]
@@ -89,14 +60,20 @@ class PipelineExecutorState(TypedDict):
     species: Optional[Literal["human", "mouse"]]
 
     # SC Reference
-    sc_reference_needed: bool
     sc_reference_candidates: Optional[list[dict]]
-    sc_reference_selected: Optional[int]
+    sc_reference_selected: Optional[dict]  # {name, path, score, source}
     sc_reference_path: Optional[str]
+
+    # Cell type mode (derived from platform_type in load_pipeline_config)
+    celltype_mode: Optional[Literal["deconvolution", "annotation"]]
+
+    # MCP availability (set by prep_executor)
+    mcp_availability: Optional[dict]       # {"normalization": True, "celltype_analysis": False, ...}
+    generated_mcp_configs: Optional[dict]  # {"celltype_analysis": {"command": ..., "args": ...}}
+    all_mcp_ready: bool
 
     # Step tracking
     step_results: list[dict]
-    current_step: Optional[str]
 
     # Output
     output_h5ad_path: Optional[str]

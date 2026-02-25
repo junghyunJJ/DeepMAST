@@ -1,0 +1,97 @@
+graph TD
+    %% Node
+    __start__([<p>__start__</p>]):::first
+
+    load_config["load_pipeline_config<br/>(parse config,<br/>derive celltype_mode)"]
+    load_st["load_st_data<br/>(HITL: collect h5ad)"]
+    sc_ref["resolve_sc_reference<br/>(HITL: SC ref confirmation)"]
+    validate["validate_data<br/>(check h5ad, setup dirs)"]
+    prep["prep_executor<br/>(batch MCP check)"]
+    gen_mcp["generate_mcp<br/>(code2MCP / rmcpagent)"]
+    human_confirm{{"human_confirm<br/>(HITL: execution plan)"}}
+
+    subgraph react_agent["Single ReAct Agent"]
+        Query[<b>🗨️ Query</b>]
+        Thinking{<b>🧠<br/>Pipeline<br/>Executor</b>}
+        ToolCall[<b>🔧 Tool</b>]
+        Answer[<b>📝 Answer</b>]
+
+        Query --> Thinking
+        Thinking -.->|<b>Action</b>| ToolCall
+        Thinking -.->|<b>Finish</b>| Answer
+        ToolCall -->|<b>Observation</b>| Thinking
+
+        subgraph MCPTools[MCP tools]
+            mcp_st[Sequential<br/>Thinking]
+            preprocessing["preprocessing tools<br/>(normalization,<br/>cell type analysis,<br/>spatial clustering)"]
+        end
+    end
+
+    save["save_results"]
+    __end__([<p>__end__</p>]):::last
+
+    %% === Edges ===
+
+    %% START → load_config
+    __start__ --> load_config
+
+    %% load_config → conditional
+    load_config -.->|<b>has config</b>| load_st
+    load_config -.->|<b>no config</b>| save
+
+    %% load_st → conditional
+    load_st -.->|<b>h5ad missing<br/>(loop)</b>| load_st
+    load_st -.->|<b>spot-based</b>| sc_ref
+    load_st -.->|<b>single-cell</b>| validate
+
+    %% SC ref resolution sub-tools
+    sc_mcp["visium_reference<br/>selector_mcp<br/>(OT ranking)"]
+    sc_skills["cellxgene-census<br/>skill<br/>(download)"]
+    sc_mcp -.-> sc_ref
+    sc_skills -.-> sc_ref
+
+    %% sc_ref → validate
+    sc_ref --> validate
+
+    %% validate → prep
+    validate --> prep
+
+    %% prep → conditional
+    prep -.->|<b>all MCP ready</b>| human_confirm
+    prep -.->|<b>MCP missing</b>| gen_mcp
+
+    %% gen_mcp → prep (re-check loop)
+    gen_mcp --> prep
+
+    %% MCP generation sub-tools
+    code2mcp["code2MCP<br/>(Python → FastMCP)"]
+    rmcpagent["rmcpagent<br/>(R package → MCP)"]
+    code2mcp -.-> gen_mcp
+    rmcpagent -.-> gen_mcp
+
+    %% human_confirm → execute
+    human_confirm --> Query
+
+    %% execute → save → END
+    Answer --> save
+    save --> __end__
+
+    %% === Styles ===
+    classDef default fill:#2d2d3d,stroke:#fff,stroke-width:2px,color:#fff
+    classDef first fill:#ff7f50,stroke:#fff,stroke-width:2px,color:#000
+    classDef last fill:#ffd700,stroke:#fff,stroke-width:2px,color:#000
+    classDef prepNode fill:#ab47bc,stroke:#fff,stroke-width:2px,color:#000
+    classDef humanNode fill:#4dabf7,stroke:#fff,stroke-width:2px,color:#000
+    classDef thinkingNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
+    classDef queryNode fill:#ff7f50,stroke:#fff,stroke-width:2px,color:#000
+    classDef toolNode fill:#d3d3d3,stroke:#fff,stroke-width:2px,color:#000
+    classDef answerNode fill:#ffd700,stroke:#fff,stroke-width:2px,color:#000
+    classDef subtoolNode fill:#555577,stroke:#aaa,stroke-width:1px,color:#ddd
+
+    class load_config,load_st,sc_ref,validate,prep,gen_mcp,save prepNode
+    class human_confirm humanNode
+    class Query queryNode
+    class Thinking thinkingNode
+    class ToolCall,MCPTools toolNode
+    class Answer answerNode
+    class sc_mcp,sc_skills,code2mcp,rmcpagent subtoolNode

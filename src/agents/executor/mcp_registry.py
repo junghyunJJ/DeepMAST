@@ -123,6 +123,34 @@ STEP_REGISTRIES: dict[str, dict[str, tuple[str, dict[str, Any]]]] = {
 # Methods that require a single-cell reference dataset
 DECONVOLUTION_METHODS: set[str] = {"iris", "cell2location", "tangram"}
 
+# ---------------------------------------------------------------------------
+# Dynamic registry (populated at runtime by generate_mcp node)
+# ---------------------------------------------------------------------------
+
+_DYNAMIC_REGISTRY: dict[str, dict[str, tuple[str, dict[str, Any]]]] = {
+    "normalization": {},
+    "celltype_analysis": {},
+    "spatial_clustering": {},
+}
+
+
+def register_dynamic_mcp(
+    step: str,
+    method: str,
+    server_key: str,
+    config: dict[str, Any],
+) -> None:
+    """Register a dynamically generated MCP server config at runtime."""
+    if step not in _DYNAMIC_REGISTRY:
+        raise KeyError(f"Unknown step: {step!r}. Valid: {list(_DYNAMIC_REGISTRY)}")
+    _DYNAMIC_REGISTRY[step][method.lower()] = (server_key, config)
+
+
+def clear_dynamic_registry() -> None:
+    """Clear all dynamically registered MCP configs (for testing)."""
+    for step_dict in _DYNAMIC_REGISTRY.values():
+        step_dict.clear()
+
 
 # ---------------------------------------------------------------------------
 # Public helpers
@@ -132,30 +160,48 @@ def get_mcp_server_config(
     step: str,
     method: str,
 ) -> tuple[str, dict[str, Any]]:
-    """Look up MCP server config for a pipeline step + method.
+    """Look up MCP server config: static registry first, then dynamic.
 
     Args:
-        step: One of ``"normalization"``, ``"celltype_analysis"``, ``"spatial_clustering"``.
-        method: Method name (case-insensitive), e.g. ``"log"``, ``"IRIS"``.
+        step: One of "normalization", "celltype_analysis", "spatial_clustering".
+        method: Method name (case-insensitive).
 
     Returns:
-        ``(server_key, config_dict)`` suitable for passing to
-        ``MultiServerMCPClient({server_key: config_dict})``.
+        (server_key, config_dict) for MultiServerMCPClient.
 
     Raises:
-        KeyError: If *step* or *method* is not found in the registry.
+        KeyError: If not found in either registry.
     """
-    registry = STEP_REGISTRIES.get(step)
-    if registry is None:
-        raise KeyError(f"Unknown pipeline step: {step!r}. Valid steps: {list(STEP_REGISTRIES)}")
+    method_lower = method.lower()
 
-    entry = registry.get(method.lower())
-    if entry is None:
-        raise KeyError(
-            f"Unknown method {method!r} for step {step!r}. "
-            f"Valid methods: {list(registry)}"
-        )
-    return entry
+    # 1. Static registry
+    static_reg = STEP_REGISTRIES.get(step)
+    if static_reg:
+        entry = static_reg.get(method_lower)
+        if entry is not None:
+            return entry
+
+    # 2. Dynamic registry
+    dynamic_reg = _DYNAMIC_REGISTRY.get(step, {})
+    entry = dynamic_reg.get(method_lower)
+    if entry is not None:
+        return entry
+
+    # 3. Not found
+    all_methods = list((static_reg or {}).keys()) + list(dynamic_reg.keys())
+    raise KeyError(
+        f"Unknown method {method!r} for step {step!r}. "
+        f"Available methods: {all_methods}"
+    )
+
+
+def has_mcp_server_config(step: str, method: str) -> bool:
+    """Check if an MCP config exists for step+method (static or dynamic)."""
+    try:
+        get_mcp_server_config(step, method)
+        return True
+    except KeyError:
+        return False
 
 
 def is_deconvolution_method(method: str) -> bool:
@@ -180,6 +226,30 @@ def get_sc_reference_server_config() -> tuple[str, dict[str, Any]]:
     )
 
 
+def get_visium_ref_selector_config() -> tuple[str, dict[str, Any]]:
+    """Return MCP config for the Visium reference selector server.
+
+    Uses OTT-JAX optimal transport to rank SC reference datasets.
+    """
+    python_path = os.getenv(
+        "VISIUM_REF_MCP_PYTHON",
+        "python",
+    )
+    server_path = os.getenv(
+        "VISIUM_REF_MCP_PATH",
+        "/Users/jungj2/Dropbox/Metadata/mcp/visium_reference_selector_mcp",
+    )
+    return (
+        "visium-reference-selector",
+        {
+            "command": python_path,
+            "args": ["-m", "visium_reference_selector.server"],
+            "env": {"PYTHONPATH": f"{server_path}/src"},
+            "transport": "stdio",
+        },
+    )
+
+
 __all__ = [
     "NORMALIZATION_REGISTRY",
     "CELLTYPE_REGISTRY",
@@ -187,6 +257,10 @@ __all__ = [
     "STEP_REGISTRIES",
     "DECONVOLUTION_METHODS",
     "get_mcp_server_config",
+    "has_mcp_server_config",
     "is_deconvolution_method",
     "get_sc_reference_server_config",
+    "get_visium_ref_selector_config",
+    "register_dynamic_mcp",
+    "clear_dynamic_registry",
 ]
