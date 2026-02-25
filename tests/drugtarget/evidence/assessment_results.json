@@ -1,0 +1,218 @@
+{
+  "CD44": {
+    "existing_drug_evidence": {
+      "score": 1,
+      "rationale": "Some indirect evidence of drugs targeting CD44 or its pathways in cancer, but no approved drugs specifically for breast cancer targeting CD44."
+    },
+    "clinical_trial_activity": {
+      "score": 1,
+      "rationale": "Few early phase clinical trials targeting CD44 or related pathways in breast cancer."
+    },
+    "mechanism_relevance": {
+      "score": 3,
+      "rationale": "CD44 is directly involved in cell adhesion and migration, key in tumor microenvironment and L-R interactions."
+    },
+    "safety_profile": {
+      "score": 0,
+      "rationale": "Minimal known safety concerns from targeting CD44 in clinical contexts."
+    },
+    "gwas_genetic_support": {
+      "score": 1,
+      "rationale": "Suggestive GWAS signals linking CD44 to breast cancer risk or progression."
+    },
+    "tractability": {
+      "score": 1,
+      "rationale": "Predicted druggable target, but no clinical precedent for direct targeting."
+    },
+    "biological_plausibility": {
+      "score": 3,
+      "rationale": "Strong biological rationale with multiple lines of evidence supporting CD44 role in breast cancer."
+    },
+    "novelty_opportunity": {
+      "score": 2,
+      "rationale": "Emerging target with growing interest but not fully established."
+    },
+    "classification": "validated_target",
+    "priority": "high"
+  },
+  "FLT1": {
+    "existing_drug_evidence": {
+      "score": 3,
+      "rationale": "Approved drugs (e.g., anti-VEGFR therapies) target FLT1 in cancer."
+    },
+    "clinical_trial_activity": {
+      "score": 3,
+      "rationale": "Extensive clinical trial activity with multiple advanced phase trials."
+    },
+    "mechanism_relevance": {
+      "score": 3,
+      "rationale": "Direct mechanism in angiogenesis and L-R signaling relevant to breast cancer."
+    },
+    "safety_profile": {
+      "score": -1,
+      "rationale": "Moderate safety concerns due to vascular effects of anti-angiogenic drugs."
+    },
+    "gwas_genetic_support": {
+      "score": 2,
+      "rationale": "Genome-wide significant GWAS signals implicate FLT1."
+    },
+    "tractability": {
+      "score": 3,
+      "rationale": "Approved modality targeting FLT1 exists."
+    },
+    "biological_plausibility": {
+      "score": 3,
+      "rationale": "Compelling multi-evidence biological plausibility."
+    },
+    "novelty_opportunity": {
+      "score": 0,
+      "rationale": "Well-established target, not novel."
+    },
+    "classification": "validated_target",
+    "priority": "high"
+  },
+  "SPP1": {
+    "existing_drug_evidence": {
+      "score": 0,
+      "rationale": "No known drugs directly targeting SPP1."
+    },
+    "clinical_trial_activity": {
+      "score": 0,
+      "rationale": "No active clinical trials targeting SPP1."
+    },
+    "mechanism_relevance": {
+      "score": 2,
+      "rationale": "Well-supported mechanism in tumor progression and L-R interactions."
+    },
+    "safety_profile": {
+      "score": 0,
+      "rationale": "Minimal safety concerns known."
+    },
+    "gwas_genetic_support": {
+      "score": 1,
+      "rationale": "Suggestive GWAS evidence."
+    },
+    "tractability": {
+      "score": 1,
+      "rationale": "Predicted druggable."
+    },
+    "biological_plausibility": {
+      "score": 3,
+      "rationale": "Strong biological rationale."
+    },
+    "novelty_opportunity": {
+      "score": 3,
+      "rationale": "Novel emerging target."
+    },
+    "classification": "exploratory_target",
+    "priority": "medium"
+  },
+  "TGFB1": {
+    "existing_drug_evidence": {
+      "score": 2,
+      "rationale": "Drugs in Phase 1-2 trials targeting TGFB1 pathway."
+    },
+    "clinical_trial_activity": {
+      "score": 2,
+      "rationale": "Multiple early to mid-phase trials ongoing."
+    },
+    "mechanism_relevance": {
+      "score": 3,
+      "rationale": "Direct mechanism in TGF-beta signaling and L-R interactions."
+    },
+    "safety_profile": {
+      "score": -1,
+      "rationale": "Moderate safety concerns due to pleiotropic effects."
+    },
+    "gwas_genetic_support": {
+      "score": 1,
+      "rationale": "Suggestive GWAS support."
+    },
+    "tractability": {
+      "score": 2,
+      "rationale": "Clinical precedent for targeting TGF-beta pathway."
+    },
+    "biological_plausibility": {
+      "score": 3,
+      "rationale": "Compelling multi-evidence biological plausibility."
+    },
+    "novelty_opportunity": {
+      "score": 1,
+      "rationale": "Moderately explored target."
+    },
+    "classification": "validated_target",
+    "priority": "high"
+  },
+  "TGFBR2": {
+    "existing_drug_evidence": {
+      "score": 1,
+      "rationale": "Indirect evidence from drugs targeting TGF-beta receptors."
+    },
+    "clinical_trial_activity": {
+      "score": 1,
+      "rationale": "Few early phase trials."
+    },
+    "mechanism_relevance": {
+      "score": 3,
+      "rationale": "Direct mechanism in receptor-mediated TGF-beta signaling."
+    },
+    "safety_profile": {
+      "score": -1,
+      "rationale": "Moderate safety concerns."
+    },
+    "gwas_genetic_support": {
+      "score": 1,
+      "rationale": "Suggestive GWAS evidence."
+    },
+    "tractability": {
+      "score": 2,
+      "rationale": "Clinical precedent for receptor targeting."
+    },
+    "biological_plausibility": {
+      "score": 3,
+      "rationale": "Strong biological rationale."
+    },
+    "novelty_opportunity": {
+      "score": 1,
+      "rationale": "Moderately explored."
+    },
+    "classification": "validated_target",
+    "priority": "medium"
+  },
+  "VEGFA": {
+    "existing_drug_evidence": {
+      "score": 3,
+      "rationale": "Approved drugs targeting VEGFA (e.g., bevacizumab)."
+    },
+    "clinical_trial_activity": {
+      "score": 3,
+      "rationale": "Extensive clinical trial activity."
+    },
+    "mechanism_relevance": {
+      "score": 3,
+      "rationale": "Direct mechanism in angiogenesis and L-R signaling."
+    },
+    "safety_profile": {
+      "score": -1,
+      "rationale": "Moderate safety concerns from anti-angiogenic therapy."
+    },
+    "gwas_genetic_support": {
+      "score": 2,
+      "rationale": "Genome-wide significant GWAS signals."
+    },
+    "tractability": {
+      "score": 3,
+      "rationale": "Approved modality."
+    },
+    "biological_plausibility": {
+      "score": 3,
+      "rationale": "Compelling evidence."
+    },
+    "novelty_opportunity": {
+      "score": 0,
+      "rationale": "Well-established target."
+    },
+    "classification": "validated_target",
+    "priority": "high"
+  }
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "ligand": "TGFB1",
+    "receptor": "TGFBR2"
+  },
+  {
+    "ligand": "SPP1",
+    "receptor": "CD44"
+  },
+  {
+    "ligand": "VEGFA",
+    "receptor": "FLT1"
+  }
+]

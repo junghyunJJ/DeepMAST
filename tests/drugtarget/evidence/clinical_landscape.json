@@ -1,0 +1,87 @@
+{
+  "drug_development_pipeline": {
+    "FLT1": {
+      "approved_drugs": [
+        "Anti-VEGFR therapies"
+      ],
+      "investigational_drugs": "Multiple advanced phase clinical trials ongoing",
+      "clinical_trial_activity": "Extensive clinical trial activity with multiple advanced phase trials"
+    },
+    "VEGFA": {
+      "approved_drugs": [
+        "Bevacizumab"
+      ],
+      "investigational_drugs": "Extensive clinical trial activity",
+      "clinical_trial_activity": "Extensive clinical trial activity"
+    },
+    "TGFB1": {
+      "approved_drugs": [],
+      "investigational_drugs": "Drugs in Phase 1-2 trials targeting TGFB1 pathway",
+      "clinical_trial_activity": "Multiple early to mid-phase trials ongoing"
+    },
+    "TGFBR2": {
+      "approved_drugs": [],
+      "investigational_drugs": "Few early phase trials",
+      "clinical_trial_activity": "Few early phase trials"
+    },
+    "CD44": {
+      "approved_drugs": [],
+      "investigational_drugs": "Few early phase clinical trials targeting CD44 or related pathways",
+      "clinical_trial_activity": "Few early phase clinical trials"
+    },
+    "SPP1": {
+      "approved_drugs": [],
+      "investigational_drugs": "No active clinical trials",
+      "clinical_trial_activity": "No active clinical trials"
+    }
+  },
+  "safety_assessment": {
+    "FLT1": {
+      "safety_profile": "Moderate safety concerns due to vascular effects of anti-angiogenic drugs",
+      "adverse_events": [
+        "Hypertension",
+        "Bleeding",
+        "Thromboembolism"
+      ],
+      "black_box_warnings": [
+        "Increased risk of severe bleeding and wound healing complications"
+      ]
+    },
+    "VEGFA": {
+      "safety_profile": "Moderate safety concerns from anti-angiogenic therapy",
+      "adverse_events": [
+        "Hypertension",
+        "Proteinuria",
+        "Hemorrhage"
+      ],
+      "black_box_warnings": [
+        "Severe bleeding risk"
+      ]
+    },
+    "TGFB1": {
+      "safety_profile": "Moderate safety concerns due to pleiotropic effects",
+      "adverse_events": [
+        "Cardiac toxicity",
+        "Immunosuppression"
+      ],
+      "black_box_warnings": []
+    },
+    "TGFBR2": {
+      "safety_profile": "Moderate safety concerns",
+      "adverse_events": [
+        "Immunosuppression"
+      ],
+      "black_box_warnings": []
+    },
+    "CD44": {
+      "safety_profile": "Minimal known safety concerns",
+      "adverse_events": [],
+      "black_box_warnings": []
+    },
+    "SPP1": {
+      "safety_profile": "Minimal safety concerns known",
+      "adverse_events": [],
+      "black_box_warnings": []
+    }
+  }
+}

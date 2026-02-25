@@ -1134,17 +1134,16 @@ Based on validation results:
 }
 ```
 
-### Phase 4.7: Drug Target Assessment (OpenTargets Platform)
+### Phase 4.7: Drug Target Assessment (DrugTargetAgent)
 
 **Purpose**: Evaluate the therapeutic potential of key genes identified in CCI analysis
-using the Open Targets Platform. This adds translational value by connecting L-R
-interaction findings to druggability, existing therapeutics, and repurposing opportunities.
+using a dedicated DrugTargetAgent. This agent queries OpenTargets, GWAS Catalog, ChEMBL,
+ClinicalTrials.gov, and FDA to provide comprehensive druggability assessment with
+clinical trial information and GWAS interpretation.
 
-#### Step 1: Comprehensive Target Assessment
+#### Step 1: Delegate to DrugTargetAgent
 
-Call **assess_therapeutic_potential** with:
-- `data_dir`: from /data_path.txt
-- `disease`: from /interpretation_guide.md (## Analysis Context or ## Target Configuration)
+Call **run_drug_target_assessment** with data_dir and disease:
 
 ```python
 # Read data directory (written by PLANNER)
@@ -1154,103 +1153,52 @@ data_path = read_file("/data_path.txt")
 guide = read_file("/interpretation_guide.md")
 # Extract disease from guide (e.g., "breast cancer")
 
-assess_therapeutic_potential(
+result = run_drug_target_assessment(
     data_dir=data_path.strip(),
     disease="<disease from guide>",
 )
 ```
 
-This tool will:
-1. Load **candidate L-R pair genes** from `lr_candidates.json` (written by INTERPRETER, top 15 pairs)
-2. Use candidate genes as the **primary Phase 4.7 input list**
-3. Query OpenTargets for each gene's druggability (tractability, safety, evidence)
-4. Find existing drugs for the disease that target these genes
-5. Collect fail-soft multi-source evidence:
-   - ChEMBL target hints (gene-level)
-   - ClinicalTrials.gov disease+drug trial counts
-   - DrugBank local lookup (if available)
-6. Score targets in **two tracks**:
-   - `Validated`: clinical-evidence centric
-   - `Exploratory`: genetic/biology-evidence centric
-7. Save complete results to `{data_dir}/therapeutic_targets.json`
-8. Save GWAS-focused outputs to `{data_dir}/therapeutic_targets_gwas.json` and `{data_dir}/synthesis_gwas.json`
-9. Include `gwas_direct_status` + `multi_source_status` in summary payload
+This tool delegates to the DrugTargetAgent which runs 3 subagents:
+1. **evidence_collector**: Queries OT, GWAS, ChEMBL, ClinicalTrials, FDA per gene
+2. **clinical_assessor**: Scores targets via validated/exploratory rubric tracks
+3. **report_writer**: Generates drug.md with ★ Featured Candidate emphasis
 
-**Fallback**: If `lr_candidates.json` is missing/empty, the tool falls back to
-`top_search_genes.json` + `selected_top3_lr.json`. If those are also unavailable, it
-falls back to extracting genes from `interest_sig_liana.csv` ranked by frequency × combined score.
+The result contains:
+- `drug_md`: Full content of drug.md (therapeutic assessment report)
+- `drug_md_path`: Path to the generated drug.md file
+- Selected top-3 L-R pairs are highlighted as ★ Featured Candidates throughout
 
-#### Step 2: Interpret Results (think_tool)
+#### Step 2: Integrate drug.md into synthesis
 
-Reflect on therapeutic findings:
+After receiving drug.md content:
+1. Read the `drug_md` field from the result
+2. Add a **### Therapeutic Implications** section to `/synthesis.md`
+   incorporating the key findings from drug.md (Executive Summary + Recommendations)
+3. Write `/synthesis_targets.json` with structured results for HTML report:
+
+```python
+write_file("/synthesis_targets.json", json.dumps({
+    "drug_md_available": True,
+    "drug_md_path": result["drug_md_path"],
+    "source": "DrugTargetAgent"
+}, indent=2))
+```
+
+#### Step 3: Reflect on findings (think_tool)
 
 ```
 think_tool(
-    reflection="Drug target assessment results: "
-               "{N} genes evaluated, {M} druggable targets found. "
-               "Key druggable L-R genes: {list}. "
-               "Existing drugs targeting CCI genes: {count}. "
-               "Novel targets (druggable, no disease association): {list}. "
-               "Safety concerns for top candidates: {summary}. "
-               "Therapeutic implications for the CCI findings: {interpretation}",
+    reflection="Drug target assessment completed via DrugTargetAgent. "
+               "Review drug.md findings: validated targets, exploratory targets, "
+               "GWAS evidence, clinical trial landscape, safety considerations. "
+               "How do these findings connect to our CCI interpretation?",
     iteration=1,
     max_iterations=2
 )
 ```
 
-Key questions to address:
-- Which L-R genes are druggable? (tractability modalities: small molecule, antibody, etc.)
-- Are there existing approved drugs targeting these genes?
-- Which L-R pairs represent novel drug targets (druggable but no known disease link)?
-- Are there drug repurposing candidates (drugs for other diseases targeting same genes)?
-- What safety concerns exist for top candidates?
-
-#### Step 3: Write Therapeutic Section
-
-Add a **### Therapeutic Implications** section to `/synthesis.md`:
-
-```markdown
-### Therapeutic Implications
-
-#### Druggable Targets
-- **{gene1}** (tractability: {modalities}): {interpretation of druggability in CCI context}
-- **{gene2}**: {interpretation}
-
-#### Existing Drugs
-- **{drug_name}** (Phase {N}): Targets {gene}, mechanism: {MOA}
-- **{drug_name2}**: {details}
-
-#### Novel Opportunities
-- **{gene}**: Druggable ({modality}) but no known {disease} association — potential novel target
-  based on its role in {L-R pair} signaling between {source_cell} and {target_cell}
-
-#### Drug Repurposing Candidates
-- **{drug}** (approved for {other_disease}): Targets {gene} which mediates
-  {L-R interaction} in the CCI analysis
-
-#### Safety Considerations
-- **{gene}**: {safety_liability_summary}
-```
-
-#### Step 4: Write synthesis_targets.json
-
-Write `/synthesis_targets.json` with structured results for HTML report generation:
-
-```python
-write_file("/synthesis_targets.json", json.dumps({
-    "druggable_targets": [...],
-    "known_drugs": [...],
-    "novel_targets": [...],
-    "summary": {
-        "total_genes_evaluated": N,
-        "druggable_count": M,
-        "known_drugs_count": K,
-        "novel_target_count": J
-    }
-}, indent=2))
-```
-
-**Note**: If `assess_therapeutic_potential` fails (e.g., OpenTargets API unavailable),
+**Note**: If `run_drug_target_assessment` fails (e.g., API unavailable),
 log the error and proceed to Phase 5. The Therapeutic Implications tab will show
 "No therapeutic analysis available" — this is acceptable as the drug target assessment
 is an enhancement, not a requirement.
@@ -1452,10 +1400,8 @@ The HTML report will have:
 ### Strategic Planning Tool
 - **think_tool**: Strategic planning (Step 2) and quality reflection (Step 4)
 
-### Drug Target Discovery Tools (for Phase 4.7)
-- **assess_therapeutic_potential**: One-stop comprehensive assessment — uses `lr_candidates.json` (top 15 pairs) as primary input, queries OpenTargets, merges GWAS direct+proxy, adds multi-source evidence (ChEMBL/ClinicalTrials/DrugBank fail-soft), computes Validated/Exploratory tracks, and writes therapeutic_targets.json + GWAS outputs
-- **search_drug_targets**: Query OpenTargets for specific genes' druggability (tractability, safety, evidence)
-- **search_known_drugs**: Find known drugs for a disease, optionally filtered by target genes
+### Drug Target Assessment (Phase 4.7)
+- **run_drug_target_assessment**: Delegates the full therapeutic target assessment to the DrugTargetAgent (3 subagents: evidence_collector → clinical_assessor → report_writer). Input: data_dir + disease. Output: drug.md content.
 
 ## Output Files Summary
 

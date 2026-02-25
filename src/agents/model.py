@@ -23,7 +23,7 @@ def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
         BaseChatModel instance
     """
     if provider is None:
-        provider = os.getenv("LLM_PROVIDER", "openrouter")
+        provider = os.getenv("LLM_PROVIDER", "openai")
     
     provider = provider.lower()
     

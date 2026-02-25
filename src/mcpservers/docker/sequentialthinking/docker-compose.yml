@@ -1,0 +1,7 @@
+services:
+  sequentialthinking:
+    build: .
+    container_name: sequentialthinking-server
+    ports:
+      - "8001:8001"
+    restart: unless-stopped

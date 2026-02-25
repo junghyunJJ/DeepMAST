@@ -1,0 +1,9 @@
+{
+  "pid": 81929,
+  "started_at": "2026-02-25T08:08:38.097Z",
+  "cwd": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST",
+  "notify_script": "/opt/homebrew/lib/node_modules/oh-my-codex/scripts/notify-hook.js",
+  "poll_ms": 700,
+  "tracked_files": 0,
+  "seen_turns": 0
+}

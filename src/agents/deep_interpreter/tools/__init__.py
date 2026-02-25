@@ -60,12 +60,6 @@ from src.agents.deep_interpreter.tools.standalone_fs import (
     write_file as standalone_write_file,
     read_file as standalone_read_file,
 )
-from src.agents.deep_interpreter.tools.drug_targets import (
-    search_drug_targets,
-    search_known_drugs,
-    assess_therapeutic_potential,
-)
-
 __all__ = [
     # Think tool (think_tool used by subagents; others exported for orchestrator-level use)
     "think_tool",
@@ -115,8 +109,4 @@ __all__ = [
     # Standalone filesystem tools
     "standalone_write_file",
     "standalone_read_file",
-    # Drug target discovery
-    "search_drug_targets",
-    "search_known_drugs",
-    "assess_therapeutic_potential",
 ]

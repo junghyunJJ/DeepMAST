@@ -1,0 +1,81 @@
+{
+  "disease": "breast cancer",
+  "disease_context": "Triple-negative breast cancer",
+  "pairs": [
+    {
+      "ligand": "TGFB1",
+      "receptor": "TGFBR2",
+      "score": 0.95
+    },
+    {
+      "ligand": "CDH1",
+      "receptor": "ITGB1",
+      "score": 0.92
+    },
+    {
+      "ligand": "SPP1",
+      "receptor": "CD44",
+      "score": 0.9
+    },
+    {
+      "ligand": "VEGFA",
+      "receptor": "FLT1",
+      "score": 0.88
+    },
+    {
+      "ligand": "WNT5A",
+      "receptor": "FZD7",
+      "score": 0.85
+    },
+    {
+      "ligand": "CXCL12",
+      "receptor": "CXCR4",
+      "score": 0.83
+    },
+    {
+      "ligand": "HGF",
+      "receptor": "MET",
+      "score": 0.8
+    },
+    {
+      "ligand": "FGF2",
+      "receptor": "FGFR1",
+      "score": 0.78
+    },
+    {
+      "ligand": "PDGFB",
+      "receptor": "PDGFRB",
+      "score": 0.76
+    },
+    {
+      "ligand": "BMP2",
+      "receptor": "BMPR1A",
+      "score": 0.74
+    },
+    {
+      "ligand": "EFNA1",
+      "receptor": "EPHA2",
+      "score": 0.72
+    },
+    {
+      "ligand": "JAG1",
+      "receptor": "NOTCH1",
+      "score": 0.7
+    },
+    {
+      "ligand": "DLL4",
+      "receptor": "NOTCH3",
+      "score": 0.68
+    },
+    {
+      "ligand": "GDF15",
+      "receptor": "GFRAL",
+      "score": 0.65
+    },
+    {
+      "ligand": "TNFSF10",
+      "receptor": "TNFRSF10B",
+      "score": 0.62
+    }
+  ]
+}

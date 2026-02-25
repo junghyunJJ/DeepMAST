@@ -9,7 +9,8 @@
     "Sub_Interpreter": "src.agents.deep_interpreter.graph_builder:interpreter_subagent_graph",
     "Sub_Reporter": "src.agents.deep_interpreter.graph_builder:reporter_subagent_graph",
     "Pipeline_executor": "src.agents.graph_builders:executor_graph",
-    "Supervisor": "src.agents.supervisor.graph_builder:supervisor_graph"
+    "Supervisor": "src.agents.supervisor.graph_builder:supervisor_graph",
+    "DrugTarget": "src.agents.drug_target.graph_builder:drug_target_graph"
   },
   "env": ".env"
 }

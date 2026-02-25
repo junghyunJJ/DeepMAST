@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1771832070146,
+  "lastScanned": 1772012204229,
   "projectRoot": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST",
   "techStack": {
     "languages": [
@@ -50,7 +50,7 @@
       "path": "agent-chat-ui",
       "purpose": null,
       "fileCount": 24,
-      "lastAccessed": 1771832070137,
+      "lastAccessed": 1772012204220,
       "keyFiles": [
         "LICENSE",
         "Makefile",
@@ -62,41 +62,34 @@
     "agent_architecture": {
       "path": "agent_architecture",
       "purpose": null,
-      "fileCount": 9,
-      "lastAccessed": 1771832070138,
+      "fileCount": 10,
+      "lastAccessed": 1772012204220,
       "keyFiles": [
         "1.pipeline_builder.mermaid",
         "1.pipeline_builder.png",
+        "2.new_pipeline_executor.mermaid",
         "2.pipeline_executor.mermaid",
-        "2.pipeline_executor.png",
-        "3.biological_interpretor.mermaid"
+        "2.pipeline_executor.png"
       ]
-    },
-    "docker": {
-      "path": "docker",
-      "purpose": null,
-      "fileCount": 0,
-      "lastAccessed": 1771832070138,
-      "keyFiles": []
     },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 13,
-      "lastAccessed": 1771832070138,
+      "fileCount": 16,
+      "lastAccessed": 1772012204220,
       "keyFiles": [
+        "2026-02-23-phase47-gwas-random-ligand-runbook.md",
         "Auto-save papers in search_literature_dynamic.md",
         "biomcp_vs_eutils_comparison.md",
         "context_window_token_analysis.md",
-        "fig_des copy.md",
-        "fig_des.md"
+        "fig_des copy.md"
       ]
     },
     "evaluation": {
       "path": "evaluation",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1771832070138,
+      "lastAccessed": 1772012204221,
       "keyFiles": [
         "README.md",
         "__init__.py",
@@ -109,7 +102,7 @@
       "path": "notebook",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1771832070138,
+      "lastAccessed": 1772012204221,
       "keyFiles": [
         "test_interpreter_steps.ipynb",
         "test_load_analysis_data.ipynb"
@@ -119,7 +112,7 @@
       "path": "old",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1771832070139,
+      "lastAccessed": 1772012204221,
       "keyFiles": [
         "st_pipeline_info_agent copy.py"
       ]
@@ -128,7 +121,7 @@
       "path": "order",
       "purpose": null,
       "fileCount": 9,
-      "lastAccessed": 1771832070139,
+      "lastAccessed": 1772012204222,
       "keyFiles": [
         "order_HITL",
         "order_deepagent",
@@ -141,7 +134,7 @@
       "path": "res",
       "purpose": null,
       "fileCount": 41,
-      "lastAccessed": 1771832070140,
+      "lastAccessed": 1772012204222,
       "keyFiles": [
         "1.spatial.png",
         "10.spatial_plot_interections.png",
@@ -153,8 +146,8 @@
     "res_bc": {
       "path": "res_bc",
       "purpose": null,
-      "fileCount": 49,
-      "lastAccessed": 1771832070140,
+      "fileCount": 52,
+      "lastAccessed": 1772012204223,
       "keyFiles": [
         "1.cluster_spatial.png",
         "10.spatial_plot_interections.png",
@@ -166,25 +159,26 @@
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 2,
-      "lastAccessed": 1771832070140,
+      "fileCount": 3,
+      "lastAccessed": 1772012204223,
       "keyFiles": [
         "__init__.py",
-        "regenerate_report.py"
+        "regenerate_report.py",
+        "run_drug_target_e2e.py"
       ]
     },
     "skills": {
       "path": "skills",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1771832070141,
+      "lastAccessed": 1772012204223,
       "keyFiles": []
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1771832070141,
+      "lastAccessed": 1772012204224,
       "keyFiles": [
         "__init__.py"
       ]
@@ -192,21 +186,21 @@
     "tests": {
       "path": "tests",
       "purpose": "Test files",
-      "fileCount": 17,
-      "lastAccessed": 1771832070141,
+      "fileCount": 20,
+      "lastAccessed": 1772012204224,
       "keyFiles": [
         "__init__.py",
         "test_data_dir_env_fix.py",
         "test_disease_synonyms.py",
-        "test_lit_benchmark_scripts.py",
-        "test_literature_dynamic_vs_baselines_smoke.ipynb"
+        "test_drug_target.py",
+        "test_drug_target_e2e.ipynb"
       ]
     },
     "evaluation/examples": {
       "path": "evaluation/examples",
       "purpose": "Example code",
       "fileCount": 1,
-      "lastAccessed": 1771832070142,
+      "lastAccessed": 1772012204224,
       "keyFiles": [
         "post_hitl_sample.json"
       ]
@@ -214,165 +208,165 @@
   },
   "hotPaths": [
     {
-      "path": "src/agents/deep_interpreter/subagents/prompts.py",
-      "accessCount": 33,
-      "lastAccessed": 1771847583926,
-      "type": "file"
-    },
-    {
-      "path": "src/agents/deep_interpreter/tools/lr_prioritizer.py",
-      "accessCount": 24,
-      "lastAccessed": 1771839751467,
-      "type": "file"
-    },
-    {
-      "path": "tests/deep_interpreter/test_lr_prioritizer.py",
-      "accessCount": 18,
-      "lastAccessed": 1771839025816,
-      "type": "file"
-    },
-    {
-      "path": "src/agents/deep_interpreter/tools/drug_targets.py",
-      "accessCount": 18,
-      "lastAccessed": 1771847571765,
-      "type": "file"
-    },
-    {
-      "path": "src/agents/deep_interpreter/tools/report.py",
-      "accessCount": 15,
-      "lastAccessed": 1771837546928,
-      "type": "directory"
-    },
-    {
-      "path": "",
-      "accessCount": 15,
-      "lastAccessed": 1771837567308,
-      "type": "directory"
-    },
-    {
-      "path": "docs/lr_filtering_pipeline.md",
+      "path": "src/agents/drug_target/agent.py",
       "accessCount": 12,
-      "lastAccessed": 1771839734238,
+      "lastAccessed": 1772050659894,
       "type": "file"
     },
     {
-      "path": "skills/opentargets-database/scripts/query_opentargets.py",
-      "accessCount": 10,
-      "lastAccessed": 1771847546528,
+      "path": "src/agents/drug_target/subagents/prompts.py",
+      "accessCount": 11,
+      "lastAccessed": 1772050667196,
       "type": "file"
     },
     {
-      "path": "src/agents/deep_interpreter/subagents/configs.py",
-      "accessCount": 8,
-      "lastAccessed": 1771847540994,
+      "path": "src/agents/drug_target/tools/evidence_loader.py",
+      "accessCount": 5,
+      "lastAccessed": 1772050673707,
       "type": "file"
     },
     {
-      "path": "scripts/regenerate_report.py",
-      "accessCount": 7,
-      "lastAccessed": 1771837539799,
+      "path": "src/agents/model.py",
+      "accessCount": 4,
+      "lastAccessed": 1772015677183,
       "type": "file"
     },
     {
-      "path": "src/agents/deep_interpreter/tools/__init__.py",
-      "accessCount": 7,
-      "lastAccessed": 1771847545602,
-      "type": "file"
-    },
-    {
-      "path": "src",
+      "path": "tests/drugtarget/drug.md",
       "accessCount": 3,
-      "lastAccessed": 1771837522003,
-      "type": "directory"
-    },
-    {
-      "path": "src/agents/deep_interpreter/tools/data_loader.py",
-      "accessCount": 2,
-      "lastAccessed": 1771835513115,
+      "lastAccessed": 1772045682843,
       "type": "file"
     },
     {
-      "path": "skills/opentargets-database/SKILL.md",
-      "accessCount": 2,
-      "lastAccessed": 1771836912467,
+      "path": "src/agents/drug_target/subagents/configs.py",
+      "accessCount": 3,
+      "lastAccessed": 1772050666750,
       "type": "file"
     },
     {
-      "path": "skills/html-report-generator/SKILL.md",
-      "accessCount": 2,
-      "lastAccessed": 1771836917585,
+      "path": "src/agents/drug_target/tools/common.py",
+      "accessCount": 3,
+      "lastAccessed": 1772050673218,
       "type": "file"
-    },
-    {
-      "path": "skills/html-report-generator/assets/theme.css",
-      "accessCount": 2,
-      "lastAccessed": 1771837528014,
-      "type": "directory"
-    },
-    {
-      "path": "skills/html-report-generator/templates/report.html.j2",
-      "accessCount": 2,
-      "lastAccessed": 1771837546123,
-      "type": "directory"
     },
     {
       "path": "src/agents/deep_interpreter",
       "accessCount": 2,
-      "lastAccessed": 1771847572631,
+      "lastAccessed": 1772013734140,
       "type": "directory"
     },
     {
-      "path": "skills/opentargets-database/references/api_reference.md",
-      "accessCount": 1,
-      "lastAccessed": 1771835975206,
+      "path": "src/agents/drug_target/rubric.py",
+      "accessCount": 2,
+      "lastAccessed": 1772050668127,
       "type": "file"
     },
     {
-      "path": "skills/opentargets-database/references/evidence_types.md",
-      "accessCount": 1,
-      "lastAccessed": 1771835975856,
+      "path": "src/agents/drug_target/integration.py",
+      "accessCount": 2,
+      "lastAccessed": 1772050668570,
       "type": "file"
     },
     {
-      "path": "skills/opentargets-database/references/target_annotations.md",
-      "accessCount": 1,
-      "lastAccessed": 1771835976286,
+      "path": "src/agents/drug_target/tools/__init__.py",
+      "accessCount": 2,
+      "lastAccessed": 1772050672660,
       "type": "file"
     },
     {
-      "path": "tests/test_reporter_phase5.py",
-      "accessCount": 1,
-      "lastAccessed": 1771836909528,
+      "path": "src/agents/drug_target/__init__.py",
+      "accessCount": 2,
+      "lastAccessed": 1772050674249,
       "type": "file"
     },
     {
-      "path": "tests/test_reporter.py",
-      "accessCount": 1,
-      "lastAccessed": 1771836909762,
+      "path": "src/agents/drug_target/tools/opentargets_tools.py",
+      "accessCount": 2,
+      "lastAccessed": 1772050675436,
       "type": "file"
     },
     {
-      "path": "skills/scanpy/SKILL.md",
-      "accessCount": 1,
-      "lastAccessed": 1771836923297,
+      "path": "src/agents/drug_target/tools/gwas_tools.py",
+      "accessCount": 2,
+      "lastAccessed": 1772050680272,
       "type": "file"
     },
     {
-      "path": "skills/biomedical-literature-search/SKILL.md",
-      "accessCount": 1,
-      "lastAccessed": 1771836930503,
+      "path": "src/agents/drug_target/tools/chembl_tools.py",
+      "accessCount": 2,
+      "lastAccessed": 1772050680844,
       "type": "file"
     },
     {
-      "path": "skills",
+      "path": "src/agents/drug_target/tools/clinical_trials_tools.py",
+      "accessCount": 2,
+      "lastAccessed": 1772050681337,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/drug_target/tools/fda_tools.py",
+      "accessCount": 2,
+      "lastAccessed": 1772050681946,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 2,
+      "lastAccessed": 1772050683465,
+      "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 2,
+      "lastAccessed": 1772050689389,
+      "type": "directory"
+    },
+    {
+      "path": "tests/test_drug_target.py",
       "accessCount": 1,
-      "lastAccessed": 1771837523217,
+      "lastAccessed": 1772012235072,
+      "type": "file"
+    },
+    {
+      "path": "src/base/util.py",
+      "accessCount": 1,
+      "lastAccessed": 1772012879215,
+      "type": "file"
+    },
+    {
+      "path": "src/base/base_agent.py",
+      "accessCount": 1,
+      "lastAccessed": 1772012879648,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/drug_target",
+      "accessCount": 1,
+      "lastAccessed": 1772013710247,
       "type": "directory"
     },
     {
       "path": "src/agents/deep_interpreter/tools",
       "accessCount": 1,
-      "lastAccessed": 1771847540471,
+      "lastAccessed": 1772013738832,
+      "type": "directory"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools/think.py",
+      "accessCount": 1,
+      "lastAccessed": 1772013742352,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/tools/quality.py",
+      "accessCount": 1,
+      "lastAccessed": 1772013742811,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/deep_interpreter/subagents",
+      "accessCount": 1,
+      "lastAccessed": 1772050688466,
       "type": "directory"
     }
   ],

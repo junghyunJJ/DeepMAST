@@ -24,3 +24,8 @@ dependencies = [
     "squidpy>=1.7.0",
     "sse-starlette>=2.0.0,<2.2.0",  # Pin for langgraph-api 0.6.x compatibility (has listen_for_exit_signal + send_timeout)
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "api: live external API connectivity tests (may be slow, requires network)",
+]

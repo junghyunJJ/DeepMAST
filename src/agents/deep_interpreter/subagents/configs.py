@@ -33,11 +33,13 @@ from src.agents.deep_interpreter.tools.lr_prioritizer import (
     prioritize_top_lr_pairs,
     save_selected_lr_pairs,
 )
-from src.agents.deep_interpreter.tools.drug_targets import (
-    assess_therapeutic_potential,
-    search_drug_targets,
-    search_known_drugs,
-)
+# Lazy import to break circular dependency chain:
+# deep_interpreter.subagents.configs → drug_target.integration
+#   → drug_target.agent → drug_target.subagents.configs → drug_target.tools.common
+#   → deep_interpreter.tools.think → deep_interpreter.__init__ (cycle)
+def _get_run_drug_target_assessment():
+    from src.agents.drug_target.integration import run_drug_target_assessment
+    return run_drug_target_assessment
 
 __all__ = [
     "get_subagents",
@@ -125,11 +127,11 @@ SUBAGENT_CONFIGS = {
             "validates synthesis claims with NEW literature search "
             "(following biomedical-literature-search workflow), and generates final HTML report. "
             "Phase 4.5 validates integration claims against independent literature sources. "
-            "Phase 4.7 assesses therapeutic potential of key CCI genes using OpenTargets Platform. "
+            "Phase 4.7 delegates drug target assessment to the DrugTargetAgent via "
+            "run_drug_target_assessment(data_dir, disease) which returns drug.md content. "
             "Falls back to abstract-based validation when RAG infrastructure unavailable. "
             "Outputs /synthesis.md, /synthesis_papers.json, /synthesis_validation.json, "
-            "/therapeutic_targets.json, /synthesis_targets.json, "
-            "and CCI_Analysis_Report.html (with Therapeutic Implications tab)."
+            "/drug.md, and CCI_Analysis_Report.html (with Therapeutic Implications tab)."
         ),
         "system_prompt": SUBAGENT_PROMPTS["reporter"],
         "tools": [
@@ -148,10 +150,8 @@ SUBAGENT_CONFIGS = {
             validate_claim_fulltext,
             # Think tool for strategic planning and reflection
             think_tool,
-            # Drug target discovery tools (Phase 4.7)
-            assess_therapeutic_potential,
-            search_drug_targets,
-            search_known_drugs,
+            # Drug target assessment (Phase 4.7) — delegates to DrugTargetAgent
+            # Injected lazily in get_subagents() to break circular import
         ],
     },
 }
@@ -181,6 +181,12 @@ def get_subagents(
         SUBAGENT_CONFIGS["interpreter"].copy(),
         SUBAGENT_CONFIGS["reporter"].copy(),
     ]
+
+    # Inject Drug Target Assessment tool into reporter (lazy to break circular import)
+    reporter = subagents[3]
+    reporter_tools = list(reporter.get("tools", []))
+    reporter_tools.append(_get_run_drug_target_assessment())
+    reporter["tools"] = reporter_tools
 
     # Add custom tools if provided
     if custom_tools:
@@ -268,17 +274,15 @@ Deep Interpreter 4-Agent Workflow:
      c. Search literature (search_literature_dynamic with integration-focused terms)
      d. Quality reflection (theme coverage, gap-filling)
      e. RAG validate & write (prepare_rag_literature, validate_claim_fulltext)
-   - **Phase 4.7: Drug Target Assessment (OpenTargets Platform)**
-     a. assess_therapeutic_potential (uses lr_candidates.json top-15 as primary L-R genes, queries OpenTargets, merges GWAS direct+proxy, adds ChEMBL/ClinicalTrials/DrugBank fail-soft evidence)
-     b. Interpret druggability findings (think_tool)
-     c. Write Therapeutic Implications section to /synthesis.md
-     d. Write /synthesis_targets.json for HTML report
-     e. Write GWAS-focused outputs /therapeutic_targets_gwas.json and /synthesis_gwas.json
-     f. Include Validated/Exploratory 2-track summaries in therapeutic outputs
+   - **Phase 4.7: Drug Target Assessment (DrugTargetAgent)**
+     a. run_drug_target_assessment(data_dir, disease) → delegates to DrugTargetAgent
+     b. DrugTargetAgent runs 3 subagents: evidence_collector → clinical_assessor → report_writer
+     c. Returns drug.md content with ★ Featured Candidate emphasis
+     d. Reporter integrates drug.md findings into synthesis.md + synthesis_targets.json
+     e. Reflect on findings (think_tool)
    - Generate HTML report (with Therapeutic Implications tab)
    - Outputs: /synthesis.md, /synthesis_papers.json, /synthesis_validation.json,
-     /therapeutic_targets.json, /therapeutic_targets_gwas.json, /synthesis_gwas.json,
-     /synthesis_targets.json, CCI_Analysis_Report.html
+     /drug.md, /synthesis_targets.json, CCI_Analysis_Report.html
    - Papers stored in: {data_path}/papers/synthesis/ (separate from Part papers)
 
 Hallucination Prevention (maintained):

@@ -1,0 +1,122 @@
+[
+  {
+    "symbol": "BMP2",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "BMPR1A",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "CD44",
+    "is_selected_top3": true
+  },
+  {
+    "symbol": "CDH1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "CXCL12",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "CXCR4",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "DLL4",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "EFNA1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "EPHA2",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "FGF2",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "FGFR1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "FLT1",
+    "is_selected_top3": true
+  },
+  {
+    "symbol": "FZD7",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "GDF15",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "GFRAL",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "HGF",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "ITGB1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "JAG1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "MET",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "NOTCH1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "NOTCH3",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "PDGFB",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "PDGFRB",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "SPP1",
+    "is_selected_top3": true
+  },
+  {
+    "symbol": "TGFB1",
+    "is_selected_top3": true
+  },
+  {
+    "symbol": "TGFBR2",
+    "is_selected_top3": true
+  },
+  {
+    "symbol": "TNFRSF10B",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "TNFSF10",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "VEGFA",
+    "is_selected_top3": true
+  },
+  {
+    "symbol": "WNT5A",
+    "is_selected_top3": false
+  }
+]
