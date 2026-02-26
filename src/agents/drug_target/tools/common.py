@@ -165,9 +165,58 @@ def sequential_thinking(
         logger.warning(f"Sequential thinking MCP failed: {e}")
         return f"[Planning thought {thought_number}/{total_thoughts}]: {thought}"
 
+@tool()
+def simple_reflection_tool(reflection: str) -> str:
+    """Force an explicit reflection step and log the agent's next intended action.
+
+    This tool should be called immediately after a search, retrieval, or any
+    major decision point (e.g., after reading a paper, running a database query,
+    or completing a scoring step). Its purpose is to make the agent externalize
+    its reasoning in a structured, auditable way before proceeding.
+
+    The tool itself is stateless — it does not persist the reflection anywhere.
+    It returns a confirmation string so that the reflection appears in the
+    agent's transcript or log, making the reasoning process transparent and
+    reviewable.
+
+    Use this tool to:
+    - Consolidate facts just learned (key findings, definitions, numeric values)
+    - Identify what is still unknown or ambiguous (missing evidence, unclear terms)
+    - Commit to a concrete next step (exact tool name + exact query string)
+
+    Args:
+        reflection (str): A concise but specific reflection with three components:
+            - Learned: Bullet-style facts or definitions discovered so far.
+            - Gap:     What evidence, data, or clarification is still missing.
+            - Next:    The precise next action — tool name and query/parameters.
+
+            Example format:
+                "Learned: PCSK9 inhibitors reduce LDL-C by ~60% in RCTs. "
+                "Gap: Need GWAS loci and eQTL co-localization data for PCSK9. "
+                "Next: gwas_search(gene='PCSK9', trait='LDL cholesterol')."
+
+    Returns:
+        str: A confirmation string of the form "Reflection recorded: <reflection>".
+             This string is intentionally visible in logs and transcripts so that
+             the structured reasoning can be audited or replayed.
+
+    Example:
+        >>> simple_reflection_tool.invoke({
+        ...     "reflection": (
+        ...         "Learned: GLP1R agonists lower HbA1c by ~1.5% and reduce "
+        ...         "cardiovascular events (LEADER trial). "
+        ...         "Gap: Missing expression data for GLP1R in pancreatic beta cells. "
+        ...         "Next: expression_search(gene='GLP1R', tissue='pancreas')."
+        ...     )
+        ... })
+        'Reflection recorded: Learned: GLP1R agonists...'
+    """
+    return f"Reflection recorded: {reflection}"
+
 
 __all__ = [
     "think_tool",
     "validate_quality",
     "sequential_thinking",
+    "simple_reflection_tool"
 ]
