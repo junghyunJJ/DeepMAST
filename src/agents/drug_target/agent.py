@@ -47,14 +47,19 @@ DEFAULT_SUBAGENT_SKILLSETS: dict[str, list[str]] = {
     "evidence_collector": [
         "opentargets-database",
         "gwas-database",
-        "chembl-database",
-        "clinicaltrials-database",
-        "fda-database",
+        "cellxgene-census",
+        "kegg-database",
+        "reactome-database",
+        "string-database",
+        "drugbank-database",
+        "pubmed-database",
+        "alphafold-database",
+        "diffdock",
+        "compare-census-gene-pair-by-cell-type",
     ],
     "clinical_assessor": [
         "gwas-database",
         "opentargets-database",
-        "clinicaltrials-database",
     ],
     "report_writer": [],
 }
@@ -228,7 +233,8 @@ Execute subagents strictly in this order via the `task` tool:
    from OpenTargets, GWAS, ChEMBL, ClinicalTrials.gov, FDA for each gene.
 2. **clinical_assessor**: Scores each target against the DRUG_TARGET_RUBRIC.
 3. **report_writer**: Generates drug.md with ★ Featured Candidate emphasis.
-   The report_writer MUST call `write_file` to save drug.md to the data directory.
+   The report_writer MUST first save target_assessment.json via
+   `save_target_assessment`, then call `write_file` to save drug.md.
 
 ## Input
 - lr_candidates.json: Top-15 L-R pairs from CCI analysis
@@ -236,6 +242,7 @@ Execute subagents strictly in this order via the `task` tool:
 - Disease context provided in initial message
 
 ## Output
+- target_assessment.json: Structured contract output (schema-aligned)
 - drug.md: Publication-quality therapeutic target assessment report
 - evidence/*.json: Intermediate evidence files
 

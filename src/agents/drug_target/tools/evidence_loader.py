@@ -10,6 +10,11 @@ import os
 from pathlib import Path
 
 from langchain_core.tools import tool
+from src.agents.drug_target.tools.stage_logic import (
+    classify_disease_type,
+    infer_oncology_flag,
+    normalize_st_colocalization_score,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +63,11 @@ def load_lr_candidates(data_dir: str) -> str:
         "lr_pairs": [],
         "selected_top3": [],
         "selected_top3_genes": [],
+        "interest_celltypes": [],
+        "targets_json_found": False,
         "disease": "",
+        "disease_type": "unknown",
+        "oncology_flag": False,
         "errors": [],
     }
 
@@ -77,6 +86,8 @@ def load_lr_candidates(data_dir: str) -> str:
 
     # Extract disease context
     result["disease"] = lr_data.get("disease", lr_data.get("disease_context", ""))
+    result["disease_type"] = classify_disease_type(result["disease"])
+    result["oncology_flag"] = infer_oncology_flag(result["disease"])
 
     # Extract L-R pairs and gene symbols
     pairs = lr_data.get("pairs", lr_data.get("lr_pairs", lr_data.get("candidates", [])))
@@ -92,6 +103,12 @@ def load_lr_candidates(data_dir: str) -> str:
             "ligand": ligand,
             "receptor": receptor,
             "score": pair.get("score", pair.get("rank_score")),
+            "st_colocalization_score": normalize_st_colocalization_score(
+                pair.get(
+                    "st_colocalization_score",
+                    pair.get("score", pair.get("rank_score")),
+                )
+            ),
         })
 
     # Load selected_top3_lr.json
@@ -120,6 +137,23 @@ def load_lr_candidates(data_dir: str) -> str:
 
     result["gene_symbols"] = sorted(all_genes)
     result["selected_top3_genes"] = sorted(top3_genes)
+
+    # Load optional targets.json for user-selected interest cell types
+    targets_path = base / "targets.json"
+    if targets_path.exists():
+        result["targets_json_found"] = True
+        try:
+            with open(targets_path) as f:
+                targets_data = json.load(f)
+            interest = targets_data.get("interest_celltypes", [])
+            if isinstance(interest, str):
+                interest = [interest]
+            if isinstance(interest, list):
+                result["interest_celltypes"] = [
+                    str(x).strip() for x in interest if str(x).strip()
+                ]
+        except Exception as e:
+            result["errors"].append(f"Failed to parse targets.json: {e}")
 
     # Mark each gene with is_selected_top3
     result["gene_details"] = []

@@ -38,6 +38,7 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
     """
     resolved_dir = str(Path(data_dir).expanduser().resolve())
     drug_md_path = Path(resolved_dir) / "drug.md"
+    target_assessment_path = Path(resolved_dir) / "target_assessment.json"
 
     # Check prerequisite files
     lr_path = Path(resolved_dir) / "lr_candidates.json"
@@ -67,7 +68,7 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
             f"Assess therapeutic potential of L-R pair genes in {resolved_dir}.\n\n"
             f"Disease context: {disease}\n"
             f"Input files: lr_candidates.json, selected_top3_lr.json\n"
-            f"Output: drug.md\n\n"
+            f"Output: target_assessment.json and drug.md\n\n"
             f"Execute the full evidence_collector → clinical_assessor → report_writer pipeline."
         )
 
@@ -85,10 +86,24 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
         # Read drug.md
         if drug_md_path.exists():
             content = drug_md_path.read_text()
+            target_assessment = None
+            if target_assessment_path.exists():
+                try:
+                    target_assessment = json.loads(target_assessment_path.read_text())
+                except Exception as parse_err:
+                    logger.warning(
+                        "Failed to parse target_assessment.json at %s: %s",
+                        target_assessment_path,
+                        parse_err,
+                    )
             return json.dumps({
                 "success": True,
                 "drug_md": content,
                 "drug_md_path": str(drug_md_path),
+                "target_assessment": target_assessment,
+                "target_assessment_path": (
+                    str(target_assessment_path) if target_assessment_path.exists() else None
+                ),
             })
         else:
             return json.dumps({

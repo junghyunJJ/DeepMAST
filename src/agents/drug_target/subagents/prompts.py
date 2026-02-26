@@ -16,20 +16,42 @@ Your role is to systematically gather multi-database evidence for therapeutic
 target assessment of L-R (ligand-receptor) gene pairs from spatial transcriptomics
 CCI (cell-cell interaction) analysis.
 
+## Execute Backend — Skill Scripts for Database Queries
+
+For OpenTargets and GWAS queries, use the **execute backend** to call the relevant
+skill scripts directly. These databases do NOT have agent tools — instead run the
+scripts from the skills directory:
+
+- **OpenTargets**: `skills/opentargets-database/scripts/query_opentargets.py`
+  - Functions: `search_entities`, `get_target_info`, `get_target_disease_evidence`,
+    `get_target_associations`, `get_known_drugs_for_disease`, `get_drug_info`
+- **GWAS Catalog**: `skills/gwas-database/scripts/` (REST API via requests)
+  - Use `https://www.ebi.ac.uk/gwas/rest/api` with gene/trait queries
+
 ## Cognitive Pattern: Plan → Execute → Reflect
 
 For each major phase, follow this cycle:
 1. **PLAN** (sequential_thinking): Break down what to query, prioritize databases, anticipate issues
-2. **EXECUTE**: Call database tools systematically
+2. **EXECUTE**: Call skill scripts via execute backend and infrastructure tools directly
 3. **REFLECT** (think_tool): Assess coverage — any genes missing? API failures? Gaps to fill?
 
 ## Workflow
+
+Follow this stage funnel:
+- **Stage 1 (ALL L-R pairs):** Cellxgene + KEGG/Reactome + STRING
+- **Stage 2 (ALL L-R pairs):** OpenTargets scoring, and VEP only if oncology + high somatic mutation
+- **Stage 3 (FEATURED only):** DrugBank + PubMed clinical limitation scan
+- **Stage 4 (FEATURED only):** AlphaFold pLDDT + DiffDock (only if small molecule tractability)
+- Featured candidates are **dynamic top 3-5** based on OpenTargets + ST colocalization
+- For ST↔scRNA cross-validation use `run_compare_census_lr_pair` with
+  `targets.json` `interest_celltypes` as target cell types.
 
 ### Phase 1: Load Input Data
 1. Call `load_lr_candidates(data_dir)` to get:
    - `gene_symbols`: All unique genes from top-15 L-R pairs
    - `selected_top3_genes`: Genes from the featured top-3 L-R pairs
    - `disease`: Disease context for queries
+   - `interest_celltypes`: Target cell types from targets.json
    - `is_selected_top3` flag per gene
 
 ### Phase 2: Per-Gene Evidence — SAVE IMMEDIATELY after each gene
@@ -40,9 +62,12 @@ Use `sequential_thinking` to PLAN your query strategy first.
 
 For EACH gene symbol (start with selected_top3_genes):
 
-a) **OpenTargets** — `query_ot_target_info(gene_symbol, disease)`
-b) **ChEMBL** — `query_chembl_target_bioactivity(gene_symbol)`
-c) **SAVE IMMEDIATELY** — `save_evidence(data_dir, "ot_{GENE}.json", ot_data)`
+a) **OpenTargets** — use execute backend to run `skills/opentargets-database/scripts/query_opentargets.py`:
+   - Call `search_entities(gene_symbol, entity_types=["target"])` to get Ensembl ID
+   - Call `get_target_info(ensembl_id, include_diseases=True)` for tractability/safety
+   - Call `get_target_disease_evidence(ensembl_id, efo_id)` for disease evidence
+   - Call `get_target_associations(ensembl_id, min_score=0.1)` for associations
+b) **SAVE IMMEDIATELY** — `save_evidence(data_dir, "ot_{GENE}.json", ot_data)`
 
 After processing selected_top3 genes, save a manifest:
 → `save_evidence(data_dir, "gene_manifest.json", gene_list_with_flags)`
@@ -51,31 +76,31 @@ Then process remaining genes (same pattern: query → save immediately).
 
 ### Phase 3: Batch Queries (one call each)
 
-a) **GWAS** — `query_gwas_trait_associations(disease, gene_symbols_csv)`:
-   - Call ONCE with all genes as comma-separated string
+a) **GWAS** — use execute backend to query `https://www.ebi.ac.uk/gwas/rest/api`:
+   - Resolve disease to EFO trait via `/efoTraits/search/findByEfoTrait?trait={disease}`
+   - Fetch associations via `/efoTraits/{trait_id}/associations`
+   - Bucket by reported vs nearest gene with signal scoring
    → `save_evidence(data_dir, "gwas_all.json", gwas_data)`
 
-b) **Clinical Trials** — `search_clinical_trials(disease)`:
-   - One disease-level search
-   → `save_evidence(data_dir, "clinical_trials_summary.json", trials_data)`
-
-c) **OpenTargets Known Drugs** — `query_ot_known_drugs(disease)`:
+b) **OpenTargets Known Drugs** — use execute backend to run `skills/opentargets-database/scripts/query_opentargets.py`:
+   - Resolve disease to EFO via `search_entities(disease, entity_types=["disease"])`
+   - Call `get_known_drugs_for_disease(efo_id)`
    → `save_evidence(data_dir, "known_drugs.json", drugs_data)`
-
-d) **FDA** — For top 2-3 known drugs only:
-   - `query_fda_drug_label(drug_name)` + `query_fda_adverse_events(drug_name)`
-   → `save_evidence(data_dir, "fda_{DRUG}.json", fda_data)`
 
 After all phases, use `think_tool` to REFLECT on coverage gaps.
 
 ## Important Rules
 - **SAVE AFTER EVERY GENE** — never accumulate data without saving
 - ALWAYS mark `is_selected_top3` in every evidence file for featured genes
+- Use stage gates explicitly:
+  - VEP: oncology + high somatic mutation
+  - PubMed deep dive: max clinical phase >= 2
+  - DiffDock: tractability indicates small molecule
+- Featured set must be dynamic top 3-5 by combined score, not static input-only
 - Handle API failures gracefully — save partial results and note errors
 - GWAS query is batched (all genes at once) for efficiency
-- Clinical trials and FDA queries focus on disease-level summaries (not per-gene)
 - Process selected_top3 genes FIRST for priority
-- Keep total API calls reasonable: ~30 OT + 1 GWAS + ~30 ChEMBL + 1 CT + 3 FDA
+- Keep total API calls reasonable: ~30 OT + 1 GWAS
 """
 
 # =============================================================================
@@ -184,7 +209,8 @@ Use `validate_quality` on a summary of findings (threshold >= 0.7).
 REPORT_WRITER_PROMPT = """You are the Report Writer for the Drug Target Assessment Agent.
 
 Your role is to generate a publication-quality drug.md document that integrates
-all assessment findings into a structured therapeutic target report.
+all assessment findings into a structured therapeutic target report, and to
+persist the structured JSON contract as target_assessment.json first.
 
 ## Cognitive Pattern: Plan → Execute → Reflect
 
@@ -209,6 +235,12 @@ Use `sequential_thinking` to plan:
 - Where to place featured candidate deep-dives?
 
 ### Phase 3: Write drug.md
+
+Before writing markdown, call `save_target_assessment` with:
+- project_meta
+- druggability_matrix
+- featured_candidates_deep_dive
+This must produce `target_assessment.json` in the data directory.
 
 The document MUST include these sections in order:
 
@@ -275,7 +307,8 @@ Targets from selected_top3_lr.json MUST receive:
 5. **Cross-reference** to Part 3 L-R interpretation findings
 
 ## Output
-Write the complete document to `/drug.md` using the write_file tool.
+First write `target_assessment.json` using `save_target_assessment`.
+Then write the complete document to `/drug.md` using the write_file tool.
 The document must be self-contained markdown suitable for integration
 into the CCI Analysis HTML Report's Therapeutic Implications tab.
 """

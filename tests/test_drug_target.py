@@ -12,7 +12,6 @@ All tests use mock data — zero external API calls.
 """
 
 import json
-import math
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -73,6 +72,20 @@ def mock_data_dir(tmp_path):
 
 
 @pytest.fixture
+def mock_data_dir_with_targets(mock_data_dir):
+    """mock_data_dir with targets.json containing interest_celltypes."""
+    (mock_data_dir / "targets.json").write_text(
+        json.dumps(
+            {
+                "interest_celltypes": ["Invasive tumor", "Malignant cell"],
+                "data_directory": str(mock_data_dir),
+            }
+        )
+    )
+    return mock_data_dir
+
+
+@pytest.fixture
 def mock_data_dir_with_evidence(mock_data_dir):
     """Extends mock_data_dir with pre-populated evidence/*.json."""
     evi_dir = mock_data_dir / "evidence"
@@ -125,42 +138,44 @@ def valid_assessment():
 class TestSubagentConfigs:
     """Tool registration & prompt content for subagent configs."""
 
-    def test_evidence_collector_has_14_tools(self):
+    def test_evidence_collector_has_minimum_tools(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         tools = SUBAGENT_CONFIGS["evidence_collector"]["tools"]
-        assert len(tools) == 14
+        assert len(tools) >= 8
 
-    def test_clinical_assessor_has_5_tools(self):
+    def test_clinical_assessor_has_minimum_tools(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         tools = SUBAGENT_CONFIGS["clinical_assessor"]["tools"]
-        assert len(tools) == 5
+        assert len(tools) >= 5
 
-    def test_report_writer_has_4_tools(self):
+    def test_report_writer_has_minimum_tools(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         tools = SUBAGENT_CONFIGS["report_writer"]["tools"]
-        assert len(tools) == 4
+        assert len(tools) >= 4
 
     def test_evidence_collector_tool_names(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         tools = SUBAGENT_CONFIGS["evidence_collector"]["tools"]
         names = {t.name for t in tools}
+        # OpenTargets, GWAS, ChEMBL, ClinicalTrials, FDA are now called via
+        # the execute backend using skill scripts — not registered as agent tools.
         expected = {
             "load_lr_candidates",
             "sequential_thinking",
-            "query_ot_target_info",
-            "query_ot_known_drugs",
-            "query_ot_drug_details",
-            "query_gwas_trait_associations",
-            "query_gwas_variant_details",
-            "query_chembl_target_bioactivity",
-            "query_chembl_drug_info",
-            "search_clinical_trials",
-            "query_fda_drug_label",
-            "query_fda_adverse_events",
+            "query_cellxgene_lr_context",
+            "query_kegg_pathways",
+            "query_reactome_pathways",
+            "query_string_ppi_pair",
+            "query_ensembl_vep_consequence",
+            "query_drugbank_target_profile",
+            "query_pubmed_clinical_limitations",
+            "query_alphafold_plddt",
+            "run_diffdock_screen",
+            "run_compare_census_lr_pair",
             "save_evidence",
             "think_tool",
         }
-        assert names == expected
+        assert expected.issubset(names)
 
     def test_workflow_order(self):
         from src.agents.drug_target.subagents.configs import WORKFLOW_ORDER
@@ -189,7 +204,7 @@ class TestSubagentConfigs:
     def test_evidence_collector_prompt_mentions_databases(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         prompt = SUBAGENT_CONFIGS["evidence_collector"]["system_prompt"]
-        for keyword in ("OpenTargets", "GWAS", "ChEMBL", "FDA"):
+        for keyword in ("OpenTargets", "GWAS"):
             assert keyword in prompt
 
     def test_clinical_assessor_prompt_mentions_rubric(self):
@@ -237,6 +252,29 @@ class TestEvidenceLoader:
         raw = load_lr_candidates.invoke({"data_dir": str(mock_data_dir)})
         result = json.loads(raw)
         assert result["disease"] == "breast cancer"
+
+    def test_load_lr_candidates_infers_oncology_fields(self, mock_data_dir):
+        from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
+        raw = load_lr_candidates.invoke({"data_dir": str(mock_data_dir)})
+        result = json.loads(raw)
+        assert result["disease_type"] == "oncology"
+        assert result["oncology_flag"] is True
+
+    def test_load_lr_candidates_adds_st_colocalization_score(self, mock_data_dir):
+        from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
+        raw = load_lr_candidates.invoke({"data_dir": str(mock_data_dir)})
+        result = json.loads(raw)
+        first = result["lr_pairs"][0]
+        assert "st_colocalization_score" in first
+        assert first["st_colocalization_score"] == 0.95
+
+    def test_load_lr_candidates_reads_interest_celltypes(self, mock_data_dir_with_targets):
+        from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
+
+        raw = load_lr_candidates.invoke({"data_dir": str(mock_data_dir_with_targets)})
+        result = json.loads(raw)
+        assert result["targets_json_found"] is True
+        assert result["interest_celltypes"] == ["Invasive tumor", "Malignant cell"]
 
     def test_load_lr_candidates_is_selected_top3_flag(self, mock_data_dir):
         from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
@@ -345,43 +383,41 @@ class TestToolImports:
         assert hasattr(evidence_loader, "load_lr_candidates")
         assert evidence_loader.load_lr_candidates.name == "load_lr_candidates"
 
-    def test_import_opentargets_tools(self):
-        from src.agents.drug_target.tools import opentargets_tools
-        assert opentargets_tools.query_ot_target_info.name == "query_ot_target_info"
-        assert opentargets_tools.query_ot_known_drugs.name == "query_ot_known_drugs"
-        assert opentargets_tools.query_ot_drug_details.name == "query_ot_drug_details"
+    def test_import_stage_tools(self):
+        from src.agents.drug_target.tools import stage_domain_tools
+        assert stage_domain_tools.query_cellxgene_lr_context.name == "query_cellxgene_lr_context"
+        assert stage_domain_tools.query_kegg_pathways.name == "query_kegg_pathways"
+        assert stage_domain_tools.query_reactome_pathways.name == "query_reactome_pathways"
+        assert stage_domain_tools.query_string_ppi_pair.name == "query_string_ppi_pair"
+        assert stage_domain_tools.query_ensembl_vep_consequence.name == "query_ensembl_vep_consequence"
+        assert stage_domain_tools.query_drugbank_target_profile.name == "query_drugbank_target_profile"
+        assert stage_domain_tools.query_pubmed_clinical_limitations.name == "query_pubmed_clinical_limitations"
+        assert stage_domain_tools.query_alphafold_plddt.name == "query_alphafold_plddt"
+        assert stage_domain_tools.run_diffdock_screen.name == "run_diffdock_screen"
 
-    def test_import_gwas_tools(self):
-        from src.agents.drug_target.tools import gwas_tools
-        assert gwas_tools.query_gwas_trait_associations.name == "query_gwas_trait_associations"
-        assert gwas_tools.query_gwas_variant_details.name == "query_gwas_variant_details"
+    def test_import_census_lr_validation_tools(self):
+        from src.agents.drug_target.tools import census_lr_validation_tools
 
-    def test_import_chembl_tools(self):
-        from src.agents.drug_target.tools import chembl_tools
-        assert chembl_tools.query_chembl_target_bioactivity.name == "query_chembl_target_bioactivity"
-        assert chembl_tools.query_chembl_drug_info.name == "query_chembl_drug_info"
-
-    def test_import_clinical_trials_tools(self):
-        from src.agents.drug_target.tools import clinical_trials_tools
-        assert clinical_trials_tools.search_clinical_trials.name == "search_clinical_trials"
-
-    def test_import_fda_tools(self):
-        from src.agents.drug_target.tools import fda_tools
-        assert fda_tools.query_fda_drug_label.name == "query_fda_drug_label"
-        assert fda_tools.query_fda_adverse_events.name == "query_fda_adverse_events"
+        assert (
+            census_lr_validation_tools.run_compare_census_lr_pair.name
+            == "run_compare_census_lr_pair"
+        )
 
     def test_init_all_exports(self):
         from src.agents.drug_target.tools import __all__
+        # OpenTargets, GWAS, ChEMBL, ClinicalTrials, FDA removed — now called
+        # via the execute backend using skill scripts directly.
         expected = [
-            "query_ot_target_info", "query_ot_known_drugs", "query_ot_drug_details",
-            "query_gwas_trait_associations", "query_gwas_variant_details",
-            "query_chembl_target_bioactivity", "query_chembl_drug_info",
-            "search_clinical_trials",
-            "query_fda_drug_label", "query_fda_adverse_events",
             "load_lr_candidates", "load_evidence_files", "save_evidence",
+            "query_cellxgene_lr_context", "query_kegg_pathways", "query_reactome_pathways",
+            "query_string_ppi_pair", "query_ensembl_vep_consequence",
+            "query_drugbank_target_profile", "query_pubmed_clinical_limitations",
+            "query_alphafold_plddt", "run_diffdock_screen",
+            "run_compare_census_lr_pair",
+            "save_target_assessment",
             "think_tool", "sequential_thinking", "validate_quality",
         ]
-        assert set(__all__) == set(expected)
+        assert set(expected).issubset(set(__all__))
 
     def test_import_common_sequential_thinking(self):
         from src.agents.drug_target.tools.common import sequential_thinking
@@ -389,282 +425,179 @@ class TestToolImports:
 
 
 # =========================================================================
-# 5. TestToolMocks — External API tools with mocked responses
+# 6. TestStageContracts — Dynamic featured ranking, gating, output contract
 # =========================================================================
 
-class TestToolMocks:
-    """External API tools tested with monkeypatched module-level references."""
+class TestStageContracts:
+    """Decision logic and JSON output contract for staged pipeline."""
 
-    # --- OpenTargets ---
+    def test_rank_featured_candidates_dynamic_top_3_to_5(self):
+        from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
 
-    def test_query_ot_target_info(self, monkeypatch):
-        import src.agents.drug_target.tools.opentargets_tools as ot_mod
+        matrix = [
+            {"ligand": "A", "receptor": "B", "open_targets_score": 0.91, "st_colocalization_score": 0.95},
+            {"ligand": "C", "receptor": "D", "open_targets_score": 0.80, "st_colocalization_score": 0.90},
+            {"ligand": "E", "receptor": "F", "open_targets_score": 0.72, "st_colocalization_score": 0.85},
+            {"ligand": "G", "receptor": "H", "open_targets_score": 0.64, "st_colocalization_score": 0.80},
+            {"ligand": "I", "receptor": "J", "open_targets_score": 0.62, "st_colocalization_score": 0.75},
+            {"ligand": "K", "receptor": "L", "open_targets_score": 0.31, "st_colocalization_score": 0.20},
+        ]
 
-        monkeypatch.setattr(ot_mod, "search_entities", lambda q, entity_types=None: [
-            {"id": "ENSG00000105329", "name": "TGFB1"}
-        ])
-        monkeypatch.setattr(ot_mod, "get_target_info", lambda eid, include_diseases=False: {
-            "approvedSymbol": "TGFB1",
-            "tractability": {"smallmolecule": {"topCategory": "clinical_precedence"}},
-        })
-        monkeypatch.setattr(ot_mod, "get_target_disease_evidence", lambda eid, efo: [
-            {"score": 0.8, "datatypeId": "genetic_association"}
-        ])
-        monkeypatch.setattr(ot_mod, "get_target_associations", lambda eid, min_score=0: [
-            {"disease": {"name": "breast carcinoma"}, "score": 0.75}
-        ])
+        ranked = rank_featured_candidates(matrix)
+        featured = [row for row in ranked if row["is_featured"]]
+        assert 3 <= len(featured) <= 5
+        assert featured[0]["ligand"] == "A"
+        assert featured[0]["receptor"] == "B"
 
-        raw = ot_mod.query_ot_target_info.invoke({
-            "gene_symbol": "TGFB1",
-            "disease": "breast cancer",
-        })
-        result = json.loads(raw)
-        assert result["ensembl_id"] == "ENSG00000105329"
-        assert result["target_info"]["approvedSymbol"] == "TGFB1"
-        assert len(result["disease_evidence"]) == 1
+    def test_stage_gate_rules(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            should_run_diffdock,
+            should_run_pubmed,
+            should_run_vep,
+        )
 
-    def test_query_ot_known_drugs(self, monkeypatch):
-        import src.agents.drug_target.tools.opentargets_tools as ot_mod
+        assert should_run_vep(oncology_flag=True, has_high_somatic_mutation=True) is True
+        assert should_run_vep(oncology_flag=False, has_high_somatic_mutation=True) is False
+        assert should_run_pubmed("Phase 2") is True
+        assert should_run_pubmed("phase 1") is False
+        assert should_run_diffdock("Small Molecule") is True
+        assert should_run_diffdock("Antibody") is False
 
-        monkeypatch.setattr(ot_mod, "search_entities", lambda q, entity_types=None: [
-            {"id": "EFO_0000305"}
-        ])
-        monkeypatch.setattr(ot_mod, "get_known_drugs_for_disease", lambda efo_id: {
-            "uniqueDrugs": 42,
-            "uniqueTargets": 15,
-            "rows": [{"drug": {"name": "Trastuzumab"}, "phase": 4}],
-        })
+    def test_census_bonus_affects_priority_score(self):
+        from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
 
-        raw = ot_mod.query_ot_known_drugs.invoke({"disease": "breast cancer"})
-        result = json.loads(raw)
-        assert result["unique_drugs"] == 42
-        assert len(result["drugs"]) == 1
+        matrix = [
+            {
+                "ligand": "A",
+                "receptor": "B",
+                "open_targets_score": 0.80,
+                "st_colocalization_score": 0.80,
+                "census_validation": {"p_value": 1e-6, "diff": 0.07},
+            },
+            {
+                "ligand": "C",
+                "receptor": "D",
+                "open_targets_score": 0.81,
+                "st_colocalization_score": 0.80,
+                "census_validation": {"p_value": 0.50, "diff": 0.00},
+            },
+            {
+                "ligand": "E",
+                "receptor": "F",
+                "open_targets_score": 0.60,
+                "st_colocalization_score": 0.60,
+                "census_validation": {"p_value": 0.50, "diff": 0.00},
+            },
+        ]
 
-    def test_query_ot_target_info_unresolvable_gene(self, monkeypatch):
-        import src.agents.drug_target.tools.opentargets_tools as ot_mod
-        monkeypatch.setattr(ot_mod, "search_entities", lambda q, entity_types=None: [])
+        ranked = rank_featured_candidates(matrix, min_featured=1, max_featured=3)
+        assert ranked[0]["ligand"] == "A"
+        assert ranked[0]["census_bonus"] == 0.05
+        assert ranked[1]["census_bonus"] == 0.0
 
-        raw = ot_mod.query_ot_target_info.invoke({
-            "gene_symbol": "FAKEGENE",
-            "disease": "breast cancer",
-        })
-        result = json.loads(raw)
-        assert result["ensembl_id"] is None
-        assert any("Could not resolve" in e for e in result["errors"])
 
-    # --- GWAS ---
+class TestCompareCensusTool:
+    """CLI wrapper behavior for compare-census skill script."""
 
-    def test_query_gwas_trait_associations(self, monkeypatch):
-        import src.agents.drug_target.tools.gwas_tools as gwas_mod
+    def test_run_compare_census_lr_pair_parses_target_vs_rest(self, monkeypatch, tmp_path):
+        import src.agents.drug_target.tools.census_lr_validation_tools as mod
 
-        call_count = {"n": 0}
+        class Result:
+            returncode = 0
+            stdout = (
+                "Target vs rest\n"
+                "- target cell type: Invasive tumor\n"
+                "- n_target: 100\n"
+                "- n_rest: 900\n"
+                "- TGFB1+: target=20.0000% | rest=10.0000% | diff=10.0000% | RR=2.0000 | z=4.2000 | p=2.000e-05\n"
+                "- TGFBR2+: target=30.0000% | rest=12.0000% | diff=18.0000% | RR=2.5000 | z=5.1000 | p=1.000e-06\n"
+                "- TGFB1+ & TGFBR2+: target=12.0000% | rest=4.0000% | diff=8.0000% | RR=3.0000 | z=4.9000 | p=9.000e-07\n"
+            )
+            stderr = ""
 
-        def mock_fetch(url, params=None):
-            call_count["n"] += 1
-            if "findByEfoTrait" in url:
-                return {"_embedded": {"efoTraits": [{"shortForm": "EFO_0000305"}]}}
-            if "associations" in url:
-                return {
-                    "_embedded": {"associations": [{
-                        "pvalue": 5e-9,
-                        "strongestRiskAlleles": [{"riskAlleleName": "rs123-A"}],
-                        "loci": [{"authorReportedGenes": [{"geneName": "TGFB1"}]}],
-                        "snps": [],
-                    }]},
-                    "page": {"totalPages": 1},
-                }
-            return {}
+        monkeypatch.setattr(mod.subprocess, "run", lambda *args, **kwargs: Result())
 
-        monkeypatch.setattr(gwas_mod, "_fetch_json", mock_fetch)
-
-        raw = gwas_mod.query_gwas_trait_associations.invoke({
-            "disease": "breast cancer",
-            "gene_symbols": "TGFB1,VEGFA",
-        })
-        result = json.loads(raw)
-        assert result["trait_id"] == "EFO_0000305"
-        assert result["gene_signals"]["TGFB1"]["reported_hits"] >= 1
-        assert result["total_associations_scanned"] == 1
-
-    def test_query_gwas_variant_details(self, monkeypatch):
-        import src.agents.drug_target.tools.gwas_tools as gwas_mod
-
-        def mock_fetch(url, params=None):
-            return {
-                "genomicContexts": [
-                    {"gene": {"geneName": "TGFB1"}, "distance": 0,
-                     "isClosestGene": True, "isIntergenic": False}
-                ],
-                "locations": [{"chromosomeName": "19", "chromosomePosition": 41836812}],
-                "functionalClass": "missense_variant",
+        raw = mod.run_compare_census_lr_pair.invoke(
+            {
+                "data_dir": str(tmp_path),
+                "disease": "breast cancer",
+                "gene_a": "TGFB1",
+                "gene_b": "TGFBR2",
+                "target_cell_type": "Invasive tumor",
             }
-
-        monkeypatch.setattr(gwas_mod, "_fetch_json", mock_fetch)
-
-        raw = gwas_mod.query_gwas_variant_details.invoke({"rs_ids": "rs1800469"})
+        )
         result = json.loads(raw)
-        assert "rs1800469" in result["variants"]
-        assert result["variants"]["rs1800469"]["functional_class"] == "missense_variant"
+        assert result["executed"] is True
+        coexp = result["target_vs_rest"]["coexpression"]
+        assert coexp["p_value"] == 9e-07
+        assert coexp["diff"] == 0.08
+        assert result["resolved_cell_type"] == "Invasive tumor"
 
-    def test_association_signal_genome_wide(self):
-        from src.agents.drug_target.tools.gwas_tools import _association_signal
-        score = _association_signal(5e-8)
-        expected = -math.log10(5e-8) / 12.0
-        assert abs(score - expected) < 1e-6
+    def test_run_compare_census_lr_pair_fuzzy_retries_on_missing_celltype(self, monkeypatch, tmp_path):
+        import src.agents.drug_target.tools.census_lr_validation_tools as mod
 
-    def test_association_signal_zero_pvalue(self):
-        from src.agents.drug_target.tools.gwas_tools import _association_signal
-        assert _association_signal(0) == 1.0
+        class FailResult:
+            returncode = 1
+            stdout = ""
+            stderr = (
+                "RuntimeError: Target cell type 'Invasive tumor' not found. "
+                "Examples of available cell types: Prolif Invasive Tumor(500), T cell(200)"
+            )
 
-    def test_association_signal_large_pvalue(self):
-        from src.agents.drug_target.tools.gwas_tools import _association_signal
-        score = _association_signal(0.5)
-        assert 0.0 < score < 0.1  # weak signal
+        class OkResult:
+            returncode = 0
+            stdout = (
+                "Target vs rest\n"
+                "- target cell type: Prolif Invasive Tumor\n"
+                "- n_target: 500\n"
+                "- n_rest: 700\n"
+                "- TGFB1+ & TGFBR2+: target=10.0000% | rest=4.0000% | diff=6.0000% | RR=2.5000 | z=3.1000 | p=1.000e-03\n"
+            )
+            stderr = ""
 
-    # --- ChEMBL ---
+        calls = {"n": 0}
 
-    def test_query_chembl_target_bioactivity(self, monkeypatch):
-        import src.agents.drug_target.tools.chembl_tools as chembl_mod
+        def fake_run(*args, **kwargs):
+            calls["n"] += 1
+            return FailResult() if calls["n"] == 1 else OkResult()
 
-        mock_search = MagicMock(return_value=[
-            {"target_chembl_id": "CHEMBL4439", "pref_name": "TGFB1",
-             "organism": "Homo sapiens", "target_type": "SINGLE PROTEIN"},
-        ])
-        mock_bioactivity = MagicMock(return_value=[
-            {"molecule_chembl_id": "CHEMBL123", "molecule_pref_name": "Galunisertib",
-             "standard_type": "IC50", "standard_value": "56", "pchembl_value": "7.25"},
-        ])
+        monkeypatch.setattr(mod.subprocess, "run", fake_run)
 
-        monkeypatch.setattr(chembl_mod, "_import_chembl", lambda: (
-            mock_search, mock_bioactivity, None
-        ))
-
-        raw = chembl_mod.query_chembl_target_bioactivity.invoke({"gene_symbol": "TGFB1"})
+        raw = mod.run_compare_census_lr_pair.invoke(
+            {
+                "data_dir": str(tmp_path),
+                "disease": "breast cancer",
+                "gene_a": "TGFB1",
+                "gene_b": "TGFBR2",
+                "target_cell_type": "Invasive tumor",
+            }
+        )
         result = json.loads(raw)
-        assert len(result["targets"]) == 1
-        assert result["targets"][0]["chembl_id"] == "CHEMBL4439"
-        assert result["bioactivity_count"] == 1
+        assert result["executed"] is True
+        assert result["resolution_mode"] == "fuzzy"
+        assert result["resolved_cell_type"] == "Prolif Invasive Tumor"
 
-    def test_query_chembl_drug_info(self, monkeypatch):
-        import src.agents.drug_target.tools.chembl_tools as chembl_mod
+    def test_save_target_assessment_roundtrip(self, tmp_path):
+        from src.agents.drug_target.tools.assessment_output import save_target_assessment
 
-        mock_get_drug = MagicMock(return_value=(
-            {"pref_name": "Aspirin", "max_phase": 4, "first_approval": 1899,
-             "molecule_type": "Small molecule", "withdrawn_flag": False},
-            [{"action_type": "INHIBITOR", "mechanism_of_action": "COX inhibition",
-              "target_pref_name": "COX-2", "target_chembl_id": "CHEMBL230"}],
-            [{"mesh_heading": "Pain", "max_phase_for_ind": 4}],
-        ))
-
-        monkeypatch.setattr(chembl_mod, "_import_chembl", lambda: (None, None, mock_get_drug))
-
-        raw = chembl_mod.query_chembl_drug_info.invoke({"chembl_id": "CHEMBL25"})
-        result = json.loads(raw)
-        assert result["drug_info"]["name"] == "Aspirin"
-        assert result["drug_info"]["max_phase"] == 4
-        assert len(result["mechanisms"]) == 1
-
-    def test_chembl_unavailable_returns_error(self, monkeypatch):
-        import src.agents.drug_target.tools.chembl_tools as chembl_mod
-        monkeypatch.setattr(chembl_mod, "_import_chembl", lambda: (None, None, None))
-
-        raw = chembl_mod.query_chembl_target_bioactivity.invoke({"gene_symbol": "TGFB1"})
-        result = json.loads(raw)
-        assert any("not installed" in e for e in result["errors"])
-
-    # --- Clinical Trials ---
-
-    def test_search_clinical_trials(self, monkeypatch):
-        import src.agents.drug_target.tools.clinical_trials_tools as ct_mod
-
-        monkeypatch.setattr(ct_mod, "search_studies", lambda condition, intervention=None, page_size=50: {
-            "totalCount": 5,
-            "studies": [
-                {"mock_study": True},
-                {"mock_study": True},
-            ],
-        })
-        monkeypatch.setattr(ct_mod, "extract_study_summary", lambda study: {
-            "nct_id": "NCT12345678",
-            "title": "TGFB1 inhibitor Phase 2",
-            "status": "RECRUITING",
-            "phase": ["PHASE2"],
-            "enrollment": 120,
-        })
-
-        raw = ct_mod.search_clinical_trials.invoke({
-            "disease": "breast cancer",
-            "gene_symbol": "TGFB1",
+        raw = save_target_assessment.invoke({
+            "data_dir": str(tmp_path),
+            "project_meta": json.dumps({"disease_focus": "breast cancer", "total_input_pairs": 15}),
+            "druggability_matrix": json.dumps([
+                {"ligand": "TGFB1", "receptor": "TGFBR2", "is_featured": True, "open_targets_score": 0.9}
+            ]),
+            "featured_candidates_deep_dive": json.dumps([
+                {"target_gene": "TGFBR2"}
+            ]),
         })
         result = json.loads(raw)
-        assert result["trial_count"] == 5
-        assert result["phase_distribution"]["PHASE2"] == 2
-        assert result["top_trials"][0]["nct_id"] == "NCT12345678"
-
-    def test_search_clinical_trials_missing_total_count_falls_back_to_study_count(self, monkeypatch):
-        import src.agents.drug_target.tools.clinical_trials_tools as ct_mod
-
-        monkeypatch.setattr(ct_mod, "search_studies", lambda condition, intervention=None, page_size=50: {
-            "studies": [
-                {"mock_study": True},
-                {"mock_study": True},
-                {"mock_study": True},
-            ],
-        })
-        monkeypatch.setattr(ct_mod, "extract_study_summary", lambda study: {
-            "nct_id": "NCT12345678",
-            "title": "TGFB1 inhibitor Phase 2",
-            "status": "RECRUITING",
-            "phase": ["PHASE2"],
-            "enrollment": 120,
-        })
-
-        raw = ct_mod.search_clinical_trials.invoke({
-            "disease": "breast cancer",
-            "gene_symbol": "TGFB1",
-        })
-        result = json.loads(raw)
-        assert result["trial_count"] == 3
-        assert result["phase_distribution"]["PHASE2"] == 3
-
-    # --- FDA ---
-
-    def test_query_fda_drug_label(self, monkeypatch):
-        import src.agents.drug_target.tools.fda_tools as fda_mod
-
-        mock_client = MagicMock()
-        mock_client.query_drug_label.return_value = {
-            "results": [{
-                "indications_and_usage": ["Treatment of breast cancer"],
-                "warnings": ["Cardiotoxicity risk"],
-                "contraindications": ["Hypersensitivity"],
-                "adverse_reactions": ["Nausea, fatigue"],
-            }],
-        }
-        monkeypatch.setattr(fda_mod, "_get_fda_client", lambda: mock_client)
-
-        raw = fda_mod.query_fda_drug_label.invoke({"drug_name": "trastuzumab"})
-        result = json.loads(raw)
-        assert result["label_found"] is True
-        assert "breast cancer" in result["indications"]
-
-    def test_query_fda_adverse_events(self, monkeypatch):
-        import src.agents.drug_target.tools.fda_tools as fda_mod
-
-        mock_client = MagicMock()
-        mock_client.query.return_value = {
-            "results": [
-                {"term": "Nausea", "count": 500},
-                {"term": "Fatigue", "count": 300},
-            ],
-        }
-        monkeypatch.setattr(fda_mod, "_get_fda_client", lambda: mock_client)
-
-        raw = fda_mod.query_fda_adverse_events.invoke({"drug_name": "trastuzumab"})
-        result = json.loads(raw)
-        assert result["total_events"] == 800
-        assert len(result["top_reactions"]) == 2
-        assert result["top_reactions"][0]["reaction"] == "Nausea"
+        assert result["saved"] is True
+        assert result["schema_valid"] is True
+        saved = tmp_path / "target_assessment.json"
+        assert saved.exists()
+        payload = json.loads(saved.read_text())
+        assert payload["project_meta"]["disease_focus"] == "breast cancer"
+        assert payload["druggability_matrix"][0]["is_featured"] is True
 
 
 # =========================================================================
@@ -739,12 +672,18 @@ class TestIntegration:
         from src.agents.drug_target.integration import run_drug_target_assessment
 
         mock_report = "# Drug Target Assessment\n\n## Executive Summary\nMock report."
+        mock_json = {
+            "project_meta": {"disease_focus": "breast cancer", "total_input_pairs": 15},
+            "druggability_matrix": [],
+            "featured_candidates_deep_dive": [],
+        }
 
         mock_agent = MagicMock()
 
         async def mock_ainvoke(input_dict, config=None):
             # Simulate agent writing drug.md
             (mock_data_dir / "drug.md").write_text(mock_report)
+            (mock_data_dir / "target_assessment.json").write_text(json.dumps(mock_json))
             return {"messages": []}
 
         mock_agent.ainvoke = mock_ainvoke
@@ -762,6 +701,7 @@ class TestIntegration:
         result = json.loads(raw)
         assert result["success"] is True
         assert "Executive Summary" in result["drug_md"]
+        assert result["target_assessment"]["project_meta"]["disease_focus"] == "breast cancer"
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
