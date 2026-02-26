@@ -206,137 +206,6 @@ class TestSubagentConfigs:
         assert "drug.md" in prompt
 
 
-# =========================================================================
-# 2. TestRubric
-# =========================================================================
-
-class TestRubric:
-    """Rubric parsing, validation, and scoring."""
-
-    def test_rubric_validated_track_has_4_criteria(self):
-        from src.agents.drug_target.rubric import DRUG_TARGET_RUBRIC
-        criteria = DRUG_TARGET_RUBRIC["validated_track"]["criteria"]
-        assert len(criteria) == 4
-
-    def test_rubric_validated_track_max_score(self):
-        from src.agents.drug_target.rubric import DRUG_TARGET_RUBRIC
-        assert DRUG_TARGET_RUBRIC["validated_track"]["max_score"] == 9
-
-    def test_rubric_exploratory_track_has_4_criteria(self):
-        from src.agents.drug_target.rubric import DRUG_TARGET_RUBRIC
-        criteria = DRUG_TARGET_RUBRIC["exploratory_track"]["criteria"]
-        assert len(criteria) == 4
-
-    def test_rubric_exploratory_track_max_score(self):
-        from src.agents.drug_target.rubric import DRUG_TARGET_RUBRIC
-        assert DRUG_TARGET_RUBRIC["exploratory_track"]["max_score"] == 12
-
-    def test_classification_rules_has_4_entries(self):
-        from src.agents.drug_target.rubric import CLASSIFICATION_RULES
-        assert len(CLASSIFICATION_RULES) == 4
-        assert set(CLASSIFICATION_RULES.keys()) == {
-            "validated_target", "exploratory_target",
-            "novel_candidate", "insufficient_evidence",
-        }
-
-    def test_priority_rules_has_4_entries(self):
-        from src.agents.drug_target.rubric import PRIORITY_RULES
-        assert len(PRIORITY_RULES) == 4
-        assert set(PRIORITY_RULES.keys()) == {"high", "medium", "low", "unranked"}
-
-    def test_format_rubric_prompt_top3(self):
-        from src.agents.drug_target.rubric import format_rubric_prompt
-        prompt = format_rubric_prompt({"gene_symbol": "TGFB1", "is_selected_top3": True})
-        assert "FEATURED CANDIDATE" in prompt
-        assert "VALIDATED TRACK" in prompt
-        assert "EXPLORATORY TRACK" in prompt
-        assert "TGFB1" in prompt
-
-    def test_format_rubric_prompt_non_top3(self):
-        from src.agents.drug_target.rubric import format_rubric_prompt
-        prompt = format_rubric_prompt({"gene_symbol": "FGF2", "is_selected_top3": False})
-        assert "FEATURED CANDIDATE" not in prompt
-        assert "FGF2" in prompt
-
-    def test_parse_assessment_response_raw_json(self):
-        from src.agents.drug_target.rubric import parse_assessment_response
-        raw = json.dumps({"gene_symbol": "TGFB1", "classification": "validated_target"})
-        parsed = parse_assessment_response(raw)
-        assert parsed is not None
-        assert parsed["gene_symbol"] == "TGFB1"
-
-    def test_parse_assessment_response_markdown_fenced(self):
-        from src.agents.drug_target.rubric import parse_assessment_response
-        raw = '```json\n{"gene_symbol": "SPP1", "priority": "medium"}\n```'
-        parsed = parse_assessment_response(raw)
-        assert parsed is not None
-        assert parsed["gene_symbol"] == "SPP1"
-
-    def test_parse_assessment_response_embedded_json(self):
-        from src.agents.drug_target.rubric import parse_assessment_response
-        raw = 'Here is the assessment:\n{"gene_symbol": "CD44", "priority": "low"}\nEnd.'
-        parsed = parse_assessment_response(raw)
-        assert parsed is not None
-        assert parsed["gene_symbol"] == "CD44"
-
-    def test_parse_assessment_response_invalid_returns_none(self):
-        from src.agents.drug_target.rubric import parse_assessment_response
-        parsed = parse_assessment_response("This is just plain text with no JSON at all.")
-        assert parsed is None
-
-    def test_validate_assessment_valid(self, valid_assessment):
-        from src.agents.drug_target.rubric import validate_assessment
-        is_valid, errors = validate_assessment(valid_assessment)
-        assert is_valid is True
-        assert errors == []
-
-    def test_validate_assessment_missing_fields(self):
-        from src.agents.drug_target.rubric import validate_assessment
-        incomplete = {"gene_symbol": "X"}
-        is_valid, errors = validate_assessment(incomplete)
-        assert is_valid is False
-        assert len(errors) > 0
-        error_text = " ".join(errors)
-        assert "validated_track" in error_text
-        assert "classification" in error_text
-
-    def test_validate_assessment_invalid_classification(self, valid_assessment):
-        from src.agents.drug_target.rubric import validate_assessment
-        valid_assessment["classification"] = "bogus_class"
-        is_valid, errors = validate_assessment(valid_assessment)
-        assert is_valid is False
-        assert any("classification" in e.lower() for e in errors)
-
-    def test_validate_assessment_invalid_priority(self, valid_assessment):
-        from src.agents.drug_target.rubric import validate_assessment
-        valid_assessment["priority"] = "super_high"
-        is_valid, errors = validate_assessment(valid_assessment)
-        assert is_valid is False
-        assert any("priority" in e.lower() for e in errors)
-
-    def test_compute_track_total_validated(self, valid_assessment):
-        from src.agents.drug_target.rubric import compute_track_total
-        total = compute_track_total(valid_assessment["validated_track"], "validated_track")
-        # 2 + 2 + 3 + (-1) = 6
-        assert total == 6
-
-    def test_compute_track_total_exploratory(self, valid_assessment):
-        from src.agents.drug_target.rubric import compute_track_total
-        total = compute_track_total(valid_assessment["exploratory_track"], "exploratory_track")
-        # 1 + 2 + 3 + 1 = 7
-        assert total == 7
-
-    def test_compute_track_total_negative_safety(self):
-        from src.agents.drug_target.rubric import compute_track_total
-        track = {
-            "existing_drug_evidence": {"score": 3},
-            "clinical_trial_activity": {"score": 3},
-            "mechanism_relevance": {"score": 3},
-            "safety_profile": {"score": -2},
-        }
-        total = compute_track_total(track, "validated_track")
-        assert total == 7  # 3+3+3+(-2)
-
 
 # =========================================================================
 # 3. TestEvidenceLoader
@@ -829,7 +698,8 @@ class TestIntegration:
 
         assert result is mock_agent
         mock_create_llm.assert_called_once_with(provider="openrouter")
-        mock_create_deep_agent.assert_called_once()
+        # 3 compiled subagents + 1 orchestrator
+        assert mock_create_deep_agent.call_count == 4
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")

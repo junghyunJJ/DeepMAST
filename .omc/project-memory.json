@@ -209,21 +209,57 @@
   "hotPaths": [
     {
       "path": "src/agents/drug_target/agent.py",
-      "accessCount": 12,
-      "lastAccessed": 1772050659894,
+      "accessCount": 16,
+      "lastAccessed": 1772095470084,
       "type": "file"
     },
     {
       "path": "src/agents/drug_target/subagents/prompts.py",
-      "accessCount": 11,
-      "lastAccessed": 1772050667196,
+      "accessCount": 12,
+      "lastAccessed": 1772091374881,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/drug_target/tools/common.py",
+      "accessCount": 8,
+      "lastAccessed": 1772095803217,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/drug_target/tools/__init__.py",
+      "accessCount": 8,
+      "lastAccessed": 1772095810339,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_drug_target.py",
+      "accessCount": 7,
+      "lastAccessed": 1772095825110,
       "type": "file"
     },
     {
       "path": "src/agents/drug_target/tools/evidence_loader.py",
-      "accessCount": 5,
-      "lastAccessed": 1772050673707,
+      "accessCount": 6,
+      "lastAccessed": 1772091370512,
       "type": "file"
+    },
+    {
+      "path": "src/agents/drug_target/subagents/configs.py",
+      "accessCount": 6,
+      "lastAccessed": 1772095559945,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/drug_target/__init__.py",
+      "accessCount": 5,
+      "lastAccessed": 1772095548402,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 5,
+      "lastAccessed": 1772095559547,
+      "type": "directory"
     },
     {
       "path": "src/agents/model.py",
@@ -238,27 +274,27 @@
       "type": "file"
     },
     {
+      "path": "src/agents/drug_target/integration.py",
+      "accessCount": 4,
+      "lastAccessed": 1772095463032,
+      "type": "file"
+    },
+    {
       "path": "tests/drugtarget/drug.md",
       "accessCount": 3,
       "lastAccessed": 1772045682843,
       "type": "file"
     },
     {
-      "path": "src/agents/drug_target/subagents/configs.py",
+      "path": "src/agents/drug_target/rubric.py",
       "accessCount": 3,
-      "lastAccessed": 1772050666750,
+      "lastAccessed": 1772091366803,
       "type": "file"
     },
     {
-      "path": "src/agents/drug_target/tools/common.py",
+      "path": "src",
       "accessCount": 3,
-      "lastAccessed": 1772050673218,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 3,
-      "lastAccessed": 1772068717528,
+      "lastAccessed": 1772095571944,
       "type": "directory"
     },
     {
@@ -266,30 +302,6 @@
       "accessCount": 2,
       "lastAccessed": 1772013734140,
       "type": "directory"
-    },
-    {
-      "path": "src/agents/drug_target/rubric.py",
-      "accessCount": 2,
-      "lastAccessed": 1772050668127,
-      "type": "file"
-    },
-    {
-      "path": "src/agents/drug_target/integration.py",
-      "accessCount": 2,
-      "lastAccessed": 1772050668570,
-      "type": "file"
-    },
-    {
-      "path": "src/agents/drug_target/tools/__init__.py",
-      "accessCount": 2,
-      "lastAccessed": 1772050672660,
-      "type": "file"
-    },
-    {
-      "path": "src/agents/drug_target/__init__.py",
-      "accessCount": 2,
-      "lastAccessed": 1772050674249,
-      "type": "file"
     },
     {
       "path": "src/agents/drug_target/tools/opentargets_tools.py",
@@ -322,15 +334,21 @@
       "type": "file"
     },
     {
-      "path": "src",
+      "path": "src/agents/drug_target",
       "accessCount": 2,
-      "lastAccessed": 1772050683465,
+      "lastAccessed": 1772091375465,
       "type": "directory"
     },
     {
-      "path": "tests/test_drug_target.py",
-      "accessCount": 1,
-      "lastAccessed": 1772012235072,
+      "path": ".venv/lib/python3.13/site-packages/deepagents/middleware/skills.py",
+      "accessCount": 2,
+      "lastAccessed": 1772092274323,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents/graph.py",
+      "accessCount": 2,
+      "lastAccessed": 1772092282234,
       "type": "file"
     },
     {
@@ -344,12 +362,6 @@
       "accessCount": 1,
       "lastAccessed": 1772012879648,
       "type": "file"
-    },
-    {
-      "path": "src/agents/drug_target",
-      "accessCount": 1,
-      "lastAccessed": 1772013710247,
-      "type": "directory"
     },
     {
       "path": "src/agents/deep_interpreter/tools",
@@ -374,6 +386,42 @@
       "accessCount": 1,
       "lastAccessed": 1772050688466,
       "type": "directory"
+    },
+    {
+      "path": "skills/opentargets-database/SKILL.md",
+      "accessCount": 1,
+      "lastAccessed": 1772092261582,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1772092270511,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents/backends/protocol.py",
+      "accessCount": 1,
+      "lastAccessed": 1772092278840,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents/middleware/subagents.py",
+      "accessCount": 1,
+      "lastAccessed": 1772092282607,
+      "type": "file"
+    },
+    {
+      "path": ".venv/lib/python3.13/site-packages/deepagents/backends/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1772092282957,
+      "type": "file"
+    },
+    {
+      "path": "src/agents/drug_target/subagents/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1772095572171,
+      "type": "file"
     }
   ],
   "userDirectives": []

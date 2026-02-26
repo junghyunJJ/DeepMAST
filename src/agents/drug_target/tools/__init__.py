@@ -34,7 +34,6 @@ from src.agents.drug_target.tools.evidence_loader import (
 # sequential_thinking is defined in common.py; think_tool and validate_quality
 # are lazy re-exports from deep_interpreter.
 from src.agents.drug_target.tools.common import sequential_thinking  # noqa: F401
-from src.agents.drug_target.tools.common import simple_reflection_tool
 
 
 def __getattr__(name):
@@ -70,6 +69,5 @@ __all__ = [
     # Common
     "think_tool",
     "sequential_thinking",
-    "simple_reflection_tool",
     "validate_quality",
 ]
