@@ -6,8 +6,8 @@ Called as a tool from the Reporter subagent.
 Architecture:
     Reporter subagent
       -> run_drug_target_assessment() tool
-        -> DrugTargetAgent (3 subagents)
-             evidence_collector -> clinical_assessor -> report_writer
+        -> DrugTargetAgent (2 subagents)
+             evidence_assessor -> report_writer
 
 Input: lr_candidates.json (top-15 L-R pairs) + selected_top3_lr.json + disease context
 Output: drug.md (markdown for HTML report integration)

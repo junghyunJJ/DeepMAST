@@ -1,4 +1,4 @@
 interface:
   display_name: "Census Gene Pair Compare"
   short_description: "Run gene-pair cell-type comparisons with CELLxGENE Census"
-  default_prompt: "Compare two genes by cell type using scripts/compare_census_gene_pair_by_cell_type.py and summarize target-vs-rest statistics."
+  default_prompt: "From this skill directory, run scripts/compare_census_gene_pair_by_cell_type.py to compare two genes by cell type and summarize target-vs-rest statistics."

@@ -7,9 +7,20 @@ description: Run and interpret scripts/compare_census_gene_pair_by_cell_type.py 
 
 ## Overview
 
-Run the project script `scripts/compare_census_gene_pair_by_cell_type.py` to compare two genes across cell types for a disease subset in CELLxGENE Census. Compute `gene_a+`, `gene_b+`, and co-expression rates, then test enrichment/depletion for one target cell type versus all remaining cells.
+Run the script `scripts/compare_census_gene_pair_by_cell_type.py` from this skill directory to compare two genes across cell types for a disease subset in CELLxGENE Census. Compute `gene_a+`, `gene_b+`, and co-expression rates, then test enrichment/depletion for one target cell type versus all remaining cells.
 
 Use [command-examples.md](references/command-examples.md) when you need ready-to-run command patterns.
+
+## Prerequisites
+
+- Ensure Python can import required packages:
+  - `cellxgene_census`
+  - `tiledbsoma`
+- Run a quick dependency check before analysis:
+
+```bash
+python -c "import cellxgene_census, tiledbsoma; print('ok')"
+```
 
 ## Workflow
 
@@ -23,6 +34,8 @@ Use [command-examples.md](references/command-examples.md) when you need ready-to
 5. Use `--output-csv` to persist full cell-type metrics and summarize downstream.
 
 ## Command Template
+
+Run from the skill directory:
 
 ```bash
 python scripts/compare_census_gene_pair_by_cell_type.py \
@@ -70,7 +83,11 @@ Treat very small cell counts cautiously, even with small p-values. Increase `--m
 
 ## Execution Notes
 
-- Run from repository root so relative script paths resolve.
+- Enter this skill directory before running commands:
+  - Repository copy: `cd skills/compare-census-gene-pair-by-cell-type`
+  - Global skill copy: `cd ~/.codex/skills/compare-census-gene-pair-by-cell-type`
+- Confirm CLI options quickly with:
+  - `python scripts/compare_census_gene_pair_by_cell_type.py --help`
 - Prefer pinned `--census-version` for reproducible analysis.
 - Use UTF-8 safe quoting for disease/cell type strings with spaces.
 

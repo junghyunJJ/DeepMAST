@@ -16,7 +16,13 @@ def _project_root() -> Path:
 
 
 def _script_path() -> Path:
-    return _project_root() / "scripts" / "compare_census_gene_pair_by_cell_type.py"
+    return (
+        _project_root()
+        / "skills"
+        / "compare-census-gene-pair-by-cell-type"
+        / "scripts"
+        / "compare_census_gene_pair_by_cell_type.py"
+    )
 
 
 def _sanitize_token(text: str) -> str:

@@ -26,7 +26,7 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
     """Run the Drug Target Assessment agent on lr_candidates.json.
 
     Delegates the full therapeutic target assessment to the DrugTargetAgent,
-    which uses 3 subagents (evidence_collector, clinical_assessor, report_writer)
+    which uses 2 subagents (evidence_assessor, report_writer)
     to gather evidence, score targets, and generate drug.md.
 
     Args:
@@ -69,7 +69,7 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
             f"Disease context: {disease}\n"
             f"Input files: lr_candidates.json, selected_top3_lr.json\n"
             f"Output: target_assessment.json and drug.md\n\n"
-            f"Execute the full evidence_collector → clinical_assessor → report_writer pipeline."
+            f"Execute the full evidence_assessor → report_writer pipeline."
         )
 
         # Run the agent

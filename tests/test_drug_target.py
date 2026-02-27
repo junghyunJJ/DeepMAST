@@ -1,4 +1,4 @@
-"""Tests for Drug Target Assessment Agent (Phase 4.7).
+"""Tests for Drug Target Assessment Agent.
 
 6 test classes covering:
 1. TestSubagentConfigs — Tool registration & prompt content
@@ -138,29 +138,24 @@ def valid_assessment():
 class TestSubagentConfigs:
     """Tool registration & prompt content for subagent configs."""
 
-    def test_evidence_collector_has_minimum_tools(self):
+    def test_evidence_assessor_has_minimum_tools(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
-        tools = SUBAGENT_CONFIGS["evidence_collector"]["tools"]
-        assert len(tools) >= 8
-
-    def test_clinical_assessor_has_minimum_tools(self):
-        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
-        tools = SUBAGENT_CONFIGS["clinical_assessor"]["tools"]
-        assert len(tools) >= 5
+        tools = SUBAGENT_CONFIGS["evidence_assessor"]["tools"]
+        assert len(tools) >= 15
 
     def test_report_writer_has_minimum_tools(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         tools = SUBAGENT_CONFIGS["report_writer"]["tools"]
         assert len(tools) >= 4
 
-    def test_evidence_collector_tool_names(self):
+    def test_evidence_assessor_tool_names(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
-        tools = SUBAGENT_CONFIGS["evidence_collector"]["tools"]
+        tools = SUBAGENT_CONFIGS["evidence_assessor"]["tools"]
         names = {t.name for t in tools}
-        # OpenTargets, GWAS, ChEMBL, ClinicalTrials, FDA are now called via
-        # the execute backend using skill scripts — not registered as agent tools.
         expected = {
             "load_lr_candidates",
+            "save_evidence",
+            "load_evidence_files",
             "sequential_thinking",
             "query_cellxgene_lr_context",
             "query_kegg_pathways",
@@ -172,25 +167,25 @@ class TestSubagentConfigs:
             "query_alphafold_plddt",
             "run_diffdock_screen",
             "run_compare_census_lr_pair",
-            "save_evidence",
             "think_tool",
+            "validate_quality",
         }
         assert expected.issubset(names)
 
     def test_workflow_order(self):
         from src.agents.drug_target.subagents.configs import WORKFLOW_ORDER
-        assert WORKFLOW_ORDER == ["evidence_collector", "clinical_assessor", "report_writer"]
+        assert WORKFLOW_ORDER == ["evidence_assessor", "report_writer"]
 
-    def test_get_subagents_returns_3(self):
+    def test_get_subagents_returns_2(self):
         from src.agents.drug_target.subagents.configs import get_subagents
         subagents = get_subagents()
-        assert len(subagents) == 3
+        assert len(subagents) == 2
 
     def test_get_subagents_order(self):
         from src.agents.drug_target.subagents.configs import get_subagents
         subagents = get_subagents()
         names = [s["name"] for s in subagents]
-        assert names == ["evidence_collector", "clinical_assessor", "report_writer"]
+        assert names == ["evidence_assessor", "report_writer"]
 
     def test_custom_tools_appended_to_all_subagents(self):
         from src.agents.drug_target.subagents.configs import get_subagents
@@ -201,18 +196,30 @@ class TestSubagentConfigs:
             tool_names = [t.name for t in s["tools"]]
             assert "custom_tool" in tool_names
 
-    def test_evidence_collector_prompt_mentions_databases(self):
+    def test_evidence_assessor_prompt_mentions_databases_and_rubric(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
-        prompt = SUBAGENT_CONFIGS["evidence_collector"]["system_prompt"]
-        for keyword in ("OpenTargets", "GWAS"):
+        prompt = SUBAGENT_CONFIGS["evidence_assessor"]["system_prompt"]
+        # Database references
+        for keyword in ("OpenTargets", "GWAS", "DrugBank", "AlphaFold"):
             assert keyword in prompt
-
-    def test_clinical_assessor_prompt_mentions_rubric(self):
-        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
-        prompt = SUBAGENT_CONFIGS["clinical_assessor"]["system_prompt"]
-        assert "rubric" in prompt.lower()
+        # Rubric references (merged from clinical_assessor)
+        assert "rubric" in prompt.lower() or "RUBRIC" in prompt
         assert "validated" in prompt.lower()
         assert "exploratory" in prompt.lower()
+
+    def test_evidence_assessor_prompt_mentions_4_stages(self):
+        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
+        prompt = SUBAGENT_CONFIGS["evidence_assessor"]["system_prompt"]
+        assert "Stage 1" in prompt
+        assert "Stage 2" in prompt
+        assert "Stage 3" in prompt
+        assert "Stage 4" in prompt
+
+    def test_evidence_assessor_prompt_mentions_census_and_gwas(self):
+        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
+        prompt = SUBAGENT_CONFIGS["evidence_assessor"]["system_prompt"]
+        assert "Census cross-validation" in prompt or "run_compare_census_lr_pair" in prompt
+        assert "GWAS" in prompt
 
     def test_report_writer_prompt_mentions_featured_candidate(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -405,8 +412,6 @@ class TestToolImports:
 
     def test_init_all_exports(self):
         from src.agents.drug_target.tools import __all__
-        # OpenTargets, GWAS, ChEMBL, ClinicalTrials, FDA removed — now called
-        # via the execute backend using skill scripts directly.
         expected = [
             "load_lr_candidates", "load_evidence_files", "save_evidence",
             "query_cellxgene_lr_context", "query_kegg_pathways", "query_reactome_pathways",
@@ -631,8 +636,8 @@ class TestIntegration:
 
         assert result is mock_agent
         mock_create_llm.assert_called_once_with(provider="openrouter")
-        # 3 compiled subagents + 1 orchestrator
-        assert mock_create_deep_agent.call_count == 4
+        # 2 compiled subagents + 1 orchestrator = 3 calls
+        assert mock_create_deep_agent.call_count == 3
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
@@ -705,7 +710,7 @@ class TestIntegration:
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
-    def test_create_agent_passes_subagents_with_3_entries(
+    def test_create_agent_passes_subagents_with_2_entries(
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
@@ -718,4 +723,4 @@ class TestIntegration:
 
         call_kwargs = mock_create_deep_agent.call_args
         subagents = call_kwargs.kwargs.get("subagents") or call_kwargs[1].get("subagents")
-        assert len(subagents) == 3
+        assert len(subagents) == 2

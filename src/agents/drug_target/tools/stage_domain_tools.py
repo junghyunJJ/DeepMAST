@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+import re
 import requests
 from langchain_core.tools import tool
 
@@ -177,17 +178,25 @@ def query_reactome_pathways(gene_symbol: str, max_results: int = 5) -> str:
         rows = client.search_pathways(gene_symbol) or []
         pathways = []
         for row in rows:
-            if row.get("schemaClass") != "Pathway":
+            # Accept both old ("schemaClass") and new ("type") response formats
+            entry_type = row.get("type") or row.get("schemaClass", "")
+            if entry_type != "Pathway":
                 continue
+            # Strip HTML highlighting tags from name
+            raw_name = row.get("name") or row.get("displayName") or ""
+            clean_name = re.sub(r"<[^>]+>", "", raw_name)
+            # Species: new format returns list of strings, old returns list of dicts
+            species_raw = row.get("species")
+            if isinstance(species_raw, list) and species_raw:
+                sp = species_raw[0]
+                species_val = sp.get("displayName") if isinstance(sp, dict) else str(sp)
+            else:
+                species_val = None
             pathways.append(
                 {
                     "reactome_id": row.get("stId"),
-                    "name": row.get("displayName"),
-                    "species": (
-                        row.get("species", [{}])[0].get("displayName")
-                        if row.get("species")
-                        else None
-                    ),
+                    "name": clean_name,
+                    "species": species_val,
                 }
             )
             if len(pathways) >= max(1, min(max_results, 10)):
@@ -316,15 +325,52 @@ def query_ensembl_vep_consequence(variant_ids: str, species: str = "human") -> s
     return _as_json(result)
 
 
+def _chembl_fallback(gene_symbol: str, max_drugs: int) -> list[dict]:
+    """Query ChEMBL for drugs targeting a gene (fallback when DrugBank unavailable)."""
+    mod = _load_skill_module("chembl-database", "example_queries.py", "chembl_queries")
+    targets = mod.search_targets_by_name(gene_symbol)
+    if not targets:
+        return []
+
+    seen: set[str] = set()
+    matches: list[dict] = []
+    cap = max(1, min(max_drugs, 25))
+
+    for tgt in targets:
+        target_id = tgt.get("target_chembl_id")
+        if not target_id:
+            continue
+        activities = mod.get_bioactivity_data(target_id, activity_type="IC50", max_value=10000)
+        for act in activities:
+            mol_id = act.get("molecule_chembl_id")
+            if not mol_id or mol_id in seen:
+                continue
+            seen.add(mol_id)
+            matches.append(
+                {
+                    "chembl_id": mol_id,
+                    "drug_name": act.get("molecule_pref_name") or mol_id,
+                    "target_gene": gene_symbol.upper(),
+                }
+            )
+            if len(matches) >= cap:
+                return matches
+
+    return matches
+
+
 @tool
 def query_drugbank_target_profile(gene_symbol: str, max_drugs: int = 10) -> str:
-    """Retrieve DrugBank drugs with targets matching a gene symbol (best-effort)."""
+    """Retrieve drugs targeting a gene symbol (DrugBank primary, ChEMBL fallback)."""
     result = {
         "gene_symbol": gene_symbol,
         "executed": False,
         "matched_drugs": [],
+        "source": None,
         "errors": [],
     }
+
+    # --- Try DrugBank first ---
     try:
         mod = _load_skill_module("drugbank-database", "drugbank_helper.py", "drugbank_helper")
         helper = mod.DrugBankHelper()
@@ -361,9 +407,22 @@ def query_drugbank_target_profile(gene_symbol: str, max_drugs: int = 10) -> str:
                     break
 
         result["matched_drugs"] = matches
+        result["source"] = "drugbank"
         result["executed"] = True
+        return _as_json(result)
     except Exception as exc:
-        result["errors"].append(f"DrugBank query unavailable: {exc}")
+        result["errors"].append(f"DrugBank unavailable: {exc}")
+
+    # --- Fallback to ChEMBL ---
+    try:
+        matches = _chembl_fallback(gene_symbol, max_drugs)
+        result["matched_drugs"] = matches
+        result["source"] = "chembl"
+        result["executed"] = True
+        result["errors"] = []  # clear DrugBank error on successful fallback
+    except Exception as exc:
+        result["errors"].append(f"ChEMBL fallback also failed: {exc}")
+
     return _as_json(result)
 
 
@@ -426,9 +485,11 @@ def query_alphafold_plddt(uniprot_id: str) -> str:
             return _as_json(result)
 
         result["entry_id"] = entry_id
-        conf_url = entry.get(
-            "confidenceUrl",
-            f"https://alphafold.ebi.ac.uk/files/{entry_id}-confidence_v4.json",
+        # Use plddtDocUrl (v6+) with fallback to legacy confidenceUrl
+        conf_url = (
+            entry.get("plddtDocUrl")
+            or entry.get("confidenceUrl")
+            or f"https://alphafold.ebi.ac.uk/files/{entry_id}-confidence_v6.json"
         )
         conf_resp = requests.get(conf_url, timeout=_TIMEOUT)
         conf_resp.raise_for_status()
@@ -459,8 +520,8 @@ def run_diffdock_screen(
         "binding_affinity": None,
         "errors": [
             (
-                "DiffDock execution is not wired in this environment yet. "
-                "Use the diffdock skill workflow for full docking runs."
+                "DiffDock execution is not available in this environment. "
+                "Install DiffDock locally to enable in-silico docking."
             )
         ],
     }

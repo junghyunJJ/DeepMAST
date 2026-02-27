@@ -1,13 +1,11 @@
 """Subagent configurations for Drug Target Assessment Agent.
 
-Three-subagent architecture:
-- evidence_collector: Gather multi-database evidence by invoking skill scripts via
-  the execute backend (OpenTargets, GWAS, ChEMBL, ClinicalTrials, FDA) plus
-  infrastructure tools (census, VEP, AlphaFold, DrugBank, STRING, KEGG, Reactome)
-- clinical_assessor: Score targets against rubric, interpret GWAS, assess safety
+Two-subagent architecture with 4-stage funnel:
+- evidence_assessor: 4-stage funnel (biological context -> validation & scoring ->
+  deep dive -> structural druggability) with inline rubric assessment
 - report_writer: Generate drug.md with featured candidate emphasis
 
-Workflow order: evidence_collector → clinical_assessor → report_writer
+Workflow order: evidence_assessor -> report_writer
 """
 
 from typing import Callable, Sequence
@@ -47,75 +45,65 @@ __all__ = [
 
 
 # =============================================================================
-# 3-Subagent Configuration Definitions
+# 2-Subagent Configuration Definitions
 # =============================================================================
 
 SUBAGENT_CONFIGS = {
-    "evidence_collector": {
-        "name": "evidence_collector",
+    "evidence_assessor": {
+        "name": "evidence_assessor",
         "description": (
-            "Multi-database evidence gatherer. Loads lr_candidates.json + selected_top3_lr.json, "
-            "then systematically queries OpenTargets, GWAS Catalog, ChEMBL, ClinicalTrials.gov, "
-            "and FDA by invoking skill scripts via the execute backend. "
-            "Also runs infrastructure queries: Cellxgene, KEGG/Reactome, STRING, VEP, DrugBank, "
-            "AlphaFold, DiffDock. Saves evidence/*.json files with is_selected_top3 flags. "
-            "Uses Plan→Execute→Reflect cycle: sequential_thinking for planning, "
-            "execute backend + infrastructure tools for execution, think_tool for reflection. "
-            "Use this FIRST to gather all evidence before assessment."
+            "4-stage funnel: biological context -> validation & scoring -> "
+            "deep dive -> structural druggability. Includes inline rubric assessment. "
+            "Loads lr_candidates.json + selected_top3_lr.json, then systematically "
+            "queries databases via execute backend (OpenTargets, GWAS) and infrastructure "
+            "tools (Cellxgene, KEGG/Reactome, STRING, VEP, DrugBank, PubMed, AlphaFold, "
+            "DiffDock, Census cross-validation). Applies DRUG_TARGET_RUBRIC scoring inline "
+            "after Stage 2. Saves evidence/*.json files with is_selected_top3 flags. "
+            "Uses Plan->Execute->Reflect cycle per stage."
         ),
-        "system_prompt": SUBAGENT_PROMPTS["evidence_collector"],
+        "system_prompt": SUBAGENT_PROMPTS["evidence_assessor"],
         "tools": [
+            # I/O
             load_lr_candidates,
-            sequential_thinking,       # PLAN: strategy before each query phase
+            save_evidence,
+            load_evidence_files,
+            # Stage 1: Biological Context
             query_cellxgene_lr_context,
             query_kegg_pathways,
             query_reactome_pathways,
             query_string_ppi_pair,
+            run_compare_census_lr_pair,
+            # Stage 2: Target Validation
             query_ensembl_vep_consequence,
+            # Stage 3: Deep Dive
             query_drugbank_target_profile,
             query_pubmed_clinical_limitations,
+            # Stage 4: Structural Druggability
             query_alphafold_plddt,
             run_diffdock_screen,
-            run_compare_census_lr_pair,
-            save_evidence,
-            think_tool,                # REFLECT: coverage gaps after each phase
-        ],
-    },
-    "clinical_assessor": {
-        "name": "clinical_assessor",
-        "description": (
-            "Rubric-based target assessor. Loads all evidence/*.json files, "
-            "evaluates each target against DRUG_TARGET_RUBRIC (validated + exploratory tracks), "
-            "produces structured JSON with score + rationale per criterion. "
-            "Performs GWAS biological interpretation, clinical landscape analysis, "
-            "and safety assessment. Flags is_selected_top3 targets for priority. "
-            "Outputs assessment_results.json, gwas_interpretation.json, clinical_landscape.json."
-        ),
-        "system_prompt": SUBAGENT_PROMPTS["clinical_assessor"],
-        "tools": [
-            load_evidence_files,
-            sequential_thinking,       # PLAN: assessment strategy
-            think_tool,                # REFLECT: scoring consistency
+            # Cognitive
+            sequential_thinking,
+            think_tool,
             validate_quality,
-            save_evidence,
         ],
     },
     "report_writer": {
         "name": "report_writer",
         "description": (
             "Publication-quality report generator. Reads all evidence and assessment files, "
-            "generates target_assessment.json + drug.md with: Executive Summary "
-            "(★ Featured Candidates first), "
-            "Target Druggability Matrix (★ rows bolded/starred), Featured Candidate Deep Dives, "
-            "Clinical Landscape, GWAS Evidence & Interpretation, Therapeutic Recommendations. "
+            "generates target_assessment.json + drug.md with 4-section structure: "
+            "Executive Summary ([FEATURED] Candidates first), "
+            "Pan-Disease Target Druggability Matrix ([FEATURED] rows bolded), "
+            "[FEATURED] Candidate Deep Dives (Stage 3 & 4), "
+            "Pipeline Execution Summary & Recommendations. "
             "selected_top3_lr genes receive dedicated sections and priority placement throughout."
         ),
         "system_prompt": SUBAGENT_PROMPTS["report_writer"],
         "tools": [
             load_evidence_files,
             save_target_assessment,
-            sequential_thinking,       # PLAN: document structure
-            think_tool,                # REFLECT: writing quality
+            sequential_thinking,
+            think_tool,
             validate_quality,
         ],
     },
@@ -126,34 +114,29 @@ SUBAGENT_CONFIGS = {
 # Workflow Order
 # =============================================================================
 
-WORKFLOW_ORDER = ["evidence_collector", "clinical_assessor", "report_writer"]
+WORKFLOW_ORDER = ["evidence_assessor", "report_writer"]
 
 WORKFLOW_DESCRIPTION = """
-Drug Target Assessment 3-Agent Workflow:
+Drug Target Assessment 2-Agent Workflow (4-Stage Funnel):
 
-1. EVIDENCE_COLLECTOR (Plan→Execute→Reflect per database)
-   - Loads lr_candidates.json + selected_top3_lr.json
-   - Per gene: OpenTargets → GWAS → ChEMBL via execute backend (skill scripts)
-   - Per disease: Known drugs → Clinical trials → FDA labels via execute backend
-   - Infrastructure tools: Cellxgene, KEGG, Reactome, STRING, VEP, DrugBank,
-     AlphaFold, DiffDock (called directly as agent tools)
-   - Outputs: evidence/*.json (each gene tagged top3/not)
+1. EVIDENCE_ASSESSOR (Plan->Execute->Reflect per stage)
+   Stage 1 (ALL L-R pairs): Cellxgene + KEGG/Reactome + STRING + Census cross-validation
+   Stage 2 (ALL L-R pairs): OpenTargets + VEP (conditional) + GWAS batch
+     -> Inline DRUG_TARGET_RUBRIC scoring after Stage 2
+     -> Dynamic featured candidate selection (top 3-5)
+   Stage 3 (FEATURED only): DrugBank + PubMed clinical limitations (conditional)
+   Stage 4 (FEATURED only): AlphaFold pLDDT + DiffDock (conditional)
+   Outputs: evidence/*.json (per stage, per L-R pair/gene)
+            assessment_results.json, gwas_interpretation.json, clinical_landscape.json
 
-2. CLINICAL_ASSESSOR (Plan→Execute→Reflect)
-   - Loads all evidence files
-   - LLM-evaluates each target against DRUG_TARGET_RUBRIC
-     → Validated track: drug evidence, trials, mechanism, safety
-     → Exploratory track: GWAS, tractability, plausibility, novelty
-   - GWAS biological interpretation
-   - Clinical landscape analysis
-   - Outputs: assessment/*.json (with rubric scores + rationale)
-
-3. REPORT_WRITER (Plan→Execute→Reflect)
-   - Generates drug.md with ★ Featured Candidate emphasis
-   - Executive Summary, Druggability Matrix, Deep Dives
-   - Clinical Landscape, GWAS Evidence, Recommendations
+2. REPORT_WRITER (Plan->Execute->Reflect)
+   - Generates target_assessment.json (structured contract)
+   - Generates drug.md with 4-section structure:
+     1. Executive Summary
+     2. Pan-Disease Target Druggability Matrix
+     3. [FEATURED] Candidate Deep Dives
+     4. Pipeline Execution Summary & Recommendations
    - Quality validation (threshold >= 0.7)
-   - Output: drug.md
 """
 
 
@@ -167,10 +150,9 @@ def get_subagents(
 ) -> list[dict]:
     """Get the subagent configurations for Drug Target Assessment.
 
-    Returns 3 subagents in workflow order:
-    1. evidence_collector - Multi-database evidence gathering
-    2. clinical_assessor - Rubric-based assessment
-    3. report_writer - drug.md generation
+    Returns 2 subagents in workflow order:
+    1. evidence_assessor - 4-stage funnel with inline rubric assessment
+    2. report_writer - drug.md generation
 
     Args:
         custom_tools: Optional list of additional tools to include in all subagents
@@ -180,9 +162,8 @@ def get_subagents(
         List of subagent configuration dictionaries
     """
     subagents = [
-        SUBAGENT_CONFIGS["evidence_collector"].copy(),
-        SUBAGENT_CONFIGS["clinical_assessor"].copy(),
-        SUBAGENT_CONFIGS["report_writer"].copy(),
+        {**SUBAGENT_CONFIGS["evidence_assessor"], "tools": list(SUBAGENT_CONFIGS["evidence_assessor"]["tools"])},
+        {**SUBAGENT_CONFIGS["report_writer"], "tools": list(SUBAGENT_CONFIGS["report_writer"]["tools"])},
     ]
 
     # Inject data_dir into each subagent's system prompt so they know the path

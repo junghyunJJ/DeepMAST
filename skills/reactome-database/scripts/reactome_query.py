@@ -54,11 +54,16 @@ class ReactomeClient:
     def search_pathways(self, term: str) -> List[Dict]:
         """Search for pathways by name"""
         response = requests.get(
-            f"{self.CONTENT_BASE}/data/query",
-            params={"name": term}
+            f"{self.CONTENT_BASE}/search/query",
+            params={"query": term, "types": "Pathway", "cluster": "true"},
         )
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+        # Extract entries from the grouped search result format
+        entries = []
+        for group in data.get("results", []):
+            entries.extend(group.get("entries", []))
+        return entries
 
     def analyze_genes(self, gene_list: List[str]) -> Dict:
         """Perform pathway enrichment analysis on gene list"""
@@ -158,11 +163,14 @@ def command_search(term: str):
         print(f"Search results for '{term}': {len(results)} found\n")
 
         for result in results[:20]:  # Show first 20
-            print(f"{result['stId']}: {result['displayName']}")
+            name = result.get('name') or result.get('displayName', '?')
+            print(f"{result['stId']}: {name}")
             if 'species' in result and result['species']:
-                species = result['species'][0]['displayName']
+                sp = result['species'][0]
+                species = sp.get('displayName') if isinstance(sp, dict) else str(sp)
                 print(f"  Species: {species}")
-            print(f"  Type: {result['schemaClass']}")
+            entry_type = result.get('type') or result.get('schemaClass', '?')
+            print(f"  Type: {entry_type}")
             print()
 
         if len(results) > 20:

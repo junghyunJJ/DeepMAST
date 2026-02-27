@@ -1,9 +1,9 @@
 """Drug Target Assessment Agent using DeepAgents framework.
 
-3-Subagent Architecture:
-1. EVIDENCE_COLLECTOR: Multi-database evidence gathering (OT, GWAS, ChEMBL, CT, FDA)
-2. CLINICAL_ASSESSOR: Rubric-based scoring with LLM-evaluated criteria
-3. REPORT_WRITER: Generate drug.md with featured candidate emphasis
+2-Subagent Architecture with 4-Stage Funnel:
+1. EVIDENCE_ASSESSOR: 4-stage funnel (biological context -> validation & scoring ->
+   deep dive -> structural druggability) with inline rubric assessment
+2. REPORT_WRITER: Generate drug.md with featured candidate emphasis
 
 This module uses a split orchestration model:
 - Orchestrator: CompositeBackend(State + Filesystem), no execute privileges
@@ -44,7 +44,7 @@ from src.agents.drug_target.tools import (
 )
 
 DEFAULT_SUBAGENT_SKILLSETS: dict[str, list[str]] = {
-    "evidence_collector": [
+    "evidence_assessor": [
         "opentargets-database",
         "gwas-database",
         "cellxgene-census",
@@ -52,14 +52,10 @@ DEFAULT_SUBAGENT_SKILLSETS: dict[str, list[str]] = {
         "reactome-database",
         "string-database",
         "drugbank-database",
+        "chembl-database",
         "pubmed-database",
         "alphafold-database",
-        "diffdock",
         "compare-census-gene-pair-by-cell-type",
-    ],
-    "clinical_assessor": [
-        "gwas-database",
-        "opentargets-database",
     ],
     "report_writer": [],
 }
@@ -217,22 +213,24 @@ class GuardedLocalExecBackend(FilesystemBackend, SandboxBackendProtocol):
 
 ORCHESTRATOR_SYSTEM_PROMPT = """You are the Drug Target Assessment orchestrator.
 
-Your task is to coordinate 3 specialized subagents to produce a comprehensive
-therapeutic target assessment report (drug.md).
+Your task is to coordinate 2 specialized subagents to produce a comprehensive
+therapeutic target assessment report (drug.md) using a 4-stage funnel approach.
 
 ## CRITICAL: First Action
 You MUST call the `load_lr_candidates` tool with the data_dir from the user message
 as your VERY FIRST action. This loads lr_candidates.json and selected_top3_lr.json,
 extracts gene symbols, and returns structured data. Do NOT use `ls` or `read_file`
-to check the directory — always use `load_lr_candidates`.
+to check the directory -- always use `load_lr_candidates`.
 
 ## Workflow
 Execute subagents strictly in this order via the `task` tool:
 
-1. **evidence_collector**: Pass the load_lr_candidates output. It gathers evidence
-   from OpenTargets, GWAS, ChEMBL, ClinicalTrials.gov, FDA for each gene.
-2. **clinical_assessor**: Scores each target against the DRUG_TARGET_RUBRIC.
-3. **report_writer**: Generates drug.md with ★ Featured Candidate emphasis.
+1. **evidence_assessor**: Pass the load_lr_candidates output. Runs the 4-stage funnel:
+   - Stage 1 (ALL pairs): Biological context (Cellxgene, KEGG/Reactome, STRING, Census)
+   - Stage 2 (ALL pairs): Validation & scoring (OpenTargets, VEP, GWAS) + inline rubric
+   - Stage 3 (FEATURED only): Deep dive (DrugBank, PubMed)
+   - Stage 4 (FEATURED only): Structural druggability (AlphaFold, DiffDock)
+2. **report_writer**: Generates drug.md with [FEATURED] Candidate emphasis.
    The report_writer MUST first save target_assessment.json via
    `save_target_assessment`, then call `write_file` to save drug.md.
 
@@ -247,9 +245,9 @@ Execute subagents strictly in this order via the `task` tool:
 - evidence/*.json: Intermediate evidence files
 
 ## Rules
-- ALWAYS start with `load_lr_candidates` — never skip this step
-- Execute subagents in ORDER: evidence_collector → clinical_assessor → report_writer
-- Each subagent uses Plan→Execute→Reflect cycle
+- ALWAYS start with `load_lr_candidates` -- never skip this step
+- Execute subagents in ORDER: evidence_assessor -> report_writer
+- Each subagent uses Plan->Execute->Reflect cycle
 - selected_top3_lr genes are [FEATURED] Featured Candidates throughout
 - The final drug.md must be self-contained markdown for HTML report integration
 """
@@ -343,7 +341,7 @@ def _prepare_subagent_skill_sources(
     DeepAgents `skills=` expects source directories containing one or more skill
     subdirectories. This helper copies selected project skills into:
     - {data_dir}/.skillsets/<subagent>/<skill>/SKILL.md
-    and returns virtual source paths (e.g., '/.skillsets/evidence_collector/').
+    and returns virtual source paths (e.g., '/.skillsets/evidence_assessor/').
     """
     project_skills_dir = _find_project_root() / "skills"
     source_map: dict[str, str] = {}
@@ -356,11 +354,16 @@ def _prepare_subagent_skill_sources(
         source_root.mkdir(parents=True, exist_ok=True)
 
         keep = set(skill_names)
-        for child in source_root.iterdir():
+        for child in list(source_root.iterdir()):  # materialize before mutation
             if child.is_dir() and child.name not in keep:
                 shutil.rmtree(child)
 
         for skill_name in skill_names:
+            if Path(skill_name).parts != (skill_name,):
+                raise ValueError(
+                    f"Invalid skill name for {subagent_name}: {skill_name!r}. "
+                    "Must be a plain directory name without path separators."
+                )
             src = project_skills_dir / skill_name
             if not src.exists():
                 raise FileNotFoundError(
@@ -432,7 +435,7 @@ def create_drug_target_agent(
     """Create the Drug Target Assessment agent using DeepAgents framework.
 
     Creates a fully configured agent with:
-    - 3 specialized compiled subagents (each with local execute backend)
+    - 2 specialized compiled subagents (each with local execute backend)
     - Per-subagent skill sources (distinct sets per role)
     - Orchestrator-level CompositeBackend for persistent file storage
     - Pre-written data_path.txt for deterministic path resolution
@@ -484,7 +487,7 @@ def create_drug_target_agent(
     if config.custom_tools:
         tools.extend(config.custom_tools)
 
-    # Get base 3-subagent specs (inject data_dir so subagents know the path)
+    # Get base 2-subagent specs (inject data_dir so subagents know the path)
     subagent_specs = get_subagents(
         custom_tools=config.custom_tools,
         data_dir=resolved_data_dir,

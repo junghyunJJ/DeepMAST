@@ -1,5 +1,7 @@
 # Command Examples
 
+Run examples from the skill directory (`cd skills/compare-census-gene-pair-by-cell-type` in this repository).
+
 ## Basic Human Disease Run
 
 ```bash
