@@ -501,6 +501,92 @@ def query_alphafold_plddt(uniprot_id: str) -> str:
 
 
 @tool
+def query_opentargets_target(gene_symbol: str, disease: str) -> str:
+    """Query OpenTargets for target-disease association, tractability, and safety."""
+    result = {
+        "gene_symbol": gene_symbol, "disease": disease,
+        "executed": False, "ensembl_id": None,
+        "target_info": {}, "disease_evidence": [], "associations": [],
+        "errors": [],
+    }
+    try:
+        mod = _load_skill_module("opentargets-database", "query_opentargets.py", "query_opentargets")
+
+        # 1. Gene → Ensembl ID
+        hits = mod.search_entities(gene_symbol, entity_types=["target"])
+        if not hits:
+            result["errors"].append(f"No OpenTargets target found for {gene_symbol}")
+            return _as_json(result)
+        ensembl_id = hits[0]["id"]
+        result["ensembl_id"] = ensembl_id
+
+        # 2. Target info (tractability, safety, top diseases)
+        result["target_info"] = mod.get_target_info(ensembl_id, include_diseases=True)
+
+        # 3. Disease → EFO ID, then evidence
+        disease_hits = mod.search_entities(disease, entity_types=["disease"])
+        if disease_hits:
+            efo_id = disease_hits[0]["id"]
+            result["efo_id"] = efo_id
+            result["disease_evidence"] = mod.get_target_disease_evidence(ensembl_id, efo_id)
+
+        # 4. All disease associations
+        result["associations"] = mod.get_target_associations(ensembl_id, min_score=0.1)
+        result["executed"] = True
+    except Exception as exc:
+        result["errors"].append(f"OpenTargets query failed: {exc}")
+    return _as_json(result)
+
+
+@tool
+def query_opentargets_known_drugs(disease: str) -> str:
+    """Get known drugs for a disease from OpenTargets."""
+    result = {"disease": disease, "executed": False, "efo_id": None, "drugs": {}, "errors": []}
+    try:
+        mod = _load_skill_module("opentargets-database", "query_opentargets.py", "query_opentargets")
+        hits = mod.search_entities(disease, entity_types=["disease"])
+        if not hits:
+            result["errors"].append(f"No disease found for '{disease}'")
+            return _as_json(result)
+        efo_id = hits[0]["id"]
+        result["efo_id"] = efo_id
+        result["drugs"] = mod.get_known_drugs_for_disease(efo_id)
+        result["executed"] = True
+    except Exception as exc:
+        result["errors"].append(f"OpenTargets drug query failed: {exc}")
+    return _as_json(result)
+
+
+@tool
+def query_gwas_gene_trait(gene_symbol: str, disease: str) -> str:
+    """Query GWAS Catalog for gene-trait associations."""
+    result = {
+        "gene_symbol": gene_symbol, "disease": disease,
+        "executed": False, "efo_traits": [],
+        "trait_associations": [], "gene_associations": [],
+        "errors": [],
+    }
+    try:
+        mod = _load_skill_module("gwas-database", "gwas_api.py", "gwas_api")
+
+        # 1. Disease → EFO traits
+        traits = mod.search_efo_traits(disease)
+        result["efo_traits"] = traits[:5]
+
+        # 2. Trait associations (if valid trait found)
+        if traits and "error" not in traits[0]:
+            efo_id = traits[0]["shortForm"]
+            result["trait_associations"] = mod.get_trait_associations(efo_id, max_results=50)
+
+        # 3. Gene-specific variants
+        result["gene_associations"] = mod.get_gene_associations(gene_symbol)
+        result["executed"] = True
+    except Exception as exc:
+        result["errors"].append(f"GWAS query failed: {exc}")
+    return _as_json(result)
+
+
+@tool
 def run_diffdock_screen(
     protein_path: str,
     ligand_smiles: str,
@@ -531,6 +617,9 @@ __all__ = [
     "query_reactome_pathways",
     "query_string_ppi_pair",
     "query_ensembl_vep_consequence",
+    "query_opentargets_target",
+    "query_opentargets_known_drugs",
+    "query_gwas_gene_trait",
     "query_drugbank_target_profile",
     "query_pubmed_clinical_limitations",
     "query_alphafold_plddt",

@@ -5,19 +5,19 @@
    deep dive -> structural druggability) with inline rubric assessment
 2. REPORT_WRITER: Generate drug.md with featured candidate emphasis
 
-This module uses a single shared DockerBackend for orchestrator + all subagents:
-- Docker container with dual mounts: host data_dir (rw) + project skills/ (ro)
-- Per-subagent skill filtering via in-container symlink directories
-- SubAgent dicts (not pre-compiled) — framework auto-wires middleware
-- Pre-written data_path.txt for deterministic subagent behavior
+All database queries are wrapped as @tool functions that run on the host process.
+Docker backend is OPTIONAL — set docker_image in DrugTargetConfig to enable
+container-level isolation for heavy-dependency tools (Census, DiffDock).
 
 Input: lr_candidates.json (top-15 L-R pairs) + selected_top3_lr.json + disease context
 Output: drug.md (markdown for HTML report integration)
 """
 
+from __future__ import annotations
+
+import logging
 import os
-import shlex
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -27,7 +27,6 @@ from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.agents.drug_target.docker_backend import DockerBackend
 from src.agents.model import create_llm
 from src.agents.drug_target.subagents.configs import get_subagents
 from src.agents.drug_target.tools import (
@@ -39,22 +38,7 @@ from src.agents.drug_target.tools import (
     validate_quality,
 )
 
-DEFAULT_SUBAGENT_SKILLSETS: dict[str, list[str]] = {
-    "evidence_assessor": [
-        "opentargets-database",
-        "gwas-database",
-        "cellxgene-census",
-        "kegg-database",
-        "reactome-database",
-        "string-database",
-        "drugbank-database",
-        "chembl-database",
-        "pubmed-database",
-        "alphafold-database",
-        "compare-census-gene-pair-by-cell-type",
-    ],
-    "report_writer": [],
-}
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -115,8 +99,9 @@ class DrugTargetConfig:
         quality_threshold: Minimum quality score to pass (default: 0.7).
         use_checkpointer: Whether to use memory checkpointer (default: False).
         custom_tools: Additional tools to include.
-        subagent_skillsets: Optional per-subagent skill-name overrides.
-        docker_image: Docker image for the sandbox container.
+        docker_image: Docker image for sandbox backend. None (default) disables
+            Docker — all tools run on the host. Set to e.g. "python:3.12-slim"
+            to enable container isolation for heavy-dependency tools.
     """
 
     provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "openrouter"
@@ -130,8 +115,29 @@ class DrugTargetConfig:
     quality_threshold: float = 0.7
     use_checkpointer: bool = False
     custom_tools: Sequence[BaseTool] = field(default_factory=list)
-    subagent_skillsets: Mapping[str, Sequence[str]] | None = None
-    docker_image: str = "python:3.12-slim"
+    docker_image: str | None = None
+
+
+def _create_docker_backend(
+    config: DrugTargetConfig,
+    resolved_data_dir: str,
+):
+    """Create DockerBackend when docker_image is configured.
+
+    Returns:
+        DockerBackend instance, or None if import fails.
+    """
+    from src.agents.drug_target.docker_backend import DockerBackend
+
+    skills_dir = str(_find_project_root() / "skills")
+    backend = DockerBackend(
+        image_name=config.docker_image,
+        host_dir=resolved_data_dir,
+        container_dir="/workspace",
+        skills_dir=skills_dir,
+    )
+    logger.info("DockerBackend enabled (image=%s)", config.docker_image)
+    return backend
 
 
 def _find_project_root() -> Path:
@@ -143,77 +149,23 @@ def _find_project_root() -> Path:
     return current.parents[3]
 
 
-def _resolve_skillsets(config: DrugTargetConfig) -> dict[str, list[str]]:
-    """Resolve per-subagent skillsets from defaults + optional config overrides."""
-    resolved = {k: list(v) for k, v in DEFAULT_SUBAGENT_SKILLSETS.items()}
-    if config.subagent_skillsets:
-        for subagent_name, skill_names in config.subagent_skillsets.items():
-            resolved[subagent_name] = [str(skill_name) for skill_name in skill_names]
-    return resolved
-
-
-def _setup_filtered_skills(
-    backend: DockerBackend,
-    skillsets: dict[str, list[str]],
-) -> None:
-    """Create per-subagent filtered skill directories via symlinks inside container.
-
-    SkillsMiddleware expects a source directory containing skill subdirectories
-    (each with SKILL.md). This creates /filtered_skills/<subagent>/ with symlinks
-    pointing to the read-only /skills/ mount.
-    """
-    for subagent_name, skill_names in skillsets.items():
-        if not skill_names:
-            continue
-        backend.execute(f"mkdir -p /filtered_skills/{shlex.quote(subagent_name)}")
-        for skill in skill_names:
-            backend.execute(
-                f"ln -sf /skills/{shlex.quote(skill)} "
-                f"/filtered_skills/{shlex.quote(subagent_name)}/{shlex.quote(skill)}"
-            )
-
-
-def _build_subagent_dicts(
-    subagent_specs: list[dict],
-    skillsets: dict[str, list[str]],
-) -> list[dict]:
-    """Convert subagent specs to SubAgent dicts with container skill paths.
-
-    Returns SubAgent dicts (not CompiledSubAgent) so the framework's
-    create_deep_agent() auto-wires middleware including SkillsMiddleware.
-    """
-    result: list[dict] = []
-    for spec in subagent_specs:
-        name = spec["name"]
-        entry: dict = {
-            "name": name,
-            "description": spec["description"],
-            "system_prompt": spec["system_prompt"],
-            "tools": spec["tools"],
-        }
-        if skillsets.get(name):
-            entry["skills"] = [f"/filtered_skills/{name}/"]
-        result.append(entry)
-    return result
-
-
 def create_drug_target_agent(
     config: DrugTargetConfig | None = None,
-) -> tuple[Runnable, DockerBackend]:
+) -> tuple[Runnable, object | None]:
     """Create the Drug Target Assessment agent using DeepAgents framework.
 
     Creates a fully configured agent with:
-    - Single shared DockerBackend (container with dual volume mounts)
-    - 2 specialized subagents as SubAgent dicts (framework auto-wires middleware)
-    - Per-subagent skill filtering via in-container symlink directories
-    - Pre-written data_path.txt for deterministic path resolution
+    - 2 specialized subagents (evidence_assessor, report_writer)
+    - All database queries via @tool wrappers (host-side by default)
+    - Optional DockerBackend when docker_image is set in config
 
     Args:
         config: Optional configuration. Uses defaults if not provided.
 
     Returns:
-        Tuple of (compiled agent runnable, DockerBackend instance).
-        Callers must manage backend lifecycle via try/finally or context manager.
+        Tuple of (compiled agent runnable, backend or None).
+        When backend is not None, callers must manage its lifecycle
+        via try/finally or context manager (backend.cleanup()).
     """
     if config is None:
         config = DrugTargetConfig()
@@ -221,28 +173,16 @@ def create_drug_target_agent(
     resolved_data_dir = str(Path(config.data_dir).expanduser().resolve())
     os.environ["DEEP_INTERPRETER_DATA_DIR"] = resolved_data_dir
 
-    skills_dir = str(_find_project_root() / "skills")
-
-    # Ensure evidence directory exists on host before mounting
+    # Ensure evidence directory exists
     evidence_dir = Path(resolved_data_dir) / "evidence"
     evidence_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Create DockerBackend with dual mounts
-    backend = DockerBackend(
-        image_name=config.docker_image,
-        host_dir=resolved_data_dir,
-        container_dir="/workspace",
-        skills_dir=skills_dir,
-    )
+    # 1. Optional Docker backend
+    backend = None
+    if config.docker_image:
+        backend = _create_docker_backend(config, resolved_data_dir)
 
-    # 2. Create per-subagent filtered skill directories (symlinks inside container)
-    skillsets = _resolve_skillsets(config)
-    _setup_filtered_skills(backend, skillsets)
-
-    # 3. Pre-write data_path.txt inside container
-    backend.write("/workspace/data_path.txt", resolved_data_dir)
-
-    # 4. Build orchestrator-level tools (these run host-side, not in Docker)
+    # 2. Build orchestrator-level tools
     tools: list = [
         load_lr_candidates,
         load_evidence_files,
@@ -254,21 +194,20 @@ def create_drug_target_agent(
     if config.custom_tools:
         tools.extend(config.custom_tools)
 
-    # 5. Get subagent specs + convert to SubAgent dicts with skills
+    # 3. Get subagent specs
     subagent_specs = get_subagents(
         custom_tools=config.custom_tools,
         data_dir=resolved_data_dir,
     )
-    subagents = _build_subagent_dicts(subagent_specs, skillsets)
 
-    # 6. Create agent
+    # 4. Create agent
     llm = create_llm(provider=config.provider)
     checkpointer = MemorySaver() if config.use_checkpointer else None
 
     agent = create_deep_agent(
         model=llm,
         tools=tools,
-        subagents=subagents,
+        subagents=subagent_specs,
         checkpointer=checkpointer,
         system_prompt=ORCHESTRATOR_SYSTEM_PROMPT,
         backend=backend,
@@ -283,10 +222,10 @@ def create_drug_target_graph() -> Runnable:
     Returns:
         Compiled Deep Agent graph.
     """
-    import atexit
-
     agent, backend = create_drug_target_agent(DrugTargetConfig())
-    atexit.register(backend.cleanup)
+    if backend:
+        import atexit
+        atexit.register(backend.cleanup)
     return agent
 
 

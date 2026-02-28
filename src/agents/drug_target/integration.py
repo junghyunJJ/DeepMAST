@@ -84,7 +84,8 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
                 config={"configurable": {"thread_id": str(uuid.uuid4())}},
             )
         finally:
-            backend.cleanup()
+            if backend:
+                backend.cleanup()
 
         # Read drug.md
         if drug_md_path.exists():

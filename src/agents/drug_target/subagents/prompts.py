@@ -17,24 +17,11 @@ target assessment of L-R (ligand-receptor) pairs from spatial transcriptomics
 CCI (cell-cell interaction) analysis, AND to score each target against a
 structured rubric with explicit rationale.
 
-## Execute Backend -- Skill Scripts for Database Queries
-
-For OpenTargets and GWAS queries, use the **execute backend** to call the relevant
-skill scripts directly. These databases do NOT have agent tools -- instead run the
-scripts from the skills directory:
-
-- **OpenTargets**: `/skills/opentargets-database/scripts/query_opentargets.py`
-  - Functions: `search_entities`, `get_target_info`, `get_target_disease_evidence`,
-    `get_target_associations`, `get_known_drugs_for_disease`, `get_drug_info`
-- **GWAS Catalog**: `/skills/gwas-database/scripts/gwas_api.py`
-  - Functions: `search_efo_traits`, `get_trait_associations`,
-    `get_gene_associations`, `get_variant_info`
-
 ## Cognitive Pattern: Plan -> Execute -> Reflect
 
 For each stage, follow this cycle:
 1. **PLAN** (sequential_thinking): Break down what to query, prioritize databases, anticipate issues
-2. **EXECUTE**: Call skill scripts via execute backend and infrastructure tools directly
+2. **EXECUTE**: Call @tool functions directly
 3. **REFLECT** (think_tool): Assess coverage -- any genes missing? API failures? Gaps to fill?
 
 ## 4-Stage Funnel Workflow
@@ -68,28 +55,19 @@ d) **[DeepMAST Enhancement] Census cross-validation** -- call `run_compare_censu
 ### Stage 2: Target Validation & Scoring (ALL L-R pairs)
 
 For EACH unique gene:
-a) **OpenTargets** -- use execute backend to run `/skills/opentargets-database/scripts/query_opentargets.py`:
-   - Call `search_entities(gene_symbol, entity_types=["target"])` to get Ensembl ID
-   - Call `get_target_info(ensembl_id, include_diseases=True)` for tractability/safety
-   - Call `get_target_disease_evidence(ensembl_id, efo_id)` for disease evidence
-   - Call `get_target_associations(ensembl_id, min_score=0.1)` for associations
+a) **OpenTargets** -- call `query_opentargets_target(gene_symbol, disease)`:
+   Returns ensembl_id, tractability, safety, disease evidence, associations.
 b) **SAVE IMMEDIATELY** -- `save_evidence(data_dir, "ot_{GENE}.json", ot_data)`
 c) IF oncology + high somatic mutation -> **Ensembl VEP**:
-   - Call `query_ensembl_vep_consequence` to predict functional consequence (Driver vs Passenger)
-d) **[DeepMAST Enhancement] GWAS** -- use execute backend to run
-   `/skills/gwas-database/scripts/gwas_api.py`:
-   - Call `search_efo_traits(disease)` to resolve disease to EFO trait ID
-   - Call `get_trait_associations(efo_id)` to fetch gene-trait associations
-   - Call `get_gene_associations(gene_symbol)` for per-gene variant lookup
-   - Bucket by reported vs nearest gene with signal scoring
+   Call `query_ensembl_vep_consequence(variant_ids)` to predict functional consequence (Driver vs Passenger)
+d) **[DeepMAST Enhancement] GWAS** -- call `query_gwas_gene_trait(gene_symbol, disease)`:
+   Returns EFO traits, trait associations (p-value filtered), gene variants.
    -> `save_evidence(data_dir, "gwas_all.json", gwas_data)`
 
 After all genes processed, save manifest:
 -> `save_evidence(data_dir, "gene_manifest.json", gene_list_with_flags)`
 
-**OpenTargets Known Drugs** -- use execute backend:
-- Resolve disease to EFO via `search_entities(disease, entity_types=["disease"])`
-- Call `get_known_drugs_for_disease(efo_id)`
+**OpenTargets Known Drugs** -- call `query_opentargets_known_drugs(disease)`:
 -> `save_evidence(data_dir, "known_drugs.json", drugs_data)`
 
 **PRIORITIZATION**: Rank all L-R pairs by OpenTargets score + ST colocalization score.

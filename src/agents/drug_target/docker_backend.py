@@ -1,8 +1,13 @@
 """Docker-based sandbox backend for Drug Target Assessment Agent.
 
-Provides true container-level isolation via Docker, replacing the
-GuardedLocalExecBackend command-whitelist approach. Implements BaseSandbox
+Provides true container-level isolation via Docker. Implements BaseSandbox
 with dual volume mounts (workspace rw + skills ro).
+
+This backend is OPTIONAL — the default workflow uses @tool wrappers that
+run on the host process. Enable Docker when you need:
+- Heavy-dependency isolation (cellxgene-census, DiffDock)
+- GPU access for structural biology tools
+- Sandboxed execution of untrusted scripts
 
 Security model: Docker process isolation — the LLM can modify /workspace
 but cannot escape the container. Host filesystem access is limited to

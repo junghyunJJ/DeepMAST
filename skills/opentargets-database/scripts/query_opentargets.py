@@ -38,7 +38,16 @@ def execute_query(query: str, variables: Optional[Dict[str, Any]] = None) -> Dic
 
     try:
         response = requests.post(BASE_URL, json=payload, timeout=30)
-        response.raise_for_status()
+
+        if response.status_code != 200:
+            try:
+                error_body = response.json()
+            except Exception:
+                error_body = response.text[:500]
+            raise Exception(
+                f"API request failed with HTTP {response.status_code}: {error_body}"
+            )
+
         data = response.json()
 
         if "errors" in data:
@@ -63,7 +72,7 @@ def search_entities(query_string: str, entity_types: Optional[List[str]] = None)
     """
     query = """
       query search($queryString: String!, $entityNames: [String!]) {
-        search(queryString: $queryString, entityNames: $entityNames, page: {size: 10}) {
+        search(queryString: $queryString, entityNames: $entityNames, page: {index: 0, size: 10}) {
           hits {
             id
             entity
@@ -94,7 +103,7 @@ def get_target_info(ensembl_id: str, include_diseases: bool = False) -> Dict[str
         Dictionary with target information including tractability, safety, expression
     """
     disease_fragment = """
-      associatedDiseases(page: {size: 10}) {
+      associatedDiseases(page: {index: 0, size: 10}) {
         rows {
           disease {
             id
@@ -102,7 +111,7 @@ def get_target_info(ensembl_id: str, include_diseases: bool = False) -> Dict[str
           }
           score
           datatypeScores {
-            componentId
+            id
             score
           }
         }
@@ -128,12 +137,12 @@ def get_target_info(ensembl_id: str, include_diseases: bool = False) -> Dict[str
             event
             effects {{
               dosing
-              organsAffected
+              direction
             }}
             biosamples {{
-              tissue {{
-                label
-              }}
+              tissueId
+              tissueLabel
+              cellLabel
             }}
           }}
 
@@ -165,7 +174,7 @@ def get_disease_info(efo_id: str, include_targets: bool = False) -> Dict[str, An
         Dictionary with disease information
     """
     target_fragment = """
-      associatedTargets(page: {size: 10}) {
+      associatedTargets(page: {index: 0, size: 10}) {
         rows {
           target {
             id
@@ -174,7 +183,7 @@ def get_disease_info(efo_id: str, include_targets: bool = False) -> Dict[str, An
           }
           score
           datatypeScores {
-            componentId
+            id
             score
           }
         }
@@ -204,22 +213,22 @@ def get_disease_info(efo_id: str, include_targets: bool = False) -> Dict[str, An
 
 
 def get_target_disease_evidence(ensembl_id: str, efo_id: str,
-                                  data_types: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+                                  datasource_ids: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """
     Retrieve evidence linking a target to a disease.
 
     Args:
         ensembl_id: Ensembl gene ID
         efo_id: EFO disease identifier
-        data_types: Optional filter for evidence types (e.g., ["genetic_association", "known_drug"])
+        datasource_ids: Optional filter by data source (e.g., ["chembl", "europepmc"])
 
     Returns:
         List of evidence records with scores and sources
     """
     query = """
-      query evidences($ensemblId: String!, $efoId: String!, $dataTypes: [String!]) {
+      query evidences($ensemblId: String!, $efoId: String!, $datasourceIds: [String!]) {
         disease(efoId: $efoId) {
-          evidences(ensemblIds: [$ensemblId], datatypes: $dataTypes, size: 100) {
+          evidences(ensemblIds: [$ensemblId], datasourceIds: $datasourceIds, size: 100) {
             rows {
               datasourceId
               datatypeId
@@ -235,8 +244,8 @@ def get_target_disease_evidence(ensembl_id: str, efo_id: str,
     """
 
     variables = {"ensemblId": ensembl_id, "efoId": efo_id}
-    if data_types:
-        variables["dataTypes"] = data_types
+    if datasource_ids:
+        variables["datasourceIds"] = datasource_ids
 
     result = execute_query(query, variables)
     return result.get("disease", {}).get("evidences", {}).get("rows", [])
@@ -265,7 +274,7 @@ def get_known_drugs_for_disease(efo_id: str) -> Dict[str, Any]:
                 drugType
                 maximumClinicalTrialPhase
               }
-              targets {
+              target {
                 id
                 approvedSymbol
               }
@@ -301,23 +310,25 @@ def get_drug_info(chembl_id: str) -> Dict[str, Any]:
           drugType
           maximumClinicalTrialPhase
           hasBeenWithdrawn
-          withdrawnNotice {
-            reasons
-            countries
-          }
           mechanismsOfAction {
-            actionType
-            mechanismOfAction
-            targetName
-            targets {
-              id
-              approvedSymbol
+            rows {
+              actionType
+              mechanismOfAction
+              targets {
+                id
+                approvedSymbol
+              }
             }
           }
           indications {
-            disease
-            efoId
-            maxPhaseForIndication
+            count
+            rows {
+              disease {
+                id
+                name
+              }
+              maxPhaseForIndication
+            }
           }
         }
       }
@@ -341,7 +352,7 @@ def get_target_associations(ensembl_id: str, min_score: float = 0.0) -> List[Dic
     query = """
       query targetAssociations($ensemblId: String!) {
         target(ensemblId: $ensemblId) {
-          associatedDiseases(page: {size: 100}) {
+          associatedDiseases(page: {index: 0, size: 100}) {
             count
             rows {
               disease {
@@ -350,7 +361,7 @@ def get_target_associations(ensembl_id: str, min_score: float = 0.0) -> List[Dic
               }
               score
               datatypeScores {
-                componentId
+                id
                 score
               }
             }

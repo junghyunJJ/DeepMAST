@@ -1640,7 +1640,11 @@ Available factors: {available_factors}
             if "factor" in response2_lower:
                 match = re.search(r"factor[_\s]?(\d+)", response2_lower)
                 if match:
-                    parsed_factor = f"Factor_{match.group(1)}"
+                    num = match.group(1)
+                    candidate = f"Factor_{num}"
+                    if candidate not in available_factors:
+                        candidate = f"Factor{num}"
+                    parsed_factor = candidate
 
             return {
                 "sel_factor": parsed_factor,
@@ -1684,12 +1688,15 @@ Available factors: {available_factors}
         if "factor" in response2_lower:
             match = re.search(r"factor[_\s]?(\d+)", response2_lower)
             if match:
-                candidate = f"Factor_{match.group(1)}"
+                num = match.group(1)
+                candidate = f"Factor_{num}"
+                if candidate not in available_factors:
+                    candidate = f"Factor{num}"  # Try without underscore
                 if candidate in available_factors:
                     parsed_factor = candidate
                 else:
                     logger.warning(
-                        f"User selected {candidate} but not in available: {available_factors}. "
+                        f"User selected Factor_{num}/Factor{num} but not in available: {available_factors}. "
                         f"Using suggestion: {sel_factor_suggestion}"
                     )
         elif response2_lower in ("yes", "ok", "confirm", "y", "sure", "accepted"):
@@ -1877,7 +1884,9 @@ Available factors: {available_factors}
         # Get or create Deep Agent with per-invocation config
         configurable = (config or {}).get("configurable", {})
         provider_override = (configurable.get("llm_provider") or "").strip() or None
-        deep_agent = self.get_deep_agent(data_directory, provider_override=provider_override)
+        deep_agent = await asyncio.to_thread(
+            self.get_deep_agent, data_directory, provider_override=provider_override
+        )
 
         # Build initial message with embedded targets
         targets_content = {

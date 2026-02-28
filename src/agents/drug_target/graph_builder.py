@@ -28,8 +28,6 @@ def _get_drug_target_graph() -> Runnable:
     Returns:
         Compiled Drug Target Agent runnable
     """
-    import atexit
-
     provider = os.getenv("LLM_PROVIDER", "openrouter")
     data_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace")
 
@@ -40,7 +38,8 @@ def _get_drug_target_graph() -> Runnable:
     )
 
     agent, backend = create_drug_target_agent(config)
-    atexit.register(backend.cleanup)
+    if backend:
+        atexit.register(backend.cleanup)
     return agent
 
 

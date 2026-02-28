@@ -18,12 +18,15 @@ from src.agents.drug_target.tools import (
     load_lr_candidates,
     save_evidence,
     load_evidence_files,
-    # Stage-specific domain tools (no skill equivalents)
+    # Stage-specific domain tools
     query_cellxgene_lr_context,
     query_kegg_pathways,
     query_reactome_pathways,
     query_string_ppi_pair,
     query_ensembl_vep_consequence,
+    query_opentargets_target,
+    query_opentargets_known_drugs,
+    query_gwas_gene_trait,
     query_drugbank_target_profile,
     query_pubmed_clinical_limitations,
     query_alphafold_plddt,
@@ -55,9 +58,9 @@ SUBAGENT_CONFIGS = {
             "4-stage funnel: biological context -> validation & scoring -> "
             "deep dive -> structural druggability. Includes inline rubric assessment. "
             "Loads lr_candidates.json + selected_top3_lr.json, then systematically "
-            "queries databases via execute backend (OpenTargets, GWAS) and infrastructure "
-            "tools (Cellxgene, KEGG/Reactome, STRING, VEP, DrugBank, PubMed, AlphaFold, "
-            "DiffDock, Census cross-validation). Applies DRUG_TARGET_RUBRIC scoring inline "
+            "queries databases via @tool wrappers (OpenTargets, GWAS, Cellxgene, "
+            "KEGG/Reactome, STRING, VEP, DrugBank, PubMed, AlphaFold, DiffDock, "
+            "Census cross-validation). Applies DRUG_TARGET_RUBRIC scoring inline "
             "after Stage 2. Saves evidence/*.json files with is_selected_top3 flags. "
             "Uses Plan->Execute->Reflect cycle per stage."
         ),
@@ -74,6 +77,9 @@ SUBAGENT_CONFIGS = {
             query_string_ppi_pair,
             run_compare_census_lr_pair,
             # Stage 2: Target Validation
+            query_opentargets_target,
+            query_opentargets_known_drugs,
+            query_gwas_gene_trait,
             query_ensembl_vep_consequence,
             # Stage 3: Deep Dive
             query_drugbank_target_profile,

@@ -1,5 +1,5 @@
 {
-  "last_turn_at": "2026-02-28T19:31:39.052Z",
-  "turn_count": 95,
-  "last_agent_output": "저장 완료했습니다.\n\n- 파일: `docs/2026-02-28-deepmast-eval-session-notes.md`\n\n이번 세션에서 합의한 내용(목적, gold 전략, 3개 타"
+  "last_turn_at": "2026-02-28T21:59:54.794Z",
+  "turn_count": 99,
+  "last_agent_output": "`src/agents/deep_interpreter` 기준으로 보면 “모델 사양”이 2단으로 잡혀 있어요.\n\n- `provider` 기본값:\n  - 함수 시그니처는 `ollama`"
 }

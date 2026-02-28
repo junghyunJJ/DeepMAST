@@ -1,8 +1,8 @@
 """Tool wrappers for Drug Target Assessment Agent.
 
 Infrastructure tools for evidence I/O, stage logic, and structural biology.
-Database queries (OpenTargets, GWAS, ChEMBL, ClinicalTrials, FDA) are handled
-by subagents via the execute backend calling skill scripts directly.
+All database queries (including OpenTargets and GWAS) are wrapped as @tool
+functions for consistent invocation by subagents.
 """
 
 from src.agents.drug_target.tools.evidence_loader import (
@@ -19,6 +19,9 @@ from src.agents.drug_target.tools.stage_domain_tools import (
     query_reactome_pathways,
     query_string_ppi_pair,
     query_ensembl_vep_consequence,
+    query_opentargets_target,
+    query_opentargets_known_drugs,
+    query_gwas_gene_trait,
     query_drugbank_target_profile,
     query_pubmed_clinical_limitations,
     query_alphafold_plddt,
@@ -54,6 +57,9 @@ __all__ = [
     "query_reactome_pathways",
     "query_string_ppi_pair",
     "query_ensembl_vep_consequence",
+    "query_opentargets_target",
+    "query_opentargets_known_drugs",
+    "query_gwas_gene_trait",
     "query_drugbank_target_profile",
     "query_pubmed_clinical_limitations",
     "query_alphafold_plddt",
