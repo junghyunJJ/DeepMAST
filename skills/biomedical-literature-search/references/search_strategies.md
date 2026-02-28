@@ -10,6 +10,18 @@ Detailed search strategies and keyword combinations by result type.
 
 ### search_literature_dynamic (PRIMARY)
 LLM-powered dynamic search with context-aware query generation and internal fallback.
+Prefer running through this skill wrapper script:
+
+```bash
+python scripts/search_literature_dynamic.py \
+  --genes "GENE1,GENE2" \
+  --pathways "pathway1" \
+  --celltypes "CellType1" \
+  --disease "disease name" \
+  --max-results 20
+```
+
+Equivalent direct tool call:
 
 ```python
 search_literature_dynamic(

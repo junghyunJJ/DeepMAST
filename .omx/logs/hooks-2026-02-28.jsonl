@@ -1,0 +1,4 @@
+{"timestamp":"2026-02-28T00:06:56.257Z","type":"hook_dispatch","event":"turn-complete","source":"native","enabled":false,"reason":"plugins_disabled"}
+{"timestamp":"2026-02-28T07:00:58.392Z","type":"hook_dispatch","event":"turn-complete","source":"native","enabled":false,"reason":"plugins_disabled"}
+{"timestamp":"2026-02-28T19:25:33.900Z","type":"hook_dispatch","event":"turn-complete","source":"native","enabled":false,"reason":"plugins_disabled"}
+{"timestamp":"2026-02-28T19:31:39.056Z","type":"hook_dispatch","event":"turn-complete","source":"native","enabled":false,"reason":"plugins_disabled"}

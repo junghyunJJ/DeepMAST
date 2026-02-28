@@ -99,17 +99,17 @@ def create_google_llm(**kwargs) -> ChatGoogleGenerativeAI:
 
 def create_ollama_llm(**kwargs) -> ChatOllama:
     """
-    Create Ollama LLM instance (default: qwen3:30b at localhost:6000)
+    Create Ollama LLM instance (default: qwen3.5:122b at localhost:6000)
     
     Args:
-        model: Model name (default: qwen3:30b)
+        model: Model name (default: qwen3.5:122b)
         base_url: Ollama server URL (default: http://localhost:6000)
         temperature: Temperature setting (default: 0)
     """
     # model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "gpt-oss:20b"))
-    # model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3:30b"))
+    # model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3.5:122b"))
     
-    model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3:30b"))
+    model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3.5:122b"))
 
     base_url = kwargs.get("base_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:6000"))
     temperature = kwargs.get("temperature", 0)

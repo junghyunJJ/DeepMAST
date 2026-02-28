@@ -1,6 +1,6 @@
 ---
 name: biomedical-literature-search
-description: Complete literature search workflow for CCI analysis interpretation - provides 4-phase workflow with search timing, quality criteria, and tool usage guidance.
+description: Complete literature search workflow for CCI analysis interpretation using src/agents/deep_interpreter/tools/literature.py::search_literature_dynamic as the primary engine, with a runnable wrapper at scripts/search_literature_dynamic.py. Use when you need phase-based biomedical paper search, coverage checks, and auto-saved outputs for Part 1 and Part 2+3.
 ---
 
 # Biomedical Literature Search Strategy
@@ -14,6 +14,23 @@ This skill provides the **complete workflow** for the SEARCHER subagent. It defi
 - **WHAT** to search (priority by analysis type)
 - **HOW** to validate (quality criteria)
 - **WHERE** to write outputs (virtual filesystem)
+
+## Script Entry Point
+
+Run the skill wrapper from this skill directory:
+
+```bash
+python scripts/search_literature_dynamic.py \
+  --genes "CDH1,TGFB1,VIM" \
+  --pathways "EMT,TGFb,Hypoxia" \
+  --celltypes "Tumor,Fibroblast,Macrophages" \
+  --disease "breast cancer" \
+  --max-results 30 \
+  --output-path "part1_papers.json"
+```
+
+The wrapper calls `src/agents/deep_interpreter/tools/literature.py::search_literature_dynamic`
+directly and prints JSON output.
 
 ## Architecture
 
@@ -34,6 +51,8 @@ This skill provides the **complete workflow** for the SEARCHER subagent. It defi
 │  - search_literature: Single query search (follow-up)            │
 │  - think_tool: Reflection (Phase 3)                               │
 │  - read_file / write_file: Virtual filesystem operations         │
+│  - scripts/search_literature_dynamic.py: CLI wrapper for primary │
+│    search_literature_dynamic tool                                │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -118,21 +137,21 @@ Write extracted context to **/partN_search_context.json**:
 ## Phase 2: Search Literature
 
 ### Step 2.1: Execute LLM-Powered Dynamic Search (Primary)
-Use **search_literature_dynamic** tool for context-aware, LLM-generated queries:
+Use **scripts/search_literature_dynamic.py** (primary) which calls
+`search_literature_dynamic` for context-aware, LLM-generated queries:
 - genes: lr_search_context["genes"] (pre-filtered top 30 by hybrid score, use directly)
 - pathways: Priority pathways from search strategy
 - celltypes: Relevant cell types for this Part
 - disease: Disease context (e.g., "breast cancer")
 
-```python
-search_literature_dynamic(
-    genes=["CDH1", "TGFB1", "VIM", "ERBB2", "MMP2"],  # Top 10-15 only
-    pathways=["EMT", "TGFB", "WNT", "Hypoxia"],
-    celltypes=["Tumor", "Fibroblast", "Macrophages"],
-    disease="breast cancer",
-    max_results=20,
-    output_path="part1_papers.json"  # Auto-saves full results to file
-)
+```bash
+python scripts/search_literature_dynamic.py \
+  --genes "CDH1,TGFB1,VIM,ERBB2,MMP2" \
+  --pathways "EMT,TGFB,WNT,Hypoxia" \
+  --celltypes "Tumor,Fibroblast,Macrophages" \
+  --disease "breast cancer" \
+  --max-results 20 \
+  --output-path "part1_papers.json"
 ```
 
 **Why Dynamic Search First?**
@@ -284,21 +303,24 @@ saves complete results (all papers with full abstracts) directly to file. You do
 need to call `write_file` for papers — the tool handles it automatically with zero truncation.
 
 ### How to Use output_path
-```python
+```bash
 # Part 1: auto-saves to DEEP_INTERPRETER_DATA_DIR/part1_papers.json
-result = search_literature_dynamic(
-    genes=[], pathways=[...], celltypes=[...], disease="breast cancer",
-    max_results=40,
-    output_path="part1_papers.json"
-)
-# result = {"saved_to": "/path/to/part1_papers.json", "total_papers": 38, "coverage": {...}, ...}
+python scripts/search_literature_dynamic.py \
+  --genes "" \
+  --pathways "Androgen,EGFR,Hypoxia,MAPK,PI3K,TGFb" \
+  --celltypes "B cells,Endothelial,Invasive Tumor,Stromal,Macrophages" \
+  --disease "breast cancer" \
+  --max-results 40 \
+  --output-path "part1_papers.json"
 
 # Part 2+3 (shared): auto-saves to DEEP_INTERPRETER_DATA_DIR/liana_papers.json
-result = search_literature_dynamic(
-    genes=[...], pathways=[...], celltypes=[...], disease="breast cancer",
-    max_results=40,
-    output_path="liana_papers.json"
-)
+python scripts/search_literature_dynamic.py \
+  --genes "ITGB1,CD44,APP,FYN,ITGAV,FN1,TGFB1" \
+  --pathways "Androgen,EGFR,Hypoxia,MAPK,PI3K,TGFb" \
+  --celltypes "B cells,Endothelial,Invasive Tumor,Stromal,Macrophages" \
+  --disease "breast cancer" \
+  --max-results 40 \
+  --output-path "liana_papers.json"
 ```
 
 ### What the Tool Returns (Compact Summary)
@@ -344,7 +366,6 @@ The auto-saved file contains the complete data:
 - Do **NOT** call `write_file` for papers when using `output_path`
 - The saved file is guaranteed to have `total_papers == len(papers)` (no truncation)
 - Use `read_file('/part1_papers.json')` or `read_file('/liana_papers.json')` to inspect saved data
-```
 
 ---
 
@@ -384,6 +405,18 @@ The auto-saved file contains the complete data:
 
 ### search_literature_dynamic (PRIMARY)
 LLM-powered dynamic search with context-aware query generation.
+
+```bash
+python scripts/search_literature_dynamic.py \
+  --genes "CDH1,TGFB1,VIM" \
+  --pathways "EMT,TGFB,WNT" \
+  --celltypes "Tumor,Fibroblast" \
+  --disease "breast cancer" \
+  --max-results 20 \
+  --output-path "part1_papers.json"
+```
+
+Equivalent tool call:
 
 ```python
 search_literature_dynamic(
@@ -528,15 +561,14 @@ search_literature_dynamic (primary — handles fallback internally)
 - Disease: Alzheimer's disease
 
 ### Phase 2: Execute Dynamic Search
-```python
-result = search_literature_dynamic(
-    genes=["APOE", "TREM2"],
-    pathways=["TREM2 signaling", "microglial activation"],
-    celltypes=["Microglia"],
-    disease="Alzheimer disease",
-    max_results=20,
-    output_path="liana_papers.json"  # Auto-saves full results to file
-)
+```bash
+python scripts/search_literature_dynamic.py \
+  --genes "APOE,TREM2" \
+  --pathways "TREM2 signaling,microglial activation" \
+  --celltypes "Microglia" \
+  --disease "Alzheimer disease" \
+  --max-results 20 \
+  --output-path "liana_papers.json"
 # Fallback is handled internally — no manual fallback needed
 # Papers auto-saved; result contains compact summary with total_papers, coverage
 ```
@@ -563,7 +595,6 @@ iteration=1, max_iterations=1)
 # Papers already auto-saved via output_path in Phase 2 — no write_file needed
 # result = {"saved_to": "/path/to/liana_papers.json", "total_papers": 28, "coverage": {...}}
 # Use read_file("/liana_papers.json") if you need to inspect the saved data
-```
 ```
 
 ### Generated Interpretation

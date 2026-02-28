@@ -3,11 +3,14 @@ name = "deepmast"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "aiofiles>=25.1.0",
     "cellcharter>=0.3.5",
+    "cellxgene-census>=1.17.0",
     "decoupler>=2.1.3",
+    "deepagents>=0.4.4",
+    "docker>=7.1.0",
     "ipykernel>=7.1.0",
     "ipython>=9.9.0",
     "langchain>=1.2.2",
@@ -16,13 +19,13 @@ dependencies = [
     "langchain-ollama>=1.0.1",
     "langchain-openai>=1.1.7",
     "langgraph>=1.0.5",
-    "langgraph-api==0.6.32",  # Pin for sse-starlette 2.1.x compatibility
+    "langgraph-api==0.6.32", # Pin for sse-starlette 2.1.x compatibility
     "langgraph-cli>=0.4.11",
     "liana>=1.6.1",
     "omnipath>=1.0.12",
     "scanpy>=1.11.5",
     "squidpy>=1.7.0",
-    "sse-starlette>=2.0.0,<2.2.0",  # Pin for langgraph-api 0.6.x compatibility (has listen_for_exit_signal + send_timeout)
+    "sse-starlette>=2.0.0,<2.2.0", # Pin for langgraph-api 0.6.x compatibility (has listen_for_exit_signal + send_timeout)
 ]
 
 [tool.pytest.ini_options]

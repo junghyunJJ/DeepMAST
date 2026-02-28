@@ -439,11 +439,8 @@ def query_pubmed_clinical_limitations(target_name: str, max_results: int = 5) ->
     query = f"\"{target_name}\"[tiab] AND \"Clinical Trial\"[pt] AND \"adverse event\"[tiab]"
     result["query"] = query
     try:
-        from src.agents.deep_interpreter.tools.pubmed_eutils import search_pubmed_advanced
-
-        pub = search_pubmed_advanced.invoke(
-            {"query": query, "max_results": max(1, min(max_results, 20))}
-        )
+        _pubmed = _load_skill_module("pubmed-eutils-search", "search_pubmed.py", "search_pubmed")
+        pub = _pubmed.search_pubmed(query=query, max_results=max(1, min(max_results, 20)))
         papers = pub.get("papers", []) if isinstance(pub, dict) else []
         result["papers"] = [
             {

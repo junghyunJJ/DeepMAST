@@ -215,6 +215,28 @@ search_pubmed_advanced(query="matrix metalloproteinase/physiology[mh] AND tumor 
 | Pathway analysis | Metabolic Networks and Pathways[mh] |
 | Single cell | Single-Cell Analysis[mh] |
 
+## Scripts
+
+The `scripts/` directory contains standalone, dependency-free Python modules:
+
+| Script | Description |
+|--------|-------------|
+| `scripts/search_pubmed.py` | Synchronous PubMed E-utilities search (stdlib only) |
+
+### Key functions in `search_pubmed.py`
+
+- `search_pubmed(query, max_results, sort, min_date, max_date)` — Execute PubMed search (sync)
+- `build_pubmed_query(genes, pathways, celltypes, disease, ...)` — Build structured query strings
+- `_parse_pubmed_xml(xml_data)` — Parse EFetch XML into paper dicts
+- `_sanitize_pubmed_term(term)` — Clean terms for query safety
+
+### Usage via `_load_skill_module()`
+
+```python
+mod = _load_skill_module("pubmed-eutils-search", "search_pubmed.py", "search_pubmed")
+result = mod.search_pubmed(query="VEGFA[tiab] AND cancer[mh]", max_results=10)
+```
+
 ## Rate Limits
 
 - Without API key: 3 requests/second (enforced automatically)

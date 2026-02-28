@@ -61,27 +61,30 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
             disease=disease,
         )
 
-        agent = create_drug_target_agent(config)
+        agent, backend = create_drug_target_agent(config)
 
-        # Build initial message with context
-        initial_message = (
-            f"Assess therapeutic potential of L-R pair genes in {resolved_dir}.\n\n"
-            f"Disease context: {disease}\n"
-            f"Input files: lr_candidates.json, selected_top3_lr.json\n"
-            f"Output: target_assessment.json and drug.md\n\n"
-            f"Execute the full evidence_assessor → report_writer pipeline."
-        )
+        try:
+            # Build initial message with context
+            initial_message = (
+                f"Assess therapeutic potential of L-R pair genes in {resolved_dir}.\n\n"
+                f"Disease context: {disease}\n"
+                f"Input files: lr_candidates.json, selected_top3_lr.json\n"
+                f"Output: target_assessment.json and drug.md\n\n"
+                f"Execute the full evidence_assessor → report_writer pipeline."
+            )
 
-        # Run the agent
-        result = await agent.ainvoke(
-            {
-                "messages": [{
-                    "role": "user",
-                    "content": initial_message,
-                }]
-            },
-            config={"configurable": {"thread_id": str(uuid.uuid4())}},
-        )
+            # Run the agent
+            result = await agent.ainvoke(
+                {
+                    "messages": [{
+                        "role": "user",
+                        "content": initial_message,
+                    }]
+                },
+                config={"configurable": {"thread_id": str(uuid.uuid4())}},
+            )
+        finally:
+            backend.cleanup()
 
         # Read drug.md
         if drug_md_path.exists():

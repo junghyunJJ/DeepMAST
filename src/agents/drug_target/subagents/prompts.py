@@ -23,11 +23,12 @@ For OpenTargets and GWAS queries, use the **execute backend** to call the releva
 skill scripts directly. These databases do NOT have agent tools -- instead run the
 scripts from the skills directory:
 
-- **OpenTargets**: `skills/opentargets-database/scripts/query_opentargets.py`
+- **OpenTargets**: `/skills/opentargets-database/scripts/query_opentargets.py`
   - Functions: `search_entities`, `get_target_info`, `get_target_disease_evidence`,
     `get_target_associations`, `get_known_drugs_for_disease`, `get_drug_info`
-- **GWAS Catalog**: `skills/gwas-database/scripts/` (REST API via requests)
-  - Use `https://www.ebi.ac.uk/gwas/rest/api` with gene/trait queries
+- **GWAS Catalog**: `/skills/gwas-database/scripts/gwas_api.py`
+  - Functions: `search_efo_traits`, `get_trait_associations`,
+    `get_gene_associations`, `get_variant_info`
 
 ## Cognitive Pattern: Plan -> Execute -> Reflect
 
@@ -67,7 +68,7 @@ d) **[DeepMAST Enhancement] Census cross-validation** -- call `run_compare_censu
 ### Stage 2: Target Validation & Scoring (ALL L-R pairs)
 
 For EACH unique gene:
-a) **OpenTargets** -- use execute backend to run `skills/opentargets-database/scripts/query_opentargets.py`:
+a) **OpenTargets** -- use execute backend to run `/skills/opentargets-database/scripts/query_opentargets.py`:
    - Call `search_entities(gene_symbol, entity_types=["target"])` to get Ensembl ID
    - Call `get_target_info(ensembl_id, include_diseases=True)` for tractability/safety
    - Call `get_target_disease_evidence(ensembl_id, efo_id)` for disease evidence
@@ -75,9 +76,11 @@ a) **OpenTargets** -- use execute backend to run `skills/opentargets-database/sc
 b) **SAVE IMMEDIATELY** -- `save_evidence(data_dir, "ot_{GENE}.json", ot_data)`
 c) IF oncology + high somatic mutation -> **Ensembl VEP**:
    - Call `query_ensembl_vep_consequence` to predict functional consequence (Driver vs Passenger)
-d) **[DeepMAST Enhancement] GWAS** -- use execute backend to batch query all genes:
-   - Resolve disease to EFO trait via `/efoTraits/search/findByEfoTrait?trait={disease}`
-   - Fetch associations via `/efoTraits/{trait_id}/associations`
+d) **[DeepMAST Enhancement] GWAS** -- use execute backend to run
+   `/skills/gwas-database/scripts/gwas_api.py`:
+   - Call `search_efo_traits(disease)` to resolve disease to EFO trait ID
+   - Call `get_trait_associations(efo_id)` to fetch gene-trait associations
+   - Call `get_gene_associations(gene_symbol)` for per-gene variant lookup
    - Bucket by reported vs nearest gene with signal scoring
    -> `save_evidence(data_dir, "gwas_all.json", gwas_data)`
 
