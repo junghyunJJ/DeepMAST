@@ -158,6 +158,7 @@ class HybridLRPrioritizer:
             ValueError: If no Moran's R column found
         """
         possible_columns = [
+            "morans",
             "morans_r",
             "morans_R",
             "Morans_R",
@@ -440,7 +441,7 @@ def _build_combinedscore_rationale(scored_df: pd.DataFrame) -> str:
 
     # Detect Moran's R column name
     morans_col = None
-    for col in ("morans_r", "morans_R", "Morans_R", "global_r"):
+    for col in ("morans", "morans_r", "morans_R", "Morans_R", "global_r"):
         if col in scored_df.columns:
             morans_col = col
             break
@@ -597,9 +598,9 @@ def _compute_hub_gene_count(
 @tool
 def prioritize_top_lr_pairs(
     data_dir: str,
-    candidate_count: int = 15,
+    candidate_count: int = 30,
 ) -> str:
-    """Get candidate L-R pairs for LLM-based novel interaction selection.
+    """Get candidate L-R pairs for drug target assessment pipeline.
 
     This tool filters out well-known L-R pairs (where both ligand and receptor
     are among the top-30 most-studied genes) and returns candidate pairs ranked
@@ -608,15 +609,15 @@ def prioritize_top_lr_pairs(
     The workflow:
     1. Load interest_sig_liana.csv (pre-filtered for interest clusters)
     2. Exclude pairs where BOTH genes are well-known hub genes (top-30)
-    3. Rank by combinedscore (advisory — LLM makes final selection)
-    4. Return up to candidate_count candidates for LLM selection
+    3. Rank by combinedscore
+    4. Return up to candidate_count candidates for drug target evidence funnel
 
     Args:
         data_dir: Path to the analysis directory containing interest_sig_liana.csv
-        candidate_count: Max number of candidate pairs to return (default: 15)
+        candidate_count: Max number of candidate pairs to return (default: 30)
 
     Returns:
-        JSON string with candidate L-R pairs for LLM selection
+        JSON string with candidate L-R pairs for drug target assessment
     """
     data_path = Path(data_dir)
 
@@ -710,7 +711,7 @@ def prioritize_top_lr_pairs(
     # Extract key columns for output
     output_columns = [
         "ligand", "receptor", "interaction",
-        "morans_r", "morans_R", "Morans_R", "global_r",
+        "morans", "morans_r", "morans_R", "Morans_R", "global_r",
         "genept_score", "combinedscore",
         "hub_gene_count", "novelty_score", "rank",
     ]
@@ -723,13 +724,11 @@ def prioritize_top_lr_pairs(
             "hub_gene_count indicates how many genes in the pair are hub genes "
             "(0=novel, 1=one hub gene; both-hub pairs already excluded). "
             "novelty_score = combinedscore - 0.1×hub_gene_count (penalizes hub genes). "
-            "YOU must select the TOP 3 most interesting pairs using the STRUCTURED RUBRIC: "
-            "score each candidate on Novelty (1-5), Spatial (1-5), Mechanism (1-5). "
-            "Select top 3 by total score; break ties by lower hub_gene_count. "
-            "Write your rubric scores BEFORE interpreting. "
-            "After selecting your TOP 3, call save_selected_lr_pairs with rubric scores to persist your selection."
+            "These candidates will be passed to the drug target assessment pipeline "
+            "which uses a 4-stage evidence funnel (11 databases) to determine featured candidates. "
+            "Call run_drug_target_assessment next to get evidence-based featured candidates."
         ),
-        "candidate_pairs": scored_df[available_columns].to_dict(orient="records"),
+        "pairs": scored_df[available_columns].to_dict(orient="records"),
         "total_pairs_in_file": total_pairs,
         "excluded_count": excluded_count,
         "exclusion_level": exclusion_level,
@@ -763,18 +762,26 @@ def save_selected_lr_pairs(
     data_dir: str,
     selected_pairs: list[dict],
 ) -> str:
-    """Save the INTERPRETER's top 3 L-R pair selection with reasoning and optional rubric.
+    """[DEPRECATED] Save the INTERPRETER's top 3 L-R pair selection.
 
-    Call this AFTER selecting your top 3 pairs from the candidates returned by
-    prioritize_top_lr_pairs. Each pair dict should contain: ligand, receptor, reasoning.
-    Optionally include a rubric dict with novelty, spatial, mechanism scores (1-5 each).
+    This tool is deprecated. Featured candidates are now determined by the
+    drug_target agent's 4-stage evidence funnel (rubric scoring). Kept for
+    backward compatibility only.
 
     Args:
         data_dir: Analysis directory (same as prioritize_top_lr_pairs)
         selected_pairs: List of dicts with keys: ligand, receptor, reasoning,
             and optionally rubric: {novelty: int, spatial: int, mechanism: int}
     """
+    import warnings
     from datetime import datetime, timezone
+
+    warnings.warn(
+        "save_selected_lr_pairs is deprecated. Featured candidates are now "
+        "determined by the drug_target agent's rubric scoring.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     data_path = Path(data_dir)
     if not data_path.is_dir():

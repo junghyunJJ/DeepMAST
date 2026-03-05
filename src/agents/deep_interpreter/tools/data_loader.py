@@ -5,12 +5,15 @@ and returns a summary of available figures and data.
 """
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from langchain_core.tools import tool
+
+logger = logging.getLogger(__name__)
 
 
 # Analysis file mapping - matches actual filenames in res/ directory
@@ -342,14 +345,54 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     # Get recommended targets for auto-selection
     recommendations = get_recommended_targets(data_dir)
 
-    # Extract search context for subagents (prevents CSV context overflow)
-    # Combined context for backward compatibility
-    search_context = _extract_search_context(data_path)
-    # Context-type based extraction (reduced redundancy)
-    # - spatial_search_context: For Part 1 (pathways + celltypes, NO genes)
-    # - lr_search_context: For Part 2 & 3 (genes + pathways + celltypes)
-    spatial_search_context = _extract_search_context(data_path, context_type="spatial")
-    lr_search_context = _extract_search_context(data_path, context_type="lr_interaction")
+    # Extract unified search context for subagents (prevents CSV context overflow)
+    # Single context used by ALL parts: genes + pathways + celltypes
+    # lr_interaction type is a superset of spatial (adds genes), so one search covers all parts
+    search_context_for_search = _extract_search_context(data_path, context_type="lr_interaction")
+
+    # --- Pre-compute lr_candidates and augment gene list ---
+    # prioritize_top_lr_pairs reads CSV + optional top_search_genes.json
+    # If top_search_genes.json is missing, prioritizer skips novelty exclusion
+    try:
+        from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+        lr_result_json = prioritize_top_lr_pairs.invoke(
+            {"data_dir": str(data_path), "candidate_count": 30}
+        )
+        lr_result = json.loads(lr_result_json)                    # FIX #1: use module-level json
+        candidate_pairs = lr_result.get("pairs", [])
+
+        # Extract novel genes from candidate pairs
+        # Complex receptor names in LIANA use underscore (e.g., ITGA2_ITGB1)
+        # Split to get individual gene symbols for search coverage
+        candidate_genes = set()
+        for pair in candidate_pairs:
+            for gene_key in ("ligand", "receptor"):
+                gene = pair.get(gene_key, "")
+                if gene:
+                    for g in gene.split("_"):
+                        if g:
+                            candidate_genes.add(g)
+
+        # Augment search_context_for_search genes with novel candidate genes
+        existing_genes_list = search_context_for_search.get("genes", [])  # FIX #2: preserve order
+        existing_genes_set = set(existing_genes_list)
+        novel_genes = sorted(candidate_genes - existing_genes_set)
+        if novel_genes:
+            search_context_for_search["genes"] = existing_genes_list + novel_genes  # FIX #2
+            search_context_for_search["candidate_genes"] = novel_genes
+            search_context_for_search["stats"]["search_genes"] = len(search_context_for_search["genes"])  # FIX #3
+            search_context_for_search["note"] = (                         # FIX #4: append
+                search_context_for_search.get("note", "") + " | "
+                f"Augmented with {len(novel_genes)} novel genes from lr_candidates. "
+                f"Total: {len(search_context_for_search['genes'])} genes."
+            )
+            logger.info(
+                f"Augmented search genes: {len(existing_genes_list)} hub + "
+                f"{len(novel_genes)} novel = {len(search_context_for_search['genes'])} total"
+            )
+    except Exception as e:
+        logger.warning(f"lr_candidates pre-computation skipped: {e}")
+        # Non-critical: SEARCHER proceeds with original top-30 genes
 
     # Try to write files to the Deep Agents filesystem
     # Deep Agents stores files in the agent state, accessible via read_file/write_file tools
@@ -376,16 +419,10 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
         "recommended_celltypes": recommendations["recommended_celltypes"],
         "recommended_mode": recommendations["recommended_mode"],
         "selection_rationale": recommendations["rationale"],
-        # Pre-extracted search context for subagents (prevents CSV context overflow)
-        # Contains ALL unique genes, pathways, celltypes from interest_sig_liana.csv
-        # Subagents should use this instead of reading CSV files directly
-        "search_context": search_context,  # Combined for backward compatibility
-        # Context-type based search contexts for targeted literature search
-        # - spatial_search_context: For Part 1 (pathways + celltypes, NO genes)
-        # - lr_search_context: For Part 2 & 3 (genes + pathways + celltypes)
-        # Note: Part 2 & 3 merged to eliminate redundancy (identical data)
-        "spatial_search_context": spatial_search_context,
-        "lr_search_context": lr_search_context,
+        # Unified search context for ALL parts (genes + pathways + celltypes)
+        # lr_interaction context is a superset of spatial (adds genes to pathways+celltypes)
+        # Single search covers all 3 parts, eliminating redundant API calls
+        "search_context": search_context_for_search,
         # Informational: /data_path.txt is pre-written by the agent framework.
         "_DATA_PATH_INFO": {
             "data_path_txt": str(data_path),

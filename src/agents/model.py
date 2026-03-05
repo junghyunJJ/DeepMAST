@@ -114,11 +114,28 @@ def create_ollama_llm(**kwargs) -> ChatOllama:
     base_url = kwargs.get("base_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:6000"))
     temperature = kwargs.get("temperature", 0)
     
-    return ChatOllama(
+    num_ctx = kwargs.get("num_ctx", 65536)
+    num_predict = kwargs.get("num_predict", 16384)
+
+    llm = ChatOllama(
         model=model,
         base_url=base_url,
         temperature=temperature,
+        keep_alive="24h",
+        num_ctx=num_ctx,
+        num_predict=num_predict,
+        disable_streaming=True,
+        client_kwargs={
+            "timeout": 7200,
+        }
     )
+    # Set profile so deepagents SummarizationMiddleware triggers at 85% of
+    # actual context window instead of defaulting to 170K tokens (unreachable).
+    llm.profile = {
+        "max_input_tokens": num_ctx - num_predict,
+        "max_output_tokens": num_predict,
+    }
+    return llm
 
 
 def create_openrouter_llm(**kwargs) -> ChatOpenAI:
@@ -131,13 +148,18 @@ def create_openrouter_llm(**kwargs) -> ChatOpenAI:
     """
     model = kwargs.get("model", os.getenv("OPENROUTER_MODEL", "moonshotai/kimi-k2.5"))
     temperature = kwargs.get("temperature", 0)
+    max_tokens = kwargs.get("max_tokens")
 
-    return ChatOpenAI(
+    init_kwargs = dict(
         model=model,
         base_url="https://openrouter.ai/api/v1",
         api_key=os.getenv("OPENROUTER_API_KEY"),
         temperature=temperature,
     )
+    if max_tokens is not None:
+        init_kwargs["max_tokens"] = max_tokens
+
+    return ChatOpenAI(**init_kwargs)
 
 
 def create_llm_from_config(

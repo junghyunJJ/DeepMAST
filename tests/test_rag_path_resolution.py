@@ -36,9 +36,9 @@ class TestResolvePathVirtual:
     """Test virtual path resolution via data_dir parameter."""
 
     def test_virtual_path_resolves_to_data_dir(self, tmp_path):
-        f = tmp_path / "part1_papers.json"
+        f = tmp_path / "papers.json"
         f.write_text("{}")
-        result = _resolve_papers_path("/part1_papers.json", data_dir=str(tmp_path))
+        result = _resolve_papers_path("/papers.json", data_dir=str(tmp_path))
         assert result == str(f.resolve())
 
     def test_virtual_path_synthesis(self, tmp_path):
@@ -49,9 +49,9 @@ class TestResolvePathVirtual:
 
     def test_virtual_path_with_subdirectory(self, tmp_path):
         """Virtual path strips directory component and uses basename."""
-        f = tmp_path / "liana_papers.json"
+        f = tmp_path / "papers.json"
         f.write_text("{}")
-        result = _resolve_papers_path("/some/deep/liana_papers.json", data_dir=str(tmp_path))
+        result = _resolve_papers_path("/some/deep/papers.json", data_dir=str(tmp_path))
         assert result == str(f.resolve())
 
 
@@ -60,10 +60,10 @@ class TestResolvePathEnvVar:
 
     def test_env_var_fallback_resolves_path(self, tmp_path, monkeypatch):
         """When data_dir param is empty, _resolve_papers_path uses env var."""
-        f = tmp_path / "part1_papers.json"
+        f = tmp_path / "papers.json"
         f.write_text("{}")
         monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", str(tmp_path))
-        result = _resolve_papers_path("/part1_papers.json")
+        result = _resolve_papers_path("/papers.json")
         assert result == str(f.resolve())
 
     def test_explicit_data_dir_takes_priority_over_env(self, tmp_path, monkeypatch):
@@ -191,7 +191,7 @@ class TestRepairJsonCombined:
     """Test combined errors (trailing comma + brace issues)."""
 
     def test_trailing_comma_and_missing_brace(self):
-        """Simulates actual part1_papers.json corruption."""
+        """Simulates actual papers.json corruption."""
         raw = '{"papers": [{"pmid": "123"}, {"pmid": "456"},]'
         result = _repair_json(raw)
         assert result == {"papers": [{"pmid": "123"}, {"pmid": "456"}]}

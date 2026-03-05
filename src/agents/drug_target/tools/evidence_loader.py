@@ -1,7 +1,9 @@
 """Evidence loading and saving tools for Drug Target Assessment Agent.
 
-Handles loading lr_candidates.json + selected_top3_lr.json,
+Handles loading lr_candidates.json (top-30 L-R pairs),
 extracting gene symbols, and managing evidence JSON files.
+selected_top3_lr.json is optional (legacy) — featured candidates
+are now determined by rubric scoring in stage_logic.py.
 """
 
 import json
@@ -45,16 +47,17 @@ def _resolve_data_dir(data_dir: str) -> Path:
 
 @tool
 def load_lr_candidates(data_dir: str) -> str:
-    """Load lr_candidates.json and selected_top3_lr.json for drug target assessment.
+    """Load lr_candidates.json for drug target assessment.
 
-    Reads the top-15 L-R pairs from lr_candidates.json, marks which genes
-    are in the selected_top3_lr.json, and extracts disease context.
+    Reads the top-30 L-R pairs from lr_candidates.json, optionally marks
+    which genes are in selected_top3_lr.json (legacy), and extracts disease context.
+    Featured candidates are determined by rubric scoring, not by selected_top3.
 
     Args:
-        data_dir: Directory containing lr_candidates.json and selected_top3_lr.json
+        data_dir: Directory containing lr_candidates.json
 
     Returns:
-        JSON with gene_symbols (unique), lr_pairs, selected_top3 info, disease context
+        JSON with gene_symbols (unique), lr_pairs, selected_top3 info (legacy), disease context
     """
     base = _resolve_data_dir(data_dir)
     result = {
@@ -90,7 +93,7 @@ def load_lr_candidates(data_dir: str) -> str:
     result["oncology_flag"] = infer_oncology_flag(result["disease"])
 
     # Extract L-R pairs and gene symbols
-    pairs = lr_data.get("pairs", lr_data.get("lr_pairs", lr_data.get("candidates", [])))
+    pairs = lr_data.get("pairs", lr_data.get("lr_pairs", lr_data.get("candidates", lr_data.get("candidate_pairs", []))))
     all_genes = set()
     for pair in pairs:
         ligand = pair.get("ligand", pair.get("source", ""))
@@ -118,7 +121,7 @@ def load_lr_candidates(data_dir: str) -> str:
         try:
             with open(top3_path) as f:
                 top3_data = json.load(f)
-            top3_pairs = top3_data if isinstance(top3_data, list) else top3_data.get("pairs", top3_data.get("selected", []))
+            top3_pairs = top3_data if isinstance(top3_data, list) else top3_data.get("selected_pairs", top3_data.get("pairs", top3_data.get("selected", [])))
             for pair in top3_pairs:
                 ligand = pair.get("ligand", pair.get("source", ""))
                 receptor = pair.get("receptor", pair.get("target", ""))
@@ -133,7 +136,7 @@ def load_lr_candidates(data_dir: str) -> str:
         except Exception as e:
             result["errors"].append(f"Failed to parse selected_top3_lr.json: {e}")
     else:
-        result["errors"].append("selected_top3_lr.json not found (optional)")
+        logger.info("selected_top3_lr.json not found (optional — featured candidates determined by rubric scoring)")
 
     result["gene_symbols"] = sorted(all_genes)
     result["selected_top3_genes"] = sorted(top3_genes)
@@ -240,6 +243,9 @@ def save_evidence(data_dir: str, filename: str, data: str) -> str:
             with open(file_path, "w") as f:
                 f.write(data)
             result["saved"] = True
+            result["errors"].append(
+                f"Warning: data was not valid JSON, saved as raw text to {file_path}"
+            )
         except Exception as write_err:
             result["errors"].append(f"Failed to save: {write_err}")
     except Exception as e:

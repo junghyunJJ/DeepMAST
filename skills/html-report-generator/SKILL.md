@@ -862,7 +862,7 @@ Structure for the Comprehensive Summary tab:
 ┌─────────────────────────────────────────────────────────────────┐
 │  Step 2: Collect References                                      │
 │  - Gather all PMIDs from interpretations                        │
-│  - Load paper details from /part1_papers.json, /liana_papers.json│
+│  - Load paper details from /papers.json                         │
 │  - Deduplicate references                                        │
 └────────────────────────────┬────────────────────────────────────┘
                              ▼
@@ -895,8 +895,7 @@ Structure for the Comprehensive Summary tab:
 | `/part1_final.md` | Part 1 interpretation text |
 | `/part2_final.md` | Part 2 interpretation text |
 | `/part3_final.md` | Part 3 interpretation text |
-| `/part1_papers.json` | Part 1 literature references |
-| `/liana_papers.json` | Part 2+3 literature references |
+| `/papers.json` | Literature references (all parts) |
 
 ---
 
@@ -1066,11 +1065,10 @@ part3_text = read_file("/part3_final.md")
 
 ### Step 2: Collect References
 ```python
-part1_papers = json.loads(read_file("/part1_papers.json"))
-liana_papers = json.loads(read_file("/liana_papers.json"))
+papers = json.loads(read_file("/papers.json"))
 
 all_references = []
-for paper in part1_papers["papers"] + liana_papers["papers"]:
+for paper in papers["papers"]:
     all_references.append({"pmid": paper["pmid"], "title": paper["title"]})
 ```
 

@@ -1,0 +1,133 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Helvetica, Arial",
+    "primaryColor": "#f5f7fa",
+    "primaryBorderColor": "#c9d1d9",
+    "lineColor": "#9aa4b2",
+    "secondaryColor": "#eef2f7",
+    "tertiaryColor": "#ffffff"
+  }
+}}%%
+
+flowchart LR
+
+%% ============================================
+%% LEFT COLUMN: Inputs & Configuration
+%% ============================================
+
+subgraph Inputs["📥 Inputs & Configuration"]
+    direction TB
+
+    inp_platform["<b>Spatial Platforms</b><br/>• 10x Visium (spot-based)<br/>• Vizgen MERFISH (molecule)<br/>• 10x Xenium (subcellular)<br/>• seqFISH+ / STARmap"]:::ann_input
+
+    inp_params["<b>User Parameters</b><br/>species: human / mouse<br/>tissue: brain cortex<br/>genes_of_interest:<br/>  EGFR, VEGFA, PDGFRA..."]:::ann_input
+
+    inp_hitl["<b>HITL Decision Points</b><br/>① Auto-approve config<br/>② Guided (modify params)<br/>③ Full manual control"]:::ann_input
+
+    inp_config["<b>pipeline_config.json</b><br/>normalization: SCTransform<br/>clustering: Leiden (res=0.5)<br/>celltype: SingleR + Azimuth<br/>cci_method: CellChat"]:::ann_code
+
+    inp_platform --> inp_params
+    inp_params --> inp_hitl
+    inp_hitl --> inp_config
+end
+
+%% ============================================
+%% CENTER: DeepMAST Main Pipeline
+%% ============================================
+
+subgraph Core["🔬 DeepMAST Pipeline"]
+    direction TB
+
+    User["👤 User"]:::user
+    Supervisor["Supervisor Agent"]:::supervisor
+
+    subgraph Agents["Expert Agent Layer"]
+        direction TB
+
+        PB["<b>1. Pipeline Builder</b><br/>ReAct loop + HITL<br/>Info gathering → Config"]:::agent_box
+
+        PE["<b>2. Pipeline Executor</b><br/>9-node dynamic graph<br/>SC-ref + MCP execution"]:::agent_box
+
+        BI["<b>3. Biological Interpreter</b><br/>2-layer architecture<br/>Wrapper + Deep Agent"]:::agent_box
+    end
+
+    MCP_Proto(["MCP Protocol"]):::mcp_proto
+
+    subgraph Servers["MCP Server Layer"]
+        direction TB
+
+        S1["📄 Article-download<br/><i>PubMed full-text retrieval</i>"]:::mcp_tool
+        S2["🔍 MAST-RAG<br/><i>Literature vector search</i>"]:::mcp_tool
+        S3["📊 rMCPAgent<br/><i>Seurat / COMMOT / R exec</i>"]:::mcp_tool
+        S4["🧬 SC-reference-selector<br/><i>CellxGene Census query</i>"]:::mcp_tool
+        S5["🔗 ST-CCI<br/><i>CellChat analysis engine</i>"]:::mcp_tool
+    end
+
+    User --> Supervisor
+    Supervisor --> PB
+    PB -->|"pipeline_config.json"| PE
+    PE -->|"11 CSVs + 11 PNGs"| BI
+
+    PB -.-> MCP_Proto
+    PE -.-> MCP_Proto
+    BI -.-> MCP_Proto
+
+    MCP_Proto -.-> S1
+    MCP_Proto -.-> S2
+    MCP_Proto -.-> S3
+    MCP_Proto -.-> S4
+    MCP_Proto -.-> S5
+end
+
+%% ============================================
+%% RIGHT COLUMN: Outputs & Architecture Detail
+%% ============================================
+
+subgraph Outputs["📤 Outputs & Architecture"]
+    direction TB
+
+    out_config["<b>Stage 1 Output</b><br/>pipeline_config.json<br/>+ HITL approval record<br/>+ data_requirements.txt"]:::ann_output
+
+    out_h5ad["<b>Stage 2 Output</b><br/>processed.h5ad<br/>+ 11 analysis CSVs<br/>+ 11 visualization PNGs<br/>+ cell type annotations"]:::ann_output
+
+    out_deep["<b>Deep Agent Pipeline</b><br/>PLANNER → SEARCHER<br/>→ INTERPRETER ×3<br/>→ REPORTER<br/>(4-subagent sequential)"]:::ann_desc
+
+    out_drug["<b>Drug Target Agent</b><br/>3-stage evidence funnel:<br/>Stage 1: Bio context (5 DBs)<br/>Stage 2: Validation (4 DBs)<br/>Stage 3: Deep dive (2 DBs)<br/>30 L-R → Featured candidates"]:::ann_desc
+
+    out_report["<b>Final Output</b><br/>CCI_Analysis_Report.html<br/>Tab 1: Spatial Patterns<br/>Tab 2: CCI & NMF Programs<br/>Tab 3: L-R Pair Analysis<br/>Tab 4: Therapeutic Targets"]:::ann_output
+
+    out_config --> out_h5ad
+    out_h5ad --> out_deep
+    out_deep --> out_drug
+    out_drug --> out_report
+end
+
+%% ============================================
+%% Cross-column Connections (invisible)
+%% ============================================
+
+inp_config ~~~ User
+S5 ~~~ out_config
+
+%% ============================================
+%% Style Definitions
+%% ============================================
+
+classDef user fill:#ffffff,stroke:#9aa4b2,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+classDef supervisor fill:#4a86c8,stroke:#3a6ea5,stroke-width:2px,rx:12,ry:12,color:#ffffff
+classDef agent_box fill:#b8d4e8,stroke:#7baac4,stroke-width:2px,rx:12,ry:12,color:#1f2933
+classDef mcp_proto fill:#8bc34a,stroke:#689f38,stroke-width:2px,rx:15,ry:15,color:#ffffff
+classDef mcp_tool fill:#fff3cd,stroke:#f0c040,stroke-width:1.5px,rx:10,ry:10,color:#1f2933
+classDef ann_input fill:#e8f5e9,stroke:#81c784,stroke-width:1.2px,rx:8,ry:8,color:#1b5e20
+classDef ann_output fill:#fce4ec,stroke:#f48fb1,stroke-width:1.2px,rx:8,ry:8,color:#880e4f
+classDef ann_code fill:#f5f5f5,stroke:#bdbdbd,stroke-width:1px,stroke-dasharray:5 5,rx:8,ry:8,color:#424242
+classDef ann_tools fill:#fff8e1,stroke:#ffcc80,stroke-width:1.2px,rx:8,ry:8,color:#e65100
+classDef ann_data fill:#e3f2fd,stroke:#90caf9,stroke-width:1.2px,rx:8,ry:8,color:#0d47a1
+classDef ann_desc fill:#f3e5f5,stroke:#ce93d8,stroke-width:1.2px,rx:8,ry:8,color:#4a148c
+
+style Inputs fill:#f8faf8,stroke:#81c784,stroke-width:2px,rx:16,ry:16
+style Core fill:#f5f7fa,stroke:#90b4d2,stroke-width:2px,rx:16,ry:16
+style Agents fill:#d6e4f0,stroke:#90b4d2,stroke-width:1.5px,rx:12,ry:12
+style Servers fill:#fff8e1,stroke:#f0c040,stroke-width:1.5px,rx:12,ry:12
+style Outputs fill:#fef5f7,stroke:#f48fb1,stroke-width:2px,rx:16,ry:16

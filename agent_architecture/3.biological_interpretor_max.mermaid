@@ -1,0 +1,172 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Helvetica, Arial",
+    "primaryColor": "#2d2d3d",
+    "primaryBorderColor": "#ffffff",
+    "lineColor": "#bbbbbb",
+    "secondaryColor": "#2a2a3a",
+    "tertiaryColor": "#2d2d3d"
+  }
+}}%%
+
+flowchart TD
+
+    %% =========================
+    %% Entry Nodes
+    %% =========================
+
+    __start__([__start__]):::first
+    st_data["ST Analysis Results<br/>(11 CSVs + 11 PNGs)"]:::inReAtc
+    hitl_node{{"HITL (4 interrupts)"}}:::humanNode
+
+    %% =========================
+    %% Input Annotations (LEFT)
+    %% =========================
+
+    ann_inp["<b>Input Data (from Executor)</b><br/>11 CSV files:<br/>• cell_type_markers.csv<br/>• spatial_autocorrelation.csv<br/>• pathway_enrichment.csv<br/>• cci_summary.csv<br/>• nmf_programs.csv<br/>• lr_pairs.csv + 5 more<br/>11 visualization PNGs"]:::ann_input
+
+    ann_hitl["<b>HITL Interrupts</b><br/>① Target confirmation<br/>② Interpretation guide review<br/>③ Literature coverage check<br/>④ Report draft approval"]:::ann_input
+
+    %% =========================
+    %% Deep Agent Pipeline
+    %% =========================
+
+    subgraph deep_agent["Deep Agent (4-Subagent Sequential Pipeline)"]
+
+        subgraph planner_grp["① PLANNER"]
+            Planner{<b>🧠 Planner</b>}:::thinkingNode
+            p_t1[load_analysis_data]:::subtoolNode
+            p_t2[search_literature_dynamic]:::subtoolNode
+            p_t3[search_pubmed_advanced]:::subtoolNode
+
+            Planner -.->|<b>Action</b>| p_t1
+            Planner -.->|<b>Action</b>| p_t2
+            Planner -.->|<b>Action</b>| p_t3
+        end
+
+        subgraph searcher_grp["② SEARCHER"]
+            Searcher{<b>🧠 Searcher</b>}:::thinkingNode
+            s_t1[search_literature_dynamic]:::subtoolNode
+            s_t2[search_literature]:::subtoolNode
+            s_t3[search_pubmed_advanced]:::subtoolNode
+            s_t4[think_tool]:::subtoolNode
+
+            Searcher -.->|<b>Action</b>| s_t1
+            Searcher -.->|<b>Action</b>| s_t2
+            Searcher -.->|<b>Action</b>| s_t3
+            Searcher -.->|<b>Action</b>| s_t4
+        end
+
+        subgraph interp_grp["③ INTERPRETER ×3"]
+            I1[<b>📝 Part 1</b><br/>Spatial & Pathway]:::interpNode
+            I2[<b>📝 Part 2</b><br/>CCI & NMF]:::interpNode
+            I3[<b>📝 Part 3</b><br/>L-R Pairs]:::interpNode
+            i_val[validate_quality]:::subtoolNode
+            i_lit[validate_claim_literature]:::subtoolNode
+            i_rag[validate_claim_fulltext]:::subtoolNode
+            i_lr[prioritize_top_lr_pairs]:::subtoolNode
+            i_drug[run_drug_target_assessment]:::subtoolNode
+
+            I1 -.-> i_val
+            I2 -.-> i_lit
+            I2 -.-> i_rag
+            I3 -.-> i_lr
+            I3 -.-> i_drug
+        end
+
+        subgraph reporter_grp["④ REPORTER"]
+            Reporter{<b>🧠 Reporter</b>}:::thinkingNode
+            r_t1[generate_html_report]:::subtoolNode
+            r_t2[validate_quality]:::subtoolNode
+            r_t3[search_literature_dynamic]:::subtoolNode
+            r_t4[validate_claim_fulltext]:::subtoolNode
+
+            Reporter -.->|<b>Action</b>| r_t1
+            Reporter -.->|<b>Action</b>| r_t2
+            Reporter -.->|<b>Action</b>| r_t3
+            Reporter -.->|<b>Action</b>| r_t4
+        end
+
+        %% Sequential pipeline flow
+        Planner -->|"interpretation_guide.md"| Searcher
+        Searcher -->|"papers.json"| I1
+        I1 --> I2
+        I2 --> I3
+        I3 -->|"partN_final.md"| Reporter
+    end
+
+    %% =========================
+    %% Exit Nodes
+    %% =========================
+
+    drug_target["DrugTarget Agent"]:::answerNode
+    final_report["CCI Analysis Report (HTML)"]:::inReAtc
+    __end__([__end__]):::last
+
+    %% =========================
+    %% Output & Detail Annotations (RIGHT)
+    %% =========================
+
+    ann_guide["<b>interpretation_guide.md</b><br/>focus_areas:<br/>  - spatial patterns<br/>  - pathway activity<br/>  - cell communication<br/>priorities: [high, med]<br/>data_coverage: 11/11"]:::ann_code
+
+    ann_papers["<b>papers.json</b><br/>[{pmid: 38012345,<br/>  genes: [EGFR, VEGFA],<br/>  relevance: 0.92}, ...]<br/>≥60% genes, ≥15 papers"]:::ann_code
+
+    ann_quality["<b>Quality Validation Loop</b><br/>Score threshold: ≥ 0.7<br/>Max 3 iterations per part<br/>• citation_accuracy<br/>• content_depth<br/>• scientific_rigor<br/>• hallucination_check"]:::ann_desc
+
+    ann_drug["<b>Drug Target 3-Stage Funnel</b><br/>Input: 30 L-R candidate pairs<br/>Stage 1: CellxGene + KEGG +<br/>  Reactome + STRING (5 DBs)<br/>Stage 2: OpenTargets + VEP +<br/>  GWAS (4 DBs) → Rubric<br/>Stage 3: DrugBank + PubMed<br/>  (Featured only, 2 DBs)"]:::ann_tools
+
+    ann_rubric["<b>rubric_scores.json</b><br/>{lr_pair: 'EGFR→MET',<br/> bio_context: 0.85,<br/> target_validation: 0.72,<br/> combined_total: 0.78,<br/> featured: true}"]:::ann_code
+
+    ann_html["<b>CCI_Analysis_Report.html</b><br/>Tab 1: Spatial Patterns<br/>Tab 2: CCI & NMF Programs<br/>Tab 3: L-R Pair Analysis<br/>Tab 4: Therapeutic Targets<br/>+ Base64-encoded figures<br/>+ Interactive data tables"]:::ann_output
+
+    %% =========================
+    %% Main Flow
+    %% =========================
+
+    __start__ --> st_data
+    st_data --> hitl_node
+    hitl_node --> Planner
+    i_drug -.->|"Phase 4.7"| drug_target
+    Reporter --> final_report
+    final_report --> __end__
+
+    %% =========================
+    %% Annotation Positioning
+    %% =========================
+
+    ann_inp ~~~ st_data
+    ann_hitl ~~~ hitl_node
+    ann_guide ~~~ planner_grp
+    ann_papers ~~~ searcher_grp
+    ann_quality ~~~ interp_grp
+    ann_drug ~~~ drug_target
+    ann_rubric ~~~ drug_target
+    ann_html ~~~ final_report
+
+    %% =========================
+    %% Style Definitions
+    %% =========================
+
+    classDef default fill:#2d2d3d,stroke:#fff,stroke-width:2px,color:#fff
+    classDef thinkingNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
+    classDef interpNode fill:#ff7f50,stroke:#fff,stroke-width:2px,color:#000
+    classDef inReAtc fill:#ab47bc,stroke:#fff,stroke-width:2px,color:#000
+    classDef humanNode fill:#4dabf7,stroke:#fff,stroke-width:2px,color:#000
+    classDef answerNode fill:#ffd700,stroke:#fff,stroke-width:2px,color:#000
+    classDef subtoolNode fill:#555577,stroke:#aaa,stroke-width:1px,color:#ddd
+    classDef first fill:#263238,color:#ffffff,stroke:#263238,stroke-width:2px,rx:15,ry:15
+    classDef last fill:#263238,color:#ffffff,stroke:#263238,stroke-width:2px,rx:15,ry:15
+    classDef ann_input fill:#e8f5e9,stroke:#81c784,stroke-width:1.2px,rx:8,ry:8,color:#1b5e20
+    classDef ann_output fill:#fce4ec,stroke:#f48fb1,stroke-width:1.2px,rx:8,ry:8,color:#880e4f
+    classDef ann_code fill:#f5f5f5,stroke:#bdbdbd,stroke-width:1px,stroke-dasharray:5 5,rx:8,ry:8,color:#424242
+    classDef ann_tools fill:#fff8e1,stroke:#ffcc80,stroke-width:1.2px,rx:8,ry:8,color:#e65100
+    classDef ann_data fill:#e3f2fd,stroke:#90caf9,stroke-width:1.2px,rx:8,ry:8,color:#0d47a1
+    classDef ann_desc fill:#f3e5f5,stroke:#ce93d8,stroke-width:1.2px,rx:8,ry:8,color:#4a148c
+
+    %% Subgraph styles
+    style deep_agent fill:#e1bee7,stroke:#9c27b0,stroke-width:2px
+    style planner_grp fill:#2a2a3a,stroke:#90ee90,stroke-width:1px
+    style searcher_grp fill:#2a2a3a,stroke:#90ee90,stroke-width:1px
+    style interp_grp fill:#2a2a3a,stroke:#ff7f50,stroke-width:1px
+    style reporter_grp fill:#2a2a3a,stroke:#90ee90,stroke-width:1px

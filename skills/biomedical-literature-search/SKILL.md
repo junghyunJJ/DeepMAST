@@ -1,6 +1,6 @@
 ---
 name: biomedical-literature-search
-description: Complete literature search workflow for CCI analysis interpretation using src/agents/deep_interpreter/tools/literature.py::search_literature_dynamic as the primary engine, with a runnable wrapper at scripts/search_literature_dynamic.py. Use when you need phase-based biomedical paper search, coverage checks, and auto-saved outputs for Part 1 and Part 2+3.
+description: Complete literature search workflow for CCI analysis interpretation using src/agents/deep_interpreter/tools/literature.py::search_literature_dynamic as the primary engine, with a runnable wrapper at scripts/search_literature_dynamic.py. Use when you need phase-based biomedical paper search, coverage checks, and auto-saved outputs.
 ---
 
 # Biomedical Literature Search Strategy
@@ -26,7 +26,7 @@ python scripts/search_literature_dynamic.py \
   --celltypes "Tumor,Fibroblast,Macrophages" \
   --disease "breast cancer" \
   --max-results 30 \
-  --output-path "part1_papers.json"
+  --output-path "papers.json"
 ```
 
 The wrapper calls `src/agents/deep_interpreter/tools/literature.py::search_literature_dynamic`
@@ -61,10 +61,8 @@ directly and prints JSON output.
 | File | Phase | Content |
 |------|-------|---------|
 | `/data_path.txt` | Read | Real data directory path |
-| `/part1_search_context.json` | Phase 1 | Part 1 spatial context |
-| `/lr_search_context.json` | Phase 1 | Part 2+3 L-R context (shared) |
-| `/part1_papers.json` | Phase 4 | Part 1 search results |
-| `/liana_papers.json` | Phase 4 | Part 2+3 search results (shared) |
+| `/search_context.json` | Phase 1 | Unified search context (all parts) |
+| `/papers.json` | Phase 4 | Search results (all parts) |
 
 ---
 
@@ -79,32 +77,12 @@ Call **load_analysis_data** with the exact path from /data_path.txt.
 ### Step 1.3: Using search_context (MANDATORY)
 The load_analysis_data tool returns pre-extracted search context fields:
 
-**Part-specific contexts (RECOMMENDED):**
+**Unified context (RECOMMENDED):**
 | Part | Context Field | Contains | Output File |
 |------|---------------|----------|-------------|
-| Part 1 | `spatial_search_context` | pathways, celltypes (NO genes) | `/part1_papers.json` |
-| Part 2+3 | `lr_search_context` | genes, pathways, celltypes | `/liana_papers.json` (shared) |
+| All Parts | `search_context` | genes, pathways, celltypes | `/papers.json` |
 
-**Combined context (backward compatibility):**
-- `search_context`: ALL genes, pathways, celltypes combined
-
-**Why Part-specific contexts?**
-- Part 1 analyzes clusters/pathways/celltypes at the spatial level (no gene-level)
-- Part 2 & 3 analyze L-R interactions with gene-level data from LIANA
-
-**Example spatial_search_context (Part 1):**
-```json
-{
-  "genes": [],
-  "pathways": ["Androgen", "EGFR", "Estrogen", "Hypoxia", "NFkB", "TGFb", "MAPK", "PI3K"],
-  "celltypes": ["B cells", "Endothelial", "Invasive Tumor", "Stromal", "Macrophages"],
-  "context_type": "spatial",
-  "applicable_parts": [1],
-  "source": "Decoupler + MISTy pathways, cell type composition"
-}
-```
-
-**Example lr_search_context (Part 2 & 3):**
+**Example search_context:**
 ```json
 {
   "genes": ["ITGB1", "CD44", "APP", "FYN", "ITGAV", "FN1", "TGFB1", "...top 30 by hybrid score (0.7×combinedscore + 0.3×freq)"],
@@ -112,7 +90,7 @@ The load_analysis_data tool returns pre-extracted search context fields:
   "pathways": ["Androgen", "EGFR", "Estrogen", "Hypoxia", "NFkB", "TGFb", "MAPK", "PI3K"],
   "celltypes": ["B cells", "Endothelial", "Invasive Tumor", "Stromal", "Macrophages"],
   "context_type": "lr_interaction",
-  "applicable_parts": [2, 3],
+  "applicable_parts": [1, 2, 3],
   "source": "interest_sig_liana.csv",
   "stats": {"total_genes": 352, "search_genes": 30, "total_pathways": 64, "total_celltypes": 13}
 }
@@ -120,7 +98,7 @@ The load_analysis_data tool returns pre-extracted search context fields:
 **Note:** `genes` contains top 30 by hybrid score (0.7×max_combinedscore + 0.3×freq; combinedscore = 0.4×Factor + 0.4×Moran's R + 0.2×GenePT). `all_genes` has the full set for reference.
 
 ### Step 1.4: Write Context File
-Write extracted context to **/partN_search_context.json**:
+Write extracted context to **/search_context.json**:
 ```json
 {
   "genes": ["CDH1", "CEACAM5", "ERBB2", "LRIG1", "TGFB1"],
@@ -139,7 +117,7 @@ Write extracted context to **/partN_search_context.json**:
 ### Step 2.1: Execute LLM-Powered Dynamic Search (Primary)
 Use **scripts/search_literature_dynamic.py** (primary) which calls
 `search_literature_dynamic` for context-aware, LLM-generated queries:
-- genes: lr_search_context["genes"] (pre-filtered top 30 by hybrid score, use directly)
+- genes: search_context["genes"] (pre-filtered top 30 by hybrid score, use directly)
 - pathways: Priority pathways from search strategy
 - celltypes: Relevant cell types for this Part
 - disease: Disease context (e.g., "breast cancer")
@@ -151,7 +129,7 @@ python scripts/search_literature_dynamic.py \
   --celltypes "Tumor,Fibroblast,Macrophages" \
   --disease "breast cancer" \
   --max-results 20 \
-  --output-path "part1_papers.json"
+  --output-path "papers.json"
 ```
 
 **Why Dynamic Search First?**
@@ -163,7 +141,7 @@ python scripts/search_literature_dynamic.py \
 
 After `search_literature_dynamic`, if coverage gaps remain in specific areas,
 use `search_pubmed_advanced` for targeted precision searches.
-Use lr_search_context["genes"] (already top 30 by hybrid score) for Part 2/3:
+Use search_context["genes"] (already top 30 by hybrid score):
 
 **When to use:**
 - Gene coverage < 60% after Phase 3.1: Search missing genes with MeSH terms
@@ -304,23 +282,14 @@ need to call `write_file` for papers — the tool handles it automatically with 
 
 ### How to Use output_path
 ```bash
-# Part 1: auto-saves to DEEP_INTERPRETER_DATA_DIR/part1_papers.json
-python scripts/search_literature_dynamic.py \
-  --genes "" \
-  --pathways "Androgen,EGFR,Hypoxia,MAPK,PI3K,TGFb" \
-  --celltypes "B cells,Endothelial,Invasive Tumor,Stromal,Macrophages" \
-  --disease "breast cancer" \
-  --max-results 40 \
-  --output-path "part1_papers.json"
-
-# Part 2+3 (shared): auto-saves to DEEP_INTERPRETER_DATA_DIR/liana_papers.json
+# All parts (unified): auto-saves to DEEP_INTERPRETER_DATA_DIR/papers.json
 python scripts/search_literature_dynamic.py \
   --genes "ITGB1,CD44,APP,FYN,ITGAV,FN1,TGFB1" \
   --pathways "Androgen,EGFR,Hypoxia,MAPK,PI3K,TGFb" \
   --celltypes "B cells,Endothelial,Invasive Tumor,Stromal,Macrophages" \
   --disease "breast cancer" \
   --max-results 40 \
-  --output-path "liana_papers.json"
+  --output-path "papers.json"
 ```
 
 ### What the Tool Returns (Compact Summary)
@@ -365,7 +334,7 @@ The auto-saved file contains the complete data:
 - **ALWAYS** use `output_path` when calling search_literature_dynamic
 - Do **NOT** call `write_file` for papers when using `output_path`
 - The saved file is guaranteed to have `total_papers == len(papers)` (no truncation)
-- Use `read_file('/part1_papers.json')` or `read_file('/liana_papers.json')` to inspect saved data
+- Use `read_file('/papers.json')` to inspect saved data
 
 ---
 
@@ -385,7 +354,7 @@ The auto-saved file contains the complete data:
 - **DO NOT** use read_file on .csv files - causes context overflow (571KB -> 5KB)
 - **DO NOT** try to parse raw CSV data manually
 - **DO NOT** extract genes from pathway enrichment `name` column - those are pathways, not genes
-- **DO NOT** override lr_search_context["genes"] with all_genes (top 30 is pre-filtered for search)
+- **DO NOT** override search_context["genes"] with all_genes (top 30 is pre-filtered for search)
 - **DO NOT** proceed with < 60% gene coverage without additional searches
 - **DO NOT** skip reflection after search (Phase 4)
 
@@ -397,7 +366,7 @@ The auto-saved file contains the complete data:
 - **NOTE** search_literature_dynamic handles fallback internally (no separate tool call needed)
 - **USE** think_tool for quality validation AFTER search (Phase 3 Reflect)
 - **RUN** follow-up searches for missing coverage using search_literature
-- **WRITE** /part1_papers.json (Part 1) or /liana_papers.json (Part 2+3 shared)
+- **WRITE** /papers.json (unified, all parts)
 
 ---
 
@@ -413,7 +382,7 @@ python scripts/search_literature_dynamic.py \
   --celltypes "Tumor,Fibroblast" \
   --disease "breast cancer" \
   --max-results 20 \
-  --output-path "part1_papers.json"
+  --output-path "papers.json"
 ```
 
 Equivalent tool call:
@@ -425,7 +394,7 @@ search_literature_dynamic(
     celltypes=["Tumor", "Fibroblast"],
     disease="breast cancer",
     max_results=20,
-    output_path="part1_papers.json"  # Auto-saves full results to file
+    output_path="papers.json"  # Auto-saves full results to file
 )
 ```
 
@@ -540,7 +509,7 @@ search_literature_dynamic (primary — handles fallback internally)
 
 | Phase | Tool | Thoughts | Purpose | Output |
 |-------|------|----------|---------|--------|
-| Phase 3 (Reflection) | think_tool | 1-2 thoughts | Validate coverage | /part1_papers.json or /liana_papers.json |
+| Phase 3 (Reflection) | think_tool | 1-2 thoughts | Validate coverage | /papers.json |
 
 | Thought Type | Key Content | should_continue |
 |--------------|-------------|-------------------|
@@ -568,7 +537,7 @@ python scripts/search_literature_dynamic.py \
   --celltypes "Microglia" \
   --disease "Alzheimer disease" \
   --max-results 20 \
-  --output-path "liana_papers.json"
+  --output-path "papers.json"
 # Fallback is handled internally — no manual fallback needed
 # Papers auto-saved; result contains compact summary with total_papers, coverage
 ```
@@ -593,8 +562,8 @@ iteration=1, max_iterations=1)
 ### Phase 4: Output (Auto-Saved)
 ```python
 # Papers already auto-saved via output_path in Phase 2 — no write_file needed
-# result = {"saved_to": "/path/to/liana_papers.json", "total_papers": 28, "coverage": {...}}
-# Use read_file("/liana_papers.json") if you need to inspect the saved data
+# result = {"saved_to": "/path/to/papers.json", "total_papers": 28, "coverage": {...}}
+# Use read_file("/papers.json") if you need to inspect the saved data
 ```
 
 ### Generated Interpretation

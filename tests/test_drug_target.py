@@ -1,11 +1,12 @@
 """Tests for Drug Target Assessment Agent.
 
-6 test classes covering:
+7 test classes covering:
 1. TestSubagentConfigs — Tool registration & prompt content
 2. TestRubric — Rubric parsing, validation, scoring
 3. TestEvidenceLoader — File I/O tools (tmp_path)
 4. TestToolImports — Verify all tools importable
 5. TestToolMocks — External API tools with mocked responses
+5b. TestStage1Confidence — Stage 1 confidence scoring & filtering
 6. TestIntegration — Agent creation & tool wiring
 
 All tests use mock data — zero external API calls.
@@ -65,10 +66,16 @@ EXPECTED_TOP3_GENES = sorted({"TGFB1", "TGFBR2", "SPP1", "CD44", "VEGFA", "FLT1"
 
 @pytest.fixture
 def mock_data_dir(tmp_path):
-    """tmp_path with lr_candidates.json + selected_top3_lr.json."""
+    """tmp_path with lr_candidates.json only (no selected_top3_lr.json)."""
     (tmp_path / "lr_candidates.json").write_text(json.dumps(MOCK_LR_CANDIDATES))
-    (tmp_path / "selected_top3_lr.json").write_text(json.dumps(MOCK_SELECTED_TOP3))
     return tmp_path
+
+
+@pytest.fixture
+def mock_data_dir_with_top3(mock_data_dir):
+    """mock_data_dir with selected_top3_lr.json for backward compat tests."""
+    (mock_data_dir / "selected_top3_lr.json").write_text(json.dumps(MOCK_SELECTED_TOP3))
+    return mock_data_dir
 
 
 @pytest.fixture
@@ -93,9 +100,6 @@ def mock_data_dir_with_evidence(mock_data_dir):
     (evi_dir / "ot_TGFB1.json").write_text(json.dumps({
         "gene_symbol": "TGFB1",
         "target_info": {"tractability": {"smallmolecule": True}},
-    }))
-    (evi_dir / "gwas_all.json").write_text(json.dumps({
-        "gene_signals": {"TGFB1": {"combined_signal": 0.45}},
     }))
     (evi_dir / "gene_manifest.json").write_text(json.dumps({
         "genes": [{"symbol": "TGFB1", "is_selected_top3": True}],
@@ -158,14 +162,13 @@ class TestSubagentConfigs:
             "load_evidence_files",
             "sequential_thinking",
             "query_cellxgene_lr_context",
+            "list_census_diseases",
             "query_kegg_pathways",
             "query_reactome_pathways",
             "query_string_ppi_pair",
             "query_ensembl_vep_consequence",
             "query_drugbank_target_profile",
             "query_pubmed_clinical_limitations",
-            "query_alphafold_plddt",
-            "run_diffdock_screen",
             "run_compare_census_lr_pair",
             "think_tool",
             "validate_quality",
@@ -200,20 +203,19 @@ class TestSubagentConfigs:
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         prompt = SUBAGENT_CONFIGS["evidence_assessor"]["system_prompt"]
         # Database references
-        for keyword in ("OpenTargets", "GWAS", "DrugBank", "AlphaFold"):
+        for keyword in ("OpenTargets", "GWAS", "DrugBank"):
             assert keyword in prompt
         # Rubric references (merged from clinical_assessor)
         assert "rubric" in prompt.lower() or "RUBRIC" in prompt
         assert "validated" in prompt.lower()
         assert "exploratory" in prompt.lower()
 
-    def test_evidence_assessor_prompt_mentions_4_stages(self):
+    def test_evidence_assessor_prompt_mentions_3_stages(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         prompt = SUBAGENT_CONFIGS["evidence_assessor"]["system_prompt"]
         assert "Stage 1" in prompt
         assert "Stage 2" in prompt
         assert "Stage 3" in prompt
-        assert "Stage 4" in prompt
 
     def test_evidence_assessor_prompt_mentions_census_and_gwas(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -248,9 +250,9 @@ class TestEvidenceLoader:
         result = json.loads(raw)
         assert len(result["lr_pairs"]) == 15
 
-    def test_load_lr_candidates_selected_top3_genes(self, mock_data_dir):
+    def test_load_lr_candidates_selected_top3_genes(self, mock_data_dir_with_top3):
         from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
-        raw = load_lr_candidates.invoke({"data_dir": str(mock_data_dir)})
+        raw = load_lr_candidates.invoke({"data_dir": str(mock_data_dir_with_top3)})
         result = json.loads(raw)
         assert sorted(result["selected_top3_genes"]) == EXPECTED_TOP3_GENES
 
@@ -283,9 +285,9 @@ class TestEvidenceLoader:
         assert result["targets_json_found"] is True
         assert result["interest_celltypes"] == ["Invasive tumor", "Malignant cell"]
 
-    def test_load_lr_candidates_is_selected_top3_flag(self, mock_data_dir):
+    def test_load_lr_candidates_is_selected_top3_flag(self, mock_data_dir_with_top3):
         from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
-        raw = load_lr_candidates.invoke({"data_dir": str(mock_data_dir)})
+        raw = load_lr_candidates.invoke({"data_dir": str(mock_data_dir_with_top3)})
         result = json.loads(raw)
         details = {d["symbol"]: d["is_selected_top3"] for d in result["gene_details"]}
         assert details["TGFB1"] is True
@@ -303,13 +305,13 @@ class TestEvidenceLoader:
     def test_load_lr_candidates_missing_top3_still_works(self, tmp_path):
         from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
         (tmp_path / "lr_candidates.json").write_text(json.dumps(MOCK_LR_CANDIDATES))
-        # No selected_top3_lr.json
+        # No selected_top3_lr.json — this is the default now
         raw = load_lr_candidates.invoke({"data_dir": str(tmp_path)})
         result = json.loads(raw)
         assert len(result["gene_symbols"]) == 30
         assert len(result["selected_top3_genes"]) == 0
-        # Should note it as optional missing
-        assert any("optional" in e.lower() for e in result["errors"])
+        # No error for missing top3 (it's info-level now, not an error)
+        assert not any("selected_top3" in e.lower() for e in result["errors"])
 
     def test_load_lr_candidates_alternative_key_names(self, tmp_path):
         from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
@@ -325,13 +327,66 @@ class TestEvidenceLoader:
         assert len(result["lr_pairs"]) == 1
         assert "EGFR" in result["gene_symbols"]
 
+    def test_load_lr_candidates_no_top3_default(self, mock_data_dir):
+        """Without selected_top3_lr.json, all genes should have is_selected_top3=False."""
+        from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
+        raw = load_lr_candidates.invoke({"data_dir": str(mock_data_dir)})
+        result = json.loads(raw)
+        for detail in result["gene_details"]:
+            assert detail["is_selected_top3"] is False
+        assert len(result["selected_top3_genes"]) == 0
+        # No errors related to missing top3
+        assert not any("selected_top3" in e.lower() for e in result["errors"])
+
+    def test_load_lr_candidates_candidate_pairs_key(self, tmp_path):
+        """Verify candidate_pairs key fallback works."""
+        from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
+        alt_data = {
+            "disease": "glioblastoma",
+            "candidate_pairs": [  # legacy key name from old lr_prioritizer
+                {"ligand": "PDGFA", "receptor": "PDGFRA", "score": 0.91},
+                {"ligand": "EGF", "receptor": "EGFR", "score": 0.88},
+            ],
+        }
+        (tmp_path / "lr_candidates.json").write_text(json.dumps(alt_data))
+        raw = load_lr_candidates.invoke({"data_dir": str(tmp_path)})
+        result = json.loads(raw)
+        assert len(result["lr_pairs"]) == 2
+        assert "PDGFA" in result["gene_symbols"]
+        assert "EGFR" in result["gene_symbols"]
+
+    def test_rank_featured_candidates_ignores_selected_top3(self):
+        """rank_featured_candidates output should be identical with/without is_selected_top3."""
+        from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
+        base_row = {
+            "gene_symbol": "TGFB1",
+            "validated_track": {
+                "existing_drug_evidence": {"score": 2, "rationale": "test"},
+                "clinical_trial_activity": {"score": 1, "rationale": "test"},
+                "mechanism_relevance": {"score": 2, "rationale": "test"},
+                "safety_profile": {"score": 0, "rationale": "test"},
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": {"score": 1, "rationale": "test"},
+                "tractability": {"score": 2, "rationale": "test"},
+                "biological_plausibility": {"score": 2, "rationale": "test"},
+                "novelty_opportunity": {"score": 1, "rationale": "test"},
+            },
+        }
+        row_with = {**base_row, "is_selected_top3": True}
+        row_without = {**base_row}
+        result_with = rank_featured_candidates([row_with])
+        result_without = rank_featured_candidates([row_without])
+        # Same ranking regardless of is_selected_top3
+        assert result_with[0]["is_featured"] == result_without[0]["is_featured"]
+        assert result_with[0]["combined_total"] == result_without[0]["combined_total"]
+
     def test_load_evidence_files(self, mock_data_dir_with_evidence):
         from src.agents.drug_target.tools.evidence_loader import load_evidence_files
         raw = load_evidence_files.invoke({"data_dir": str(mock_data_dir_with_evidence)})
         result = json.loads(raw)
-        assert result["file_count"] == 3
+        assert result["file_count"] == 2
         assert "ot_TGFB1.json" in result["files"]
-        assert "gwas_all.json" in result["files"]
 
     def test_load_evidence_files_missing_dir(self, tmp_path):
         from src.agents.drug_target.tools.evidence_loader import load_evidence_files
@@ -399,8 +454,6 @@ class TestToolImports:
         assert stage_domain_tools.query_ensembl_vep_consequence.name == "query_ensembl_vep_consequence"
         assert stage_domain_tools.query_drugbank_target_profile.name == "query_drugbank_target_profile"
         assert stage_domain_tools.query_pubmed_clinical_limitations.name == "query_pubmed_clinical_limitations"
-        assert stage_domain_tools.query_alphafold_plddt.name == "query_alphafold_plddt"
-        assert stage_domain_tools.run_diffdock_screen.name == "run_diffdock_screen"
 
     def test_import_census_lr_validation_tools(self):
         from src.agents.drug_target.tools import census_lr_validation_tools
@@ -414,10 +467,10 @@ class TestToolImports:
         from src.agents.drug_target.tools import __all__
         expected = [
             "load_lr_candidates", "load_evidence_files", "save_evidence",
-            "query_cellxgene_lr_context", "query_kegg_pathways", "query_reactome_pathways",
+            "query_cellxgene_lr_context", "list_census_diseases",
+            "query_kegg_pathways", "query_reactome_pathways",
             "query_string_ppi_pair", "query_ensembl_vep_consequence",
             "query_drugbank_target_profile", "query_pubmed_clinical_limitations",
-            "query_alphafold_plddt", "run_diffdock_screen",
             "run_compare_census_lr_pair",
             "save_target_assessment",
             "think_tool", "sequential_thinking", "validate_quality",
@@ -436,69 +489,569 @@ class TestToolImports:
 class TestStageContracts:
     """Decision logic and JSON output contract for staged pipeline."""
 
-    def test_rank_featured_candidates_dynamic_top_3_to_5(self):
+    def test_rank_featured_candidates_dual_track(self):
         from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
 
+        def _row(ligand, receptor, vt_scores, et_scores):
+            return {
+                "ligand": ligand,
+                "receptor": receptor,
+                "open_targets_score": 0.5,
+                "validated_track": dict(zip(
+                    ("existing_drug_evidence", "clinical_trial_activity", "mechanism_relevance", "safety_profile"),
+                    vt_scores,
+                )),
+                "exploratory_track": dict(zip(
+                    ("gwas_genetic_support", "tractability", "biological_plausibility", "novelty_opportunity"),
+                    et_scores,
+                )),
+            }
+
         matrix = [
-            {"ligand": "A", "receptor": "B", "open_targets_score": 0.91, "st_colocalization_score": 0.95},
-            {"ligand": "C", "receptor": "D", "open_targets_score": 0.80, "st_colocalization_score": 0.90},
-            {"ligand": "E", "receptor": "F", "open_targets_score": 0.72, "st_colocalization_score": 0.85},
-            {"ligand": "G", "receptor": "H", "open_targets_score": 0.64, "st_colocalization_score": 0.80},
-            {"ligand": "I", "receptor": "J", "open_targets_score": 0.62, "st_colocalization_score": 0.75},
-            {"ligand": "K", "receptor": "L", "open_targets_score": 0.31, "st_colocalization_score": 0.20},
+            # Featured pool (drug_evidence >= 1)
+            _row("A", "B", (3, 3, 3, 0), (3, 3, 3, 3)),   # combined=21
+            _row("C", "D", (2, 2, 2, -1), (2, 2, 2, 2)),   # combined=13
+            _row("E", "F", (1, 1, 2, 0), (1, 1, 2, 1)),    # combined=9
+            _row("G", "H", (1, 0, 1, 0), (1, 1, 1, 1)),    # combined=6
+            # Novel pool (drug_evidence == 0)
+            _row("I", "J", (0, 1, 1, 0), (1, 1, 1, 0)),    # exploratory_total=3
+            _row("K", "L", (0, 0, 1, 0), (0, 0, 1, 0)),    # exploratory_total=1
         ]
 
         ranked = rank_featured_candidates(matrix)
         featured = [row for row in ranked if row["is_featured"]]
-        assert 3 <= len(featured) <= 5
+        novel = [row for row in ranked if row.get("is_novel")]
+
+        # Featured: drug_evidence >= 1 rows
+        assert 2 <= len(featured) <= 5
         assert featured[0]["ligand"] == "A"
-        assert featured[0]["receptor"] == "B"
+        assert featured[0]["combined_total"] == 21
+        assert all(not r["is_novel"] for r in featured)
+
+        # Novel: drug_evidence == 0 rows
+        assert len(novel) >= 1
+        assert all(not r["is_featured"] for r in novel)
+
+        # All rows have both flags
+        for r in ranked:
+            assert "is_featured" in r
+            assert "is_novel" in r
 
     def test_stage_gate_rules(self):
         from src.agents.drug_target.tools.stage_logic import (
-            should_run_diffdock,
             should_run_pubmed,
             should_run_vep,
         )
 
-        assert should_run_vep(oncology_flag=True, has_high_somatic_mutation=True) is True
-        assert should_run_vep(oncology_flag=False, has_high_somatic_mutation=True) is False
+        assert should_run_vep(oncology_flag=True, has_gwas_variants=True) is True
+        assert should_run_vep(oncology_flag=False, has_gwas_variants=True) is True
         assert should_run_pubmed("Phase 2") is True
         assert should_run_pubmed("phase 1") is False
-        assert should_run_diffdock("Small Molecule") is True
-        assert should_run_diffdock("Antibody") is False
 
-    def test_census_bonus_affects_priority_score(self):
+    def test_insufficient_evidence_excluded_from_both_tracks(self):
         from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
 
+        def _row(ligand, receptor, vt_scores, et_scores):
+            return {
+                "ligand": ligand,
+                "receptor": receptor,
+                "open_targets_score": 0.5,
+                "validated_track": dict(zip(
+                    ("existing_drug_evidence", "clinical_trial_activity", "mechanism_relevance", "safety_profile"),
+                    vt_scores,
+                )),
+                "exploratory_track": dict(zip(
+                    ("gwas_genetic_support", "tractability", "biological_plausibility", "novelty_opportunity"),
+                    et_scores,
+                )),
+            }
+
         matrix = [
-            {
-                "ligand": "A",
-                "receptor": "B",
-                "open_targets_score": 0.80,
-                "st_colocalization_score": 0.80,
-                "census_validation": {"p_value": 1e-6, "diff": 0.07},
-            },
-            {
-                "ligand": "C",
-                "receptor": "D",
-                "open_targets_score": 0.81,
-                "st_colocalization_score": 0.80,
-                "census_validation": {"p_value": 0.50, "diff": 0.00},
-            },
-            {
-                "ligand": "E",
-                "receptor": "F",
-                "open_targets_score": 0.60,
-                "st_colocalization_score": 0.60,
-                "census_validation": {"p_value": 0.50, "diff": 0.00},
-            },
+            # Featured pool (drug_evidence >= 1)
+            _row("A", "B", (2, 2, 3, 0), (2, 2, 3, 2)),    # validated_target, combined=16
+            _row("C", "D", (1, 1, 2, 0), (1, 2, 2, 1)),    # validated_target, combined=10
+            # Novel pool (drug_evidence == 0, eligible)
+            _row("E", "F", (0, 0, 1, 0), (2, 1, 2, 1)),    # exploratory_target, exploratory_total=6
+            # insufficient_evidence — must NOT be featured or novel
+            _row("G", "H", (0, 0, 0, 0), (0, 0, 0, 0)),    # insufficient_evidence, combined=0
+            _row("I", "J", (0, 0, 1, 0), (0, 0, 1, 0)),    # insufficient_evidence, combined=2
         ]
 
-        ranked = rank_featured_candidates(matrix, min_featured=1, max_featured=3)
-        assert ranked[0]["ligand"] == "A"
-        assert ranked[0]["census_bonus"] == 0.05
-        assert ranked[1]["census_bonus"] == 0.0
+        ranked = rank_featured_candidates(matrix, min_featured=2, max_featured=5)
+
+        featured = [r for r in ranked if r["is_featured"]]
+        novel = [r for r in ranked if r.get("is_novel")]
+
+        # 2 featured (drug_evidence >= 1)
+        assert len(featured) == 2
+        assert all(r["classification"] != "insufficient_evidence" for r in featured)
+
+        # 1 novel (drug_evidence == 0, eligible)
+        assert len(novel) == 1
+        assert novel[0]["ligand"] == "E"
+
+        # insufficient_evidence rows have rank=None, is_featured=False, is_novel=False
+        for r in ranked:
+            if r["classification"] == "insufficient_evidence":
+                assert r["rank"] is None
+                assert r["is_featured"] is False
+                assert r["is_novel"] is False
+
+
+# =========================================================================
+# 5. TestVepTool — Ensembl VEP with mocked HTTP responses
+# =========================================================================
+
+class TestVepTool:
+    """query_ensembl_vep_consequence with mocked requests."""
+
+    def test_vep_single_variant_missense(self, monkeypatch):
+        import src.agents.drug_target.tools.stage_domain_tools as mod
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = [
+            {
+                "input": "rs1042522",
+                "id": "rs1042522",
+                "most_severe_consequence": "missense_variant",
+            }
+        ]
+        monkeypatch.setattr(mod.requests, "post", lambda *a, **kw: mock_resp)
+
+        raw = mod.query_ensembl_vep_consequence.invoke({
+            "variant_ids": "rs1042522",
+        })
+        result = json.loads(raw)
+        assert result["executed"] is True
+        assert len(result["variants"]) == 1
+        assert result["variants"][0]["most_severe_consequence"] == "missense_variant"
+        assert result["variants"][0]["id"] == "rs1042522"
+
+    def test_vep_multiple_variants(self, monkeypatch):
+        import src.agents.drug_target.tools.stage_domain_tools as mod
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = [
+            {"input": "rs699", "id": "rs699", "most_severe_consequence": "missense_variant"},
+            {"input": "rs28934578", "id": "rs28934578", "most_severe_consequence": "stop_gained"},
+        ]
+        monkeypatch.setattr(mod.requests, "post", lambda *a, **kw: mock_resp)
+
+        raw = mod.query_ensembl_vep_consequence.invoke({
+            "variant_ids": "rs699, rs28934578",
+        })
+        result = json.loads(raw)
+        assert result["executed"] is True
+        assert len(result["variants"]) == 2
+        consequences = {v["id"]: v["most_severe_consequence"] for v in result["variants"]}
+        assert consequences["rs699"] == "missense_variant"
+        assert consequences["rs28934578"] == "stop_gained"
+
+    def test_vep_empty_variant_ids(self):
+        from src.agents.drug_target.tools.stage_domain_tools import query_ensembl_vep_consequence
+
+        raw = query_ensembl_vep_consequence.invoke({"variant_ids": ""})
+        result = json.loads(raw)
+        assert result["executed"] is False
+        assert "No variant IDs" in result["errors"][0]
+
+    def test_vep_api_failure(self, monkeypatch):
+        import src.agents.drug_target.tools.stage_domain_tools as mod
+
+        def raise_error(*a, **kw):
+            raise ConnectionError("Ensembl API unreachable")
+        monkeypatch.setattr(mod.requests, "post", raise_error)
+
+        raw = mod.query_ensembl_vep_consequence.invoke({
+            "variant_ids": "rs1042522",
+        })
+        result = json.loads(raw)
+        assert result["executed"] is False
+        assert "VEP query failed" in result["errors"][0]
+
+    def test_vep_gate_or_logic(self):
+        """VEP runs when oncology OR GWAS variants available."""
+        from src.agents.drug_target.tools.stage_logic import should_run_vep
+
+        # Both conditions met
+        assert should_run_vep(oncology_flag=True, has_gwas_variants=True) is True
+        # Only oncology
+        assert should_run_vep(oncology_flag=True, has_gwas_variants=False) is True
+        # Only GWAS
+        assert should_run_vep(oncology_flag=False, has_gwas_variants=True) is True
+        # Neither
+        assert should_run_vep(oncology_flag=False, has_gwas_variants=False) is False
+
+    def test_classify_vep_consequence(self):
+        """classify_vep_consequence categorizes impact severity."""
+        from src.agents.drug_target.tools.stage_logic import classify_vep_consequence
+
+        # High impact
+        assert classify_vep_consequence("stop_gained") == "high_impact"
+        assert classify_vep_consequence("frameshift_variant") == "high_impact"
+        assert classify_vep_consequence("splice_donor_variant") == "high_impact"
+        # Moderate impact
+        assert classify_vep_consequence("missense_variant") == "moderate_impact"
+        assert classify_vep_consequence("inframe_deletion") == "moderate_impact"
+        # Low impact
+        assert classify_vep_consequence("synonymous_variant") == "low_impact"
+        assert classify_vep_consequence("intron_variant") == "low_impact"
+
+    def test_vep_consequence_severity_interpretation(self, monkeypatch):
+        """Driver mutations (stop_gained, frameshift) vs passenger (synonymous)."""
+        import src.agents.drug_target.tools.stage_domain_tools as mod
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = [
+            {"input": "rs111", "id": "rs111", "most_severe_consequence": "stop_gained"},
+            {"input": "rs222", "id": "rs222", "most_severe_consequence": "synonymous_variant"},
+            {"input": "rs333", "id": "rs333", "most_severe_consequence": "frameshift_variant"},
+        ]
+        monkeypatch.setattr(mod.requests, "post", lambda *a, **kw: mock_resp)
+
+        raw = mod.query_ensembl_vep_consequence.invoke({
+            "variant_ids": "rs111,rs222,rs333",
+        })
+        result = json.loads(raw)
+        assert result["executed"] is True
+
+        consequences = {v["id"]: v["most_severe_consequence"] for v in result["variants"]}
+        # Driver-like
+        assert consequences["rs111"] == "stop_gained"
+        assert consequences["rs333"] == "frameshift_variant"
+        # Passenger-like
+        assert consequences["rs222"] == "synonymous_variant"
+
+
+# =========================================================================
+# 5b. TestRubricScoring — RUBRIC validation, classification, priority
+# =========================================================================
+
+class TestRubricScoring:
+    """DRUG_TARGET_RUBRIC scoring logic from stage_logic.py."""
+
+    # --- Schema validation ---
+
+    def test_valid_assessment_passes_validation(self, valid_assessment):
+        from src.agents.drug_target.tools.stage_logic import validate_rubric_assessment
+        errors = validate_rubric_assessment(valid_assessment)
+        assert errors == []
+
+    def test_missing_validated_track(self):
+        from src.agents.drug_target.tools.stage_logic import validate_rubric_assessment
+        errors = validate_rubric_assessment({"exploratory_track": {
+            "gwas_genetic_support": 1, "tractability": 1,
+            "biological_plausibility": 1, "novelty_opportunity": 1,
+        }})
+        assert any("validated_track" in e for e in errors)
+
+    def test_missing_exploratory_track(self):
+        from src.agents.drug_target.tools.stage_logic import validate_rubric_assessment
+        errors = validate_rubric_assessment({"validated_track": {
+            "existing_drug_evidence": 1, "clinical_trial_activity": 1,
+            "mechanism_relevance": 1, "safety_profile": 0,
+        }})
+        assert any("exploratory_track" in e for e in errors)
+
+    def test_missing_criterion_detected(self):
+        from src.agents.drug_target.tools.stage_logic import validate_rubric_assessment
+        errors = validate_rubric_assessment({
+            "validated_track": {
+                "existing_drug_evidence": 2,
+                # missing clinical_trial_activity, mechanism_relevance, safety_profile
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 1, "tractability": 1,
+                "biological_plausibility": 1, "novelty_opportunity": 1,
+            },
+        })
+        assert any("clinical_trial_activity" in e for e in errors)
+
+    def test_safety_profile_out_of_range(self):
+        from src.agents.drug_target.tools.stage_logic import validate_rubric_assessment
+        errors = validate_rubric_assessment({
+            "validated_track": {
+                "existing_drug_evidence": {"score": 2, "rationale": ""},
+                "clinical_trial_activity": {"score": 1, "rationale": ""},
+                "mechanism_relevance": {"score": 2, "rationale": ""},
+                "safety_profile": {"score": 1, "rationale": "should be <=0"},
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": {"score": 1, "rationale": ""},
+                "tractability": {"score": 1, "rationale": ""},
+                "biological_plausibility": {"score": 1, "rationale": ""},
+                "novelty_opportunity": {"score": 1, "rationale": ""},
+            },
+        })
+        assert any("safety_profile" in e for e in errors)
+
+    def test_score_above_max_detected(self):
+        from src.agents.drug_target.tools.stage_logic import validate_rubric_assessment
+        errors = validate_rubric_assessment({
+            "validated_track": {
+                "existing_drug_evidence": {"score": 5, "rationale": "too high"},
+                "clinical_trial_activity": {"score": 1, "rationale": ""},
+                "mechanism_relevance": {"score": 2, "rationale": ""},
+                "safety_profile": {"score": 0, "rationale": ""},
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": {"score": 1, "rationale": ""},
+                "tractability": {"score": 1, "rationale": ""},
+                "biological_plausibility": {"score": 1, "rationale": ""},
+                "novelty_opportunity": {"score": 1, "rationale": ""},
+            },
+        })
+        assert any("existing_drug_evidence" in e for e in errors)
+
+    # --- Validated track pass logic ---
+
+    def test_validated_pass_drug_evidence_ge_2(self):
+        from src.agents.drug_target.tools.stage_logic import compute_validated_track
+        result = compute_validated_track({"validated_track": {
+            "existing_drug_evidence": 2, "clinical_trial_activity": 0,
+            "mechanism_relevance": 1, "safety_profile": 0,
+        }})
+        assert result["pass"] is True
+
+    def test_validated_pass_drug_1_and_trial_1(self):
+        from src.agents.drug_target.tools.stage_logic import compute_validated_track
+        result = compute_validated_track({"validated_track": {
+            "existing_drug_evidence": 1, "clinical_trial_activity": 1,
+            "mechanism_relevance": 0, "safety_profile": 0,
+        }})
+        assert result["pass"] is True
+
+    def test_validated_fail_drug_0(self):
+        from src.agents.drug_target.tools.stage_logic import compute_validated_track
+        result = compute_validated_track({"validated_track": {
+            "existing_drug_evidence": 0, "clinical_trial_activity": 3,
+            "mechanism_relevance": 3, "safety_profile": 0,
+        }})
+        assert result["pass"] is False
+
+    def test_validated_fail_drug_1_trial_0(self):
+        from src.agents.drug_target.tools.stage_logic import compute_validated_track
+        result = compute_validated_track({"validated_track": {
+            "existing_drug_evidence": 1, "clinical_trial_activity": 0,
+            "mechanism_relevance": 3, "safety_profile": 0,
+        }})
+        assert result["pass"] is False
+
+    def test_validated_total_includes_negative_safety(self):
+        from src.agents.drug_target.tools.stage_logic import compute_validated_track
+        result = compute_validated_track({"validated_track": {
+            "existing_drug_evidence": 3, "clinical_trial_activity": 2,
+            "mechanism_relevance": 3, "safety_profile": -2,
+        }})
+        assert result["total"] == 6  # 3+2+3+(-2)
+        assert result["pass"] is True
+
+    # --- Exploratory track pass logic ---
+
+    def test_exploratory_pass_gwas_1_tract_1(self):
+        from src.agents.drug_target.tools.stage_logic import compute_exploratory_track
+        result = compute_exploratory_track({"exploratory_track": {
+            "gwas_genetic_support": 1, "tractability": 1,
+            "biological_plausibility": 0, "novelty_opportunity": 0,
+        }})
+        assert result["pass"] is True
+
+    def test_exploratory_pass_gwas_1_bio_2(self):
+        from src.agents.drug_target.tools.stage_logic import compute_exploratory_track
+        result = compute_exploratory_track({"exploratory_track": {
+            "gwas_genetic_support": 1, "tractability": 0,
+            "biological_plausibility": 2, "novelty_opportunity": 0,
+        }})
+        assert result["pass"] is True
+
+    def test_exploratory_fail_no_gwas(self):
+        from src.agents.drug_target.tools.stage_logic import compute_exploratory_track
+        result = compute_exploratory_track({"exploratory_track": {
+            "gwas_genetic_support": 0, "tractability": 3,
+            "biological_plausibility": 3, "novelty_opportunity": 3,
+        }})
+        assert result["pass"] is False
+
+    def test_exploratory_fail_gwas_1_but_no_tract_or_bio(self):
+        from src.agents.drug_target.tools.stage_logic import compute_exploratory_track
+        result = compute_exploratory_track({"exploratory_track": {
+            "gwas_genetic_support": 1, "tractability": 0,
+            "biological_plausibility": 1, "novelty_opportunity": 3,
+        }})
+        assert result["pass"] is False
+
+    # --- Classification ---
+
+    def test_classify_validated_target(self, valid_assessment):
+        from src.agents.drug_target.tools.stage_logic import classify_target
+        assert classify_target(valid_assessment) == "validated_target"
+
+    def test_classify_exploratory_target(self):
+        from src.agents.drug_target.tools.stage_logic import classify_target
+        assessment = {
+            "validated_track": {
+                "existing_drug_evidence": 0, "clinical_trial_activity": 0,
+                "mechanism_relevance": 1, "safety_profile": 0,
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 2, "tractability": 2,
+                "biological_plausibility": 2, "novelty_opportunity": 1,
+            },
+        }
+        assert classify_target(assessment) == "exploratory_target"
+
+    def test_classify_novel_candidate_via_bio_plausibility(self):
+        from src.agents.drug_target.tools.stage_logic import classify_target
+        assessment = {
+            "validated_track": {
+                "existing_drug_evidence": 0, "clinical_trial_activity": 0,
+                "mechanism_relevance": 1, "safety_profile": 0,
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 0, "tractability": 0,
+                "biological_plausibility": 2, "novelty_opportunity": 0,
+            },
+        }
+        assert classify_target(assessment) == "novel_candidate"
+
+    def test_classify_novel_candidate_via_novelty(self):
+        from src.agents.drug_target.tools.stage_logic import classify_target
+        assessment = {
+            "validated_track": {
+                "existing_drug_evidence": 0, "clinical_trial_activity": 0,
+                "mechanism_relevance": 0, "safety_profile": 0,
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 0, "tractability": 0,
+                "biological_plausibility": 0, "novelty_opportunity": 2,
+            },
+        }
+        assert classify_target(assessment) == "novel_candidate"
+
+    def test_classify_insufficient_evidence(self):
+        from src.agents.drug_target.tools.stage_logic import classify_target
+        assessment = {
+            "validated_track": {
+                "existing_drug_evidence": 0, "clinical_trial_activity": 0,
+                "mechanism_relevance": 0, "safety_profile": 0,
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 0, "tractability": 0,
+                "biological_plausibility": 1, "novelty_opportunity": 1,
+            },
+        }
+        assert classify_target(assessment) == "insufficient_evidence"
+
+    # --- Priority ---
+
+    def test_priority_high_validated(self, valid_assessment):
+        from src.agents.drug_target.tools.stage_logic import compute_priority
+        # valid_assessment: validated total=6 -> high
+        assert compute_priority(valid_assessment) == "high"
+
+    def test_priority_medium_validated(self):
+        from src.agents.drug_target.tools.stage_logic import compute_priority
+        assessment = {
+            "validated_track": {
+                "existing_drug_evidence": 2, "clinical_trial_activity": 0,
+                "mechanism_relevance": 1, "safety_profile": 0,
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 0, "tractability": 0,
+                "biological_plausibility": 0, "novelty_opportunity": 0,
+            },
+        }
+        # total=3 -> medium
+        assert compute_priority(assessment) == "medium"
+
+    def test_priority_high_exploratory(self):
+        from src.agents.drug_target.tools.stage_logic import compute_priority
+        assessment = {
+            "validated_track": {
+                "existing_drug_evidence": 0, "clinical_trial_activity": 0,
+                "mechanism_relevance": 0, "safety_profile": 0,
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 2, "tractability": 2,
+                "biological_plausibility": 2, "novelty_opportunity": 2,
+            },
+        }
+        # exploratory total=8 -> high
+        assert compute_priority(assessment) == "high"
+
+    def test_priority_medium_exploratory(self):
+        from src.agents.drug_target.tools.stage_logic import compute_priority
+        assessment = {
+            "validated_track": {
+                "existing_drug_evidence": 0, "clinical_trial_activity": 0,
+                "mechanism_relevance": 0, "safety_profile": 0,
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 1, "tractability": 2,
+                "biological_plausibility": 1, "novelty_opportunity": 1,
+            },
+        }
+        # exploratory total=5 -> medium
+        assert compute_priority(assessment) == "medium"
+
+    def test_priority_unranked_insufficient(self):
+        from src.agents.drug_target.tools.stage_logic import compute_priority
+        assessment = {
+            "validated_track": {
+                "existing_drug_evidence": 0, "clinical_trial_activity": 0,
+                "mechanism_relevance": 0, "safety_profile": 0,
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 0, "tractability": 0,
+                "biological_plausibility": 0, "novelty_opportunity": 0,
+            },
+        }
+        assert compute_priority(assessment) == "unranked"
+
+    def test_priority_low_novel_candidate(self):
+        from src.agents.drug_target.tools.stage_logic import compute_priority
+        assessment = {
+            "validated_track": {
+                "existing_drug_evidence": 0, "clinical_trial_activity": 0,
+                "mechanism_relevance": 0, "safety_profile": 0,
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 0, "tractability": 0,
+                "biological_plausibility": 2, "novelty_opportunity": 0,
+            },
+        }
+        assert compute_priority(assessment) == "low"
+
+    # --- Dict with score/rationale format ---
+
+    def test_rubric_with_dict_scores(self):
+        from src.agents.drug_target.tools.stage_logic import compute_validated_track, compute_exploratory_track
+        assessment = {
+            "validated_track": {
+                "existing_drug_evidence": {"score": 2, "rationale": "Phase 2"},
+                "clinical_trial_activity": {"score": 2, "rationale": "Active"},
+                "mechanism_relevance": {"score": 3, "rationale": "Direct"},
+                "safety_profile": {"score": -1, "rationale": "Moderate risk"},
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": {"score": 1, "rationale": "Suggestive"},
+                "tractability": {"score": 2, "rationale": "Clinical precedent"},
+                "biological_plausibility": {"score": 3, "rationale": "Strong"},
+                "novelty_opportunity": {"score": 1, "rationale": "Moderate"},
+            },
+        }
+        vt = compute_validated_track(assessment)
+        et = compute_exploratory_track(assessment)
+        assert vt["total"] == 6  # 2+2+3+(-1)
+        assert vt["pass"] is True
+        assert et["total"] == 7  # 1+2+3+1
+        assert et["pass"] is True
 
 
 class TestCompareCensusTool:
@@ -582,6 +1135,208 @@ class TestCompareCensusTool:
         assert result["resolution_mode"] == "fuzzy"
         assert result["resolved_cell_type"] == "Prolif Invasive Tumor"
 
+    def test_disease_fuzzy_resolution_on_no_cells_matched(self, monkeypatch, tmp_path):
+        """First attempt fails (disease mismatch) → fuzzy disease resolve → retry succeeds."""
+        import src.agents.drug_target.tools.census_lr_validation_tools as mod
+
+        class FailResult:
+            returncode = 1
+            stdout = ""
+            stderr = "RuntimeError: No cells matched the provided obs filter."
+
+        class OkResult:
+            returncode = 0
+            stdout = (
+                "Target vs rest\n"
+                "- TGFB1+ & TGFBR2+: target=10.0000% | rest=4.0000% | diff=6.0000% | RR=2.5000 | z=3.1000 | p=1.000e-03\n"
+            )
+            stderr = ""
+
+        calls = {"n": 0}
+
+        def fake_run(*args, **kwargs):
+            calls["n"] += 1
+            return FailResult() if calls["n"] == 1 else OkResult()
+
+        monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+        # Mock list_census_diseases to return candidates with fuzzy match
+        # "breast cancer" is a substring of "invasive breast cancer"
+        mock_diseases_result = json.dumps({
+            "executed": True,
+            "diseases": [
+                {"label": "normal", "total_cell_count": 50000},
+                {"label": "invasive breast cancer", "total_cell_count": 12000},
+                {"label": "lung adenocarcinoma", "total_cell_count": 8000},
+            ],
+        })
+        import src.agents.drug_target.tools.stage_domain_tools as domain_mod
+        mock_tool = MagicMock()
+        mock_tool.invoke = MagicMock(return_value=mock_diseases_result)
+        monkeypatch.setattr(domain_mod, "list_census_diseases", mock_tool)
+
+        raw = mod.run_compare_census_lr_pair.invoke({
+            "data_dir": str(tmp_path),
+            "disease": "breast cancer",
+            "gene_a": "TGFB1",
+            "gene_b": "TGFBR2",
+            "target_cell_type": "Invasive tumor",
+        })
+        result = json.loads(raw)
+        assert result["executed"] is True
+        assert result["disease_resolved"] == "invasive breast cancer"
+        assert result["disease_resolution_mode"] == "fuzzy"
+        assert result["disease"] == "invasive breast cancer"
+
+    def test_disease_resolution_exact_match(self, monkeypatch, tmp_path):
+        """Disease differs only by case → exact match resolution."""
+        import src.agents.drug_target.tools.census_lr_validation_tools as mod
+
+        class FailResult:
+            returncode = 1
+            stdout = ""
+            stderr = "RuntimeError: No cells matched the provided obs filter."
+
+        class OkResult:
+            returncode = 0
+            stdout = (
+                "Target vs rest\n"
+                "- TGFB1+ & TGFBR2+: target=10.0000% | rest=4.0000% | diff=6.0000% | RR=2.5000 | z=3.1000 | p=1.000e-03\n"
+            )
+            stderr = ""
+
+        calls = {"n": 0}
+
+        def fake_run(*args, **kwargs):
+            calls["n"] += 1
+            return FailResult() if calls["n"] == 1 else OkResult()
+
+        monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+        mock_diseases_result = json.dumps({
+            "executed": True,
+            "diseases": [
+                {"label": "Breast Carcinoma", "total_cell_count": 12000},
+            ],
+        })
+        import src.agents.drug_target.tools.stage_domain_tools as domain_mod
+        mock_tool = MagicMock()
+        mock_tool.invoke = MagicMock(return_value=mock_diseases_result)
+        monkeypatch.setattr(domain_mod, "list_census_diseases", mock_tool)
+
+        raw = mod.run_compare_census_lr_pair.invoke({
+            "data_dir": str(tmp_path),
+            "disease": "breast carcinoma",
+            "gene_a": "TGFB1",
+            "gene_b": "TGFBR2",
+            "target_cell_type": "Invasive tumor",
+        })
+        result = json.loads(raw)
+        assert result["executed"] is True
+        assert result["disease_resolved"] == "Breast Carcinoma"
+        assert result["disease_resolution_mode"] == "exact"
+
+    def test_disease_resolution_fallback_to_celltype(self, monkeypatch, tmp_path):
+        """Disease resolution fails → falls back to cell type resolution (existing behavior)."""
+        import src.agents.drug_target.tools.census_lr_validation_tools as mod
+
+        class FailResult:
+            returncode = 1
+            stdout = ""
+            stderr = (
+                "RuntimeError: Target cell type 'Invasive tumor' not found. "
+                "Examples of available cell types: Prolif Invasive Tumor(500), T cell(200)"
+            )
+
+        class OkResult:
+            returncode = 0
+            stdout = (
+                "Target vs rest\n"
+                "- TGFB1+ & TGFBR2+: target=10.0000% | rest=4.0000% | diff=6.0000% | RR=2.5000 | z=3.1000 | p=1.000e-03\n"
+            )
+            stderr = ""
+
+        calls = {"n": 0}
+
+        def fake_run(*args, **kwargs):
+            calls["n"] += 1
+            return FailResult() if calls["n"] == 1 else OkResult()
+
+        monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+        # Disease resolution returns no match → should skip disease retry
+        mock_diseases_result = json.dumps({
+            "executed": True,
+            "diseases": [
+                {"label": "normal", "total_cell_count": 50000},
+                {"label": "lung adenocarcinoma", "total_cell_count": 8000},
+            ],
+        })
+        import src.agents.drug_target.tools.stage_domain_tools as domain_mod
+        mock_tool = MagicMock()
+        mock_tool.invoke = MagicMock(return_value=mock_diseases_result)
+        monkeypatch.setattr(domain_mod, "list_census_diseases", mock_tool)
+
+        raw = mod.run_compare_census_lr_pair.invoke({
+            "data_dir": str(tmp_path),
+            "disease": "breast cancer",
+            "gene_a": "TGFB1",
+            "gene_b": "TGFBR2",
+            "target_cell_type": "Invasive tumor",
+        })
+        result = json.loads(raw)
+        assert result["executed"] is True
+        assert result["disease_resolved"] is None  # no disease resolution
+        assert result["retried"] is True  # cell type resolution happened
+        assert result["resolved_cell_type"] == "Prolif Invasive Tumor"
+
+    def test_disease_resolution_census_unavailable(self, monkeypatch, tmp_path):
+        """list_census_diseases raises → graceful skip, falls back to cell type logic."""
+        import src.agents.drug_target.tools.census_lr_validation_tools as mod
+
+        class FailResult:
+            returncode = 1
+            stdout = ""
+            stderr = (
+                "RuntimeError: Target cell type 'Invasive tumor' not found. "
+                "Examples of available cell types: Prolif Invasive Tumor(500), T cell(200)"
+            )
+
+        class OkResult:
+            returncode = 0
+            stdout = (
+                "Target vs rest\n"
+                "- TGFB1+ & TGFBR2+: target=10.0000% | rest=4.0000% | diff=6.0000% | RR=2.5000 | z=3.1000 | p=1.000e-03\n"
+            )
+            stderr = ""
+
+        calls = {"n": 0}
+
+        def fake_run(*args, **kwargs):
+            calls["n"] += 1
+            return FailResult() if calls["n"] == 1 else OkResult()
+
+        monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+        # Make list_census_diseases raise an exception
+        import src.agents.drug_target.tools.stage_domain_tools as domain_mod
+        mock_tool = MagicMock()
+        mock_tool.invoke = MagicMock(side_effect=RuntimeError("Census unavailable"))
+        monkeypatch.setattr(domain_mod, "list_census_diseases", mock_tool)
+
+        raw = mod.run_compare_census_lr_pair.invoke({
+            "data_dir": str(tmp_path),
+            "disease": "breast cancer",
+            "gene_a": "TGFB1",
+            "gene_b": "TGFBR2",
+            "target_cell_type": "Invasive tumor",
+        })
+        result = json.loads(raw)
+        assert result["executed"] is True
+        assert result["disease_resolved"] is None  # disease resolution skipped
+        assert result["retried"] is True  # fell back to cell type resolution
+        assert result["resolved_cell_type"] == "Prolif Invasive Tumor"
+
     def test_save_target_assessment_roundtrip(self, tmp_path):
         from src.agents.drug_target.tools.assessment_output import save_target_assessment
 
@@ -589,7 +1344,23 @@ class TestCompareCensusTool:
             "data_dir": str(tmp_path),
             "project_meta": json.dumps({"disease_focus": "breast cancer", "total_input_pairs": 15}),
             "druggability_matrix": json.dumps([
-                {"ligand": "TGFB1", "receptor": "TGFBR2", "is_featured": True, "open_targets_score": 0.9}
+                {
+                    "ligand": "TGFB1",
+                    "receptor": "TGFBR2",
+                    "open_targets_score": 0.9,
+                    "validated_track": {
+                        "existing_drug_evidence": 2,
+                        "clinical_trial_activity": 2,
+                        "mechanism_relevance": 3,
+                        "safety_profile": 0,
+                    },
+                    "exploratory_track": {
+                        "gwas_genetic_support": 2,
+                        "tractability": 2,
+                        "biological_plausibility": 3,
+                        "novelty_opportunity": 1,
+                    },
+                }
             ]),
             "featured_candidates_deep_dive": json.dumps([
                 {"target_gene": "TGFBR2"}
@@ -603,6 +1374,272 @@ class TestCompareCensusTool:
         payload = json.loads(saved.read_text())
         assert payload["project_meta"]["disease_focus"] == "breast cancer"
         assert payload["druggability_matrix"][0]["is_featured"] is True
+        assert payload["druggability_matrix"][0]["is_novel"] is False
+        assert payload["druggability_matrix"][0]["combined_total"] == 15
+
+
+# =========================================================================
+# Stage 1 Confidence Filtering Tests
+# =========================================================================
+
+class TestStage1Confidence:
+    """Tests for compute_stage1_confidence and filter_by_stage1_confidence."""
+
+    def test_compute_stage1_confidence_full_evidence(self):
+        """Full evidence (strong PPI + significant census + shared pathway + expression) → high confidence."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
+
+        evidence = {
+            "ligand": "TGFB1",
+            "receptor": "TGFBR2",
+            "string_ppi": {"max_combined_score": 0.999},  # 0-1 scale from STRING API
+            "census_validation": {
+                "coexpression": {"p_value": 0.001, "risk_ratio": 3.0},  # 1.0 * 1.0
+                "target_vs_rest": {
+                    "gene_a": {"target_pct": 5.2},
+                    "gene_b": {"target_pct": 3.1},
+                    "coexpression": {"p_value": 0.001, "risk_ratio": 3.0},
+                },
+            },
+            "kegg_pathways": {
+                "ligand_pathways": [{"pathway_id": "hsa04350"}, {"pathway_id": "hsa04060"}],
+                "receptor_pathways": [{"pathway_id": "hsa04350"}, {"pathway_id": "hsa04010"}],
+            },  # shared hsa04350 → 1.0
+            "reactome_pathways": {
+                "ligand_pathways": [{"reactome_id": "R-HSA-2173789"}],
+                "receptor_pathways": [{"reactome_id": "R-HSA-2173789"}],
+            },
+            "cellxgene": {"available_genes": ["TGFB1", "TGFBR2"]},  # fallback (not used)
+        }
+        result = compute_stage1_confidence(evidence)
+        assert result["confidence"] >= 0.99  # 0.999 string → rounds to ~1.0
+        assert result["string_score"] >= 0.99  # 0.999 from STRING API (0-1 scale)
+        assert result["census_score"] == 1.0
+        assert result["pathway_score"] == 1.0
+        assert result["expression_score"] == 1.0
+
+    def test_compute_stage1_confidence_missing_signals(self):
+        """Partial evidence (weak STRING, no census, no shared pathway, 1 gene) → low confidence.
+
+        No target_vs_rest in census_validation → fallback to available_genes.
+        """
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
+
+        evidence = {
+            "ligand": "GDF15",
+            "receptor": "GFRAL",
+            "string_ppi": {"max_combined_score": 0.222},  # 0-1 scale from STRING API
+            "census_validation": {
+                "coexpression": {"p_value": 0.1, "risk_ratio": 1.5},  # p>=0.05 → 0.0
+            },
+            "kegg_pathways": {
+                "ligand_pathways": [{"pathway_id": "hsa04060"}],
+                "receptor_pathways": [{"pathway_id": "hsa04010"}],
+            },  # no overlap → 0.0
+            "reactome_pathways": {
+                "ligand_pathways": [],
+                "receptor_pathways": [],
+            },
+            "cellxgene": {"available_genes": ["GDF15"]},  # fallback: 1/2 = 0.5
+        }
+        result = compute_stage1_confidence(evidence)
+        # 0.35 * 0.222 + 0.30 * 0.0 + 0.20 * 0.0 + 0.15 * 0.5 ≈ 0.153
+        assert result["confidence"] < 0.2
+        assert result["census_score"] == 0.0
+        assert result["pathway_score"] == 0.0
+        assert result["expression_score"] == 0.5
+
+    def test_compute_stage1_confidence_shared_kegg_pathway(self):
+        """KEGG shared pathway only → pathway_score = 1.0."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
+
+        evidence = {
+            "ligand": "TNFSF10",
+            "receptor": "TNFRSF10C",
+            "string_ppi": {"max_combined_score": 0},
+            "kegg_pathways": {
+                "ligand_pathways": [{"pathway_id": "hsa04060"}, {"pathway_id": "hsa04061"}],
+                "receptor_pathways": [{"pathway_id": "hsa04060"}, {"pathway_id": "hsa04210"}],
+            },  # shared hsa04060 → 1.0
+            "reactome_pathways": {
+                "ligand_pathways": [],
+                "receptor_pathways": [],
+            },
+            "cellxgene": {"available_genes": []},
+        }
+        result = compute_stage1_confidence(evidence)
+        assert result["pathway_score"] == 1.0
+
+    def test_compute_stage1_confidence_no_shared_pathway(self):
+        """Both have pathways but no overlap → pathway_score = 0.0."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
+
+        evidence = {
+            "ligand": "GDF15",
+            "receptor": "GFRAL",
+            "string_ppi": {"max_combined_score": 0},
+            "kegg_pathways": {
+                "ligand_pathways": [{"pathway_id": "hsa04060"}],
+                "receptor_pathways": [{"pathway_id": "hsa04010"}],
+            },
+            "reactome_pathways": {
+                "ligand_pathways": [{"reactome_id": "R-HSA-111"}],
+                "receptor_pathways": [{"reactome_id": "R-HSA-222"}],
+            },  # no overlap in either DB → 0.0
+            "cellxgene": {"available_genes": []},
+        }
+        result = compute_stage1_confidence(evidence)
+        assert result["pathway_score"] == 0.0
+
+    def test_compute_stage1_confidence_old_format_fallback(self):
+        """Old flat 'pathways' list format → count-based fallback."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
+
+        evidence = {
+            "ligand": "TGFB1",
+            "receptor": "TGFBR2",
+            "string_ppi": {"max_combined_score": 0},
+            "kegg_pathways": {"pathways": ["p1", "p2"]},
+            "reactome_pathways": {"pathways": ["r1", "r2"]},  # 4/4 = 1.0
+            "cellxgene": {"available_genes": []},
+        }
+        result = compute_stage1_confidence(evidence)
+        assert result["pathway_score"] == 1.0
+
+    def test_compute_stage1_confidence_nested_census(self):
+        """Census data under target_vs_rest.coexpression is also handled."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
+
+        evidence = {
+            "ligand": "VEGFA",
+            "receptor": "FLT1",
+            "string_ppi": {"max_combined_score": 450},
+            "census_validation": {
+                "target_vs_rest": {
+                    "coexpression": {"p_value": 0.01, "risk_ratio": 2.0},
+                },
+            },
+            "kegg_pathways": {
+                "ligand_pathways": [{"pathway_id": "hsa04370"}],
+                "receptor_pathways": [{"pathway_id": "hsa04370"}],
+            },
+            "reactome_pathways": {
+                "ligand_pathways": [],
+                "receptor_pathways": [],
+            },
+            "cellxgene": {"available_genes": ["VEGFA", "FLT1"]},
+        }
+        result = compute_stage1_confidence(evidence)
+        assert result["census_score"] > 0  # p<0.05 and rr>0
+
+    def test_compute_stage1_confidence_empty_evidence(self):
+        """Completely empty evidence → zero confidence."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
+
+        result = compute_stage1_confidence({})
+        assert result["confidence"] == 0.0
+
+    def test_expression_score_from_census_target_pct(self):
+        """Both genes have target_pct > 0 → expression_score = 1.0."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
+
+        evidence = {
+            "ligand": "TGFB1",
+            "receptor": "TGFBR2",
+            "string_ppi": {"max_combined_score": 0},
+            "census_validation": {
+                "target_vs_rest": {
+                    "gene_a": {"target_pct": 5.2},
+                    "gene_b": {"target_pct": 3.1},
+                },
+            },
+            "kegg_pathways": {"ligand_pathways": [], "receptor_pathways": []},
+            "reactome_pathways": {"ligand_pathways": [], "receptor_pathways": []},
+        }
+        result = compute_stage1_confidence(evidence)
+        assert result["expression_score"] == 1.0
+
+    def test_expression_score_one_gene_expressed(self):
+        """Only one gene has target_pct > 0 → expression_score = 0.5."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
+
+        evidence = {
+            "ligand": "GDF15",
+            "receptor": "GFRAL",
+            "string_ppi": {"max_combined_score": 0},
+            "census_validation": {
+                "target_vs_rest": {
+                    "gene_a": {"target_pct": 4.0},
+                    "gene_b": {"target_pct": 0},
+                },
+            },
+            "kegg_pathways": {"ligand_pathways": [], "receptor_pathways": []},
+            "reactome_pathways": {"ligand_pathways": [], "receptor_pathways": []},
+        }
+        result = compute_stage1_confidence(evidence)
+        assert result["expression_score"] == 0.5
+
+    def test_expression_score_fallback_old_format(self):
+        """No target_vs_rest in census → fallback to available_genes."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
+
+        evidence = {
+            "ligand": "VEGFA",
+            "receptor": "FLT1",
+            "string_ppi": {"max_combined_score": 0},
+            "census_validation": {
+                "coexpression": {"p_value": 0.5, "risk_ratio": 0.5},
+            },
+            "kegg_pathways": {"ligand_pathways": [], "receptor_pathways": []},
+            "reactome_pathways": {"ligand_pathways": [], "receptor_pathways": []},
+            "cellxgene": {"available_genes": ["VEGFA", "FLT1"]},
+        }
+        result = compute_stage1_confidence(evidence)
+        assert result["expression_score"] == 1.0
+
+    def test_filter_by_stage1_confidence_basic(self):
+        """All pairs pass; low-confidence ones are tagged."""
+        from src.agents.drug_target.tools.stage_logic import filter_by_stage1_confidence
+
+        pairs = [
+            {"name": f"pair_{i}", "stage1_confidence": {"confidence": c}}
+            for i, c in enumerate([0.8, 0.7, 0.6, 0.5, 0.45, 0.3, 0.2, 0.1, 0.05, 0.0])
+        ]
+        passed, filtered = filter_by_stage1_confidence(pairs, threshold=0.4, min_remaining=3)
+        assert len(passed) == 10  # all pairs pass
+        assert len(filtered) == 0
+        # Low-confidence pairs tagged
+        low = [p for p in passed if p.get("stage1_low_confidence")]
+        assert len(low) == 5  # 0.3, 0.2, 0.1, 0.05, 0.0
+        high = [p for p in passed if not p.get("stage1_low_confidence")]
+        assert len(high) == 5  # 0.8, 0.7, 0.6, 0.5, 0.45
+
+    def test_filter_by_stage1_confidence_graduated_relaxation(self):
+        """All pairs pass; below-threshold pairs are tagged."""
+        from src.agents.drug_target.tools.stage_logic import filter_by_stage1_confidence
+
+        pairs = [
+            {"name": f"pair_{i}", "stage1_confidence": {"confidence": c}}
+            for i, c in enumerate([0.5, 0.45, 0.35, 0.30, 0.25, 0.22, 0.15, 0.10])
+        ]
+        passed, filtered = filter_by_stage1_confidence(pairs, threshold=0.4, min_remaining=5)
+        assert len(passed) == 8  # all pairs pass
+        assert len(filtered) == 0
+        low = [p for p in passed if p.get("stage1_low_confidence")]
+        assert len(low) == 6  # 0.35, 0.30, 0.25, 0.22, 0.15, 0.10
+
+    def test_filter_by_stage1_confidence_no_filtering_fallback(self):
+        """All low-confidence pairs still pass with tag."""
+        from src.agents.drug_target.tools.stage_logic import filter_by_stage1_confidence
+
+        pairs = [
+            {"name": f"pair_{i}", "stage1_confidence": {"confidence": c}}
+            for i, c in enumerate([0.15, 0.10, 0.05])
+        ]
+        passed, filtered = filter_by_stage1_confidence(pairs, threshold=0.4, min_remaining=5)
+        assert len(passed) == 3
+        assert len(filtered) == 0
+        assert all(p.get("stage1_low_confidence") for p in passed)
 
 
 # =========================================================================
@@ -616,8 +1653,6 @@ class TestIntegration:
         from src.agents.drug_target.agent import DrugTargetConfig
         config = DrugTargetConfig()
         assert config.provider == "openrouter"
-        assert config.max_iterations == 2
-        assert config.quality_threshold == 0.7
         assert config.use_checkpointer is False
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
@@ -634,10 +1669,12 @@ class TestIntegration:
         config = DrugTargetConfig(data_dir=str(tmp_path))
         result = create_drug_target_agent(config)
 
-        assert result is mock_agent
+        # create_drug_target_agent returns (agent, backend_or_None)
+        agent, backend = result
+        assert agent is mock_agent
+        assert backend is None
         mock_create_llm.assert_called_once_with(provider="openrouter")
-        # 2 compiled subagents + 1 orchestrator = 3 calls
-        assert mock_create_deep_agent.call_count == 3
+        mock_create_deep_agent.assert_called_once()
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
@@ -652,8 +1689,7 @@ class TestIntegration:
         config = DrugTargetConfig(data_dir=str(tmp_path))
         create_drug_target_agent(config)
 
-        # data_path.txt is written by the OverwriteFilesystemBackend
-        assert (tmp_path / "data_path.txt").exists()
+        # evidence directory is created during agent initialization
         assert (tmp_path / "evidence").is_dir()
 
     def test_run_drug_target_assessment_missing_lr_candidates(self, tmp_path):
@@ -694,9 +1730,10 @@ class TestIntegration:
         mock_agent.ainvoke = mock_ainvoke
 
         # Patch at source module (lazy import inside the function)
+        # create_drug_target_agent returns (agent, backend_or_None)
         with patch(
             "src.agents.drug_target.agent.create_drug_target_agent",
-            return_value=mock_agent,
+            return_value=(mock_agent, None),
         ):
             raw = await run_drug_target_assessment.ainvoke({
                 "data_dir": str(mock_data_dir),
@@ -724,3 +1761,309 @@ class TestIntegration:
         call_kwargs = mock_create_deep_agent.call_args
         subagents = call_kwargs.kwargs.get("subagents") or call_kwargs[1].get("subagents")
         assert len(subagents) == 2
+
+
+# =========================================================================
+# 9. TestCensusDiseaseTool — list_census_diseases + disease_matched flag
+# =========================================================================
+
+class TestCensusDiseaseTool:
+    """Tests for list_census_diseases tool and disease_matched flag."""
+
+    def test_list_census_diseases_returns_disease_list(self):
+        """Mock summary_cell_counts returns disease list."""
+        import pandas as pd
+        from src.agents.drug_target.tools.stage_domain_tools import list_census_diseases
+
+        mock_df = pd.DataFrame({
+            "organism": ["Homo sapiens", "Homo sapiens", "Homo sapiens"],
+            "category": ["disease", "disease", "cell_type"],
+            "label": ["normal", "breast carcinoma", "fibroblast"],
+            "total_cell_count": [1000000, 50000, 200000],
+        })
+
+        mock_table = MagicMock()
+        mock_table.read.return_value.concat.return_value.to_pandas.return_value = mock_df
+
+        mock_census = MagicMock()
+        mock_census.__getitem__ = lambda self, key: {
+            "census_info": {"summary_cell_counts": mock_table},
+        }[key]
+
+        with patch("cellxgene_census.open_soma") as mock_open:
+            mock_open.return_value.__enter__ = lambda s: mock_census
+            mock_open.return_value.__exit__ = MagicMock(return_value=False)
+            raw = list_census_diseases.invoke({"organism": "homo_sapiens"})
+
+        result = json.loads(raw)
+        assert result["executed"] is True
+        assert len(result["diseases"]) == 2
+        labels = [d["label"] for d in result["diseases"]]
+        assert "normal" in labels
+        assert "breast carcinoma" in labels
+
+    def test_list_census_diseases_sorted_descending(self):
+        """Disease list is sorted by total_cell_count descending."""
+        import pandas as pd
+        from src.agents.drug_target.tools.stage_domain_tools import list_census_diseases
+
+        mock_df = pd.DataFrame({
+            "organism": ["Homo sapiens", "Homo sapiens", "Homo sapiens"],
+            "category": ["disease", "disease", "disease"],
+            "label": ["small_disease", "big_disease", "medium_disease"],
+            "total_cell_count": [100, 100000, 5000],
+        })
+
+        mock_table = MagicMock()
+        mock_table.read.return_value.concat.return_value.to_pandas.return_value = mock_df
+
+        mock_census = MagicMock()
+        mock_census.__getitem__ = lambda self, key: {
+            "census_info": {"summary_cell_counts": mock_table},
+        }[key]
+
+        with patch("cellxgene_census.open_soma") as mock_open:
+            mock_open.return_value.__enter__ = lambda s: mock_census
+            mock_open.return_value.__exit__ = MagicMock(return_value=False)
+            raw = list_census_diseases.invoke({"organism": "homo_sapiens"})
+
+        result = json.loads(raw)
+        assert result["executed"] is True
+        counts = [d["total_cell_count"] for d in result["diseases"]]
+        assert counts == sorted(counts, reverse=True)
+        assert result["diseases"][0]["label"] == "big_disease"
+
+    def test_list_census_diseases_cellxgene_unavailable(self):
+        """Graceful error when cellxgene_census not installed."""
+        from src.agents.drug_target.tools.stage_domain_tools import list_census_diseases
+
+        original_import = __builtins__.__import__ if hasattr(__builtins__, '__import__') else __import__
+
+        def guarded_import(name, *args, **kwargs):
+            if name == "cellxgene_census":
+                raise ImportError("no module named 'cellxgene_census'")
+            return original_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=guarded_import):
+            raw = list_census_diseases.invoke({"organism": "homo_sapiens"})
+
+        result = json.loads(raw)
+        assert result["executed"] is False
+        assert any("unavailable" in e for e in result["errors"])
+
+    def test_disease_matched_true_when_rows_found(self):
+        """disease_matched is True when disease filter returns rows."""
+        import pandas as pd
+        from src.agents.drug_target.tools.stage_domain_tools import (
+            query_cellxgene_lr_context,
+        )
+
+        mock_obs = pd.DataFrame({"cell_type": ["fibroblast"] * 10})
+        mock_var = pd.DataFrame({"feature_name": ["TGFB1", "TGFBR2"]})
+
+        with patch("cellxgene_census.open_soma") as mock_open, \
+             patch("cellxgene_census.get_obs", return_value=mock_obs), \
+             patch("cellxgene_census.get_var", return_value=mock_var):
+            mock_open.return_value.__enter__ = MagicMock()
+            mock_open.return_value.__exit__ = MagicMock(return_value=False)
+            raw = query_cellxgene_lr_context.invoke({
+                "ligand": "TGFB1",
+                "receptor": "TGFBR2",
+                "disease": "breast carcinoma",
+            })
+
+        result = json.loads(raw)
+        assert result["executed"] is True
+        assert result["disease_matched"] is True
+
+    def test_disease_matched_false_on_fallback(self):
+        """disease_matched is False when disease filter returns 0 rows (fallback)."""
+        import pandas as pd
+        from src.agents.drug_target.tools.stage_domain_tools import (
+            query_cellxgene_lr_context,
+        )
+
+        empty_obs = pd.DataFrame({"cell_type": []})
+        fallback_obs = pd.DataFrame({"cell_type": ["fibroblast"] * 5})
+        mock_var = pd.DataFrame({"feature_name": ["TGFB1"]})
+
+        with patch("cellxgene_census.open_soma") as mock_open, \
+             patch("cellxgene_census.get_obs", side_effect=[empty_obs, fallback_obs]), \
+             patch("cellxgene_census.get_var", return_value=mock_var):
+            mock_open.return_value.__enter__ = MagicMock()
+            mock_open.return_value.__exit__ = MagicMock(return_value=False)
+            raw = query_cellxgene_lr_context.invoke({
+                "ligand": "TGFB1",
+                "receptor": "TGFBR2",
+                "disease": "nonexistent disease xyz",
+            })
+
+        result = json.loads(raw)
+        assert result["executed"] is True
+        assert result["disease_matched"] is False
+        assert any("not matched" in e for e in result["errors"])
+        assert any("list_census_diseases" in e for e in result["errors"])
+
+    def test_list_census_diseases_registered_in_evidence_assessor(self):
+        """list_census_diseases is in evidence_assessor tools."""
+        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
+        tools = SUBAGENT_CONFIGS["evidence_assessor"]["tools"]
+        names = {t.name for t in tools}
+        assert "list_census_diseases" in names
+
+    def test_evidence_assessor_prompt_mentions_disease_matching(self):
+        """Prompt contains disease matching keywords."""
+        from src.agents.drug_target.subagents.prompts import EVIDENCE_ASSESSOR_PROMPT
+        assert "list_census_diseases" in EVIDENCE_ASSESSOR_PROMPT
+        assert "census_disease" in EVIDENCE_ASSESSOR_PROMPT
+        assert "disease_matched" in EVIDENCE_ASSESSOR_PROMPT
+
+
+# =========================================================================
+# 10. TestNovelCandidates — Dual-track Featured vs Novel selection
+# =========================================================================
+
+class TestNovelCandidates:
+    """Novel candidate selection, tier assignment, and slot allocation."""
+
+    @staticmethod
+    def _row(ligand, receptor, vt_scores, et_scores):
+        return {
+            "ligand": ligand,
+            "receptor": receptor,
+            "open_targets_score": 0.5,
+            "validated_track": dict(zip(
+                ("existing_drug_evidence", "clinical_trial_activity", "mechanism_relevance", "safety_profile"),
+                vt_scores,
+            )),
+            "exploratory_track": dict(zip(
+                ("gwas_genetic_support", "tractability", "biological_plausibility", "novelty_opportunity"),
+                et_scores,
+            )),
+        }
+
+    def test_rank_novel_candidates_by_exploratory_total(self):
+        """Novel candidates (drug_evidence=0) are marked is_novel and sorted by exploratory_total."""
+        from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
+
+        matrix = [
+            # Featured pool (drug_evidence >= 1)
+            self._row("A", "B", (2, 2, 3, 0), (1, 1, 2, 1)),   # featured
+            # Novel pool (drug_evidence == 0), different exploratory totals
+            self._row("C", "D", (0, 0, 1, 0), (2, 1, 2, 1)),   # exploratory_total=6
+            self._row("E", "F", (0, 0, 1, 0), (1, 2, 3, 2)),   # exploratory_total=8
+            self._row("G", "H", (0, 0, 1, 0), (0, 0, 2, 1)),   # exploratory_total=3
+        ]
+
+        ranked = rank_featured_candidates(matrix, min_featured=1, max_featured=3, min_novel=1, max_novel=3)
+        novel = [r for r in ranked if r.get("is_novel")]
+
+        assert len(novel) >= 1
+        # Novel sorted by exploratory_total descending
+        assert novel[0]["exploratory_total"] >= novel[-1]["exploratory_total"]
+        # Highest exploratory_total novel is E (8)
+        assert novel[0]["ligand"] == "E"
+        # All novel have is_featured=False
+        assert all(not r["is_featured"] for r in novel)
+
+    def test_novel_tier_assignment(self):
+        """Novel Tier 1 (GWAS/tractability) vs Tier 2 (ST-only)."""
+        from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
+
+        matrix = [
+            # Novel with GWAS support → Tier 1
+            self._row("A", "B", (0, 0, 1, 0), (2, 0, 2, 1)),   # gwas=2 → tier 1
+            # Novel with tractability → Tier 1
+            self._row("C", "D", (0, 0, 1, 0), (0, 2, 2, 1)),   # tract=2 → tier 1
+            # Novel without GWAS or tractability → Tier 2
+            self._row("E", "F", (0, 0, 1, 0), (0, 0, 2, 2)),   # gwas=0, tract=0 → tier 2
+        ]
+
+        ranked = rank_featured_candidates(matrix, min_featured=0, max_featured=0, min_novel=1, max_novel=3)
+        novel = [r for r in ranked if r.get("is_novel")]
+
+        tier_map = {r["ligand"]: r.get("novel_tier") for r in novel}
+        assert tier_map["A"] == 1  # GWAS support
+        assert tier_map["C"] == 1  # tractability support
+        assert tier_map["E"] == 2  # ST-only
+
+    def test_featured_and_novel_coexist(self):
+        """Both featured (drug evidence) and novel (no drug evidence) tracks populated."""
+        from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
+
+        matrix = [
+            # Featured (drug_evidence >= 1)
+            self._row("A", "B", (3, 2, 3, 0), (2, 2, 3, 1)),   # validated
+            self._row("C", "D", (1, 1, 2, 0), (1, 1, 2, 1)),   # validated
+            # Novel (drug_evidence == 0)
+            self._row("E", "F", (0, 0, 2, 0), (2, 1, 3, 2)),   # exploratory
+            self._row("G", "H", (0, 0, 1, 0), (0, 0, 2, 2)),   # novel_candidate
+        ]
+
+        ranked = rank_featured_candidates(matrix, min_featured=2, max_featured=3, min_novel=1, max_novel=2)
+        featured = [r for r in ranked if r["is_featured"]]
+        novel = [r for r in ranked if r.get("is_novel")]
+
+        assert len(featured) >= 2
+        assert len(novel) >= 1
+        # No overlap between tracks
+        featured_ligands = {r["ligand"] for r in featured}
+        novel_ligands = {r["ligand"] for r in novel}
+        assert featured_ligands.isdisjoint(novel_ligands)
+        # All featured have drug_evidence >= 1
+        for r in featured:
+            ede = r["validated_track"]["existing_drug_evidence"]
+            score = ede["score"] if isinstance(ede, dict) else ede
+            assert score >= 1
+
+    def test_novel_slot_allocation_dynamic(self):
+        """When fewer featured candidates, more novel slots are allocated (up to max_total)."""
+        from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
+
+        matrix = [
+            # Only 1 featured candidate
+            self._row("A", "B", (2, 1, 2, 0), (1, 1, 2, 1)),   # drug_evidence=2
+            # 4 novel candidates
+            self._row("C", "D", (0, 0, 1, 0), (2, 2, 3, 2)),   # exploratory_total=9
+            self._row("E", "F", (0, 0, 1, 0), (1, 2, 2, 1)),   # exploratory_total=6
+            self._row("G", "H", (0, 0, 1, 0), (1, 1, 2, 1)),   # exploratory_total=5
+            self._row("I", "J", (0, 0, 1, 0), (0, 0, 2, 1)),   # exploratory_total=3
+        ]
+
+        ranked = rank_featured_candidates(
+            matrix, min_featured=1, max_featured=3, min_novel=1, max_novel=3, max_total=5
+        )
+        featured = [r for r in ranked if r["is_featured"]]
+        novel = [r for r in ranked if r.get("is_novel")]
+
+        # Only 1 featured available → 1 featured
+        assert len(featured) == 1
+        # Remaining slots (5 - 1 = 4) → capped by max_novel=3
+        assert len(novel) == 3
+        # Total does not exceed max_total
+        assert len(featured) + len(novel) <= 5
+
+    def test_all_novel_no_featured(self):
+        """When all candidates have drug_evidence=0, all go to novel track."""
+        from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
+
+        matrix = [
+            self._row("A", "B", (0, 0, 2, 0), (2, 2, 3, 2)),   # exploratory_total=9
+            self._row("C", "D", (0, 0, 1, 0), (1, 1, 2, 1)),   # exploratory_total=5
+            self._row("E", "F", (0, 0, 1, 0), (0, 0, 2, 2)),   # exploratory_total=4
+        ]
+
+        ranked = rank_featured_candidates(
+            matrix, min_featured=2, max_featured=5, min_novel=1, max_novel=3, max_total=7
+        )
+        featured = [r for r in ranked if r["is_featured"]]
+        novel = [r for r in ranked if r.get("is_novel")]
+
+        # No featured candidates (all drug_evidence=0)
+        assert len(featured) == 0
+        # All eligible are novel
+        assert len(novel) == 3
+        # Sorted by exploratory_total descending
+        assert novel[0]["exploratory_total"] == 9
+        assert novel[1]["exploratory_total"] == 5
+        assert novel[2]["exploratory_total"] == 4

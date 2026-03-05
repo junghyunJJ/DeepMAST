@@ -1,97 +1,94 @@
-graph TD
-    %% Node
-    __start__([<p>__start__</p>]):::first
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Helvetica, Arial",
+    "primaryBorderColor": "#b0b8c1",
+    "lineColor": "#8c96a3"
+  }
+}}%%
 
-    load_config["load_pipeline_config<br/>(parse config,<br/>derive celltype_mode)"]
-    load_st["load_st_data<br/>(HITL: collect h5ad)"]
-    sc_ref["resolve_sc_reference<br/>(HITL: SC ref confirmation)"]
-    validate["validate_data<br/>(check h5ad, setup dirs)"]
-    prep["prep_executor<br/>(batch MCP check)"]
-    gen_mcp["generate_mcp<br/>(code2MCP / rmcpagent)"]
-    human_confirm{{"human_confirm<br/>(HITL: execution plan)"}}
+flowchart TB
 
-    subgraph react_agent["Single ReAct Agent"]
-        Query[<b>🗨️ Query</b>]
-        Thinking{<b>🧠<br/>Pipeline<br/>Executor</b>}
-        ToolCall[<b>🔧 Tool</b>]
-        Answer[<b>📝 Answer</b>]
+%% =========================
+%% PANEL A — INPUT
+%% =========================
 
-        Query --> Thinking
-        Thinking -.->|<b>Action</b>| ToolCall
-        Thinking -.->|<b>Finish</b>| Answer
-        ToolCall -->|<b>Observation</b>| Thinking
+subgraph A["Input & Data Preparation"]
+direction TB
 
-        subgraph MCPTools[MCP tools]
-            mcp_st[Sequential<br/>Thinking]
-            preprocessing["preprocessing tools<br/>(normalization,<br/>cell type analysis,<br/>spatial clustering)"]
-        end
-    end
+start([Start]):::terminal
 
-    save["save_results"]
-    __end__([<p>__end__</p>]):::last
+load_config["Load Configuration"]:::module
+load_st["Load Spatial Data"]:::module
+sc_ref["Resolve SC Reference<br/>(if spot-based)"]:::module
+validate["Validate & Setup"]:::module
+prep["MCP Readiness Check"]:::module
+gen_mcp["MCP Generation<br/>(if required)"]:::module
+human_confirm{{"Human Confirmation<br/>HITL"}}:::decision
 
-    %% === Edges ===
+start --> load_config --> load_st
+load_st -->|spot-based| sc_ref
+load_st -->|single-cell| validate
+sc_ref --> validate
+validate --> prep
+prep -->|missing MCP| gen_mcp --> prep
+prep -->|ready| human_confirm
 
-    %% START → load_config
-    __start__ --> load_config
+end
 
-    %% load_config → conditional
-    load_config -.->|<b>has config</b>| load_st
-    load_config -.->|<b>no config</b>| save
+%% =========================
+%% PANEL B — EXECUTION CORE
+%% =========================
 
-    %% load_st → conditional
-    load_st -.->|<b>h5ad missing<br/>(loop)</b>| load_st
-    load_st -.->|<b>spot-based</b>| sc_ref
-    load_st -.->|<b>single-cell</b>| validate
+subgraph B["Single ReAct Execution Core"]
+direction TB
 
-    %% SC ref resolution sub-tools
-    sc_mcp["visium_reference<br/>selector_mcp<br/>(OT ranking)"]
-    sc_skills["cellxgene-census<br/>skill<br/>(download)"]
-    sc_mcp -.-> sc_ref
-    sc_skills -.-> sc_ref
+Query["Query"]:::inner
+Thinking{{"Pipeline Executor"}}:::agent
+ToolCall["Tool Invocation"]:::tool
+Answer["Final Answer"]:::inner
 
-    %% sc_ref → validate
-    sc_ref --> validate
+Query --> Thinking
+Thinking -->|Action| ToolCall
+ToolCall -->|Observation| Thinking
+Thinking -->|Finish| Answer
 
-    %% validate → prep
-    validate --> prep
+subgraph MCP["MCP Tool Layer"]
+direction TB
+mcp_st["Sequential Thinking"]
+preprocessing["Preprocessing Modules"]
+end
 
-    %% prep → conditional
-    prep -.->|<b>all MCP ready</b>| human_confirm
-    prep -.->|<b>MCP missing</b>| gen_mcp
+end
 
-    %% gen_mcp → prep (re-check loop)
-    gen_mcp --> prep
+%% =========================
+%% PANEL C — OUTPUT
+%% =========================
 
-    %% MCP generation sub-tools
-    code2mcp["code2MCP<br/>(Python → FastMCP)"]
-    rmcpagent["rmcpagent<br/>(R package → MCP)"]
-    code2mcp -.-> gen_mcp
-    rmcpagent -.-> gen_mcp
+subgraph C["Output"]
+direction TB
 
-    %% human_confirm → execute
-    human_confirm --> Query
+save["Save Results"]:::module
+end_node([End]):::terminal
 
-    %% execute → save → END
-    Answer --> save
-    save --> __end__
+save --> end_node
 
-    %% === Styles ===
-    classDef default fill:#2d2d3d,stroke:#fff,stroke-width:2px,color:#fff
-    classDef first fill:#ff7f50,stroke:#fff,stroke-width:2px,color:#000
-    classDef last fill:#ffd700,stroke:#fff,stroke-width:2px,color:#000
-    classDef prepNode fill:#ab47bc,stroke:#fff,stroke-width:2px,color:#000
-    classDef humanNode fill:#4dabf7,stroke:#fff,stroke-width:2px,color:#000
-    classDef thinkingNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
-    classDef queryNode fill:#ff7f50,stroke:#fff,stroke-width:2px,color:#000
-    classDef toolNode fill:#d3d3d3,stroke:#fff,stroke-width:2px,color:#000
-    classDef answerNode fill:#ffd700,stroke:#fff,stroke-width:2px,color:#000
-    classDef subtoolNode fill:#555577,stroke:#aaa,stroke-width:1px,color:#ddd
+end
 
-    class load_config,load_st,sc_ref,validate,prep,gen_mcp,save prepNode
-    class human_confirm humanNode
-    class Query queryNode
-    class Thinking thinkingNode
-    class ToolCall,MCPTools toolNode
-    class Answer answerNode
-    class sc_mcp,sc_skills,code2mcp,rmcpagent subtoolNode
+%% =========================
+%% MAIN FLOW
+%% =========================
+
+human_confirm --> Query
+Answer --> save
+
+%% =========================
+%% STYLES — Academic Minimal
+%% =========================
+
+classDef module fill:#ffffff,stroke:#b0b8c1,stroke-width:1.2px,rx:8,ry:8
+classDef decision fill:#f7f9fb,stroke:#8fa1b3,stroke-width:1.2px,rx:8,ry:8
+classDef agent fill:#f0f3f6,stroke:#6b7785,stroke-width:2px,rx:12,ry:12
+classDef inner fill:#ffffff,stroke:#c5ccd3,stroke-width:1px,rx:6,ry:6
+classDef tool fill:#f4f6f8,stroke:#aab4bf,stroke-width:1px,rx:6,ry:6
+classDef terminal fill:#2f3b45,color:#ffffff,stroke:#2f3b45,stroke-width:1.5px,rx:12,ry:12

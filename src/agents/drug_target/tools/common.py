@@ -12,6 +12,7 @@ to avoid circular import through deep_interpreter.__init__.py chain:
 """
 
 import asyncio
+import atexit
 import logging
 import os
 import threading
@@ -51,6 +52,7 @@ _SEQ_THINKING_LOCK = threading.Lock()
 _SEQ_THINKING_CLIENT: Optional[MultiServerMCPClient] = None
 _SEQ_THINKING_TOOLS: Optional[list[BaseTool]] = None
 _EXECUTOR = ThreadPoolExecutor(max_workers=2)
+atexit.register(_EXECUTOR.shutdown, wait=False)
 
 
 def _get_seq_thinking_config() -> dict:
@@ -65,7 +67,11 @@ def _get_seq_thinking_config() -> dict:
 
 
 def _run_async(coro):
-    """Run async coroutine from sync context."""
+    """Run async coroutine from sync context.
+
+    When called from an already-running event loop, delegates to a
+    ThreadPoolExecutor to avoid deadlock.
+    """
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -73,28 +79,27 @@ def _run_async(coro):
 
     if loop and loop.is_running():
         future = _EXECUTOR.submit(asyncio.run, coro)
-        return future.result(timeout=60)
+        return future.result(timeout=120)
     else:
         return asyncio.run(coro)
 
 
-async def _get_seq_thinking_tools() -> list[BaseTool]:
-    """Get or create cached sequential-thinking MCP tools."""
-    global _SEQ_THINKING_CLIENT, _SEQ_THINKING_TOOLS
+def _get_seq_thinking_tools() -> list[BaseTool]:
+    """Get or create cached sequential-thinking MCP tools.
 
+    Uses a lock around the entire initialization to prevent TOCTOU race.
+    Runs async client initialization via _run_async to stay sync-safe.
+    """
+    global _SEQ_THINKING_CLIENT, _SEQ_THINKING_TOOLS
     with _SEQ_THINKING_LOCK:
         if _SEQ_THINKING_TOOLS is not None:
             return _SEQ_THINKING_TOOLS
-
-    config = _get_seq_thinking_config()
-    client = MultiServerMCPClient(config)
-    tools = await client.get_tools()
-
-    with _SEQ_THINKING_LOCK:
+        config = _get_seq_thinking_config()
+        client = MultiServerMCPClient(config)
+        tools = _run_async(client.get_tools())
         _SEQ_THINKING_CLIENT = client
         _SEQ_THINKING_TOOLS = tools
-
-    return tools
+        return tools
 
 
 async def _invoke_sequential_thinking(
@@ -104,7 +109,7 @@ async def _invoke_sequential_thinking(
     next_thought_needed: bool,
 ) -> str:
     """Invoke the sequential-thinking MCP tool."""
-    tools = await _get_seq_thinking_tools()
+    tools = _get_seq_thinking_tools()
 
     # Find the sequentialthinking tool
     seq_tool = None
@@ -162,7 +167,7 @@ def sequential_thinking(
         return result
     except Exception as e:
         # Graceful fallback: return the thought as-is
-        logger.warning(f"Sequential thinking MCP failed: {e}")
+        logger.warning("Sequential thinking MCP failed: %s", e)
         return f"[Planning thought {thought_number}/{total_thoughts}]: {thought}"
 
 

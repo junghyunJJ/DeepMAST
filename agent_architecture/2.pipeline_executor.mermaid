@@ -1,71 +1,113 @@
-graph TD
-    %% Node
-    __start__([<p>__start__</p>]):::first
-    
-    pipeline_data["Pipeline<br/>Information<br/>load"]
-    st_data["ST data<br/>load"]
-    sc_data["sc refercne data<br/>load"]
-    sc_mcp["sc-reference<br/>selector"]
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Helvetica, Arial",
+    "primaryColor": "#f5f7fa",
+    "primaryBorderColor": "#c9d1d9",
+    "lineColor": "#9aa4b2"
+  }
+}}%%
 
-    sc_thinking{<b>🧠<br/>single cell<br/>reference<br/>Selector</b>}
-    human_node{{Human<br/>Decision}}
+flowchart LR
 
-    subgraph react_agent2["ReAct agnet"]
-        Query2[<b>🗨️ Query</b>]
-        Thinking2{<b>🧠<br/>Pipeline<br/>Executor</b>}
-        Tool2[<b>🔧 Tool</b>]
-        Answer2[<b>📝 Answer</b>]
-        
-        Query2 --> Thinking2
-        Thinking2 -.->|<b>Action</b>| Tool2
-        Thinking2 -.->|<b>Finish</b>| Answer2
-        Tool2 -->|<b>Observation</b>| Thinking2
+%% =====================================================
+%% LEFT PANEL — Input & Preparation
+%% =====================================================
 
-        subgraph Tool2[MCP tools]
-            rMCP[rMCPAgent]
-            mcp_st[Sequential<br/>Thinking]
-            mcp_dc[Desktop<br/>Commander]
-            preprocessing["preprocessing tools<br/> (normalization<br/>cellee type anlaysis,<br/>spatial clusteirng)"]
-        end
-    end
+subgraph INPUT_PANEL["Input & Preparation"]
+direction TB
 
-    __end__([<p>__end__</p>]):::last
+start([Start]):::terminal
+
+load_config["Load Pipeline Config<br/>(parse config,<br/>derive celltype_mode)"]:::module
+
+load_st["Load ST Data<br/>(HITL: collect h5ad)"]:::module
+
+sc_ref["Resolve SC Reference<br/>(HITL confirmation)"]:::module
+
+validate["Validate Data<br/>(check h5ad,<br/>setup dirs)"]:::module
+
+prep["Prepare Executor<br/>(MCP readiness check)"]:::module
+
+gen_mcp["Generate MCP<br/>(code2MCP / rmcpagent)"]:::module
+
+human_confirm{{"Human Confirm<br/>(HITL execution plan)"}}:::human
+
+end_input_anchor(( )):::hidden
+end
+
+%% =====================================================
+%% CENTER PANEL — Single ReAct Executor
+%% =====================================================
+
+subgraph EXECUTOR["Single ReAct Pipeline Executor"]
+direction TB
+
+Query["🗨️ Query"]:::inner
+Thinking{{"🧠 Pipeline<br/>Executor"}}:::agent
+ToolCall["🔧 Tool Execution"]:::tool
+Answer["📝 Answer"]:::answer
+
+Query --> Thinking
+Thinking -->|Action| ToolCall
+Thinking -->|Finish| Answer
+ToolCall -->|Observation| Thinking
+
+subgraph MCP["MCP Tools"]
+direction TB
+mcp_st["Sequential Thinking"]:::subtool
+preprocessing["Preprocessing Tools<br/>(normalization,<br/>cell type analysis,<br/>spatial clustering)"]:::subtool
+end
+
+end
+
+%% =====================================================
+%% RIGHT PANEL — Output
+%% =====================================================
+
+subgraph OUTPUT_PANEL["Output"]
+direction TB
+
+save["Save Results"]:::module
+end_node([End]):::terminal
+
+end
+
+%% =====================================================
+%% FLOW CONNECTIONS
+%% =====================================================
+
+start --> load_config
+
+load_config -->|has config| load_st
+load_config -->|no config| save
+
+load_st -->|h5ad missing| load_st
+load_st -->|spot-based| sc_ref
+load_st -->|single-cell| validate
+
+sc_ref --> validate
+validate --> prep
+
+prep -->|all MCP ready| human_confirm
+prep -->|MCP missing| gen_mcp
+gen_mcp --> prep
+
+human_confirm --> Query
+Answer --> save
+save --> end_node
 
 
-    %% Flow
-    __start__ --> pipeline_data
-    __start__ --> st_data
-    __start__ --> sc_data
+%% =====================================================
+%% STYLE DEFINITIONS
+%% =====================================================
 
-    sc_data-.->|<b>multiple sc-data</b>| sc_thinking
-    pipeline_data --> human_node
-    st_data --> human_node
-    sc_data-.->|<b>single sc-data</b>| human_node
-    sc_thinking --> human_node
-    sc_mcp --> sc_thinking
-
-    human_node --> Query2 
-    Answer2 --> __end__
-
-
-    %% color
-    classDef validate_infoNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
-    classDef default fill:#2d2d3d,stroke:#fff,stroke-width:2px,color:#fff
-    classDef queryNode fill:#ff7f50,stroke:#fff,stroke-width:2px,color:#000
-    classDef thinkingNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
-    classDef toolNode fill:#d3d3d3,stroke:#fff,stroke-width:2px,color:#000
-    classDef answerNode fill:#ffd700,stroke:#fff,stroke-width:2px,color:#000
-    classDef inReAtc fill:#ab47bc,stroke:#fff,stroke-width:2px,color:#000
-    classDef humanNode fill:#4dabf7,stroke:#fff,stroke-width:2px,color:#000
-
-
-    class pipeline_data,st_data,sc_data inReAtc
-    class Platform validate_infoNode
-    class Query1,Query2 queryNode
-    class sc_thinking,Thinking2 thinkingNode
-    class Tool1,Tool2 toolNode
-    class Answer1,Answer2 answerNode
-    class human_node humanNode
-
-    %% HITL 선 스타일 (파란 긴 대시)
-    linkStyle 13 stroke:#0000FF,stroke-width:2px,stroke-dasharray:15 5 
+classDef module fill:#ffffff,stroke:#c9d1d9,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+classDef human fill:#e8f5e9,stroke:#81c784,stroke-width:1.5px,rx:12,ry:12
+classDef agent fill:#f4f6f8,stroke:#9aa4b2,stroke-width:2.5px,rx:18,ry:18
+classDef inner fill:#ffffff,stroke:#d1d5db,stroke-width:1.2px,rx:10,ry:10
+classDef tool fill:#eceff1,stroke:#b0bec5,stroke-width:1.2px,rx:10,ry:10
+classDef answer fill:#fff8e1,stroke:#ffcc80,stroke-width:1.2px,rx:10,ry:10
+classDef subtool fill:#f9fafb,stroke:#d1d5db,stroke-dasharray:4 4,rx:8,ry:8
+classDef terminal fill:#263238,color:#ffffff,stroke:#263238,stroke-width:2px,rx:16,ry:16
+classDef hidden fill:transparent,stroke:transparent

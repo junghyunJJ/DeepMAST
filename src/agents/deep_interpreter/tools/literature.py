@@ -8,8 +8,10 @@ LLM-powered dynamic query generation (search_literature_dynamic).
 """
 
 import asyncio
+import csv
 import json
 import logging
+import math
 import os
 import re
 import threading
@@ -57,6 +59,229 @@ _GENE_ALIAS_CACHE_LOCK = threading.Lock()
 # Session-level cache for disease synonyms fetched from BioMCP + rule-based expansion
 _DISEASE_SYNONYM_CACHE: dict[str, list[str]] = {}
 _DISEASE_SYNONYM_CACHE_LOCK = threading.Lock()
+
+# SJR (Scimago Journal Rank) Composite Score Cache
+_SJR_SCORE_CACHE: dict[str, float] = {}  # normalized_name -> composite score (0-1)
+_SJR_SCORE_CACHE_LOCK = threading.Lock()
+_SJR_CACHE_LOADED = False
+
+_SJR_CSV_URL = "https://raw.githubusercontent.com/Michael-E-Rose/SCImagoJournalRankIndicators/master/all.csv"
+_SJR_DEFAULT_SCORE = 0.5
+_SJR_CACHE_DIR = Path.home() / ".cache" / "deepmast"
+_SJR_CACHE_FILE = _SJR_CACHE_DIR / "sjr_all.csv"
+_SJR_CACHE_MAX_AGE_DAYS = 90
+
+# Composite score weights
+_SJR_WEIGHT = 0.4       # Journal prestige (PageRank-based)
+_HINDEX_WEIGHT = 0.3    # Cumulative impact
+_AVGCIT_WEIGHT = 0.3    # Recent citation impact (IF proxy)
+
+
+def _normalize_journal_name(name: str) -> str:
+    """Normalize journal name for SJR lookup.
+
+    Lowercase, strip 'the ' prefix, collapse whitespace, expand common abbreviations.
+    """
+    n = name.lower().strip()
+    if n.startswith("the "):
+        n = n[4:]
+    # Expand common abbreviations
+    abbrev_map = {
+        "j.": "journal",
+        "int.": "international",
+        "sci.": "science",
+        "res.": "research",
+        "med.": "medicine",
+        "biol.": "biology",
+        "chem.": "chemistry",
+        "phys.": "physics",
+        "proc.": "proceedings",
+        "natl.": "national",
+        "acad.": "academy",
+        "am.": "american",
+        "eur.": "european",
+        "mol.": "molecular",
+        "cell.": "cellular",
+        "biochem.": "biochemistry",
+        "biophys.": "biophysical",
+        "genet.": "genetics",
+        "immunol.": "immunology",
+        "neurosci.": "neuroscience",
+        "pharmacol.": "pharmacology",
+        "physiol.": "physiology",
+        "rev.": "review",
+        "ann.": "annals",
+        "clin.": "clinical",
+        "exp.": "experimental",
+        "dev.": "developmental",
+        "environ.": "environmental",
+        "microbiol.": "microbiology",
+    }
+    for abbr, full in abbrev_map.items():
+        n = n.replace(abbr, full)
+    # Collapse whitespace
+    n = re.sub(r"\s+", " ", n).strip()
+    return n
+
+
+def _download_sjr_csv_sync() -> str:
+    """Download SJR CSV to local cache. Returns path to cached file.
+
+    Uses ~/.cache/deepmast/sjr_all.csv with 90-day max age.
+    Falls back to stale cache on download failure, empty string if no cache exists.
+    """
+    import time as _time
+
+    _SJR_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Check if cached file is fresh enough
+    if _SJR_CACHE_FILE.exists():
+        age_days = (_time.time() - _SJR_CACHE_FILE.stat().st_mtime) / 86400
+        if age_days < _SJR_CACHE_MAX_AGE_DAYS:
+            logger.debug(f"SJR cache is fresh ({age_days:.0f} days old)")
+            return str(_SJR_CACHE_FILE)
+
+    # Download
+    try:
+        logger.info(f"Downloading SJR CSV from {_SJR_CSV_URL}")
+        req = urllib.request.Request(_SJR_CSV_URL, headers={"User-Agent": "DeepMAST/1.0"})
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = resp.read()
+        _SJR_CACHE_FILE.write_bytes(data)
+        logger.info(f"SJR CSV cached at {_SJR_CACHE_FILE} ({len(data)} bytes)")
+        return str(_SJR_CACHE_FILE)
+    except Exception as e:
+        logger.warning(f"SJR CSV download failed: {e}")
+        # Fall back to stale cache
+        if _SJR_CACHE_FILE.exists():
+            logger.info("Using stale SJR cache")
+            return str(_SJR_CACHE_FILE)
+        return ""
+
+
+def _build_sjr_lookup(csv_path: str) -> dict[str, float]:
+    """Parse SJR CSV and build composite score lookup.
+
+    For each journal, uses the most recent year's data.
+    When a journal appears in multiple ASJC fields, takes the max values.
+    Composite = SJR_norm * 0.4 + hindex_norm * 0.3 + avgcit_norm * 0.3
+    Each metric is log-normalized: log(1+x) / log(1+max_x) -> [0, 1]
+    """
+    if not csv_path:
+        return {}
+
+    # Phase 1: Collect raw values per journal (latest year, max across fields)
+    raw: dict[str, tuple[int, float, float, float]] = {}
+    # raw[name] = (year, sjr, h_index, avg_citations)
+
+    try:
+        with open(csv_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                title = row.get("Title", "").strip()
+                if not title:
+                    continue
+                name = _normalize_journal_name(title)
+
+                try:
+                    year = int(row.get("Year", "0"))
+                except (ValueError, TypeError):
+                    year = 0
+
+                try:
+                    sjr_val = float(row.get("SJR", "0") or "0")
+                except (ValueError, TypeError):
+                    sjr_val = 0.0
+
+                try:
+                    h_val = float(row.get("h-index", "0") or "0")
+                except (ValueError, TypeError):
+                    h_val = 0.0
+
+                try:
+                    avg_cit = float(row.get("avg_citations", "0") or "0")
+                except (ValueError, TypeError):
+                    avg_cit = 0.0
+
+                if name in raw:
+                    existing_year = raw[name][0]
+                    if year > existing_year:
+                        # Newer year replaces
+                        raw[name] = (year, sjr_val, h_val, avg_cit)
+                    elif year == existing_year:
+                        # Same year: take max of each metric
+                        _, e_sjr, e_h, e_cit = raw[name]
+                        raw[name] = (year, max(sjr_val, e_sjr), max(h_val, e_h), max(avg_cit, e_cit))
+                else:
+                    raw[name] = (year, sjr_val, h_val, avg_cit)
+    except Exception as e:
+        logger.warning(f"Failed to parse SJR CSV: {e}")
+        return {}
+
+    if not raw:
+        return {}
+
+    # Phase 2: Find max values for log-normalization
+    max_sjr = max(v[1] for v in raw.values()) or 1.0
+    max_h = max(v[2] for v in raw.values()) or 1.0
+    max_cit = max(v[3] for v in raw.values()) or 1.0
+
+    log_max_sjr = math.log(1 + max_sjr)
+    log_max_h = math.log(1 + max_h)
+    log_max_cit = math.log(1 + max_cit)
+
+    # Phase 3: Compute composite scores
+    lookup: dict[str, float] = {}
+    for name, (_, sjr_val, h_val, cit_val) in raw.items():
+        sjr_norm = math.log(1 + sjr_val) / log_max_sjr if log_max_sjr > 0 else 0.0
+        h_norm = math.log(1 + h_val) / log_max_h if log_max_h > 0 else 0.0
+        cit_norm = math.log(1 + cit_val) / log_max_cit if log_max_cit > 0 else 0.0
+        composite = sjr_norm * _SJR_WEIGHT + h_norm * _HINDEX_WEIGHT + cit_norm * _AVGCIT_WEIGHT
+        lookup[name] = round(composite, 4)
+
+    logger.info(f"SJR lookup built: {len(lookup)} journals")
+    return lookup
+
+
+async def _ensure_sjr_cache_loaded() -> None:
+    """Load SJR composite scores into _SJR_SCORE_CACHE (once)."""
+    global _SJR_CACHE_LOADED
+    if _SJR_CACHE_LOADED:
+        return
+
+    with _SJR_SCORE_CACHE_LOCK:
+        if _SJR_CACHE_LOADED:
+            return
+
+        csv_path = await asyncio.to_thread(_download_sjr_csv_sync)
+        lookup = await asyncio.to_thread(_build_sjr_lookup, csv_path)
+
+        _SJR_SCORE_CACHE.update(lookup)
+        _SJR_CACHE_LOADED = True
+        logger.info(f"SJR cache loaded: {len(_SJR_SCORE_CACHE)} journals")
+
+
+def _get_journal_quality(journal_name: str) -> float:
+    """Get composite journal quality score (0-1) from SJR cache.
+
+    Returns _SJR_DEFAULT_SCORE (0.5) for unknown journals.
+    """
+    if not journal_name:
+        return _SJR_DEFAULT_SCORE
+
+    name = _normalize_journal_name(journal_name)
+    score = _SJR_SCORE_CACHE.get(name)
+    if score is not None:
+        return score
+
+    # Fallback: try stripping after colon (e.g. "PLoS ONE : e12345" -> "plos one")
+    if ":" in name:
+        stripped = _normalize_journal_name(name.split(":")[0])
+        score = _SJR_SCORE_CACHE.get(stripped)
+        if score is not None:
+            return score
+
+    return _SJR_DEFAULT_SCORE
 
 
 async def _fetch_gene_aliases_from_biomcp(
@@ -1513,6 +1738,7 @@ def _parse_article(pmid: str, result: Any) -> dict:
         "pmid": pmid,
         "title": f"Article {pmid}",
         "abstract": "",
+        "journal_quality": _SJR_DEFAULT_SCORE,
     }
 
     if result is None:
@@ -1538,6 +1764,7 @@ def _parse_article(pmid: str, result: Any) -> dict:
                                 article["authors"] = article_data["authors"]
                             if "journal" in article_data:
                                 article["journal"] = article_data["journal"]
+                                article["journal_quality"] = _get_journal_quality(article_data["journal"])
                             if "date" in article_data:
                                 article["date"] = article_data["date"]
                     elif isinstance(data, dict):
@@ -1868,6 +2095,8 @@ async def _execute_fixed_strategy_search_async(
             logger.warning(f"Async fixed strategy search failed for query {sq['type']}: {e}")
             continue
 
+    await _ensure_sjr_cache_loaded()
+    papers.sort(key=lambda p: p.get("journal_quality", _SJR_DEFAULT_SCORE), reverse=True)
     papers = papers[:max_results]
 
     # Use unified coverage calculation (same as search_literature_dynamic)
@@ -2548,7 +2777,7 @@ def search_literature_dynamic(
         target_pathway_coverage: Target pathway coverage percentage (default 0.5 = 50%)
         max_iterations: Maximum search iterations (default 3)
         enforce_disease_match: Whether to post-filter papers by disease context
-        output_path: If provided (e.g., "part1_papers.json"), saves complete results
+        output_path: If provided (e.g., "papers.json"), saves complete results
             to data_dir/output_path. Returns compact summary.
         data_dir: Directory for saving output files. SEARCHER should read this from
             /data_path.txt (written by PLANNER). Falls back to contextvars if empty.
@@ -2842,6 +3071,10 @@ async def search_literature_dynamic_async(
             except Exception as e:
                 logger.warning(f"Pathway search failed for query {i} at iteration {iteration}: {e}")
                 continue
+
+    # Sort by journal quality before truncating
+    await _ensure_sjr_cache_loaded()
+    all_papers.sort(key=lambda p: p.get("journal_quality", _SJR_DEFAULT_SCORE), reverse=True)
 
     # Final coverage calculation
     final_papers = all_papers[:max_results]

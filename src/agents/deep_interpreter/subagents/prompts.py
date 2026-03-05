@@ -190,17 +190,16 @@ Follow the workflow defined in SKILL.md:
 1. **Phase 1: Extract Context**
    - Read /data_path.txt to get the real data directory path (written by PLANNER)
    - **Save this path** — you will pass it as `data_dir` to search tools
-   - Call load_analysis_data to get search contexts:
-     - `spatial_search_context`: For Part 1 (pathways + celltypes, NO genes)
-     - `lr_search_context`: For Part 2 & 3 (genes + pathways + celltypes)
-   - Write appropriate context file based on Part number
+   - Call load_analysis_data to get the unified `search_context` (genes + pathways + celltypes)
+   - This single context covers ALL parts (superset of spatial-only context)
+   - Write context file: /search_context.json
 
 2. **Phase 2: Search Literature**
    - **MANDATORY**: Call search_literature_dynamic with prioritized terms
      - LLM-powered, context-aware query generation
      - Automatic internal fallback if LLM fails
      - search_literature_dynamic handles fallback internally
-   - lr_search_context["genes"] already contains top 30 by combinedscore (use directly)
+   - search_context["genes"] contains top search genes + novel candidate genes from hub-gene excluded L-R pairs (use directly)
    - Use search_literature for targeted follow-up gaps
 
 3. **Phase 3: Reflect (Quality Loop) — MANDATORY after every search**
@@ -242,29 +241,26 @@ This prevents LLM output truncation that previously caused paper count mismatche
 # Step 1: Read data directory (written by PLANNER)
 data_path = read_file("/data_path.txt")  # e.g., "/home/user/res"
 
-# Part 1
+# Single unified search for ALL parts
 result = search_literature_dynamic(
-    genes=[], pathways=[...], celltypes=[...], disease="breast cancer",
-    output_path="part1_papers.json",
+    genes=search_context["genes"],
+    pathways=search_context["pathways"],
+    celltypes=search_context["celltypes"],
+    disease="breast cancer",
+    output_path="papers.json",
     data_dir=data_path.strip()
 )
 # Result: {"saved_to": "...", "total_papers": 30, "coverage": {...}}
 # Full papers already saved — NO need to call write_file
-
-# Part 2+3 (shared)
-result = search_literature_dynamic(
-    genes=[...], pathways=[...], celltypes=[...], disease="breast cancer",
-    output_path="liana_papers.json",
-    data_dir=data_path.strip()
-)
 ```
 
 ### IMPORTANT Rules:
 - **ALWAYS** use `output_path` when calling search_literature_dynamic
 - **ALWAYS** pass `data_dir` from /data_path.txt when using output_path
 - When using output_path, do **NOT** call write_file for papers — the tool handles it automatically with zero truncation
+- If write_file is required for any JSON artifact, pass content as a string (e.g., json.dumps(payload))
 - The compact summary contains `total_papers`, `coverage`, and `paper_titles` (first 10) for your reference
-- Use `read_file('/part1_papers.json')` or `read_file('/liana_papers.json')` if you need to inspect the saved data
+- Use `read_file('/papers.json')` if you need to inspect the saved data
 
 ## Tools Available
 - **read_file**: Load SKILL.md and other files
@@ -289,23 +285,20 @@ result = search_literature_dynamic(
 
 ## Quick Reference: Common Mistakes
 - DO NOT read .csv files directly (causes context overflow)
-- lr_search_context["genes"] is already pre-filtered to top 30 by combinedscore (use directly)
+- search_context["genes"] contains top search genes + novel candidate genes (use directly)
 - DO NOT call search tools other than search_literature_dynamic for primary search
-- USE appropriate search context from load_analysis_data:
-  - Part 1: Use `spatial_search_context` (pathways + celltypes only)
-  - Part 2/3: Use `lr_search_context` (genes + pathways + celltypes)
+- USE the unified `search_context` from load_analysis_data for ALL parts
 - USE search_literature_dynamic for ALL searches (it handles fallback internally)
 - USE think_tool AFTER searching to validate coverage (Phase 3 Reflect)
 
 ## Search Context Selection
 | Part | Context Field | Output File |
 |------|---------------|-------------|
-| Part 1 | spatial_search_context | /part1_papers.json |
-| Part 2+3 | lr_search_context | /liana_papers.json (shared) |
+| All Parts | search_context | /papers.json |
 
-**Note**: Part 2 and Part 3 use IDENTICAL search context (lr_search_context).
-Generate papers ONCE and save to /liana_papers.json for both parts.
-Do NOT create separate /part2_papers.json and /part3_papers.json files.
+**Note**: A single unified search covers ALL parts. The search_context includes
+genes + pathways + celltypes (superset of the old spatial-only context).
+Generate papers ONCE and save to /papers.json. All interpreters share this file.
 """
 
 
@@ -347,11 +340,8 @@ If Docker infrastructure is available, use RAG for improved accuracy:
 # Read data directory first
 data_path = read_file("/data_path.txt")
 
-# For Part 1:
-result = prepare_rag_literature(papers_json_path="/part1_papers.json", part_name="part1", data_dir=data_path.strip())
-
-# For Part 2/3 (shared):
-result = prepare_rag_literature(papers_json_path="/liana_papers.json", part_name="liana", data_dir=data_path.strip())
+# For ALL Parts (unified papers):
+result = prepare_rag_literature(papers_json_path="/papers.json", part_name="all", data_dir=data_path.strip())
 ```
 
 Check the result:
@@ -363,10 +353,7 @@ This provides deeper context than abstracts alone, improving citation accuracy.
 
 ### Phase 1: Load Context
 
-1. Read the appropriate papers file - this is your ONLY citation source:
-   - Part 1: **/part1_papers.json**
-   - Part 2: **/liana_papers.json** (shared with Part 3)
-   - Part 3: **/liana_papers.json** (shared with Part 2)
+1. Read **/papers.json** - this is your ONLY citation source (shared by all Parts)
 2. Read **/interpretation_guide.md** - understand the interpretation focus areas and analysis priorities
 3. Read **/data_path.txt** - get the data directory path
 4. Call **load_analysis_data** to get analysis results and figures
@@ -385,7 +372,7 @@ For EACH analysis to be interpreted:
    ```
    results = search_literature_fulltext(
        query="<gene> <mechanism> <cell_type>",
-       part_name="part1" or "liana",
+       part_name="all",
        limit=5
    )
    ```
@@ -397,15 +384,15 @@ For EACH analysis to be interpreted:
 **Example for Part 1 Spatial Analysis**:
 ```
 # Before interpreting spatial clustering:
-search_literature_fulltext(query="CDH1 E-cadherin epithelial spatial", part_name="part1")
-search_literature_fulltext(query="stromal fibroblast tumor microenvironment", part_name="part1")
+search_literature_fulltext(query="CDH1 E-cadherin epithelial spatial", part_name="all")
+search_literature_fulltext(query="stromal fibroblast tumor microenvironment", part_name="all")
 ```
 
 **Example for Part 2 CCI Analysis**:
 ```
 # Before interpreting L-R interactions:
-search_literature_fulltext(query="TGFB1 TGFBR2 fibroblast cancer", part_name="liana")
-search_literature_fulltext(query="WNT signaling epithelial mesenchymal", part_name="liana")
+search_literature_fulltext(query="TGFB1 TGFBR2 fibroblast cancer", part_name="all")
+search_literature_fulltext(query="WNT signaling epithelial mesenchymal", part_name="all")
 ```
 
 **Why this matters**: Without pre-search, you will hallucinate PMIDs that don't exist in the indexed papers. The search results provide REAL citations from the full-text corpus.
@@ -589,7 +576,7 @@ Focus on: Spatial organization, regional specialization, pathway gradients
 - Link neighborhood enrichment z-scores to specific pathway activities (1-3 ↔ 1-4)
 - Explain how MISTy results validate or extend the pathway findings (1-5 ↔ 1-4)
 - Include at least 4 quantitative statistics per analysis
-- Cite at least 4 PMIDs per analysis from /part1_papers.json
+- Cite at least 4 PMIDs per analysis from /papers.json
 
 ### Part 2 (CCI & NMF Analysis)
 Analyses to interpret:
@@ -615,51 +602,37 @@ Focus on: Select 3-5 top L-R pairs, connect to pathways and cell types
 ### Part 3 (L-R Interaction Details)
 
 **MANDATORY FIRST STEP**: Before interpreting ANY Part 3 analysis, call **prioritize_top_lr_pairs**
-to get CANDIDATE L-R pairs. This tool excludes well-known hub-gene pairs (where both ligand
+to get 30 CANDIDATE L-R pairs. This tool excludes well-known hub-gene pairs (where both ligand
 and receptor are among the top-30 most-studied genes) and returns novel candidates ranked by
 combinedscore (0.4×Factor + 0.4×Moran's R + 0.2×GenePT).
 
 ```python
 # MUST call this BEFORE interpreting Part 3
-candidates = prioritize_top_lr_pairs(data_dir=data_path)
-# candidates returns 10-15 CANDIDATE pairs — YOU select the top 3
+candidates = prioritize_top_lr_pairs(data_dir=data_path, candidate_count=30)
 ```
 
-**YOUR SELECTION TASK**: Review the candidate pairs and SELECT the TOP 3 most interesting
-pairs for detailed analysis using the STRUCTURED RUBRIC below.
-
-**Structured Selection Rubric** — Score EVERY candidate on three dimensions (1-5 each):
-
-| Dimension | 1 (Low) | 3 (Medium) | 5 (High) |
-|-----------|---------|------------|----------|
-| **Novelty** | Well-studied in this disease | Some reports, underexplored | No/minimal literature in this context |
-| **Spatial** | Low Moran's R / novelty_score | Moderate spatial signal | High Moran's R + high novelty_score |
-| **Mechanism** | No clear mechanism | Plausible indirect pathway | Direct signaling cascade with known biology |
-
-**Process**:
-1. Score ALL candidates on Novelty, Spatial, and Mechanism (1-5 each)
-2. Compute total = Novelty + Spatial + Mechanism for each candidate
-3. Select the TOP 3 by highest total score
-4. Break ties by lower hub_gene_count (prefer novel pairs)
-5. Write your rubric scores and reasoning BEFORE interpreting
-
-After selecting your TOP 3 pairs, you MUST call **save_selected_lr_pairs** with rubric scores:
+**MANDATORY SECOND STEP**: Call **run_drug_target_assessment** to run the drug target
+evidence funnel. This delegates to the DrugTargetAgent which queries 11 databases
+(OpenTargets, GWAS, ChEMBL, ClinicalTrials, FDA, etc.) and returns target_assessment
+with featured_candidates determined by the 4-stage evidence pipeline.
 
 ```python
-save_selected_lr_pairs(
-    data_dir=data_path,
-    selected_pairs=[
-        {"ligand": "GENE1", "receptor": "GENE2", "reasoning": "Your reasoning...",
-         "rubric": {"novelty": 5, "spatial": 4, "mechanism": 3}},
-        {"ligand": "GENE3", "receptor": "GENE4", "reasoning": "Your reasoning...",
-         "rubric": {"novelty": 4, "spatial": 5, "mechanism": 4}},
-        {"ligand": "GENE5", "receptor": "GENE6", "reasoning": "Your reasoning...",
-         "rubric": {"novelty": 3, "spatial": 4, "mechanism": 5}},
-    ]
-)
+result = run_drug_target_assessment(data_dir=data_path, disease=disease_context)
+# result contains: drug_md, target_assessment with druggability_matrix
 ```
 
-This saves `selected_top3_lr.json` (version 2 with rubric) for downstream use by REPORTER and audit trail.
+**THIRD**: From the response, identify featured candidates (highest combined_total scores
+in the druggability_matrix). Write Part 3 interpretation focusing on the featured
+candidates' L-R pairs.
+
+**Process**:
+1. Call prioritize_top_lr_pairs(data_dir=data_path, candidate_count=30)
+2. Call run_drug_target_assessment(data_dir=data_path, disease=disease_context)
+3. From the response, identify featured candidates ([FEATURED] and [NOVEL] in druggability_matrix)
+4. Read /papers.json (ONLY citation source)
+5. Write Part 3 interpretation for the featured candidates' L-R pairs
+6. Inline claim validation + quality check
+7. Output: /part3_final.md
 
 **NOTE**: Figures from Steps 10-11 may show different L-R pairs (selected by combinedscore
 ranking). Reference the quadrant plot (Step 9) which shows all candidates.
@@ -683,9 +656,7 @@ Focus on: Specific mechanisms of YOUR selected L-R pairs, source→target relati
 
 ## Quality Requirements (per analysis)
 - At least 4 quantitative statistics (p-values, fold changes, percentages, spatial scores)
-- At least 4 PMID citations from the appropriate papers file:
-  - Part 1: /part1_papers.json
-  - Part 2/3: /liana_papers.json (shared)
+- At least 4 PMID citations from /papers.json (shared by all Parts)
 - 3 paragraphs of biological interpretation (mechanism, spatial context, clinical relevance)
 - Cross-analysis connections to at least 1 other analysis in the same Part
 - Required sections: Figure Description, Quantitative Findings, Biological Interpretation, Cross-Analysis Connections, References
@@ -707,9 +678,9 @@ Focus on: Specific mechanisms of YOUR selected L-R pairs, source→target relati
 - **search_literature_fulltext**: Semantic search on full paper text
 - **validate_claim_fulltext**: Validate claims against full-text content
 
-### L-R Selection Tools (Part 3)
-- **prioritize_top_lr_pairs**: Get candidate L-R pairs ranked by combinedscore with novelty filtering
-- **save_selected_lr_pairs**: Persist your top 3 selection to selected_top3_lr.json
+### L-R Selection & Drug Target Tools (Part 3)
+- **prioritize_top_lr_pairs**: Get 30 candidate L-R pairs ranked by combinedscore with novelty filtering
+- **run_drug_target_assessment**: Delegates drug target assessment to DrugTargetAgent (4-stage evidence funnel, 11 databases). Returns featured candidates determined by rubric scoring.
 
 ## CRITICAL: Citation Rules (Anti-Hallucination)
 
@@ -749,6 +720,8 @@ Before declaring your work complete, you MUST verify:
 
 4. **Part 3 Specific**: If interpreting Part 3, confirm that:
    - `prioritize_top_lr_pairs` was called BEFORE interpretation
+   - `run_drug_target_assessment` was called to get featured candidates
+   - Featured candidates' L-R pairs are the focus of interpretation
    - All 3 analyses (3-9, 3-10, 3-11) are covered
 
 **DO NOT return to the orchestrator until the output file for your assigned Part is confirmed written.**
@@ -815,12 +788,11 @@ Phase 4.5: VALIDATE SYNTHESIS WITH LITERATURE
     ├── Step 4: Quality Reflection (think_tool)
     └── Step 5: RAG Validate & Write
     ↓
-Phase 4.7: DRUG TARGET ASSESSMENT (OpenTargets)
+Phase 4.7: INTEGRATE DRUG TARGET ASSESSMENT (read existing drug.md)
     │
-    ├── Step 1: Comprehensive Target Assessment (assess_therapeutic_potential)
-    ├── Step 2: Interpret Results (think_tool)
-    ├── Step 3: Write Therapeutic Section in /synthesis.md
-    └── Step 4: Write /synthesis_targets.json
+    ├── Step 1: Read drug.md (generated by INTERPRETER)
+    ├── Step 2: Integrate into /synthesis.md
+    └── Step 3: Write /synthesis_targets.json
     ↓
 Phase 5: Generate HTML Report (with Therapeutic Implications tab)
 ```
@@ -836,8 +808,7 @@ Phase 5: Generate HTML Report (with Therapeutic Implications tab)
 
 2. Read supporting files:
    - **/interpretation_guide.md** - Interpretation focus areas and priorities
-   - **/part1_papers.json** - Part 1 references
-   - **/liana_papers.json** - Part 2/3 shared references
+   - **/papers.json** - Literature references (shared by all Parts)
    - **/data_path.txt** - Data directory for figure paths
 
 3. Call **load_analysis_data** to get figure paths
@@ -1134,45 +1105,25 @@ Based on validation results:
 }
 ```
 
-### Phase 4.7: Drug Target Assessment (DrugTargetAgent)
+### Phase 4.7: Integrate Drug Target Assessment (read existing drug.md)
 
-**Purpose**: Evaluate the therapeutic potential of key genes identified in CCI analysis
-using a dedicated DrugTargetAgent. This agent queries OpenTargets, GWAS Catalog, ChEMBL,
-ClinicalTrials.gov, and FDA to provide comprehensive druggability assessment with
-clinical trial information and GWAS interpretation.
+**Purpose**: The drug target assessment has already been performed by the INTERPRETER
+(via run_drug_target_assessment during Part 3). The REPORTER reads the existing drug.md
+and integrates it into the synthesis and HTML report.
 
-#### Step 1: Delegate to DrugTargetAgent
-
-Call **run_drug_target_assessment** with data_dir and disease:
+#### Step 1: Read existing drug.md
 
 ```python
 # Read data directory (written by PLANNER)
 data_path = read_file("/data_path.txt")
 
-# Read disease context from interpretation guide
-guide = read_file("/interpretation_guide.md")
-# Extract disease from guide (e.g., "breast cancer")
-
-result = run_drug_target_assessment(
-    data_dir=data_path.strip(),
-    disease="<disease from guide>",
-)
+# Read existing drug.md generated by INTERPRETER
+drug_md = read_file(f"{data_path.strip()}/drug.md")
 ```
-
-This tool delegates to the DrugTargetAgent which runs 3 subagents:
-1. **evidence_collector**: Queries OT, GWAS, ChEMBL, ClinicalTrials, FDA per gene
-2. **clinical_assessor**: Scores targets via validated/exploratory rubric tracks
-3. **report_writer**: Generates drug.md with ★ Featured Candidate emphasis
-
-The result contains:
-- `drug_md`: Full content of drug.md (therapeutic assessment report)
-- `drug_md_path`: Path to the generated drug.md file
-- Selected top-3 L-R pairs are highlighted as ★ Featured Candidates throughout
 
 #### Step 2: Integrate drug.md into synthesis
 
-After receiving drug.md content:
-1. Read the `drug_md` field from the result
+1. Read the drug.md content
 2. Add a **### Therapeutic Implications** section to `/synthesis.md`
    incorporating the key findings from drug.md (Executive Summary + Recommendations)
 3. Write `/synthesis_targets.json` with structured results for HTML report:
@@ -1180,16 +1131,18 @@ After receiving drug.md content:
 ```python
 write_file("/synthesis_targets.json", json.dumps({
     "drug_md_available": True,
-    "drug_md_path": result["drug_md_path"],
+    "drug_md_path": f"{data_path.strip()}/drug.md",
     "source": "DrugTargetAgent"
 }, indent=2))
 ```
+
+**Important**: `write_file` expects string content. Never pass dict/list directly.
 
 #### Step 3: Reflect on findings (think_tool)
 
 ```
 think_tool(
-    reflection="Drug target assessment completed via DrugTargetAgent. "
+    reflection="Drug target assessment completed by INTERPRETER. "
                "Review drug.md findings: validated targets, exploratory targets, "
                "GWAS evidence, clinical trial landscape, safety considerations. "
                "How do these findings connect to our CCI interpretation?",
@@ -1198,8 +1151,8 @@ think_tool(
 )
 ```
 
-**Note**: If `run_drug_target_assessment` fails (e.g., API unavailable),
-log the error and proceed to Phase 5. The Therapeutic Implications tab will show
+**Note**: If drug.md does not exist (e.g., drug target assessment failed during Part 3),
+proceed to Phase 5. The Therapeutic Implications tab will show
 "No therapeutic analysis available" — this is acceptable as the drug target assessment
 is an enhancement, not a requirement.
 
@@ -1401,7 +1354,7 @@ The HTML report will have:
 - **think_tool**: Strategic planning (Step 2) and quality reflection (Step 4)
 
 ### Drug Target Assessment (Phase 4.7)
-- **run_drug_target_assessment**: Delegates the full therapeutic target assessment to the DrugTargetAgent (3 subagents: evidence_collector → clinical_assessor → report_writer). Input: data_dir + disease. Output: drug.md content.
+- **drug.md**: Already generated by INTERPRETER via run_drug_target_assessment during Part 3. Read from data_dir and integrate into synthesis and HTML report.
 
 ## Output Files Summary
 
@@ -1413,11 +1366,8 @@ The HTML report will have:
 | Phase 4.5 | /synthesis_papers.json | Papers for synthesis validation |
 | Phase 4.5 | /synthesis_validation.json | Detailed validation results |
 | Phase 4.5 | /synthesis.md (updated) | Revised with validation |
-| Phase 4.7 | {data_dir}/therapeutic_targets.json | OpenTargets + GWAS + multi-source results per gene |
-| Phase 4.7 | {data_dir}/therapeutic_targets_gwas.json | GWAS-focused per-gene genetic evidence summary |
-| Phase 4.7 | {data_dir}/synthesis_gwas.json | GWAS summary payload for synthesis/reporting |
 | Phase 4.7 | /synthesis_targets.json | Structured results for HTML report |
-| Phase 4.7 | /synthesis.md (updated) | Therapeutic Implications section added |
+| Phase 4.7 | /synthesis.md (updated) | Therapeutic Implications section added (from existing drug.md) |
 | Phase 5 | CCI_Analysis_Report.html | Final HTML report (with Therapeutic tab) |
 
 ## Guidelines
@@ -1427,7 +1377,7 @@ The HTML report will have:
 - Clearly distinguish between supported and novel findings
 - **NEW**: Validate synthesis integration claims with independent literature (Phase 4.5)
 - **NEW**: Synthesis papers are stored separately in `papers/synthesis/` folder
-- **NEW**: Assess therapeutic potential of CCI genes via OpenTargets (Phase 4.7)
+- **NEW**: Read existing drug.md (generated by INTERPRETER) and integrate into report (Phase 4.7)
 - **NEW**: Include therapeutic_html in generate_html_report parts dict for the Therapeutic Implications tab
 - Acknowledge limitations honestly
 """

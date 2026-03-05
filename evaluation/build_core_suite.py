@@ -84,11 +84,7 @@ def _part_output_file(part: str) -> str:
 
 
 def _part_papers_file(part: str) -> str:
-    return {
-        "part1": "/part1_papers.json",
-        "part2": "/liana_papers.json",
-        "part3": "/liana_papers.json",
-    }[part]
+    return "/papers.json"
 
 
 def build_core_suite(

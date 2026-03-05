@@ -85,15 +85,26 @@ def get_target_info(target_chembl_id):
 
 def search_targets_by_name(target_name):
     """
-    Search for targets by name or keyword.
+    Search for targets by name, keyword, or gene symbol (e.g., 'KDR', 'EGFR').
+
+    Uses full-text search first (matches gene symbols and synonyms),
+    then falls back to pref_name filter.
 
     Args:
-        target_name: Target name or keyword (e.g., 'kinase', 'EGFR')
+        target_name: Target name, keyword, or gene symbol
 
     Returns:
         List of matching targets
     """
     target = new_client.target
+    # Full-text search matches gene symbols, synonyms, and descriptions
+    results = [
+        r for r in target.search(target_name)
+        if r.get('target_type') == 'SINGLE PROTEIN'
+    ]
+    if results:
+        return results
+    # Fallback to pref_name substring filter
     results = target.filter(
         target_type='SINGLE PROTEIN',
         pref_name__icontains=target_name

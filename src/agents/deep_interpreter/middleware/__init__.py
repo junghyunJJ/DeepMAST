@@ -9,10 +9,12 @@ Architecture:
 """
 
 from src.agents.deep_interpreter.middleware.skills_middleware import SkillsMiddleware
+from src.agents.deep_interpreter.middleware.write_file_guard import WriteFileArgGuardMiddleware
 from src.agents.deep_interpreter.middleware.load import list_skills, SkillMetadata
 
 __all__ = [
     "SkillsMiddleware",
+    "WriteFileArgGuardMiddleware",
     "list_skills",
     "SkillMetadata",
 ]

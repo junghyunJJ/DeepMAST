@@ -25,7 +25,7 @@ Note on HITL behavior:
 - For HITL with target selection:
   1. Wrapper agent collects targets from user
   2. Wrapper passes targets to Deep Agent via initial message
-  3. planner (readonly) parses and writes /targets.json
+  3. Framework pre-writes /targets.json from wrapper-provided targets
   4. Strategic planning and interpretation proceed without HITL
 
 Backend Configuration:
@@ -33,6 +33,7 @@ Backend Configuration:
 - Virtual mode: Enabled (paths sandboxed to root_dir; files written to real disk)
 """
 
+import json
 import uuid
 from dataclasses import dataclass, field
 from typing import Callable, Literal, Optional, Sequence
@@ -152,6 +153,7 @@ def _create_backend_factory(
 
 def create_deep_interpreter_agent(
     config: Optional[DeepInterpreterConfig] = None,
+    preselected_targets: Optional[dict[str, object]] = None,
 ) -> Runnable:
     """Create the Deep Interpreter agent using DeepAgents framework.
 
@@ -169,6 +171,8 @@ def create_deep_interpreter_agent(
 
     Args:
         config: Optional configuration object. Uses defaults if not provided.
+        preselected_targets: Optional target configuration to pre-write as
+            /targets.json in the virtual filesystem.
 
     Returns:
         Compiled Deep Agent runnable
@@ -194,6 +198,13 @@ def create_deep_interpreter_agent(
     # non-deterministic and could write the project root instead of the data dir.
     resolved_data_dir = str(Path(config.data_dir).expanduser().resolve())
     _fs_backend.write("/data_path.txt", resolved_data_dir)
+    if preselected_targets is not None:
+        serialized_targets = json.dumps(
+            preselected_targets,
+            indent=2,
+            ensure_ascii=False,
+        )
+        _fs_backend.write("/targets.json", serialized_targets)
 
     # Build tools list (all tools available to orchestrator)
     tools = [
@@ -289,19 +300,8 @@ def interpret_analysis(
     Returns:
         Dictionary with interpretation results, report path, and thread_id
     """
-    import json
-
     if output_path is None:
         output_path = f"{data_dir}/CCI_Analysis_Report.html"
-
-    config = DeepInterpreterConfig(
-        provider=provider,
-        data_dir=data_dir,
-        output_dir=data_dir,
-        use_checkpointer=use_checkpointer,
-    )
-
-    agent = create_deep_interpreter_agent(config)
 
     # Build targets content
     targets_content = {
@@ -310,6 +310,18 @@ def interpret_analysis(
         "sel_factor": sel_factor,
         "data_directory": data_dir,
     }
+
+    config = DeepInterpreterConfig(
+        provider=provider,
+        data_dir=data_dir,
+        output_dir=data_dir,
+        use_checkpointer=use_checkpointer,
+    )
+
+    agent = create_deep_interpreter_agent(
+        config,
+        preselected_targets=targets_content,
+    )
 
     # Build initial message with embedded targets
     initial_message = f"""Interpret the CCI analysis results in {data_dir}.

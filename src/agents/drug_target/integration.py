@@ -30,7 +30,7 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
     to gather evidence, score targets, and generate drug.md.
 
     Args:
-        data_dir: Directory containing lr_candidates.json and selected_top3_lr.json
+        data_dir: Directory containing lr_candidates.json
         disease: Disease context (e.g., "breast cancer", "glioblastoma")
 
     Returns:
@@ -68,7 +68,7 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
             initial_message = (
                 f"Assess therapeutic potential of L-R pair genes in {resolved_dir}.\n\n"
                 f"Disease context: {disease}\n"
-                f"Input files: lr_candidates.json, selected_top3_lr.json\n"
+                f"Input files: lr_candidates.json\n"
                 f"Output: target_assessment.json and drug.md\n\n"
                 f"Execute the full evidence_assessor → report_writer pipeline."
             )
@@ -117,7 +117,7 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
             })
 
     except Exception as e:
-        logger.error(f"Drug target assessment failed: {e}", exc_info=True)
+        logger.error("Drug target assessment failed: %s", e, exc_info=True)
         return json.dumps({
             "success": False,
             "error": str(e),

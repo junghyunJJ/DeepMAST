@@ -95,8 +95,7 @@ def validate_post_hitl_payload(payload: dict[str, Any]) -> list[str]:
         "part1_final",
         "part2_final",
         "part3_final",
-        "part1_papers",
-        "part23_papers",
+        "papers",
         "final_report",
     ):
         if not _is_nonempty_str(artifacts.get(key)):

@@ -99,7 +99,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-path",
         default="",
-        help="Relative output JSON filename for auto-save (e.g., part1_papers.json).",
+        help="Relative output JSON filename for auto-save (e.g., papers.json).",
     )
     parser.add_argument(
         "--data-dir",

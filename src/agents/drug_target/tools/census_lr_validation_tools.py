@@ -154,6 +154,43 @@ def _resolve_interest_cell_type(
     return None, "none"
 
 
+def _resolve_disease_name(
+    requested: str,
+    organism: str = "homo_sapiens",
+) -> tuple[str | None, str]:
+    """Fuzzy-match disease name against Census MONDO vocabulary."""
+    try:
+        from src.agents.drug_target.tools.stage_domain_tools import list_census_diseases
+
+        raw = list_census_diseases.invoke({"organism": organism})
+        diseases_result = json.loads(raw)
+        if not diseases_result.get("executed") or not diseases_result.get("diseases"):
+            return None, "none"
+
+        candidates = diseases_result["diseases"]
+    except Exception:
+        return None, "none"
+
+    req = requested.strip().lower()
+
+    # Exact match (case-insensitive)
+    exact = [c for c in candidates if c["label"].strip().lower() == req]
+    if exact:
+        return exact[0]["label"], "exact"
+
+    # Substring match — request contained in label or vice versa
+    partial = [
+        c
+        for c in candidates
+        if req in c["label"].strip().lower() or c["label"].strip().lower() in req
+    ]
+    if partial:
+        best = max(partial, key=lambda x: x["total_cell_count"])
+        return best["label"], "fuzzy"
+
+    return None, "none"
+
+
 @tool
 def run_compare_census_lr_pair(
     data_dir: str,
@@ -183,6 +220,8 @@ def run_compare_census_lr_pair(
         "census_version": census_version,
         "executed": False,
         "retried": False,
+        "disease_resolved": None,
+        "disease_resolution_mode": None,
         "command": [],
         "target_vs_rest": {
             "gene_a": None,
@@ -209,9 +248,9 @@ def run_compare_census_lr_pair(
         )
         csv_path = str(evidence_dir / csv_name)
 
-    def _run(cell_type: str):
+    def _run(cell_type: str, run_disease: str | None = None):
         cmd = _build_compare_command(
-            disease=disease,
+            disease=run_disease or disease,
             gene_a=gene_a,
             gene_b=gene_b,
             target_cell_type=cell_type,
@@ -240,16 +279,33 @@ def run_compare_census_lr_pair(
         result["stderr_excerpt"] = proc.stderr[-2000:]
 
         if proc.returncode != 0:
-            candidates = _parse_available_celltypes(combined_output)
-            resolved, mode = _resolve_interest_cell_type(target_cell_type, candidates)
-            if resolved and resolved != target_cell_type:
-                result["retried"] = True
-                result["resolved_cell_type"] = resolved
-                result["resolution_mode"] = mode
-                cmd, proc = _run(resolved)
+            # ① Disease resolution first — "No cells matched" often means
+            #   the disease string doesn't exist in Census MONDO vocabulary.
+            current_disease = disease
+            disease_resolved, disease_mode = _resolve_disease_name(disease, organism)
+            if disease_resolved and disease_resolved != disease:
+                result["disease_resolved"] = disease_resolved
+                result["disease_resolution_mode"] = disease_mode
+                result["disease"] = disease_resolved
+                current_disease = disease_resolved
+                cmd, proc = _run(target_cell_type, current_disease)
                 result["command"] = cmd
+                combined_output = f"{proc.stdout}\n{proc.stderr}"
                 result["stdout_excerpt"] = proc.stdout[-2000:]
                 result["stderr_excerpt"] = proc.stderr[-2000:]
+
+            # ② Cell type resolution (existing logic) — if still failing
+            if proc.returncode != 0:
+                candidates = _parse_available_celltypes(combined_output)
+                resolved, mode = _resolve_interest_cell_type(target_cell_type, candidates)
+                if resolved and resolved != target_cell_type:
+                    result["retried"] = True
+                    result["resolved_cell_type"] = resolved
+                    result["resolution_mode"] = mode
+                    cmd, proc = _run(resolved, current_disease)
+                    result["command"] = cmd
+                    result["stdout_excerpt"] = proc.stdout[-2000:]
+                    result["stderr_excerpt"] = proc.stderr[-2000:]
 
             if proc.returncode != 0:
                 result["errors"].append(

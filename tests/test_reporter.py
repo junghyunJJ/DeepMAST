@@ -8,7 +8,7 @@ Prerequisites:
 - part1_final.md, part2_final.md, part3_final.md (written by INTERPRETER)
 - interpretation_guide.md (written by PLANNER)
 - data_path.txt (written by PLANNER)
-- part1_papers.json, liana_papers.json (written by SEARCHER)
+- papers.json (written by SEARCHER)
 
 Usage:
     python tests/test_reporter.py
@@ -56,8 +56,7 @@ REPORTER_MESSAGE = {
                 "3. read_file('/part2_final.md') — Part 2 interpretation\n"
                 "4. read_file('/part3_final.md') — Part 3 interpretation\n"
                 "5. read_file('/interpretation_guide.md') — focus areas\n"
-                "6. read_file('/part1_papers.json') — Part 1 references\n"
-                "7. read_file('/liana_papers.json') — Part 2/3 references\n"
+                "6. read_file('/papers.json') — Literature references (all Parts)\n"
                 "8. load_analysis_data(data_dir=...) — figure paths\n\n"
                 "### Phase 2-4: Cross-Part Synthesis\n"
                 "- Identify 4+ cross-part themes connecting Part 1, 2, and 3\n"

@@ -60,21 +60,6 @@ def normalize_st_colocalization_score(value: Any) -> float:
     return _to_float(value, default=0.0)
 
 
-def _safe_float(value: Any) -> float | None:
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    text = str(value).strip()
-    if not text:
-        return None
-    if text.startswith("<"):
-        text = text[1:]
-    try:
-        return float(text)
-    except ValueError:
-        return None
-
 
 def infer_oncology_flag(disease: str) -> bool:
     """Infer whether disease context is oncology-related."""
@@ -91,81 +76,371 @@ def classify_disease_type(disease: str) -> str:
     return "unknown"
 
 
-def _composite_priority_score(row: dict[str, Any]) -> float:
-    """Base composite score used for featured ranking."""
-    ot_score = _to_float(row.get("open_targets_score"), default=0.0)
-    st_score = normalize_st_colocalization_score(
-        row.get("st_colocalization_score", row.get("score"))
-    )
-    # Weight OpenTargets slightly higher than ST for therapeutic prioritization.
-    return round(ot_score * 0.6 + st_score * 0.4, 4)
-
-
-def _census_bonus_score(row: dict[str, Any]) -> float:
-    """Auxiliary bonus from Census cross-validation evidence."""
-    census = row.get("census_validation")
-    if not isinstance(census, dict):
-        return 0.0
-
-    p_value = _safe_float(census.get("p_value"))
-    diff = _safe_float(census.get("diff"))
-    if p_value is None or diff is None:
-        return 0.0
-
-    if p_value < 1e-4 and diff >= 0.05:
-        return 0.05
-    if p_value < 0.05 and diff >= 0.02:
-        return 0.02
-    return 0.0
-
-
 def rank_featured_candidates(
     druggability_matrix: list[dict[str, Any]],
     *,
-    min_featured: int = 3,
+    min_featured: int = 2,
     max_featured: int = 5,
-    score_threshold: float = 0.55,
+    min_novel: int = 1,
+    max_novel: int = 3,
+    max_total: int = 7,
 ) -> list[dict[str, Any]]:
-    """Rank candidates and dynamically mark top 3-5 as featured."""
+    """Rank candidates into Featured (validated) and Novel (new) tracks.
+
+    Featured: targets with existing drug evidence (existing_drug_evidence >= 1),
+              ranked by combined_total descending.
+    Novel: targets with NO existing drug evidence (existing_drug_evidence == 0),
+           ranked by exploratory_total descending.
+
+    Each row must contain ``validated_track`` and ``exploratory_track``
+    dictionaries (produced by the LLM rubric assessment).  Rows classified
+    as ``insufficient_evidence`` are automatically excluded from both tracks.
+    """
     if not druggability_matrix:
         return []
 
     scored_rows: list[dict[str, Any]] = []
     for row in druggability_matrix:
         item = dict(row)
-        base_score = _composite_priority_score(item)
-        census_bonus = _census_bonus_score(item)
-        item["priority_base_score"] = base_score
-        item["census_bonus"] = census_bonus
-        item["priority_score"] = round(min(1.0, base_score + census_bonus), 4)
+        vt = compute_validated_track(item)
+        et = compute_exploratory_track(item)
+        classification = classify_target(item)
+        priority = compute_priority(item)
+        combined_total = vt["total"] + et["total"]
+
+        item["classification"] = classification
+        item["priority"] = priority
+        item["combined_total"] = combined_total
+        item["validated_total"] = vt["total"]
+        item["exploratory_total"] = et["total"]
         scored_rows.append(item)
 
-    scored_rows.sort(
-        key=lambda x: (
-            x.get("priority_score", 0.0),
-            _to_float(x.get("open_targets_score"), default=0.0),
-            normalize_st_colocalization_score(x.get("st_colocalization_score")),
-        ),
-        reverse=True,
+    # Separate insufficient_evidence rows
+    eligible = [r for r in scored_rows if r["classification"] != "insufficient_evidence"]
+    insufficient = [r for r in scored_rows if r["classification"] == "insufficient_evidence"]
+
+    # --- Featured pool: existing_drug_evidence >= 1 ---
+    featured_pool = [
+        r for r in eligible
+        if _extract_score(r.get("validated_track", {}).get("existing_drug_evidence", 0)) >= 1
+    ]
+    featured_pool.sort(key=lambda x: x["combined_total"], reverse=True)
+
+    # --- Novel pool: existing_drug_evidence == 0 ---
+    novel_pool = [
+        r for r in eligible
+        if _extract_score(r.get("validated_track", {}).get("existing_drug_evidence", 0)) == 0
+    ]
+    novel_pool.sort(key=lambda x: x["exploratory_total"], reverse=True)
+
+    # --- Novel tier assignment ---
+    for row in novel_pool:
+        et = row.get("exploratory_track", {})
+        gwas = _extract_score(et.get("gwas_genetic_support", 0))
+        tract = _extract_score(et.get("tractability", 0))
+        row["novel_tier"] = 1 if (gwas >= 1 or tract >= 1) else 2
+
+    # --- Slot allocation (dynamic, max_total limit) ---
+    n_featured = min(max_featured, len(featured_pool))
+    if len(featured_pool) >= min_featured:
+        n_featured = max(min_featured, n_featured)
+    else:
+        n_featured = len(featured_pool)
+
+    remaining = max_total - n_featured
+    n_novel = min(max_novel, len(novel_pool), remaining)
+    if remaining > 0 and len(novel_pool) >= min_novel:
+        n_novel = max(min_novel, n_novel)
+    else:
+        n_novel = min(len(novel_pool), remaining)
+
+    # --- Mark featured ---
+    for idx, row in enumerate(featured_pool):
+        row["is_featured"] = idx < n_featured
+        row["is_novel"] = False
+        row["rank"] = idx + 1 if idx < n_featured else None
+
+    # --- Mark novel ---
+    for idx, row in enumerate(novel_pool):
+        row["is_novel"] = idx < n_novel
+        row["is_featured"] = False
+        row["rank"] = idx + 1 if idx < n_novel else None
+        if idx >= n_novel:
+            row.pop("novel_tier", None)
+
+    # --- Mark insufficient ---
+    for row in insufficient:
+        row["rank"] = None
+        row["is_featured"] = False
+        row["is_novel"] = False
+
+    return featured_pool + novel_pool + insufficient
+
+
+# -------------------------------------------------------------------------
+# RUBRIC scoring helpers (encode prompt logic into testable functions)
+# -------------------------------------------------------------------------
+
+# Score ranges per criterion
+VALIDATED_CRITERIA = ("existing_drug_evidence", "clinical_trial_activity", "mechanism_relevance", "safety_profile")
+EXPLORATORY_CRITERIA = ("gwas_genetic_support", "tractability", "biological_plausibility", "novelty_opportunity")
+
+
+def _extract_score(criterion: dict[str, Any] | int | float) -> int:
+    """Extract numeric score from criterion dict or raw value."""
+    if isinstance(criterion, dict):
+        return int(criterion.get("score", 0))
+    return int(criterion)
+
+
+def compute_validated_track(assessment: dict[str, Any]) -> dict[str, Any]:
+    """Compute validated track total and pass/fail.
+
+    Pass logic: existing_drug_evidence >= 2
+                OR (existing_drug_evidence >= 1 AND clinical_trial_activity >= 1)
+    """
+    vt = assessment.get("validated_track", {})
+    scores = {k: _extract_score(vt.get(k, 0)) for k in VALIDATED_CRITERIA}
+    total = sum(scores.values())
+
+    ede = scores["existing_drug_evidence"]
+    cta = scores["clinical_trial_activity"]
+    passed = ede >= 2 or (ede >= 1 and cta >= 1)
+
+    return {"scores": scores, "total": total, "pass": passed}
+
+
+def compute_exploratory_track(assessment: dict[str, Any]) -> dict[str, Any]:
+    """Compute exploratory track total and pass/fail.
+
+    Pass logic: gwas_genetic_support >= 1
+                AND (tractability >= 1 OR biological_plausibility >= 2)
+    """
+    et = assessment.get("exploratory_track", {})
+    scores = {k: _extract_score(et.get(k, 0)) for k in EXPLORATORY_CRITERIA}
+    total = sum(scores.values())
+
+    gwas = scores["gwas_genetic_support"]
+    tract = scores["tractability"]
+    bio = scores["biological_plausibility"]
+    passed = gwas >= 1 and (tract >= 1 or bio >= 2)
+
+    return {"scores": scores, "total": total, "pass": passed}
+
+
+def classify_target(assessment: dict[str, Any]) -> str:
+    """Classify target: validated_target | exploratory_target | novel_candidate | insufficient_evidence."""
+    vt = compute_validated_track(assessment)
+    et = compute_exploratory_track(assessment)
+
+    if vt["pass"]:
+        return "validated_target"
+    if et["pass"]:
+        return "exploratory_target"
+
+    # novel_candidate: biological_plausibility >= 2 or novelty_opportunity >= 2
+    et_scores = et["scores"]
+    if et_scores["biological_plausibility"] >= 2 or et_scores["novelty_opportunity"] >= 2:
+        return "novel_candidate"
+
+    return "insufficient_evidence"
+
+
+def compute_priority(assessment: dict[str, Any]) -> str:
+    """Compute priority: high | medium | low | unranked."""
+    classification = classify_target(assessment)
+    if classification == "insufficient_evidence":
+        return "unranked"
+
+    vt = compute_validated_track(assessment)
+    et = compute_exploratory_track(assessment)
+
+    if classification == "validated_target":
+        if vt["total"] >= 6:
+            return "high"
+        if vt["total"] >= 3:
+            return "medium"
+        return "low"
+
+    if classification == "exploratory_target":
+        if et["total"] >= 8:
+            return "high"
+        if et["total"] >= 5:
+            return "medium"
+        return "low"
+
+    # novel_candidate
+    return "low"
+
+
+def validate_rubric_assessment(assessment: dict[str, Any]) -> list[str]:
+    """Validate rubric assessment structure. Returns list of errors (empty = valid)."""
+    errors: list[str] = []
+
+    if "validated_track" not in assessment:
+        errors.append("Missing validated_track")
+    else:
+        vt = assessment["validated_track"]
+        for key in VALIDATED_CRITERIA:
+            if key not in vt:
+                errors.append(f"validated_track missing '{key}'")
+
+    if "exploratory_track" not in assessment:
+        errors.append("Missing exploratory_track")
+    else:
+        et = assessment["exploratory_track"]
+        for key in EXPLORATORY_CRITERIA:
+            if key not in et:
+                errors.append(f"exploratory_track missing '{key}'")
+
+    # Score range checks
+    if not errors:
+        vt = assessment["validated_track"]
+        for key in VALIDATED_CRITERIA:
+            score = _extract_score(vt[key])
+            if key == "safety_profile":
+                if not (-2 <= score <= 0):
+                    errors.append(f"safety_profile score {score} not in [-2, 0]")
+            else:
+                if not (0 <= score <= 3):
+                    errors.append(f"{key} score {score} not in [0, 3]")
+
+        et = assessment["exploratory_track"]
+        for key in EXPLORATORY_CRITERIA:
+            score = _extract_score(et[key])
+            if not (0 <= score <= 3):
+                errors.append(f"{key} score {score} not in [0, 3]")
+
+    return errors
+
+
+# -------------------------------------------------------------------------
+# Stage gating helpers
+# -------------------------------------------------------------------------
+
+def compute_stage1_confidence(stage1_evidence: dict[str, Any]) -> dict[str, Any]:
+    """Compute Stage 1 biological confidence score from evidence signals.
+
+    Weighted combination of 4 signals (all normalized to [0, 1]):
+      - STRING PPI (35%): physical interaction evidence
+      - Census coexpression (30%): scRNA cross-validation
+      - Pathway count (20%): KEGG + Reactome pathways
+      - Expression (15%): CELLxGENE gene availability
+
+    Returns dict with individual scores, weights, and combined confidence.
+    """
+    # STRING PPI: API returns score in 0-1 range (not 0-1000)
+    # Note: required_score *input* param uses 0-1000, but output score column is 0-1
+    string_data = stage1_evidence.get("string_ppi", {})
+    raw_string = float(string_data.get("max_combined_score", 0))
+    string_score = min(raw_string, 1.0) if raw_string <= 1.0 else min(raw_string / 1000.0, 1.0)
+
+    # Census coexpression: p-value gated, then risk_ratio normalized
+    census = stage1_evidence.get("census_validation", {})
+    coexpr = census.get(
+        "coexpression",
+        census.get("target_vs_rest", {}).get("coexpression", {}),
+    )
+    p_val = float(coexpr.get("p_value", 1.0))
+    rr = float(coexpr.get("risk_ratio", 0.0))
+    census_score = (1.0 if p_val < 0.05 else 0.0) * min(rr / 3.0, 1.0)
+
+    # Pathway: binary — shared pathway between ligand & receptor
+    kegg = stage1_evidence.get("kegg_pathways", {})
+    kegg_lig_ids = {p["pathway_id"] for p in kegg.get("ligand_pathways", []) if "pathway_id" in p}
+    kegg_rec_ids = {p["pathway_id"] for p in kegg.get("receptor_pathways", []) if "pathway_id" in p}
+
+    reactome = stage1_evidence.get("reactome_pathways", {})
+    reactome_lig_ids = {p["reactome_id"] for p in reactome.get("ligand_pathways", []) if "reactome_id" in p}
+    reactome_rec_ids = {p["reactome_id"] for p in reactome.get("receptor_pathways", []) if "reactome_id" in p}
+
+    has_shared = bool((kegg_lig_ids & kegg_rec_ids) or (reactome_lig_ids & reactome_rec_ids))
+
+    # Backward compatibility: old format (flat "pathways" list) → count-based fallback
+    if not kegg_lig_ids and not kegg_rec_ids and not reactome_lig_ids and not reactome_rec_ids:
+        old_kegg = len(kegg.get("pathways", []))
+        old_reactome = len(reactome.get("pathways", []))
+        pathway_score = min((old_kegg + old_reactome) / 4.0, 1.0)
+    else:
+        pathway_score = 1.0 if has_shared else 0.0
+
+    # Expression: cell-type-specific expression from Census z-test
+    tvr = census.get("target_vs_rest", {})
+    gene_a_pct = float(tvr.get("gene_a", {}).get("target_pct", 0))
+    gene_b_pct = float(tvr.get("gene_b", {}).get("target_pct", 0))
+    genes_expressed = sum(1 for pct in [gene_a_pct, gene_b_pct] if pct > 0)
+    expression_score = genes_expressed / 2.0
+
+    # Backward compat: no census target_vs_rest → old available_genes fallback
+    if not tvr:
+        cellxgene = stage1_evidence.get("cellxgene", {})
+        available = {g.upper() for g in cellxgene.get("available_genes", [])}
+        ligand_name = stage1_evidence.get("ligand", "").upper()
+        receptor_name = stage1_evidence.get("receptor", "").upper()
+        genes_found = sum(1 for g in [ligand_name, receptor_name] if g and g in available)
+        expression_score = genes_found / 2.0
+
+    confidence = round(
+        0.35 * string_score
+        + 0.30 * census_score
+        + 0.20 * pathway_score
+        + 0.15 * expression_score,
+        4,
     )
 
-    eligible = sum(1 for row in scored_rows if row["priority_score"] >= score_threshold)
-    if len(scored_rows) < min_featured:
-        featured_count = len(scored_rows)
-    else:
-        featured_count = max(min_featured, min(max_featured, eligible))
-
-    ranked: list[dict[str, Any]] = []
-    for idx, row in enumerate(scored_rows, start=1):
-        row["rank"] = idx
-        row["is_featured"] = idx <= featured_count
-        ranked.append(row)
-    return ranked
+    return {
+        "confidence": confidence,
+        "string_score": round(string_score, 4),
+        "census_score": round(census_score, 4),
+        "pathway_score": round(pathway_score, 4),
+        "expression_score": round(expression_score, 4),
+    }
 
 
-def should_run_vep(*, oncology_flag: bool, has_high_somatic_mutation: bool) -> bool:
-    """Stage 2 VEP gate."""
-    return bool(oncology_flag and has_high_somatic_mutation)
+def filter_by_stage1_confidence(
+    pairs_with_evidence: list[dict[str, Any]],
+    *,
+    threshold: float = 0.4,
+    min_remaining: int = 5,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Tag L-R pairs by Stage 1 confidence score (no filtering).
+
+    All pairs proceed to Stage 2. Pairs with confidence below *threshold*
+    are tagged with ``stage1_low_confidence=True`` for informational purposes.
+
+    Returns (all_pairs, []).  The second element is always an empty list
+    for backward compatibility.
+    """
+    for p in pairs_with_evidence:
+        conf = p.get("stage1_confidence", {}).get("confidence", 0)
+        if conf < threshold:
+            p["stage1_low_confidence"] = True
+
+    return list(pairs_with_evidence), []
+
+
+def should_run_vep(*, oncology_flag: bool, has_gwas_variants: bool) -> bool:
+    """Stage 2 VEP gate: run when oncology OR GWAS variants available."""
+    return bool(oncology_flag or has_gwas_variants)
+
+
+VEP_HIGH_IMPACT = frozenset({
+    "transcript_ablation", "splice_acceptor_variant", "splice_donor_variant",
+    "stop_gained", "frameshift_variant", "stop_lost", "start_lost",
+})
+VEP_MODERATE_IMPACT = frozenset({
+    "missense_variant", "inframe_insertion", "inframe_deletion",
+    "protein_altering_variant",
+})
+
+
+def classify_vep_consequence(most_severe_consequence: str) -> str:
+    """Classify VEP consequence as high_impact, moderate_impact, or low_impact."""
+    if most_severe_consequence in VEP_HIGH_IMPACT:
+        return "high_impact"
+    if most_severe_consequence in VEP_MODERATE_IMPACT:
+        return "moderate_impact"
+    return "low_impact"
 
 
 def should_run_pubmed(max_clinical_phase: str | int | None) -> bool:
@@ -182,7 +457,182 @@ def should_run_pubmed(max_clinical_phase: str | int | None) -> bool:
     return int(match.group(1)) >= 2
 
 
-def should_run_diffdock(tractability: str | None) -> bool:
-    """Stage 4 DiffDock gate."""
-    text = (tractability or "").strip().lower().replace("_", " ")
-    return "small molecule" in text or "smallmolecule" in text
+# -------------------------------------------------------------------------
+# Programmatic drug-evidence scoring from ChEMBL indications
+# -------------------------------------------------------------------------
+
+# Breast cancer keyword variants for indication matching
+_BREAST_CANCER_KEYWORDS = (
+    "breast cancer",
+    "breast carcinoma",
+    "breast neoplasm",
+    "breast tumour",
+    "breast tumor",
+    "mammary cancer",
+    "mammary carcinoma",
+    "triple negative breast",
+    "tnbc",
+    "her2-positive breast",
+    "er-positive breast",
+)
+
+
+def _indication_matches_disease(indication_term: str, disease: str) -> bool:
+    """Check if an indication term matches the target disease.
+
+    Note: Breast cancer has enhanced keyword matching. Other diseases
+    rely on substring matching only. Consider adding ontology-based
+    matching for improved coverage across disease types.
+    """
+    term_lower = indication_term.lower()
+    disease_lower = disease.lower()
+
+    # Direct match
+    if disease_lower in term_lower:
+        return True
+
+    # For breast cancer, check specific keyword variants
+    if "breast" in disease_lower:
+        return any(kw in term_lower for kw in _BREAST_CANCER_KEYWORDS)
+
+    return False
+
+
+def _indication_is_oncology(indication_term: str) -> bool:
+    """Check if an indication term is oncology-related."""
+    return any(kw in indication_term.lower() for kw in _ONCOLOGY_KEYWORDS)
+
+
+def compute_drug_evidence_scores(
+    chembl_drugs: list[dict],
+    disease: str,
+    opentargets_tractability: list[dict] | None = None,
+) -> dict[str, Any]:
+    """Programmatically compute existing_drug_evidence and clinical_trial_activity.
+
+    Scoring logic:
+      existing_drug_evidence:
+        3 = target disease has Phase 3+ or approved drug
+        2 = target disease has Phase 1-2 drug
+        1 = other indication has approved drug (repurposing candidate)
+            OR OpenTargets tractability Approved Drug = True
+        0 = no drugs
+
+      clinical_trial_activity:
+        3 = target disease has Phase 3+ (multiple)
+        2 = target disease has Phase 2+ OR other indication Phase 3+
+        1 = other indication has clinical trials
+        0 = none
+
+    Args:
+        chembl_drugs: List of dicts from _chembl_fallback (with indications).
+        disease: Target disease string (e.g. "breast cancer").
+        opentargets_tractability: OpenTargets tractability modality list.
+
+    Returns:
+        Dict with existing_drug_evidence, clinical_trial_activity, and detail.
+    """
+    if not chembl_drugs:
+        # Check OpenTargets tractability even without ChEMBL drugs
+        ot_approved = _check_opentargets_approved(opentargets_tractability)
+        return {
+            "existing_drug_evidence": 1 if ot_approved else 0,
+            "clinical_trial_activity": 0,
+            "detail": {
+                "disease_phase_max": None,
+                "other_phase_max": None,
+                "disease_indication_count": 0,
+                "other_indication_count": 0,
+                "opentargets_approved_drug": ot_approved,
+                "matched_disease_drugs": [],
+                "matched_other_drugs": [],
+            },
+        }
+
+    disease_phase_max: float = 0.0
+    other_phase_max: float = 0.0
+    disease_indication_count = 0
+    other_indication_count = 0
+    matched_disease_drugs: list[str] = []
+    matched_other_drugs: list[str] = []
+
+    for drug in chembl_drugs:
+        drug_name = drug.get("drug_name", drug.get("chembl_id", "unknown"))
+        indications = drug.get("indications", [])
+
+        drug_has_disease_match = False
+        drug_has_other_match = False
+
+        for ind in indications:
+            efo_term = ind.get("efo_term") or ind.get("mesh_heading") or ""
+            phase = float(ind.get("max_phase") or 0)
+
+            if _indication_matches_disease(efo_term, disease):
+                disease_phase_max = max(disease_phase_max, phase)
+                disease_indication_count += 1
+                drug_has_disease_match = True
+            else:
+                other_phase_max = max(other_phase_max, phase)
+                other_indication_count += 1
+                drug_has_other_match = True
+
+        if drug_has_disease_match:
+            matched_disease_drugs.append(drug_name)
+        elif drug_has_other_match:
+            matched_other_drugs.append(drug_name)
+
+    # OpenTargets tractability check
+    ot_approved = _check_opentargets_approved(opentargets_tractability)
+
+    # --- existing_drug_evidence scoring ---
+    if disease_phase_max >= 3:
+        existing_drug_evidence = 3
+    elif disease_phase_max >= 1:
+        existing_drug_evidence = 2
+    elif other_phase_max >= 3 or ot_approved:
+        existing_drug_evidence = 1
+    else:
+        existing_drug_evidence = 0
+
+    # --- clinical_trial_activity scoring ---
+    if disease_phase_max >= 3 and disease_indication_count >= 2:
+        clinical_trial_activity = 3
+    elif disease_phase_max >= 2 or other_phase_max >= 3:
+        clinical_trial_activity = 2
+    elif other_indication_count > 0:
+        clinical_trial_activity = 1
+    else:
+        clinical_trial_activity = 0
+
+    return {
+        "existing_drug_evidence": existing_drug_evidence,
+        "clinical_trial_activity": clinical_trial_activity,
+        "detail": {
+            "disease_phase_max": disease_phase_max if disease_phase_max > 0 else None,
+            "other_phase_max": other_phase_max if other_phase_max > 0 else None,
+            "disease_indication_count": disease_indication_count,
+            "other_indication_count": other_indication_count,
+            "opentargets_approved_drug": ot_approved,
+            "matched_disease_drugs": matched_disease_drugs,
+            "matched_other_drugs": matched_other_drugs,
+        },
+    }
+
+
+def _check_opentargets_approved(
+    tractability: list[dict] | None,
+) -> bool:
+    """Check if OpenTargets tractability contains an approved drug."""
+    if not tractability:
+        return False
+    for entry in tractability:
+        # OpenTargets tractability modality format:
+        #   {"modality": "SM", "top_category": "Approved Drug", "value": True}
+        # or nested format with buckets
+        if isinstance(entry, dict):
+            if entry.get("top_category") == "Approved Drug" and entry.get("value") is True:
+                return True
+            # Alternative: check for has_drug / approved_drug fields
+            if entry.get("approved_drug") is True or entry.get("has_drug") is True:
+                return True
+    return False

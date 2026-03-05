@@ -246,7 +246,12 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
 
     # ===== Helper Methods =====
 
-    def get_deep_agent(self, data_directory: str, provider_override: str | None = None):
+    def get_deep_agent(
+        self,
+        data_directory: str,
+        provider_override: str | None = None,
+        preselected_targets: dict | None = None,
+    ):
         """Get or create the Deep Agent instance with correct data_dir.
 
         Creates a fresh Deep Agent with per-invocation config to avoid
@@ -255,6 +260,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         Args:
             data_directory: Path to analysis results directory
             provider_override: Optional LLM provider from runtime config
+            preselected_targets: Optional target config to pre-write as /targets.json
 
         Returns:
             Compiled Deep Agent runnable
@@ -270,13 +276,19 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             config_copy.data_dir = str(data_directory)
             if provider_override:
                 config_copy.provider = provider_override
-            return create_deep_interpreter_agent(config_copy)
+            return create_deep_interpreter_agent(
+                config_copy,
+                preselected_targets=preselected_targets,
+            )
         else:
             kwargs = {"data_dir": str(data_directory)}
             if provider_override:
                 kwargs["provider"] = provider_override
             config = DeepInterpreterConfig(**kwargs)
-            return create_deep_interpreter_agent(config)
+            return create_deep_interpreter_agent(
+                config,
+                preselected_targets=preselected_targets,
+            )
 
     def _build_research_summary(
         self,
@@ -1881,13 +1893,6 @@ Available factors: {available_factors}
         if self.is_debug:
             print(f"Invoking Deep Agent for: {data_directory}")
 
-        # Get or create Deep Agent with per-invocation config
-        configurable = (config or {}).get("configurable", {})
-        provider_override = (configurable.get("llm_provider") or "").strip() or None
-        deep_agent = await asyncio.to_thread(
-            self.get_deep_agent, data_directory, provider_override=provider_override
-        )
-
         # Build initial message with embedded targets
         targets_content = {
             "interest_clusters": state.get("interest_clusters"),
@@ -1895,6 +1900,16 @@ Available factors: {available_factors}
             "sel_factor": state.get("sel_factor"),
             "data_directory": str(data_directory),
         }
+
+        # Get or create Deep Agent with per-invocation config
+        configurable = (config or {}).get("configurable", {})
+        provider_override = (configurable.get("llm_provider") or "").strip() or None
+        deep_agent = await asyncio.to_thread(
+            self.get_deep_agent,
+            data_directory,
+            provider_override=provider_override,
+            preselected_targets=targets_content,
+        )
 
         initial_message = f"""Interpret the CCI analysis results in {data_directory}.
 
@@ -1905,8 +1920,8 @@ The following targets have been pre-selected by the user (DO NOT ask for user in
 {json.dumps(targets_content, indent=2)}
 ```
 
-IMPORTANT: The planner subagent will parse the targets from this message and write /targets.json to the virtual filesystem.
-After target confirmation, proceed directly to strategic planning with these targets."""
+IMPORTANT: /targets.json is already pre-written by the wrapper/framework.
+The planner should read /targets.json and proceed directly to strategic planning."""
 
         try:
             result = await deep_agent.ainvoke(

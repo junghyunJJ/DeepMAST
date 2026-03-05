@@ -5,7 +5,7 @@ and validates Part 3 output quality.
 
 Prerequisites:
 - res_bc/ directory with all analysis files
-- liana_papers.json (searched by SEARCHER)
+- papers.json (searched by SEARCHER)
 - interpretation_guide.md (written by PLANNER)
 - data_path.txt (written by PLANNER)
 
@@ -52,14 +52,14 @@ PART3_MESSAGE = {
                 "- 3-10 Spatial L-R Visualization\n"
                 "- 3-11 L-R Interaction Summary\n\n"
                 "Input files:\n"
-                "- /liana_papers.json (shared with Part 2)\n"
+                "- /papers.json (literature references)\n"
                 "- /interpretation_guide.md\n"
                 "- /data_path.txt\n\n"
                 "Output: **/part3_final.md** (MUST be written via write_file tool)\n\n"
                 "## MANDATORY WORKFLOW:\n"
                 "1. read_file('/data_path.txt') to get data directory\n"
                 "2. read_file('/interpretation_guide.md') for context\n"
-                "3. read_file('/liana_papers.json') to load citation source\n"
+                "3. read_file('/papers.json') to load citation source\n"
                 "4. load_analysis_data(data_dir=...) to get Part 3 analysis data\n"
                 "5. prioritize_top_lr_pairs(data_dir=...) to get candidate L-R pairs\n"
                 "6. Select top 3 most interesting L-R pairs and document selection reasoning\n"

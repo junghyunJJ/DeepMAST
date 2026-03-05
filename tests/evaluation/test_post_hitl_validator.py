@@ -35,8 +35,7 @@ def _valid_payload() -> dict:
             "part1_final": "/part1_final.md",
             "part2_final": "/part2_final.md",
             "part3_final": "/part3_final.md",
-            "part1_papers": "/part1_papers.json",
-            "part23_papers": "/liana_papers.json",
+            "papers": "/papers.json",
             "final_report": "CCI_Analysis_Report.html",
         },
         "gold_binding": {

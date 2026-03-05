@@ -501,11 +501,10 @@ def build_context():
     }
 
     # --- Papers ---
-    part1_papers = load_json("part1_papers.json")
-    liana_papers = load_json("liana_papers.json")
+    all_papers = load_json("papers.json")
     seen = set()
     papers = []
-    for p in part1_papers.get("papers", []) + liana_papers.get("papers", []):
+    for p in all_papers.get("papers", []):
         pmid = p.get("pmid", "")
         if pmid and pmid not in seen:
             seen.add(pmid)

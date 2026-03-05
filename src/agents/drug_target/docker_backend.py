@@ -90,8 +90,12 @@ class DockerBackend(BaseSandbox):
     def execute(
         self, command: str, *, timeout: int | None = None
     ) -> ExecuteResponse:
+        kwargs = {}
+        if timeout is not None:
+            kwargs["socket_timeout"] = timeout
         exit_code, output = self.container.exec_run(
             ["/bin/sh", "-c", command],
+            **kwargs,
         )
         decoded = output.decode("utf-8") if isinstance(output, bytes) else output
         return ExecuteResponse(output=decoded, exit_code=exit_code)

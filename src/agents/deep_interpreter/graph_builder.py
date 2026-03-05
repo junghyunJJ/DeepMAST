@@ -200,13 +200,12 @@ def create_subagent_graph(
       - Reads /targets.json, loads analysis data
       - Outputs: /interpretation_guide.md, /data_path.txt
 
-    - **searcher**: Context extraction + literature search
-      - For Part 1: outputs /part1_papers.json
-      - For Part 2+3: outputs /liana_papers.json (shared)
+    - **searcher**: Context extraction + unified literature search
+      - Outputs /papers.json (shared by all Parts)
       - Uses search_literature_dynamic with automatic fallback
 
     - **interpreter**: Literature-grounded interpretation
-      - Reads /partN_papers.json (ONLY citation source)
+      - Reads /papers.json (ONLY citation source)
       - Validates claims, ensures quality >= 0.7
       - Outputs: /part1_final.md, /part2_final.md, /part3_final.md
 

@@ -1,0 +1,401 @@
+#!/usr/bin/env python3
+"""Local Parquet reader for Open Targets Platform data.
+
+Mirrors the function signatures and return structures of query_opentargets.py
+but reads from local Parquet files in ot_data/ instead of calling the API.
+
+Expected directory layout (relative to project root):
+    ot_data/
+        target/   (partitioned parquet, ~94MB)
+        disease/  (single file disease.parquet, ~4.6MB)
+        evidence/ (partitioned by sourceId, ~7.9GB)
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+import pyarrow.parquet as pq
+
+logger = logging.getLogger(__name__)
+
+# ── Data directory ────────────────────────────────────────────────────
+DATA_DIR = Path(__file__).resolve().parents[3] / "ot_data"
+
+# ── Module-level caches (loaded once on first use) ────────────────────
+_target_df: pd.DataFrame | None = None
+_disease_df: pd.DataFrame | None = None
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Availability check
+# ══════════════════════════════════════════════════════════════════════
+
+def is_available() -> bool:
+    """Return True if ot_data/ has target, disease, and evidence dirs."""
+    try:
+        target_ok = (DATA_DIR / "target").is_dir() and any((DATA_DIR / "target").glob("*.parquet"))
+        disease_ok = (DATA_DIR / "disease").is_dir() and any((DATA_DIR / "disease").glob("*.parquet"))
+        evidence_ok = (DATA_DIR / "evidence").is_dir() and any((DATA_DIR / "evidence").iterdir())
+        return target_ok and disease_ok and evidence_ok
+    except Exception:
+        return False
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Internal loaders
+# ══════════════════════════════════════════════════════════════════════
+
+def _load_targets() -> pd.DataFrame:
+    """Load target parquet into memory (~94MB). Cached after first call."""
+    global _target_df
+    if _target_df is not None:
+        return _target_df
+    logger.info("Loading target parquet from %s", DATA_DIR / "target")
+    _target_df = pq.read_table(DATA_DIR / "target").to_pandas()
+    return _target_df
+
+
+def _load_diseases() -> pd.DataFrame:
+    """Load disease parquet into memory (~4.6MB). Cached after first call."""
+    global _disease_df
+    if _disease_df is not None:
+        return _disease_df
+    logger.info("Loading disease parquet from %s", DATA_DIR / "disease")
+    _disease_df = pq.read_table(DATA_DIR / "disease").to_pandas()
+    return _disease_df
+
+
+def _to_native(val: Any) -> Any:
+    """Recursively convert numpy/pandas types to JSON-serializable Python natives."""
+    if val is None:
+        return None
+    # numpy array (ndarray) — must check before .item() since arrays also have it
+    if hasattr(val, "ndim") and hasattr(val, "tolist") and not isinstance(val, str):
+        if val.ndim == 0:
+            # 0-d array (scalar wrapper)
+            return val.item()
+        return [_to_native(v) for v in val.tolist()]
+    # numpy scalar (int64, float64, bool_, etc.) — has .item() but no .ndim or ndim==0
+    if hasattr(val, "item") and not hasattr(val, "__len__"):
+        return val.item()
+    if isinstance(val, dict):
+        return {str(k): _to_native(v) for k, v in val.items()}
+    if isinstance(val, list):
+        return [_to_native(v) for v in val]
+    if isinstance(val, (bytes, bytearray)):
+        return val.decode("utf-8", errors="replace")
+    return val
+
+
+def _struct_list_to_dicts(val: Any) -> list[dict]:
+    """Convert a numpy array of dicts (from parquet struct list) to plain list[dict]."""
+    return _to_native(val) if val is not None else []
+
+
+def _disease_id_to_name(disease_ids: list[str]) -> dict[str, str]:
+    """Map disease IDs to names using the disease parquet."""
+    if not disease_ids:
+        return {}
+    df = _load_diseases()
+    matched = df[df["id"].isin(disease_ids)][["id", "name"]]
+    return dict(zip(matched["id"], matched["name"]))
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Public API — mirrors query_opentargets.py signatures
+# ══════════════════════════════════════════════════════════════════════
+
+def search_entities(
+    query_string: str, entity_types: Optional[List[str]] = None
+) -> List[Dict[str, Any]]:
+    """Search for targets and/or diseases by name.
+
+    Target: approvedSymbol exact match → case-insensitive contains fallback.
+    Disease: name exact match → contains match → synonyms match.
+    """
+    results: list[dict] = []
+    types = [t.lower() for t in entity_types] if entity_types else ["target", "disease"]
+
+    if "target" in types:
+        tdf = _load_targets()
+        query_upper = query_string.upper()
+        # Exact symbol match
+        exact = tdf[tdf["approvedSymbol"] == query_upper]
+        if len(exact) == 0:
+            # Case-insensitive contains fallback
+            exact = tdf[tdf["approvedSymbol"].str.contains(query_string, case=False, na=False)]
+        for _, row in exact.head(10).iterrows():
+            results.append({
+                "id": row["id"],
+                "entity": "target",
+                "name": row.get("approvedSymbol", ""),
+                "description": row.get("approvedName", ""),
+            })
+
+    if "disease" in types:
+        ddf = _load_diseases()
+        query_lower = query_string.lower()
+        # Exact name match
+        exact = ddf[ddf["name"].str.lower() == query_lower]
+        if len(exact) == 0:
+            # Contains match
+            exact = ddf[ddf["name"].str.lower().str.contains(query_lower, na=False)]
+        if len(exact) == 0:
+            # Synonyms match
+            mask = ddf["synonyms"].apply(
+                lambda s: _synonyms_match(s, query_lower) if isinstance(s, dict) else False
+            )
+            exact = ddf[mask]
+        for _, row in exact.head(10).iterrows():
+            results.append({
+                "id": row["id"],
+                "entity": "disease",
+                "name": row.get("name", ""),
+                "description": row.get("description", ""),
+            })
+
+    return results
+
+
+def _synonyms_match(synonyms: dict, query_lower: str) -> bool:
+    """Check if query matches any synonym field."""
+    for key in ("hasExactSynonym", "hasRelatedSynonym", "hasNarrowSynonym", "hasBroadSynonym"):
+        vals = synonyms.get(key)
+        if vals is None:
+            continue
+        if hasattr(vals, "tolist"):
+            vals = vals.tolist()
+        if isinstance(vals, list):
+            for v in vals:
+                if isinstance(v, str) and query_lower in v.lower():
+                    return True
+    return False
+
+
+def get_target_info(
+    ensembl_id: str, include_diseases: bool = False
+) -> Dict[str, Any]:
+    """Retrieve target information from local parquet.
+
+    Returns dict with same structure as the API version.
+    """
+    tdf = _load_targets()
+    row_df = tdf[tdf["id"] == ensembl_id]
+    if len(row_df) == 0:
+        return {}
+
+    row = row_df.iloc[0]
+    info: dict[str, Any] = {
+        "id": str(row["id"]),
+        "approvedSymbol": str(row.get("approvedSymbol", "")),
+        "approvedName": str(row.get("approvedName", "")),
+        "biotype": str(row.get("biotype", "")),
+        "functionDescriptions": _to_native(_to_list(row.get("functionDescriptions"))),
+        "tractability": _struct_list_to_dicts(row.get("tractability")),
+        "safetyLiabilities": _struct_list_to_dicts(row.get("safetyLiabilities")),
+        "geneticConstraint": _struct_list_to_dicts(row.get("constraint")),
+    }
+
+    if include_diseases:
+        # Derive top associated diseases from evidence parquet
+        try:
+            ev = pq.read_table(
+                DATA_DIR / "evidence",
+                columns=["targetId", "diseaseId", "score"],
+                filters=[("targetId", "=", ensembl_id)],
+            ).to_pandas()
+            if len(ev) > 0:
+                agg = (
+                    ev.groupby("diseaseId")["score"]
+                    .max()
+                    .sort_values(ascending=False)
+                    .head(10)
+                )
+                disease_names = _disease_id_to_name(list(agg.index))
+                rows = []
+                for did, sc in agg.items():
+                    rows.append({
+                        "disease": {"id": did, "name": disease_names.get(did, did)},
+                        "score": round(float(sc), 4),
+                    })
+                info["associatedDiseases"] = {"rows": rows}
+        except Exception as exc:
+            logger.warning("Failed to derive associated diseases: %s", exc)
+
+    return info
+
+
+def get_target_disease_evidence(
+    ensembl_id: str,
+    efo_id: str,
+    datasource_ids: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Retrieve evidence linking a target to a disease from evidence parquet.
+
+    Uses predicate pushdown for fast filtering on the 7.9GB dataset.
+    """
+    filters = [
+        ("targetId", "=", ensembl_id),
+        ("diseaseId", "=", efo_id),
+    ]
+    columns = [
+        "datasourceId", "datatypeId", "score", "targetFromSourceId",
+        "studyId", "literature", "cohortPhenotypes", "drugId", "clinicalPhase",
+    ]
+    try:
+        table = pq.read_table(DATA_DIR / "evidence", columns=columns, filters=filters)
+        df = table.to_pandas()
+        # Limit to top 100 by score (matching API behavior)
+        df = df.sort_values("score", ascending=False).head(100)
+        records = []
+        for _, row in df.iterrows():
+            rec = {
+                "datasourceId": row.get("datasourceId"),
+                "datatypeId": row.get("datatypeId"),
+                "score": float(row["score"]) if pd.notna(row.get("score")) else 0.0,
+                "targetFromSourceId": row.get("targetFromSourceId"),
+                "studyId": row.get("studyId"),
+            }
+            lit = row.get("literature")
+            if lit is not None:
+                rec["literature"] = _to_list(lit)
+            cohort = row.get("cohortPhenotypes")
+            if cohort is not None:
+                rec["cohortPhenotypes"] = _to_list(cohort)
+            if pd.notna(row.get("drugId")):
+                rec["drugId"] = row["drugId"]
+            if pd.notna(row.get("clinicalPhase")):
+                rec["clinicalPhase"] = int(row["clinicalPhase"])
+            records.append(rec)
+        return records
+    except Exception as exc:
+        logger.error("Evidence parquet read failed: %s", exc)
+        return []
+
+
+def get_target_associations(
+    ensembl_id: str, min_score: float = 0.0
+) -> List[Dict[str, Any]]:
+    """Get all disease associations for a target, derived from evidence parquet.
+
+    Groups evidence by diseaseId and takes max(score) per disease.
+    """
+    try:
+        ev = pq.read_table(
+            DATA_DIR / "evidence",
+            columns=["targetId", "diseaseId", "score", "datatypeId"],
+            filters=[("targetId", "=", ensembl_id)],
+        ).to_pandas()
+
+        if len(ev) == 0:
+            return []
+
+        # Aggregate: max score per disease
+        agg = ev.groupby("diseaseId")["score"].max().reset_index()
+        agg = agg[agg["score"] >= min_score].sort_values("score", ascending=False).head(100)
+
+        # Datatype scores per disease
+        dtype_scores = (
+            ev.groupby(["diseaseId", "datatypeId"])["score"]
+            .max()
+            .reset_index()
+        )
+
+        disease_names = _disease_id_to_name(list(agg["diseaseId"]))
+
+        results = []
+        for _, row in agg.iterrows():
+            did = row["diseaseId"]
+            ds = dtype_scores[dtype_scores["diseaseId"] == did]
+            dt_scores = [
+                {"id": r["datatypeId"], "score": round(float(r["score"]), 4)}
+                for _, r in ds.iterrows()
+            ]
+            results.append({
+                "disease": {"id": did, "name": disease_names.get(did, did)},
+                "score": round(float(row["score"]), 4),
+                "datatypeScores": dt_scores,
+            })
+        return results
+    except Exception as exc:
+        logger.error("Associations derivation failed: %s", exc)
+        return []
+
+
+def get_known_drugs_for_disease(efo_id: str) -> Dict[str, Any]:
+    """Get known drugs for a disease from evidence parquet.
+
+    Filters evidence where datatypeId='known_drug' and diseaseId=efo_id.
+    """
+    try:
+        ev = pq.read_table(
+            DATA_DIR / "evidence",
+            columns=[
+                "targetId", "diseaseId", "datasourceId", "datatypeId",
+                "score", "drugId", "clinicalPhase",
+            ],
+            filters=[
+                ("diseaseId", "=", efo_id),
+                ("datatypeId", "=", "known_drug"),
+            ],
+        ).to_pandas()
+
+        if len(ev) == 0:
+            return {"uniqueDrugs": 0, "uniqueTargets": 0, "rows": []}
+
+        unique_drugs = ev["drugId"].dropna().nunique()
+        unique_targets = ev["targetId"].dropna().nunique()
+
+        # Load target names for mapping
+        tdf = _load_targets()
+        target_map = dict(zip(tdf["id"], tdf["approvedSymbol"]))
+
+        rows = []
+        # Group by drugId to deduplicate
+        for drug_id, grp in ev.groupby("drugId"):
+            if pd.isna(drug_id):
+                continue
+            best = grp.sort_values("score", ascending=False).iloc[0]
+            phase = int(best["clinicalPhase"]) if pd.notna(best.get("clinicalPhase")) else None
+            target_id = best.get("targetId", "")
+            rows.append({
+                "drug": {
+                    "id": str(drug_id),
+                    "name": str(drug_id),  # Parquet doesn't have drug names
+                    "drugType": None,
+                    "maximumClinicalTrialPhase": phase,
+                },
+                "target": {
+                    "id": target_id,
+                    "approvedSymbol": target_map.get(target_id, target_id),
+                },
+                "phase": phase,
+                "status": None,
+                "mechanismOfAction": None,
+            })
+
+        return {
+            "uniqueDrugs": int(unique_drugs),
+            "uniqueTargets": int(unique_targets),
+            "rows": rows,
+        }
+    except Exception as exc:
+        logger.error("Known drugs parquet read failed: %s", exc)
+        return {"uniqueDrugs": 0, "uniqueTargets": 0, "rows": []}
+
+
+# ── Helpers ───────────────────────────────────────────────────────────
+
+def _to_list(val: Any) -> list:
+    """Convert numpy array or other iterable to plain JSON-safe list."""
+    if val is None:
+        return []
+    if hasattr(val, "tolist") and not isinstance(val, str):
+        return _to_native(val.tolist())
+    if isinstance(val, list):
+        return _to_native(val)
+    return [_to_native(val)]

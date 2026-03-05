@@ -5,7 +5,7 @@ and validates Part 2 output quality.
 
 Prerequisites:
 - res_bc/ directory with all analysis files
-- liana_papers.json (searched by SEARCHER, shared with Part 3)
+- papers.json (searched by SEARCHER)
 - interpretation_guide.md (written by PLANNER)
 - data_path.txt (written by PLANNER)
 
@@ -52,14 +52,14 @@ PART2_MESSAGE = {
                 "- 2-7 NMF Factor Spatial Patterns\n"
                 "- 2-8 Pathway-Factor Enrichment (includes GenePT scores)\n\n"
                 "Input files:\n"
-                "- /liana_papers.json (shared with Part 3)\n"
+                "- /papers.json (literature references)\n"
                 "- /interpretation_guide.md\n"
                 "- /data_path.txt\n\n"
                 "Output: **/part2_final.md** (MUST be written via write_file tool)\n\n"
                 "## MANDATORY WORKFLOW:\n"
                 "1. read_file('/data_path.txt') to get data directory\n"
                 "2. read_file('/interpretation_guide.md') for context\n"
-                "3. read_file('/liana_papers.json') to load citation source\n"
+                "3. read_file('/papers.json') to load citation source\n"
                 "4. load_analysis_data(data_dir=...) to get Part 2 analysis data\n"
                 "5. Write detailed interpretation for ALL 3 analyses (2-6, 2-7, 2-8)\n"
                 "6. validate_quality(interpretation=...) — target score >= 0.8\n"

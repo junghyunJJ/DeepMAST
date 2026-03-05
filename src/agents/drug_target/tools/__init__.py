@@ -1,6 +1,6 @@
 """Tool wrappers for Drug Target Assessment Agent.
 
-Infrastructure tools for evidence I/O, stage logic, and structural biology.
+Infrastructure tools for evidence I/O and stage logic.
 All database queries (including OpenTargets and GWAS) are wrapped as @tool
 functions for consistent invocation by subagents.
 """
@@ -15,6 +15,7 @@ from src.agents.drug_target.tools.assessment_output import (
 )
 from src.agents.drug_target.tools.stage_domain_tools import (
     query_cellxgene_lr_context,
+    list_census_diseases,
     query_kegg_pathways,
     query_reactome_pathways,
     query_string_ppi_pair,
@@ -24,8 +25,6 @@ from src.agents.drug_target.tools.stage_domain_tools import (
     query_gwas_gene_trait,
     query_drugbank_target_profile,
     query_pubmed_clinical_limitations,
-    query_alphafold_plddt,
-    run_diffdock_screen,
 )
 from src.agents.drug_target.tools.census_lr_validation_tools import (
     run_compare_census_lr_pair,
@@ -53,6 +52,7 @@ __all__ = [
     "save_evidence",
     # Stage-specific domain tools
     "query_cellxgene_lr_context",
+    "list_census_diseases",
     "query_kegg_pathways",
     "query_reactome_pathways",
     "query_string_ppi_pair",
@@ -62,8 +62,6 @@ __all__ = [
     "query_gwas_gene_trait",
     "query_drugbank_target_profile",
     "query_pubmed_clinical_limitations",
-    "query_alphafold_plddt",
-    "run_diffdock_screen",
     "run_compare_census_lr_pair",
     # Output contract
     "save_target_assessment",

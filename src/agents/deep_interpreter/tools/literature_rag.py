@@ -55,7 +55,7 @@ def _resolve_path(path: str) -> str:
 def _resolve_papers_path(path: str, data_dir: str = "") -> str:
     """Resolve virtual/relative papers path to real OS path.
 
-    DeepAgents uses virtual paths like '/part1_papers.json' which resolve
+    DeepAgents uses virtual paths like '/papers.json' which resolve
     to the OS root instead of the data directory. This helper resolves:
 
     Resolution order:
@@ -1401,8 +1401,8 @@ def prepare_rag_literature(
     Falls back to Abstract mode if Docker/RAG unavailable.
 
     Args:
-        papers_json_path: Path to papers JSON (e.g., "res/part1_papers.json")
-        part_name: Part identifier ("part1", "part2", "part3", "liana", "synthesis")
+        papers_json_path: Path to papers JSON (e.g., "res/papers.json")
+        part_name: Part identifier ("all", "part1", "part2", "part3", "synthesis")
         data_dir: Explicit data directory for resolving papers path. Read from
             /data_path.txt (written by PLANNER). Falls back to contextvars if empty.
 

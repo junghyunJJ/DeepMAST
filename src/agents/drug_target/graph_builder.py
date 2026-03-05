@@ -39,14 +39,10 @@ def _get_drug_target_graph() -> Runnable:
 
     agent, backend = create_drug_target_agent(config)
     if backend:
+        import atexit
         atexit.register(backend.cleanup)
     return agent
 
 
-# LangGraph CLI export
+# LangGraph CLI export — eager initialization (LangGraph reads module.__dict__ directly)
 drug_target_graph = _get_drug_target_graph()
-
-
-__all__ = [
-    "drug_target_graph",
-]

@@ -36,7 +36,7 @@ If the initial message contains "## PRE-SELECTED TARGET CONFIGURATION" with a JS
 - The targets have ALREADY been selected by the wrapper agent
 - DO NOT ask the user for cluster or cell type selection
 - Pass the pre-selected configuration to **planner** for confirmation
-- The planner will parse from message and write /targets.json to virtual filesystem
+- /targets.json is pre-written by the wrapper/framework
 - Then proceed directly to strategic planning
 
 ### Option 2: /targets.json File Exists (Fallback)
@@ -66,45 +66,39 @@ This workflow uses a strict anti-hallucination approach:
 ### Step 1: PLANNER
 Use the **planner** subagent to:
 - Parse the embedded target configuration from initial message
-- Write /targets.json to virtual filesystem
+- Read /targets.json from virtual filesystem (already pre-written)
 - Load analysis data (data_path.txt is pre-written)
 - Generate biomedical context via BioMCP think (optional enrichment)
 - Search literature for grounding (search_literature_dynamic, 20 papers)
 - Assess data availability and create interpretation focus areas
 - Output: /interpretation_guide.md
 
-### Step 2: SEARCHER (for ALL Parts)
-Use the **searcher** subagent to search literature for ALL three parts:
+### Step 2: SEARCHER (Unified Search for ALL Parts)
+Use the **searcher** subagent to perform a single unified literature search:
 
 ```
-For Part 1:
-  1. Extract spatial context (pathways, celltypes, NO genes)
-  2. Search PubMed proactively
-  3. Ensure coverage >= 50% pathways
-  4. Output: /part1_search_context.json, /part1_papers.json
-
-For Part 2+3 (shared search):
-  1. Extract L-R context (genes, pathways, celltypes)
-  2. Search PubMed proactively
-  3. Ensure coverage >= 60% genes, >= 50% pathways
-  4. Output: /lr_search_context.json, /liana_papers.json (shared)
+Single unified search:
+  1. Extract search_context (genes + pathways + celltypes) from load_analysis_data
+  2. Search PubMed proactively with all terms
+  3. Ensure coverage >= 60% genes, >= 50% pathways, >= 15 papers
+  4. Output: /search_context.json, /papers.json
 ```
 
-**CRITICAL**: Both /part1_papers.json and /liana_papers.json must exist BEFORE calling interpreter.
+**CRITICAL**: /papers.json must exist BEFORE calling interpreter.
 
 ### Step 3a: INTERPRETER (Part 1 - Spatial & Pathway)
 Use the **interpreter** subagent to interpret Part 1 ONLY:
 
 ```
 Part 1:
-  1. Read /part1_papers.json (ONLY citation source)
+  1. Read /papers.json (ONLY citation source)
   2. Generate literature-grounded interpretation for Part 1 analyses (1-1 through 1-5)
   3. Inline claim validation (every PMID checked)
   4. Inline quality check (score >= 0.8, max 3 iterations)
   5. Output: /part1_final.md
 ```
 
-**CRITICAL**: Every claim must cite PMID from /part1_papers.json OR be marked (Novel Finding).
+**CRITICAL**: Every claim must cite PMID from /papers.json OR be marked (Novel Finding).
 Tell the interpreter: "Interpret Part 1 ONLY. Output /part1_final.md."
 
 ### Step 3b: INTERPRETER (Part 2 - CCI & NMF)
@@ -112,14 +106,14 @@ Use the **interpreter** subagent to interpret Part 2 ONLY:
 
 ```
 Part 2:
-  1. Read /liana_papers.json (ONLY citation source)
+  1. Read /papers.json (ONLY citation source)
   2. Generate literature-grounded interpretation for Part 2 analyses (2-6 through 2-8)
   3. Inline claim validation (every PMID checked)
   4. Inline quality check (score >= 0.8, max 3 iterations)
   5. Output: /part2_final.md
 ```
 
-**CRITICAL**: Every claim must cite PMID from /liana_papers.json OR be marked (Novel Finding).
+**CRITICAL**: Every claim must cite PMID from /papers.json OR be marked (Novel Finding).
 Tell the interpreter: "Interpret Part 2 ONLY. Connect CCI findings to Part 1 spatial patterns — reference relevant spatial clusters and pathways from Part 1. Output /part2_final.md."
 
 ### Step 3c: INTERPRETER (Part 3 - L-R Interaction Details)
@@ -127,19 +121,18 @@ Use the **interpreter** subagent to interpret Part 3 ONLY:
 
 ```
 Part 3:
-  1. FIRST call prioritize_top_lr_pairs to get novel CANDIDATE L-R pairs
-     (well-known hub-gene pairs are excluded; returns 10-15 candidates)
-  2. SELECT the top 3 most interesting pairs based on novelty, spatial significance,
-     and mechanistic plausibility — write selection reasoning
-  3. Read /liana_papers.json (ONLY citation source)
-  4. Generate literature-grounded interpretation for Part 3 analyses (3-9 through 3-11)
-  5. Inline claim validation (every PMID checked)
-  6. Inline quality check (score >= 0.8, max 3 iterations)
-  7. Output: /part3_final.md
+  1. FIRST call prioritize_top_lr_pairs(candidate_count=30) to get candidates
+  2. Call run_drug_target_assessment(data_dir, disease) to get evidence-based featured candidates
+  3. Identify featured candidates from the drug target assessment results
+  4. Read /papers.json (ONLY citation source)
+  5. Interpret featured candidates' L-R pairs with literature grounding
+  6. Inline claim validation (every PMID checked)
+  7. Inline quality check (score >= 0.8, max 3 iterations)
+  8. Output: /part3_final.md
 ```
 
-**CRITICAL**: Every claim must cite PMID from /liana_papers.json OR be marked (Novel Finding).
-Tell the interpreter: "Interpret Part 3 ONLY. FIRST call prioritize_top_lr_pairs to get candidates, then select top 3 novel pairs with reasoning, then interpret. Connect L-R pair analysis back to both Part 1 spatial patterns and Part 2 NMF/pathway results. Output /part3_final.md."
+**CRITICAL**: Every claim must cite PMID from /papers.json OR be marked (Novel Finding).
+Tell the interpreter: "Interpret Part 3 ONLY. FIRST call prioritize_top_lr_pairs(candidate_count=30) to get candidates, then call run_drug_target_assessment to get featured candidates, then interpret the featured candidates' L-R pairs. Connect L-R pair analysis back to both Part 1 spatial patterns and Part 2 NMF/pathway results. Output /part3_final.md."
 
 **WHY 3 SEPARATE CALLS**: Each Part is called as a separate task() invocation so each gets a fresh
 context window. This prevents SummarizationMiddleware from truncating Part 3 instructions after
@@ -185,10 +178,10 @@ Use the **reporter** subagent to:
    - If you encounter "Directory not found" error, you used the wrong path
 
 3. **LITERATURE FIRST**: Always call SEARCHER before INTERPRETER.
-   All /partN_papers.json files MUST exist before interpretation.
+   /papers.json MUST exist before interpretation.
 
 4. **Citation Requirements**: Every biological claim must either:
-   - Cite a PMID from /partN_papers.json
+   - Cite a PMID from /papers.json
    - Be marked as **(Novel Finding)** if no literature support exists
 
 5. **Quality Loop**: Each Part interpretation goes through:
@@ -224,8 +217,8 @@ Use the **reporter** subagent to:
 | Subagent | Role | Inputs | Outputs |
 |----------|------|--------|---------|
 | **planner** | Target confirmation + data assessment + interpretation guide | /targets.json (from message) | /interpretation_guide.md |
-| **searcher** | Context extraction + literature search | /data_path.txt, spatial_search_context (Part 1), lr_search_context (Part 2/3) | /part1_papers.json, /liana_papers.json (Part 2/3 shared) |
-| **interpreter** | Part 1/2/3 interpretation with inline validation | /partN_papers.json, /interpretation_guide.md | /part1_final.md, /part2_final.md, /part3_final.md |
+| **searcher** | Context extraction + unified literature search | /data_path.txt, search_context (all Parts) | /papers.json |
+| **interpreter** | Part 1/2/3 interpretation with inline validation | /papers.json, /interpretation_guide.md | /part1_final.md, /part2_final.md, /part3_final.md |
 | **reporter** | Cross-part synthesis + emergent themes + HTML report | /partN_final.md, /interpretation_guide.md | /synthesis.md, /synthesis_papers.json, CCI_Analysis_Report.html |
 
 ## Workflow Diagram
@@ -243,22 +236,21 @@ Use the **reporter** subagent to:
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ SEARCHER (for Part 1, 2, 3)                                                 │
-│  - Extract context (genes, pathways, cell types)                            │
-│  - Search PubMed proactively                                                │
+│ SEARCHER (unified search for ALL Parts)                                      │
+│  - Extract unified search_context (genes, pathways, cell types)             │
+│  - Search PubMed proactively (single search)                                │
 │  - Quality loop: coverage >= 60% genes, >= 50% pathways, >= 15 papers       │
-│  → /part1_search_context.json, /part1_papers.json (Part 1)                  │
-│  → /lr_search_context.json, /liana_papers.json (Part 2/3 shared)            │
+│  → /search_context.json, /papers.json                                       │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ INTERPRETER × 3 (separate task() calls to avoid context truncation)         │
 │                                                                             │
-│  Part 1: Read /part1_papers.json → interpret 1-1..1-5 → /part1_final.md     │
-│  Part 2: Read /liana_papers.json → interpret 2-6..2-8 → /part2_final.md     │
-│  Part 3: prioritize_top_lr_pairs → Read /liana_papers.json                  │
-│           → interpret 3-9..3-11 → /part3_final.md                           │
+│  Part 1: Read /papers.json → interpret 1-1..1-5 → /part1_final.md           │
+│  Part 2: Read /papers.json → interpret 2-6..2-8 → /part2_final.md           │
+│  Part 3: prioritize_top_lr_pairs(30) → run_drug_target_assessment            │
+│           → Read /papers.json → interpret 3-9..3-11 → /part3_final.md       │
 │                                                                             │
 │  Each: inline claim validation + quality loop (score >= 0.7, max 3 iter)    │
 └─────────────────────────────────────────────────────────────────────────────┘

@@ -5,7 +5,7 @@ and validates Part 1 output quality.
 
 Prerequisites:
 - res_bc/ directory with all analysis files
-- part1_papers.json (searched by SEARCHER)
+- papers.json (searched by SEARCHER)
 - interpretation_guide.md (written by PLANNER)
 - data_path.txt (written by PLANNER)
 
@@ -54,14 +54,14 @@ PART1_MESSAGE = {
                 "- 1-4 Decoupler Pathway (pathway activity by cluster)\n"
                 "- 1-5 MISTy (pathway-celltype spatial relationships)\n\n"
                 "Input files:\n"
-                "- /part1_papers.json (Part 1 literature)\n"
+                "- /papers.json (literature references)\n"
                 "- /interpretation_guide.md\n"
                 "- /data_path.txt\n\n"
                 "Output: **/part1_final.md** (MUST be written via write_file tool)\n\n"
                 "## MANDATORY WORKFLOW:\n"
                 "1. read_file('/data_path.txt') to get data directory\n"
                 "2. read_file('/interpretation_guide.md') for context\n"
-                "3. read_file('/part1_papers.json') to load citation source\n"
+                "3. read_file('/papers.json') to load citation source\n"
                 "4. load_analysis_data(data_dir=...) to get Part 1 analysis data\n"
                 "5. Write detailed interpretation for ALL 5 analyses (1-1, 1-2, 1-3, 1-4, 1-5)\n"
                 "6. validate_quality(interpretation=...) — target score >= 0.8\n"
@@ -94,7 +94,7 @@ PART1_MESSAGE = {
                 "- Link neighborhood enrichment z-scores to specific pathway activities (1-3 <-> 1-4)\n"
                 "- Explain how MISTy results validate or extend the pathway findings (1-5 <-> 1-4)\n"
                 "- Include at least 4 quantitative statistics per analysis\n"
-                "- Cite at least 4 PMIDs per analysis from /part1_papers.json\n\n"
+                "- Cite at least 4 PMIDs per analysis from /papers.json\n\n"
                 "## CRITICAL RULE:\n"
                 "You MUST call the **write_file** tool to save /part1_final.md.\n"
                 "Do NOT just output the interpretation as text — it must be persisted to disk.\n\n"

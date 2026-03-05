@@ -25,6 +25,7 @@ def _schema_path() -> Path:
 
 
 def _validate_contract(payload: dict[str, Any], errors: list[str]) -> bool:
+    initial_count = len(errors)
     if not isinstance(payload.get("project_meta"), dict):
         errors.append("project_meta must be an object")
     if not isinstance(payload.get("druggability_matrix"), list):
@@ -34,11 +35,11 @@ def _validate_contract(payload: dict[str, Any], errors: list[str]) -> bool:
 
     matrix = payload.get("druggability_matrix", [])
     for idx, row in enumerate(matrix):
-        for key in ("ligand", "receptor", "is_featured", "open_targets_score"):
+        for key in ("ligand", "receptor", "is_featured", "is_novel", "open_targets_score"):
             if key not in row:
                 errors.append(f"druggability_matrix[{idx}] missing required key: {key}")
 
-    return not errors
+    return len(errors) == initial_count
 
 
 @tool

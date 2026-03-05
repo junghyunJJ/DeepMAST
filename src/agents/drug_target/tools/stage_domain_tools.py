@@ -1,4 +1,4 @@
-"""Stage-specific domain tool wrappers for the 4-stage funnel."""
+"""Stage-specific domain tool wrappers for the 3-stage funnel."""
 
 from __future__ import annotations
 
@@ -17,8 +17,13 @@ logger = logging.getLogger(__name__)
 _SKILLS_DIR = Path(__file__).resolve().parents[4] / "skills"
 _TIMEOUT = 30
 
+_module_cache: dict[tuple[str, str], Any] = {}
+
 
 def _load_skill_module(skill_name: str, script_name: str, module_name: str):
+    cache_key = (skill_name, script_name)
+    if cache_key in _module_cache:
+        return _module_cache[cache_key]
     script_path = _SKILLS_DIR / skill_name / "scripts" / script_name
     if not script_path.exists():
         raise FileNotFoundError(f"Skill script not found: {script_path}")
@@ -27,6 +32,7 @@ def _load_skill_module(skill_name: str, script_name: str, module_name: str):
         raise ImportError(f"Could not load module spec for {script_path}")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    _module_cache[cache_key] = mod
     return mod
 
 
@@ -52,6 +58,7 @@ def query_cellxgene_lr_context(
         "disease": disease,
         "organism": organism,
         "executed": False,
+        "disease_matched": True,
         "cell_count": 0,
         "top_cell_types": [],
         "available_genes": [],
@@ -63,7 +70,7 @@ def query_cellxgene_lr_context(
         result["errors"].append(f"cellxgene_census unavailable: {exc}")
         return _as_json(result)
 
-    disease_safe = disease.replace("'", "\\'")
+    disease_safe = disease.replace("\\", "\\\\").replace("'", "\\'")
     try:
         with cellxgene_census.open_soma() as census:
             obs = cellxgene_census.get_obs(
@@ -73,6 +80,12 @@ def query_cellxgene_lr_context(
                 column_names=["cell_type"],
             )
             if len(obs) == 0:
+                result["disease_matched"] = False
+                result["errors"].append(
+                    f"Disease '{disease}' not matched in Census; "
+                    "falling back to ALL cells. Use list_census_diseases() "
+                    "to find the correct Census MONDO label."
+                )
                 obs = cellxgene_census.get_obs(
                     census,
                     organism,
@@ -92,7 +105,7 @@ def query_cellxgene_lr_context(
         result["executed"] = True
         result["cell_count"] = int(len(obs))
         if len(obs) > 0:
-            vc = obs["cell_type"].value_counts().head(5)
+            vc = obs["cell_type"].value_counts().head(20)
             result["top_cell_types"] = [
                 {"cell_type": str(name), "count": int(count)}
                 for name, count in vc.items()
@@ -102,6 +115,46 @@ def query_cellxgene_lr_context(
         )
     except Exception as exc:
         result["errors"].append(f"CELLxGENE query failed: {exc}")
+
+    return _as_json(result)
+
+
+@tool
+def list_census_diseases(organism: str = "homo_sapiens") -> str:
+    """List disease labels available in CELLxGENE Census for vocabulary matching."""
+    result: dict[str, Any] = {
+        "organism": organism,
+        "executed": False,
+        "diseases": [],
+        "errors": [],
+    }
+    try:
+        import cellxgene_census
+    except Exception as exc:
+        result["errors"].append(f"cellxgene_census unavailable: {exc}")
+        return _as_json(result)
+
+    try:
+        with cellxgene_census.open_soma() as census:
+            summary_df = (
+                census["census_info"]["summary_cell_counts"]
+                .read(column_names=["organism", "category", "label", "total_cell_count"])
+                .concat()
+                .to_pandas()
+            )
+        org_display = organism.replace("_", " ").lower()
+        mask = (
+            (summary_df["organism"].str.lower() == org_display)
+            & (summary_df["category"] == "disease")
+        )
+        diseases_df = summary_df[mask].sort_values("total_cell_count", ascending=False)
+        result["diseases"] = [
+            {"label": str(row["label"]), "total_cell_count": int(row["total_cell_count"])}
+            for _, row in diseases_df.iterrows()
+        ]
+        result["executed"] = True
+    except Exception as exc:
+        result["errors"].append(f"Census disease list query failed: {exc}")
 
     return _as_json(result)
 
@@ -325,8 +378,36 @@ def query_ensembl_vep_consequence(variant_ids: str, species: str = "human") -> s
     return _as_json(result)
 
 
+def _fetch_drug_indications_and_mechanism(
+    mod: Any, molecule_chembl_id: str
+) -> tuple[list[dict], str | None]:
+    """Fetch drug indications and mechanism of action for a molecule.
+
+    Returns (indications_list, mechanism_of_action_string).
+    """
+    indications: list[dict] = []
+    mechanism_of_action: str | None = None
+    try:
+        _drug_info, mechanisms, raw_indications = mod.get_drug_info(molecule_chembl_id)
+        for ind in raw_indications:
+            indications.append({
+                "efo_term": ind.get("efo_term") or ind.get("mesh_heading") or "",
+                "max_phase": ind.get("max_phase_for_ind"),
+                "mesh_heading": ind.get("mesh_heading") or "",
+            })
+        if mechanisms:
+            mechanism_of_action = mechanisms[0].get("mechanism_of_action")
+    except Exception as exc:
+        logger.debug("Indication/mechanism lookup failed for %s: %s", molecule_chembl_id, exc)
+    return indications, mechanism_of_action
+
+
 def _chembl_fallback(gene_symbol: str, max_drugs: int) -> list[dict]:
-    """Query ChEMBL for drugs targeting a gene (fallback when DrugBank unavailable)."""
+    """Query ChEMBL for drugs targeting a gene (fallback when DrugBank unavailable).
+
+    Each matched compound includes indications and mechanism_of_action
+    retrieved from the ChEMBL drug_indication and mechanism APIs.
+    """
     mod = _load_skill_module("chembl-database", "example_queries.py", "chembl_queries")
     targets = mod.search_targets_by_name(gene_symbol)
     if not targets:
@@ -346,11 +427,17 @@ def _chembl_fallback(gene_symbol: str, max_drugs: int) -> list[dict]:
             if not mol_id or mol_id in seen:
                 continue
             seen.add(mol_id)
+
+            # Fetch indication + mechanism for this compound
+            indications, moa = _fetch_drug_indications_and_mechanism(mod, mol_id)
+
             matches.append(
                 {
                     "chembl_id": mol_id,
                     "drug_name": act.get("molecule_pref_name") or mol_id,
                     "target_gene": gene_symbol.upper(),
+                    "mechanism_of_action": moa,
+                    "indications": indications,
                 }
             )
             if len(matches) >= cap:
@@ -374,7 +461,11 @@ def query_drugbank_target_profile(gene_symbol: str, max_drugs: int = 10) -> str:
     try:
         mod = _load_skill_module("drugbank-database", "drugbank_helper.py", "drugbank_helper")
         helper = mod.DrugBankHelper()
-        root = helper._get_root()  # noqa: SLF001 - library helper exposes this method
+        try:
+            root = helper._get_root()  # noqa: SLF001
+        except AttributeError:
+            result["errors"].append("DrugBank helper API incompatible — _get_root() unavailable")
+            raise
         ns = helper.NAMESPACE
         target_upper = gene_symbol.upper()
         matches = []
@@ -456,48 +547,30 @@ def query_pubmed_clinical_limitations(target_name: str, max_results: int = 5) ->
     return _as_json(result)
 
 
-@tool
-def query_alphafold_plddt(uniprot_id: str) -> str:
-    """Retrieve AlphaFold confidence summary (average pLDDT) by UniProt ID."""
-    result = {
-        "uniprot_id": uniprot_id,
-        "executed": False,
-        "entry_id": None,
-        "mean_plddt": None,
-        "errors": [],
-    }
-    api_url = f"https://alphafold.ebi.ac.uk/api/prediction/{uniprot_id}"
+def _try_load_parquet_module():
+    """Try to load opentargets_parquet module. Returns module or None."""
     try:
-        meta_resp = requests.get(api_url, timeout=_TIMEOUT)
-        meta_resp.raise_for_status()
-        rows = meta_resp.json()
-        if not rows:
-            result["errors"].append(f"No AlphaFold prediction found for {uniprot_id}")
-            return _as_json(result)
-
-        entry = rows[0]
-        entry_id = entry.get("entryId")
-        if not entry_id:
-            result["errors"].append("AlphaFold entryId missing")
-            return _as_json(result)
-
-        result["entry_id"] = entry_id
-        # Use plddtDocUrl (v6+) with fallback to legacy confidenceUrl
-        conf_url = (
-            entry.get("plddtDocUrl")
-            or entry.get("confidenceUrl")
-            or f"https://alphafold.ebi.ac.uk/files/{entry_id}-confidence_v6.json"
+        mod = _load_skill_module(
+            "opentargets-database", "opentargets_parquet.py", "opentargets_parquet"
         )
-        conf_resp = requests.get(conf_url, timeout=_TIMEOUT)
-        conf_resp.raise_for_status()
-        conf = conf_resp.json()
-        scores = conf.get("confidenceScore", [])
-        if scores:
-            result["mean_plddt"] = round(sum(scores) / len(scores), 3)
-        result["executed"] = True
+        if mod.is_available():
+            return mod
     except Exception as exc:
-        result["errors"].append(f"AlphaFold query failed: {exc}")
-    return _as_json(result)
+        logger.debug("Parquet module unavailable: %s", exc)
+    return None
+
+
+def _try_load_gwas_parquet_module():
+    """Try to load gwas_parquet module. Returns module or None."""
+    try:
+        mod = _load_skill_module(
+            "gwas-database", "gwas_parquet.py", "gwas_parquet"
+        )
+        if mod.is_available():
+            return mod
+    except Exception as exc:
+        logger.debug("GWAS parquet module unavailable: %s", exc)
+    return None
 
 
 @tool
@@ -510,7 +583,11 @@ def query_opentargets_target(gene_symbol: str, disease: str) -> str:
         "errors": [],
     }
     try:
-        mod = _load_skill_module("opentargets-database", "query_opentargets.py", "query_opentargets")
+        # Parquet-first, API fallback
+        pq_mod = _try_load_parquet_module()
+        mod = pq_mod or _load_skill_module(
+            "opentargets-database", "query_opentargets.py", "query_opentargets"
+        )
 
         # 1. Gene → Ensembl ID
         hits = mod.search_entities(gene_symbol, entity_types=["target"])
@@ -543,7 +620,11 @@ def query_opentargets_known_drugs(disease: str) -> str:
     """Get known drugs for a disease from OpenTargets."""
     result = {"disease": disease, "executed": False, "efo_id": None, "drugs": {}, "errors": []}
     try:
-        mod = _load_skill_module("opentargets-database", "query_opentargets.py", "query_opentargets")
+        # Parquet-first, API fallback
+        pq_mod = _try_load_parquet_module()
+        mod = pq_mod or _load_skill_module(
+            "opentargets-database", "query_opentargets.py", "query_opentargets"
+        )
         hits = mod.search_entities(disease, entity_types=["disease"])
         if not hits:
             result["errors"].append(f"No disease found for '{disease}'")
@@ -567,52 +648,81 @@ def query_gwas_gene_trait(gene_symbol: str, disease: str) -> str:
         "errors": [],
     }
     try:
-        mod = _load_skill_module("gwas-database", "gwas_api.py", "gwas_api")
+        # Parquet-first, API fallback
+        pq_mod = _try_load_gwas_parquet_module()
+        mod = pq_mod or _load_skill_module("gwas-database", "gwas_api.py", "gwas_api")
 
-        # 1. Disease → EFO traits
+        # 1. Disease → EFO traits (exact + synonym search for EFO/MONDO coverage)
         traits = mod.search_efo_traits(disease)
+        # Cancer/carcinoma are common synonyms in ontologies; try both
+        _synonyms = {"cancer": "carcinoma", "carcinoma": "cancer"}
+        disease_lower = disease.lower()
+        for old, new in _synonyms.items():
+            if old in disease_lower:
+                alt = disease_lower.replace(old, new)
+                alt_traits = mod.search_efo_traits(alt)
+                seen_ids = {t.get("shortForm") for t in traits}
+                for t in alt_traits:
+                    if t.get("shortForm") not in seen_ids and "error" not in t:
+                        traits.append(t)
         result["efo_traits"] = traits[:5]
 
-        # 2. Trait associations (if valid trait found)
-        if traits and "error" not in traits[0]:
-            efo_id = traits[0]["shortForm"]
-            result["trait_associations"] = mod.get_trait_associations(efo_id, max_results=50)
+        # 2. Trait associations from ALL matching EFO/MONDO IDs
+        #    Different ontologies (EFO vs MONDO) have different gene annotations
+        all_trait_assocs: list[dict] = []
+        seen_rsids: set[str] = set()
+        for t in traits[:5]:
+            if "error" in t:
+                continue
+            efo_id = t.get("shortForm", "")
+            if not efo_id:
+                continue
+            for ta in mod.get_trait_associations(efo_id, max_results=500):
+                rsid = ta.get("rsId", "")
+                if rsid and rsid in seen_rsids:
+                    continue
+                if rsid:
+                    seen_rsids.add(rsid)
+                all_trait_assocs.append(ta)
+        result["trait_associations"] = all_trait_assocs
 
         # 3. Gene-specific variants
         result["gene_associations"] = mod.get_gene_associations(gene_symbol)
+
+        # 4. Disease-specific cross-filtering
+        trait_assocs = result["trait_associations"]
+        gene_assocs = result["gene_associations"]
+        gene_upper = gene_symbol.upper()
+
+        # Method A: trait SNPs where this gene is author-reported
+        gene_in_trait = [
+            ta for ta in trait_assocs
+            if gene_upper in [g.upper() for g in ta.get("genes", [])]
+        ]
+
+        # Method B: gene SNPs whose rsId also appears in trait SNPs
+        trait_rsids = {ta["rsId"] for ta in trait_assocs if ta.get("rsId")}
+        gene_snps_in_disease = [
+            ga for ga in gene_assocs
+            if ga.get("rsId") in trait_rsids
+        ]
+
+        result["disease_specific_hits"] = {
+            "gene_in_trait_associations": gene_in_trait,
+            "gene_snps_in_disease": gene_snps_in_disease,
+            "n_gene_in_trait": len(gene_in_trait),
+            "n_gene_snps_in_disease": len(gene_snps_in_disease),
+        }
+
         result["executed"] = True
     except Exception as exc:
         result["errors"].append(f"GWAS query failed: {exc}")
     return _as_json(result)
 
 
-@tool
-def run_diffdock_screen(
-    protein_path: str,
-    ligand_smiles: str,
-    out_dir: str = "",
-    samples_per_complex: int = 10,
-) -> str:
-    """Fail-soft DiffDock launcher placeholder for Stage 4 gating."""
-    result = {
-        "protein_path": protein_path,
-        "ligand_smiles": ligand_smiles,
-        "out_dir": out_dir,
-        "samples_per_complex": samples_per_complex,
-        "executed": False,
-        "binding_affinity": None,
-        "errors": [
-            (
-                "DiffDock execution is not available in this environment. "
-                "Install DiffDock locally to enable in-silico docking."
-            )
-        ],
-    }
-    return _as_json(result)
-
-
 __all__ = [
     "query_cellxgene_lr_context",
+    "list_census_diseases",
     "query_kegg_pathways",
     "query_reactome_pathways",
     "query_string_ppi_pair",
@@ -622,7 +732,5 @@ __all__ = [
     "query_gwas_gene_trait",
     "query_drugbank_target_profile",
     "query_pubmed_clinical_limitations",
-    "query_alphafold_plddt",
-    "run_diffdock_screen",
 ]
 

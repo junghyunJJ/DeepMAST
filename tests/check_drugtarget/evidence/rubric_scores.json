@@ -1,0 +1,128 @@
+{
+  "TGFB1": {
+    "assessment": {
+      "gene": "TGFB1",
+      "validated_track": {
+        "existing_drug_evidence": {
+          "score": 2,
+          "rationale": "approved_SM=False, approved_AB=False, advanced=True"
+        },
+        "clinical_trial_activity": {
+          "score": 2,
+          "rationale": "advanced=True, phase1=False, evidence_count=100"
+        },
+        "mechanism_relevance": {
+          "score": 3,
+          "rationale": "disease_evidence=100"
+        },
+        "safety_profile": {
+          "score": 0,
+          "rationale": "No known safety signals"
+        }
+      },
+      "exploratory_track": {
+        "gwas_genetic_support": {
+          "score": 1,
+          "rationale": "genome-wide significant hits: 0"
+        },
+        "tractability": {
+          "score": 3,
+          "rationale": "SM=True, AB=True"
+        },
+        "biological_plausibility": {
+          "score": 3,
+          "rationale": "associations=100"
+        },
+        "novelty_opportunity": {
+          "score": 1,
+          "rationale": "no approved drug = True"
+        }
+      }
+    },
+    "validated_track": {
+      "scores": {
+        "existing_drug_evidence": 2,
+        "clinical_trial_activity": 2,
+        "mechanism_relevance": 3,
+        "safety_profile": 0
+      },
+      "total": 7,
+      "pass": true
+    },
+    "exploratory_track": {
+      "scores": {
+        "gwas_genetic_support": 1,
+        "tractability": 3,
+        "biological_plausibility": 3,
+        "novelty_opportunity": 1
+      },
+      "total": 8,
+      "pass": true
+    },
+    "classification": "validated_target",
+    "priority": "high"
+  },
+  "TGFBR2": {
+    "assessment": {
+      "gene": "TGFBR2",
+      "validated_track": {
+        "existing_drug_evidence": {
+          "score": 1,
+          "rationale": "approved_SM=False, approved_AB=False, advanced=False"
+        },
+        "clinical_trial_activity": {
+          "score": 1,
+          "rationale": "advanced=False, phase1=False, evidence_count=100"
+        },
+        "mechanism_relevance": {
+          "score": 3,
+          "rationale": "disease_evidence=100"
+        },
+        "safety_profile": {
+          "score": 0,
+          "rationale": "No known safety signals"
+        }
+      },
+      "exploratory_track": {
+        "gwas_genetic_support": {
+          "score": 1,
+          "rationale": "genome-wide significant hits: 0"
+        },
+        "tractability": {
+          "score": 3,
+          "rationale": "SM=True, AB=True"
+        },
+        "biological_plausibility": {
+          "score": 3,
+          "rationale": "associations=100"
+        },
+        "novelty_opportunity": {
+          "score": 1,
+          "rationale": "no approved drug = True"
+        }
+      }
+    },
+    "validated_track": {
+      "scores": {
+        "existing_drug_evidence": 1,
+        "clinical_trial_activity": 1,
+        "mechanism_relevance": 3,
+        "safety_profile": 0
+      },
+      "total": 5,
+      "pass": true
+    },
+    "exploratory_track": {
+      "scores": {
+        "gwas_genetic_support": 1,
+        "tractability": 3,
+        "biological_plausibility": 3,
+        "novelty_opportunity": 1
+      },
+      "total": 8,
+      "pass": true
+    },
+    "classification": "validated_target",
+    "priority": "medium"
+  }
+}

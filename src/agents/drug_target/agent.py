@@ -1,15 +1,15 @@
 """Drug Target Assessment Agent using DeepAgents framework.
 
-2-Subagent Architecture with 4-Stage Funnel:
-1. EVIDENCE_ASSESSOR: 4-stage funnel (biological context -> validation & scoring ->
-   deep dive -> structural druggability) with inline rubric assessment
+2-Subagent Architecture with 3-Stage Funnel:
+1. EVIDENCE_ASSESSOR: 3-stage funnel (biological context -> validation & scoring ->
+   deep dive) with inline rubric assessment
 2. REPORT_WRITER: Generate drug.md with featured candidate emphasis
 
 All database queries are wrapped as @tool functions that run on the host process.
 Docker backend is OPTIONAL — set docker_image in DrugTargetConfig to enable
-container-level isolation for heavy-dependency tools (Census, DiffDock).
+container-level isolation for heavy-dependency tools (Census).
 
-Input: lr_candidates.json (top-15 L-R pairs) + selected_top3_lr.json + disease context
+Input: lr_candidates.json (top-30 L-R pairs) + disease context
 Output: drug.md (markdown for HTML report integration)
 """
 
@@ -48,29 +48,27 @@ logger = logging.getLogger(__name__)
 ORCHESTRATOR_SYSTEM_PROMPT = """You are the Drug Target Assessment orchestrator.
 
 Your task is to coordinate 2 specialized subagents to produce a comprehensive
-therapeutic target assessment report (drug.md) using a 4-stage funnel approach.
+therapeutic target assessment report (drug.md) using a 3-stage funnel approach.
 
 ## CRITICAL: First Action
 You MUST call the `load_lr_candidates` tool with the data_dir from the user message
-as your VERY FIRST action. This loads lr_candidates.json and selected_top3_lr.json,
-extracts gene symbols, and returns structured data. Do NOT use `ls` or `read_file`
-to check the directory -- always use `load_lr_candidates`.
+as your VERY FIRST action. This loads lr_candidates.json, extracts gene symbols,
+and returns structured data. Do NOT use `ls` or `read_file` to check the directory
+-- always use `load_lr_candidates`.
 
 ## Workflow
 Execute subagents strictly in this order via the `task` tool:
 
-1. **evidence_assessor**: Pass the load_lr_candidates output. Runs the 4-stage funnel:
+1. **evidence_assessor**: Pass the load_lr_candidates output. Runs the 3-stage funnel:
    - Stage 1 (ALL pairs): Biological context (Cellxgene, KEGG/Reactome, STRING, Census)
    - Stage 2 (ALL pairs): Validation & scoring (OpenTargets, VEP, GWAS) + inline rubric
    - Stage 3 (FEATURED only): Deep dive (DrugBank, PubMed)
-   - Stage 4 (FEATURED only): Structural druggability (AlphaFold, DiffDock)
 2. **report_writer**: Generates drug.md with [FEATURED] Candidate emphasis.
    The report_writer MUST first save target_assessment.json via
    `save_target_assessment`, then call `write_file` to save drug.md.
 
 ## Input
-- lr_candidates.json: Top-15 L-R pairs from CCI analysis
-- selected_top3_lr.json: Top-3 L-R pairs selected for detailed analysis
+- lr_candidates.json: Top-30 L-R pairs from CCI analysis
 - Disease context provided in initial message
 
 ## Output
@@ -82,7 +80,7 @@ Execute subagents strictly in this order via the `task` tool:
 - ALWAYS start with `load_lr_candidates` -- never skip this step
 - Execute subagents in ORDER: evidence_assessor -> report_writer
 - Each subagent uses Plan->Execute->Reflect cycle
-- selected_top3_lr genes are [FEATURED] Featured Candidates throughout
+- [FEATURED] candidates are determined by rubric scoring (combined_total)
 - The final drug.md must be self-contained markdown for HTML report integration
 """
 
@@ -110,9 +108,7 @@ class DrugTargetConfig:
             "DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace"
         )
     )
-    disease: str = ""
-    max_iterations: int = 2
-    quality_threshold: float = 0.7
+    disease: str = ""  # Currently passed via user message, not injected into agent
     use_checkpointer: bool = False
     custom_tools: Sequence[BaseTool] = field(default_factory=list)
     docker_image: str | None = None
@@ -146,7 +142,10 @@ def _find_project_root() -> Path:
     for parent in current.parents:
         if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
             return parent
-    return current.parents[3]
+    raise FileNotFoundError(
+        f"Could not find project root from {current}. "
+        "Ensure pyproject.toml or .git exists in a parent directory."
+    )
 
 
 def create_drug_target_agent(
@@ -171,7 +170,8 @@ def create_drug_target_agent(
         config = DrugTargetConfig()
 
     resolved_data_dir = str(Path(config.data_dir).expanduser().resolve())
-    os.environ["DEEP_INTERPRETER_DATA_DIR"] = resolved_data_dir
+    # data_dir is passed explicitly through config and injected into subagent prompts;
+    # no os.environ mutation needed.
 
     # Ensure evidence directory exists
     evidence_dir = Path(resolved_data_dir) / "evidence"

@@ -213,7 +213,7 @@ class TestPrioritizeTool:
         })
 
         parsed = json.loads(result)
-        assert "candidate_pairs" in parsed or "error" in parsed
+        assert "pairs" in parsed or "error" in parsed
 
     def test_tool_missing_file_error(self, monkeypatch):
         """Test tool handles missing file gracefully."""
@@ -249,7 +249,7 @@ class TestPrioritizeTool:
                 "candidate_count": 2,
             })
             parsed = json.loads(result)
-            interactions = [pair["interaction"] for pair in parsed["candidate_pairs"]]
+            interactions = [pair["interaction"] for pair in parsed["pairs"]]
             # combinedscore ranking: L3 (0.99) > L2 (0.20) > L1 (0.10)
             assert interactions == ["L3^R3", "L2^R2"]
 
@@ -432,7 +432,7 @@ class TestLRCandidatesJsonPersistence:
             assert candidates_file.exists(), "lr_candidates.json should be created"
 
     def test_lr_candidates_json_contains_expected_fields(self):
-        """Verify saved file has candidate_pairs, selection_mode, exclusion_level."""
+        """Verify saved file has pairs, selection_mode, exclusion_level."""
         from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -454,10 +454,10 @@ class TestLRCandidatesJsonPersistence:
             with open(data_dir / "lr_candidates.json") as f:
                 saved = json.load(f)
 
-            assert "candidate_pairs" in saved
+            assert "pairs" in saved
             assert "selection_mode" in saved
             assert "exclusion_level" in saved
-            assert isinstance(saved["candidate_pairs"], list)
+            assert isinstance(saved["pairs"], list)
 
 
 class TestSaveSelectedLRPairs:
@@ -1464,7 +1464,7 @@ class TestHubGenePenalty:
         assert result.iloc[1] == 0  # NOVEL is not
 
     def test_tool_output_includes_hub_and_novelty(self):
-        """candidate_pairs should include hub_gene_count and novelty_score fields."""
+        """pairs should include hub_gene_count and novelty_score fields."""
         from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1491,7 +1491,7 @@ class TestHubGenePenalty:
                 "data_dir": str(data_dir),
                 "candidate_count": 5,
             }))
-            pairs = result["candidate_pairs"]
+            pairs = result["pairs"]
             assert all("hub_gene_count" in p for p in pairs)
             assert all("novelty_score" in p for p in pairs)
 
@@ -1524,7 +1524,7 @@ class TestHubGenePenalty:
                 "data_dir": str(data_dir),
                 "candidate_count": 10,
             }))
-            pairs = result["candidate_pairs"]
+            pairs = result["pairs"]
             # NOVEL_L^R2 (novelty=0.45) should rank above TP53^R1 (novelty=0.40)
             assert pairs[0]["interaction"] == "NOVEL_L^R2"
             assert pairs[0]["hub_gene_count"] == 0
@@ -1550,7 +1550,7 @@ class TestHubGenePenalty:
                 "data_dir": str(data_dir),
                 "candidate_count": 5,
             }))
-            for pair in result["candidate_pairs"]:
+            for pair in result["pairs"]:
                 assert pair["hub_gene_count"] == 0
                 assert pair["novelty_score"] == pair["combinedscore"]
 

@@ -1,0 +1,100 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Helvetica, Arial",
+    "primaryColor": "#f5f7fa",
+    "primaryBorderColor": "#c9d1d9",
+    "lineColor": "#9aa4b2",
+    "secondaryColor": "#eef2f7",
+    "tertiaryColor": "#ffffff"
+  }
+}}%%
+
+flowchart TB
+
+%% =========================
+%% User
+%% =========================
+
+User["👤 User: I need to<br/>analyze Visium..."]:::user
+
+%% =========================
+%% Supervisor Agent
+%% =========================
+
+Supervisor["Supervisor<br/>Agent"]:::supervisor
+
+%% =========================
+%% Expert Agent Layer
+%% =========================
+
+subgraph ExpertAgent["Expert Agent"]
+    direction LR
+
+    subgraph PB["1. Pipeline Builder"]
+        pb_mcp["MCP Client"]:::mcp_client
+    end
+
+    subgraph PE["2. Pipeline Executor"]
+        pe_mcp["MCP Client"]:::mcp_client
+    end
+
+    subgraph BI["3. Biological Interpreter"]
+        bi_mcp["MCP Client"]:::mcp_client
+    end
+end
+
+%% =========================
+%% MCP Protocol
+%% =========================
+
+MCP_Proto(["MCP"]):::mcp_proto
+
+%% =========================
+%% MCP Server Layer
+%% =========================
+
+subgraph MCPServer["MCP Server"]
+    direction LR
+
+    S1["1. Article-<br/>download"]:::mcp_tool
+    S2["2. MAST-RAG"]:::mcp_tool
+    S3["3. rMCPAgent"]:::mcp_tool
+    S4["4. SC-reference-<br/>selector"]:::mcp_tool
+    S5["5. ST-CCI"]:::mcp_tool
+end
+
+%% =========================
+%% Flow Connections
+%% =========================
+
+User --> Supervisor
+Supervisor <--> PB
+Supervisor <--> PE
+Supervisor <--> BI
+
+pb_mcp --- MCP_Proto
+pe_mcp --- MCP_Proto
+bi_mcp --- MCP_Proto
+
+MCP_Proto --- S1
+MCP_Proto --- S2
+MCP_Proto --- S3
+MCP_Proto --- S4
+MCP_Proto --- S5
+
+%% =========================
+%% Style Definitions
+%% =========================
+
+classDef user fill:#ffffff,stroke:#9aa4b2,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+classDef supervisor fill:#4a86c8,stroke:#3a6ea5,stroke-width:2px,rx:12,ry:12,color:#ffffff
+classDef mcp_client fill:#d6e4f0,stroke:#90b4d2,stroke-width:1.2px,rx:8,ry:8,color:#1f2933
+classDef mcp_proto fill:#8bc34a,stroke:#689f38,stroke-width:2px,rx:15,ry:15,color:#ffffff
+classDef mcp_tool fill:#fff3cd,stroke:#f0c040,stroke-width:1.5px,rx:10,ry:10,color:#1f2933
+
+style ExpertAgent fill:#d6e4f0,stroke:#90b4d2,stroke-width:2px,rx:16,ry:16
+style PB fill:#b8d4e8,stroke:#7baac4,stroke-width:1.5px,rx:12,ry:12
+style PE fill:#b8d4e8,stroke:#7baac4,stroke-width:1.5px,rx:12,ry:12
+style BI fill:#b8d4e8,stroke:#7baac4,stroke-width:1.5px,rx:12,ry:12
+style MCPServer fill:#fff8e1,stroke:#f0c040,stroke-width:2px,rx:16,ry:16

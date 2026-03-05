@@ -9,7 +9,7 @@ Architecture:
         -> DrugTargetAgent (2 subagents)
              evidence_assessor -> report_writer
 
-Input: lr_candidates.json (top-15 L-R pairs) + selected_top3_lr.json + disease context
+Input: lr_candidates.json (top-30 L-R pairs) + disease context
 Output: drug.md (markdown for HTML report integration)
 """
 

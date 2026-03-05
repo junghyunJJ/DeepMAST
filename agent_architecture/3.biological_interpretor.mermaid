@@ -1,65 +1,99 @@
 graph TD
-    %% Node
+    %% Nodes
     __start__([<p>__start__</p>]):::first
-    
-    sc_data["ST analysis<br/>resutls"]
 
+    st_data["ST Analysis<br/>Results"]
+    hitl_node{{"HITL<br/>(4 interrupts)"}}
 
-    subgraph react_agent2["Deep agnet"]
-        Query2[<b>🗨️ Query</b>]
-        Thinking2{<b>🧠<br/>Biological<br/>Interpreter</b>}
-        Tool2[<b>🔧 Tool</b>]
-        Answer2[<b>📝 Answer</b>]
-        
-        Query2 --> Thinking2
-        Thinking2 -.->|<b>Action</b>| Tool2
-        Thinking2 -.->|<b>Finish</b>| Answer2
-        Tool2 -->|<b>Observation</b>| Thinking2
+    subgraph deep_agent["Deep Agent (4-Subagent Sequential Pipeline)"]
 
-        subgraph Tool2[MCP tools]
-            mcp_cci[ST-CCI]
-            mcp_down[Article<br/>Download]
-            mcp_rag[CCI-RAG]
-            mcp_st2[Sequential<br/>Thinking]
-            mcp_biomcp["BioMCP<br/>(Article Search)"]
-            
+        subgraph planner_group["① Planner"]
+            Planner{<b>🧠<br/>Planner</b>}
+            pt1[load_analysis<br/>_data]
+            pt2[search_literature<br/>_dynamic]
+
+            Planner -.->|<b>Action</b>| pt1
+            Planner -.->|<b>Action</b>| pt2
         end
+
+        subgraph searcher_group["② Searcher"]
+            Searcher{<b>🧠<br/>Searcher</b>}
+            st1[search_literature<br/>_dynamic]
+            st2["BioMCP<br/>(Article Search)"]
+            st3[Biomedical<br/>Thinking]
+
+            Searcher -.->|<b>Action</b>| st1
+            Searcher -.->|<b>Action</b>| st2
+            Searcher -.->|<b>Action</b>| st3
+        end
+
+        subgraph interp_group["③ Interpreter (×3 separate calls)"]
+            Interp1[<b>📝 Part 1</b><br/>Spatial &<br/>Pathway]
+            Interp2[<b>📝 Part 2</b><br/>CCI &<br/>NMF]
+            Interp3[<b>📝 Part 3</b><br/>L-R Pairs]
+            it1[validate<br/>_quality]
+            it2[validate_claim<br/>_literature]
+            it3[Reflection<br/>Tool]
+            it4[prioritize_top<br/>_lr_pairs]
+
+            Interp1 -.-> it1
+            Interp2 -.-> it2
+            Interp3 -.-> it4
+        end
+
+        subgraph reporter_group["④ Reporter"]
+            Reporter{<b>🧠<br/>Reporter</b>}
+            rt1[generate_html<br/>_report]
+            rt2[validate<br/>_quality]
+            rt3[search_literature<br/>_dynamic]
+            rt4[run_drug_target<br/>_assessment]
+
+            Reporter -.->|<b>Action</b>| rt1
+            Reporter -.->|<b>Action</b>| rt4
+        end
+
+        %% Sequential pipeline flow
+        Planner -->|interpretation_guide.md| Searcher
+        Searcher -->|papers.json| Interp1
+        Interp1 --> Interp2
+        Interp2 --> Interp3
+        Interp3 -->|partN_final.md| Reporter
     end
 
-    
-    final_report["Final<br/>HTML reports"]
-
+    drug_target["DrugTarget<br/>Agent"]
+    final_report["CCI Analysis<br/>Report (HTML)"]
     __end__([<p>__end__</p>]):::last
 
+    %% Main flow
+    __start__ --> st_data
+    st_data --> hitl_node
+    hitl_node --> Planner
+    rt4 -.->|<b>Phase 4.7</b>| drug_target
+    Reporter --> final_report
+    final_report --> __end__
 
-    %% Flow
-    __start__ --> sc_data
-    sc_data --> Query2
-    Answer2 --> final_report
-
-    final_report -.->|<b>Countinue</b>| Thinking2
-    final_report -.->|<b>Finish</b>| __end__
-
-    %% color
-    classDef validate_infoNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
+    %% Colors (matching 1.pipeline_builder & 2.new_pipeline_executor)
     classDef default fill:#2d2d3d,stroke:#fff,stroke-width:2px,color:#fff
-    classDef queryNode fill:#ff7f50,stroke:#fff,stroke-width:2px,color:#000
     classDef thinkingNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
-    classDef toolNode fill:#d3d3d3,stroke:#fff,stroke-width:2px,color:#000
-    classDef answerNode fill:#ffd700,stroke:#fff,stroke-width:2px,color:#000
+    classDef interpNode fill:#ff7f50,stroke:#fff,stroke-width:2px,color:#000
     classDef inReAtc fill:#ab47bc,stroke:#fff,stroke-width:2px,color:#000
     classDef humanNode fill:#4dabf7,stroke:#fff,stroke-width:2px,color:#000
+    classDef answerNode fill:#ffd700,stroke:#fff,stroke-width:2px,color:#000
+    classDef subtoolNode fill:#555577,stroke:#aaa,stroke-width:1px,color:#ddd
 
+    class st_data,final_report inReAtc
+    class Planner,Searcher,Reporter thinkingNode
+    class Interp1,Interp2,Interp3 interpNode
+    class hitl_node humanNode
+    class drug_target answerNode
+    class pt1,pt2 subtoolNode
+    class st1,st2,st3 subtoolNode
+    class it1,it2,it3,it4 subtoolNode
+    class rt1,rt2,rt3,rt4 subtoolNode
 
-    class sc_data,final_report inReAtc
-    class Platform validate_infoNode
-    class Query1,Query2 queryNode
-    class Thinking1,Thinking2 thinkingNode
-    class Tool1,Tool2 toolNode
-    class Answer1,Answer2 answerNode
-    class human_node humanNode
-
-    %% HITL 선 스타일 (파란 긴 대시)
-    %% linkStyle 11 stroke:#0000FF,stroke-width:2px,stroke-dasharray:15 5
-    style react_agent2 fill:#e1bee7,stroke:#9c27b0,stroke-width:2px
-    %% style react_agent1 fill:#bbdefb,stroke:#1976d2,stroke-width:2px
+    %% Subgraph styles
+    style deep_agent fill:#e1bee7,stroke:#9c27b0,stroke-width:2px
+    style planner_group fill:#2a2a3a,stroke:#90ee90,stroke-width:1px
+    style searcher_group fill:#2a2a3a,stroke:#90ee90,stroke-width:1px
+    style interp_group fill:#2a2a3a,stroke:#ff7f50,stroke-width:1px
+    style reporter_group fill:#2a2a3a,stroke:#90ee90,stroke-width:1px

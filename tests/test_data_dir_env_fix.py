@@ -153,7 +153,7 @@ class TestAutoSaveErrorSignal:
                 disease="cancer",
                 max_results=5,
                 max_iterations=1,
-                output_path="part1_papers.json",
+                output_path="papers.json",
                 data_dir="",
             )
 
@@ -227,9 +227,9 @@ class TestReaderSites:
         """literature_rag._resolve_papers_path should fall back to env var."""
         # Create a test file in the env-specified directory
         monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", str(tmp_path))
-        papers_file = tmp_path / "part1_papers.json"
+        papers_file = tmp_path / "papers.json"
         papers_file.write_text("{}")
 
         from src.agents.deep_interpreter.tools.literature_rag import _resolve_papers_path
-        result = _resolve_papers_path("/part1_papers.json", data_dir="")
+        result = _resolve_papers_path("/papers.json", data_dir="")
         assert result == str(papers_file.resolve())

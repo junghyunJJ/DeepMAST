@@ -182,21 +182,26 @@ def get_trait_associations(efo_id: str, p_threshold: float = 5e-8,
         if pval_float > p_threshold:
             continue
 
-        # Extract gene names from loci -> strongestRiskAlleles or SNP links
+        # Extract rsId and gene names from loci
+        rs_ids: list[str] = []
         genes: list[str] = []
         for locus in assoc.get("loci", []):
             for allele in locus.get("strongestRiskAlleles", []):
                 risk_allele = allele.get("riskAlleleName", "")
                 if risk_allele:
-                    # Risk allele format is typically "rs12345-A"
-                    pass
+                    # Risk allele format is "rs12345-A" or "rs12345-?"
+                    parts = risk_allele.split("-")
+                    if parts[0].startswith("rs") and parts[0] not in rs_ids:
+                        rs_ids.append(parts[0])
             for gene_entry in locus.get("authorReportedGenes", []):
                 gene_name = gene_entry.get("geneName", "")
                 if gene_name and gene_name not in genes:
                     genes.append(gene_name)
 
+        top_rsid = rs_ids[0] if rs_ids else ""
+
         results.append({
-            "rsId": assoc.get("rsId", ""),
+            "rsId": top_rsid,
             "pvalue": pval_float,
             "pvalueMantissa": assoc.get("pvalueMantissa"),
             "pvalueExponent": assoc.get("pvalueExponent"),
