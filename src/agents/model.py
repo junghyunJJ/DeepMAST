@@ -115,7 +115,7 @@ def create_ollama_llm(**kwargs) -> ChatOllama:
     temperature = kwargs.get("temperature", 0)
     
     num_ctx = kwargs.get("num_ctx", 65536)
-    num_predict = kwargs.get("num_predict", 16384)
+    num_predict = kwargs.get("num_predict", -1)  # unlimited; prevents truncated tool call JSON (#14570)
 
     llm = ChatOllama(
         model=model,

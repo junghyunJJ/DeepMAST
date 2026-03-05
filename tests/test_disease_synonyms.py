@@ -1,29 +1,21 @@
-"""Tests for universal disease synonym matching in literature.py."""
+"""Tests for lightweight disease post-filter in literature.py.
 
-import asyncio
+Tests the hybrid approach: simple rule-based pre-filter + LLM relevance filter.
+"""
+
+import json
 import pytest
 
 from src.agents.deep_interpreter.tools.literature import (
     _normalize_for_filter,
-    _generate_disease_match_terms,
-    _parse_disease_synonyms,
-    _resolve_mondo_id,
-    _get_disease_synonyms_async,
-    get_disease_match_terms,
-    _paper_matches_disease_context,
-    _DISEASE_SYNONYM_CACHE,
-    _DISEASE_SYNONYM_CACHE_LOCK,
-    _resolve_uberon_organ_synonyms,
-    _get_organ_synonyms,
-    _ORGAN_SYNONYM_CACHE,
-    _ORGAN_SYNONYM_CACHE_LOCK,
-    _extract_organ_tokens,
-    _UBERON_STOPWORDS,
+    _paper_matches_disease_context_simple,
+    _llm_disease_relevance_filter,
+    _ORGAN_TO_MEDICAL,
 )
 
 
 # =============================================================================
-# Step 0: Regex bug fix
+# _normalize_for_filter
 # =============================================================================
 class TestNormalizeForFilter:
     def test_apostrophe_collapse(self):
@@ -43,308 +35,231 @@ class TestNormalizeForFilter:
 
 
 # =============================================================================
-# Step 3: _generate_disease_match_terms (rule-based)
+# _paper_matches_disease_context_simple — canonical match tests
 # =============================================================================
-class TestGenerateDiseaseMatchTerms:
-    def test_breast_cancer(self):
-        terms = _generate_disease_match_terms("breast cancer")
-        assert "breast carcinoma" in terms
-        assert "breast neoplasm" in terms
-        assert any("mammary" in t for t in terms)
-
-    def test_alzheimers(self):
-        terms = _generate_disease_match_terms("Alzheimer's disease")
-        assert "alzheimer" in terms
-        assert "alzheimers" in terms
-        assert "alzheimer disease" in terms
-        assert "ad" in terms
-
-    def test_aml_abbreviation(self):
-        terms = _generate_disease_match_terms("AML")
-        assert "acute myeloid leukemia" in terms
-        assert "acute myeloid leukaemia" in terms
-
-    def test_pulmonary_fibrosis(self):
-        terms = _generate_disease_match_terms("pulmonary fibrosis")
-        assert "pulmonary fibrotic" in terms
-        assert any("lung" in t and "fibrosis" in t for t in terms)
-
-    def test_hepatocellular_carcinoma(self):
-        terms = _generate_disease_match_terms("hepatocellular carcinoma")
-        assert "hcc" in terms
-        assert any("cancer" in t for t in terms)
-        assert any("liver" in t for t in terms)
-
-    def test_dlbcl(self):
-        terms = _generate_disease_match_terms("diffuse large B-cell lymphoma")
-        assert "dlbcl" in terms
-
-    def test_unknown_disease(self):
-        terms = _generate_disease_match_terms("Xylothrax syndrome")
-        assert len(terms) >= 1
-        assert "xylothrax syndrome" in terms
-
-    def test_empty(self):
-        assert _generate_disease_match_terms("") == []
-
-    def test_leukemia_uk_spelling(self):
-        terms = _generate_disease_match_terms("acute myeloid leukemia")
-        assert "acute myeloid leukaemia" in terms
-        assert "aml" in terms
-
-    def test_parkinson(self):
-        terms = _generate_disease_match_terms("Parkinson's disease")
-        assert "parkinson" in terms
-        assert "pd" in terms
-
-    def test_tumor_tumour(self):
-        terms = _generate_disease_match_terms("brain tumor")
-        assert any("tumour" in t for t in terms)
-        assert any("cancer" in t for t in terms)
-
-    def test_organ_forward_mapping(self):
-        """Common organ → medical term."""
-        terms = _generate_disease_match_terms("liver cancer")
-        assert any("hepatic" in t or "hepatocellular" in t for t in terms)
-
-    def test_organ_reverse_mapping(self):
-        """Medical term → common organ (for match generation)."""
-        terms = _generate_disease_match_terms("renal cell carcinoma")
-        assert any("kidney" in t for t in terms)
-
-    def test_fibrotic_to_fibrosis(self):
-        terms = _generate_disease_match_terms("pulmonary fibrotic")
-        assert "pulmonary fibrosis" in terms
-
-    def test_inflammatory(self):
-        terms = _generate_disease_match_terms("ulcerative colitis")
-        assert "uc" in terms
-
-    def test_lupus(self):
-        terms = _generate_disease_match_terms("systemic lupus erythematosus")
-        assert "sle" in terms
-
-    def test_no_duplicates(self):
-        terms = _generate_disease_match_terms("breast cancer")
-        assert len(terms) == len(set(terms))
-
-
-# =============================================================================
-# Step 2: BioMCP response parsing
-# =============================================================================
-class TestParseDiseaseSyms:
-    def test_markdown_format(self):
-        result = [{"type": "text", "text": (
-            "# Disease\nName: Breast carcinoma\n"
-            "Synonym: breast cancer, mammary carcinoma, mammary cancer\n"
-        )}]
-        syns = _parse_disease_synonyms(result)
-        assert "breast cancer" in syns
-        assert "mammary carcinoma" in syns
-        assert "Breast carcinoma" in syns  # from Name field
-
-    def test_json_fallback(self):
-        result = [{"type": "text", "text": '{"synonyms": ["term1", "term2"]}'}]
-        syns = _parse_disease_synonyms(result)
-        assert "term1" in syns
-        assert "term2" in syns
-
-    def test_none_input(self):
-        assert _parse_disease_synonyms(None) == []
-
-    def test_empty_list(self):
-        assert _parse_disease_synonyms([]) == []
-
-
-# =============================================================================
-# Step 4: Call site — _paper_matches_disease_context
-# =============================================================================
-class TestPaperMatchesDiseaseContext:
+class TestSimpleFilterCanonicalMatch:
     def test_exact_match(self):
-        paper = {"title": "Breast cancer microenvironment", "abstract": "..."}
-        assert _paper_matches_disease_context(paper, ["breast cancer"]) is True
+        paper = {"title": "Breast cancer microenvironment", "abstract": "tumor study"}
+        assert _paper_matches_disease_context_simple(paper, ["breast cancer"]) is True
 
-    def test_synonym_match(self):
-        paper = {"title": "Mammary carcinoma study", "abstract": "tumor progression"}
-        assert _paper_matches_disease_context(paper, ["breast cancer"]) is True
+    def test_canonical_in_abstract(self):
+        paper = {"title": "Microenvironment study", "abstract": "in breast cancer models"}
+        assert _paper_matches_disease_context_simple(paper, ["breast cancer"]) is True
 
-    def test_no_match(self):
-        paper = {"title": "Lung adenocarcinoma", "abstract": "pulmonary disease"}
-        assert _paper_matches_disease_context(paper, ["breast cancer"]) is False
+    def test_abbreviation_match_aml(self):
+        paper = {"title": "AML treatment outcomes", "abstract": "leukemia study"}
+        assert _paper_matches_disease_context_simple(paper, ["AML"]) is True
 
-    def test_empty_paper(self):
-        paper = {"title": "", "abstract": ""}
-        assert _paper_matches_disease_context(paper, ["breast cancer"]) is False
+    def test_abbreviation_word_boundary(self):
+        """Short abbreviation should use word-boundary matching."""
+        paper = {"title": "Amlodipine pharmacokinetics", "abstract": "blood pressure"}
+        # "AML" should NOT match "Amlodipine" (no word boundary)
+        assert _paper_matches_disease_context_simple(paper, ["AML"]) is not True
 
-    def test_alzheimer_match(self):
+    def test_alzheimers_uncertain(self):
+        """Alzheimer's → 'alzheimer s disease' won't match 'alzheimers' → uncertain."""
         paper = {"title": "Alzheimers disease progression", "abstract": "neurodegeneration"}
-        assert _paper_matches_disease_context(paper, ["Alzheimer's disease"]) is True
+        # Canonical is "alzheimer s disease", text has "alzheimers disease" — no exact match
+        # Should return None (uncertain → LLM decides)
+        result = _paper_matches_disease_context_simple(paper, ["Alzheimer's disease"])
+        assert result is None
 
-    def test_abbreviation_match(self):
-        paper = {"title": "AML treatment outcomes", "abstract": "acute myeloid leukemia"}
-        assert _paper_matches_disease_context(paper, ["AML"]) is True
+    def test_empty_paper_uncertain(self):
+        """Empty paper → None (uncertain, let LLM decide)."""
+        paper = {"title": "", "abstract": ""}
+        assert _paper_matches_disease_context_simple(paper, ["breast cancer"]) is None
 
-    def test_safe_mode_blocks_generic_term_false_positive(self):
-        """Safe mode should block broad term-only matches (e.g., 'malignant')."""
+    def test_no_text_paper_uncertain(self):
+        """Paper with only PMID → None (uncertain)."""
+        paper = {"pmid": "12345", "title": "", "abstract": ""}
+        assert _paper_matches_disease_context_simple(paper, ["breast cancer"]) is None
+
+
+# =============================================================================
+# _paper_matches_disease_context_simple — organ mismatch rejection
+# =============================================================================
+class TestSimpleFilterOrganMismatch:
+    def test_different_organ_cancer_rejected(self):
+        """Searching 'breast cancer' but paper is about 'prostate cancer' → False."""
         paper = {
-            "title": "Malignant microenvironment in colorectal cancer",
-            "abstract": "Tumor-associated macrophage dynamics in colorectal tumors",
+            "title": "Prostate cancer progression",
+            "abstract": "Prostate cancer metastasis study",
         }
-        assert _paper_matches_disease_context(paper, ["breast cancer"]) is False
+        assert _paper_matches_disease_context_simple(paper, ["breast cancer"]) is False
 
+    def test_different_organ_carcinoma_rejected(self):
+        """Searching 'liver cancer' but paper is about 'lung carcinoma' → False."""
+        paper = {
+            "title": "Lung carcinoma staging",
+            "abstract": "Non-small cell lung carcinoma treatment",
+        }
+        assert _paper_matches_disease_context_simple(paper, ["liver cancer"]) is False
 
-class TestSafeModeDiseaseTerms:
-    def test_no_generic_single_terms_for_breast_cancer(self):
-        terms = get_disease_match_terms("breast cancer")
-        assert "malignant" not in terms
-        assert "disease" not in terms
-        assert "neoplasm" not in terms
+    def test_same_organ_kept(self):
+        """Paper about same organ cancer should match."""
+        paper = {
+            "title": "Breast carcinoma progression",
+            "abstract": "mammary gland tumors",
+        }
+        # "breast cancer" canonical won't match "breast carcinoma" directly
+        # but breast (disease organ) IS in the text → not organ-mismatched → uncertain
+        result = _paper_matches_disease_context_simple(paper, ["breast cancer"])
+        assert result is not False  # Should be True or None, not rejected
 
-    def test_keeps_specific_cross_organ_synonym(self):
-        terms = get_disease_match_terms("breast cancer")
-        assert "mammary carcinoma" in terms
+    def test_medical_organ_alias_kept(self):
+        """Paper using medical term (hepatic) for organ (liver) should not be rejected."""
+        paper = {
+            "title": "Hepatic carcinoma treatment",
+            "abstract": "Hepatocellular cancer therapy",
+        }
+        result = _paper_matches_disease_context_simple(paper, ["liver cancer"])
+        assert result is not False  # hepatic is an alias of liver
+
+    def test_no_organ_disease_uncertain(self):
+        """Non-organ disease (e.g., AML) → no organ mismatch check → None."""
+        paper = {
+            "title": "Novel therapy for colorectal cancer",
+            "abstract": "Colon tumor treatment",
+        }
+        result = _paper_matches_disease_context_simple(paper, ["AML"])
+        # AML has no organ in _ORGAN_TO_MEDICAL → can't do organ mismatch
+        assert result is None
+
+    def test_generic_paper_uncertain(self):
+        """Paper without any organ-cancer context → uncertain."""
+        paper = {
+            "title": "EMT signaling in tumor progression",
+            "abstract": "Epithelial-mesenchymal transition study",
+        }
+        result = _paper_matches_disease_context_simple(paper, ["breast cancer"])
+        assert result is None  # No organ-cancer mismatch detected → uncertain
 
 
 # =============================================================================
-# Step 2: Async functions (EBI OLS4 + BioMCP) — integration tests
+# _paper_matches_disease_context_simple — edge cases
 # =============================================================================
-class TestAsyncDiseaseSync:
-    """These tests hit real APIs — mark as integration."""
+class TestSimpleFilterEdgeCases:
+    def test_multiple_diseases_any_match(self):
+        """Should return True if ANY disease matches."""
+        paper = {"title": "AML blast crisis", "abstract": "leukemia"}
+        assert _paper_matches_disease_context_simple(paper, ["breast cancer", "AML"]) is True
+
+    def test_generic_disease_uncertain(self):
+        """Generic disease name like 'cancer' → uncertain (no organ to check)."""
+        paper = {"title": "Novel oncology approaches", "abstract": "tumor biology"}
+        result = _paper_matches_disease_context_simple(paper, ["cancer"])
+        # "cancer" is in _ORGAN_TO_MEDICAL keys? No. But canonical "cancer" could be in text.
+        assert result is None or result is True
+
+    def test_long_disease_name_substring_match(self):
+        """Long disease name should use substring matching."""
+        paper = {
+            "title": "Hepatocellular carcinoma staging",
+            "abstract": "HCC treatment outcomes",
+        }
+        assert _paper_matches_disease_context_simple(
+            paper, ["hepatocellular carcinoma"]
+        ) is True
+
+
+# =============================================================================
+# _llm_disease_relevance_filter — mock tests
+# =============================================================================
+class _MockResponse:
+    def __init__(self, content: str):
+        self.content = content
+
+
+class _MockLLM:
+    def __init__(self, content: str):
+        self._content = content
+
+    async def ainvoke(self, _messages):
+        return _MockResponse(self._content)
+
+
+class TestLLMDiseaseRelevanceFilter:
+    @pytest.mark.asyncio
+    async def test_empty_input(self):
+        """No uncertain papers → empty result."""
+        result, stats = await _llm_disease_relevance_filter([], ["breast cancer"])
+        assert result == []
+        assert stats["applied_count"] == 0
 
     @pytest.mark.asyncio
-    async def test_resolve_mondo_id(self):
-        """Test EBI OLS4 lookup (requires network)."""
-        mondo_id = await _resolve_mondo_id("breast cancer")
-        if mondo_id is not None:  # Network might be unavailable
-            assert mondo_id.startswith("MONDO:")
-            print(f"  Resolved 'breast cancer' → {mondo_id}")
-        else:
-            pytest.skip("EBI OLS4 unavailable")
+    async def test_filters_irrelevant(self, monkeypatch):
+        """LLM marks paper as irrelevant → dropped."""
+        papers = [
+            {"pmid": "111", "title": "Breast cancer study", "abstract": "..."},
+            {"pmid": "222", "title": "Unrelated prostate paper", "abstract": "..."},
+        ]
+
+        monkeypatch.setattr(
+            "src.agents.deep_interpreter.tools.literature.create_llm",
+            lambda: _MockLLM(
+                json.dumps([
+                    {"pmid": "111", "relevant": True},
+                    {"pmid": "222", "relevant": False},
+                ])
+            ),
+        )
+
+        result, stats = await _llm_disease_relevance_filter(papers, ["breast cancer"])
+        pmids = {str(p["pmid"]) for p in result}
+        assert pmids == {"111"}
+        assert stats["dropped_count"] == 1
+        assert stats["applied_count"] == 2
 
     @pytest.mark.asyncio
-    async def test_get_disease_synonyms_async_enriched(self):
-        """Test full hybrid pipeline (requires BioMCP)."""
-        # Clear cache first
-        with _DISEASE_SYNONYM_CACHE_LOCK:
-            _DISEASE_SYNONYM_CACHE.pop("breast cancer", None)
+    async def test_keeps_all_on_error(self, monkeypatch):
+        """LLM error → keep all uncertain papers."""
 
-        terms = await _get_disease_synonyms_async("breast cancer")
-        assert len(terms) >= 3  # At minimum rule-based terms
-        assert "breast carcinoma" in terms
-        print(f"  Got {len(terms)} terms for 'breast cancer': {terms[:8]}...")
+        class _FailLLM:
+            async def ainvoke(self, _messages):
+                raise RuntimeError("LLM unavailable")
 
-    def test_sync_wrapper(self):
-        """Test get_disease_match_terms sync wrapper."""
-        terms = get_disease_match_terms("hepatocellular carcinoma")
-        assert "hcc" in terms
-        assert any("liver" in t for t in terms)
+        monkeypatch.setattr(
+            "src.agents.deep_interpreter.tools.literature.create_llm",
+            lambda: _FailLLM(),
+        )
 
-
-# =============================================================================
-# Cross-product organ alias tests
-# =============================================================================
-class TestCrossProductOrganAliases:
-    def test_cross_product_mammary_carcinoma(self):
-        """breast cancer → mammary carcinoma, mammary neoplasm via cross-product."""
-        terms = _generate_disease_match_terms("breast cancer")
-        assert "mammary carcinoma" in terms
-        assert "mammary neoplasm" in terms
-
-    def test_cross_product_hepatic_carcinoma(self):
-        """liver cancer → hepatic carcinoma, hepatocellular carcinoma."""
-        terms = _generate_disease_match_terms("liver cancer")
-        assert "hepatic carcinoma" in terms
-        assert "hepatocellular carcinoma" in terms
-
-    def test_cross_product_reverse(self):
-        """renal cell carcinoma → kidney cell carcinoma via reverse cross-product."""
-        terms = _generate_disease_match_terms("renal cell carcinoma")
-        assert "kidney cell carcinoma" in terms
-
-
-# =============================================================================
-# Organ synonym functions
-# =============================================================================
-class TestOrganSynonyms:
-    def test_static_fallback_breast(self):
-        """_get_organ_synonyms('breast') includes 'mammary' from static dict."""
-        syns = _get_organ_synonyms("breast")
-        assert "mammary" in syns
-
-    def test_static_fallback_brain(self):
-        """_get_organ_synonyms('brain') includes 'cerebral'."""
-        syns = _get_organ_synonyms("brain")
-        assert "cerebral" in syns
-
-    def test_unknown_organ(self):
-        """_get_organ_synonyms for unknown organ returns []."""
-        syns = _get_organ_synonyms("xylophone")
-        assert syns == []
-
-    def test_extract_organ_tokens_breast_cancer(self):
-        tokens = _extract_organ_tokens("breast cancer")
-        assert "breast" in tokens
-
-    def test_extract_organ_tokens_no_match(self):
-        tokens = _extract_organ_tokens("alzheimer disease")
-        assert tokens == []
-
-    def test_extract_organ_tokens_multiple(self):
-        tokens = _extract_organ_tokens("liver and kidney disease")
-        assert "liver" in tokens
-        assert "kidney" in tokens
-
-
-# =============================================================================
-# UBERON API tests (network-dependent)
-# =============================================================================
-class TestUberonLookup:
-    """These tests hit EBI OLS4 — skip if network unavailable."""
+        papers = [
+            {"pmid": "111", "title": "Paper 1", "abstract": "..."},
+            {"pmid": "222", "title": "Paper 2", "abstract": "..."},
+        ]
+        result, stats = await _llm_disease_relevance_filter(papers, ["breast cancer"])
+        assert len(result) == 2  # All kept on error
+        assert stats["applied_count"] == 0
 
     @pytest.mark.asyncio
-    async def test_resolve_uberon_breast(self):
-        """UBERON synonyms for 'breast' should contain 'mammary'."""
-        syns = await _resolve_uberon_organ_synonyms("breast")
-        if not syns:
-            pytest.skip("EBI OLS4 UBERON unavailable")
-        assert any("mammary" in s for s in syns), f"Expected 'mammary' in {syns}"
+    async def test_keeps_all_on_parse_failure(self, monkeypatch):
+        """LLM returns invalid JSON → keep all uncertain papers."""
+        monkeypatch.setattr(
+            "src.agents.deep_interpreter.tools.literature.create_llm",
+            lambda: _MockLLM("not valid json"),
+        )
+
+        papers = [{"pmid": "111", "title": "Paper", "abstract": "..."}]
+        result, stats = await _llm_disease_relevance_filter(papers, ["breast cancer"])
+        assert len(result) == 1
 
     @pytest.mark.asyncio
-    async def test_resolve_uberon_liver(self):
-        """UBERON synonyms for 'liver' should contain 'hepatic'."""
-        syns = await _resolve_uberon_organ_synonyms("liver")
-        if not syns:
-            pytest.skip("EBI OLS4 UBERON unavailable")
-        assert any("hepatic" in s for s in syns), f"Expected 'hepatic' in {syns}"
+    async def test_conservative_default(self, monkeypatch):
+        """Paper missing from LLM response → kept by default (conservative)."""
+        monkeypatch.setattr(
+            "src.agents.deep_interpreter.tools.literature.create_llm",
+            lambda: _MockLLM(
+                json.dumps([{"pmid": "111", "relevant": False}])
+            ),
+        )
 
-    @pytest.mark.asyncio
-    async def test_uberon_timeout(self):
-        """Nonexistent organ returns [] without error."""
-        syns = await _resolve_uberon_organ_synonyms("xylophoneorgan")
-        assert syns == []
-
-
-# =============================================================================
-# Substring bug regression tests (HIGH-1, HIGH-2, HIGH-3)
-# =============================================================================
-class TestSubstringBugRegression:
-    def test_all_abbreviation_no_false_positive(self):
-        """HIGH-1: 'ALL' should NOT match 'overall survival analysis'."""
-        paper = {"title": "Overall survival analysis of treatment outcomes",
-                 "abstract": "We analyzed all patients in the small cohort"}
-        assert _paper_matches_disease_context(paper, ["ALL"]) is False
-
-    def test_extract_organ_tokens_hodgkin(self):
-        """HIGH-2: 'hodgkin lymphoma' should NOT extract 'skin'."""
-        tokens = _extract_organ_tokens("hodgkin lymphoma")
-        assert "skin" not in tokens
-
-    @pytest.mark.asyncio
-    async def test_uberon_stopword_filtering(self):
-        """HIGH-3: UBERON results should NOT contain generic words."""
-        syns = await _resolve_uberon_organ_synonyms("breast")
-        stopwords = {"gland", "body", "zone", "region", "tissue", "organ"}
-        assert not any(s in stopwords for s in syns), f"Found stopwords in {syns}"
+        papers = [
+            {"pmid": "111", "title": "Dropped", "abstract": "..."},
+            {"pmid": "222", "title": "Not in response", "abstract": "..."},
+        ]
+        result, stats = await _llm_disease_relevance_filter(papers, ["breast cancer"])
+        pmids = {str(p["pmid"]) for p in result}
+        assert "222" in pmids  # Not in LLM response → kept
 
 
 if __name__ == "__main__":

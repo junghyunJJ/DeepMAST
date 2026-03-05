@@ -1,6 +1,7 @@
-"""Unit tests for optional LLM rerank in literature search."""
+"""Unit tests for LLM disease relevance filter in literature search."""
 
 import inspect
+import json
 
 import pytest
 
@@ -34,22 +35,10 @@ class _MockLLM:
         return _MockResponse(self._content)
 
 
-def test_parse_rerank_judgments_codefence():
-    response = """
-    ```json
-    [
-      {"source":"kept","pmid":"12345678","verdict":"irrelevant","confidence":0.91},
-      {"source":"removed","pmid":"87654321","verdict":"relevant","confidence":0.84}
-    ]
-    ```
-    """
-    parsed = lit._parse_rerank_judgments(response)
-    assert parsed[("kept", "12345678")] == ("irrelevant", 0.91)
-    assert parsed[("removed", "87654321")] == ("relevant", 0.84)
-
-
 @pytest.mark.asyncio
-async def test_search_with_biomcp_llm_rerank_drops_boundary_paper(monkeypatch):
+async def test_search_with_biomcp_llm_filter_drops_irrelevant(monkeypatch):
+    """LLM filter drops uncertain papers judged irrelevant."""
+
     async def _fake_get_tools(_url):
         async def _searcher(_params):
             return [{"type": "text", "text": "PMID: 11111111\nPMID: 33333333"}]
@@ -62,8 +51,8 @@ async def test_search_with_biomcp_llm_rerank_drops_boundary_paper(monkeypatch):
                     "abstract": "Breast cancer specific pathway analysis.",
                 }
             return {
-                "title": "Mammary stromal remodeling study",
-                "abstract": "Mammary microenvironment with broad tumor context.",
+                "title": "General immune cell dynamics",
+                "abstract": "T cell exhaustion in chronic viral infection context.",
             }
 
         return [
@@ -71,19 +60,15 @@ async def test_search_with_biomcp_llm_rerank_drops_boundary_paper(monkeypatch):
             _MockTool("article_getter", _getter),
         ]
 
-    async def _fake_disease_synonyms(_disease, _biomcp_url=lit.DEFAULT_BIOMCP_URL):
-        return ["breast cancer", "mammary"]
-
+    # LLM filter: paper 33333333 is irrelevant to breast cancer
     monkeypatch.setattr(lit, "get_biomcp_tools", _fake_get_tools)
-    monkeypatch.setattr(lit, "_get_disease_synonyms_async", _fake_disease_synonyms)
-    monkeypatch.setattr(
-        lit, "get_disease_match_terms", lambda _disease: ["breast cancer", "mammary"]
-    )
     monkeypatch.setattr(
         lit,
         "create_llm",
         lambda: _MockLLM(
-            '[{"source":"kept","pmid":"33333333","verdict":"irrelevant","confidence":0.95}]'
+            json.dumps([
+                {"pmid": "33333333", "relevant": False},
+            ])
         ),
     )
 
@@ -101,10 +86,52 @@ async def test_search_with_biomcp_llm_rerank_drops_boundary_paper(monkeypatch):
     )
 
     pmids = {str(p.get("pmid", "")) for p in result}
-    assert pmids == {"11111111"}
-    assert stats["applied_count"] == 1
+    # Paper 11111111 matches canonically ("breast cancer" in text)
+    assert "11111111" in pmids
+    # Paper 33333333 was uncertain (no canonical match) and LLM said irrelevant
+    assert "33333333" not in pmids
     assert stats["dropped_count"] == 1
-    assert stats["promoted_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_search_with_biomcp_no_llm_keeps_uncertain(monkeypatch):
+    """When rerank_mode='off', uncertain papers are kept."""
+
+    async def _fake_get_tools(_url):
+        async def _searcher(_params):
+            return [{"type": "text", "text": "PMID: 11111111\nPMID: 33333333"}]
+
+        async def _getter(params):
+            pmid = str(params["pmid"])
+            if pmid == "11111111":
+                return {
+                    "title": "Breast cancer signaling",
+                    "abstract": "Breast cancer pathway analysis.",
+                }
+            return {
+                "title": "Mammary gland development",
+                "abstract": "Mammary tissue remodeling study.",
+            }
+
+        return [
+            _MockTool("article_searcher", _searcher),
+            _MockTool("article_getter", _getter),
+        ]
+
+    monkeypatch.setattr(lit, "get_biomcp_tools", _fake_get_tools)
+
+    result = await lit._search_with_biomcp(
+        genes=["BRCA1"],
+        diseases=["breast cancer"],
+        page_size=10,
+        enforce_disease_match=True,
+        rerank_mode="off",
+    )
+
+    pmids = {str(p.get("pmid", "")) for p in result}
+    # Both kept: 11111111 matches canonically, 33333333 is uncertain but kept (no LLM)
+    assert "11111111" in pmids
+    assert "33333333" in pmids
 
 
 @pytest.mark.asyncio
