@@ -51,6 +51,9 @@ class DeepInterpreterWrapperState(TypedDict):
         llm_suggestion: Cached LLM suggestion text from prepare_research_summary
         clusters_collected: Phase B done (cluster/celltype selection confirmed)
         research_discussion_complete: Research HITL flag (all 3 sub-phases done)
+        drug_target_complete: Step 9.5 drug_target pipeline execution flag
+        drug_target_error: Error message if Step 9.5 failed (None on success)
+        featured_lr_pairs: Featured L-R pairs from drug_target assessment
         analysis_9_11_complete: Steps 9-11 execution flag
         # Deep Agent output
         deep_agent_result: Output from Deep Agent invocation (JSON string)
@@ -89,6 +92,9 @@ class DeepInterpreterWrapperState(TypedDict):
     cluster_attempt: Optional[int]        # Re-prompt counter for cluster selection (0=first, 1+=re-prompt)
     clusters_collected: bool              # Phase B done (clusters selected)
     research_discussion_complete: bool
+    drug_target_complete: bool            # Step 9.5: drug_target pipeline done
+    drug_target_error: Optional[str]      # Step 9.5: error message if pipeline failed
+    featured_lr_pairs: Optional[list[str]]  # ["LIGAND^RECEPTOR", ...] from drug_target
     analysis_9_11_complete: bool
     interpretation_confirmed: bool
 
@@ -125,6 +131,9 @@ def create_initial_state() -> DeepInterpreterWrapperState:
         cluster_attempt=0,
         clusters_collected=False,
         research_discussion_complete=False,
+        drug_target_complete=False,
+        drug_target_error=None,
+        featured_lr_pairs=[],
         analysis_9_11_complete=False,
         interpretation_confirmed=False,
         deep_agent_result=None,

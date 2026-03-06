@@ -672,8 +672,11 @@ async def index_papers_to_vectordb(
 
                 logger.debug(f"Collection {full_collection_name} not found in existing collections")
             except Exception as e:
-                logger.debug(f"list_collections EXCEPTION: {type(e).__name__}: {e}")
-                logger.debug(f"Error listing collections: {e}")
+                logger.warning(
+                    "Error listing collections for '%s': %r (%s)",
+                    full_collection_name, e, type(e).__name__,
+                    exc_info=True,
+                )
 
         if collection_id is None and 'create' in tools_map:
             try:
@@ -713,9 +716,14 @@ async def index_papers_to_vectordb(
                     _RAG_STATE["collection_ids"][collection_name] = collection_id
                     logger.info(f"Created collection: {full_collection_name} (id: {collection_id})")
             except Exception as e:
-                logger.error(f"Error creating collection: {e}")
+                logger.error(
+                    "Error creating collection '%s': %r (%s)",
+                    full_collection_name, e, type(e).__name__,
+                    exc_info=True,
+                )
 
         if collection_id is None:
+            logger.error("Failed to parse collection_id from create response: %r", result)
             return {"success": False, "error": "Could not create/find collection"}
 
         # Index papers

@@ -2,6 +2,7 @@
 
 This script evaluates literature-search methods on a fixed case set:
 - dynamic: search_literature_dynamic (iterative, coverage-aware)
+- dynamic_off: search_literature_dynamic with rerank_mode forced to "off"
 - dynamic_no_disease_filter: search_literature_dynamic with disease filtering disabled
 - baseline_lit: search_literature (single-pass BioMCP search)
 - baseline_eutils: search_pubmed_advanced (single-pass E-utilities query)
@@ -145,8 +146,9 @@ def _run_method_once(
     search_method = None
     recommended_actions: list[str] = []
 
-    if method in {"dynamic", "dynamic_no_disease_filter"}:
-        enforce_disease_match = method == "dynamic"
+    if method in {"dynamic", "dynamic_off", "dynamic_no_disease_filter"}:
+        enforce_disease_match = method != "dynamic_no_disease_filter"
+        effective_rerank = "off" if method == "dynamic_off" else rerank_mode
         result = search_literature_dynamic.invoke(
             {
                 "genes": case["genes"],
@@ -155,7 +157,7 @@ def _run_method_once(
                 "disease": case["disease"],
                 "max_results": max_results,
                 "max_iterations": max_iterations,
-                "rerank_mode": rerank_mode,
+                "rerank_mode": effective_rerank,
                 "enforce_disease_match": enforce_disease_match,
             }
         )
@@ -273,7 +275,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--methods",
         nargs="+",
         default=["dynamic", "baseline_lit", "baseline_eutils"],
-        choices=["dynamic", "dynamic_no_disease_filter", "baseline_lit", "baseline_eutils"],
+        choices=["dynamic", "dynamic_off", "dynamic_no_disease_filter", "baseline_lit", "baseline_eutils"],
         help="Methods to run",
     )
     parser.add_argument("--max-results", type=int, default=30)
@@ -301,7 +303,7 @@ def main() -> None:
     for method in args.methods:
         repeat = (
             args.dynamic_repeats
-            if method in {"dynamic", "dynamic_no_disease_filter"}
+            if method in {"dynamic", "dynamic_off", "dynamic_no_disease_filter"}
             else args.baseline_repeats
         )
         total_jobs += len(cases) * repeat
@@ -310,7 +312,7 @@ def main() -> None:
     for method in args.methods:
         repeat = (
             args.dynamic_repeats
-            if method in {"dynamic", "dynamic_no_disease_filter"}
+            if method in {"dynamic", "dynamic_off", "dynamic_no_disease_filter"}
             else args.baseline_repeats
         )
         for case in cases:
@@ -367,14 +369,17 @@ def main() -> None:
                 }
                 records.append(record)
 
+                # Incremental append – survives crashes
+                with (run_dir / "raw_runs.jsonl").open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
                 completed_jobs += 1
                 print(
                     f"[{completed_jobs}/{total_jobs}] "
                     f"{method} case={case['case_id']} rep={rep} papers={len(pmids)} "
-                    f"error={'yes' if error else 'no'}"
+                    f"latency={latency_ms:.0f}ms error={'yes' if error else 'no'}",
+                    flush=True,
                 )
-
-    _write_jsonl(run_dir / "raw_runs.jsonl", records)
 
     failed = sum(1 for r in records if r.get("error"))
     summary = {

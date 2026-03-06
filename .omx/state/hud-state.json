@@ -1,5 +1,5 @@
 {
-  "last_turn_at": "2026-03-05T18:55:21.369Z",
-  "turn_count": 162,
-  "last_agent_output": "가능합니다. 그리고 현재는 이미 `.gitignore`에 `.omc` 규칙이 있어서 **새로 생기는 `.omc` 파일은 무시**됩니다.\n\n다만 `.omc` 내부 파일들이 이미 Gi"
+  "last_turn_at": "2026-03-06T18:49:51.025Z",
+  "turn_count": 174,
+  "last_agent_output": "`sample_count` 정규화 helper와 `TestInfoValidationSampleCountCoercion` 테스트는 제거했고, `info_validation_node`"
 }

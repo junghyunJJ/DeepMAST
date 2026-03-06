@@ -3,7 +3,7 @@
 This module implements a wrapper agent that manages the complete spatial
 analysis pipeline before invoking the Deep Agent for interpretation.
 
-Architecture (10-node graph):
+Architecture (11-node graph):
 1.  check_state: Route to next incomplete phase
 2.  info_collection: Collect h5ad files, keys, directories from user
 3.  info_validation: Validate collected information
@@ -12,6 +12,7 @@ Architecture (10-node graph):
 5b. collect_clusters: 1x interrupt() for cluster/celltype selection (re-prompts if empty)
 5c. collect_factor: 1x interrupt() for NMF factor selection
 6.  run_single_analysis_step_9_11: Execute targeted analysis Steps 9-11 via MCP (one step per loop iteration)
+6.5 run_drug_target: Drug target assessment (Step 9.5, after Step 9, before Step 10)
 7.  confirm_interpretation: HITL confirmation before expensive Deep Agent invocation
 8.  invoke_deep_agent: Invoke Deep Agent for interpretation/report generation
 
@@ -52,7 +53,7 @@ logger = logging.getLogger(__name__)
 class DeepInterpreterWrapperAgent(BaseAgent):
     """Wrapper agent for Deep Interpreter with full spatial analysis pipeline.
 
-    Graph Flow (10 nodes):
+    Graph Flow (11 nodes):
         START → check_state
           ├─(need_info)──→ info_collection ←─┐
           │                     ↓              │
@@ -71,6 +72,10 @@ class DeepInterpreterWrapperAgent(BaseAgent):
           ├─(research done)──→ run_single_analysis_step_9_11 ←──┐
           │                          ↓ (loop)                    │
           │                     route_after_step_9_11 ───────────┘
+          │                          ↓ (step 9 done)
+          ├─(step 9 done)────→ run_drug_target (Step 9.5)
+          │                          ↓
+          │                    route_after_step_9_11 (steps 10-11)
           │                          ↓ (done)
           ├─(9-11 done)──────→ confirm_interpretation (interrupt() HITL)
           │                          ↓
@@ -86,6 +91,7 @@ class DeepInterpreterWrapperAgent(BaseAgent):
         "COLLECT_CLUSTERS": "collect_clusters",
         "COLLECT_FACTOR": "collect_factor",
         "RUN_SINGLE_STEP_9_11": "run_single_analysis_step_9_11",
+        "RUN_DRUG_TARGET": "run_drug_target",
         "CONFIRM_INTERP": "confirm_interpretation",
         "INVOKE_DEEP": "invoke_deep_agent",
     }
@@ -613,22 +619,27 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
                 "save_path": save_path,
             }
 
-        # Steps 10-11: read top 3 interactions from Step 9 output CSV
-        # CSV is pre-sorted by combinedscore (descending) in Step 9
-        sel_interactions_csv = f"{save_path}/sel_interest_sig_liana.csv"
-        try:
-            sel_interactions_df = pd.read_csv(sel_interactions_csv)
-            if "interaction" not in sel_interactions_df.columns:
-                logger.error(f"'interaction' column not found in {sel_interactions_csv}. Available: {list(sel_interactions_df.columns)}")
+        # Steps 10-11: use featured pairs from drug_target if available, else fallback to CSV head(3)
+        featured_pairs = state.get("featured_lr_pairs") or []
+        if featured_pairs:
+            sel_interactions = featured_pairs[:3]
+            logger.info(f"Using featured L-R pairs for Steps 10-11: {sel_interactions}")
+        else:
+            # Fallback: read top 3 interactions from Step 9 output CSV
+            sel_interactions_csv = f"{save_path}/sel_interest_sig_liana.csv"
+            try:
+                sel_interactions_df = pd.read_csv(sel_interactions_csv)
+                if "interaction" not in sel_interactions_df.columns:
+                    logger.error(f"'interaction' column not found in {sel_interactions_csv}. Available: {list(sel_interactions_df.columns)}")
+                    sel_interactions = []
+                else:
+                    sel_interactions = sel_interactions_df["interaction"].head(3).tolist()
+            except FileNotFoundError:
+                logger.error(f"sel_interest_sig_liana.csv not found at {sel_interactions_csv}. Step 9 may have failed.")
                 sel_interactions = []
-            else:
-                sel_interactions = sel_interactions_df["interaction"].head(3).tolist()
-        except FileNotFoundError:
-            logger.error(f"sel_interest_sig_liana.csv not found at {sel_interactions_csv}. Step 9 may have failed.")
-            sel_interactions = []
-        except Exception as e:
-            logger.error(f"Failed to read {sel_interactions_csv}: {e}")
-            sel_interactions = []
+            except Exception as e:
+                logger.error(f"Failed to read {sel_interactions_csv}: {e}")
+                sel_interactions = []
 
         if step == 10:
             args = {
@@ -735,6 +746,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         graph.add_node(self.get_node_name("COLLECT_CLUSTERS"), self.collect_clusters_node)
         graph.add_node(self.get_node_name("COLLECT_FACTOR"), self.collect_factor_node)
         graph.add_node(self.get_node_name("RUN_SINGLE_STEP_9_11"), self.run_single_analysis_step_9_11_node)
+        graph.add_node(self.get_node_name("RUN_DRUG_TARGET"), self.run_drug_target_node)
         graph.add_node(self.get_node_name("CONFIRM_INTERP"), self.confirm_interpretation_node)
         graph.add_node(self.get_node_name("INVOKE_DEEP"), self.invoke_deep_agent_node)
 
@@ -748,6 +760,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         collect_clusters = self.get_node_name("COLLECT_CLUSTERS")
         collect_factor = self.get_node_name("COLLECT_FACTOR")
         run_single_step_9_11 = self.get_node_name("RUN_SINGLE_STEP_9_11")
+        run_drug_target = self.get_node_name("RUN_DRUG_TARGET")
         confirm_interp = self.get_node_name("CONFIRM_INTERP")
         invoke_deep = self.get_node_name("INVOKE_DEEP")
 
@@ -759,7 +772,8 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             check_state,
             self.route_after_check,
             [info_col, run_single_step, prepare_research, collect_clusters,
-             collect_factor, run_single_step_9_11, confirm_interp, invoke_deep],
+             collect_factor, run_single_step_9_11, run_drug_target,
+             confirm_interp, invoke_deep],
         )
 
         # info_collection → [END | info_validation | info_collection]
@@ -798,12 +812,15 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             [run_single_step_9_11, END],
         )
 
-        # run_single_step_9_11 → loop or proceed to confirm
+        # run_single_step_9_11 → loop, drug_target (after step 9), or proceed to confirm
         graph.add_conditional_edges(
             run_single_step_9_11,
             self.route_after_step_9_11,
-            [run_single_step_9_11, confirm_interp],
+            [run_single_step_9_11, run_drug_target, confirm_interp],
         )
+
+        # run_drug_target → back to run_single_step_9_11 (for Steps 10-11)
+        graph.add_edge(run_drug_target, run_single_step_9_11)
 
         # confirm_interpretation → invoke_deep_agent OR END (if user declines)
         graph.add_conditional_edges(
@@ -838,6 +855,9 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         if not state.get("research_discussion_complete"):
             return self.get_node_name("COLLECT_FACTOR")
         if not state.get("analysis_9_11_complete"):
+            # Resume support: if step 9 done but drug_target not yet, route there first
+            if state.get("current_analysis_step", 9) >= 10 and not state.get("drug_target_complete"):
+                return self.get_node_name("RUN_DRUG_TARGET")
             return self.get_node_name("RUN_SINGLE_STEP_9_11")
         if not state.get("interpretation_confirmed"):
             return self.get_node_name("CONFIRM_INTERP")
@@ -876,9 +896,12 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
     def route_after_step_9_11(
         self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
     ) -> str:
-        """Route after single analysis step 9-11: loop or proceed to confirm."""
+        """Route after single analysis step 9-11: loop, drug_target, or proceed to confirm."""
         if state.get("analysis_9_11_complete"):
             return self.get_node_name("CONFIRM_INTERP")
+        # After Step 9 completes (current_step becomes 10), run drug_target before Step 10
+        if state.get("current_analysis_step", 9) >= 10 and not state.get("drug_target_complete"):
+            return self.get_node_name("RUN_DRUG_TARGET")
         return self.get_node_name("RUN_SINGLE_STEP_9_11")
 
     def route_after_clusters(
@@ -1838,6 +1861,97 @@ Available factors: {available_factors}
             update["analysis_9_11_complete"] = True
 
         return update
+
+    # ===== Node 6.5: Run Drug Target Assessment (Step 9.5) =====
+
+    async def run_drug_target_node(
+        self, state: DeepInterpreterWrapperState, config: RunnableConfig  # noqa: ARG002
+    ) -> dict:
+        """Run drug target assessment pipeline after Step 9, before Steps 10-11.
+
+        1. Call prioritize_top_lr_pairs() to generate lr_candidates.json
+        2. Call run_drug_target_assessment() to generate drug.md + target_assessment.json
+        3. Extract featured pairs from target_assessment.json → state
+        4. Delete cached Step 10-11 figures so they regenerate with featured pairs
+        """
+        save_path = state["data_directory"]
+        disease = state.get("disease", "cancer")
+
+        logger.info("Step 9.5: Running drug target assessment pipeline")
+
+        # 1. Generate lr_candidates.json via prioritizer
+        drug_target_error = None
+        try:
+            # Lazy import to break circular dependency (wrapper → lr_prioritizer)
+            from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+            lr_result_json = prioritize_top_lr_pairs.invoke(
+                {"data_dir": save_path, "candidate_count": 30}
+            )
+            lr_result = json.loads(lr_result_json)
+            candidate_count = len(lr_result.get("pairs", []))
+            logger.info(f"Step 9.5: Generated lr_candidates.json with {candidate_count} candidates")
+        except Exception as e:
+            logger.error(f"Step 9.5: prioritize_top_lr_pairs failed: {e}")
+            drug_target_error = f"prioritize_top_lr_pairs failed: {e}"
+            candidate_count = 0
+
+        # 2. Run drug target assessment (generates drug.md + target_assessment.json)
+        featured_pairs = []
+        try:
+            # Lazy import to break circular dependency (wrapper → drug_target integration)
+            from src.agents.drug_target.integration import run_drug_target_assessment
+            result_json = await run_drug_target_assessment.ainvoke(
+                {"data_dir": save_path, "disease": disease}
+            )
+            result = json.loads(result_json)
+
+            if result.get("success"):
+                logger.info("Step 9.5: Drug target assessment completed successfully")
+
+                # 3. Extract featured pairs from target_assessment.json
+                target_assessment = result.get("target_assessment")
+                if target_assessment:
+                    matrix = target_assessment.get("druggability_matrix", [])
+                    for entry in matrix:
+                        if entry.get("is_featured"):
+                            interaction = entry.get("interaction", "")
+                            if interaction:
+                                featured_pairs.append(interaction)
+                    logger.info(f"Step 9.5: Extracted {len(featured_pairs)} featured pairs: {featured_pairs}")
+            else:
+                error_msg = result.get('error', 'unknown error')
+                logger.warning(f"Step 9.5: Drug target assessment returned error: {error_msg}")
+                drug_target_error = drug_target_error or f"run_drug_target_assessment error: {error_msg}"
+        except Exception as e:
+            logger.error(f"Step 9.5: run_drug_target_assessment failed: {e}", exc_info=True)
+            drug_target_error = drug_target_error or f"run_drug_target_assessment failed: {e}"
+
+        # 4. Delete cached Step 10-11 figures only when we have better data to regenerate with
+        if featured_pairs:
+            for fig_name in ["10.spatial_plot_interections.png", "11.lr_interections.png"]:
+                fig_path = Path(save_path) / fig_name
+                if fig_path.exists():
+                    fig_path.unlink()
+                    logger.info(f"Deleted cached {fig_name} for featured pair regeneration")
+
+        # Build status message
+        status_parts = ["**Step 9.5: Drug Target Assessment**"]
+        if featured_pairs:
+            status_parts.append(f"Featured L-R pairs ({len(featured_pairs)}): {', '.join(featured_pairs[:3])}")
+        else:
+            status_parts.append("No featured pairs extracted (will fallback to combinedscore ranking)")
+        status_parts.append(f"Candidates evaluated: {candidate_count}")
+        if drug_target_error:
+            status_parts.append(f"Warning: {drug_target_error}")
+
+        # Only mark complete on success (both sub-steps succeeded or at least assessment ran)
+        is_complete = drug_target_error is None or featured_pairs
+        return {
+            "drug_target_complete": bool(is_complete),
+            "drug_target_error": drug_target_error,
+            "featured_lr_pairs": featured_pairs or [],
+            "messages": [AIMessage(content=[{"type": "text", "text": "\n".join(status_parts)}])],
+        }
 
     # ===== Node 7: Confirm Interpretation (HITL) =====
 
