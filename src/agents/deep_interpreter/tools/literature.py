@@ -1899,6 +1899,8 @@ def search_literature_dynamic(
     rerank_mode: str = "off",
     rerank_top_n: int = 12,
     rerank_min_confidence: float = 0.70,
+    llm_provider: str = "",
+    sort_by_journal_quality: bool = True,
 ) -> dict:
     """LLM-powered dynamic literature search with ITERATIVE coverage improvement.
 
@@ -1928,6 +1930,10 @@ def search_literature_dynamic(
         rerank_mode: "off" or "llm" for optional second-stage rerank
         rerank_top_n: Max boundary candidates reranked by LLM
         rerank_min_confidence: Minimum confidence threshold for rerank decision
+        llm_provider: Override LLM provider for query generation (e.g. "openai").
+            Empty string uses env default.
+        sort_by_journal_quality: Whether to sort final results by SJR journal
+            quality score (default True). Set False to skip SJR sorting.
 
     Returns:
         If output_path is empty: Dictionary with papers, generated_queries, coverage,
@@ -1951,6 +1957,8 @@ def search_literature_dynamic(
             rerank_mode=rerank_mode,
             rerank_top_n=rerank_top_n,
             rerank_min_confidence=rerank_min_confidence,
+            llm_provider=llm_provider,
+            sort_by_journal_quality=sort_by_journal_quality,
         ),
         timeout=300,
     )
@@ -1972,6 +1980,8 @@ async def search_literature_dynamic_async(
     rerank_mode: str = "off",
     rerank_top_n: int = 12,
     rerank_min_confidence: float = 0.70,
+    llm_provider: str = "",
+    sort_by_journal_quality: bool = True,
 ) -> dict:
     """Async version of search_literature_dynamic with ITERATIVE coverage improvement.
 
@@ -1993,6 +2003,10 @@ async def search_literature_dynamic_async(
         rerank_mode: "off" or "llm" for optional second-stage rerank
         rerank_top_n: Max boundary candidates reranked by LLM
         rerank_min_confidence: Minimum confidence threshold for rerank decision
+        llm_provider: Override LLM provider for query generation (e.g. "openai").
+            Empty string uses env default.
+        sort_by_journal_quality: Whether to sort final results by SJR journal
+            quality score (default True).
 
     Returns:
         If output_path is empty: full results dict.
@@ -2012,7 +2026,7 @@ async def search_literature_dynamic_async(
     # Note: pre-fetch aliases removed - BioMCP article_searcher
     # automatically handles gene aliases internally (e.g., ACKR3 -> CXCR7)
 
-    llm = create_llm()
+    llm = create_llm(provider=llm_provider) if llm_provider else create_llm()
 
     for iteration in range(max_iterations):
         logger.info(f"=== Async Iteration {iteration + 1}/{max_iterations} ===")
@@ -2217,8 +2231,9 @@ async def search_literature_dynamic_async(
                 continue
 
     # Sort by journal quality before truncating
-    await _ensure_sjr_cache_loaded()
-    all_papers.sort(key=lambda p: p.get("journal_quality", _SJR_DEFAULT_SCORE), reverse=True)
+    if sort_by_journal_quality:
+        await _ensure_sjr_cache_loaded()
+        all_papers.sort(key=lambda p: p.get("journal_quality", _SJR_DEFAULT_SCORE), reverse=True)
 
     # Final coverage calculation
     final_papers = all_papers[:max_results]

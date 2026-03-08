@@ -98,6 +98,7 @@ def create_deep_interpreter_graph_wrapped(
     data_dir: str = "",
     use_checkpointer: bool = False,
     is_debug: bool = False,
+    subagent_models: dict[str, str] | None = None,
 ) -> Runnable:
     """Create wrapped Deep Interpreter graph with HITL target collection.
 
@@ -134,6 +135,7 @@ def create_deep_interpreter_graph_wrapped(
         provider=provider,
         data_dir=data_dir,
         use_checkpointer=use_checkpointer,
+        subagent_models=subagent_models,
     )
 
     # Create wrapper agent

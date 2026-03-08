@@ -10,6 +10,7 @@ Workflow order: evidence_assessor -> report_writer
 
 from typing import Callable, Sequence
 
+from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 
 from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
@@ -152,6 +153,7 @@ Drug Target Assessment 2-Agent Workflow (3-Stage Funnel):
 def get_subagents(
     custom_tools: Sequence[BaseTool | Callable] | None = None,
     data_dir: str | None = None,
+    model_overrides: dict[str, BaseChatModel | str] | None = None,
 ) -> list[dict]:
     """Get the subagent configurations for Drug Target Assessment.
 
@@ -162,6 +164,9 @@ def get_subagents(
     Args:
         custom_tools: Optional list of additional tools to include in all subagents
         data_dir: Resolved data directory path to inject into subagent prompts
+        model_overrides: Optional per-subagent model overrides.
+            Keys are subagent names, values are init_chat_model format strings
+            (e.g. "openai:gpt-4.1") or BaseChatModel instances.
 
     Returns:
         List of subagent configuration dictionaries
@@ -170,6 +175,12 @@ def get_subagents(
         {**SUBAGENT_CONFIGS["evidence_assessor"], "tools": list(SUBAGENT_CONFIGS["evidence_assessor"]["tools"])},
         {**SUBAGENT_CONFIGS["report_writer"], "tools": list(SUBAGENT_CONFIGS["report_writer"]["tools"])},
     ]
+
+    # Apply per-subagent model overrides
+    if model_overrides:
+        for subagent in subagents:
+            if subagent["name"] in model_overrides:
+                subagent["model"] = model_overrides[subagent["name"]]
 
     # Inject data_dir into each subagent's system prompt so they know the path
     if data_dir:

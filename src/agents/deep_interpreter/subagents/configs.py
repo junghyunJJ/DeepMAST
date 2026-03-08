@@ -12,6 +12,7 @@ This module provides the subagent definitions used by create_deep_agent().
 
 from typing import Callable, Sequence
 
+from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 
 from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
@@ -150,6 +151,7 @@ SUBAGENT_CONFIGS = {
 
 def get_subagents(
     custom_tools: Sequence[BaseTool | Callable] | None = None,
+    model_overrides: dict[str, BaseChatModel | str] | None = None,
 ) -> list[dict]:
     """Get the subagent configurations for Deep Interpreter.
 
@@ -161,6 +163,9 @@ def get_subagents(
 
     Args:
         custom_tools: Optional list of additional tools to include in all subagents
+        model_overrides: Optional per-subagent model overrides.
+            Keys are subagent names, values are init_chat_model format strings
+            (e.g. "openai:gpt-4.1-mini") or BaseChatModel instances.
 
     Returns:
         List of subagent configuration dictionaries
@@ -172,6 +177,12 @@ def get_subagents(
         SUBAGENT_CONFIGS["interpreter"].copy(),
         SUBAGENT_CONFIGS["reporter"].copy(),
     ]
+
+    # Apply per-subagent model overrides
+    if model_overrides:
+        for subagent in subagents:
+            if subagent["name"] in model_overrides:
+                subagent["model"] = model_overrides[subagent["name"]]
 
     # Add custom tools if provided
     if custom_tools:

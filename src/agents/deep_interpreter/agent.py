@@ -49,7 +49,7 @@ from langgraph.checkpoint.memory import MemorySaver
 import os
 from pathlib import Path
 
-from src.agents.model import create_llm
+from src.agents.model import create_llm, load_subagent_models_from_env
 from src.agents.deep_interpreter.middleware import SkillsMiddleware
 from src.agents.deep_interpreter.prompts import ORCHESTRATOR_SYSTEM_PROMPT
 from src.agents.deep_interpreter.subagents.configs import get_subagents
@@ -117,6 +117,16 @@ class DeepInterpreterConfig:
     custom_tools: Sequence[BaseTool] = field(default_factory=list)
     custom_subagents: list[dict] = field(default_factory=list)
     output_dir: str = "."
+    subagent_models: dict[str, str] | None = None
+    # init_chat_model format per subagent, e.g.:
+    # {"planner": "openai:gpt-4.1-mini", "interpreter": "ollama:qwen3.5:122b"}
+    # If None, auto-loads from SUBAGENT_{NAME}_PROVIDER env vars.
+
+    def __post_init__(self):
+        if self.subagent_models is None:
+            self.subagent_models = load_subagent_models_from_env(
+                ["planner", "searcher", "interpreter", "reporter"]
+            )
 
 
 def _create_backend_factory(
@@ -222,7 +232,10 @@ def create_deep_interpreter_agent(
         tools.extend(config.custom_tools)
 
     # Get simplified 4-agent configuration
-    subagents = get_subagents(custom_tools=config.custom_tools)
+    subagents = get_subagents(
+        custom_tools=config.custom_tools,
+        model_overrides=config.subagent_models,
+    )
 
     # Add custom subagents
     if config.custom_subagents:

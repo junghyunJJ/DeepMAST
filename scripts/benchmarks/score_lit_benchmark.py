@@ -127,6 +127,7 @@ def extract_continuous_metrics(record: dict[str, Any]) -> dict[str, float]:
 
     gene_cov = _normalize_coverage_pct(coverage.get("genes_coverage_pct", 0.0))
     path_cov = _normalize_coverage_pct(coverage.get("pathways_coverage_pct", 0.0))
+    ct_cov = _normalize_coverage_pct(coverage.get("celltypes_coverage_pct", 0.0))
 
     total_raw = coverage.get("total_papers", record.get("total_papers", 0))
     try:
@@ -139,7 +140,8 @@ def extract_continuous_metrics(record: dict[str, Any]) -> dict[str, float]:
     return {
         "gene_coverage_pct": gene_cov,
         "pathway_coverage_pct": path_cov,
-        "coverage_composite_pct": (gene_cov + path_cov) / 2.0,
+        "celltype_coverage_pct": ct_cov,
+        "coverage_composite_pct": (gene_cov + path_cov + ct_cov) / 3.0,
         "total_papers": total_papers,
     }
 
@@ -201,6 +203,7 @@ def _disease_tokens(disease: str) -> list[str]:
 
 
 def _paper_contamination_rate(record: dict[str, Any]) -> float | None:
+    """Disease-nonspecificity: fraction of papers lacking disease tokens."""
     papers = record.get("papers", [])
     if not isinstance(papers, list) or not papers:
         return None
@@ -223,6 +226,117 @@ def _paper_contamination_rate(record: dict[str, Any]) -> float | None:
     if count == 0:
         return None
     return contam / count
+
+
+def _input_feature_tokens(record: dict[str, Any]) -> list[str]:
+    """Collect all normalized input feature tokens (genes, pathways, celltypes, disease)."""
+    inp = record.get("input", {})
+    if not isinstance(inp, dict):
+        return []
+    tokens: list[str] = []
+    for gene in inp.get("genes", []):
+        tok = _normalize(str(gene))
+        if len(tok) >= 3:
+            tokens.append(tok)
+    for pathway in inp.get("pathways", []):
+        tok = _normalize(str(pathway))
+        if len(tok) >= 3:
+            tokens.append(tok)
+    for ct in inp.get("celltypes", []):
+        tok = _normalize(str(ct))
+        if len(tok) >= 3:
+            tokens.append(tok)
+    tokens.extend(_disease_tokens(str(inp.get("disease", ""))))
+    return tokens
+
+
+def _strict_contamination_rate(record: dict[str, Any]) -> float | None:
+    """Strict contamination: fraction of papers matching NO input features at all.
+
+    A paper is strictly contaminated only if none of genes, pathways,
+    celltypes, or disease tokens appear in its title+abstract.
+    """
+    papers = record.get("papers", [])
+    if not isinstance(papers, list) or not papers:
+        return None
+    tokens = _input_feature_tokens(record)
+    if not tokens:
+        return None
+
+    contam = 0
+    count = 0
+    for p in papers:
+        if not isinstance(p, dict):
+            continue
+        text = _normalize(f"{p.get('title', '')} {p.get('abstract', '')}")
+        if not text:
+            continue
+        count += 1
+        if not any(tok in text for tok in tokens):
+            contam += 1
+    if count == 0:
+        return None
+    return contam / count
+
+
+def _load_llm_labels(path: Path | None) -> dict[tuple[str, str], bool]:
+    """Load LLM relevance labels from JSONL file.
+
+    Returns dict keyed by (disease, pmid) -> bool (relevant).
+    Entries where relevant is null are skipped.
+    If path is None, auto-discovers llm_relevance_labels.jsonl in parent dir.
+    """
+    if path is None:
+        return {}
+    if not path.exists():
+        return {}
+
+    labels: dict[tuple[str, str], bool] = {}
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            disease = str(obj.get("disease", "")).strip()
+            pmid = str(obj.get("pmid", "")).strip()
+            relevant = obj.get("relevant")
+            if not disease or not pmid or relevant is None:
+                continue
+            labels[(disease, pmid)] = bool(relevant)
+    return labels
+
+
+def _llm_contamination_rate(
+    record: dict[str, Any], llm_labels: dict[tuple[str, str], bool]
+) -> float | None:
+    """Fraction of papers labeled NOT relevant by LLM."""
+    if not llm_labels:
+        return None
+    disease = str(record.get("input", {}).get("disease", "")).strip()
+    papers = record.get("papers", [])
+    if not isinstance(papers, list) or not papers or not disease:
+        return None
+
+    labeled = 0
+    not_relevant = 0
+    for p in papers:
+        if not isinstance(p, dict):
+            continue
+        pmid = str(p.get("pmid", "")).strip()
+        if not pmid:
+            continue
+        key = (disease, pmid)
+        if key in llm_labels:
+            labeled += 1
+            if not llm_labels[key]:
+                not_relevant += 1
+    if labeled == 0:
+        return None
+    return not_relevant / labeled
 
 
 def _precision_at_k(
@@ -298,6 +412,7 @@ def _group_case_metric(rows: list[dict[str, Any]], key: str) -> dict[str, float]
 def _compute_method_summary(
     records: list[dict[str, Any]],
     labels: dict[tuple[str, str, str], float],
+    llm_labels: dict[tuple[str, str], bool] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, dict[str, float]]]:
     enriched: list[dict[str, Any]] = []
     for r in records:
@@ -306,6 +421,8 @@ def _compute_method_summary(
         p10 = _precision_at_k(rr, labels, k=10)
         rr["p_at_10"] = p10
         rr["contamination_rate"] = _paper_contamination_rate(rr)
+        rr["strict_contamination_rate"] = _strict_contamination_rate(rr)
+        rr["llm_contamination_rate"] = _llm_contamination_rate(rr, llm_labels or {})
         rr.update(extract_continuous_metrics(rr))
         enriched.append(rr)
 
@@ -321,12 +438,23 @@ def _compute_method_summary(
         p10_vals = [float(r["p_at_10"]) for r in valid_rows if isinstance(r.get("p_at_10"), (int, float))]
         gene_cov_vals = [float(r["gene_coverage_pct"]) for r in valid_rows]
         path_cov_vals = [float(r["pathway_coverage_pct"]) for r in valid_rows]
+        ct_cov_vals = [float(r["celltype_coverage_pct"]) for r in valid_rows]
         comp_cov_vals = [float(r["coverage_composite_pct"]) for r in valid_rows]
         total_paper_vals = [float(r["total_papers"]) for r in valid_rows]
         contam_vals = [
             float(r["contamination_rate"])
             for r in valid_rows
             if isinstance(r.get("contamination_rate"), (int, float))
+        ]
+        strict_contam_vals = [
+            float(r["strict_contamination_rate"])
+            for r in valid_rows
+            if isinstance(r.get("strict_contamination_rate"), (int, float))
+        ]
+        llm_contam_vals = [
+            float(r["llm_contamination_rate"])
+            for r in valid_rows
+            if isinstance(r.get("llm_contamination_rate"), (int, float))
         ]
 
         summary_rows.append(
@@ -340,6 +468,9 @@ def _compute_method_summary(
                 "mean_pathway_coverage_pct": (
                     sum(path_cov_vals) / len(path_cov_vals) if path_cov_vals else None
                 ),
+                "mean_celltype_coverage_pct": (
+                    sum(ct_cov_vals) / len(ct_cov_vals) if ct_cov_vals else None
+                ),
                 "mean_coverage_composite_pct": (
                     sum(comp_cov_vals) / len(comp_cov_vals) if comp_cov_vals else None
                 ),
@@ -349,6 +480,12 @@ def _compute_method_summary(
                 "coverage_pass_rate": (sum(coverage_vals) / len(coverage_vals)) if coverage_vals else None,
                 "precision_at_10": (sum(p10_vals) / len(p10_vals)) if p10_vals else None,
                 "contamination_rate": (sum(contam_vals) / len(contam_vals)) if contam_vals else None,
+                "strict_contamination_rate": (
+                    sum(strict_contam_vals) / len(strict_contam_vals) if strict_contam_vals else None
+                ),
+                "llm_contamination_rate": (
+                    sum(llm_contam_vals) / len(llm_contam_vals) if llm_contam_vals else None
+                ),
                 "avg_latency_ms": (
                     sum(float(r.get("latency_ms", 0.0)) for r in valid_rows) / len(valid_rows)
                     if valid_rows
@@ -361,8 +498,12 @@ def _compute_method_summary(
         case_metric_cache[f"{method}:p_at_10"] = _group_case_metric(valid_rows, "p_at_10")
         case_metric_cache[f"{method}:gene_coverage_pct"] = _group_case_metric(valid_rows, "gene_coverage_pct")
         case_metric_cache[f"{method}:pathway_coverage_pct"] = _group_case_metric(valid_rows, "pathway_coverage_pct")
+        case_metric_cache[f"{method}:celltype_coverage_pct"] = _group_case_metric(valid_rows, "celltype_coverage_pct")
         case_metric_cache[f"{method}:coverage_composite_pct"] = _group_case_metric(valid_rows, "coverage_composite_pct")
         case_metric_cache[f"{method}:total_papers"] = _group_case_metric(valid_rows, "total_papers")
+        case_metric_cache[f"{method}:contamination_rate"] = _group_case_metric(valid_rows, "contamination_rate")
+        case_metric_cache[f"{method}:strict_contamination_rate"] = _group_case_metric(valid_rows, "strict_contamination_rate")
+        case_metric_cache[f"{method}:llm_contamination_rate"] = _group_case_metric(valid_rows, "llm_contamination_rate")
 
     return summary_rows, case_metric_cache
 
@@ -378,6 +519,7 @@ def _paired_bootstrap_comparisons(
         for metric in (
             "gene_coverage_pct",
             "pathway_coverage_pct",
+            "celltype_coverage_pct",
             "coverage_composite_pct",
             "total_papers",
             "coverage_pass",
@@ -419,12 +561,12 @@ def _render_markdown_report(
     lines.append("## Method Summary")
     lines.append("")
     lines.append(
-        "| Method | Runs | Success Runs | Mean Gene Cov % | Mean Pathway Cov % | Mean Composite Cov % | Mean Papers | Coverage Pass Rate | Precision@10 | Contamination Rate | Avg Latency (ms) |"
+        "| Method | Runs | Success Runs | Mean Gene Cov % | Mean Pathway Cov % | Mean CellType Cov % | Mean Composite Cov % | Mean Papers | Coverage Pass Rate | Precision@10 | Strict Contam | Disease Nonspec | Avg Latency (ms) |"
     )
-    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     for row in summary_rows:
         lines.append(
-            "| {method} | {n_runs} | {n_success_runs} | {mean_gene_coverage_pct} | {mean_pathway_coverage_pct} | {mean_coverage_composite_pct} | {mean_total_papers} | {coverage_pass_rate} | {precision_at_10} | {contamination_rate} | {avg_latency_ms} |".format(
+            "| {method} | {n_runs} | {n_success_runs} | {mean_gene_coverage_pct} | {mean_pathway_coverage_pct} | {mean_celltype_coverage_pct} | {mean_coverage_composite_pct} | {mean_total_papers} | {coverage_pass_rate} | {precision_at_10} | {strict_contamination_rate} | {contamination_rate} | {avg_latency_ms} |".format(
                 method=row["method"],
                 n_runs=row["n_runs"],
                 n_success_runs=row["n_success_runs"],
@@ -436,6 +578,11 @@ def _render_markdown_report(
                 mean_pathway_coverage_pct=(
                     f"{row['mean_pathway_coverage_pct']:.1f}"
                     if isinstance(row.get("mean_pathway_coverage_pct"), (int, float))
+                    else "NA"
+                ),
+                mean_celltype_coverage_pct=(
+                    f"{row['mean_celltype_coverage_pct']:.1f}"
+                    if isinstance(row.get("mean_celltype_coverage_pct"), (int, float))
                     else "NA"
                 ),
                 mean_coverage_composite_pct=(
@@ -456,6 +603,11 @@ def _render_markdown_report(
                 precision_at_10=(
                     f"{row['precision_at_10']:.3f}"
                     if isinstance(row.get("precision_at_10"), (int, float))
+                    else "NA"
+                ),
+                strict_contamination_rate=(
+                    f"{row['strict_contamination_rate']:.3f}"
+                    if isinstance(row.get("strict_contamination_rate"), (int, float))
                     else "NA"
                 ),
                 contamination_rate=(
@@ -527,6 +679,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--dynamic-method", default="dynamic")
     parser.add_argument("--n-boot", type=int, default=5000)
+    parser.add_argument(
+        "--llm-labels",
+        default="",
+        help="Path to llm_relevance_labels.jsonl (auto-discovers in run dir if absent)",
+    )
     return parser
 
 
@@ -539,7 +696,18 @@ def main() -> None:
     labels_path = Path(args.labels) if args.labels else None
     labels = _load_labels(labels_path)
 
-    summary_rows, case_metric_cache = _compute_method_summary(records, labels)
+    llm_labels_path: Path | None = None
+    if args.llm_labels:
+        llm_labels_path = Path(args.llm_labels)
+    else:
+        auto = (runs_path if runs_path.is_dir() else runs_path.parent) / "llm_relevance_labels.jsonl"
+        if auto.exists():
+            llm_labels_path = auto
+    llm_labels = _load_llm_labels(llm_labels_path)
+    if llm_labels:
+        print(f"Loaded {len(llm_labels)} LLM relevance labels")
+
+    summary_rows, case_metric_cache = _compute_method_summary(records, labels, llm_labels)
     repro = _compute_reproducibility(records, dynamic_method=args.dynamic_method)
     baseline_methods = [
         row["method"] for row in summary_rows if row["method"] != args.dynamic_method

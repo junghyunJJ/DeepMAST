@@ -24,7 +24,13 @@ def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
     """
     if provider is None:
         provider = os.getenv("LLM_PROVIDER", "openai")
-    
+
+    # LLM_MODEL: provider-independent model override
+    if "model" not in kwargs:
+        llm_model = os.getenv("LLM_MODEL")
+        if llm_model:
+            kwargs["model"] = llm_model
+
     provider = provider.lower()
     
     if provider == "ollama":
@@ -99,17 +105,17 @@ def create_google_llm(**kwargs) -> ChatGoogleGenerativeAI:
 
 def create_ollama_llm(**kwargs) -> ChatOllama:
     """
-    Create Ollama LLM instance (default: qwen3.5:122b at localhost:6000)
+    Create Ollama LLM instance (default: qwen3.5:35b at localhost:6000)
     
     Args:
-        model: Model name (default: qwen3.5:122b)
+        model: Model name (default: qwen3.5:35b)
         base_url: Ollama server URL (default: http://localhost:6000)
         temperature: Temperature setting (default: 0)
     """
     # model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "gpt-oss:20b"))
-    # model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3.5:122b"))
+    # model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3.5:35b"))
     
-    model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3.5:122b"))
+    model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3.5:35b"))
 
     base_url = kwargs.get("base_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:6000"))
     temperature = kwargs.get("temperature", 0)
@@ -160,6 +166,76 @@ def create_openrouter_llm(**kwargs) -> ChatOpenAI:
         init_kwargs["max_tokens"] = max_tokens
 
     return ChatOpenAI(**init_kwargs)
+
+
+def load_subagent_models_from_env(
+    subagent_names: list[str],
+    prefix: str = "SUBAGENT",
+) -> dict[str, BaseChatModel] | None:
+    """Load per-subagent model configs from environment variables.
+
+    For each subagent name, reads:
+        {PREFIX}_{NAME}_PROVIDER  (required to activate override)
+        {PREFIX}_{NAME}_MODEL
+        {PREFIX}_{NAME}_TEMPERATURE
+        {PREFIX}_{NAME}_NUM_CTX       (Ollama only)
+        {PREFIX}_{NAME}_NUM_PREDICT   (Ollama only)
+        {PREFIX}_{NAME}_BASE_URL      (Ollama only)
+        {PREFIX}_{NAME}_MAX_TOKENS    (OpenRouter only)
+
+    Example .env:
+        SUBAGENT_PLANNER_PROVIDER=openai
+        SUBAGENT_PLANNER_MODEL=gpt-4.1-mini
+        SUBAGENT_INTERPRETER_PROVIDER=ollama
+        SUBAGENT_INTERPRETER_MODEL=qwen3.5:35b
+        SUBAGENT_INTERPRETER_NUM_CTX=65536
+
+    Args:
+        subagent_names: List of subagent names to check (e.g. ["planner", "searcher"])
+        prefix: Environment variable prefix (default: "SUBAGENT")
+
+    Returns:
+        Dict of {name: BaseChatModel} if any env vars found, None otherwise.
+    """
+    models: dict[str, BaseChatModel] = {}
+
+    for name in subagent_names:
+        env_prefix = f"{prefix}_{name.upper()}"
+        provider = os.getenv(f"{env_prefix}_PROVIDER")
+        if not provider:
+            continue
+
+        kwargs: dict = {}
+
+        model = os.getenv(f"{env_prefix}_MODEL")
+        if model:
+            kwargs["model"] = model
+
+        temperature = os.getenv(f"{env_prefix}_TEMPERATURE")
+        if temperature:
+            kwargs["temperature"] = float(temperature)
+
+        # Ollama-specific
+        num_ctx = os.getenv(f"{env_prefix}_NUM_CTX")
+        if num_ctx:
+            kwargs["num_ctx"] = int(num_ctx)
+
+        num_predict = os.getenv(f"{env_prefix}_NUM_PREDICT")
+        if num_predict:
+            kwargs["num_predict"] = int(num_predict)
+
+        base_url = os.getenv(f"{env_prefix}_BASE_URL")
+        if base_url:
+            kwargs["base_url"] = base_url
+
+        # OpenRouter-specific
+        max_tokens = os.getenv(f"{env_prefix}_MAX_TOKENS")
+        if max_tokens:
+            kwargs["max_tokens"] = int(max_tokens)
+
+        models[name] = create_llm(provider=provider, **kwargs)
+
+    return models if models else None
 
 
 def create_llm_from_config(

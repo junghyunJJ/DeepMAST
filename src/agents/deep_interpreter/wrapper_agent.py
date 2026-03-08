@@ -257,6 +257,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         data_directory: str,
         provider_override: str | None = None,
         preselected_targets: dict | None = None,
+        subagent_models: dict[str, str] | None = None,
     ):
         """Get or create the Deep Agent instance with correct data_dir.
 
@@ -267,6 +268,8 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             data_directory: Path to analysis results directory
             provider_override: Optional LLM provider from runtime config
             preselected_targets: Optional target config to pre-write as /targets.json
+            subagent_models: Optional per-subagent model overrides from configurable.
+                Keys are subagent names, values are init_chat_model format strings.
 
         Returns:
             Compiled Deep Agent runnable
@@ -282,6 +285,8 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             config_copy.data_dir = str(data_directory)
             if provider_override:
                 config_copy.provider = provider_override
+            if subagent_models:
+                config_copy.subagent_models = subagent_models
             return create_deep_interpreter_agent(
                 config_copy,
                 preselected_targets=preselected_targets,
@@ -290,6 +295,8 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             kwargs = {"data_dir": str(data_directory)}
             if provider_override:
                 kwargs["provider"] = provider_override
+            if subagent_models:
+                kwargs["subagent_models"] = subagent_models
             config = DeepInterpreterConfig(**kwargs)
             return create_deep_interpreter_agent(
                 config,
@@ -1077,7 +1084,8 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         st_technology = tool_args.get("st_technology") or state.get("st_technology")
         disease = tool_args.get("disease") or state.get("disease")
         species = tool_args.get("species") or state.get("species")
-        sample_count = tool_args.get("sample_count") or state.get("sample_count")
+        raw_sample_count = tool_args.get("sample_count") or state.get("sample_count")
+        sample_count = int(raw_sample_count) if raw_sample_count is not None else None
         celltype_key = tool_args.get("celltype_key")
         sample_key = tool_args.get("sample_key")
         interest_sample = tool_args.get("interest_sample")
@@ -2018,11 +2026,13 @@ Available factors: {available_factors}
         # Get or create Deep Agent with per-invocation config
         configurable = (config or {}).get("configurable", {})
         provider_override = (configurable.get("llm_provider") or "").strip() or None
+        subagent_models = configurable.get("subagent_models")
         deep_agent = await asyncio.to_thread(
             self.get_deep_agent,
             data_directory,
             provider_override=provider_override,
             preselected_targets=targets_content,
+            subagent_models=subagent_models,
         )
 
         initial_message = f"""Interpret the CCI analysis results in {data_directory}.

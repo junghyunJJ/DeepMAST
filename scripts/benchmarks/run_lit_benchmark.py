@@ -4,6 +4,7 @@ This script evaluates literature-search methods on a fixed case set:
 - dynamic: search_literature_dynamic (iterative, coverage-aware)
 - dynamic_off: search_literature_dynamic with rerank_mode forced to "off"
 - dynamic_no_disease_filter: search_literature_dynamic with disease filtering disabled
+- dynamic_no_sjr: search_literature_dynamic with SJR journal quality sorting disabled
 - baseline_lit: search_literature (single-pass BioMCP search)
 - baseline_eutils: search_pubmed_advanced (single-pass E-utilities query)
 """
@@ -146,9 +147,10 @@ def _run_method_once(
     search_method = None
     recommended_actions: list[str] = []
 
-    if method in {"dynamic", "dynamic_off", "dynamic_no_disease_filter"}:
+    if method in {"dynamic", "dynamic_off", "dynamic_no_disease_filter", "dynamic_no_sjr"}:
         enforce_disease_match = method != "dynamic_no_disease_filter"
         effective_rerank = "off" if method == "dynamic_off" else rerank_mode
+        sort_by_journal = method != "dynamic_no_sjr"
         result = search_literature_dynamic.invoke(
             {
                 "genes": case["genes"],
@@ -159,6 +161,7 @@ def _run_method_once(
                 "max_iterations": max_iterations,
                 "rerank_mode": effective_rerank,
                 "enforce_disease_match": enforce_disease_match,
+                "sort_by_journal_quality": sort_by_journal,
             }
         )
         papers = result.get("papers", []) if isinstance(result, dict) else []
@@ -275,7 +278,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--methods",
         nargs="+",
         default=["dynamic", "baseline_lit", "baseline_eutils"],
-        choices=["dynamic", "dynamic_off", "dynamic_no_disease_filter", "baseline_lit", "baseline_eutils"],
+        choices=["dynamic", "dynamic_off", "dynamic_no_disease_filter", "dynamic_no_sjr", "baseline_lit", "baseline_eutils"],
         help="Methods to run",
     )
     parser.add_argument("--max-results", type=int, default=30)
@@ -303,7 +306,7 @@ def main() -> None:
     for method in args.methods:
         repeat = (
             args.dynamic_repeats
-            if method in {"dynamic", "dynamic_off", "dynamic_no_disease_filter"}
+            if method in {"dynamic", "dynamic_off", "dynamic_no_disease_filter", "dynamic_no_sjr"}
             else args.baseline_repeats
         )
         total_jobs += len(cases) * repeat
@@ -312,7 +315,7 @@ def main() -> None:
     for method in args.methods:
         repeat = (
             args.dynamic_repeats
-            if method in {"dynamic", "dynamic_off", "dynamic_no_disease_filter"}
+            if method in {"dynamic", "dynamic_off", "dynamic_no_disease_filter", "dynamic_no_sjr"}
             else args.baseline_repeats
         )
         for case in cases:

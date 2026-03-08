@@ -27,7 +27,7 @@ from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.agents.model import create_llm
+from src.agents.model import create_llm, load_subagent_models_from_env
 from src.agents.drug_target.subagents.configs import get_subagents
 from src.agents.drug_target.tools import (
     load_evidence_files,
@@ -112,6 +112,16 @@ class DrugTargetConfig:
     use_checkpointer: bool = False
     custom_tools: Sequence[BaseTool] = field(default_factory=list)
     docker_image: str | None = None
+    subagent_models: dict[str, str] | None = None
+    # init_chat_model format per subagent, e.g.:
+    # {"evidence_assessor": "openai:gpt-4.1", "report_writer": "openai:gpt-4.1-mini"}
+    # If None, auto-loads from SUBAGENT_{NAME}_PROVIDER env vars.
+
+    def __post_init__(self):
+        if self.subagent_models is None:
+            self.subagent_models = load_subagent_models_from_env(
+                ["evidence_assessor", "report_writer"]
+            )
 
 
 def _create_docker_backend(
@@ -198,6 +208,7 @@ def create_drug_target_agent(
     subagent_specs = get_subagents(
         custom_tools=config.custom_tools,
         data_dir=resolved_data_dir,
+        model_overrides=config.subagent_models,
     )
 
     # 4. Create agent
