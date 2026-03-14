@@ -1,12 +1,19 @@
 """Run reproducibility and method benchmark for literature search tools.
 
 This script evaluates literature-search methods on a fixed case set:
-- dynamic: search_literature_dynamic (iterative, coverage-aware)
-- dynamic_off: search_literature_dynamic with rerank_mode forced to "off"
-- dynamic_no_disease_filter: search_literature_dynamic with disease filtering disabled
-- dynamic_no_sjr: search_literature_dynamic with SJR journal quality sorting disabled
+- dynamic_off: all filters/sort OFF (pure baseline)
+- dynamic_lean: rerank OFF, disease filter OFF, SJR ON
+- dynamic: disease filter ON, SJR ON
+- dynamic_coverage_weighted: coverage+SJR greedy sort ON, disease filter OFF, SJR ON
+- dynamic_filter_coverage_weighted: disease filter ON, coverage+SJR greedy sort ON, SJR ON
+- dynamic_no_disease_filter: disease filtering disabled
+- dynamic_no_sjr: SJR journal quality sorting disabled
 - baseline_lit: search_literature (single-pass BioMCP search)
 - baseline_eutils: search_pubmed_advanced (single-pass E-utilities query)
+
+Use --shared-queries to cache iteration-0 queries from the reference method
+(dynamic_lean) and replay them for all other methods, ensuring identical paper
+pools for fair sort/filter strategy comparison.
 """
 
 from __future__ import annotations
@@ -141,34 +148,58 @@ def _run_method_once(
     max_results: int,
     max_iterations: int,
     rerank_mode: str,
-) -> tuple[list[dict[str, Any]], dict[str, Any], str | None, str | None, list[str]]:
-    """Run a single method for one case and normalize return values."""
+    query_cache: list[dict] | None = None,
+    record_queries: bool = False,
+) -> tuple[list[dict[str, Any]], dict[str, Any], str | None, str | None, list[str], list[dict]]:
+    """Run a single method for one case and normalize return values.
+
+    Returns:
+        (papers, coverage, query_used, search_method, recommended_actions,
+         recorded_query_cache)
+        recorded_query_cache is non-empty only when record_queries=True.
+    """
     query_used = None
     search_method = None
     recommended_actions: list[str] = []
+    recorded_query_cache: list[dict] = []
 
-    if method in {"dynamic", "dynamic_off", "dynamic_no_disease_filter", "dynamic_no_sjr"}:
-        enforce_disease_match = method != "dynamic_no_disease_filter"
-        effective_rerank = "off" if method == "dynamic_off" else rerank_mode
-        sort_by_journal = method != "dynamic_no_sjr"
-        result = search_literature_dynamic.invoke(
-            {
-                "genes": case["genes"],
-                "pathways": case["pathways"],
-                "celltypes": case["celltypes"],
-                "disease": case["disease"],
-                "max_results": max_results,
-                "max_iterations": max_iterations,
-                "rerank_mode": effective_rerank,
-                "enforce_disease_match": enforce_disease_match,
-                "sort_by_journal_quality": sort_by_journal,
-            }
-        )
+    _DYNAMIC_METHODS = {
+        "dynamic", "dynamic_off", "dynamic_no_disease_filter",
+        "dynamic_no_sjr", "dynamic_lean", "dynamic_coverage_weighted",
+        "dynamic_filter_coverage_weighted",
+    }
+
+    if method in _DYNAMIC_METHODS:
+        enforce_disease_match = method not in {
+            "dynamic_off", "dynamic_no_disease_filter", "dynamic_lean",
+            "dynamic_coverage_weighted",
+        }
+        effective_rerank = "off" if method in {"dynamic_off", "dynamic_lean"} else rerank_mode
+        sort_by_journal = method not in {"dynamic_no_sjr", "dynamic_off"}
+        coverage_weighted = method in {"dynamic_coverage_weighted", "dynamic_filter_coverage_weighted"}
+        invoke_params: dict[str, Any] = {
+            "genes": case["genes"],
+            "pathways": case["pathways"],
+            "celltypes": case["celltypes"],
+            "disease": case["disease"],
+            "max_results": max_results,
+            "max_iterations": max_iterations,
+            "rerank_mode": effective_rerank,
+            "enforce_disease_match": enforce_disease_match,
+            "sort_by_journal_quality": sort_by_journal,
+            "coverage_weighted_sort": coverage_weighted,
+        }
+        if query_cache is not None:
+            invoke_params["query_cache"] = query_cache
+        if record_queries:
+            invoke_params["record_queries"] = True
+        result = search_literature_dynamic.invoke(invoke_params)
         papers = result.get("papers", []) if isinstance(result, dict) else []
         coverage = result.get("coverage") if isinstance(result, dict) else None
         search_method = result.get("search_method") if isinstance(result, dict) else None
         if isinstance(result, dict):
             recommended_actions = [str(a) for a in result.get("recommended_actions", [])]
+            recorded_query_cache = result.get("query_cache", [])
     elif method == "baseline_lit":
         papers = search_literature.invoke(
             {
@@ -204,7 +235,7 @@ def _run_method_once(
             pathways=case["pathways"],
             celltypes=case["celltypes"],
         )
-    return papers, coverage, query_used, search_method, recommended_actions
+    return papers, coverage, query_used, search_method, recommended_actions, recorded_query_cache
 
 
 def _write_json(path: Path, data: Any) -> None:
@@ -278,14 +309,31 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--methods",
         nargs="+",
         default=["dynamic", "baseline_lit", "baseline_eutils"],
-        choices=["dynamic", "dynamic_off", "dynamic_no_disease_filter", "dynamic_no_sjr", "baseline_lit", "baseline_eutils"],
+        choices=[
+            "dynamic", "dynamic_off", "dynamic_no_disease_filter",
+            "dynamic_no_sjr", "dynamic_lean", "dynamic_coverage_weighted",
+            "dynamic_filter_coverage_weighted",
+            "baseline_lit", "baseline_eutils",
+        ],
         help="Methods to run",
+    )
+    parser.add_argument(
+        "--run-dir",
+        default=None,
+        help="Append results to an existing run directory (skips writing config/summary/labels/latest_run)",
     )
     parser.add_argument("--max-results", type=int, default=30)
     parser.add_argument("--dynamic-repeats", type=int, default=20)
     parser.add_argument("--baseline-repeats", type=int, default=1)
     parser.add_argument("--max-iterations", type=int, default=3)
     parser.add_argument("--rerank-mode", choices=["off", "llm"], default="off")
+    parser.add_argument(
+        "--shared-queries",
+        action="store_true",
+        default=False,
+        help="Phase 1: reference run (dynamic_lean) caches iteration-0 queries. "
+             "Phase 2: remaining methods replay cached queries for fair comparison.",
+    )
     return parser
 
 
@@ -298,111 +346,253 @@ def main() -> None:
     run_id = (
         f"run_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{uuid.uuid4().hex[:8]}"
     )
-    run_dir = Path(args.output_dir) / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
+    appending = args.run_dir is not None
+    if appending:
+        run_dir = Path(args.run_dir)
+        if not run_dir.exists():
+            raise FileNotFoundError(f"--run-dir does not exist: {run_dir}")
+    else:
+        run_dir = Path(args.output_dir) / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+    _DYNAMIC_METHODS = {
+        "dynamic", "dynamic_off", "dynamic_no_disease_filter",
+        "dynamic_no_sjr", "dynamic_lean", "dynamic_coverage_weighted",
+        "dynamic_filter_coverage_weighted",
+    }
+
+    def _repeats_for(method: str) -> int:
+        return args.dynamic_repeats if method in _DYNAMIC_METHODS else args.baseline_repeats
 
     records: list[dict[str, Any]] = []
-    total_jobs = 0
-    for method in args.methods:
-        repeat = (
-            args.dynamic_repeats
-            if method in {"dynamic", "dynamic_off", "dynamic_no_disease_filter", "dynamic_no_sjr"}
-            else args.baseline_repeats
-        )
-        total_jobs += len(cases) * repeat
-
+    total_jobs = sum(len(cases) * _repeats_for(m) for m in args.methods)
     completed_jobs = 0
-    for method in args.methods:
-        repeat = (
-            args.dynamic_repeats
-            if method in {"dynamic", "dynamic_off", "dynamic_no_disease_filter", "dynamic_no_sjr"}
-            else args.baseline_repeats
+
+    def _record_run(
+        method: str,
+        case: dict[str, Any],
+        rep: int,
+        papers: list[dict[str, Any]],
+        coverage: dict[str, Any],
+        query_used: str | None,
+        search_method: str | None,
+        recommended_actions: list[str],
+        latency_ms: float,
+        error: str | None,
+        error_type: str | None,
+        shared_queries_mode: bool = False,
+    ) -> dict[str, Any]:
+        nonlocal completed_jobs
+        compact_papers = _compact_papers(papers)
+        pmids = extract_pmids(compact_papers)
+        record = {
+            "run_id": run_id,
+            "started_at_utc": datetime.now(UTC).isoformat(),
+            "finished_at_utc": datetime.now(UTC).isoformat(),
+            "case_id": case["case_id"],
+            "method": method,
+            "repeat_index": rep,
+            "input": {
+                "genes": case["genes"],
+                "pathways": case["pathways"],
+                "celltypes": case["celltypes"],
+                "disease": case["disease"],
+                "notes": case.get("notes", ""),
+            },
+            "query_used": query_used,
+            "search_method": search_method,
+            "papers": compact_papers,
+            "pmids": pmids,
+            "total_papers": len(compact_papers),
+            "coverage": coverage,
+            "coverage_sufficient": _coverage_sufficient(coverage) if coverage else False,
+            "recommended_actions": recommended_actions,
+            "shared_queries": shared_queries_mode,
+            "latency_ms": latency_ms,
+            "error": error,
+            "error_type": error_type,
+        }
+        records.append(record)
+
+        # Incremental append – survives crashes
+        with (run_dir / "raw_runs.jsonl").open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+        completed_jobs += 1
+        print(
+            f"[{completed_jobs}/{total_jobs}] "
+            f"{method} case={case['case_id']} rep={rep} papers={len(pmids)} "
+            f"latency={latency_ms:.0f}ms error={'yes' if error else 'no'}"
+            + (" [shared-queries]" if shared_queries_mode else ""),
+            flush=True,
         )
+        return record
+
+    if args.shared_queries:
+        # ── Shared-queries mode ──────────────────────────────────────
+        # Phase 1: Run reference method (dynamic_lean) with record_queries
+        # Phase 2: Replay cached iteration-0 queries for remaining methods
+        reference_method = "dynamic_lean"
+        replay_methods = [m for m in args.methods if m != reference_method]
+
         for case in cases:
-            for rep in range(repeat):
-                started_at = datetime.now(UTC).isoformat()
-                t0 = time.perf_counter()
-                error = None
-                error_type = None
-                query_used = None
-                papers: list[dict[str, Any]] = []
-                coverage: dict[str, Any] = {}
-                search_method = None
-                recommended_actions: list[str] = []
-                try:
-                    papers, coverage, query_used, search_method, recommended_actions = _run_method_once(
-                        method=method,
+            # Phase 1: reference run – record iteration-0 queries
+            t0 = time.perf_counter()
+            error = error_type = query_used = search_method = None
+            papers: list[dict[str, Any]] = []
+            coverage: dict[str, Any] = {}
+            recommended_actions: list[str] = []
+            cached_queries: list[dict] = []
+            try:
+                papers, coverage, query_used, search_method, recommended_actions, cached_queries = (
+                    _run_method_once(
+                        method=reference_method,
                         case=case,
                         max_results=args.max_results,
                         max_iterations=args.max_iterations,
                         rerank_mode=args.rerank_mode,
+                        record_queries=True,
                     )
-                except Exception as exc:  # pragma: no cover - exercised in integration runs
-                    error = str(exc)
-                    error_type = type(exc).__name__
-
-                latency_ms = round((time.perf_counter() - t0) * 1000.0, 3)
-                compact_papers = _compact_papers(papers)
-                pmids = extract_pmids(compact_papers)
-                record = {
-                    "run_id": run_id,
-                    "started_at_utc": started_at,
-                    "finished_at_utc": datetime.now(UTC).isoformat(),
-                    "case_id": case["case_id"],
-                    "method": method,
-                    "repeat_index": rep,
-                    "input": {
-                        "genes": case["genes"],
-                        "pathways": case["pathways"],
-                        "celltypes": case["celltypes"],
-                        "disease": case["disease"],
-                        "notes": case.get("notes", ""),
-                    },
-                    "query_used": query_used,
-                    "search_method": search_method,
-                    "papers": compact_papers,
-                    "pmids": pmids,
-                    "total_papers": len(compact_papers),
-                    "coverage": coverage,
-                    "coverage_sufficient": _coverage_sufficient(coverage) if coverage else False,
-                    "recommended_actions": recommended_actions,
-                    "latency_ms": latency_ms,
-                    "error": error,
-                    "error_type": error_type,
-                }
-                records.append(record)
-
-                # Incremental append – survives crashes
-                with (run_dir / "raw_runs.jsonl").open("a", encoding="utf-8") as f:
-                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-                completed_jobs += 1
-                print(
-                    f"[{completed_jobs}/{total_jobs}] "
-                    f"{method} case={case['case_id']} rep={rep} papers={len(pmids)} "
-                    f"latency={latency_ms:.0f}ms error={'yes' if error else 'no'}",
-                    flush=True,
                 )
+            except Exception as exc:
+                error = str(exc)
+                error_type = type(exc).__name__
+
+            latency_ms = round((time.perf_counter() - t0) * 1000.0, 3)
+            _record_run(
+                method=reference_method, case=case, rep=0,
+                papers=papers, coverage=coverage, query_used=query_used,
+                search_method=search_method, recommended_actions=recommended_actions,
+                latency_ms=latency_ms, error=error, error_type=error_type,
+                shared_queries_mode=True,
+            )
+
+            # Save cache artifact
+            if cached_queries:
+                cache_path = run_dir / f"query_cache_{case['case_id']}.json"
+                _write_json(cache_path, {
+                    "case_id": case["case_id"],
+                    "generated_at_utc": datetime.now(UTC).isoformat(),
+                    "reference_method": reference_method,
+                    "queries": cached_queries,
+                })
+
+            # Phase 2: replay cached queries for remaining methods
+            for method in replay_methods:
+                if method not in _DYNAMIC_METHODS:
+                    # Baseline methods don't use query cache
+                    for rep in range(_repeats_for(method)):
+                        t0 = time.perf_counter()
+                        error = error_type = query_used = search_method = None
+                        papers = []
+                        coverage = {}
+                        recommended_actions = []
+                        try:
+                            papers, coverage, query_used, search_method, recommended_actions, _ = (
+                                _run_method_once(
+                                    method=method, case=case,
+                                    max_results=args.max_results,
+                                    max_iterations=args.max_iterations,
+                                    rerank_mode=args.rerank_mode,
+                                )
+                            )
+                        except Exception as exc:
+                            error = str(exc)
+                            error_type = type(exc).__name__
+                        latency_ms = round((time.perf_counter() - t0) * 1000.0, 3)
+                        _record_run(
+                            method=method, case=case, rep=rep,
+                            papers=papers, coverage=coverage, query_used=query_used,
+                            search_method=search_method,
+                            recommended_actions=recommended_actions,
+                            latency_ms=latency_ms, error=error, error_type=error_type,
+                        )
+                    continue
+
+                for rep in range(_repeats_for(method)):
+                    t0 = time.perf_counter()
+                    error = error_type = query_used = search_method = None
+                    papers = []
+                    coverage = {}
+                    recommended_actions = []
+                    try:
+                        papers, coverage, query_used, search_method, recommended_actions, _ = (
+                            _run_method_once(
+                                method=method, case=case,
+                                max_results=args.max_results,
+                                max_iterations=args.max_iterations,
+                                rerank_mode=args.rerank_mode,
+                                query_cache=cached_queries if cached_queries else None,
+                            )
+                        )
+                    except Exception as exc:
+                        error = str(exc)
+                        error_type = type(exc).__name__
+                    latency_ms = round((time.perf_counter() - t0) * 1000.0, 3)
+                    _record_run(
+                        method=method, case=case, rep=rep,
+                        papers=papers, coverage=coverage, query_used=query_used,
+                        search_method=search_method,
+                        recommended_actions=recommended_actions,
+                        latency_ms=latency_ms, error=error, error_type=error_type,
+                        shared_queries_mode=bool(cached_queries),
+                    )
+
+    else:
+        # ── Normal mode (unchanged behavior) ─────────────────────────
+        for method in args.methods:
+            for case in cases:
+                for rep in range(_repeats_for(method)):
+                    started_at = datetime.now(UTC).isoformat()
+                    t0 = time.perf_counter()
+                    error = error_type = query_used = search_method = None
+                    papers: list[dict[str, Any]] = []
+                    coverage: dict[str, Any] = {}
+                    recommended_actions: list[str] = []
+                    try:
+                        papers, coverage, query_used, search_method, recommended_actions, _ = (
+                            _run_method_once(
+                                method=method,
+                                case=case,
+                                max_results=args.max_results,
+                                max_iterations=args.max_iterations,
+                                rerank_mode=args.rerank_mode,
+                            )
+                        )
+                    except Exception as exc:  # pragma: no cover
+                        error = str(exc)
+                        error_type = type(exc).__name__
+
+                    latency_ms = round((time.perf_counter() - t0) * 1000.0, 3)
+                    _record_run(
+                        method=method, case=case, rep=rep,
+                        papers=papers, coverage=coverage, query_used=query_used,
+                        search_method=search_method,
+                        recommended_actions=recommended_actions,
+                        latency_ms=latency_ms, error=error, error_type=error_type,
+                    )
 
     failed = sum(1 for r in records if r.get("error"))
-    summary = {
-        "run_id": run_id,
-        "cases_path": str(Path(args.cases).resolve()),
-        "methods": args.methods,
-        "dynamic_repeats": args.dynamic_repeats,
-        "baseline_repeats": args.baseline_repeats,
-        "max_results": args.max_results,
-        "max_iterations": args.max_iterations,
-        "rerank_mode": args.rerank_mode,
-        "total_records": len(records),
-        "failed_records": failed,
-        "success_records": len(records) - failed,
-        "created_at_utc": datetime.now(UTC).isoformat(),
-    }
-    _write_json(run_dir / "run_summary.json", summary)
-    _write_json(run_dir / "run_config.json", vars(args))
-    _write_label_template(run_dir / "labels_top20_template.csv", records, top_k=20)
-    (Path(args.output_dir) / "latest_run.txt").write_text(run_id, encoding="utf-8")
+    if not appending:
+        summary = {
+            "run_id": run_id,
+            "cases_path": str(Path(args.cases).resolve()),
+            "methods": args.methods,
+            "dynamic_repeats": args.dynamic_repeats,
+            "baseline_repeats": args.baseline_repeats,
+            "max_results": args.max_results,
+            "max_iterations": args.max_iterations,
+            "rerank_mode": args.rerank_mode,
+            "shared_queries": args.shared_queries,
+            "total_records": len(records),
+            "failed_records": failed,
+            "success_records": len(records) - failed,
+            "created_at_utc": datetime.now(UTC).isoformat(),
+        }
+        _write_json(run_dir / "run_summary.json", summary)
+        _write_json(run_dir / "run_config.json", vars(args))
+        _write_label_template(run_dir / "labels_top20_template.csv", records, top_k=20)
+        (Path(args.output_dir) / "latest_run.txt").write_text(run_id, encoding="utf-8")
 
     print(f"Saved benchmark run to: {run_dir}")
 

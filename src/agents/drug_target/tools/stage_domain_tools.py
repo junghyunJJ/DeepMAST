@@ -12,6 +12,15 @@ import re
 import requests
 from langchain_core.tools import tool
 
+from src.agents.drug_target.tools.stage2_service import (
+    build_stage2_gene_panel,
+    query_gwas_gene_trait_data,
+    query_opentargets_known_drugs_data,
+    query_opentargets_target_data,
+    summarize_stage2_bundle,
+    write_stage2_artifacts,
+)
+
 logger = logging.getLogger(__name__)
 
 _SKILLS_DIR = Path(__file__).resolve().parents[4] / "skills"
@@ -576,148 +585,53 @@ def _try_load_gwas_parquet_module():
 @tool
 def query_opentargets_target(gene_symbol: str, disease: str) -> str:
     """Query OpenTargets for target-disease association, tractability, and safety."""
-    result = {
-        "gene_symbol": gene_symbol, "disease": disease,
-        "executed": False, "ensembl_id": None,
-        "target_info": {}, "disease_evidence": [], "associations": [],
-        "errors": [],
-    }
-    try:
-        # Parquet-first, API fallback
-        pq_mod = _try_load_parquet_module()
-        mod = pq_mod or _load_skill_module(
-            "opentargets-database", "query_opentargets.py", "query_opentargets"
-        )
-
-        # 1. Gene → Ensembl ID
-        hits = mod.search_entities(gene_symbol, entity_types=["target"])
-        if not hits:
-            result["errors"].append(f"No OpenTargets target found for {gene_symbol}")
-            return _as_json(result)
-        ensembl_id = hits[0]["id"]
-        result["ensembl_id"] = ensembl_id
-
-        # 2. Target info (tractability, safety, top diseases)
-        result["target_info"] = mod.get_target_info(ensembl_id, include_diseases=True)
-
-        # 3. Disease → EFO ID, then evidence
-        disease_hits = mod.search_entities(disease, entity_types=["disease"])
-        if disease_hits:
-            efo_id = disease_hits[0]["id"]
-            result["efo_id"] = efo_id
-            result["disease_evidence"] = mod.get_target_disease_evidence(ensembl_id, efo_id)
-
-        # 4. All disease associations
-        result["associations"] = mod.get_target_associations(ensembl_id, min_score=0.1)
-        result["executed"] = True
-    except Exception as exc:
-        result["errors"].append(f"OpenTargets query failed: {exc}")
-    return _as_json(result)
+    return _as_json(query_opentargets_target_data(gene_symbol, disease))
 
 
 @tool
 def query_opentargets_known_drugs(disease: str) -> str:
     """Get known drugs for a disease from OpenTargets."""
-    result = {"disease": disease, "executed": False, "efo_id": None, "drugs": {}, "errors": []}
-    try:
-        # Parquet-first, API fallback
-        pq_mod = _try_load_parquet_module()
-        mod = pq_mod or _load_skill_module(
-            "opentargets-database", "query_opentargets.py", "query_opentargets"
-        )
-        hits = mod.search_entities(disease, entity_types=["disease"])
-        if not hits:
-            result["errors"].append(f"No disease found for '{disease}'")
-            return _as_json(result)
-        efo_id = hits[0]["id"]
-        result["efo_id"] = efo_id
-        result["drugs"] = mod.get_known_drugs_for_disease(efo_id)
-        result["executed"] = True
-    except Exception as exc:
-        result["errors"].append(f"OpenTargets drug query failed: {exc}")
-    return _as_json(result)
+    return _as_json(query_opentargets_known_drugs_data(disease))
 
 
 @tool
 def query_gwas_gene_trait(gene_symbol: str, disease: str) -> str:
     """Query GWAS Catalog for gene-trait associations."""
-    result = {
-        "gene_symbol": gene_symbol, "disease": disease,
-        "executed": False, "efo_traits": [],
-        "trait_associations": [], "gene_associations": [],
-        "errors": [],
-    }
-    try:
-        # Parquet-first, API fallback
-        pq_mod = _try_load_gwas_parquet_module()
-        mod = pq_mod or _load_skill_module("gwas-database", "gwas_api.py", "gwas_api")
+    return _as_json(query_gwas_gene_trait_data(gene_symbol, disease))
 
-        # 1. Disease → EFO traits (exact + synonym search for EFO/MONDO coverage)
-        traits = mod.search_efo_traits(disease)
-        # Cancer/carcinoma are common synonyms in ontologies; try both
-        _synonyms = {"cancer": "carcinoma", "carcinoma": "cancer"}
-        disease_lower = disease.lower()
-        for old, new in _synonyms.items():
-            if old in disease_lower:
-                alt = disease_lower.replace(old, new)
-                alt_traits = mod.search_efo_traits(alt)
-                seen_ids = {t.get("shortForm") for t in traits}
-                for t in alt_traits:
-                    if t.get("shortForm") not in seen_ids and "error" not in t:
-                        traits.append(t)
-        result["efo_traits"] = traits[:5]
 
-        # 2. Trait associations from ALL matching EFO/MONDO IDs
-        #    Different ontologies (EFO vs MONDO) have different gene annotations
-        all_trait_assocs: list[dict] = []
-        seen_rsids: set[str] = set()
-        for t in traits[:5]:
-            if "error" in t:
-                continue
-            efo_id = t.get("shortForm", "")
-            if not efo_id:
-                continue
-            for ta in mod.get_trait_associations(efo_id, max_results=500):
-                rsid = ta.get("rsId", "")
-                if rsid and rsid in seen_rsids:
-                    continue
-                if rsid:
-                    seen_rsids.add(rsid)
-                all_trait_assocs.append(ta)
-        result["trait_associations"] = all_trait_assocs
+@tool
+def query_stage2_gene_panel(
+    gene_symbols: list[str],
+    disease: str,
+    selected_top3_genes: list[str] | None = None,
+    data_dir: str | None = None,
+) -> str:
+    """Build Stage 2 evidence for all unique genes in one batch call.
 
-        # 3. Gene-specific variants
-        result["gene_associations"] = mod.get_gene_associations(gene_symbol)
+    Full evidence data is saved to ``<data_dir>/evidence/`` when *data_dir*
+    is provided.  The tool returns a **compact summary** (gene-level stats)
+    instead of the raw payloads to keep LangGraph checkpoint size small.
+    Use ``load_evidence_files()`` to read the detailed per-gene JSON files.
+    """
+    bundle = build_stage2_gene_panel(
+        gene_symbols,
+        disease,
+        selected_top3_genes=selected_top3_genes,
+        data_dir=data_dir,
+    )
 
-        # 4. Disease-specific cross-filtering
-        trait_assocs = result["trait_associations"]
-        gene_assocs = result["gene_associations"]
-        gene_upper = gene_symbol.upper()
+    # Persist full evidence to disk when a workspace directory is available.
+    if data_dir:
+        evidence_dir = Path(data_dir) / "evidence"
+        written = write_stage2_artifacts(bundle, evidence_dir)
+        logger.info("Stage 2 artifacts written (%d files) → %s", len(written), evidence_dir)
 
-        # Method A: trait SNPs where this gene is author-reported
-        gene_in_trait = [
-            ta for ta in trait_assocs
-            if gene_upper in [g.upper() for g in ta.get("genes", [])]
-        ]
-
-        # Method B: gene SNPs whose rsId also appears in trait SNPs
-        trait_rsids = {ta["rsId"] for ta in trait_assocs if ta.get("rsId")}
-        gene_snps_in_disease = [
-            ga for ga in gene_assocs
-            if ga.get("rsId") in trait_rsids
-        ]
-
-        result["disease_specific_hits"] = {
-            "gene_in_trait_associations": gene_in_trait,
-            "gene_snps_in_disease": gene_snps_in_disease,
-            "n_gene_in_trait": len(gene_in_trait),
-            "n_gene_snps_in_disease": len(gene_snps_in_disease),
-        }
-
-        result["executed"] = True
-    except Exception as exc:
-        result["errors"].append(f"GWAS query failed: {exc}")
-    return _as_json(result)
+    # Return a lightweight summary so ToolMessage stays small.
+    summary = summarize_stage2_bundle(bundle)
+    if data_dir:
+        summary["evidence_dir"] = str(Path(data_dir) / "evidence")
+    return _as_json(summary)
 
 
 __all__ = [
@@ -730,7 +644,7 @@ __all__ = [
     "query_opentargets_target",
     "query_opentargets_known_drugs",
     "query_gwas_gene_trait",
+    "query_stage2_gene_panel",
     "query_drugbank_target_profile",
     "query_pubmed_clinical_limitations",
 ]
-

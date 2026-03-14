@@ -2,10 +2,10 @@
 """Download GWAS Catalog bulk TSV and convert to Parquet.
 
 Downloads the 'alternative' (all associations) TSV from the GWAS Catalog,
-normalises key columns, and saves as two Parquet files under gwas_data/:
+normalises key columns, and saves as two Parquet files under data/gwas_data/:
 
-    gwas_data/associations.parquet  – main association table
-    gwas_data/traits.parquet        – unique EFO ID → trait name mapping
+    data/gwas_data/associations.parquet  – main association table
+    data/gwas_data/traits.parquet        – unique EFO ID → trait name mapping
 
 Usage:
     python skills/gwas-database/scripts/download_gwas_bulk.py
@@ -28,7 +28,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-DATA_DIR = PROJECT_ROOT / "gwas_data"
+DATA_DIR = PROJECT_ROOT / "data" / "gwas_data"
 
 # FTP bulk download – ontology-annotated version includes MAPPED_TRAIT_URI
 ASSOCIATIONS_URL = (

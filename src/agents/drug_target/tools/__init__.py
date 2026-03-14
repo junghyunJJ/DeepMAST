@@ -23,11 +23,15 @@ from src.agents.drug_target.tools.stage_domain_tools import (
     query_opentargets_target,
     query_opentargets_known_drugs,
     query_gwas_gene_trait,
+    query_stage2_gene_panel,
     query_drugbank_target_profile,
     query_pubmed_clinical_limitations,
 )
 from src.agents.drug_target.tools.census_lr_validation_tools import (
     run_compare_census_lr_pair,
+)
+from src.agents.drug_target.tools.skill_reader import (
+    read_skill_file,
 )
 # Common tools use lazy imports to break circular dependency chain.
 # sequential_thinking is defined in common.py; think_tool and validate_quality
@@ -60,9 +64,11 @@ __all__ = [
     "query_opentargets_target",
     "query_opentargets_known_drugs",
     "query_gwas_gene_trait",
+    "query_stage2_gene_panel",
     "query_drugbank_target_profile",
     "query_pubmed_clinical_limitations",
     "run_compare_census_lr_pair",
+    "read_skill_file",
     # Output contract
     "save_target_assessment",
     # Common

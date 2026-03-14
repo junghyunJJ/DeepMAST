@@ -143,13 +143,10 @@ async def main():
     print(f"  Agent created (provider=openrouter, checkpointer=True)")
 
     # 3. Run the agent
+    # Natural language message — data_dir and disease are already
+    # injected into the system prompt via DrugTargetConfig.
     initial_message = (
-        f"Assess therapeutic potential of L-R pair genes.\n\n"
-        f"Disease context: breast cancer (triple-negative)\n"
-        f"Data directory: {data_dir}\n"
-        f"Input: lr_candidates.json (15 L-R pairs, 30 genes), selected_top3_lr.json\n"
-        f"Output: drug.md\n\n"
-        f"Execute: evidence_collector -> clinical_assessor -> report_writer"
+        "Run the full drug target assessment pipeline for triple-negative breast cancer."
     )
 
     print(f"\n{'='*60}")

@@ -101,9 +101,9 @@ def mock_data_dir_with_evidence(mock_data_dir):
         "gene_symbol": "TGFB1",
         "target_info": {"tractability": {"smallmolecule": True}},
     }))
-    (evi_dir / "gene_manifest.json").write_text(json.dumps({
-        "genes": [{"symbol": "TGFB1", "is_selected_top3": True}],
-    }))
+    (evi_dir / "gene_manifest.json").write_text(json.dumps([
+        {"symbol": "TGFB1", "is_selected_top3": True},
+    ]))
     return mock_data_dir
 
 
@@ -166,10 +166,15 @@ class TestSubagentConfigs:
             "query_kegg_pathways",
             "query_reactome_pathways",
             "query_string_ppi_pair",
+            "query_opentargets_target",
+            "query_opentargets_known_drugs",
+            "query_gwas_gene_trait",
+            "query_stage2_gene_panel",
             "query_ensembl_vep_consequence",
             "query_drugbank_target_profile",
             "query_pubmed_clinical_limitations",
             "run_compare_census_lr_pair",
+            "read_skill_file",
             "think_tool",
             "validate_quality",
         }
@@ -216,6 +221,11 @@ class TestSubagentConfigs:
         assert "Stage 1" in prompt
         assert "Stage 2" in prompt
         assert "Stage 3" in prompt
+
+    def test_workflow_description_uses_all_unique_genes_for_stage2(self):
+        from src.agents.drug_target.subagents.configs import WORKFLOW_DESCRIPTION
+
+        assert "Stage 2 (ALL unique genes)" in WORKFLOW_DESCRIPTION
 
     def test_evidence_assessor_prompt_mentions_census_and_gwas(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -451,6 +461,7 @@ class TestToolImports:
         assert stage_domain_tools.query_kegg_pathways.name == "query_kegg_pathways"
         assert stage_domain_tools.query_reactome_pathways.name == "query_reactome_pathways"
         assert stage_domain_tools.query_string_ppi_pair.name == "query_string_ppi_pair"
+        assert stage_domain_tools.query_stage2_gene_panel.name == "query_stage2_gene_panel"
         assert stage_domain_tools.query_ensembl_vep_consequence.name == "query_ensembl_vep_consequence"
         assert stage_domain_tools.query_drugbank_target_profile.name == "query_drugbank_target_profile"
         assert stage_domain_tools.query_pubmed_clinical_limitations.name == "query_pubmed_clinical_limitations"
@@ -470,8 +481,11 @@ class TestToolImports:
             "query_cellxgene_lr_context", "list_census_diseases",
             "query_kegg_pathways", "query_reactome_pathways",
             "query_string_ppi_pair", "query_ensembl_vep_consequence",
+            "query_opentargets_target", "query_opentargets_known_drugs",
+            "query_gwas_gene_trait", "query_stage2_gene_panel",
             "query_drugbank_target_profile", "query_pubmed_clinical_limitations",
             "run_compare_census_lr_pair",
+            "read_skill_file",
             "save_target_assessment",
             "think_tool", "sequential_thinking", "validate_quality",
         ]
@@ -480,6 +494,355 @@ class TestToolImports:
     def test_import_common_sequential_thinking(self):
         from src.agents.drug_target.tools.common import sequential_thinking
         assert sequential_thinking.name == "sequential_thinking"
+
+
+# =========================================================================
+# 5. TestStage2Service
+# =========================================================================
+
+class TestStage2Service:
+    """Batch Stage 2 orchestration and canonical artifact contract."""
+
+    def test_load_stage2_inputs_extracts_candidate_pairs_and_selected_top3(self, tmp_path):
+        from src.agents.drug_target.tools.stage2_service import load_stage2_inputs
+
+        (tmp_path / "lr_candidates.json").write_text(json.dumps({
+            "disease_context": "lung cancer",
+            "candidate_pairs": [
+                {"ligand": "met", "receptor": "EGFR"},
+                {"ligand": "MET", "receptor": "erbb2"},
+            ],
+        }))
+        (tmp_path / "selected_top3_lr.json").write_text(json.dumps({
+            "selected_pairs": [{"ligand": "EGFR", "receptor": "ERBB2"}],
+        }))
+
+        result = load_stage2_inputs(tmp_path)
+
+        assert result["disease"] == "lung cancer"
+        assert result["gene_symbols"] == ["EGFR", "ERBB2", "MET"]
+        assert result["selected_top3_genes"] == ["EGFR", "ERBB2"]
+        assert len(result["pairs"]) == 2
+
+    def test_build_stage2_gene_panel_dedups_and_sorts_genes(self):
+        import src.agents.drug_target.tools.stage2_service as mod
+
+        ot_calls = []
+        gwas_calls = []
+
+        def fake_ot(gene_symbol, disease, *, mod=None, disease_context=None):
+            ot_calls.append((gene_symbol, disease_context))
+            return {"gene_symbol": gene_symbol, "executed": True, "errors": []}
+
+        def fake_gwas(gene_symbol, disease, *, mod=None, disease_context=None):
+            gwas_calls.append((gene_symbol, disease_context))
+            return {"gene_symbol": gene_symbol, "executed": True, "errors": []}
+
+        with patch.object(mod, "_try_load_ot_module", return_value=(object(), "parquet")), \
+             patch.object(mod, "_try_load_gwas_module", return_value=(object(), "parquet")), \
+             patch.object(mod, "_build_ot_disease_context", return_value={"efo_id": "EFO_1"}) as ot_ctx, \
+             patch.object(mod, "_build_gwas_disease_context", return_value={"trait_associations": []}) as gwas_ctx, \
+             patch.object(mod, "query_opentargets_target_data", side_effect=fake_ot), \
+             patch.object(mod, "query_gwas_gene_trait_data", side_effect=fake_gwas), \
+             patch.object(mod, "query_opentargets_known_drugs_data", return_value={"executed": True, "errors": []}):
+            result = mod.build_stage2_gene_panel(
+                ["met", "EGFR", "egfr", " MET "],
+                "lung cancer",
+                selected_top3_genes=["met"],
+            )
+
+        assert result["gene_symbols"] == ["EGFR", "MET"]
+        assert list(result["stage2_evidence"]) == ["EGFR", "MET"]
+        assert result["gene_manifest"] == [
+            {"symbol": "EGFR", "is_selected_top3": False},
+            {"symbol": "MET", "is_selected_top3": True},
+        ]
+        assert [call[0] for call in ot_calls] == ["EGFR", "MET"]
+        assert [call[0] for call in gwas_calls] == ["EGFR", "MET"]
+        assert ot_ctx.call_count == 1
+        assert gwas_ctx.call_count == 1
+
+    def test_build_stage2_gene_panel_uses_workspace_cache_when_exact_match(self, tmp_path):
+        import src.agents.drug_target.tools.stage2_service as mod
+
+        bundle = {
+            "disease": "lung cancer",
+            "gene_symbols": ["EGFR"],
+            "stage2_evidence": {
+                "EGFR": {
+                    "opentargets": {
+                        "gene_symbol": "EGFR",
+                        "disease": "lung cancer",
+                        "executed": True,
+                        "errors": [],
+                    },
+                    "gwas": {
+                        "gene_symbol": "EGFR",
+                        "disease": "lung cancer",
+                        "executed": True,
+                        "errors": [],
+                    },
+                },
+            },
+            "known_drugs": {"disease": "lung cancer", "executed": True},
+            "gene_manifest": [{"symbol": "EGFR", "is_selected_top3": True}],
+        }
+        mod.write_stage2_artifacts(bundle, tmp_path / "evidence")
+
+        with patch.object(mod, "_try_load_ot_module", side_effect=AssertionError("cache should bypass OT setup")), \
+             patch.object(mod, "_try_load_gwas_module", side_effect=AssertionError("cache should bypass GWAS setup")):
+            result = mod.build_stage2_gene_panel(
+                ["EGFR"],
+                "lung cancer",
+                selected_top3_genes=["EGFR"],
+                data_dir=tmp_path,
+            )
+
+        assert result["stage2_evidence"] == bundle["stage2_evidence"]
+        assert result["known_drugs"] == bundle["known_drugs"]
+        assert result["gene_manifest"] == bundle["gene_manifest"]
+        assert result["source_modes"] == {"opentargets": "cache", "gwas": "cache"}
+
+    def test_build_stage2_gene_panel_cache_miss_rebuilds_on_manifest_mismatch(self, tmp_path):
+        import src.agents.drug_target.tools.stage2_service as mod
+
+        cached_bundle = {
+            "disease": "lung cancer",
+            "gene_symbols": ["EGFR"],
+            "stage2_evidence": {
+                "EGFR": {
+                    "opentargets": {
+                        "gene_symbol": "EGFR",
+                        "disease": "lung cancer",
+                        "executed": True,
+                        "errors": [],
+                    },
+                    "gwas": {
+                        "gene_symbol": "EGFR",
+                        "disease": "lung cancer",
+                        "executed": True,
+                        "errors": [],
+                    },
+                },
+            },
+            "known_drugs": {"disease": "lung cancer", "executed": True},
+            "gene_manifest": [{"symbol": "EGFR", "is_selected_top3": True}],
+        }
+        mod.write_stage2_artifacts(cached_bundle, tmp_path / "evidence")
+
+        ot_calls = []
+        gwas_calls = []
+
+        def fake_ot(gene_symbol, disease, *, mod=None, disease_context=None):
+            ot_calls.append(gene_symbol)
+            return {"gene_symbol": gene_symbol, "disease": disease, "executed": True, "errors": []}
+
+        def fake_gwas(gene_symbol, disease, *, mod=None, disease_context=None):
+            gwas_calls.append(gene_symbol)
+            return {"gene_symbol": gene_symbol, "disease": disease, "executed": True, "errors": []}
+
+        with patch.object(mod, "_try_load_ot_module", return_value=(object(), "parquet")), \
+             patch.object(mod, "_try_load_gwas_module", return_value=(object(), "parquet")), \
+             patch.object(mod, "_build_ot_disease_context", return_value={"efo_id": "EFO_1"}), \
+             patch.object(mod, "_build_gwas_disease_context", return_value={"trait_associations": []}), \
+             patch.object(mod, "query_opentargets_target_data", side_effect=fake_ot), \
+             patch.object(mod, "query_gwas_gene_trait_data", side_effect=fake_gwas), \
+             patch.object(mod, "query_opentargets_known_drugs_data", return_value={"disease": "lung cancer", "executed": True}):
+            result = mod.build_stage2_gene_panel(
+                ["EGFR"],
+                "lung cancer",
+                selected_top3_genes=[],
+                data_dir=tmp_path,
+            )
+
+        assert ot_calls == ["EGFR"]
+        assert gwas_calls == ["EGFR"]
+        assert result["gene_manifest"] == [{"symbol": "EGFR", "is_selected_top3": False}]
+        assert result["source_modes"] == {"opentargets": "parquet", "gwas": "parquet"}
+
+    def test_query_opentargets_target_data_uses_bundle_helper(self):
+        from src.agents.drug_target.tools.stage2_service import query_opentargets_target_data
+
+        bundle_calls = []
+
+        class FakeOpenTargetsModule:
+            def search_entities(self, query_string, entity_types=None):
+                if entity_types == ["target"]:
+                    return [{"id": "ENSG000001"}]
+                return [{"id": "EFO_0001"}]
+
+            def get_target_bundle(self, ensembl_id, efo_id=None, min_score=0.0):
+                bundle_calls.append((ensembl_id, efo_id, min_score))
+                return {
+                    "target_info": {"approvedSymbol": "EGFR"},
+                    "disease_evidence": [{"datasourceId": "ot"}],
+                    "associations": [{"score": 0.9}],
+                }
+
+            def get_target_info(self, *args, **kwargs):
+                raise AssertionError("get_target_info should not be called when bundle helper exists")
+
+            def get_target_disease_evidence(self, *args, **kwargs):
+                raise AssertionError("get_target_disease_evidence should not be called when bundle helper exists")
+
+            def get_target_associations(self, *args, **kwargs):
+                raise AssertionError("get_target_associations should not be called when bundle helper exists")
+
+        result = query_opentargets_target_data(
+            "EGFR",
+            "lung cancer",
+            mod=FakeOpenTargetsModule(),
+            disease_context={"efo_id": "EFO_0001"},
+        )
+
+        assert result["executed"] is True
+        assert bundle_calls == [("ENSG000001", "EFO_0001", 0.1)]
+        assert result["target_info"]["approvedSymbol"] == "EGFR"
+
+    def test_build_stage2_gene_panel_reuses_gwas_disease_context_once(self):
+        import src.agents.drug_target.tools.stage2_service as mod
+
+        class FakeOpenTargetsModule:
+            def search_entities(self, query_string, entity_types=None):
+                if entity_types == ["target"]:
+                    return [{"id": f"ENSG_{query_string.upper()}"}]
+                return [{"id": "EFO_0001"}]
+
+            def get_target_bundle(self, ensembl_id, efo_id=None, min_score=0.0):
+                return {
+                    "target_info": {"id": ensembl_id},
+                    "disease_evidence": [],
+                    "associations": [],
+                }
+
+            def get_known_drugs_for_disease(self, efo_id):
+                return {"rows": [], "uniqueDrugs": 0, "uniqueTargets": 0}
+
+        class FakeGWASModule:
+            def __init__(self):
+                self.context_calls = 0
+                self.query_calls = 0
+
+            def build_disease_context(self, disease):
+                self.context_calls += 1
+                return {
+                    "disease": disease,
+                    "efo_traits": [{"shortForm": "EFO_0001"}],
+                    "trait_associations": [],
+                }
+
+            def query_gene_trait_with_context(self, gene_symbol, disease, *, disease_context=None):
+                self.query_calls += 1
+                return {
+                    "gene_symbol": gene_symbol,
+                    "disease": disease,
+                    "executed": True,
+                    "efo_traits": disease_context["efo_traits"],
+                    "trait_associations": disease_context["trait_associations"],
+                    "gene_associations": [],
+                    "errors": [],
+                }
+
+        fake_gwas = FakeGWASModule()
+
+        with patch.object(mod, "_try_load_ot_module", return_value=(FakeOpenTargetsModule(), "parquet")), \
+             patch.object(mod, "_try_load_gwas_module", return_value=(fake_gwas, "parquet")):
+            result = mod.build_stage2_gene_panel(["EGFR", "MET"], "lung cancer")
+
+        assert fake_gwas.context_calls == 1
+        assert fake_gwas.query_calls == 2
+        assert result["gene_symbols"] == ["EGFR", "MET"]
+
+    def test_build_stage2_gene_panel_keeps_partial_source_failures_nonfatal(self):
+        import src.agents.drug_target.tools.stage2_service as mod
+
+        with patch.object(mod, "_try_load_ot_module", side_effect=RuntimeError("ot down")), \
+             patch.object(mod, "_try_load_gwas_module", return_value=(object(), "parquet")), \
+             patch.object(mod, "_build_gwas_disease_context", return_value={"trait_associations": []}), \
+             patch.object(
+                 mod,
+                 "query_gwas_gene_trait_data",
+                 return_value={"gene_symbol": "EGFR", "executed": True, "errors": []},
+             ):
+            result = mod.build_stage2_gene_panel(["EGFR"], "lung cancer")
+
+        ot_result = result["stage2_evidence"]["EGFR"]["opentargets"]
+        gwas_result = result["stage2_evidence"]["EGFR"]["gwas"]
+        assert result["source_modes"]["opentargets"] == "unavailable"
+        assert ot_result["executed"] is False
+        assert "OpenTargets setup failed" in ot_result["errors"][0]
+        assert result["known_drugs"]["executed"] is False
+        assert gwas_result["executed"] is True
+
+    def test_write_stage2_artifacts_writes_canonical_files(self, tmp_path):
+        from src.agents.drug_target.tools.stage2_service import write_stage2_artifacts
+
+        bundle = {
+            "gene_symbols": ["EGFR", "MET"],
+            "stage2_evidence": {
+                "EGFR": {
+                    "opentargets": {"gene_symbol": "EGFR", "executed": True},
+                    "gwas": {"gene_symbol": "EGFR", "executed": True},
+                },
+                "MET": {
+                    "opentargets": {"gene_symbol": "MET", "executed": False},
+                    "gwas": {"gene_symbol": "MET", "executed": True},
+                },
+            },
+            "known_drugs": {"disease": "lung cancer", "executed": True},
+            "gene_manifest": [
+                {"symbol": "EGFR", "is_selected_top3": False},
+                {"symbol": "MET", "is_selected_top3": True},
+            ],
+        }
+
+        written = write_stage2_artifacts(bundle, tmp_path / "evidence")
+
+        assert {path.name for path in written} == {
+            "stage2_evidence.json",
+            "known_drugs.json",
+            "gene_manifest.json",
+            "ot_EGFR.json",
+            "ot_MET.json",
+        }
+        assert json.loads((tmp_path / "evidence" / "gene_manifest.json").read_text()) == [
+            {"symbol": "EGFR", "is_selected_top3": False},
+            {"symbol": "MET", "is_selected_top3": True},
+        ]
+        assert json.loads((tmp_path / "evidence" / "ot_EGFR.json").read_text()) == {
+            "gene_symbol": "EGFR",
+            "executed": True,
+        }
+
+    def test_query_stage2_gene_panel_tool_returns_bundle_json(self):
+        from src.agents.drug_target.tools.stage_domain_tools import query_stage2_gene_panel
+
+        payload = {
+            "gene_symbols": ["EGFR"],
+            "stage2_evidence": {"EGFR": {"opentargets": {}, "gwas": {}}},
+            "known_drugs": {"executed": True},
+            "gene_manifest": [{"symbol": "EGFR", "is_selected_top3": True}],
+            "source_modes": {"opentargets": "parquet", "gwas": "parquet"},
+        }
+
+        with patch(
+            "src.agents.drug_target.tools.stage_domain_tools.build_stage2_gene_panel",
+            return_value=payload,
+        ) as mock_build:
+            raw = query_stage2_gene_panel.invoke({
+                "gene_symbols": ["EGFR"],
+                "disease": "lung cancer",
+                "selected_top3_genes": ["EGFR"],
+                "data_dir": "/tmp/workspace",
+            })
+
+        mock_build.assert_called_once_with(
+            ["EGFR"],
+            "lung cancer",
+            selected_top3_genes=["EGFR"],
+            data_dir="/tmp/workspace",
+        )
+        assert json.loads(raw) == payload
 
 
 # =========================================================================
@@ -1762,6 +2125,72 @@ class TestIntegration:
         subagents = call_kwargs.kwargs.get("subagents") or call_kwargs[1].get("subagents")
         assert len(subagents) == 2
 
+    def test_shared_skills_middleware_filters_allowed_skill_names(self, tmp_path):
+        import asyncio
+        from src.agents.shared.skills_middleware import SkillsMiddleware
+
+        skills_dir = tmp_path / "skills"
+        for name in ["opentargets-database", "gwas-database", "chembl-database", "string-database"]:
+            skill_dir = skills_dir / name
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "SKILL.md").write_text(
+                f"---\nname: {name}\ndescription: test\n---\n# {name}\n",
+                encoding="utf-8",
+            )
+
+        middleware = SkillsMiddleware(
+            skills_dir=skills_dir,
+            allowed_skill_names=("opentargets-database", "gwas-database", "chembl-database"),
+        )
+
+        asyncio.run(middleware.abefore_agent(state={}, runtime=None))
+
+        assert middleware._skills_cache is not None
+        assert [s["name"] for s in middleware._skills_cache] == [
+            "opentargets-database",
+            "gwas-database",
+            "chembl-database",
+        ]
+
+    @patch("src.agents.drug_target.agent.create_deep_agent")
+    @patch("src.agents.drug_target.agent.create_llm")
+    def test_create_drug_target_agent_attaches_skills_middleware_when_enabled(
+        self, mock_create_llm, mock_create_deep_agent, tmp_path
+    ):
+        from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
+        from src.agents.shared.skills_middleware import SkillsMiddleware
+
+        mock_create_llm.return_value = MagicMock()
+        mock_create_deep_agent.return_value = MagicMock()
+
+        config = DrugTargetConfig(data_dir=str(tmp_path))
+        create_drug_target_agent(config)
+
+        call_kwargs = mock_create_deep_agent.call_args.kwargs
+        middleware = call_kwargs.get("middleware")
+        assert middleware is not None
+        assert len(middleware) == 1
+        assert isinstance(middleware[0], SkillsMiddleware)
+
+    @patch("src.agents.drug_target.agent.create_deep_agent")
+    @patch("src.agents.drug_target.agent.create_llm")
+    def test_create_drug_target_agent_can_disable_progressive_disclosure(
+        self, mock_create_llm, mock_create_deep_agent, tmp_path
+    ):
+        from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
+
+        mock_create_llm.return_value = MagicMock()
+        mock_create_deep_agent.return_value = MagicMock()
+
+        config = DrugTargetConfig(
+            data_dir=str(tmp_path),
+            enable_progressive_disclosure=False,
+        )
+        create_drug_target_agent(config)
+
+        call_kwargs = mock_create_deep_agent.call_args.kwargs
+        assert "middleware" not in call_kwargs
+
 
 # =========================================================================
 # 9. TestCensusDiseaseTool — list_census_diseases + disease_matched flag
@@ -1917,6 +2346,30 @@ class TestCensusDiseaseTool:
         assert "list_census_diseases" in EVIDENCE_ASSESSOR_PROMPT
         assert "census_disease" in EVIDENCE_ASSESSOR_PROMPT
         assert "disease_matched" in EVIDENCE_ASSESSOR_PROMPT
+
+    def test_evidence_assessor_prompt_mentions_selected_skill_reads(self):
+        """Prompt contains stage-specific progressive disclosure guidance."""
+        from src.agents.drug_target.subagents.prompts import EVIDENCE_ASSESSOR_PROMPT
+
+        assert "read_skill_file" in EVIDENCE_ASSESSOR_PROMPT
+        assert "query_stage2_gene_panel" in EVIDENCE_ASSESSOR_PROMPT
+        assert "opentargets-database" in EVIDENCE_ASSESSOR_PROMPT
+        assert "gwas-database" in EVIDENCE_ASSESSOR_PROMPT
+        assert "chembl-database" in EVIDENCE_ASSESSOR_PROMPT
+        assert "cellxgene-census" not in EVIDENCE_ASSESSOR_PROMPT
+
+    def test_read_skill_file_reads_project_relative_skill_doc(self, tmp_path):
+        from src.agents.drug_target.tools.skill_reader import read_skill_file
+        import src.agents.drug_target.tools.skill_reader as mod
+
+        skill_file = tmp_path / "skills" / "opentargets-database" / "SKILL.md"
+        skill_file.parent.mkdir(parents=True)
+        skill_file.write_text("# OpenTargets\nLine 2\n", encoding="utf-8")
+
+        with patch.object(mod, "_find_project_root", return_value=tmp_path):
+            raw = read_skill_file.invoke({"skill_path": "skills/opentargets-database/SKILL.md"})
+
+        assert "OpenTargets" in raw
 
 
 # =========================================================================

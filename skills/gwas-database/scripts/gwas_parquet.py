@@ -1,10 +1,10 @@
 """Local Parquet reader for GWAS Catalog data.
 
 Mirrors the function signatures and return structures of gwas_api.py
-but reads from local Parquet files in gwas_data/ instead of calling the API.
+but reads from local Parquet files in data/gwas_data/ instead of calling the API.
 
 Expected directory layout (relative to project root):
-    gwas_data/
+    data/gwas_data/
         associations.parquet   (main association table)
         traits.parquet         (EFO ID → trait name mapping)
 
@@ -22,11 +22,12 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 # ── Data directory ────────────────────────────────────────────────────
-DATA_DIR = Path(__file__).resolve().parents[3] / "gwas_data"
+DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "gwas_data"
 
 # ── Module-level caches (loaded once on first use) ────────────────────
 _assoc_df: pd.DataFrame | None = None
 _traits_df: pd.DataFrame | None = None
+_disease_context_cache: dict[str, dict[str, Any]] = {}
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -217,6 +218,94 @@ def get_gene_associations(gene_name: str) -> list[dict]:
         })
 
     return results
+
+
+def build_disease_context(disease_name: str) -> dict[str, Any]:
+    """Build and cache disease-level GWAS context for reuse across genes."""
+    cache_key = disease_name.strip().lower()
+    cached = _disease_context_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    traits = search_efo_traits(disease_name)
+    synonyms = {"cancer": "carcinoma", "carcinoma": "cancer"}
+    disease_lower = disease_name.lower()
+    for old, new in synonyms.items():
+        if old in disease_lower:
+            alt = disease_lower.replace(old, new)
+            alt_traits = search_efo_traits(alt)
+            seen_ids = {t.get("shortForm") for t in traits}
+            for trait in alt_traits:
+                if trait.get("shortForm") not in seen_ids and "error" not in trait:
+                    traits.append(trait)
+
+    traits = traits[:5]
+    trait_associations: list[dict[str, Any]] = []
+    seen_rsids: set[str] = set()
+    for trait in traits:
+        if "error" in trait:
+            continue
+        efo_id = trait.get("shortForm", "")
+        if not efo_id:
+            continue
+        for assoc in get_trait_associations(efo_id, max_results=500):
+            rsid = assoc.get("rsId", "")
+            if rsid and rsid in seen_rsids:
+                continue
+            if rsid:
+                seen_rsids.add(rsid)
+            trait_associations.append(assoc)
+
+    cached = {
+        "disease": disease_name,
+        "efo_traits": traits,
+        "trait_associations": trait_associations,
+    }
+    _disease_context_cache[cache_key] = cached
+    return cached
+
+
+def query_gene_trait_with_context(
+    gene_symbol: str,
+    disease: str,
+    *,
+    disease_context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Return canonical GWAS payload reusing a cached disease context."""
+    context = disease_context or build_disease_context(disease)
+    result = {
+        "gene_symbol": gene_symbol,
+        "disease": disease,
+        "executed": False,
+        "efo_traits": context.get("efo_traits", []),
+        "trait_associations": context.get("trait_associations", []),
+        "gene_associations": [],
+        "errors": [],
+    }
+    try:
+        result["gene_associations"] = get_gene_associations(gene_symbol)
+        trait_assocs = result["trait_associations"]
+        gene_assocs = result["gene_associations"]
+        gene_upper = gene_symbol.upper()
+        gene_in_trait = [
+            assoc
+            for assoc in trait_assocs
+            if gene_upper in [g.upper() for g in assoc.get("genes", [])]
+        ]
+        trait_rsids = {assoc["rsId"] for assoc in trait_assocs if assoc.get("rsId")}
+        gene_snps_in_disease = [
+            assoc for assoc in gene_assocs if assoc.get("rsId") in trait_rsids
+        ]
+        result["disease_specific_hits"] = {
+            "gene_in_trait_associations": gene_in_trait,
+            "gene_snps_in_disease": gene_snps_in_disease,
+            "n_gene_in_trait": len(gene_in_trait),
+            "n_gene_snps_in_disease": len(gene_snps_in_disease),
+        }
+        result["executed"] = True
+    except Exception as exc:
+        result["errors"].append(f"GWAS query failed: {exc}")
+    return result
 
 
 if __name__ == "__main__":

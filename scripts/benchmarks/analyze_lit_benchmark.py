@@ -40,6 +40,82 @@ from scripts.benchmarks.score_lit_benchmark import (
 )
 
 
+def _load_llm_coverage_labels(
+    path: Path | None,
+) -> dict[tuple[str, str], dict[str, list[str]]]:
+    """Load LLM coverage labels from JSONL file.
+
+    Returns dict keyed by (case_id, method) -> coverage data.
+    """
+    if path is None or not path.exists():
+        return {}
+
+    labels: dict[tuple[str, str], dict[str, list[str]]] = {}
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            case_id = str(obj.get("case_id", "")).strip()
+            method = str(obj.get("method", "")).strip()
+            if not case_id or not method:
+                continue
+            labels[(case_id, method)] = {
+                "llm_genes_covered": obj.get("llm_genes_covered", []),
+                "llm_pathways_covered": obj.get("llm_pathways_covered", []),
+                "llm_celltypes_covered": obj.get("llm_celltypes_covered", []),
+            }
+    return labels
+
+
+def _compute_hybrid_coverage(
+    record: dict[str, Any],
+    llm_coverage_labels: dict[tuple[str, str], dict[str, list[str]]],
+) -> None:
+    """Add hybrid coverage fields to a record in-place."""
+    case_id = str(record.get("case_id", ""))
+    method = str(record.get("method", ""))
+    coverage = record.get("coverage", {})
+    inp = record.get("input", {})
+
+    if not isinstance(coverage, dict) or not isinstance(inp, dict):
+        record["hybrid_gene_coverage_pct"] = record.get("gene_coverage_pct", 0.0)
+        record["hybrid_pathway_coverage_pct"] = record.get("pathway_coverage_pct", 0.0)
+        record["hybrid_celltype_coverage_pct"] = record.get("celltype_coverage_pct", 0.0)
+        record["hybrid_composite_cov_pct"] = record.get("coverage_composite_pct", 0.0)
+        return
+
+    input_genes = inp.get("genes", [])
+    input_pathways = inp.get("pathways", [])
+    input_celltypes = inp.get("celltypes", [])
+
+    string_genes = set(coverage.get("genes_covered", []))
+    string_pathways = set(coverage.get("pathways_covered", []))
+    string_celltypes = set(coverage.get("celltypes_covered", []))
+
+    llm_data = llm_coverage_labels.get((case_id, method), {})
+    llm_genes = set(llm_data.get("llm_genes_covered", []))
+    llm_pathways = set(llm_data.get("llm_pathways_covered", []))
+    llm_celltypes = set(llm_data.get("llm_celltypes_covered", []))
+
+    hybrid_genes = string_genes | llm_genes
+    hybrid_pathways = string_pathways | llm_pathways
+    hybrid_celltypes = string_celltypes | llm_celltypes
+
+    h_gene = (len(hybrid_genes) / len(input_genes) * 100) if input_genes else 0.0
+    h_path = (len(hybrid_pathways) / len(input_pathways) * 100) if input_pathways else 0.0
+    h_ct = (len(hybrid_celltypes) / len(input_celltypes) * 100) if input_celltypes else 0.0
+
+    record["hybrid_gene_coverage_pct"] = h_gene
+    record["hybrid_pathway_coverage_pct"] = h_path
+    record["hybrid_celltype_coverage_pct"] = h_ct
+    record["hybrid_composite_cov_pct"] = (h_gene + h_path + h_ct) / 3.0
+
+
 # ---------------------------------------------------------------------------
 # 2a: Simple method comparison
 # ---------------------------------------------------------------------------
@@ -48,6 +124,7 @@ from scripts.benchmarks.score_lit_benchmark import (
 def _enrich_records(
     records: list[dict[str, Any]],
     llm_labels: dict[tuple[str, str], bool] | None = None,
+    llm_coverage_labels: dict[tuple[str, str], dict[str, list[str]]] | None = None,
 ) -> list[dict[str, Any]]:
     enriched = []
     for r in records:
@@ -59,6 +136,7 @@ def _enrich_records(
         rr["contamination_rate"] = _paper_contamination_rate(rr)
         rr["strict_contamination_rate"] = _strict_contamination_rate(rr)
         rr["llm_contamination_rate"] = _llm_contamination_rate(rr, llm_labels or {})
+        _compute_hybrid_coverage(rr, llm_coverage_labels or {})
         enriched.append(rr)
     return enriched
 
@@ -67,9 +145,10 @@ def generate_simple_method_comparison(
     records: list[dict[str, Any]],
     out_dir: Path,
     llm_labels: dict[tuple[str, str], bool] | None = None,
+    llm_coverage_labels: dict[tuple[str, str], dict[str, list[str]]] | None = None,
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
-    enriched = _enrich_records(records, llm_labels)
+    enriched = _enrich_records(records, llm_labels, llm_coverage_labels)
 
     # Group by (case_id, method) -> case-level means
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
@@ -79,6 +158,9 @@ def generate_simple_method_comparison(
     case_rows: list[dict[str, Any]] = []
     for (case_id, method), rows in sorted(grouped.items()):
         comp_vals = [r["coverage_composite_pct"] for r in rows]
+        gene_cov_vals = [r["gene_coverage_pct"] for r in rows]
+        pathway_cov_vals = [r["pathway_coverage_pct"] for r in rows]
+        celltype_cov_vals = [r["celltype_coverage_pct"] for r in rows]
         contam_vals = [
             r["contamination_rate"]
             for r in rows
@@ -94,11 +176,22 @@ def generate_simple_method_comparison(
             for r in rows
             if r["llm_contamination_rate"] is not None
         ]
+        hybrid_gene_vals = [r["hybrid_gene_coverage_pct"] for r in rows]
+        hybrid_path_vals = [r["hybrid_pathway_coverage_pct"] for r in rows]
+        hybrid_ct_vals = [r["hybrid_celltype_coverage_pct"] for r in rows]
+        hybrid_comp_vals = [r["hybrid_composite_cov_pct"] for r in rows]
         case_rows.append(
             {
                 "case_id": case_id,
                 "method": method,
+                "gene_coverage_pct": statistics.mean(gene_cov_vals) if gene_cov_vals else None,
+                "pathway_coverage_pct": statistics.mean(pathway_cov_vals) if pathway_cov_vals else None,
+                "celltype_coverage_pct": statistics.mean(celltype_cov_vals) if celltype_cov_vals else None,
                 "composite_cov_pct": statistics.mean(comp_vals) if comp_vals else None,
+                "hybrid_gene_coverage_pct": statistics.mean(hybrid_gene_vals) if hybrid_gene_vals else None,
+                "hybrid_pathway_coverage_pct": statistics.mean(hybrid_path_vals) if hybrid_path_vals else None,
+                "hybrid_celltype_coverage_pct": statistics.mean(hybrid_ct_vals) if hybrid_ct_vals else None,
+                "hybrid_composite_cov_pct": statistics.mean(hybrid_comp_vals) if hybrid_comp_vals else None,
                 "contamination_rate": (
                     statistics.mean(contam_vals) if contam_vals else None
                 ),
@@ -119,7 +212,14 @@ def generate_simple_method_comparison(
             fieldnames=[
                 "case_id",
                 "method",
+                "gene_coverage_pct",
+                "pathway_coverage_pct",
+                "celltype_coverage_pct",
                 "composite_cov_pct",
+                "hybrid_gene_coverage_pct",
+                "hybrid_pathway_coverage_pct",
+                "hybrid_celltype_coverage_pct",
+                "hybrid_composite_cov_pct",
                 "contamination_rate",
                 "strict_contamination_rate",
                 "llm_contamination_rate",
@@ -137,6 +237,9 @@ def generate_simple_method_comparison(
     summary_rows: list[dict[str, Any]] = []
     for method in sorted(by_method):
         rows = by_method[method]
+        gene_cov_vals2 = [r["gene_coverage_pct"] for r in rows if r["gene_coverage_pct"] is not None]
+        pathway_cov_vals2 = [r["pathway_coverage_pct"] for r in rows if r["pathway_coverage_pct"] is not None]
+        celltype_cov_vals2 = [r["celltype_coverage_pct"] for r in rows if r["celltype_coverage_pct"] is not None]
         comp_vals = [r["composite_cov_pct"] for r in rows if r["composite_cov_pct"] is not None]
         contam_vals = [
             r["contamination_rate"]
@@ -153,13 +256,45 @@ def generate_simple_method_comparison(
             for r in rows
             if r["llm_contamination_rate"] is not None
         ]
+        hybrid_gene_vals2 = [r["hybrid_gene_coverage_pct"] for r in rows if r.get("hybrid_gene_coverage_pct") is not None]
+        hybrid_path_vals2 = [r["hybrid_pathway_coverage_pct"] for r in rows if r.get("hybrid_pathway_coverage_pct") is not None]
+        hybrid_ct_vals2 = [r["hybrid_celltype_coverage_pct"] for r in rows if r.get("hybrid_celltype_coverage_pct") is not None]
+        hybrid_comp_vals2 = [r["hybrid_composite_cov_pct"] for r in rows if r.get("hybrid_composite_cov_pct") is not None]
         summary_rows.append(
             {
                 "method": method,
                 "n_cases": len(rows),
+                "mean_gene_coverage_pct": statistics.mean(gene_cov_vals2) if gene_cov_vals2 else None,
+                "sd_gene_coverage_pct": (
+                    statistics.stdev(gene_cov_vals2) if len(gene_cov_vals2) >= 2 else None
+                ),
+                "mean_pathway_coverage_pct": statistics.mean(pathway_cov_vals2) if pathway_cov_vals2 else None,
+                "sd_pathway_coverage_pct": (
+                    statistics.stdev(pathway_cov_vals2) if len(pathway_cov_vals2) >= 2 else None
+                ),
+                "mean_celltype_coverage_pct": statistics.mean(celltype_cov_vals2) if celltype_cov_vals2 else None,
+                "sd_celltype_coverage_pct": (
+                    statistics.stdev(celltype_cov_vals2) if len(celltype_cov_vals2) >= 2 else None
+                ),
                 "mean_composite_cov_pct": statistics.mean(comp_vals) if comp_vals else None,
                 "sd_composite_cov_pct": (
                     statistics.stdev(comp_vals) if len(comp_vals) >= 2 else None
+                ),
+                "mean_hybrid_gene_coverage_pct": statistics.mean(hybrid_gene_vals2) if hybrid_gene_vals2 else None,
+                "sd_hybrid_gene_coverage_pct": (
+                    statistics.stdev(hybrid_gene_vals2) if len(hybrid_gene_vals2) >= 2 else None
+                ),
+                "mean_hybrid_pathway_coverage_pct": statistics.mean(hybrid_path_vals2) if hybrid_path_vals2 else None,
+                "sd_hybrid_pathway_coverage_pct": (
+                    statistics.stdev(hybrid_path_vals2) if len(hybrid_path_vals2) >= 2 else None
+                ),
+                "mean_hybrid_celltype_coverage_pct": statistics.mean(hybrid_ct_vals2) if hybrid_ct_vals2 else None,
+                "sd_hybrid_celltype_coverage_pct": (
+                    statistics.stdev(hybrid_ct_vals2) if len(hybrid_ct_vals2) >= 2 else None
+                ),
+                "mean_hybrid_composite_cov_pct": statistics.mean(hybrid_comp_vals2) if hybrid_comp_vals2 else None,
+                "sd_hybrid_composite_cov_pct": (
+                    statistics.stdev(hybrid_comp_vals2) if len(hybrid_comp_vals2) >= 2 else None
                 ),
                 "mean_contamination_rate": (
                     statistics.mean(contam_vals) if contam_vals else None
@@ -188,8 +323,22 @@ def generate_simple_method_comparison(
             fieldnames=[
                 "method",
                 "n_cases",
+                "mean_gene_coverage_pct",
+                "sd_gene_coverage_pct",
+                "mean_pathway_coverage_pct",
+                "sd_pathway_coverage_pct",
+                "mean_celltype_coverage_pct",
+                "sd_celltype_coverage_pct",
                 "mean_composite_cov_pct",
                 "sd_composite_cov_pct",
+                "mean_hybrid_gene_coverage_pct",
+                "sd_hybrid_gene_coverage_pct",
+                "mean_hybrid_pathway_coverage_pct",
+                "sd_hybrid_pathway_coverage_pct",
+                "mean_hybrid_celltype_coverage_pct",
+                "sd_hybrid_celltype_coverage_pct",
+                "mean_hybrid_composite_cov_pct",
+                "sd_hybrid_composite_cov_pct",
                 "mean_contamination_rate",
                 "sd_contamination_rate",
                 "mean_strict_contamination_rate",
@@ -211,7 +360,19 @@ def generate_simple_method_comparison(
         "metrics": {},
     }
 
-    for metric_key in ("composite_cov_pct", "contamination_rate", "strict_contamination_rate", "llm_contamination_rate"):
+    for metric_key in (
+        "composite_cov_pct",
+        "gene_coverage_pct",
+        "pathway_coverage_pct",
+        "celltype_coverage_pct",
+        "hybrid_composite_cov_pct",
+        "hybrid_gene_coverage_pct",
+        "hybrid_pathway_coverage_pct",
+        "hybrid_celltype_coverage_pct",
+        "contamination_rate",
+        "strict_contamination_rate",
+        "llm_contamination_rate",
+    ):
         # Build matrix: cases x methods (only cases present in ALL methods)
         cases_per_method: dict[str, dict[str, float]] = {}
         for m in methods:
@@ -308,6 +469,24 @@ def generate_simple_method_comparison(
     # Plots
     _plot_violin_jitter(
         case_rows,
+        metric_key="gene_coverage_pct",
+        ylabel="Gene Coverage (%)",
+        out_path=out_dir / "fig_gene_coverage_boxplot_case_mean.png",
+    )
+    _plot_violin_jitter(
+        case_rows,
+        metric_key="pathway_coverage_pct",
+        ylabel="Pathway Coverage (%)",
+        out_path=out_dir / "fig_pathway_coverage_boxplot_case_mean.png",
+    )
+    _plot_violin_jitter(
+        case_rows,
+        metric_key="celltype_coverage_pct",
+        ylabel="CellType Coverage (%)",
+        out_path=out_dir / "fig_celltype_coverage_boxplot_case_mean.png",
+    )
+    _plot_violin_jitter(
+        case_rows,
         metric_key="composite_cov_pct",
         ylabel="Mean Composite Coverage (%)",
         out_path=out_dir / "fig_composite_cov_boxplot_case_mean.png",
@@ -330,6 +509,30 @@ def generate_simple_method_comparison(
         ylabel="LLM Contamination Rate",
         out_path=out_dir / "fig_llm_contamination_boxplot_case_mean.png",
     )
+    _plot_violin_jitter(
+        case_rows,
+        metric_key="hybrid_gene_coverage_pct",
+        ylabel="Hybrid Gene Coverage (%)",
+        out_path=out_dir / "fig_hybrid_gene_coverage_boxplot_case_mean.png",
+    )
+    _plot_violin_jitter(
+        case_rows,
+        metric_key="hybrid_pathway_coverage_pct",
+        ylabel="Hybrid Pathway Coverage (%)",
+        out_path=out_dir / "fig_hybrid_pathway_coverage_boxplot_case_mean.png",
+    )
+    _plot_violin_jitter(
+        case_rows,
+        metric_key="hybrid_celltype_coverage_pct",
+        ylabel="Hybrid CellType Coverage (%)",
+        out_path=out_dir / "fig_hybrid_celltype_coverage_boxplot_case_mean.png",
+    )
+    _plot_violin_jitter(
+        case_rows,
+        metric_key="hybrid_composite_cov_pct",
+        ylabel="Hybrid Composite Coverage (%)",
+        out_path=out_dir / "fig_hybrid_composite_cov_boxplot_case_mean.png",
+    )
 
 
 def _plot_violin_jitter(
@@ -346,6 +549,13 @@ def _plot_violin_jitter(
 
     methods = sorted(by_method.keys())
     data = [by_method[m] for m in methods]
+
+    # Filter out methods with no data to avoid violinplot errors
+    non_empty = [(m, d) for m, d in zip(methods, data) if len(d) > 0]
+    if not non_empty:
+        return
+    methods, data = zip(*non_empty)
+    methods, data = list(methods), list(data)
 
     fig, ax = plt.subplots(figsize=(max(6, len(methods) * 1.5), 5))
     positions = list(range(1, len(methods) + 1))
@@ -789,6 +999,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default="",
         help="Path to llm_relevance_labels.jsonl (auto-discovers in run dir if absent)",
     )
+    parser.add_argument(
+        "--llm-coverage-labels",
+        default="",
+        help="Path to llm_coverage_labels.jsonl (auto-discovers in run dir if absent)",
+    )
     return parser
 
 
@@ -807,11 +1022,22 @@ def main() -> None:
     if llm_labels:
         print(f"Loaded {len(llm_labels)} LLM relevance labels")
 
+    llm_cov_path: Path | None = None
+    if args.llm_coverage_labels:
+        llm_cov_path = Path(args.llm_coverage_labels)
+    else:
+        auto_cov = run_dir / "llm_coverage_labels.jsonl"
+        if auto_cov.exists():
+            llm_cov_path = auto_cov
+    llm_coverage_labels = _load_llm_coverage_labels(llm_cov_path)
+    if llm_coverage_labels:
+        print(f"Loaded {len(llm_coverage_labels)} LLM coverage labels")
+
     print(f"Loaded {len(records)} records from {run_dir}")
 
     print("Generating simple_method_comparison/ ...")
     generate_simple_method_comparison(
-        records, run_dir / "simple_method_comparison", llm_labels
+        records, run_dir / "simple_method_comparison", llm_labels, llm_coverage_labels
     )
 
     print("Generating reproducibility_plots/ ...")

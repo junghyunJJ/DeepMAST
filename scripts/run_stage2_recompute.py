@@ -18,8 +18,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.agents.drug_target.tools.stage_domain_tools import (
     _chembl_fallback,
-    query_gwas_gene_trait,
-    query_opentargets_target,
+)
+from src.agents.drug_target.tools.stage2_service import (
+    build_stage2_gene_panel,
+    load_stage2_inputs,
+    write_stage2_artifacts,
 )
 from src.agents.drug_target.tools.stage_logic import (
     compute_drug_evidence_scores,
@@ -225,11 +228,9 @@ def main():
     evidence_path = data_path / "evidence"
     evidence_path.mkdir(parents=True, exist_ok=True)
 
-    with open(data_path / "lr_candidates.json") as f:
-        lr_data = json.load(f)
-    pairs = lr_data["candidate_pairs"]
-
-    genes = sorted({p["ligand"] for p in pairs} | {p["receptor"] for p in pairs})
+    stage2_inputs = load_stage2_inputs(data_path)
+    pairs = stage2_inputs["pairs"]
+    genes = stage2_inputs["gene_symbols"]
     print(f"{'='*80}")
     print(f"STAGE 2: Evidence Collection & Rubric Scoring")
     print(f"Disease: {DISEASE} | L-R pairs: {len(pairs)} | Unique genes: {len(genes)}")
@@ -239,45 +240,22 @@ def main():
     # STAGE 2: OpenTargets + GWAS → Rubric → Rank
     # ================================================================
 
-    # Step 1: OpenTargets
-    print("--- Step 1/3: OpenTargets queries ---")
-    ot_results = {}
-    stage2_evidence = {}
-    for i, gene in enumerate(genes, 1):
-        t0 = time.time()
-        try:
-            raw = query_opentargets_target.invoke({"gene_symbol": gene, "disease": DISEASE})
-            result = json.loads(raw)
-        except Exception as e:
-            result = {"executed": False, "errors": [str(e)]}
-        elapsed = round(time.time() - t0, 1)
-        ot_results[gene] = result
-        stage2_evidence[gene] = {"opentargets": result}
-        n_assocs = len(result.get("associations", [])) if result.get("executed") else 0
-        print(f"  [{i}/{len(genes)}] {gene}: {'OK' if result.get('executed') else 'FAIL'}, {n_assocs} assocs ({elapsed}s)")
-        sys.stdout.flush()
-
-    # Step 2: GWAS
-    print("\n--- Step 2/3: GWAS queries ---")
-    gwas_results = {}
-    for i, gene in enumerate(genes, 1):
-        t0 = time.time()
-        try:
-            raw = query_gwas_gene_trait.invoke({"gene_symbol": gene, "disease": DISEASE})
-            result = json.loads(raw)
-        except Exception as e:
-            result = {"executed": False, "errors": [str(e)]}
-        elapsed = round(time.time() - t0, 1)
-        gwas_results[gene] = result
-        stage2_evidence[gene]["gwas"] = result
-        n_ga = len(result.get("gene_associations", [])) if result.get("executed") else 0
-        print(f"  [{i}/{len(genes)}] {gene}: {'OK' if result.get('executed') else 'FAIL'}, {n_ga} gene_assocs ({elapsed}s)")
-        sys.stdout.flush()
-
-    # Save stage2_evidence.json
-    with open(evidence_path / "stage2_evidence.json", "w") as f:
-        json.dump(stage2_evidence, f, indent=2)
-    print(f"\nSaved stage2_evidence.json")
+    print("--- Step 1/3: Shared Stage 2 batch query ---")
+    stage2_bundle = build_stage2_gene_panel(
+        genes,
+        DISEASE,
+        selected_top3_genes=stage2_inputs["selected_top3_genes"],
+        data_dir=data_path,
+    )
+    stage2_evidence = stage2_bundle["stage2_evidence"]
+    ot_results = {gene: stage2_evidence[gene]["opentargets"] for gene in genes}
+    gwas_results = {gene: stage2_evidence[gene]["gwas"] for gene in genes}
+    write_stage2_artifacts(stage2_bundle, evidence_path)
+    print(
+        "Saved canonical Stage 2 artifacts "
+        f"(OT={stage2_bundle['source_modes']['opentargets']}, "
+        f"GWAS={stage2_bundle['source_modes']['gwas']})"
+    )
 
     # Step 3: Rubric scoring (OT + GWAS only, no ChEMBL yet)
     print("\n--- Step 3/3: Stage 2 Rubric Scoring ---")

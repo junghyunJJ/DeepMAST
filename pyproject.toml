@@ -19,13 +19,13 @@ dependencies = [
     "langchain-ollama>=1.0.1",
     "langchain-openai>=1.1.7",
     "langgraph>=1.0.5",
-    "langgraph-api==0.6.32", # Pin for sse-starlette 2.1.x compatibility
+    "langgraph-api==0.7.70", # Upgrade to supported 0.7.x server line
     "langgraph-cli>=0.4.11",
     "liana>=1.6.1",
     "omnipath>=1.0.12",
     "scanpy>=1.11.5",
     "squidpy>=1.7.0",
-    "sse-starlette>=2.0.0,<2.2.0", # Pin for langgraph-api 0.6.x compatibility (has listen_for_exit_signal + send_timeout)
+    "sse-starlette>=3.0.0,<3.4.0", # Required by langgraph-api 0.7.70
 ]
 
 [tool.pytest.ini_options]

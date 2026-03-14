@@ -40,8 +40,7 @@ htmlcov/
 order/
 papers/
 *.log
-gwas_data/
-ot_data/
+data/
 
 # resutls files
 res*

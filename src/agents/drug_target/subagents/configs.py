@@ -29,9 +29,11 @@ from src.agents.drug_target.tools import (
     query_opentargets_target,
     query_opentargets_known_drugs,
     query_gwas_gene_trait,
+    query_stage2_gene_panel,
     query_drugbank_target_profile,
     query_pubmed_clinical_limitations,
     run_compare_census_lr_pair,
+    read_skill_file,
     # Assessment tools
     save_target_assessment,
     # Common tools
@@ -83,10 +85,12 @@ SUBAGENT_CONFIGS = {
             query_opentargets_target,
             query_opentargets_known_drugs,
             query_gwas_gene_trait,
+            query_stage2_gene_panel,
             query_ensembl_vep_consequence,
             # Stage 3: Deep Dive
             query_drugbank_target_profile,
             query_pubmed_clinical_limitations,
+            read_skill_file,
             # Cognitive
             sequential_thinking,
             think_tool,
@@ -128,7 +132,7 @@ Drug Target Assessment 2-Agent Workflow (3-Stage Funnel):
 1. EVIDENCE_ASSESSOR (Plan->Execute->Reflect per stage)
    Stage 1 (ALL L-R pairs): Cellxgene + KEGG/Reactome + STRING + Census cross-validation
    Stage 1 Filtering: confidence score >= 0.4 (graduated relaxation if < 5 pass)
-   Stage 2 (PASSED pairs only): OpenTargets + VEP (conditional) + GWAS batch
+   Stage 2 (ALL unique genes): batch OpenTargets + batch GWAS + VEP (conditional)
      -> Inline DRUG_TARGET_RUBRIC scoring after Stage 2
      -> RUBRIC combined_total based featured selection (top 3-5)
    Stage 3 (FEATURED only): DrugBank + PubMed clinical limitations (conditional)

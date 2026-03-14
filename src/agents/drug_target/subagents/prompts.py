@@ -93,27 +93,37 @@ Save scoring results:
 
 All pairs proceed to Stage 2 regardless of Stage 1 confidence.
 
-### Stage 2: Target Validation & Scoring (ALL pairs)
+### Stage 2: Target Validation & Scoring (ALL unique genes from ALL pairs)
 
-For EACH unique gene:
-a) **OpenTargets** -- call `query_opentargets_target(gene_symbol, disease)`:
-   Returns ensembl_id, tractability, safety, disease evidence, associations.
-b) **SAVE IMMEDIATELY** -- `save_evidence(data_dir, "ot_{GENE}.json", ot_data)`
-c) **[DeepMAST Enhancement] GWAS** -- call `query_gwas_gene_trait(gene_symbol, disease)`:
-   Returns EFO traits, trait associations (p-value filtered), gene variants.
-   GWAS data is stored per-gene inside `stage2_evidence.json` under `[gene]["gwas"]`.
-d) **Ensembl VEP** (oncology OR GWAS variants available):
-   Collect rs IDs from GWAS gene_associations (step c).
+Before starting Stage 2 interpretation, read the following skill guides if you need
+help with evidence weighting, ontology mapping, or result interpretation:
+- `read_skill_file("skills/opentargets-database/SKILL.md")`
+- `read_skill_file("skills/gwas-database/SKILL.md")`
+
+These skill documents provide strategy guidance only. Continue to execute all
+database access through the provided Stage 2 database tools.
+
+Call `query_stage2_gene_panel(gene_symbols, disease, selected_top3_genes, data_dir)` ONCE:
+- Uses the full unique-gene panel from `load_lr_candidates`
+- Reuses disease-level OpenTargets and GWAS context internally
+- Reuses existing workspace Stage 2 evidence files when they exactly match the request
+- Returns:
+  - `stage2_evidence` keyed by gene symbol
+  - `known_drugs`
+  - `gene_manifest`
+
+After the batch call:
+a) **SAVE IMMEDIATELY** -- `save_evidence(data_dir, "stage2_evidence.json", stage2_evidence)`
+b) For EACH gene in the returned panel:
+   `save_evidence(data_dir, "ot_{GENE}.json", stage2_evidence[GENE]["opentargets"])`
+c) `save_evidence(data_dir, "known_drugs.json", known_drugs)`
+d) `save_evidence(data_dir, "gene_manifest.json", gene_manifest)`
+e) **Ensembl VEP** (oncology OR GWAS variants available):
+   Collect rs IDs from each gene's `stage2_evidence[GENE]["gwas"]["gene_associations"]`.
    Call `query_ensembl_vep_consequence(variant_ids)` to predict
    functional consequence (LoF, missense, synonymous).
    Use `classify_vep_consequence()` to categorize impact severity.
    VEP results inform mechanism_relevance and biological_plausibility scores.
-
-After all genes processed, save manifest:
--> `save_evidence(data_dir, "gene_manifest.json", gene_list_with_flags)`
-
-**OpenTargets Known Drugs** -- call `query_opentargets_known_drugs(disease)`:
--> `save_evidence(data_dir, "known_drugs.json", drugs_data)`
 
 ### Inline Rubric Assessment (after Stage 2 → Featured & Novel Selection)
 
@@ -193,6 +203,13 @@ Use `validate_quality` on a summary of findings (threshold >= 0.7).
 
 ### Stage 3: Deep Dive (FEATURED AND NOVEL CANDIDATES)
 
+Before interpreting ChEMBL-derived evidence, read the following skill guide if you
+need help interpreting activity values, target relevance, or compound evidence:
+- `read_skill_file("skills/chembl-database/SKILL.md")`
+
+Do NOT read separate pathway, STRING, or Census skill documents for this workflow.
+Those stages remain tool-driven.
+
 For EACH Featured and Novel Candidate:
 a) **DrugBank/ChEMBL** -- call `query_drugbank_target_profile` to retrieve known drugs
    (DrugBank primary, ChEMBL REST API fallback). Check the `source` field in the
@@ -213,7 +230,7 @@ Use `think_tool` to REFLECT on overall coverage and quality.
 - Featured candidates are determined by rubric scoring (combined_total), NOT by external selection
 - Featured set: validated targets ranked by combined_total; Novel set: new targets ranked by exploratory_total
 - Handle API failures gracefully -- save partial results and note errors
-- GWAS query is batched (all genes at once) for efficiency
+- Stage 2 batching happens through `query_stage2_gene_panel(...)`
 - Every rubric score MUST have an explicit rationale grounded in evidence
 - Do NOT hallucinate evidence -- if data is missing, score conservatively
 """

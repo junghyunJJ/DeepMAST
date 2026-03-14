@@ -21,11 +21,13 @@ from src.agents.drug_target.tools.stage_domain_tools import (
     query_kegg_pathways,
     query_reactome_pathways,
     query_string_ppi_pair,
-    query_opentargets_target,
-    query_opentargets_known_drugs,
-    query_gwas_gene_trait,
     query_drugbank_target_profile,
     _chembl_fallback,
+)
+from src.agents.drug_target.tools.stage2_service import (
+    build_stage2_gene_panel,
+    load_stage2_inputs,
+    write_stage2_artifacts,
 )
 from src.agents.drug_target.tools.stage_logic import (
     rank_featured_candidates,
@@ -37,7 +39,6 @@ from src.agents.drug_target.tools.stage_logic import (
 DATA_DIR = PROJECT_ROOT / "res_bc_ollama"
 DISEASE = "breast cancer"
 DELAY = 0.3  # polite delay between API calls
-
 
 def _call_tool(tool_fn, **kwargs):
     """Call a LangChain @tool function and parse JSON result."""
@@ -54,16 +55,11 @@ def _save_json(path: Path, data):
 
 
 # ── Load input data ───────────────────────────────────────────────────
-lr_data = json.loads((DATA_DIR / "lr_candidates.json").read_text())
-pairs = lr_data.get("pairs", lr_data.get("candidate_pairs", []))
+stage2_inputs = load_stage2_inputs(DATA_DIR)
+pairs = stage2_inputs["pairs"]
 print(f"Loaded {len(pairs)} L-R candidate pairs")
 
-# Extract unique genes
-all_genes = set()
-for p in pairs:
-    all_genes.add(p["ligand"].upper())
-    all_genes.add(p["receptor"].upper())
-unique_genes = sorted(all_genes)
+unique_genes = stage2_inputs["gene_symbols"]
 print(f"Unique genes: {len(unique_genes)}")
 
 # Ensure evidence directory
@@ -151,169 +147,23 @@ print(f"\n✓ Stage 1 complete: {len(stage1_evidence)} pairs processed")
 # STAGE 2: Target Validation & Scoring (ALL unique genes)
 # ══════════════════════════════════════════════════════════════════════
 print("\n" + "=" * 70)
-print("STAGE 2: OpenTargets + GWAS (per unique gene)")
+print("STAGE 2: OpenTargets + GWAS batch")
 print("=" * 70)
+stage2_bundle = build_stage2_gene_panel(
+    unique_genes,
+    DISEASE,
+    selected_top3_genes=stage2_inputs["selected_top3_genes"],
+    data_dir=DATA_DIR,
+)
+stage2_evidence = stage2_bundle["stage2_evidence"]
+for path in write_stage2_artifacts(stage2_bundle, evidence_dir):
+    print(f"  Saved → {path.name}")
 
-# ── Detect Parquet data availability ──────────────────────────────────
-SKILLS_DIR = PROJECT_ROOT / "skills"
-_parquet_available = False
-try:
-    sys.path.insert(0, str(SKILLS_DIR / "opentargets-database/scripts"))
-    import opentargets_parquet as otpq
-    _parquet_available = otpq.is_available()
-except ImportError:
-    pass
-
-if _parquet_available:
-    print("  ⚡ Using LOCAL Parquet data (fast mode)")
-else:
-    print("  🌐 Using API mode")
-
-stage2_evidence = {}
-stage2_t0 = time.time()
-
-if _parquet_available:
-    # ── Parquet mode: sequential but fast (~1.6s/gene) ────────────────
-    for i, gene in enumerate(unique_genes):
-        print(f"\n[{i+1}/{len(unique_genes)}] {gene}")
-        gt0 = time.time()
-
-        ot: dict = {
-            "gene_symbol": gene, "disease": DISEASE,
-            "executed": False, "ensembl_id": None,
-            "target_info": {}, "disease_evidence": [], "associations": [],
-            "errors": [],
-        }
-        try:
-            # 1. Gene → Ensembl ID
-            hits = otpq.search_entities(gene, entity_types=["target"])
-            if not hits:
-                ot["errors"].append(f"No target found for {gene}")
-            else:
-                ensembl_id = hits[0]["id"]
-                ot["ensembl_id"] = ensembl_id
-
-                # 2. Target info
-                ot["target_info"] = otpq.get_target_info(ensembl_id, include_diseases=True)
-
-                # 3. Disease evidence
-                disease_hits = otpq.search_entities(DISEASE, entity_types=["disease"])
-                if disease_hits:
-                    efo_id = disease_hits[0]["id"]
-                    ot["efo_id"] = efo_id
-                    ot["disease_evidence"] = otpq.get_target_disease_evidence(ensembl_id, efo_id)
-
-                # 4. Associations
-                ot["associations"] = otpq.get_target_associations(ensembl_id, min_score=0.1)
-                ot["executed"] = True
-        except Exception as exc:
-            ot["errors"].append(f"Parquet query failed: {exc}")
-
-        elapsed = round(time.time() - gt0, 1)
-        n_assoc = len(ot.get("associations", []))
-        n_ev = len(ot.get("disease_evidence", []))
-        print(f"  → OpenTargets (parquet) ... executed={ot.get('executed')}, "
-              f"associations={n_assoc}, evidence={n_ev} ({elapsed}s)")
-
-        # GWAS (still API)
-        print(f"  → GWAS ...", end=" ", flush=True)
-        gwas = _call_tool(query_gwas_gene_trait, gene_symbol=gene, disease=DISEASE)
-        n_gene_assoc = len(gwas.get("gene_associations", []))
-        n_trait_assoc = len(gwas.get("trait_associations", []))
-        print(f"executed={gwas.get('executed')}, gene_assoc={n_gene_assoc}, trait_assoc={n_trait_assoc}")
-        time.sleep(DELAY)
-
-        stage2_evidence[gene] = {"opentargets": ot, "gwas": gwas}
-        _save_json(evidence_dir / f"ot_{gene}.json", ot)
-
-else:
-    # ── Async API mode: parallel queries (~5min for 50 genes) ─────────
-    _has_aiohttp = False
-    try:
-        import asyncio
-        from query_opentargets import async_batch_query_targets
-        _has_aiohttp = True
-        print("  Using ASYNC API mode (parallel)")
-    except ImportError:
-        pass
-
-    if _has_aiohttp:
-        # Batch async OpenTargets queries
-        async_results = asyncio.run(
-            async_batch_query_targets(unique_genes, DISEASE, max_concurrent=5)
-        )
-        for gene in unique_genes:
-            ot = async_results.get(gene, {"executed": False, "errors": ["missing"]})
-            n_assoc = len(ot.get("associations", []))
-            n_ev = len(ot.get("disease_evidence", []))
-            print(f"  {gene}: executed={ot.get('executed')}, associations={n_assoc}, evidence={n_ev}")
-
-            # GWAS (sequential API)
-            gwas = _call_tool(query_gwas_gene_trait, gene_symbol=gene, disease=DISEASE)
-            time.sleep(DELAY)
-
-            stage2_evidence[gene] = {"opentargets": ot, "gwas": gwas}
-            _save_json(evidence_dir / f"ot_{gene}.json", ot)
-    else:
-        # Fallback: original sequential API mode
-        print("  Using sequential API mode (aiohttp not available)")
-        for i, gene in enumerate(unique_genes):
-            print(f"\n[{i+1}/{len(unique_genes)}] {gene}")
-
-            print(f"  → OpenTargets ...", end=" ", flush=True)
-            ot = _call_tool(query_opentargets_target, gene_symbol=gene, disease=DISEASE)
-            n_assoc = len(ot.get("associations", []))
-            n_ev = len(ot.get("disease_evidence", []))
-            print(f"executed={ot.get('executed')}, associations={n_assoc}, evidence={n_ev}")
-            time.sleep(DELAY)
-
-            print(f"  → GWAS ...", end=" ", flush=True)
-            gwas = _call_tool(query_gwas_gene_trait, gene_symbol=gene, disease=DISEASE)
-            n_gene_assoc = len(gwas.get("gene_associations", []))
-            n_trait_assoc = len(gwas.get("trait_associations", []))
-            print(f"executed={gwas.get('executed')}, gene_assoc={n_gene_assoc}, trait_assoc={n_trait_assoc}")
-            time.sleep(DELAY)
-
-            stage2_evidence[gene] = {"opentargets": ot, "gwas": gwas}
-            _save_json(evidence_dir / f"ot_{gene}.json", ot)
-
-stage2_elapsed = round(time.time() - stage2_t0, 1)
-print(f"\n  Stage 2 OpenTargets+GWAS completed in {stage2_elapsed}s")
-
-# Save Stage 2 evidence
-_save_json(evidence_dir / "stage2_evidence.json", stage2_evidence)
-
-# OpenTargets Known Drugs (disease-level)
-print(f"\n  → OpenTargets Known Drugs for '{DISEASE}' ...", end=" ", flush=True)
-if _parquet_available:
-    disease_hits = otpq.search_entities(DISEASE, entity_types=["disease"])
-    if disease_hits:
-        efo_id = disease_hits[0]["id"]
-        drugs_data = otpq.get_known_drugs_for_disease(efo_id)
-        known_drugs = {"disease": DISEASE, "executed": True, "efo_id": efo_id, "drugs": drugs_data, "errors": []}
-    else:
-        known_drugs = {"disease": DISEASE, "executed": False, "errors": ["No disease found"]}
-else:
-    known_drugs = _call_tool(query_opentargets_known_drugs, disease=DISEASE)
-print(f"executed={known_drugs.get('executed')}")
-_save_json(evidence_dir / "known_drugs.json", known_drugs)
-
-# Gene manifest
-gene_manifest = []
-for gene in unique_genes:
-    ot = stage2_evidence[gene]["opentargets"]
-    gwas = stage2_evidence[gene]["gwas"]
-    gene_manifest.append({
-        "gene_symbol": gene,
-        "ot_executed": ot.get("executed", False),
-        "gwas_executed": gwas.get("executed", False),
-        "ensembl_id": ot.get("ensembl_id"),
-        "n_associations": len(ot.get("associations", [])),
-        "n_gwas_hits": len(gwas.get("gene_associations", [])),
-    })
-_save_json(evidence_dir / "gene_manifest.json", gene_manifest)
-
-print(f"\n✓ Stage 2 complete: {len(unique_genes)} genes processed")
+print(
+    f"\n✓ Stage 2 complete: {len(unique_genes)} genes processed "
+    f"(OT={stage2_bundle['source_modes']['opentargets']}, "
+    f"GWAS={stage2_bundle['source_modes']['gwas']})"
+)
 
 
 # ══════════════════════════════════════════════════════════════════════

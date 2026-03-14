@@ -28,10 +28,12 @@ from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import MemorySaver
 
 from src.agents.model import create_llm, load_subagent_models_from_env
+from src.agents.shared.skills_middleware import SkillsMiddleware
 from src.agents.drug_target.subagents.configs import get_subagents
 from src.agents.drug_target.tools import (
     load_evidence_files,
     load_lr_candidates,
+    read_skill_file,
     save_evidence,
     sequential_thinking,
     think_tool,
@@ -40,28 +42,42 @@ from src.agents.drug_target.tools import (
 
 logger = logging.getLogger(__name__)
 
+DRUG_TARGET_SKILLS_GUIDANCE = """
+**How to Use Skills (Progressive Disclosure):**
+
+1. Only consult a listed skill when the stage instructions say it may help.
+2. Use `read_skill_file(skill_path=...)` to load the full `SKILL.md` when needed.
+3. Skills provide interpretation guidance only; all database access must still happen through the provided `@tool` wrappers.
+"""
+
 
 # =============================================================================
 # Orchestrator System Prompt
 # =============================================================================
 
-ORCHESTRATOR_SYSTEM_PROMPT = """You are the Drug Target Assessment orchestrator.
+ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE = """You are the Drug Target Assessment orchestrator.
 
 Your task is to coordinate 2 specialized subagents to produce a comprehensive
 therapeutic target assessment report (drug.md) using a 3-stage funnel approach.
 
+## Pre-configured Context
+- **Data directory**: `{data_dir}`
+- **Disease context**: `{disease}`
+
+These values are injected from configuration. Use them directly — do NOT
+attempt to parse or extract data_dir or disease from the user message.
+
 ## CRITICAL: First Action
-You MUST call the `load_lr_candidates` tool with the data_dir from the user message
-as your VERY FIRST action. This loads lr_candidates.json, extracts gene symbols,
-and returns structured data. Do NOT use `ls` or `read_file` to check the directory
--- always use `load_lr_candidates`.
+You MUST call `load_lr_candidates(data_dir="{data_dir}")` as your VERY FIRST
+action. This loads lr_candidates.json, extracts gene symbols, and returns
+structured data. Do NOT use `ls` or `read_file` to check the directory.
 
 ## Workflow
 Execute subagents strictly in this order via the `task` tool:
 
 1. **evidence_assessor**: Pass the load_lr_candidates output. Runs the 3-stage funnel:
    - Stage 1 (ALL pairs): Biological context (Cellxgene, KEGG/Reactome, STRING, Census)
-   - Stage 2 (ALL pairs): Validation & scoring (OpenTargets, VEP, GWAS) + inline rubric
+   - Stage 2 (ALL unique genes): batch validation & scoring (OpenTargets, GWAS, VEP) + inline rubric
    - Stage 3 (FEATURED only): Deep dive (DrugBank, PubMed)
 2. **report_writer**: Generates drug.md with [FEATURED] Candidate emphasis.
    The report_writer MUST first save target_assessment.json via
@@ -69,7 +85,7 @@ Execute subagents strictly in this order via the `task` tool:
 
 ## Input
 - lr_candidates.json: Top-30 L-R pairs from CCI analysis
-- Disease context provided in initial message
+- Disease context: {disease}
 
 ## Output
 - target_assessment.json: Structured contract output (schema-aligned)
@@ -100,6 +116,10 @@ class DrugTargetConfig:
         docker_image: Docker image for sandbox backend. None (default) disables
             Docker — all tools run on the host. Set to e.g. "python:3.12-slim"
             to enable container isolation for heavy-dependency tools.
+        enable_progressive_disclosure: Whether to expose selected skills metadata
+            to the agent and allow on-demand skill reading.
+        agent_skill_names: Agent-facing skills to expose via progressive disclosure.
+        skills_dir: Optional override for the project skills directory.
     """
 
     provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "openrouter"
@@ -112,6 +132,13 @@ class DrugTargetConfig:
     use_checkpointer: bool = False
     custom_tools: Sequence[BaseTool] = field(default_factory=list)
     docker_image: str | None = None
+    enable_progressive_disclosure: bool = True
+    agent_skill_names: tuple[str, ...] = (
+        "opentargets-database",
+        "gwas-database",
+        "chembl-database",
+    )
+    skills_dir: str | None = None
     subagent_models: dict[str, str] | None = None
     # init_chat_model format per subagent, e.g.:
     # {"evidence_assessor": "openai:gpt-4.1", "report_writer": "openai:gpt-4.1-mini"}
@@ -135,7 +162,7 @@ def _create_docker_backend(
     """
     from src.agents.drug_target.docker_backend import DockerBackend
 
-    skills_dir = str(_find_project_root() / "skills")
+    skills_dir = str(_resolve_skills_dir(config))
     backend = DockerBackend(
         image_name=config.docker_image,
         host_dir=resolved_data_dir,
@@ -144,6 +171,13 @@ def _create_docker_backend(
     )
     logger.info("DockerBackend enabled (image=%s)", config.docker_image)
     return backend
+
+
+def _resolve_skills_dir(config: DrugTargetConfig) -> Path:
+    """Resolve the project skills directory."""
+    if config.skills_dir:
+        return Path(config.skills_dir).expanduser().resolve()
+    return _find_project_root() / "skills"
 
 
 def _find_project_root() -> Path:
@@ -196,6 +230,7 @@ def create_drug_target_agent(
     tools: list = [
         load_lr_candidates,
         load_evidence_files,
+        read_skill_file,
         save_evidence,
         sequential_thinking,
         think_tool,
@@ -214,15 +249,35 @@ def create_drug_target_agent(
     # 4. Create agent
     llm = create_llm(provider=config.provider)
     checkpointer = MemorySaver() if config.use_checkpointer else None
+    middleware = None
+    if config.enable_progressive_disclosure:
+        middleware = [
+            SkillsMiddleware(
+                skills_dir=_resolve_skills_dir(config),
+                allowed_skill_names=config.agent_skill_names,
+                usage_guidance=DRUG_TARGET_SKILLS_GUIDANCE,
+            )
+        ]
 
-    agent = create_deep_agent(
+    # Render system prompt with config values so the LLM knows
+    # data_dir / disease without parsing the user message.
+    system_prompt = ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE.format(
+        data_dir=resolved_data_dir,
+        disease=config.disease or "(see lr_candidates.json)",
+    )
+
+    create_kwargs = dict(
         model=llm,
         tools=tools,
         subagents=subagent_specs,
         checkpointer=checkpointer,
-        system_prompt=ORCHESTRATOR_SYSTEM_PROMPT,
+        system_prompt=system_prompt,
         backend=backend,
     )
+    if middleware:
+        create_kwargs["middleware"] = middleware
+
+    agent = create_deep_agent(**create_kwargs)
 
     return agent, backend
 

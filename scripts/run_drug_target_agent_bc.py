@@ -60,13 +60,10 @@ async def main():
     print(f"  Agent created in {time.time() - t0:.1f}s")
 
     try:
-        # Build initial message
+        # Natural language message — data_dir and disease are already
+        # injected into the system prompt via DrugTargetConfig.
         initial_message = (
-            f"Assess therapeutic potential of L-R pair genes in {DATA_DIR}.\n\n"
-            f"Disease context: {DISEASE}\n"
-            f"Input files: lr_candidates.json\n"
-            f"Output: target_assessment.json and drug.md\n\n"
-            f"Execute the full evidence_assessor → report_writer pipeline."
+            "Run the full drug target assessment pipeline for breast cancer."
         )
 
         print("\nInvoking agent...")

@@ -1,7 +1,7 @@
 """Reporter integration tool for Drug Target Assessment Agent.
 
 Provides run_drug_target_assessment() as a single @tool that the Reporter
-subagent calls to delegate the entire Phase 4.7 drug target assessment
+subagent calls to delegate the entire Step 9.5 drug target assessment
 to the DrugTargetAgent.
 """
 
@@ -64,13 +64,10 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
         agent, backend = create_drug_target_agent(config)
 
         try:
-            # Build initial message with context
+            # Natural language message — data_dir and disease are already
+            # injected into the system prompt via DrugTargetConfig.
             initial_message = (
-                f"Assess therapeutic potential of L-R pair genes in {resolved_dir}.\n\n"
-                f"Disease context: {disease}\n"
-                f"Input files: lr_candidates.json\n"
-                f"Output: target_assessment.json and drug.md\n\n"
-                f"Execute the full evidence_assessor → report_writer pipeline."
+                f"Run the full drug target assessment pipeline for {disease}."
             )
 
             # Run the agent

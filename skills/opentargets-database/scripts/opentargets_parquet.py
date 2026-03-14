@@ -2,10 +2,10 @@
 """Local Parquet reader for Open Targets Platform data.
 
 Mirrors the function signatures and return structures of query_opentargets.py
-but reads from local Parquet files in ot_data/ instead of calling the API.
+but reads from local Parquet files in data/ot_data/ instead of calling the API.
 
 Expected directory layout (relative to project root):
-    ot_data/
+    data/ot_data/
         target/   (partitioned parquet, ~94MB)
         disease/  (single file disease.parquet, ~4.6MB)
         evidence/ (partitioned by sourceId, ~7.9GB)
@@ -23,11 +23,13 @@ import pyarrow.parquet as pq
 logger = logging.getLogger(__name__)
 
 # ── Data directory ────────────────────────────────────────────────────
-DATA_DIR = Path(__file__).resolve().parents[3] / "ot_data"
+DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "ot_data"
 
 # ── Module-level caches (loaded once on first use) ────────────────────
 _target_df: pd.DataFrame | None = None
 _disease_df: pd.DataFrame | None = None
+_target_evidence_cache: dict[str, pd.DataFrame] = {}
+_known_drugs_cache: dict[str, Dict[str, Any]] = {}
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -103,6 +105,171 @@ def _disease_id_to_name(disease_ids: list[str]) -> dict[str, str]:
     df = _load_diseases()
     matched = df[df["id"].isin(disease_ids)][["id", "name"]]
     return dict(zip(matched["id"], matched["name"]))
+
+
+def _build_target_info_base(row: pd.Series) -> dict[str, Any]:
+    return {
+        "id": str(row["id"]),
+        "approvedSymbol": str(row.get("approvedSymbol", "")),
+        "approvedName": str(row.get("approvedName", "")),
+        "biotype": str(row.get("biotype", "")),
+        "functionDescriptions": _to_native(_to_list(row.get("functionDescriptions"))),
+        "tractability": _struct_list_to_dicts(row.get("tractability")),
+        "safetyLiabilities": _struct_list_to_dicts(row.get("safetyLiabilities")),
+        "geneticConstraint": _struct_list_to_dicts(row.get("constraint")),
+    }
+
+
+def _get_target_evidence_df(ensembl_id: str) -> pd.DataFrame:
+    cached = _target_evidence_cache.get(ensembl_id)
+    if cached is not None:
+        return cached
+
+    table = pq.read_table(
+        DATA_DIR / "evidence",
+        columns=[
+            "targetId",
+            "diseaseId",
+            "score",
+            "datatypeId",
+            "datasourceId",
+            "targetFromSourceId",
+            "studyId",
+            "literature",
+            "cohortPhenotypes",
+            "drugId",
+            "clinicalPhase",
+        ],
+        filters=[("targetId", "=", ensembl_id)],
+    )
+    cached = table.to_pandas()
+    _target_evidence_cache[ensembl_id] = cached
+    return cached
+
+
+def _build_associated_diseases(ev: pd.DataFrame) -> dict[str, Any]:
+    if len(ev) == 0:
+        return {"rows": []}
+
+    agg = ev.groupby("diseaseId")["score"].max().sort_values(ascending=False).head(10)
+    disease_names = _disease_id_to_name(list(agg.index))
+    rows = []
+    for did, sc in agg.items():
+        rows.append({
+            "disease": {"id": did, "name": disease_names.get(did, did)},
+            "score": round(float(sc), 4),
+        })
+    return {"rows": rows}
+
+
+def _build_target_disease_records(
+    ev: pd.DataFrame,
+    efo_id: str,
+    datasource_ids: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    if len(ev) == 0:
+        return []
+
+    disease_df = ev[ev["diseaseId"] == efo_id]
+    if datasource_ids:
+        allowed = set(datasource_ids)
+        disease_df = disease_df[disease_df["datasourceId"].isin(allowed)]
+    if len(disease_df) == 0:
+        return []
+
+    disease_df = disease_df.sort_values("score", ascending=False).head(100)
+    records = []
+    for _, row in disease_df.iterrows():
+        rec = {
+            "datasourceId": row.get("datasourceId"),
+            "datatypeId": row.get("datatypeId"),
+            "score": float(row["score"]) if pd.notna(row.get("score")) else 0.0,
+            "targetFromSourceId": row.get("targetFromSourceId"),
+            "studyId": row.get("studyId"),
+        }
+        lit = row.get("literature")
+        if lit is not None:
+            rec["literature"] = _to_list(lit)
+        cohort = row.get("cohortPhenotypes")
+        if cohort is not None:
+            rec["cohortPhenotypes"] = _to_list(cohort)
+        if pd.notna(row.get("drugId")):
+            rec["drugId"] = row["drugId"]
+        if pd.notna(row.get("clinicalPhase")):
+            rec["clinicalPhase"] = int(row["clinicalPhase"])
+        records.append(rec)
+    return records
+
+
+def _build_target_associations(ev: pd.DataFrame, min_score: float) -> List[Dict[str, Any]]:
+    if len(ev) == 0:
+        return []
+
+    agg = ev.groupby("diseaseId")["score"].max().reset_index()
+    agg = agg[agg["score"] >= min_score].sort_values("score", ascending=False).head(100)
+    if len(agg) == 0:
+        return []
+
+    dtype_scores = ev.groupby(["diseaseId", "datatypeId"])["score"].max().reset_index()
+    disease_names = _disease_id_to_name(list(agg["diseaseId"]))
+
+    results = []
+    for _, row in agg.iterrows():
+        did = row["diseaseId"]
+        ds = dtype_scores[dtype_scores["diseaseId"] == did]
+        dt_scores = [
+            {"id": r["datatypeId"], "score": round(float(r["score"]), 4)}
+            for _, r in ds.iterrows()
+        ]
+        results.append({
+            "disease": {"id": did, "name": disease_names.get(did, did)},
+            "score": round(float(row["score"]), 4),
+            "datatypeScores": dt_scores,
+        })
+    return results
+
+
+def get_target_bundle(
+    ensembl_id: str,
+    efo_id: Optional[str] = None,
+    min_score: float = 0.0,
+    datasource_ids: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Read evidence once for a target and derive all Stage 2 views."""
+    tdf = _load_targets()
+    row_df = tdf[tdf["id"] == ensembl_id]
+    if len(row_df) == 0:
+        return {
+            "target_info": {},
+            "disease_evidence": [],
+            "associations": [],
+        }
+
+    row = row_df.iloc[0]
+    target_info = _build_target_info_base(row)
+
+    try:
+        ev = _get_target_evidence_df(ensembl_id)
+    except Exception as exc:
+        logger.warning("Failed to read target evidence for %s: %s", ensembl_id, exc)
+        return {
+            "target_info": target_info,
+            "disease_evidence": [],
+            "associations": [],
+        }
+
+    target_info["associatedDiseases"] = _build_associated_diseases(ev)
+    disease_evidence = (
+        _build_target_disease_records(ev, efo_id, datasource_ids=datasource_ids)
+        if efo_id
+        else []
+    )
+    associations = _build_target_associations(ev, min_score=min_score)
+    return {
+        "target_info": target_info,
+        "disease_evidence": disease_evidence,
+        "associations": associations,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -189,40 +356,14 @@ def get_target_info(
         return {}
 
     row = row_df.iloc[0]
-    info: dict[str, Any] = {
-        "id": str(row["id"]),
-        "approvedSymbol": str(row.get("approvedSymbol", "")),
-        "approvedName": str(row.get("approvedName", "")),
-        "biotype": str(row.get("biotype", "")),
-        "functionDescriptions": _to_native(_to_list(row.get("functionDescriptions"))),
-        "tractability": _struct_list_to_dicts(row.get("tractability")),
-        "safetyLiabilities": _struct_list_to_dicts(row.get("safetyLiabilities")),
-        "geneticConstraint": _struct_list_to_dicts(row.get("constraint")),
-    }
+    info = _build_target_info_base(row)
 
     if include_diseases:
-        # Derive top associated diseases from evidence parquet
         try:
-            ev = pq.read_table(
-                DATA_DIR / "evidence",
-                columns=["targetId", "diseaseId", "score"],
-                filters=[("targetId", "=", ensembl_id)],
-            ).to_pandas()
-            if len(ev) > 0:
-                agg = (
-                    ev.groupby("diseaseId")["score"]
-                    .max()
-                    .sort_values(ascending=False)
-                    .head(10)
-                )
-                disease_names = _disease_id_to_name(list(agg.index))
-                rows = []
-                for did, sc in agg.items():
-                    rows.append({
-                        "disease": {"id": did, "name": disease_names.get(did, did)},
-                        "score": round(float(sc), 4),
-                    })
-                info["associatedDiseases"] = {"rows": rows}
+            info["associatedDiseases"] = get_target_bundle(ensembl_id)["target_info"].get(
+                "associatedDiseases",
+                {"rows": []},
+            )
         except Exception as exc:
             logger.warning("Failed to derive associated diseases: %s", exc)
 
@@ -238,40 +379,13 @@ def get_target_disease_evidence(
 
     Uses predicate pushdown for fast filtering on the 7.9GB dataset.
     """
-    filters = [
-        ("targetId", "=", ensembl_id),
-        ("diseaseId", "=", efo_id),
-    ]
-    columns = [
-        "datasourceId", "datatypeId", "score", "targetFromSourceId",
-        "studyId", "literature", "cohortPhenotypes", "drugId", "clinicalPhase",
-    ]
     try:
-        table = pq.read_table(DATA_DIR / "evidence", columns=columns, filters=filters)
-        df = table.to_pandas()
-        # Limit to top 100 by score (matching API behavior)
-        df = df.sort_values("score", ascending=False).head(100)
-        records = []
-        for _, row in df.iterrows():
-            rec = {
-                "datasourceId": row.get("datasourceId"),
-                "datatypeId": row.get("datatypeId"),
-                "score": float(row["score"]) if pd.notna(row.get("score")) else 0.0,
-                "targetFromSourceId": row.get("targetFromSourceId"),
-                "studyId": row.get("studyId"),
-            }
-            lit = row.get("literature")
-            if lit is not None:
-                rec["literature"] = _to_list(lit)
-            cohort = row.get("cohortPhenotypes")
-            if cohort is not None:
-                rec["cohortPhenotypes"] = _to_list(cohort)
-            if pd.notna(row.get("drugId")):
-                rec["drugId"] = row["drugId"]
-            if pd.notna(row.get("clinicalPhase")):
-                rec["clinicalPhase"] = int(row["clinicalPhase"])
-            records.append(rec)
-        return records
+        bundle = get_target_bundle(
+            ensembl_id,
+            efo_id=efo_id,
+            datasource_ids=datasource_ids,
+        )
+        return bundle["disease_evidence"]
     except Exception as exc:
         logger.error("Evidence parquet read failed: %s", exc)
         return []
@@ -285,42 +399,7 @@ def get_target_associations(
     Groups evidence by diseaseId and takes max(score) per disease.
     """
     try:
-        ev = pq.read_table(
-            DATA_DIR / "evidence",
-            columns=["targetId", "diseaseId", "score", "datatypeId"],
-            filters=[("targetId", "=", ensembl_id)],
-        ).to_pandas()
-
-        if len(ev) == 0:
-            return []
-
-        # Aggregate: max score per disease
-        agg = ev.groupby("diseaseId")["score"].max().reset_index()
-        agg = agg[agg["score"] >= min_score].sort_values("score", ascending=False).head(100)
-
-        # Datatype scores per disease
-        dtype_scores = (
-            ev.groupby(["diseaseId", "datatypeId"])["score"]
-            .max()
-            .reset_index()
-        )
-
-        disease_names = _disease_id_to_name(list(agg["diseaseId"]))
-
-        results = []
-        for _, row in agg.iterrows():
-            did = row["diseaseId"]
-            ds = dtype_scores[dtype_scores["diseaseId"] == did]
-            dt_scores = [
-                {"id": r["datatypeId"], "score": round(float(r["score"]), 4)}
-                for _, r in ds.iterrows()
-            ]
-            results.append({
-                "disease": {"id": did, "name": disease_names.get(did, did)},
-                "score": round(float(row["score"]), 4),
-                "datatypeScores": dt_scores,
-            })
-        return results
+        return get_target_bundle(ensembl_id, min_score=min_score)["associations"]
     except Exception as exc:
         logger.error("Associations derivation failed: %s", exc)
         return []
@@ -331,6 +410,9 @@ def get_known_drugs_for_disease(efo_id: str) -> Dict[str, Any]:
 
     Filters evidence where datatypeId='known_drug' and diseaseId=efo_id.
     """
+    cached = _known_drugs_cache.get(efo_id)
+    if cached is not None:
+        return cached
     try:
         ev = pq.read_table(
             DATA_DIR / "evidence",
@@ -378,11 +460,13 @@ def get_known_drugs_for_disease(efo_id: str) -> Dict[str, Any]:
                 "mechanismOfAction": None,
             })
 
-        return {
+        result = {
             "uniqueDrugs": int(unique_drugs),
             "uniqueTargets": int(unique_targets),
             "rows": rows,
         }
+        _known_drugs_cache[efo_id] = result
+        return result
     except Exception as exc:
         logger.error("Known drugs parquet read failed: %s", exc)
         return {"uniqueDrugs": 0, "uniqueTargets": 0, "rows": []}

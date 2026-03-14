@@ -67,6 +67,8 @@ _SJR_DEFAULT_SCORE = 0.5
 _SJR_CACHE_DIR = Path.home() / ".cache" / "deepmast"
 _SJR_CACHE_FILE = _SJR_CACHE_DIR / "sjr_all.csv"
 _SJR_CACHE_MAX_AGE_DAYS = 90
+# Local SCImago official CSV (manually downloaded from scimagojr.com)
+_SJR_LOCAL_DIR = Path(__file__).resolve().parents[4] / "data" / "sjr"
 
 # Composite score weights
 _SJR_WEIGHT = 0.4       # Journal prestige (PageRank-based)
@@ -121,24 +123,41 @@ def _normalize_journal_name(name: str) -> str:
     return n
 
 
-def _download_sjr_csv_sync() -> str:
-    """Download SJR CSV to local cache. Returns path to cached file.
+def _find_local_sjr_csv() -> str:
+    """Find the most recent SCImago CSV in data/sjr/. Returns path or empty string."""
+    if not _SJR_LOCAL_DIR.is_dir():
+        return ""
+    csvs = sorted(_SJR_LOCAL_DIR.glob("scimagojr*.csv"), reverse=True)
+    if csvs:
+        logger.info(f"Using local SCImago CSV: {csvs[0]}")
+        return str(csvs[0])
+    return ""
 
-    Uses ~/.cache/deepmast/sjr_all.csv with 90-day max age.
-    Falls back to stale cache on download failure, empty string if no cache exists.
+
+def _download_sjr_csv_sync() -> str:
+    """Get SJR CSV path. Prefers local SCImago file, falls back to GitHub download.
+
+    Priority:
+    1. Local SCImago CSV in data/sjr/ (manually downloaded from scimagojr.com)
+    2. Cached GitHub CSV in ~/.cache/deepmast/sjr_all.csv
+    3. Fresh download from GitHub
     """
     import time as _time
 
-    _SJR_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    # Priority 1: Local SCImago official CSV
+    local = _find_local_sjr_csv()
+    if local:
+        return local
 
-    # Check if cached file is fresh enough
+    # Priority 2: Cached GitHub CSV
+    _SJR_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     if _SJR_CACHE_FILE.exists():
         age_days = (_time.time() - _SJR_CACHE_FILE.stat().st_mtime) / 86400
         if age_days < _SJR_CACHE_MAX_AGE_DAYS:
             logger.debug(f"SJR cache is fresh ({age_days:.0f} days old)")
             return str(_SJR_CACHE_FILE)
 
-    # Download
+    # Priority 3: Download from GitHub
     try:
         logger.info(f"Downloading SJR CSV from {_SJR_CSV_URL}")
         req = urllib.request.Request(_SJR_CSV_URL, headers={"User-Agent": "DeepMAST/1.0"})
@@ -149,7 +168,6 @@ def _download_sjr_csv_sync() -> str:
         return str(_SJR_CACHE_FILE)
     except Exception as e:
         logger.warning(f"SJR CSV download failed: {e}")
-        # Fall back to stale cache
         if _SJR_CACHE_FILE.exists():
             logger.info("Using stale SJR cache")
             return str(_SJR_CACHE_FILE)
@@ -159,69 +177,73 @@ def _download_sjr_csv_sync() -> str:
 def _build_sjr_lookup(csv_path: str) -> dict[str, float]:
     """Parse SJR CSV and build composite score lookup.
 
-    For each journal, uses the most recent year's data.
-    When a journal appears in multiple ASJC fields, takes the max values.
+    Auto-detects format:
+    - SCImago official (semicolon-delimited, comma decimals, single year)
+    - GitHub mirror (comma-delimited, multi-year with Year column)
+
     Composite = SJR_norm * 0.4 + hindex_norm * 0.3 + avgcit_norm * 0.3
     Each metric is log-normalized: log(1+x) / log(1+max_x) -> [0, 1]
     """
     if not csv_path:
         return {}
 
-    # Phase 1: Collect raw values per journal (latest year, max across fields)
-    raw: dict[str, tuple[int, float, float, float]] = {}
-    # raw[name] = (year, sjr, h_index, avg_citations)
+    # Auto-detect format by peeking at the header
+    try:
+        with open(csv_path, "r", encoding="utf-8") as f:
+            header_line = f.readline()
+    except Exception as e:
+        logger.warning(f"Failed to read SJR CSV header: {e}")
+        return {}
+
+    is_scimago = ";" in header_line and "H index" in header_line
+
+    # Phase 1: Collect raw values per journal (max across categories/years)
+    raw: dict[str, tuple[float, float, float]] = {}
+    # raw[name] = (sjr, h_index, avg_citations)
 
     try:
         with open(csv_path, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
+            if is_scimago:
+                reader = csv.DictReader(f, delimiter=";")
+                sjr_col, h_col, cit_col = "SJR", "H index", "Citations / Doc. (2years)"
+            else:
+                reader = csv.DictReader(f)
+                sjr_col, h_col, cit_col = "SJR", "h-index", "avg_citations"
+
             for row in reader:
                 title = row.get("Title", "").strip()
                 if not title:
                     continue
                 name = _normalize_journal_name(title)
 
-                try:
-                    year = int(row.get("Year", "0"))
-                except (ValueError, TypeError):
-                    year = 0
+                def _parse_float(val: str) -> float:
+                    try:
+                        return float((val or "0").replace(",", "."))
+                    except (ValueError, TypeError):
+                        return 0.0
 
-                try:
-                    sjr_val = float(row.get("SJR", "0") or "0")
-                except (ValueError, TypeError):
-                    sjr_val = 0.0
-
-                try:
-                    h_val = float(row.get("h-index", "0") or "0")
-                except (ValueError, TypeError):
-                    h_val = 0.0
-
-                try:
-                    avg_cit = float(row.get("avg_citations", "0") or "0")
-                except (ValueError, TypeError):
-                    avg_cit = 0.0
+                sjr_val = _parse_float(row.get(sjr_col, "0"))
+                h_val = _parse_float(row.get(h_col, "0"))
+                avg_cit = _parse_float(row.get(cit_col, "0"))
 
                 if name in raw:
-                    existing_year = raw[name][0]
-                    if year > existing_year:
-                        # Newer year replaces
-                        raw[name] = (year, sjr_val, h_val, avg_cit)
-                    elif year == existing_year:
-                        # Same year: take max of each metric
-                        _, e_sjr, e_h, e_cit = raw[name]
-                        raw[name] = (year, max(sjr_val, e_sjr), max(h_val, e_h), max(avg_cit, e_cit))
+                    e_sjr, e_h, e_cit = raw[name]
+                    raw[name] = (max(sjr_val, e_sjr), max(h_val, e_h), max(avg_cit, e_cit))
                 else:
-                    raw[name] = (year, sjr_val, h_val, avg_cit)
+                    raw[name] = (sjr_val, h_val, avg_cit)
     except Exception as e:
         logger.warning(f"Failed to parse SJR CSV: {e}")
         return {}
+
+    logger.info(f"SJR CSV format: {'SCImago official' if is_scimago else 'GitHub mirror'}")
 
     if not raw:
         return {}
 
     # Phase 2: Find max values for log-normalization
-    max_sjr = max(v[1] for v in raw.values()) or 1.0
-    max_h = max(v[2] for v in raw.values()) or 1.0
-    max_cit = max(v[3] for v in raw.values()) or 1.0
+    max_sjr = max(v[0] for v in raw.values()) or 1.0
+    max_h = max(v[1] for v in raw.values()) or 1.0
+    max_cit = max(v[2] for v in raw.values()) or 1.0
 
     log_max_sjr = math.log(1 + max_sjr)
     log_max_h = math.log(1 + max_h)
@@ -229,7 +251,7 @@ def _build_sjr_lookup(csv_path: str) -> dict[str, float]:
 
     # Phase 3: Compute composite scores
     lookup: dict[str, float] = {}
-    for name, (_, sjr_val, h_val, cit_val) in raw.items():
+    for name, (sjr_val, h_val, cit_val) in raw.items():
         sjr_norm = math.log(1 + sjr_val) / log_max_sjr if log_max_sjr > 0 else 0.0
         h_norm = math.log(1 + h_val) / log_max_h if log_max_h > 0 else 0.0
         cit_norm = math.log(1 + cit_val) / log_max_cit if log_max_cit > 0 else 0.0
@@ -581,7 +603,7 @@ async def _search_with_biomcp(
 
             llm_dropped = 0
             rerank_local_stats = {
-                "applied_count": 0, "promoted_count": 0, "dropped_count": 0,
+                "applied_count": 0, "dropped_count": 0,
             }
             if uncertain and _normalize_rerank_mode(rerank_mode) == "llm":
                 llm_kept, rerank_local_stats = await _llm_disease_relevance_filter(
@@ -763,9 +785,9 @@ async def _llm_disease_relevance_filter(
     Batch processes papers with a single LLM call.
 
     Returns:
-        Tuple of (filtered papers, stats dict with applied/promoted/dropped counts)
+        Tuple of (filtered papers, stats dict with applied/dropped counts)
     """
-    stats = {"applied_count": 0, "promoted_count": 0, "dropped_count": 0}
+    stats = {"applied_count": 0, "dropped_count": 0}
     if not uncertain_papers:
         return [], stats
 
@@ -844,7 +866,7 @@ def _normalize_rerank_mode(mode: str | None) -> str:
 
 def _merge_rerank_stats(target: dict[str, int], delta: dict[str, int]) -> None:
     """Merge rerank counters into mutable target dict."""
-    for key in ("applied_count", "promoted_count", "dropped_count"):
+    for key in ("applied_count", "dropped_count"):
         target[key] = int(target.get(key, 0)) + int(delta.get(key, 0))
 
 
@@ -1248,7 +1270,6 @@ async def _execute_fixed_strategy_search_async(
 
     rerank_telemetry = rerank_stats or {
         "applied_count": 0,
-        "promoted_count": 0,
         "dropped_count": 0,
     }
     filter_stage = (
@@ -1272,7 +1293,6 @@ async def _execute_fixed_strategy_search_async(
         "search_method": "fixed_strategy_fallback",
         "filter_stage": filter_stage,
         "rerank_applied_count": int(rerank_telemetry.get("applied_count", 0)),
-        "rerank_promoted_count": int(rerank_telemetry.get("promoted_count", 0)),
         "rerank_dropped_count": int(rerank_telemetry.get("dropped_count", 0)),
     }
 
@@ -1637,6 +1657,161 @@ def _calculate_coverage(
     return coverage
 
 
+def _compute_paper_coverage_score(
+    paper: dict,
+    genes: list[str],
+    pathways: list[str],
+    celltypes: list[str],
+    already_covered: set[str] | None = None,
+) -> tuple[float, set[str]]:
+    """Compute how many target entities a single paper covers.
+
+    Args:
+        paper: Paper dict with 'title' and 'abstract'.
+        genes: Target gene list.
+        pathways: Target pathway list.
+        celltypes: Target cell type list.
+        already_covered: If provided, only count entities NOT in this set
+            (for greedy marginal-contribution calculation).
+
+    Returns:
+        (score, covered_entities) where score is the fraction of (novel)
+        entities this paper covers and covered_entities is the set of
+        entity names matched.
+    """
+    combined = _normalize_text_for_matching(
+        paper.get("abstract", "") + " " + paper.get("title", "")
+    )
+    covered: set[str] = set()
+
+    # Gene matching (reuses existing pattern generator)
+    for gene in genes:
+        if already_covered and gene in already_covered:
+            continue
+        for pattern in _generate_gene_patterns(gene):
+            if len(pattern) <= 3:
+                if re.search(rf'\b{re.escape(pattern)}\b', combined):
+                    covered.add(gene)
+                    break
+            else:
+                if pattern in combined:
+                    covered.add(gene)
+                    break
+
+    # Pathway matching
+    for pathway in pathways:
+        if already_covered and pathway in already_covered:
+            continue
+        for pattern in _generate_pathway_patterns(pathway):
+            if pattern in combined:
+                covered.add(pathway)
+                break
+
+    # Cell type matching
+    for celltype in celltypes:
+        if already_covered and celltype in already_covered:
+            continue
+        ct_lower = celltype.lower()
+        if ct_lower in combined:
+            covered.add(celltype)
+        elif re.sub(r'\s*\d+\s*', '', ct_lower) in combined:
+            covered.add(celltype)
+
+    total_target = len(genes) + len(pathways) + len(celltypes)
+    if already_covered:
+        total_target = total_target - len(already_covered)
+
+    score = len(covered) / total_target if total_target > 0 else 0.0
+    return score, covered
+
+
+def _greedy_coverage_sort(
+    papers: list[dict],
+    genes: list[str],
+    pathways: list[str],
+    celltypes: list[str],
+    max_results: int,
+    alpha: float = 0.4,
+) -> list[dict]:
+    """Greedy set-cover sort blending journal quality with marginal coverage.
+
+    At each step picks the paper maximising:
+        alpha * normalised_sjr  +  (1 - alpha) * marginal_coverage_contribution
+
+    Once all target entities are covered the remaining slots are filled by
+    pure SJR order (no coverage signal needed).
+
+    Args:
+        papers: Candidate papers (already deduplicated).
+        genes/pathways/celltypes: Target entity lists.
+        max_results: How many papers to select.
+        alpha: Blend weight.  0 = pure coverage, 1 = pure SJR.
+
+    Returns:
+        Ordered list of at most *max_results* papers.
+    """
+    if not papers:
+        return []
+
+    all_entities = set(genes) | set(pathways) | set(celltypes)
+    if not all_entities:
+        # Nothing to optimise for coverage — fall back to pure SJR
+        papers_sorted = sorted(
+            papers,
+            key=lambda p: p.get("journal_quality", _SJR_DEFAULT_SCORE),
+            reverse=True,
+        )
+        return papers_sorted[:max_results]
+
+    # Pre-compute per-paper full entity coverage (before greedy loop)
+    paper_entities: list[tuple[dict, set[str]]] = []
+    for paper in papers:
+        _, entities = _compute_paper_coverage_score(
+            paper, genes, pathways, celltypes,
+        )
+        paper_entities.append((paper, entities))
+
+    # Normalise SJR scores to [0, 1] across candidate set
+    sjr_values = [p.get("journal_quality", _SJR_DEFAULT_SCORE) for p in papers]
+    sjr_min = min(sjr_values)
+    sjr_max = max(sjr_values)
+    sjr_range = sjr_max - sjr_min if sjr_max > sjr_min else 1.0
+
+    selected: list[dict] = []
+    covered: set[str] = set()
+    remaining = list(range(len(paper_entities)))  # indices into paper_entities
+
+    while len(selected) < max_results and remaining:
+        # Once all entities covered, fill by SJR only
+        if covered >= all_entities:
+            leftover = [paper_entities[i][0] for i in remaining]
+            leftover.sort(
+                key=lambda p: p.get("journal_quality", _SJR_DEFAULT_SCORE),
+                reverse=True,
+            )
+            selected.extend(leftover[: max_results - len(selected)])
+            break
+
+        best_idx = -1
+        best_score = -1.0
+        for idx in remaining:
+            paper, entities = paper_entities[idx]
+            marginal = entities - covered
+            marginal_frac = len(marginal) / len(all_entities - covered) if (all_entities - covered) else 0.0
+            norm_sjr = (paper.get("journal_quality", _SJR_DEFAULT_SCORE) - sjr_min) / sjr_range
+            composite = alpha * norm_sjr + (1 - alpha) * marginal_frac
+            if composite > best_score:
+                best_score = composite
+                best_idx = idx
+
+        paper, entities = paper_entities[best_idx]
+        selected.append(paper)
+        covered |= entities
+        remaining.remove(best_idx)
+
+    return selected
+
+
 async def _think_with_biomcp(
     genes: list[str],
     pathways: list[str],
@@ -1901,6 +2076,9 @@ def search_literature_dynamic(
     rerank_min_confidence: float = 0.70,
     llm_provider: str = "",
     sort_by_journal_quality: bool = True,
+    coverage_weighted_sort: bool = False,
+    query_cache: list[dict] | None = None,
+    record_queries: bool = False,
 ) -> dict:
     """LLM-powered dynamic literature search with ITERATIVE coverage improvement.
 
@@ -1934,6 +2112,9 @@ def search_literature_dynamic(
             Empty string uses env default.
         sort_by_journal_quality: Whether to sort final results by SJR journal
             quality score (default True). Set False to skip SJR sorting.
+        query_cache: Cached iteration-0 queries to replay (skip LLM generation).
+        record_queries: If True, include iteration-0 queries in return value
+            under the "query_cache" key.
 
     Returns:
         If output_path is empty: Dictionary with papers, generated_queries, coverage,
@@ -1959,6 +2140,9 @@ def search_literature_dynamic(
             rerank_min_confidence=rerank_min_confidence,
             llm_provider=llm_provider,
             sort_by_journal_quality=sort_by_journal_quality,
+            coverage_weighted_sort=coverage_weighted_sort,
+            query_cache=query_cache,
+            record_queries=record_queries,
         ),
         timeout=300,
     )
@@ -1982,6 +2166,9 @@ async def search_literature_dynamic_async(
     rerank_min_confidence: float = 0.70,
     llm_provider: str = "",
     sort_by_journal_quality: bool = True,
+    coverage_weighted_sort: bool = False,
+    query_cache: list[dict] | None = None,
+    record_queries: bool = False,
 ) -> dict:
     """Async version of search_literature_dynamic with ITERATIVE coverage improvement.
 
@@ -2007,6 +2194,9 @@ async def search_literature_dynamic_async(
             Empty string uses env default.
         sort_by_journal_quality: Whether to sort final results by SJR journal
             quality score (default True).
+        query_cache: Cached iteration-0 queries to replay (skip LLM generation).
+        record_queries: If True, include iteration-0 queries in return value
+            under the "query_cache" key.
 
     Returns:
         If output_path is empty: full results dict.
@@ -2018,7 +2208,7 @@ async def search_literature_dynamic_async(
     seen_pmids = set()
     coverage_history = []
     normalized_rerank_mode = _normalize_rerank_mode(rerank_mode)
-    rerank_totals = {"applied_count": 0, "promoted_count": 0, "dropped_count": 0}
+    rerank_totals = {"applied_count": 0, "dropped_count": 0}
 
     # Keep output schema backward-compatible even though strategic think is skipped.
     think_success = True
@@ -2027,6 +2217,7 @@ async def search_literature_dynamic_async(
     # automatically handles gene aliases internally (e.g., ACKR3 -> CXCR7)
 
     llm = create_llm(provider=llm_provider) if llm_provider else create_llm()
+    recorded_iter0_queries: list[dict] = []
 
     for iteration in range(max_iterations):
         logger.info(f"=== Async Iteration {iteration + 1}/{max_iterations} ===")
@@ -2057,15 +2248,21 @@ async def search_literature_dynamic_async(
 
         # Generate queries based on iteration
         if iteration == 0:
-            # Initial broad search
-            # Note: gene_aliases="" - BioMCP article_searcher handles aliases internally
-            prompt_text = LITERATURE_QUERY_GENERATION_PROMPT.format(
-                genes=", ".join(genes) if genes else "None",
-                pathways=", ".join(pathways) if pathways else "None",
-                celltypes=", ".join(celltypes) if celltypes else "None",
-                disease=disease or "Not specified",
-                gene_aliases="",  # BioMCP article_searcher handles aliases internally
-            )
+            if query_cache is not None:
+                # REPLAY: use cached queries, skip LLM entirely
+                validated_queries = query_cache
+                all_queries.extend(validated_queries)
+                logger.info(f"Replaying {len(validated_queries)} cached iteration-0 queries")
+            else:
+                # GENERATE: initial broad search via LLM
+                # Note: gene_aliases="" - BioMCP article_searcher handles aliases internally
+                prompt_text = LITERATURE_QUERY_GENERATION_PROMPT.format(
+                    genes=", ".join(genes) if genes else "None",
+                    pathways=", ".join(pathways) if pathways else "None",
+                    celltypes=", ".join(celltypes) if celltypes else "None",
+                    disease=disease or "Not specified",
+                    gene_aliases="",  # BioMCP article_searcher handles aliases internally
+                )
         else:
             # Gap-filling search for missing genes/pathways
             missing_genes = [g for g in genes if g not in covered_genes]
@@ -2085,53 +2282,61 @@ async def search_literature_dynamic_async(
             )
             logger.info(f"Gap-filling: {len(missing_genes)} missing genes, {len(missing_pathways)} missing pathways")
 
-        # Generate queries using LLM
-        try:
-            response = await llm.ainvoke([HumanMessage(content=prompt_text)])
-            response_text = response.content if hasattr(response, "content") else str(response)
-        except Exception as e:
-            logger.error(f"LLM query generation failed at iteration {iteration}: {e}")
-            if iteration == 0:
-                return await _execute_fixed_strategy_search_async(
-                    genes=genes,
-                    pathways=pathways,
-                    celltypes=celltypes,
-                    disease=disease,
-                    max_results=max_results,
-                    enforce_disease_match=enforce_disease_match,
-                    biomcp_url=biomcp_url,
-                    rerank_mode=normalized_rerank_mode,
-                    rerank_top_n=rerank_top_n,
-                    rerank_min_confidence=rerank_min_confidence,
-                    rerank_stats=rerank_totals,
-                )
-            break
+        # When replaying cached iteration-0 queries, skip LLM generation
+        if iteration == 0 and query_cache is not None:
+            pass  # validated_queries already set above from cache
+        else:
+            # Generate queries using LLM
+            try:
+                response = await llm.ainvoke([HumanMessage(content=prompt_text)])
+                response_text = response.content if hasattr(response, "content") else str(response)
+            except Exception as e:
+                logger.error(f"LLM query generation failed at iteration {iteration}: {e}")
+                if iteration == 0:
+                    return await _execute_fixed_strategy_search_async(
+                        genes=genes,
+                        pathways=pathways,
+                        celltypes=celltypes,
+                        disease=disease,
+                        max_results=max_results,
+                        enforce_disease_match=enforce_disease_match,
+                        biomcp_url=biomcp_url,
+                        rerank_mode=normalized_rerank_mode,
+                        rerank_top_n=rerank_top_n,
+                        rerank_min_confidence=rerank_min_confidence,
+                        rerank_stats=rerank_totals,
+                    )
+                break
 
-        # Parse and validate queries
-        raw_queries = _parse_llm_queries(response_text)
-        validated_queries = _validate_generated_queries(raw_queries)
+            # Parse and validate queries
+            raw_queries = _parse_llm_queries(response_text)
+            validated_queries = _validate_generated_queries(raw_queries)
 
-        if not validated_queries:
-            if iteration == 0:
-                logger.warning("No valid queries on first iteration, falling back")
-                return await _execute_fixed_strategy_search_async(
-                    genes=genes,
-                    pathways=pathways,
-                    celltypes=celltypes,
-                    disease=disease,
-                    max_results=max_results,
-                    enforce_disease_match=enforce_disease_match,
-                    biomcp_url=biomcp_url,
-                    rerank_mode=normalized_rerank_mode,
-                    rerank_top_n=rerank_top_n,
-                    rerank_min_confidence=rerank_min_confidence,
-                    rerank_stats=rerank_totals,
-                )
-            logger.warning(f"No valid queries at iteration {iteration}, stopping")
-            break
+            if not validated_queries:
+                if iteration == 0:
+                    logger.warning("No valid queries on first iteration, falling back")
+                    return await _execute_fixed_strategy_search_async(
+                        genes=genes,
+                        pathways=pathways,
+                        celltypes=celltypes,
+                        disease=disease,
+                        max_results=max_results,
+                        enforce_disease_match=enforce_disease_match,
+                        biomcp_url=biomcp_url,
+                        rerank_mode=normalized_rerank_mode,
+                        rerank_top_n=rerank_top_n,
+                        rerank_min_confidence=rerank_min_confidence,
+                        rerank_stats=rerank_totals,
+                    )
+                logger.warning(f"No valid queries at iteration {iteration}, stopping")
+                break
 
-        all_queries.extend(validated_queries)
-        logger.info(f"Generated {len(validated_queries)} queries for iteration {iteration + 1}")
+            all_queries.extend(validated_queries)
+            logger.info(f"Generated {len(validated_queries)} queries for iteration {iteration + 1}")
+
+            # Record iteration-0 queries if requested
+            if iteration == 0 and record_queries:
+                recorded_iter0_queries = list(validated_queries)
 
         # Separate gene-centric and pathway-centric queries for balanced execution
         gene_queries = [q for q in validated_queries if q.get("genes")]
@@ -2174,6 +2379,7 @@ async def search_literature_dynamic_async(
                 )
 
                 new_papers = 0
+                fallback_papers: list[dict] = []
                 for paper in results:
                     pmid = paper.get("pmid", "")
                     if pmid and pmid not in seen_pmids:
@@ -2181,10 +2387,24 @@ async def search_literature_dynamic_async(
                         paper["query_index"] = len(all_queries) - len(validated_queries) + i
                         paper["iteration"] = iteration
                         paper["query_type"] = "gene"
+                        # Option D: gap-filling validation for iteration > 0
+                        if coverage_weighted_sort and iteration > 0:
+                            score, _ = _compute_paper_coverage_score(
+                                paper, genes, pathways, celltypes,
+                            )
+                            if score == 0:
+                                fallback_papers.append(paper)
+                                continue
                         all_papers.append(paper)
                         new_papers += 1
 
-                logger.debug(f"Gene query {i}: {new_papers} new papers")
+                # Backfill from fallback if slots remain
+                if fallback_papers and len(all_papers) < max_results:
+                    slots = max_results - len(all_papers)
+                    all_papers.extend(fallback_papers[:slots])
+                    new_papers += min(slots, len(fallback_papers))
+
+                logger.debug(f"Gene query {i}: {new_papers} new papers (fallback={len(fallback_papers)})")
 
             except Exception as e:
                 logger.warning(f"Gene search failed for query {i} at iteration {iteration}: {e}")
@@ -2214,6 +2434,7 @@ async def search_literature_dynamic_async(
                 )
 
                 new_papers = 0
+                fallback_papers = []
                 for paper in results:
                     pmid = paper.get("pmid", "")
                     if pmid and pmid not in seen_pmids:
@@ -2221,22 +2442,42 @@ async def search_literature_dynamic_async(
                         paper["query_index"] = len(all_queries) - len(validated_queries) + len(gene_queries) + i
                         paper["iteration"] = iteration
                         paper["query_type"] = "pathway"
+                        # Option D: gap-filling validation for iteration > 0
+                        if coverage_weighted_sort and iteration > 0:
+                            score, _ = _compute_paper_coverage_score(
+                                paper, genes, pathways, celltypes,
+                            )
+                            if score == 0:
+                                fallback_papers.append(paper)
+                                continue
                         all_papers.append(paper)
                         new_papers += 1
 
-                logger.debug(f"Pathway query {i}: {new_papers} new papers")
+                # Backfill from fallback if slots remain
+                if fallback_papers and len(all_papers) < max_results:
+                    slots = max_results - len(all_papers)
+                    all_papers.extend(fallback_papers[:slots])
+                    new_papers += min(slots, len(fallback_papers))
+
+                logger.debug(f"Pathway query {i}: {new_papers} new papers (fallback={len(fallback_papers)})")
 
             except Exception as e:
                 logger.warning(f"Pathway search failed for query {i} at iteration {iteration}: {e}")
                 continue
 
-    # Sort by journal quality before truncating
+    # Truncation: coverage-weighted greedy sort or pure SJR sort
     if sort_by_journal_quality:
         await _ensure_sjr_cache_loaded()
-        all_papers.sort(key=lambda p: p.get("journal_quality", _SJR_DEFAULT_SCORE), reverse=True)
-
-    # Final coverage calculation
-    final_papers = all_papers[:max_results]
+        if coverage_weighted_sort:
+            final_papers = _greedy_coverage_sort(
+                all_papers, genes, pathways, celltypes,
+                max_results=max_results, alpha=0.4,
+            )
+        else:
+            all_papers.sort(key=lambda p: p.get("journal_quality", _SJR_DEFAULT_SCORE), reverse=True)
+            final_papers = all_papers[:max_results]
+    else:
+        final_papers = all_papers[:max_results]
     final_coverage = _calculate_coverage(final_papers, genes, pathways, celltypes)
 
     coverage_history.append({
@@ -2291,9 +2532,11 @@ async def search_literature_dynamic_async(
         "recommended_actions": recommended_actions,
         "filter_stage": filter_stage,
         "rerank_applied_count": int(rerank_totals.get("applied_count", 0)),
-        "rerank_promoted_count": int(rerank_totals.get("promoted_count", 0)),
         "rerank_dropped_count": int(rerank_totals.get("dropped_count", 0)),
     }
+
+    if record_queries and recorded_iter0_queries:
+        full_result["query_cache"] = recorded_iter0_queries
 
     # Auto-save: write full results to file, return compact summary to LLM
     if output_path:
@@ -2321,7 +2564,6 @@ async def search_literature_dynamic_async(
                     "recommended_actions": recommended_actions,
                     "filter_stage": filter_stage,
                     "rerank_applied_count": int(rerank_totals.get("applied_count", 0)),
-                    "rerank_promoted_count": int(rerank_totals.get("promoted_count", 0)),
                     "rerank_dropped_count": int(rerank_totals.get("dropped_count", 0)),
                     "message": (
                         f"Full results ({len(final_papers)} papers) saved to "
