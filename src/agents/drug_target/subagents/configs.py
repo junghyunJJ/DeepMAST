@@ -33,6 +33,7 @@ from src.agents.drug_target.tools import (
     query_drugbank_target_profile,
     query_pubmed_clinical_limitations,
     run_compare_census_lr_pair,
+    finalize_stage1_artifacts,
     read_skill_file,
     # Assessment tools
     save_target_assessment,
@@ -81,6 +82,7 @@ SUBAGENT_CONFIGS = {
             query_reactome_pathways,
             query_string_ppi_pair,
             run_compare_census_lr_pair,
+            finalize_stage1_artifacts,
             # Stage 2: Target Validation
             query_opentargets_target,
             query_opentargets_known_drugs,
@@ -110,6 +112,7 @@ SUBAGENT_CONFIGS = {
         ),
         "system_prompt": SUBAGENT_PROMPTS["report_writer"],
         "tools": [
+            load_lr_candidates,
             load_evidence_files,
             save_target_assessment,
             sequential_thinking,

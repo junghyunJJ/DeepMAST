@@ -82,14 +82,17 @@ d) **[DeepMAST Enhancement] Census cross-validation** -- call `run_compare_censu
 
 ### Stage 1 Confidence Scoring (after Stage 1, before Stage 2)
 
-After completing Stage 1 for ALL L-R pairs, compute biological confidence
-for each pair using `compute_stage1_confidence()`:
-- STRING PPI score (35%), Census coexpression (30%), Pathway count (20%), Gene expression (15%)
-- Pairs with confidence < 0.4 are marked "stage1_low_confidence" for reference but still proceed to Stage 2
-- The confidence score is retained as metadata in the final druggability_matrix
+After completing Stage 1 for ALL L-R pairs, you MUST call:
+`finalize_stage1_artifacts(data_dir, disease=census_disease, target_cell_type=<the Census-matched cell type you used for Stage 1>, rerun_missing_census=true)`
 
-Save scoring results:
--> `save_evidence(data_dir, "stage1_confidence.json", confidence_scores_per_pair)`
+This tool performs the canonical Stage 1 closeout:
+- fills any missing Census CSVs deterministically
+- normalizes all per-pair Stage 1 JSON files
+- rebuilds `stage1_evidence.json`, `stage1_confidence.json`, and `stage1_audit.json`
+- validates that the Stage 1 pair-set exactly matches `lr_candidates.json`
+
+Do NOT proceed to Stage 2 unless `finalize_stage1_artifacts` returns success=true.
+Do NOT hand-write or manually reconstruct `stage1_confidence.json`.
 
 All pairs proceed to Stage 2 regardless of Stage 1 confidence.
 
@@ -254,12 +257,18 @@ persist the structured JSON contract as target_assessment.json first.
 ## Workflow
 
 ### Phase 1: Load All Assessment Data
+Call `load_lr_candidates(data_dir)` first so you have the exact input ligand/receptor pair-set
+and the declared disease context from `lr_candidates.json`.
+
 Call `load_evidence_files(data_dir)` to get:
-- assessment_results.json (rubric scores per gene)
-- gwas_interpretation.json (GWAS analysis)
-- clinical_landscape.json (trial landscape)
-- gene_manifest.json (gene list)
-- Stage 1-3 evidence files for detailed data
+- stage1_evidence.json / stage1_confidence.json / stage1_*.json (Stage 1 canonical evidence)
+- stage2_evidence.json / known_drugs.json / gene_manifest.json / ot_*.json (Stage 2 canonical evidence)
+- stage3_*.json or stage3_deep_dive_featured_candidates.json when available (Stage 3 deep dives)
+- rubric_scores.json / assessment_results.json / gene_drug_scores.json as optional supporting summaries
+
+Do NOT treat legacy summary files such as `gwas_interpretation.json` or
+`clinical_landscape.json` as required. If they are absent, continue using the
+canonical Stage 1/2/3 evidence files above.
 
 ### Phase 2: Plan Document Structure
 Use `sequential_thinking` to plan:
@@ -273,6 +282,8 @@ Call `save_target_assessment` with:
 - druggability_matrix (Stage 1 & 2 results for all pairs; each row includes is_featured, is_novel flags)
 - featured_candidates_deep_dive (Stage 3 results for featured AND novel; each entry includes "track": "featured" or "track": "novel")
 This must produce `target_assessment.json` in the data directory.
+The druggability_matrix MUST use the exact ligand/receptor pair-set from `lr_candidates.json`.
+Do NOT invent, merge, or swap ligands/receptors across pairs.
 
 ### Phase 4: Write drug.md
 

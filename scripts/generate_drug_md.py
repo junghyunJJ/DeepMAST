@@ -6,6 +6,7 @@ files, then uses an LLM to produce the final drug.md report.
 """
 
 import asyncio
+import argparse
 import json
 import sys
 import time
@@ -18,11 +19,26 @@ from dotenv import load_dotenv
 load_dotenv(PROJECT_ROOT / ".env")
 
 from src.agents.model import create_llm
+from src.agents.drug_target.tools.stage1_normalization import (
+    load_stage1_json,
+    resolve_stage1_context,
+)
 
-DATA_DIR = PROJECT_ROOT / "res_bc_ollama"
-DISEASE = "breast cancer"
 PROVIDER = "openrouter"
 
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "data_dir",
+        nargs="?",
+        default="res_bc_ollama",
+        help="Data directory that contains target_assessment.json and evidence/",
+    )
+    return parser.parse_args()
+
+
+DATA_DIR = PROJECT_ROOT / "res_bc_ollama"
 
 def load_all_evidence() -> dict:
     """Load target_assessment.json and key evidence files."""
@@ -34,6 +50,10 @@ def load_all_evidence() -> dict:
     ta_path = DATA_DIR / "target_assessment.json"
     if ta_path.exists():
         data["target_assessment"] = json.loads(ta_path.read_text())
+    data["resolved_context"] = resolve_stage1_context(
+        DATA_DIR,
+        allow_existing_evidence_fallback=True,
+    )
 
     # Key evidence files
     for fname in [
@@ -59,9 +79,12 @@ def load_all_evidence() -> dict:
     stage1_details = {}
     for f in evidence_dir.glob("stage1_*.json"):
         if f.name in ("stage1_evidence.json", "stage1_confidence.json",
-                       "stage1_cellxgene_all_pairs.json"):
+                       "stage1_cellxgene_all_pairs.json", "stage1_audit.json"):
             continue
-        stage1_details[f.stem] = json.loads(f.read_text())
+        detail, repairs = load_stage1_json(f)
+        if repairs:
+            detail["file_repairs"] = repairs
+        stage1_details[f.stem] = detail
     data["stage1_details"] = stage1_details
 
     # OpenTargets per-gene
@@ -69,6 +92,7 @@ def load_all_evidence() -> dict:
     for f in evidence_dir.glob("ot_*.json"):
         ot_details[f.stem] = json.loads(f.read_text())
     data["opentargets_details"] = ot_details
+    data["resolved_disease"] = data["resolved_context"]["disease"]
 
     return data
 
@@ -77,6 +101,21 @@ def _build_stage1_table(evidence: dict) -> str:
     """Build a pre-computed Stage 1 markdown table from individual stage1 data."""
     confidence = evidence.get("stage1_confidence", {})
     details = evidence.get("stage1_details", {})
+
+    def _extract_ids_and_names(entries: list, id_key: str) -> tuple[set[str], dict[str, str]]:
+        ids: set[str] = set()
+        names: dict[str, str] = {}
+        for entry in entries:
+            if isinstance(entry, dict):
+                entry_id = entry.get(id_key)
+                entry_name = entry.get("name", entry_id)
+                if entry_id:
+                    ids.add(str(entry_id))
+                    if entry_name:
+                        names[str(entry_id)] = str(entry_name)
+            elif isinstance(entry, str):
+                names[entry] = entry
+        return ids, names
 
     rows = []
     for pair_key, conf in confidence.items():
@@ -92,33 +131,66 @@ def _build_stage1_table(evidence: dict) -> str:
 
         # Shared pathways (KEGG + Reactome)
         kegg = detail.get("kegg_pathways", {})
-        kegg_lig = {p["pathway_id"] for p in kegg.get("ligand_pathways", []) if "pathway_id" in p}
-        kegg_rec = {p["pathway_id"] for p in kegg.get("receptor_pathways", []) if "pathway_id" in p}
+        kegg_lig, kegg_lig_names = _extract_ids_and_names(
+            kegg.get("ligand_pathways", []),
+            "pathway_id",
+        )
+        kegg_rec, kegg_rec_names = _extract_ids_and_names(
+            kegg.get("receptor_pathways", []),
+            "pathway_id",
+        )
         shared_kegg = kegg_lig & kegg_rec
+        shared_kegg_names = {
+            name
+            for name in kegg_lig_names.values()
+            if name in kegg_rec_names.values()
+        }
 
         reactome = detail.get("reactome_pathways", {})
-        react_lig = {p["reactome_id"] for p in reactome.get("ligand_pathways", []) if "reactome_id" in p}
-        react_rec = {p["reactome_id"] for p in reactome.get("receptor_pathways", []) if "reactome_id" in p}
+        react_lig, react_lig_names = _extract_ids_and_names(
+            reactome.get("ligand_pathways", []),
+            "reactome_id",
+        )
+        react_rec, react_rec_names = _extract_ids_and_names(
+            reactome.get("receptor_pathways", []),
+            "reactome_id",
+        )
         shared_reactome = react_lig & react_rec
+        shared_reactome_names = {
+            name
+            for name in react_lig_names.values()
+            if name in react_rec_names.values()
+        }
 
         shared_names = []
         if shared_kegg:
             name_map = {}
             for p in kegg.get("ligand_pathways", []) + kegg.get("receptor_pathways", []):
+                if not isinstance(p, dict):
+                    continue
                 pid = p.get("pathway_id", "")
                 name = p.get("name", pid)
                 name = name.split(" - Homo sapiens")[0] if " - Homo sapiens" in name else name
                 name_map[pid] = name
             shared_names.extend(name_map[pid] for pid in shared_kegg if pid in name_map)
+        if shared_kegg_names:
+            shared_names.extend(
+                name.split(" - Homo sapiens")[0] if " - Homo sapiens" in name else name
+                for name in sorted(shared_kegg_names)
+            )
         if shared_reactome:
             name_map = {}
             for p in reactome.get("ligand_pathways", []) + reactome.get("receptor_pathways", []):
+                if not isinstance(p, dict):
+                    continue
                 pid = p.get("reactome_id", "")
                 name = p.get("name", pid)
                 name_map[pid] = name
             shared_names.extend(name_map[pid] for pid in shared_reactome if pid in name_map)
+        if shared_reactome_names:
+            shared_names.extend(sorted(shared_reactome_names))
 
-        pathway_str = ", ".join(shared_names) if shared_names else "—"
+        pathway_str = ", ".join(dict.fromkeys(shared_names)) if shared_names else "—"
 
         # Census coexpression
         census = detail.get("census_validation", {})
@@ -157,6 +229,45 @@ def _build_stage1_table(evidence: dict) -> str:
     return "\n".join(lines)
 
 
+def _build_stage1_context_notes(evidence: dict) -> str:
+    """Build a short deterministic note block for microenvironment-tagged pairs."""
+    details = evidence.get("stage1_details", {})
+    confidence = evidence.get("stage1_confidence", {})
+    resolved_context = evidence.get("resolved_context", {})
+    primary_target_cell_type = (
+        resolved_context.get("resolved_target_cell_type")
+        or resolved_context.get("requested_target_cell_type")
+        or "primary target cell type"
+    )
+    notes = []
+
+    ranked_pairs = sorted(
+        confidence,
+        key=lambda pair_key: confidence.get(pair_key, {}).get("confidence", 0),
+        reverse=True,
+    )
+    for pair_key in ranked_pairs:
+        if "^" not in pair_key:
+            continue
+        ligand, receptor = pair_key.split("^", 1)
+        detail = details.get(f"stage1_{ligand}_{receptor}", {})
+        annotation = detail.get("stage1_annotations", {})
+        if not annotation.get("microenvironment_candidate"):
+            continue
+        notes.append(
+            "- "
+            f"`{pair_key}` shows weak coexpression in the primary target cell type "
+            f"({primary_target_cell_type}) but strong "
+            f"{annotation.get('supporting_cell_type', 'supporting')} support "
+            f"({annotation.get('supporting_coexpression_pct', 0):.2f}% coexpression); "
+            "interpret as a vascular microenvironment candidate rather than a primary target-cell candidate."
+        )
+
+    if not notes:
+        return ""
+    return "\n".join(["**Context Notes**", *notes])
+
+
 def _replace_stage1_table(content: str, evidence: dict) -> str:
     """Replace the LLM-generated Stage 1 table with the pre-computed one.
 
@@ -166,6 +277,10 @@ def _replace_stage1_table(content: str, evidence: dict) -> str:
     import re
 
     correct_table = _build_stage1_table(evidence)
+    context_notes = _build_stage1_context_notes(evidence)
+    replacement = correct_table
+    if context_notes:
+        replacement += "\n\n" + context_notes
 
     # Find the Stage 1 table region: starts with the header row, ends before
     # the Confidence Score Formula line or the next ## heading.
@@ -176,7 +291,7 @@ def _replace_stage1_table(content: str, evidence: dict) -> str:
     )
     match = pattern.search(content)
     if match:
-        content = content[:match.start()] + correct_table + "\n" + content[match.end():]
+        content = content[:match.start()] + replacement + "\n" + content[match.end():]
         print("  Post-processed: replaced Stage 1 table with pre-computed values")
     else:
         print("  WARNING: Could not find Stage 1 table to replace")
@@ -197,14 +312,16 @@ def build_prompt(evidence: dict) -> str:
 
     rubric = evidence.get("rubric_scores", [])
     known_drugs = evidence.get("known_drugs", {})
+    disease_focus = evidence["resolved_context"]["disease"]
 
     # Build pre-computed Stage 1 table from individual stage1 details
     stage1_table = _build_stage1_table(evidence)
+    stage1_context_notes = _build_stage1_context_notes(evidence)
 
     prompt = f"""Generate a comprehensive drug.md report for therapeutic target assessment.
 
 ## Context
-- Disease: {meta.get('disease_focus', DISEASE)}
+- Disease: {disease_focus}
 - Total L-R pairs assessed: {meta.get('total_input_pairs', len(matrix))}
 - Data sources: {', '.join(meta.get('data_sources', []))}
 - Featured candidates: {len(featured_pairs)}
@@ -228,6 +345,9 @@ def build_prompt(evidence: dict) -> str:
 ## Stage 1 — Biological Context Validation (PRE-COMPUTED TABLE — USE EXACTLY AS-IS):
 {stage1_table}
 
+## Stage 1 Context Notes (PRE-COMPUTED — USE EXACTLY AS-IS IF PRESENT):
+{stage1_context_notes or "(none)"}
+
 ## Stage 1 Confidence Scores (per-pair):
 {json.dumps(evidence.get('stage1_confidence', {}), indent=2)}
 
@@ -243,7 +363,7 @@ def build_prompt(evidence: dict) -> str:
 
 Write a complete drug.md document following this exact structure:
 
-# Therapeutic Target Assessment Report — {meta.get('disease_focus', DISEASE).title()}
+# Therapeutic Target Assessment Report — {disease_focus.title()}
 
 ## 1. Executive Summary
 - Assessment scope (N L-R pairs, disease)
@@ -254,6 +374,7 @@ Write a complete drug.md document following this exact structure:
 ## 2. Stage 1 — Biological Context Validation
 COPY THE PRE-COMPUTED TABLE FROM "Stage 1 — Biological Context Validation" SECTION ABOVE EXACTLY AS-IS.
 Do NOT recalculate or modify the Confidence, STRING PPI, Census p-value, or Census RR values.
+If the "Stage 1 Context Notes" section is not "(none)", copy it exactly below the table.
 Add a footnote explaining: Confidence = 0.35×STRING + 0.30×Census + 0.20×Pathway + 0.15×Expression.
 Describe the Confidence Score formula components: STRING PPI (35%), Census coexpression (30%), shared KEGG/Reactome pathways (20%), gene expression availability (15%).
 Note Census p-value and RR are from a two-proportion z-test comparing coexpression rates in the target cell type vs. all other cells.
@@ -296,6 +417,10 @@ IMPORTANT:
 
 
 async def main():
+    global DATA_DIR
+    args = _parse_args()
+    DATA_DIR = (PROJECT_ROOT / args.data_dir).resolve()
+
     print("Generating drug.md from existing evidence...")
     t0 = time.time()
 

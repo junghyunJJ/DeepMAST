@@ -1,0 +1,36 @@
+flowchart TD
+    A([Agent])
+
+    A --> T
+    A -.-> AC
+
+    T[Thought] --> AC[Action]
+    AC --> OB[Observation]
+    OB -.-> T
+
+    SK["**Skills (SKILL.md)**
+    → Thought 단계에 주입
+    제공: 절차적 지식
+    Progressive Disclosure
+    SOP / 도메인 워크플로우
+    &quot;어떻게 생각할 것인가&quot;"]
+
+    MCP["**MCP Tools**
+    → Action 단계에서 호출
+    제공: 실행 가능한 능력
+    Thought → Action 원자 단위
+    API / 외부 서비스 호출
+    &quot;무엇을 할 수 있는가&quot;"]
+
+    SK --> T
+    MCP --> AC
+
+    classDef agent fill:#5F5E5A,stroke:#888780,color:#F1EFE8
+    classDef loop fill:#444441,stroke:#888780,color:#D3D1C7
+    classDef skill fill:#085041,stroke:#1D9E75,color:#9FE1CB
+    classDef mcptool fill:#3C3489,stroke:#7F77DD,color:#CECBF6
+
+    class A agent
+    class T,AC,OB loop
+    class SK skill
+    class MCP mcptool

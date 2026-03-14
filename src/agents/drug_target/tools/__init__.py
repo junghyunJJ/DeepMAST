@@ -13,6 +13,9 @@ from src.agents.drug_target.tools.evidence_loader import (
 from src.agents.drug_target.tools.assessment_output import (
     save_target_assessment,
 )
+from src.agents.drug_target.tools.stage1_normalization import (
+    finalize_stage1_artifacts,
+)
 from src.agents.drug_target.tools.stage_domain_tools import (
     query_cellxgene_lr_context,
     list_census_diseases,
@@ -69,6 +72,7 @@ __all__ = [
     "query_pubmed_clinical_limitations",
     "run_compare_census_lr_pair",
     "read_skill_file",
+    "finalize_stage1_artifacts",
     # Output contract
     "save_target_assessment",
     # Common

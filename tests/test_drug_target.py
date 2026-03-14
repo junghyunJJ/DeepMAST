@@ -160,6 +160,7 @@ class TestSubagentConfigs:
             "load_lr_candidates",
             "save_evidence",
             "load_evidence_files",
+            "finalize_stage1_artifacts",
             "sequential_thinking",
             "query_cellxgene_lr_context",
             "list_census_diseases",
@@ -485,6 +486,7 @@ class TestToolImports:
             "query_gwas_gene_trait", "query_stage2_gene_panel",
             "query_drugbank_target_profile", "query_pubmed_clinical_limitations",
             "run_compare_census_lr_pair",
+            "finalize_stage1_artifacts",
             "read_skill_file",
             "save_target_assessment",
             "think_tool", "sequential_thinking", "validate_quality",
@@ -818,9 +820,26 @@ class TestStage2Service:
         from src.agents.drug_target.tools.stage_domain_tools import query_stage2_gene_panel
 
         payload = {
+            "disease": "lung cancer",
             "gene_symbols": ["EGFR"],
-            "stage2_evidence": {"EGFR": {"opentargets": {}, "gwas": {}}},
-            "known_drugs": {"executed": True},
+            "stage2_evidence": {
+                "EGFR": {
+                    "opentargets": {
+                        "executed": True,
+                        "ensembl_id": "ENSG00000146648",
+                        "disease_evidence": [],
+                        "associations": [],
+                        "errors": [],
+                    },
+                    "gwas": {
+                        "executed": True,
+                        "trait_associations": [],
+                        "gene_associations": [],
+                        "errors": [],
+                    },
+                }
+            },
+            "known_drugs": {"executed": True, "drugs": {"EGFR": []}},
             "gene_manifest": [{"symbol": "EGFR", "is_selected_top3": True}],
             "source_modes": {"opentargets": "parquet", "gwas": "parquet"},
         }
@@ -842,7 +861,33 @@ class TestStage2Service:
             selected_top3_genes=["EGFR"],
             data_dir="/tmp/workspace",
         )
-        assert json.loads(raw) == payload
+        assert json.loads(raw) == {
+            "disease": "lung cancer",
+            "gene_count": 1,
+            "gene_symbols": ["EGFR"],
+            "gene_summaries": {
+                "EGFR": {
+                    "has_ensembl_id": True,
+                    "ot_executed": True,
+                    "ot_disease_evidence_count": 0,
+                    "ot_associations_count": 0,
+                    "ot_errors": [],
+                    "gwas_executed": True,
+                    "gwas_trait_associations_count": 0,
+                    "gwas_gene_associations_count": 0,
+                    "gwas_errors": [],
+                }
+            },
+            "known_drugs_count": 0,
+            "known_drugs_executed": True,
+            "source_modes": {"opentargets": "parquet", "gwas": "parquet"},
+            "gene_manifest": [{"symbol": "EGFR", "is_selected_top3": True}],
+            "note": (
+                "Full evidence data saved to evidence/ directory. "
+                "Use load_evidence_files() to read detailed per-gene payloads."
+            ),
+            "evidence_dir": "/tmp/workspace/evidence",
+        }
 
 
 # =========================================================================
@@ -1703,9 +1748,14 @@ class TestCompareCensusTool:
     def test_save_target_assessment_roundtrip(self, tmp_path):
         from src.agents.drug_target.tools.assessment_output import save_target_assessment
 
+        (tmp_path / "lr_candidates.json").write_text(json.dumps({
+            "pairs": [
+                {"ligand": "TGFB1", "receptor": "TGFBR2"},
+            ]
+        }))
         raw = save_target_assessment.invoke({
             "data_dir": str(tmp_path),
-            "project_meta": json.dumps({"disease_focus": "breast cancer", "total_input_pairs": 15}),
+            "project_meta": json.dumps({"disease_focus": "breast cancer", "total_input_pairs": 1}),
             "druggability_matrix": json.dumps([
                 {
                     "ligand": "TGFB1",
@@ -1739,6 +1789,43 @@ class TestCompareCensusTool:
         assert payload["druggability_matrix"][0]["is_featured"] is True
         assert payload["druggability_matrix"][0]["is_novel"] is False
         assert payload["druggability_matrix"][0]["combined_total"] == 15
+
+    def test_save_target_assessment_rejects_pair_set_mismatch(self, tmp_path):
+        from src.agents.drug_target.tools.assessment_output import save_target_assessment
+
+        (tmp_path / "lr_candidates.json").write_text(json.dumps({
+            "pairs": [
+                {"ligand": "TGFB1", "receptor": "TGFBR2"},
+            ]
+        }))
+        raw = save_target_assessment.invoke({
+            "data_dir": str(tmp_path),
+            "project_meta": json.dumps({"disease_focus": "breast cancer", "total_input_pairs": 1}),
+            "druggability_matrix": json.dumps([
+                {
+                    "ligand": "TGFB1",
+                    "receptor": "FLT1",
+                    "open_targets_score": 0.9,
+                    "validated_track": {
+                        "existing_drug_evidence": 2,
+                        "clinical_trial_activity": 2,
+                        "mechanism_relevance": 3,
+                        "safety_profile": 0,
+                    },
+                    "exploratory_track": {
+                        "gwas_genetic_support": 2,
+                        "tractability": 2,
+                        "biological_plausibility": 3,
+                        "novelty_opportunity": 1,
+                    },
+                }
+            ]),
+            "featured_candidates_deep_dive": json.dumps([]),
+        })
+        result = json.loads(raw)
+        assert result["saved"] is False
+        assert "pair-set" in result["errors"][0]
+        assert not (tmp_path / "target_assessment.json").exists()
 
 
 # =========================================================================
@@ -2097,6 +2184,12 @@ class TestIntegration:
         with patch(
             "src.agents.drug_target.agent.create_drug_target_agent",
             return_value=(mock_agent, None),
+        ), patch(
+            "src.agents.drug_target.integration.finalize_stage1_workspace",
+            return_value={"success": True, "post_validation": {"errors": []}},
+        ), patch(
+            "src.agents.drug_target.integration.validate_target_assessment_file",
+            return_value={"valid": True, "errors": []},
         ):
             raw = await run_drug_target_assessment.ainvoke({
                 "data_dir": str(mock_data_dir),

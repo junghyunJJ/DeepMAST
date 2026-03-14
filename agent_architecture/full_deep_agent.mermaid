@@ -1,0 +1,38 @@
+graph TB
+    Input[Input: CCI Analysis Results] --> Planning
+    
+    subgraph DeepAgent["🤖 Deep Agent Architecture"]
+        Planning[📋 Planning Layer<br/>write_todos]
+        
+        Planning --> MainAgent{Main Agent<br/>Coordinator}
+        
+        MainAgent -->|Thought-Action-Observation| Tools[🛠️ Tools]
+        Tools --> MainAgent
+        
+        MainAgent -->|task tool| Subagents[👥 Subagents<br/>Specialized Workers]
+        Subagents -->|Results| MainAgent
+        
+        MainAgent <-->|read/write| FileSystem[(📁 File System<br/>Context Management)]
+        
+        MainAgent <-->|save/retrieve| Memory[(💾 Long-term Memory<br/>LangGraph Store)]
+    end
+    
+    MainAgent --> Output[Output: Final Result]
+    
+    subgraph Example["💡 Biological Interpreter 예시"]
+        Ex_Tools[Tools:<br/>• PubMed download<br/>• RAG upload]
+        Ex_Subagents[Subagents:<br/>• Pathway interpreter<br/>• CCI interpreter<br/>• Process interpreter]
+        Ex_FileSystem[File System:<br/>• Downloaded papers<br/>• RAG vector store]
+        Ex_Memory[Memory:<br/>• Previous interpretations<br/>• Reference database]
+        Ex_Output[Output:<br/>• Cited interpretation<br/>• Low hallucination]
+    end
+    
+    style Planning fill:#fff4e6
+    style MainAgent fill:#e3f2fd
+    style Tools fill:#ffe0b2
+    style Subagents fill:#f3e5f5
+    style FileSystem fill:#e8f5e9
+    style Memory fill:#e1f5fe
+    style Output fill:#c8e6c9
+    style DeepAgent fill:#fafafa,stroke:#333,stroke-width:2px
+    style Example fill:#f5f5f5,stroke:#666,stroke-dasharray: 5 5

@@ -23,10 +23,14 @@ class TestIndicationMatchesDisease:
     def test_no_match(self):
         assert not _indication_matches_disease("hepatocellular carcinoma", "breast cancer")
 
-    def test_breast_keyword_variants(self):
-        assert _indication_matches_disease("triple negative breast cancer", "breast cancer")
-        assert _indication_matches_disease("mammary carcinoma", "breast cancer")
-        assert _indication_matches_disease("TNBC", "breast cancer")
+    def test_generic_oncology_synonym_match(self):
+        assert _indication_matches_disease("breast neoplasm", "breast cancer")
+        assert _indication_matches_disease("non-small cell lung carcinoma", "lung cancer")
+        assert _indication_matches_disease("renal cell tumor", "renal cell carcinoma")
+
+    def test_non_oncology_is_conservative(self):
+        assert not _indication_matches_disease("colitis", "ulcerative colitis")
+        assert not _indication_matches_disease("type 1 diabetes", "diabetes mellitus")
 
     def test_non_breast_disease(self):
         assert _indication_matches_disease("renal cell carcinoma", "renal cell carcinoma")

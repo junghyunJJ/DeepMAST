@@ -12,6 +12,12 @@ import uuid
 from pathlib import Path
 
 from langchain_core.tools import tool
+from src.agents.drug_target.tools.assessment_output import (
+    validate_target_assessment_file,
+)
+from src.agents.drug_target.tools.stage1_normalization import (
+    finalize_stage1_workspace,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +60,13 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
 
         # Get provider from environment
         provider = os.getenv("LLM_PROVIDER", "openrouter")
+        if os.getenv("LANGSMITH_TRACING", "").lower() == "true" and not os.getenv(
+            "DISABLE_RUN_COMPRESSION"
+        ):
+            os.environ["DISABLE_RUN_COMPRESSION"] = "true"
+            logger.info(
+                "Enabled DISABLE_RUN_COMPRESSION for drug-target runtime while keeping LANGSMITH_TRACING=true"
+            )
 
         config = DrugTargetConfig(
             provider=provider,
@@ -84,8 +97,15 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
             if backend:
                 backend.cleanup()
 
+        stage1_result = finalize_stage1_workspace(
+            resolved_dir,
+            disease=disease,
+            rerun_missing_census=True,
+        )
+        target_assessment_validation = validate_target_assessment_file(resolved_dir)
+
         # Read drug.md
-        if drug_md_path.exists():
+        if stage1_result["success"] and target_assessment_validation["valid"] and drug_md_path.exists():
             content = drug_md_path.read_text()
             target_assessment = None
             if target_assessment_path.exists():
@@ -102,15 +122,32 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
                 "drug_md": content,
                 "drug_md_path": str(drug_md_path),
                 "target_assessment": target_assessment,
+                "stage1_validation": stage1_result["post_validation"],
+                "target_assessment_validation": target_assessment_validation,
                 "target_assessment_path": (
                     str(target_assessment_path) if target_assessment_path.exists() else None
                 ),
             })
         else:
+            errors: list[str] = []
+            if not stage1_result["success"]:
+                errors.append(
+                    "Stage1 artifacts incomplete: "
+                    + "; ".join(stage1_result["post_validation"]["errors"])
+                )
+            if not target_assessment_validation["valid"]:
+                errors.append(
+                    "target_assessment validation failed: "
+                    + "; ".join(target_assessment_validation["errors"])
+                )
+            if not drug_md_path.exists():
+                errors.append("drug.md was not generated")
             return json.dumps({
                 "success": False,
-                "error": "DrugTargetAgent completed but drug.md was not generated",
+                "error": " | ".join(errors) if errors else "DrugTargetAgent artifacts incomplete",
                 "drug_md": None,
+                "stage1_validation": stage1_result["post_validation"],
+                "target_assessment_validation": target_assessment_validation,
             })
 
     except Exception as e:

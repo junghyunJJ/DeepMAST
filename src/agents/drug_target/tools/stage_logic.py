@@ -60,6 +60,29 @@ def normalize_st_colocalization_score(value: Any) -> float:
     return _to_float(value, default=0.0)
 
 
+def _extract_pathway_tokens(
+    entries: list[Any],
+    *,
+    id_key: str,
+) -> tuple[set[str], set[str]]:
+    """Extract stable IDs and fallback names from pathway entries."""
+    ids: set[str] = set()
+    names: set[str] = set()
+    for entry in entries:
+        if isinstance(entry, dict):
+            raw_id = str(entry.get(id_key) or "").strip()
+            raw_name = str(entry.get("name") or "").strip()
+            if raw_id:
+                ids.add(raw_id)
+            if raw_name:
+                names.add(raw_name.lower())
+        elif isinstance(entry, str):
+            text = entry.strip()
+            if text:
+                names.add(text.lower())
+    return ids, names
+
+
 
 def infer_oncology_flag(disease: str) -> bool:
     """Infer whether disease context is oncology-related."""
@@ -347,17 +370,37 @@ def compute_stage1_confidence(stage1_evidence: dict[str, Any]) -> dict[str, Any]
 
     # Pathway: binary — shared pathway between ligand & receptor
     kegg = stage1_evidence.get("kegg_pathways", {})
-    kegg_lig_ids = {p["pathway_id"] for p in kegg.get("ligand_pathways", []) if "pathway_id" in p}
-    kegg_rec_ids = {p["pathway_id"] for p in kegg.get("receptor_pathways", []) if "pathway_id" in p}
+    kegg_lig_ids, kegg_lig_names = _extract_pathway_tokens(
+        kegg.get("ligand_pathways", []),
+        id_key="pathway_id",
+    )
+    kegg_rec_ids, kegg_rec_names = _extract_pathway_tokens(
+        kegg.get("receptor_pathways", []),
+        id_key="pathway_id",
+    )
 
     reactome = stage1_evidence.get("reactome_pathways", {})
-    reactome_lig_ids = {p["reactome_id"] for p in reactome.get("ligand_pathways", []) if "reactome_id" in p}
-    reactome_rec_ids = {p["reactome_id"] for p in reactome.get("receptor_pathways", []) if "reactome_id" in p}
+    reactome_lig_ids, reactome_lig_names = _extract_pathway_tokens(
+        reactome.get("ligand_pathways", []),
+        id_key="reactome_id",
+    )
+    reactome_rec_ids, reactome_rec_names = _extract_pathway_tokens(
+        reactome.get("receptor_pathways", []),
+        id_key="reactome_id",
+    )
 
-    has_shared = bool((kegg_lig_ids & kegg_rec_ids) or (reactome_lig_ids & reactome_rec_ids))
+    has_shared = bool(
+        (kegg_lig_ids & kegg_rec_ids)
+        or (reactome_lig_ids & reactome_rec_ids)
+        or (kegg_lig_names & kegg_rec_names)
+        or (reactome_lig_names & reactome_rec_names)
+    )
 
     # Backward compatibility: old format (flat "pathways" list) → count-based fallback
-    if not kegg_lig_ids and not kegg_rec_ids and not reactome_lig_ids and not reactome_rec_ids:
+    if (
+        not kegg_lig_ids and not kegg_rec_ids and not reactome_lig_ids and not reactome_rec_ids
+        and not kegg_lig_names and not kegg_rec_names and not reactome_lig_names and not reactome_rec_names
+    ):
         old_kegg = len(kegg.get("pathways", []))
         old_reactome = len(reactome.get("pathways", []))
         pathway_score = min((old_kegg + old_reactome) / 4.0, 1.0)
@@ -461,41 +504,55 @@ def should_run_pubmed(max_clinical_phase: str | int | None) -> bool:
 # Programmatic drug-evidence scoring from ChEMBL indications
 # -------------------------------------------------------------------------
 
-# Breast cancer keyword variants for indication matching
-_BREAST_CANCER_KEYWORDS = (
-    "breast cancer",
-    "breast carcinoma",
-    "breast neoplasm",
-    "breast tumour",
-    "breast tumor",
-    "mammary cancer",
-    "mammary carcinoma",
-    "triple negative breast",
-    "tnbc",
-    "her2-positive breast",
-    "er-positive breast",
-)
+_INDICATION_MATCH_ONCOLOGY_SYNONYMS = frozenset({
+    "cancer",
+    "carcinoma",
+    "tumor",
+    "tumour",
+    "neoplasm",
+})
+
+
+def _normalize_indication_text(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+
+def _core_oncology_tokens(text: str) -> set[str]:
+    normalized = _normalize_indication_text(text)
+    return {
+        token
+        for token in normalized.split()
+        if token not in _INDICATION_MATCH_ONCOLOGY_SYNONYMS
+    }
 
 
 def _indication_matches_disease(indication_term: str, disease: str) -> bool:
     """Check if an indication term matches the target disease.
 
-    Note: Breast cancer has enhanced keyword matching. Other diseases
-    rely on substring matching only. Consider adding ontology-based
-    matching for improved coverage across disease types.
+    Generic rule:
+    - direct normalized substring match first
+    - if both sides are oncology terms, allow cancer/carcinoma/tumor/neoplasm
+      synonym matching when their non-generic core tokens overlap
     """
-    term_lower = indication_term.lower()
-    disease_lower = disease.lower()
+    term_normalized = _normalize_indication_text(indication_term)
+    disease_normalized = _normalize_indication_text(disease)
+
+    if not term_normalized or not disease_normalized:
+        return False
 
     # Direct match
-    if disease_lower in term_lower:
+    if disease_normalized in term_normalized:
         return True
 
-    # For breast cancer, check specific keyword variants
-    if "breast" in disease_lower:
-        return any(kw in term_lower for kw in _BREAST_CANCER_KEYWORDS)
+    if not (_indication_is_oncology(indication_term) and infer_oncology_flag(disease)):
+        return False
 
-    return False
+    disease_core = _core_oncology_tokens(disease)
+    term_core = _core_oncology_tokens(indication_term)
+    if not disease_core or not term_core:
+        return False
+
+    return bool(disease_core & term_core)
 
 
 def _indication_is_oncology(indication_term: str) -> bool:

@@ -1,5 +1,5 @@
 {
-  "last_turn_at": "2026-03-14T09:15:26.677Z",
-  "turn_count": 241,
-  "last_agent_output": ""
+  "last_turn_at": "2026-03-14T17:14:36.181Z",
+  "turn_count": 265,
+  "last_agent_output": "**Findings**\n\n`HIGH` Direct `DrugTarget` graph runs the raw agent and bypasses the only hardened run"
 }

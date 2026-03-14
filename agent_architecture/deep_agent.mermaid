@@ -4,17 +4,19 @@ graph TB
     subgraph DeepAgent["🤖 Deep Agent Architecture"]
         Planning[📋 Planning Layer<br/>write_todos]
         
-        Planning --> MainAgent{Main Agent<br/>Coordinator}
+        Planning --> MainAgent{Orchestrator<br/>Agent}
+
+        MainAgent <-->|progressive disclosure| Memory[💾 Skiils]    
+        Memory -.-> MainAgent
+        MainAgent -->|Thought-Action-Observation| Tools[🛠️ Tools<br/>MCP servers]
+        Tools -.-> MainAgent
         
-        MainAgent -->|Thought-Action-Observation| Tools[🛠️ Tools]
-        Tools --> MainAgent
-        
+
         MainAgent -->|task tool| Subagents[👥 Subagents<br/>Specialized Workers]
-        Subagents -->|Results| MainAgent
+        Subagents -.->|Results| MainAgent
         
         MainAgent <-->|read/write| FileSystem[(📁 File System<br/>Context Management)]
-        
-        MainAgent <-->|save/retrieve| Memory[(💾 Long-term Memory<br/>LangGraph Store)]
+    
     end
     
     MainAgent --> Output[Output: Final Result]
