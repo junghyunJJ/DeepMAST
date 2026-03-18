@@ -172,7 +172,7 @@ class TestSubagentConfigs:
             "query_gwas_gene_trait",
             "query_stage2_gene_panel",
             "query_ensembl_vep_consequence",
-            "query_drugbank_target_profile",
+            "query_chembl_target_profile",
             "query_pubmed_clinical_limitations",
             "run_compare_census_lr_pair",
             "read_skill_file",
@@ -464,7 +464,7 @@ class TestToolImports:
         assert stage_domain_tools.query_string_ppi_pair.name == "query_string_ppi_pair"
         assert stage_domain_tools.query_stage2_gene_panel.name == "query_stage2_gene_panel"
         assert stage_domain_tools.query_ensembl_vep_consequence.name == "query_ensembl_vep_consequence"
-        assert stage_domain_tools.query_drugbank_target_profile.name == "query_drugbank_target_profile"
+        assert stage_domain_tools.query_chembl_target_profile.name == "query_chembl_target_profile"
         assert stage_domain_tools.query_pubmed_clinical_limitations.name == "query_pubmed_clinical_limitations"
 
     def test_import_census_lr_validation_tools(self):
@@ -484,7 +484,7 @@ class TestToolImports:
             "query_string_ppi_pair", "query_ensembl_vep_consequence",
             "query_opentargets_target", "query_opentargets_known_drugs",
             "query_gwas_gene_trait", "query_stage2_gene_panel",
-            "query_drugbank_target_profile", "query_pubmed_clinical_limitations",
+            "query_chembl_target_profile", "query_pubmed_clinical_limitations",
             "run_compare_census_lr_pair",
             "finalize_stage1_artifacts",
             "read_skill_file",

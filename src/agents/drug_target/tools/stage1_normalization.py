@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import math
+import re
 from pathlib import Path
 from statistics import NormalDist
 from typing import Any
@@ -145,8 +146,15 @@ def parse_stage1_pair_from_filename(path: str | Path) -> tuple[str, str]:
     return ligand.upper(), receptor.upper()
 
 
+def _validate_stage1_dict(data: Any, path: Path) -> dict[str, Any]:
+    """Ensure parsed JSON is a dict, raising ValueError otherwise."""
+    if not isinstance(data, dict):
+        raise ValueError(f"Expected JSON object in {path}")
+    return data
+
+
 def load_stage1_json(path: str | Path) -> tuple[dict[str, Any], list[str]]:
-    """Load Stage1 JSON with a narrow repair for extra trailing braces."""
+    """Load Stage1 JSON with repairs for common LLM writing errors."""
     path = Path(path)
     raw = path.read_text()
     repairs: list[str] = []
@@ -154,24 +162,33 @@ def load_stage1_json(path: str | Path) -> tuple[dict[str, Any], list[str]]:
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        if raw.count("}") == raw.count("{") + 1 and raw.rstrip().endswith("}}}"):
-            candidate = raw.rstrip()
+        text = raw.strip()
+
+        # Repair 1: Remove trailing commas before } or ]
+        repaired = re.sub(r',\s*([}\]])', r'\1', text)
+        if repaired != text:
+            try:
+                data = json.loads(repaired)
+                repairs.append("removed_trailing_commas")
+                return _validate_stage1_dict(data, path), repairs
+            except json.JSONDecodeError:
+                text = repaired  # keep the comma fix, continue to brace repair
+
+        # Repair 2: Trim extra closing braces
+        if text.count("}") > text.count("{"):
+            candidate = text
             while candidate.endswith("}") and candidate.count("}") > candidate.count("{"):
                 candidate = candidate[:-1]
                 try:
                     data = json.loads(candidate)
                     repairs.append("trimmed_extra_closing_brace")
-                    break
+                    return _validate_stage1_dict(data, path), repairs
                 except json.JSONDecodeError:
                     continue
-            else:
-                raise
-        else:
-            raise
 
-    if not isinstance(data, dict):
-        raise ValueError(f"Expected JSON object in {path}")
-    return data, repairs
+        raise  # re-raise original error if all repairs fail
+
+    return _validate_stage1_dict(data, path), repairs
 
 
 def _load_existing_stage1_context(evidence_dir: Path) -> dict[str, str]:
@@ -956,11 +973,47 @@ def finalize_stage1_artifacts(
     target_cell_type: str | None = None,
     rerun_missing_census: bool = True,
 ) -> str:
-    """Repair, rebuild, and validate canonical Stage1 artifacts."""
+    """Repair, rebuild, and validate canonical Stage1 artifacts.
+
+    Returns a compact summary (success flag, counts, file paths, errors)
+    instead of full validation payloads to keep ToolMessage size small.
+    Full details are written to evidence/stage1_*.json files on disk.
+    """
     result = finalize_stage1_workspace(
         data_dir,
         disease=disease,
         target_cell_type=target_cell_type,
         rerun_missing_census=rerun_missing_census,
     )
-    return json.dumps(result, indent=2)
+
+    # Build compact summary to avoid multi-MB ToolMessage payloads
+    pre = result.get("pre_validation", {})
+    post = result.get("post_validation", {})
+    compact = {
+        "success": result.get("success", False),
+        "context": result.get("context", {}),
+        "rebuild": result.get("rebuild", {}),
+        "rerun_missing_census": result.get("rerun_missing_census", False),
+        "rerun_count": len(result.get("rerun_results", [])),
+        "pre_validation_summary": {
+            "valid": pre.get("valid", False),
+            "expected_pair_count": pre.get("expected_pair_count", 0),
+            "missing_detail_files": len(pre.get("missing_detail_files", [])),
+            "missing_csv_files": len(pre.get("missing_csv_files", [])),
+            "missing_aggregate_files": len(pre.get("missing_aggregate_files", [])),
+            "parse_errors": len(pre.get("parse_errors", {})),
+            "schema_mismatches": len(pre.get("schema_mismatches", {})),
+            "errors": pre.get("errors", []),
+        },
+        "post_validation_summary": {
+            "valid": post.get("valid", False),
+            "expected_pair_count": post.get("expected_pair_count", 0),
+            "missing_detail_files": len(post.get("missing_detail_files", [])),
+            "missing_csv_files": len(post.get("missing_csv_files", [])),
+            "missing_aggregate_files": len(post.get("missing_aggregate_files", [])),
+            "parse_errors": len(post.get("parse_errors", {})),
+            "schema_mismatches": len(post.get("schema_mismatches", {})),
+            "errors": post.get("errors", []),
+        },
+    }
+    return json.dumps(compact, indent=2)

@@ -145,22 +145,21 @@ def rank_featured_candidates(
     # --- Featured pool: existing_drug_evidence >= 1 ---
     featured_pool = [
         r for r in eligible
-        if _extract_score(r.get("validated_track", {}).get("existing_drug_evidence", 0)) >= 1
+        if _safe_track_get(r, "validated_track", "existing_drug_evidence") >= 1
     ]
     featured_pool.sort(key=lambda x: x["combined_total"], reverse=True)
 
     # --- Novel pool: existing_drug_evidence == 0 ---
     novel_pool = [
         r for r in eligible
-        if _extract_score(r.get("validated_track", {}).get("existing_drug_evidence", 0)) == 0
+        if _safe_track_get(r, "validated_track", "existing_drug_evidence") == 0
     ]
     novel_pool.sort(key=lambda x: x["exploratory_total"], reverse=True)
 
     # --- Novel tier assignment ---
     for row in novel_pool:
-        et = row.get("exploratory_track", {})
-        gwas = _extract_score(et.get("gwas_genetic_support", 0))
-        tract = _extract_score(et.get("tractability", 0))
+        gwas = _safe_track_get(row, "exploratory_track", "gwas_genetic_support")
+        tract = _safe_track_get(row, "exploratory_track", "tractability")
         row["novel_tier"] = 1 if (gwas >= 1 or tract >= 1) else 2
 
     # --- Slot allocation (dynamic, max_total limit) ---
@@ -216,6 +215,14 @@ def _extract_score(criterion: dict[str, Any] | int | float) -> int:
     return int(criterion)
 
 
+def _safe_track_get(row: dict, track_key: str, criterion: str, default: int = 0) -> int:
+    """Safely extract a criterion score from a track that may be a flat int."""
+    track = row.get(track_key, {})
+    if not isinstance(track, dict):
+        return default
+    return _extract_score(track.get(criterion, default))
+
+
 def compute_validated_track(assessment: dict[str, Any]) -> dict[str, Any]:
     """Compute validated track total and pass/fail.
 
@@ -223,6 +230,9 @@ def compute_validated_track(assessment: dict[str, Any]) -> dict[str, Any]:
                 OR (existing_drug_evidence >= 1 AND clinical_trial_activity >= 1)
     """
     vt = assessment.get("validated_track", {})
+    if not isinstance(vt, dict):
+        # LLM passed flat int total — no per-criterion breakdown available
+        return {"scores": {k: 0 for k in VALIDATED_CRITERIA}, "total": int(vt) if vt else 0, "pass": False}
     scores = {k: _extract_score(vt.get(k, 0)) for k in VALIDATED_CRITERIA}
     total = sum(scores.values())
 
@@ -240,6 +250,8 @@ def compute_exploratory_track(assessment: dict[str, Any]) -> dict[str, Any]:
                 AND (tractability >= 1 OR biological_plausibility >= 2)
     """
     et = assessment.get("exploratory_track", {})
+    if not isinstance(et, dict):
+        return {"scores": {k: 0 for k in EXPLORATORY_CRITERIA}, "total": int(et) if et else 0, "pass": False}
     scores = {k: _extract_score(et.get(k, 0)) for k in EXPLORATORY_CRITERIA}
     total = sum(scores.values())
 

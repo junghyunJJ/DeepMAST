@@ -5,6 +5,7 @@ via ToolRuntime. Standalone React agents lack this infrastructure, so this modul
 provides lightweight replacements backed by FilesystemBackend.
 """
 
+import json
 import os
 from pathlib import Path
 
@@ -37,6 +38,9 @@ def _get_project_root() -> Path:
 @tool
 def write_file(file_path: str, content: str) -> str:
     """Write content to a file. Virtual paths (e.g., /data_path.txt) resolve to workspace."""
+    # Ollama may pass raw dict/list instead of JSON string
+    if isinstance(content, (dict, list)):
+        content = json.dumps(content, indent=2)
     backend = _get_backend()
     if not file_path.startswith("/"):
         file_path = f"/{file_path}"

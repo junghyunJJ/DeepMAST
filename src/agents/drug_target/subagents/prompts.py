@@ -51,6 +51,20 @@ For each stage, follow this cycle:
 
 Use `sequential_thinking` to PLAN your query strategy first.
 
+## PERFORMANCE: Minimize LLM Round Trips
+
+For EACH L-R pair in Stage 1, issue ALL independent tool calls in a SINGLE batch.
+Do NOT call tools one at a time — the framework supports parallel tool execution.
+Each model→tools round trip costs ~2 minutes with large models.
+
+- **Batch 1** (all independent, call together): query_cellxgene_lr_context,
+  query_kegg_pathways(ligand), query_kegg_pathways(receptor),
+  query_reactome_pathways(ligand), query_reactome_pathways(receptor),
+  query_string_ppi_pair
+- **Batch 2** (depends on Census result from Batch 1): run_compare_census_lr_pair + save_evidence
+
+Target: 2-3 round trips per pair, NOT 6-8.
+
 For EACH L-R pair:
 a) **Cellxgene Census** -- call `query_cellxgene_lr_context` using `census_disease`
    (from Phase 0 mapping) as the disease argument. Check the `disease_matched` flag
@@ -116,12 +130,12 @@ Call `query_stage2_gene_panel(gene_symbols, disease, selected_top3_genes, data_d
   - `gene_manifest`
 
 After the batch call:
-a) **SAVE IMMEDIATELY** -- `save_evidence(data_dir, "stage2_evidence.json", stage2_evidence)`
-b) For EACH gene in the returned panel:
-   `save_evidence(data_dir, "ot_{GENE}.json", stage2_evidence[GENE]["opentargets"])`
-c) `save_evidence(data_dir, "known_drugs.json", known_drugs)`
-d) `save_evidence(data_dir, "gene_manifest.json", gene_manifest)`
-e) **Ensembl VEP** (oncology OR GWAS variants available):
+`query_stage2_gene_panel` automatically saves all evidence files to disk:
+stage2_evidence.json, known_drugs.json, gene_manifest.json, and ot_{GENE}.json per gene.
+Verify by calling `load_evidence_files(data_dir)` afterward.
+Do NOT call save_evidence to overwrite these files — they contain the real database results.
+
+a) **Ensembl VEP** (oncology OR GWAS variants available):
    Collect rs IDs from each gene's `stage2_evidence[GENE]["gwas"]["gene_associations"]`.
    Call `query_ensembl_vep_consequence(variant_ids)` to predict
    functional consequence (LoF, missense, synonymous).
@@ -206,17 +220,14 @@ Use `validate_quality` on a summary of findings (threshold >= 0.7).
 
 ### Stage 3: Deep Dive (FEATURED AND NOVEL CANDIDATES)
 
-Before interpreting ChEMBL-derived evidence, read the following skill guide if you
-need help interpreting activity values, target relevance, or compound evidence:
+Before calling `query_chembl_target_profile`, read the ChEMBL skill guide to understand activity values, target relevance, and compound evidence interpretation:
 - `read_skill_file("skills/chembl-database/SKILL.md")`
 
 Do NOT read separate pathway, STRING, or Census skill documents for this workflow.
 Those stages remain tool-driven.
 
 For EACH Featured and Novel Candidate:
-a) **DrugBank/ChEMBL** -- call `query_drugbank_target_profile` to retrieve known drugs
-   (DrugBank primary, ChEMBL REST API fallback). Check the `source` field in the
-   response to identify which database provided the data.
+a) **ChEMBL** -- call `query_chembl_target_profile` to retrieve known drugs via ChEMBL REST API.
 b) IF max clinical phase >= 2:
    - Call `query_pubmed_clinical_limitations` to scan latest clinical trial
      adverse events and efficacy summaries.
@@ -236,6 +247,17 @@ Use `think_tool` to REFLECT on overall coverage and quality.
 - Stage 2 batching happens through `query_stage2_gene_panel(...)`
 - Every rubric score MUST have an explicit rationale grounded in evidence
 - Do NOT hallucinate evidence -- if data is missing, score conservatively
+
+## EVIDENCE INTEGRITY (CRITICAL)
+- NEVER fabricate p-values, odds ratios, effect sizes, mechanism details,
+  phosphorylation sites, or any quantitative data not returned by tools
+- If a tool returns empty results, errors, or timeouts: record the ABSENCE
+  of evidence, do NOT fill in data from your training knowledge
+- Every numeric claim in rubric rationales MUST cite the specific tool call
+  that produced it (e.g., "GWAS: 34 gene_associations from query_stage2_gene_panel")
+- Score 0 on any criterion where the corresponding tool returned no data or errors
+- If ALL tools for a stage fail: explicitly state "No evidence collected for Stage N
+  due to tool failures" and score all criteria at 0
 """
 
 # =============================================================================
@@ -253,6 +275,13 @@ persist the structured JSON contract as target_assessment.json first.
 1. **PLAN** (sequential_thinking): Plan document structure, identify key findings to highlight
 2. **EXECUTE**: Write drug.md sections
 3. **REFLECT** (think_tool): Check quality -- comprehensive? Clear? Are featured candidates properly highlighted?
+
+## IMPORTANT: Evidence Access
+- ALWAYS use `load_evidence_files(data_dir=...)` to load evidence data
+- NEVER use `read_file` to read evidence/*.json directly — these files may not
+  exist at the path you expect, and load_evidence_files returns all evidence
+  in a structured format with metadata summaries
+- Use `save_evidence` / `load_evidence_files` as the canonical read/write interface
 
 ## Workflow
 
@@ -311,8 +340,8 @@ For EACH Featured Candidate, a dedicated subsection:
 - **Header**: `### [FEATURED] {GENE} -- Priority: {PRIORITY}`
 
 **A. Clinical & Safety Profile (Stage 3)**
-- Known Drugs (DrugBank)
-- Toxicity & ADMET (DrugBank)
+- Known Drugs (ChEMBL)
+- Toxicity & ADMET (ChEMBL)
 - Latest Clinical Insights (PubMed -- conditional, if Phase >= 2)
 
 **B. Biological Context & Pathway (Stage 1 Validation)**
@@ -343,7 +372,7 @@ For EACH Novel Candidate, a dedicated subsection:
 - GWAS findings, tractability, biological plausibility
 
 **D. Drug Development Potential (Stage 3)**
-- DrugBank/ChEMBL (expected: no matches for truly novel)
+- ChEMBL (expected: no matches for truly novel)
 - Tractability assessment
 
 **E. Recommendation**
@@ -378,9 +407,27 @@ validated_track + exploratory_track). Genes with highest scores receive
 4. **Bold/highlighted rows** in the druggability matrix
 5. **Cross-reference** to Part 3 L-R interpretation findings
 
+## EVIDENCE INTEGRITY (CRITICAL)
+- MUST call `validate_evidence_completeness(data_dir)` before writing drug.md.
+  If `ready_for_report` is False, include a prominent warning in the Executive Summary
+  stating which evidence sources are missing.
+- ONLY report data that exists in evidence/*.json files
+- If stage2_evidence.json contains empty arrays for a gene: report "No OpenTargets/GWAS
+  data available" — do NOT fabricate association scores, p-values, or odds ratios
+- If known_drugs.json has empty drug lists: report "No known drugs identified" —
+  do NOT describe drugs from your training knowledge
+- If ChEMBL queries failed (check stage3_*.json for errors): state "ChEMBL query
+  failed" — do NOT invent drug mechanisms or clinical trial data
+- Quantitative claims require a traceable source file. If you cannot point to the
+  specific JSON key, do not include the claim.
+- Include a "Data Completeness" section in Section 5 noting which tool calls
+  succeeded vs failed and any data gaps
+
 ## Output
 First write `target_assessment.json` using `save_target_assessment`.
-Then write the complete document to `/drug.md` using the write_file tool.
+Then you MUST call the `save_drug_md(data_dir=..., content=...)` tool to write drug.md to disk.
+WARNING: Do NOT use Command(files=...) or any state-update mechanism — those only update
+in-memory state and do NOT persist the file to the filesystem. Only `save_drug_md` writes to disk.
 The document must be self-contained markdown suitable for integration
 into the CCI Analysis HTML Report's Therapeutic Implications tab.
 """

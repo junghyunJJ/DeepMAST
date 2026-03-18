@@ -316,6 +316,16 @@ def query_opentargets_target_data(
                 )
             result["associations"] = mod.get_target_associations(ensembl_id, min_score=0.1)
 
+        # Truncate large payloads to prevent token bloat
+        if len(result["associations"]) > 20:
+            result["associations"] = sorted(
+                result["associations"], key=lambda x: x.get("score", 0), reverse=True
+            )[:20]
+            result["associations_truncated"] = True
+        if len(result["disease_evidence"]) > 30:
+            result["disease_evidence"] = result["disease_evidence"][:30]
+            result["disease_evidence_truncated"] = True
+
         if disease_context.get("efo_id"):
             result["efo_id"] = disease_context["efo_id"]
         result["executed"] = True
@@ -350,6 +360,15 @@ def query_opentargets_known_drugs_data(
 
         result["efo_id"] = efo_id
         result["drugs"] = mod.get_known_drugs_for_disease(efo_id)
+
+        # Truncate large drug lists to prevent token bloat
+        drugs = result["drugs"]
+        if isinstance(drugs, dict):
+            for target, drug_list in drugs.items():
+                if isinstance(drug_list, list) and len(drug_list) > 10:
+                    drugs[target] = drug_list[:10]
+            result["drugs_truncated"] = True
+
         result["executed"] = True
     except Exception as exc:
         result["errors"].append(f"OpenTargets drug query failed: {exc}")
@@ -455,6 +474,15 @@ def query_gwas_gene_trait_data(
                 "n_gene_snps_in_disease": len(gene_snps_in_disease),
             }
             result["executed"] = True
+
+        # Truncate large GWAS payloads to prevent token bloat
+        if len(result["gene_associations"]) > 50:
+            result["gene_associations"] = result["gene_associations"][:50]
+            result["gene_associations_truncated"] = True
+        if len(result["trait_associations"]) > 100:
+            result["trait_associations"] = result["trait_associations"][:100]
+            result["trait_associations_truncated"] = True
+
     except Exception as exc:
         result["errors"].append(f"GWAS query failed: {exc}")
 

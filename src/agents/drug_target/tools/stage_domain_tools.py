@@ -5,9 +5,12 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
+import sqlite3
+import threading
 from pathlib import Path
 from typing import Any
 
+import os
 import re
 import requests
 from langchain_core.tools import tool
@@ -25,24 +28,28 @@ logger = logging.getLogger(__name__)
 
 _SKILLS_DIR = Path(__file__).resolve().parents[4] / "skills"
 _TIMEOUT = 30
+_DEFAULT_CENSUS_VERSION = os.getenv("CENSUS_VERSION", "2025-11-08")
 
 _module_cache: dict[tuple[str, str], Any] = {}
+_CHEMBL_LOCK = threading.Lock()
+_MODULE_CACHE_LOCK = threading.Lock()
 
 
 def _load_skill_module(skill_name: str, script_name: str, module_name: str):
     cache_key = (skill_name, script_name)
-    if cache_key in _module_cache:
-        return _module_cache[cache_key]
-    script_path = _SKILLS_DIR / skill_name / "scripts" / script_name
-    if not script_path.exists():
-        raise FileNotFoundError(f"Skill script not found: {script_path}")
-    spec = importlib.util.spec_from_file_location(module_name, script_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Could not load module spec for {script_path}")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    _module_cache[cache_key] = mod
-    return mod
+    with _MODULE_CACHE_LOCK:
+        if cache_key in _module_cache:
+            return _module_cache[cache_key]
+        script_path = _SKILLS_DIR / skill_name / "scripts" / script_name
+        if not script_path.exists():
+            raise FileNotFoundError(f"Skill script not found: {script_path}")
+        spec = importlib.util.spec_from_file_location(module_name, script_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Could not load module spec for {script_path}")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _module_cache[cache_key] = mod
+        return mod
 
 
 def _as_json(payload: dict[str, Any]) -> str:
@@ -53,6 +60,14 @@ def _trim_text(value: str, max_len: int = 2000) -> str:
     return value if len(value) <= max_len else value[:max_len] + "...[truncated]"
 
 
+_ORGANISM_MAP = {
+    "human": "homo_sapiens",
+    "homo sapiens": "homo_sapiens",
+    "mouse": "mus_musculus",
+    "mus musculus": "mus_musculus",
+}
+
+
 @tool
 def query_cellxgene_lr_context(
     ligand: str,
@@ -61,6 +76,7 @@ def query_cellxgene_lr_context(
     organism: str = "homo_sapiens",
 ) -> str:
     """Query CELLxGENE census metadata for disease/cell-type context."""
+    organism = _ORGANISM_MAP.get(organism.lower().strip(), organism)
     result = {
         "ligand": ligand,
         "receptor": receptor,
@@ -81,7 +97,7 @@ def query_cellxgene_lr_context(
 
     disease_safe = disease.replace("\\", "\\\\").replace("'", "\\'")
     try:
-        with cellxgene_census.open_soma() as census:
+        with cellxgene_census.open_soma(census_version=_DEFAULT_CENSUS_VERSION) as census:
             obs = cellxgene_census.get_obs(
                 census,
                 organism,
@@ -131,6 +147,7 @@ def query_cellxgene_lr_context(
 @tool
 def list_census_diseases(organism: str = "homo_sapiens") -> str:
     """List disease labels available in CELLxGENE Census for vocabulary matching."""
+    organism = _ORGANISM_MAP.get(organism.lower().strip(), organism)
     result: dict[str, Any] = {
         "organism": organism,
         "executed": False,
@@ -144,13 +161,15 @@ def list_census_diseases(organism: str = "homo_sapiens") -> str:
         return _as_json(result)
 
     try:
-        with cellxgene_census.open_soma() as census:
+        with cellxgene_census.open_soma(census_version=_DEFAULT_CENSUS_VERSION) as census:
             summary_df = (
                 census["census_info"]["summary_cell_counts"]
                 .read(column_names=["organism", "category", "label", "total_cell_count"])
                 .concat()
                 .to_pandas()
             )
+        logger.info("Census summary_cell_counts: shape=%s, columns=%s",
+                     summary_df.shape, list(summary_df.columns))
         org_display = organism.replace("_", " ").lower()
         mask = (
             (summary_df["organism"].str.lower() == org_display)
@@ -411,8 +430,8 @@ def _fetch_drug_indications_and_mechanism(
     return indications, mechanism_of_action
 
 
-def _chembl_fallback(gene_symbol: str, max_drugs: int) -> list[dict]:
-    """Query ChEMBL for drugs targeting a gene (fallback when DrugBank unavailable).
+def _query_chembl_drugs(gene_symbol: str, max_drugs: int) -> list[dict]:
+    """Query ChEMBL for drugs targeting a gene.
 
     Each matched compound includes indications and mechanism_of_action
     retrieved from the ChEMBL drug_indication and mechanism APIs.
@@ -456,100 +475,92 @@ def _chembl_fallback(gene_symbol: str, max_drugs: int) -> list[dict]:
 
 
 @tool
-def query_drugbank_target_profile(gene_symbol: str, max_drugs: int = 10) -> str:
-    """Retrieve drugs targeting a gene symbol (DrugBank primary, ChEMBL fallback)."""
+def query_chembl_target_profile(gene_symbol: str, max_drugs: int = 10) -> str:
+    """Retrieve drugs targeting a gene symbol via ChEMBL."""
     result = {
         "gene_symbol": gene_symbol,
         "executed": False,
         "matched_drugs": [],
-        "source": None,
+        "source": "chembl",
         "errors": [],
     }
-
-    # --- Try DrugBank first ---
-    try:
-        mod = _load_skill_module("drugbank-database", "drugbank_helper.py", "drugbank_helper")
-        helper = mod.DrugBankHelper()
+    with _CHEMBL_LOCK:
         try:
-            root = helper._get_root()  # noqa: SLF001
-        except AttributeError:
-            result["errors"].append("DrugBank helper API incompatible — _get_root() unavailable")
-            raise
-        ns = helper.NAMESPACE
-        target_upper = gene_symbol.upper()
-        matches = []
-        for drug in root.findall("db:drug", ns):
-            if len(matches) >= max(1, min(max_drugs, 25)):
-                break
-            drug_id_el = drug.find("db:drugbank-id[@primary='true']", ns)
-            drug_name_el = drug.find("db:name", ns)
-            drug_id = drug_id_el.text if drug_id_el is not None else None
-            drug_name = drug_name_el.text if drug_name_el is not None else None
-            if not drug_id:
-                continue
-            targets_el = drug.find("db:targets", ns)
-            if targets_el is None:
-                continue
-            for target in targets_el.findall("db:target", ns):
-                polypeptide = target.find("db:polypeptide", ns)
-                if polypeptide is None:
-                    continue
-                gene_el = polypeptide.find("db:gene-name", ns)
-                gene_name = gene_el.text if gene_el is not None else ""
-                if gene_name and gene_name.upper() == target_upper:
-                    matches.append(
-                        {
-                            "drugbank_id": drug_id,
-                            "drug_name": drug_name,
-                            "target_gene": gene_name,
-                        }
-                    )
-                    break
-
-        result["matched_drugs"] = matches
-        result["source"] = "drugbank"
-        result["executed"] = True
-        return _as_json(result)
-    except Exception as exc:
-        result["errors"].append(f"DrugBank unavailable: {exc}")
-
-    # --- Fallback to ChEMBL ---
-    try:
-        matches = _chembl_fallback(gene_symbol, max_drugs)
-        result["matched_drugs"] = matches
-        result["source"] = "chembl"
-        result["executed"] = True
-        result["errors"] = []  # clear DrugBank error on successful fallback
-    except Exception as exc:
-        result["errors"].append(f"ChEMBL fallback also failed: {exc}")
-
+            matches = _query_chembl_drugs(gene_symbol, max_drugs)
+            result["matched_drugs"] = matches
+            result["executed"] = True
+        except (sqlite3.DatabaseError, sqlite3.OperationalError) as exc:
+            logger.warning("ChEMBL cache corrupted (%s), clearing and retrying", exc)
+            try:
+                from chembl_webresource_client.settings import Settings
+                Settings.Instance().clear_cache()
+            except Exception:
+                pass
+            matches = _query_chembl_drugs(gene_symbol, max_drugs)
+            result["matched_drugs"] = matches
+            result["executed"] = True
+        except Exception as exc:
+            result["errors"].append(f"ChEMBL query failed: {exc}")
     return _as_json(result)
+
+
+_chembl_fallback = _query_chembl_drugs
 
 
 @tool
 def query_pubmed_clinical_limitations(target_name: str, max_results: int = 5) -> str:
-    """Search PubMed clinical-trial adverse event insights for a target."""
+    """Search PubMed clinical-trial adverse event insights for a target.
+
+    Uses a tiered query strategy: tries specific queries first, then
+    progressively broader queries until results are found.
+    """
     result = {
         "target_name": target_name,
         "executed": False,
         "query": "",
+        "query_tier": "",
         "papers": [],
         "errors": [],
     }
-    query = f"\"{target_name}\"[tiab] AND \"Clinical Trial\"[pt] AND \"adverse event\"[tiab]"
-    result["query"] = query
+
+    # Tiered query strategy: try progressively broader queries
+    queries = [
+        (
+            f'"{target_name}"[tiab] AND "Clinical Trial"[pt] AND ("adverse event"[tiab] OR "safety"[tiab] OR "toxicity"[tiab])',
+            "tier1_clinical_safety",
+        ),
+        (
+            f'"{target_name}"[tiab] AND ("Clinical Trial"[pt] OR "Review"[pt]) AND ("therapeutic"[tiab] OR "treatment"[tiab])',
+            "tier2_therapeutic",
+        ),
+        (
+            f'"{target_name}"[tiab] AND ("drug target"[tiab] OR "inhibitor"[tiab] OR "therapy"[tiab])',
+            "tier3_broad",
+        ),
+    ]
+
     try:
         _pubmed = _load_skill_module("pubmed-eutils-search", "search_pubmed.py", "search_pubmed")
-        pub = _pubmed.search_pubmed(query=query, max_results=max(1, min(max_results, 20)))
-        papers = pub.get("papers", []) if isinstance(pub, dict) else []
-        result["papers"] = [
-            {
-                "pmid": row.get("pmid"),
-                "title": row.get("title"),
-                "year": row.get("year"),
-            }
-            for row in papers
-        ]
+        cap = max(1, min(max_results, 20))
+
+        for query, tier in queries:
+            result["query"] = query
+            result["query_tier"] = tier
+            pub = _pubmed.search_pubmed(query=query, max_results=cap)
+            papers = pub.get("papers", []) if isinstance(pub, dict) else []
+            if papers:
+                result["papers"] = [
+                    {
+                        "pmid": row.get("pmid"),
+                        "title": row.get("title"),
+                        "year": row.get("year"),
+                    }
+                    for row in papers
+                ]
+                result["executed"] = True
+                return _as_json(result)
+
+        # All tiers returned 0 results
         result["executed"] = True
     except Exception as exc:
         result["errors"].append(f"PubMed query failed: {exc}")
@@ -605,32 +616,54 @@ def query_stage2_gene_panel(
     gene_symbols: list[str],
     disease: str,
     selected_top3_genes: list[str] | None = None,
-    data_dir: str | None = None,
+    data_dir: str = "",
 ) -> str:
     """Build Stage 2 evidence for all unique genes in one batch call.
 
-    Full evidence data is saved to ``<data_dir>/evidence/`` when *data_dir*
-    is provided.  The tool returns a **compact summary** (gene-level stats)
-    instead of the raw payloads to keep LangGraph checkpoint size small.
+    Full evidence data is **always** saved to ``<data_dir>/evidence/``.
+    The tool returns a **compact summary** (gene-level stats) instead of
+    the raw payloads to keep LangGraph checkpoint size small.
     Use ``load_evidence_files()`` to read the detailed per-gene JSON files.
+
+    DO NOT call save_evidence for stage2_evidence.json, known_drugs.json,
+    gene_manifest.json, or ot_*.json — this tool writes them automatically.
     """
+    from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir
+
+    # Resolve data_dir with fallback to env var
+    resolved_dir = _resolve_data_dir(data_dir)
+
+    # Auto-finalize Stage 1 if not already done
+    s1_conf = resolved_dir / "evidence" / "stage1_confidence.json"
+    if not s1_conf.exists() or s1_conf.stat().st_size <= 10:
+        logger.info("Auto-finalizing Stage 1 before Stage 2 batch...")
+        try:
+            from src.agents.drug_target.tools.stage1_normalization import finalize_stage1_workspace
+            finalize_stage1_workspace(str(resolved_dir))
+        except Exception as exc:
+            logger.warning("Stage 1 auto-finalize failed (continuing): %s", exc)
+
     bundle = build_stage2_gene_panel(
         gene_symbols,
         disease,
         selected_top3_genes=selected_top3_genes,
-        data_dir=data_dir,
+        data_dir=str(resolved_dir),
     )
 
-    # Persist full evidence to disk when a workspace directory is available.
-    if data_dir:
-        evidence_dir = Path(data_dir) / "evidence"
-        written = write_stage2_artifacts(bundle, evidence_dir)
-        logger.info("Stage 2 artifacts written (%d files) → %s", len(written), evidence_dir)
+    # Always persist full evidence to disk.
+    evidence_dir = resolved_dir / "evidence"
+    written = write_stage2_artifacts(bundle, evidence_dir)
+    logger.info("Stage 2 artifacts written (%d files) → %s", len(written), evidence_dir)
 
     # Return a lightweight summary so ToolMessage stays small.
     summary = summarize_stage2_bundle(bundle)
-    if data_dir:
-        summary["evidence_dir"] = str(Path(data_dir) / "evidence")
+    summary["evidence_dir"] = str(evidence_dir)
+    summary["written_files_count"] = len(written)
+    summary["note"] = (
+        "Full evidence data saved to evidence/ directory. "
+        "Use load_evidence_files() to read detailed per-gene payloads. "
+        "Do NOT overwrite these files with save_evidence."
+    )
     return _as_json(summary)
 
 
@@ -645,6 +678,6 @@ __all__ = [
     "query_opentargets_known_drugs",
     "query_gwas_gene_trait",
     "query_stage2_gene_panel",
-    "query_drugbank_target_profile",
+    "query_chembl_target_profile",
     "query_pubmed_clinical_limitations",
 ]

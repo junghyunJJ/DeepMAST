@@ -293,6 +293,31 @@ def _write_label_template(path: Path, rows: list[dict[str, Any]], top_k: int = 2
         writer.writerows(template_rows)
 
 
+def _load_completed_keys(run_dir: Path) -> set[tuple[str, str, int]]:
+    """Read existing raw_runs.jsonl and return completed (method, case_id, rep) keys.
+
+    Records with errors are excluded so they can be retried.
+    """
+    completed: set[tuple[str, str, int]] = set()
+    jsonl_path = run_dir / "raw_runs.jsonl"
+    if not jsonl_path.exists():
+        return completed
+    with jsonl_path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if rec.get("error"):
+                continue
+            key = (str(rec["method"]), str(rec["case_id"]), int(rec["repeat_index"]))
+            completed.add(key)
+    return completed
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -334,6 +359,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Phase 1: reference run (dynamic_lean) caches iteration-0 queries. "
              "Phase 2: remaining methods replay cached queries for fair comparison.",
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        default=False,
+        help="Resume an interrupted run: skip (method, case, rep) combos already "
+             "in raw_runs.jsonl (error records are retried). Requires --run-dir.",
+    )
     return parser
 
 
@@ -347,6 +379,8 @@ def main() -> None:
         f"run_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}_{uuid.uuid4().hex[:8]}"
     )
     appending = args.run_dir is not None
+    if args.resume and not args.run_dir:
+        parser.error("--resume requires --run-dir")
     if appending:
         run_dir = Path(args.run_dir)
         if not run_dir.exists():
@@ -354,6 +388,11 @@ def main() -> None:
     else:
         run_dir = Path(args.output_dir) / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
+
+    completed_keys: set[tuple[str, str, int]] = set()
+    if args.resume:
+        completed_keys = _load_completed_keys(run_dir)
+        print(f"[resume] Found {len(completed_keys)} completed records, skipping them.")
 
     _DYNAMIC_METHODS = {
         "dynamic", "dynamic_off", "dynamic_no_disease_filter",
@@ -437,51 +476,64 @@ def main() -> None:
 
         for case in cases:
             # Phase 1: reference run – record iteration-0 queries
-            t0 = time.perf_counter()
-            error = error_type = query_used = search_method = None
-            papers: list[dict[str, Any]] = []
-            coverage: dict[str, Any] = {}
-            recommended_actions: list[str] = []
             cached_queries: list[dict] = []
-            try:
-                papers, coverage, query_used, search_method, recommended_actions, cached_queries = (
-                    _run_method_once(
-                        method=reference_method,
-                        case=case,
-                        max_results=args.max_results,
-                        max_iterations=args.max_iterations,
-                        rerank_mode=args.rerank_mode,
-                        record_queries=True,
-                    )
-                )
-            except Exception as exc:
-                error = str(exc)
-                error_type = type(exc).__name__
-
-            latency_ms = round((time.perf_counter() - t0) * 1000.0, 3)
-            _record_run(
-                method=reference_method, case=case, rep=0,
-                papers=papers, coverage=coverage, query_used=query_used,
-                search_method=search_method, recommended_actions=recommended_actions,
-                latency_ms=latency_ms, error=error, error_type=error_type,
-                shared_queries_mode=True,
-            )
-
-            # Save cache artifact
-            if cached_queries:
+            ref_key = (reference_method, case["case_id"], 0)
+            if ref_key in completed_keys:
+                completed_jobs += 1
+                # Load cached queries from saved artifact for Phase 2
                 cache_path = run_dir / f"query_cache_{case['case_id']}.json"
-                _write_json(cache_path, {
-                    "case_id": case["case_id"],
-                    "generated_at_utc": datetime.now(UTC).isoformat(),
-                    "reference_method": reference_method,
-                    "queries": cached_queries,
-                })
+                if cache_path.exists():
+                    cached_queries = json.loads(
+                        cache_path.read_text(encoding="utf-8")
+                    ).get("queries", [])
+            else:
+                t0 = time.perf_counter()
+                error = error_type = query_used = search_method = None
+                papers: list[dict[str, Any]] = []
+                coverage: dict[str, Any] = {}
+                recommended_actions: list[str] = []
+                try:
+                    papers, coverage, query_used, search_method, recommended_actions, cached_queries = (
+                        _run_method_once(
+                            method=reference_method,
+                            case=case,
+                            max_results=args.max_results,
+                            max_iterations=args.max_iterations,
+                            rerank_mode=args.rerank_mode,
+                            record_queries=True,
+                        )
+                    )
+                except Exception as exc:
+                    error = str(exc)
+                    error_type = type(exc).__name__
+
+                latency_ms = round((time.perf_counter() - t0) * 1000.0, 3)
+                _record_run(
+                    method=reference_method, case=case, rep=0,
+                    papers=papers, coverage=coverage, query_used=query_used,
+                    search_method=search_method, recommended_actions=recommended_actions,
+                    latency_ms=latency_ms, error=error, error_type=error_type,
+                    shared_queries_mode=True,
+                )
+
+                # Save cache artifact
+                if cached_queries:
+                    cache_path = run_dir / f"query_cache_{case['case_id']}.json"
+                    _write_json(cache_path, {
+                        "case_id": case["case_id"],
+                        "generated_at_utc": datetime.now(UTC).isoformat(),
+                        "reference_method": reference_method,
+                        "queries": cached_queries,
+                    })
 
             # Phase 2: replay cached queries for remaining methods
             for method in replay_methods:
                 if method not in _DYNAMIC_METHODS:
                     # Baseline methods don't use query cache
                     for rep in range(_repeats_for(method)):
+                        if (method, case["case_id"], rep) in completed_keys:
+                            completed_jobs += 1
+                            continue
                         t0 = time.perf_counter()
                         error = error_type = query_used = search_method = None
                         papers = []
@@ -510,6 +562,9 @@ def main() -> None:
                     continue
 
                 for rep in range(_repeats_for(method)):
+                    if (method, case["case_id"], rep) in completed_keys:
+                        completed_jobs += 1
+                        continue
                     t0 = time.perf_counter()
                     error = error_type = query_used = search_method = None
                     papers = []
@@ -543,6 +598,9 @@ def main() -> None:
         for method in args.methods:
             for case in cases:
                 for rep in range(_repeats_for(method)):
+                    if (method, case["case_id"], rep) in completed_keys:
+                        completed_jobs += 1
+                        continue
                     started_at = datetime.now(UTC).isoformat()
                     t0 = time.perf_counter()
                     error = error_type = query_used = search_method = None

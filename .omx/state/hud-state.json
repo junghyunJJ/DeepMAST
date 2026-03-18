@@ -1,5 +1,5 @@
 {
-  "last_turn_at": "2026-03-14T17:14:36.181Z",
-  "turn_count": 265,
-  "last_agent_output": "**Findings**\n\n`HIGH` Direct `DrugTarget` graph runs the raw agent and bypasses the only hardened run"
+  "last_turn_at": "2026-03-16T07:43:48.873Z",
+  "turn_count": 269,
+  "last_agent_output": "정리하면 이렇습니다.\n\n- `Q00/ouroboros`는 등록 자체는 가능합니다.\n- 단, 저장소 전체를 한 번에 “하나의 skill”로 넣는 게 아니라 `skills/<skill"
 }

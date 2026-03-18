@@ -39,7 +39,7 @@ def search_molecules_by_name(name_pattern):
     """
     molecule = new_client.molecule
     results = molecule.filter(pref_name__icontains=name_pattern)
-    return list(results)
+    return list(results[:500])
 
 
 def find_molecules_by_properties(max_mw=500, min_logp=None, max_logp=None):
@@ -66,7 +66,7 @@ def find_molecules_by_properties(max_mw=500, min_logp=None, max_logp=None):
         filters['molecule_properties__alogp__lte'] = max_logp
 
     results = molecule.filter(**filters)
-    return list(results)
+    return list(results[:500])
 
 
 def get_target_info(target_chembl_id):
@@ -109,7 +109,7 @@ def search_targets_by_name(target_name):
         target_type='SINGLE PROTEIN',
         pref_name__icontains=target_name
     )
-    return list(results)
+    return list(results[:100])
 
 
 def get_bioactivity_data(target_chembl_id, activity_type='IC50', max_value=100):
@@ -131,7 +131,7 @@ def get_bioactivity_data(target_chembl_id, activity_type='IC50', max_value=100):
         standard_value__lte=max_value,
         standard_units='nM'
     )
-    return list(results)
+    return list(results[:1000])
 
 
 def find_similar_compounds(smiles, similarity_threshold=85):
@@ -150,7 +150,7 @@ def find_similar_compounds(smiles, similarity_threshold=85):
         smiles=smiles,
         similarity=similarity_threshold
     )
-    return list(results)
+    return list(results[:500])
 
 
 def substructure_search(smiles):
@@ -165,7 +165,7 @@ def substructure_search(smiles):
     """
     substructure = new_client.substructure
     results = substructure.filter(smiles=smiles)
-    return list(results)
+    return list(results[:500])
 
 
 def get_drug_info(molecule_chembl_id):
@@ -187,8 +187,8 @@ def get_drug_info(molecule_chembl_id):
     except:
         drug_info = None
 
-    mechanisms = list(mechanism.filter(molecule_chembl_id=molecule_chembl_id))
-    indications = list(drug_indication.filter(molecule_chembl_id=molecule_chembl_id))
+    mechanisms = list(mechanism.filter(molecule_chembl_id=molecule_chembl_id)[:100])
+    indications = list(drug_indication.filter(molecule_chembl_id=molecule_chembl_id)[:100])
 
     return drug_info, mechanisms, indications
 
@@ -223,7 +223,7 @@ def find_kinase_inhibitors(max_ic50=100):
         standard_units='nM'
     )
 
-    return list(results)
+    return list(results[:1000])
 
 
 def get_compound_bioactivities(molecule_chembl_id):
@@ -241,7 +241,7 @@ def get_compound_bioactivities(molecule_chembl_id):
         molecule_chembl_id=molecule_chembl_id,
         pchembl_value__isnull=False
     )
-    return list(results)
+    return list(results[:1000])
 
 
 def export_to_dataframe(data):

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import subprocess
 from pathlib import Path
 from typing import Any
 
 from langchain_core.tools import tool
+
+logger = logging.getLogger(__name__)
 
 
 def _project_root() -> Path:
@@ -205,7 +208,7 @@ def run_compare_census_lr_pair(
     include_non_primary: bool = False,
     obs_extra_filter: str = "",
     output_csv: str = "",
-    timeout_sec: int = 120,
+    timeout_sec: int = 600,
 ) -> str:
     """Run compare_census_gene_pair_by_cell_type.py with fail-soft behavior."""
     result: dict[str, Any] = {
@@ -222,14 +225,11 @@ def run_compare_census_lr_pair(
         "retried": False,
         "disease_resolved": None,
         "disease_resolution_mode": None,
-        "command": [],
         "target_vs_rest": {
             "gene_a": None,
             "gene_b": None,
             "coexpression": None,
         },
-        "stdout_excerpt": "",
-        "stderr_excerpt": "",
         "errors": [],
     }
 
@@ -273,10 +273,9 @@ def run_compare_census_lr_pair(
 
     try:
         cmd, proc = _run(target_cell_type)
-        result["command"] = cmd
         combined_output = f"{proc.stdout}\n{proc.stderr}"
-        result["stdout_excerpt"] = proc.stdout[-2000:]
-        result["stderr_excerpt"] = proc.stderr[-2000:]
+        logger.debug("Census stdout: %s", proc.stdout[-2000:])
+        logger.debug("Census stderr: %s", proc.stderr[-2000:])
 
         if proc.returncode != 0:
             # ① Disease resolution first — "No cells matched" often means
@@ -289,10 +288,9 @@ def run_compare_census_lr_pair(
                 result["disease"] = disease_resolved
                 current_disease = disease_resolved
                 cmd, proc = _run(target_cell_type, current_disease)
-                result["command"] = cmd
                 combined_output = f"{proc.stdout}\n{proc.stderr}"
-                result["stdout_excerpt"] = proc.stdout[-2000:]
-                result["stderr_excerpt"] = proc.stderr[-2000:]
+                logger.debug("Census stdout: %s", proc.stdout[-2000:])
+                logger.debug("Census stderr: %s", proc.stderr[-2000:])
 
             # ② Cell type resolution (existing logic) — if still failing
             if proc.returncode != 0:
@@ -303,9 +301,8 @@ def run_compare_census_lr_pair(
                     result["resolved_cell_type"] = resolved
                     result["resolution_mode"] = mode
                     cmd, proc = _run(resolved, current_disease)
-                    result["command"] = cmd
-                    result["stdout_excerpt"] = proc.stdout[-2000:]
-                    result["stderr_excerpt"] = proc.stderr[-2000:]
+                    logger.debug("Census stdout: %s", proc.stdout[-2000:])
+                    logger.debug("Census stderr: %s", proc.stderr[-2000:])
 
             if proc.returncode != 0:
                 result["errors"].append(

@@ -139,7 +139,7 @@ async def main():
         disease="breast cancer",
         use_checkpointer=True,
     )
-    agent = create_drug_target_agent(config)
+    agent, backend = create_drug_target_agent(config)
     print(f"  Agent created (provider=openrouter, checkpointer=True)")
 
     # 3. Run the agent
@@ -153,7 +153,7 @@ async def main():
     print("Running DrugTargetAgent pipeline...")
     print(f"{'='*60}\n")
 
-    TIMEOUT_SECONDS = 30 * 60  # 30 minutes
+    TIMEOUT_SECONDS = 150 * 60  # 150 minutes
     try:
         result = await asyncio.wait_for(
             agent.ainvoke(

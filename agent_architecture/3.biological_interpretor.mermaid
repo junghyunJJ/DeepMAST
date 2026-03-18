@@ -1,99 +1,138 @@
-graph TD
-    %% Nodes
-    __start__([<p>__start__</p>]):::first
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Helvetica, Arial",
+    "primaryColor": "#f5f7fa",
+    "primaryBorderColor": "#c9d1d9",
+    "lineColor": "#9aa4b2",
+    "secondaryColor": "#eef2f7",
+    "tertiaryColor": "#ffffff"
+  }
+}}%%
 
-    st_data["ST Analysis<br/>Results"]
-    hitl_node{{"HITL<br/>(4 interrupts)"}}
+flowchart TB
 
-    subgraph deep_agent["Deep Agent (4-Subagent Sequential Pipeline)"]
+%% ======================
+%% Biological Interpreter
+%% ======================
+subgraph BI[Biological Interpreter]
+    ST[Load Preprocessed ST Data]:::module
+    STCCI[[ST-CCI Tool]]:::tool
+    CCI[Cell–Cell Interaction Results]:::module
+    LR[Ligand–Receptor Candidates]:::module
+end
 
-        subgraph planner_group["① Planner"]
-            Planner{<b>🧠<br/>Planner</b>}
-            pt1[load_analysis<br/>_data]
-            pt2[search_literature<br/>_dynamic]
+%% ======================
+%% AI-driven Interpretation Engine
+%% ======================
+subgraph AI[AI-driven Interpretation Engine]
+    P[Planner Agent]:::agent
+    S[Searcher Agent]:::agent
+    I[Interpreter Agent]:::agent
+    R[Reporter Agent]:::agent
+end
 
-            Planner -.->|<b>Action</b>| pt1
-            Planner -.->|<b>Action</b>| pt2
-        end
+%% ======================
+%% Evidence Sources
+%% ======================
+subgraph ES[Evidence Sources]
 
-        subgraph searcher_group["② Searcher"]
-            Searcher{<b>🧠<br/>Searcher</b>}
-            st1[search_literature<br/>_dynamic]
-            st2["BioMCP<br/>(Article Search)"]
-            st3[Biomedical<br/>Thinking]
-
-            Searcher -.->|<b>Action</b>| st1
-            Searcher -.->|<b>Action</b>| st2
-            Searcher -.->|<b>Action</b>| st3
-        end
-
-        subgraph interp_group["③ Interpreter (×3 separate calls)"]
-            Interp1[<b>📝 Part 1</b><br/>Spatial &<br/>Pathway]
-            Interp2[<b>📝 Part 2</b><br/>CCI &<br/>NMF]
-            Interp3[<b>📝 Part 3</b><br/>L-R Pairs]
-            it1[validate<br/>_quality]
-            it2[validate_claim<br/>_literature]
-            it3[Reflection<br/>Tool]
-            it4[prioritize_top<br/>_lr_pairs]
-
-            Interp1 -.-> it1
-            Interp2 -.-> it2
-            Interp3 -.-> it4
-        end
-
-        subgraph reporter_group["④ Reporter"]
-            Reporter{<b>🧠<br/>Reporter</b>}
-            rt1[generate_html<br/>_report]
-            rt2[validate<br/>_quality]
-            rt3[search_literature<br/>_dynamic]
-            rt4[run_drug_target<br/>_assessment]
-
-            Reporter -.->|<b>Action</b>| rt1
-            Reporter -.->|<b>Action</b>| rt4
-        end
-
-        %% Sequential pipeline flow
-        Planner -->|interpretation_guide.md| Searcher
-        Searcher -->|papers.json| Interp1
-        Interp1 --> Interp2
-        Interp2 --> Interp3
-        Interp3 -->|partN_final.md| Reporter
+    subgraph LIT[Biomedical Literature]
+        direction TB
+        DPS[[Dynamic Paper Search]]:::tool
+        AR[[Agentic RAG]]:::tool
     end
 
-    drug_target["DrugTarget<br/>Agent"]
-    final_report["CCI Analysis<br/>Report (HTML)"]
-    __end__([<p>__end__</p>]):::last
 
-    %% Main flow
-    __start__ --> st_data
-    st_data --> hitl_node
-    hitl_node --> Planner
-    rt4 -.->|<b>Phase 4.7</b>| drug_target
-    Reporter --> final_report
-    final_report --> __end__
+subgraph DB[Drug & Genetic Databases]
+    direction LR
 
-    %% Colors (matching 1.pipeline_builder & 2.new_pipeline_executor)
-    classDef default fill:#2d2d3d,stroke:#fff,stroke-width:2px,color:#fff
-    classDef thinkingNode fill:#90ee90,stroke:#fff,stroke-width:2px,color:#000
-    classDef interpNode fill:#ff7f50,stroke:#fff,stroke-width:2px,color:#000
-    classDef inReAtc fill:#ab47bc,stroke:#fff,stroke-width:2px,color:#000
-    classDef humanNode fill:#4dabf7,stroke:#fff,stroke-width:2px,color:#000
-    classDef answerNode fill:#ffd700,stroke:#fff,stroke-width:2px,color:#000
-    classDef subtoolNode fill:#555577,stroke:#aaa,stroke-width:1px,color:#ddd
+    subgraph DB1[Single-cell / Expression]
+        scdb[(CellxGene Census)]
+    end
 
-    class st_data,final_report inReAtc
-    class Planner,Searcher,Reporter thinkingNode
-    class Interp1,Interp2,Interp3 interpNode
-    class hitl_node humanNode
-    class drug_target answerNode
-    class pt1,pt2 subtoolNode
-    class st1,st2,st3 subtoolNode
-    class it1,it2,it3,it4 subtoolNode
-    class rt1,rt2,rt3,rt4 subtoolNode
+    subgraph DB2[Pathway / Network]
+        pathwaydb[(KEGG/Reactome)]
+        ppidb[(STRING)]
+    end
 
-    %% Subgraph styles
-    style deep_agent fill:#e1bee7,stroke:#9c27b0,stroke-width:2px
-    style planner_group fill:#2a2a3a,stroke:#90ee90,stroke-width:1px
-    style searcher_group fill:#2a2a3a,stroke:#90ee90,stroke-width:1px
-    style interp_group fill:#2a2a3a,stroke:#ff7f50,stroke-width:1px
-    style reporter_group fill:#2a2a3a,stroke:#90ee90,stroke-width:1px
+    subgraph DB3[Genetics / Targets]
+        ot[(OpenTargets)]
+        gwasdb[(GWAS Catalog)]
+        chembl[(ChEMBL)]
+        vepdb[(Ensembl VEP)]
+    end
+end
+end
+
+%% ======================
+%% Drug Target Discovery Engine
+%% ======================
+subgraph DT[Drug Target Discovery Engine]
+
+    subgraph EA[Evidence Assessor Agent]
+        direction TB
+        F1[Stage 1<br/>Biological Context]:::agent
+        F2[Stage 2<br/>Validation & Scoring]:::agent
+        F3[Stage 3<br/>Deep Evidence Analysis]:::agent
+    end
+
+    RS[Results Summary Agent]:::agent
+
+end
+
+%% ======================
+%% Outputs
+%% ======================
+subgraph OUT[Outputs]
+    REP[Biological Interpretation Report]:::output
+    RANK[Ranked Drug Targets]:::output
+end
+
+%% ======================
+%% Flow
+%% ======================
+
+ST --> STCCI --> CCI --> LR
+
+%% 🔥 Hypothesis Initialization 강조
+LR --> P
+
+P --> S --> I --> R
+
+%% Literature loop
+S --> LIT
+DPS --> AR
+AR -.-> DPS
+
+%% 🔥 Multi-source retrieval 강조
+%%S -.->|Database Query| DB
+EA --> DB
+
+%% Drug target pipeline
+LR --> EA
+
+%% 🔥 Funnel-like progression
+F1 -->|Refinement| F2 -->|Filtering| F3 -->|Prioritization| RS
+
+RS --> RANK
+
+%% Outputs
+R --> REP
+RANK --> REP
+
+%% ======================
+%% Style Classes
+%% ======================
+
+classDef module fill:#ffffff,stroke:#c9d1d9,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+classDef agent fill:#f4f6f8,stroke:#9aa4b2,stroke-width:2px,rx:18,ry:18,color:#1f2933
+classDef tool fill:#eceff1,stroke:#b0bec5,stroke-width:1.2px,rx:10,ry:10,color:#1f2933
+classDef database fill:#f3e5f5,stroke:#ce93d8,stroke-width:1.5px,rx:10,ry:10,color:#1f2933
+classDef output fill:#e8f5e9,stroke:#81c784,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+
+class ST,CCI,LR module
+class P,S,I,R,F1,F2,F3,RS agent
+class STCCI,DPS,AR tool
+class scdb,pathwaydb,ppidb,ot,gwasdb,chembl,vepdb database
+class REP,RANK output

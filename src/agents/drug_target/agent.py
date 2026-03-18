@@ -28,6 +28,7 @@ from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import MemorySaver
 
 from src.agents.model import create_llm, load_subagent_models_from_env
+from src.agents.deep_interpreter.middleware.write_file_guard import WriteFileArgGuardMiddleware
 from src.agents.shared.skills_middleware import SkillsMiddleware
 from src.agents.drug_target.subagents.configs import get_subagents
 from src.agents.drug_target.tools import (
@@ -68,7 +69,7 @@ These values are injected from configuration. Use them directly — do NOT
 attempt to parse or extract data_dir or disease from the user message.
 
 ## CRITICAL: First Action
-You MUST call `load_lr_candidates(data_dir="{data_dir}")` as your VERY FIRST
+You MUST call `load_lr_candidates(data_dir="{data_dir}", disease="{disease}")` as your VERY FIRST
 action. This loads lr_candidates.json, extracts gene symbols, and returns
 structured data. Do NOT use `ls` or `read_file` to check the directory.
 
@@ -78,10 +79,20 @@ Execute subagents strictly in this order via the `task` tool:
 1. **evidence_assessor**: Pass the load_lr_candidates output. Runs the 3-stage funnel:
    - Stage 1 (ALL pairs): Biological context (Cellxgene, KEGG/Reactome, STRING, Census)
    - Stage 2 (ALL unique genes): batch validation & scoring (OpenTargets, GWAS, VEP) + inline rubric
-   - Stage 3 (FEATURED only): Deep dive (DrugBank, PubMed)
+   - Stage 3 (FEATURED only): Deep dive (ChEMBL, PubMed)
 2. **report_writer**: Generates drug.md with [FEATURED] Candidate emphasis.
    The report_writer MUST first save target_assessment.json via
-   `save_target_assessment`, then call `write_file` to save drug.md.
+   `save_target_assessment`, then call `save_drug_md` to save drug.md.
+
+CRITICAL: After load_lr_candidates returns, you MUST immediately call the `task` tool
+to delegate to evidence_assessor. Do NOT call load_lr_candidates again. Do NOT stop.
+Example: task(subagent_type="evidence_assessor", instruction="Run the full 3-stage
+evidence assessment for {disease}. Data dir: {data_dir}. <paste lr_candidates output>")
+
+After evidence_assessor completes, IMMEDIATELY call:
+task(subagent_type="report_writer", instruction="Generate drug.md report. Data dir: {data_dir}.")
+
+You MUST NOT terminate until BOTH subagents have completed.
 
 ## Input
 - lr_candidates.json: Top-30 L-R pairs from CCI analysis
@@ -94,6 +105,7 @@ Execute subagents strictly in this order via the `task` tool:
 
 ## Rules
 - ALWAYS start with `load_lr_candidates` -- never skip this step
+- After load_lr_candidates, IMMEDIATELY call `task` for evidence_assessor -- do NOT stop
 - Execute subagents in ORDER: evidence_assessor -> report_writer
 - Each subagent uses Plan->Execute->Reflect cycle
 - [FEATURED] candidates are determined by rubric scoring (combined_total)
@@ -125,7 +137,8 @@ class DrugTargetConfig:
     provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "openrouter"
     data_dir: str = field(
         default_factory=lambda: os.getenv(
-            "DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace"
+            "DRUG_TARGET_DATA_DIR",
+            os.getenv("DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace"),
         )
     )
     disease: str = ""  # Currently passed via user message, not injected into agent
@@ -243,21 +256,22 @@ def create_drug_target_agent(
     subagent_specs = get_subagents(
         custom_tools=config.custom_tools,
         data_dir=resolved_data_dir,
+        disease=config.disease,
         model_overrides=config.subagent_models,
     )
 
     # 4. Create agent
     llm = create_llm(provider=config.provider)
     checkpointer = MemorySaver() if config.use_checkpointer else None
-    middleware = None
+    middleware = [WriteFileArgGuardMiddleware()]
     if config.enable_progressive_disclosure:
-        middleware = [
+        middleware.append(
             SkillsMiddleware(
                 skills_dir=_resolve_skills_dir(config),
                 allowed_skill_names=config.agent_skill_names,
                 usage_guidance=DRUG_TARGET_SKILLS_GUIDANCE,
             )
-        ]
+        )
 
     # Render system prompt with config values so the LLM knows
     # data_dir / disease without parsing the user message.

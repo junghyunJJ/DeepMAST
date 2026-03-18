@@ -13,12 +13,14 @@ from typing import Callable, Sequence
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 
+from src.agents.deep_interpreter.middleware.write_file_guard import WriteFileArgGuardMiddleware
 from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
 from src.agents.drug_target.tools import (
     # Evidence I/O tools
     load_lr_candidates,
     save_evidence,
     load_evidence_files,
+    validate_evidence_completeness,
     # Stage-specific domain tools
     query_cellxgene_lr_context,
     list_census_diseases,
@@ -26,17 +28,15 @@ from src.agents.drug_target.tools import (
     query_reactome_pathways,
     query_string_ppi_pair,
     query_ensembl_vep_consequence,
-    query_opentargets_target,
-    query_opentargets_known_drugs,
-    query_gwas_gene_trait,
     query_stage2_gene_panel,
-    query_drugbank_target_profile,
+    query_chembl_target_profile,
     query_pubmed_clinical_limitations,
     run_compare_census_lr_pair,
     finalize_stage1_artifacts,
     read_skill_file,
     # Assessment tools
     save_target_assessment,
+    save_drug_md,
     # Common tools
     sequential_thinking,
     think_tool,
@@ -63,7 +63,7 @@ SUBAGENT_CONFIGS = {
             "deep dive. Includes inline rubric assessment. "
             "Loads lr_candidates.json (top-30 L-R pairs), then systematically "
             "queries databases via @tool wrappers (OpenTargets, GWAS, Cellxgene, "
-            "KEGG/Reactome, STRING, VEP, DrugBank, PubMed, "
+            "KEGG/Reactome, STRING, VEP, ChEMBL, PubMed, "
             "Census cross-validation). Applies DRUG_TARGET_RUBRIC scoring to select "
             "Featured Candidates after Stage 2. "
             "Uses Plan->Execute->Reflect cycle per stage."
@@ -83,14 +83,11 @@ SUBAGENT_CONFIGS = {
             query_string_ppi_pair,
             run_compare_census_lr_pair,
             finalize_stage1_artifacts,
-            # Stage 2: Target Validation
-            query_opentargets_target,
-            query_opentargets_known_drugs,
-            query_gwas_gene_trait,
+            # Stage 2: Target Validation (batch only — individual tools removed to prevent token bloat)
             query_stage2_gene_panel,
             query_ensembl_vep_consequence,
             # Stage 3: Deep Dive
-            query_drugbank_target_profile,
+            query_chembl_target_profile,
             query_pubmed_clinical_limitations,
             read_skill_file,
             # Cognitive
@@ -114,7 +111,9 @@ SUBAGENT_CONFIGS = {
         "tools": [
             load_lr_candidates,
             load_evidence_files,
+            validate_evidence_completeness,
             save_target_assessment,
+            save_drug_md,
             sequential_thinking,
             think_tool,
             validate_quality,
@@ -138,7 +137,7 @@ Drug Target Assessment 2-Agent Workflow (3-Stage Funnel):
    Stage 2 (ALL unique genes): batch OpenTargets + batch GWAS + VEP (conditional)
      -> Inline DRUG_TARGET_RUBRIC scoring after Stage 2
      -> RUBRIC combined_total based featured selection (top 3-5)
-   Stage 3 (FEATURED only): DrugBank + PubMed clinical limitations (conditional)
+   Stage 3 (FEATURED only): ChEMBL + PubMed clinical limitations (conditional)
    Outputs: evidence/*.json (per stage, per L-R pair/gene)
             assessment_results.json, gwas_interpretation.json, clinical_landscape.json
 
@@ -160,6 +159,7 @@ Drug Target Assessment 2-Agent Workflow (3-Stage Funnel):
 def get_subagents(
     custom_tools: Sequence[BaseTool | Callable] | None = None,
     data_dir: str | None = None,
+    disease: str | None = None,
     model_overrides: dict[str, BaseChatModel | str] | None = None,
 ) -> list[dict]:
     """Get the subagent configurations for Drug Target Assessment.
@@ -171,6 +171,7 @@ def get_subagents(
     Args:
         custom_tools: Optional list of additional tools to include in all subagents
         data_dir: Resolved data directory path to inject into subagent prompts
+        disease: Disease context to inject into subagent prompts
         model_overrides: Optional per-subagent model overrides.
             Keys are subagent names, values are init_chat_model format strings
             (e.g. "openai:gpt-4.1") or BaseChatModel instances.
@@ -189,13 +190,21 @@ def get_subagents(
             if subagent["name"] in model_overrides:
                 subagent["model"] = model_overrides[subagent["name"]]
 
-    # Inject data_dir into each subagent's system prompt so they know the path
+    # Inject data_dir and disease into each subagent's system prompt
     if data_dir:
+        disease_line = ""
+        if disease:
+            disease_line = (
+                f"- **Disease context**: `{disease}`\n"
+                f"Pass `disease=\"{disease}\"` to `load_lr_candidates` so the CLI disease "
+                f"context takes priority over lr_candidates.json.\n"
+            )
         data_dir_note = (
             f"\n\n## Data Directory\n"
             f"The data directory for this session is: `{data_dir}`\n"
             f"Pass this exact path as `data_dir` to all tool calls "
             f"(load_lr_candidates, load_evidence_files, save_evidence).\n"
+            f"{disease_line}"
         )
         for subagent in subagents:
             subagent["system_prompt"] = subagent["system_prompt"] + data_dir_note
@@ -205,5 +214,11 @@ def get_subagents(
             current_tools = list(subagent.get("tools", []))
             current_tools.extend(custom_tools)
             subagent["tools"] = current_tools
+
+    # Guard write_file tool calls against non-string content emitted by some models.
+    for subagent in subagents:
+        mw = list(subagent.get("middleware", []))
+        mw.insert(0, WriteFileArgGuardMiddleware())
+        subagent["middleware"] = mw
 
     return subagents

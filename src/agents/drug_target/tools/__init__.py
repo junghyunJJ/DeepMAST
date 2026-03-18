@@ -9,9 +9,11 @@ from src.agents.drug_target.tools.evidence_loader import (
     load_lr_candidates,
     load_evidence_files,
     save_evidence,
+    validate_evidence_completeness,
 )
 from src.agents.drug_target.tools.assessment_output import (
     save_target_assessment,
+    save_drug_md,
 )
 from src.agents.drug_target.tools.stage1_normalization import (
     finalize_stage1_artifacts,
@@ -27,7 +29,7 @@ from src.agents.drug_target.tools.stage_domain_tools import (
     query_opentargets_known_drugs,
     query_gwas_gene_trait,
     query_stage2_gene_panel,
-    query_drugbank_target_profile,
+    query_chembl_target_profile,
     query_pubmed_clinical_limitations,
 )
 from src.agents.drug_target.tools.census_lr_validation_tools import (
@@ -57,6 +59,7 @@ __all__ = [
     "load_lr_candidates",
     "load_evidence_files",
     "save_evidence",
+    "validate_evidence_completeness",
     # Stage-specific domain tools
     "query_cellxgene_lr_context",
     "list_census_diseases",
@@ -68,13 +71,14 @@ __all__ = [
     "query_opentargets_known_drugs",
     "query_gwas_gene_trait",
     "query_stage2_gene_panel",
-    "query_drugbank_target_profile",
+    "query_chembl_target_profile",
     "query_pubmed_clinical_limitations",
     "run_compare_census_lr_pair",
     "read_skill_file",
     "finalize_stage1_artifacts",
     # Output contract
     "save_target_assessment",
+    "save_drug_md",
     # Common
     "think_tool",
     "sequential_thinking",

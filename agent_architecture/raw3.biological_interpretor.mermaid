@@ -1,0 +1,51 @@
+flowchart TB
+
+subgraph Data Layer
+ST[Spatial Transcriptomics Data]
+CCI[Cell–Cell Interaction Analysis]
+LR[Ligand–Receptor Candidates]
+end
+
+subgraph AI-driven Interpretation Engine
+P[Planner Agent]
+S[Searcher Agent]
+I[Interpreter Agent]
+R[Reporter Agent]
+end
+
+subgraph Evidence Sources
+LIT[Biomedical Literature]
+DB[(Drug & Genetic Databases)]
+end
+
+subgraph Drug Target Discovery Engine
+EA[Evidence Assessor]
+F1[Stage 1 Biological Context]
+F2[Stage 2 Validation & Scoring]
+F3[Stage 3 Deep Evidence Analysis]
+end
+
+subgraph Outputs
+REP[Biological Interpretation Report]
+RANK[Ranked Drug Targets]
+end
+
+ST --> CCI
+CCI --> LR
+
+LR --> P
+P --> S
+S --> I
+I --> R
+
+S --> LIT
+EA --> DB
+
+R --> REP
+
+LR --> EA
+EA --> F1
+F1 --> F2
+F2 --> F3
+
+F3 --> RANK

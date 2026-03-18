@@ -21,7 +21,7 @@ from src.agents.drug_target.tools.stage_domain_tools import (
     query_kegg_pathways,
     query_reactome_pathways,
     query_string_ppi_pair,
-    query_drugbank_target_profile,
+    query_chembl_target_profile,
     _chembl_fallback,
 )
 from src.agents.drug_target.tools.stage2_service import (
@@ -472,7 +472,7 @@ for i, gene in enumerate(selected_genes, 1):
     print(f"  [{i}/{len(selected_genes)}] {gene} → ChEMBL ...", end=" ", flush=True)
 
     # Try DrugBank first via tool, then ChEMBL fallback
-    drug_profile = _call_tool(query_drugbank_target_profile, gene_symbol=gene, max_drugs=10)
+    drug_profile = _call_tool(query_chembl_target_profile, gene_symbol=gene, max_drugs=10)
     elapsed = round(time.time() - t0, 1)
     n_drugs = len(drug_profile.get("matched_drugs", []))
     source = drug_profile.get("source", "unknown")

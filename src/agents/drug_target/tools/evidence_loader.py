@@ -9,7 +9,9 @@ are now determined by rubric scoring in stage_logic.py.
 import json
 import logging
 import os
+import re
 from pathlib import Path
+from typing import Union
 
 from langchain_core.tools import tool
 from src.agents.drug_target.tools.stage_logic import (
@@ -46,7 +48,7 @@ def _resolve_data_dir(data_dir: str) -> Path:
 
 
 @tool
-def load_lr_candidates(data_dir: str) -> str:
+def load_lr_candidates(data_dir: str, disease: str = "") -> str:
     """Load lr_candidates.json for drug target assessment.
 
     Reads the top-30 L-R pairs from lr_candidates.json, optionally marks
@@ -55,6 +57,7 @@ def load_lr_candidates(data_dir: str) -> str:
 
     Args:
         data_dir: Directory containing lr_candidates.json
+        disease: Disease context from CLI (takes priority over lr_candidates.json)
 
     Returns:
         JSON with gene_symbols (unique), lr_pairs, selected_top3 info (legacy), disease context
@@ -87,8 +90,8 @@ def load_lr_candidates(data_dir: str) -> str:
         result["errors"].append(f"Failed to parse lr_candidates.json: {e}")
         return json.dumps(result, indent=2)
 
-    # Extract disease context
-    result["disease"] = lr_data.get("disease", lr_data.get("disease_context", ""))
+    # Extract disease context: CLI param → lr_candidates.json → empty
+    result["disease"] = disease or lr_data.get("disease", lr_data.get("disease_context", ""))
     result["disease_type"] = classify_disease_type(result["disease"])
     result["oncology_flag"] = infer_oncology_flag(result["disease"])
 
@@ -158,36 +161,30 @@ def load_lr_candidates(data_dir: str) -> str:
         except Exception as e:
             result["errors"].append(f"Failed to parse targets.json: {e}")
 
-    # Mark each gene with is_selected_top3
-    result["gene_details"] = []
-    for gene in sorted(all_genes):
-        result["gene_details"].append({
-            "symbol": gene,
-            "is_selected_top3": gene in top3_genes,
-        })
-
     return json.dumps(result, indent=2)
 
 
 @tool
 def load_evidence_files(data_dir: str) -> str:
-    """Load all evidence JSON files from the evidence/ subdirectory.
+    """List evidence JSON files from the evidence/ subdirectory with metadata summaries.
 
-    Reads all *.json files from {data_dir}/evidence/ and returns
-    their contents as a structured dictionary.
+    Returns file names, sizes, top-level keys, and record counts — NOT full content.
+    Use save_evidence / read individual files on-demand for full data.
 
     Args:
         data_dir: Directory containing evidence/ subdirectory
 
     Returns:
-        JSON with filename -> content mapping for all evidence files
+        JSON with filename -> metadata mapping (size_bytes, top_keys, record_count)
     """
     base = _resolve_data_dir(data_dir)
     evidence_dir = base / "evidence"
     result = {
         "data_dir": str(base),
+        "evidence_dir": str(evidence_dir),
         "files": {},
         "file_count": 0,
+        "total_size_bytes": 0,
         "errors": [],
     }
 
@@ -197,10 +194,25 @@ def load_evidence_files(data_dir: str) -> str:
 
     for path in sorted(evidence_dir.glob("*.json")):
         try:
+            size_bytes = path.stat().st_size
             with open(path) as f:
                 data = json.load(f)
-            result["files"][path.name] = data
+
+            # Build lightweight summary instead of embedding full content
+            summary = {"size_bytes": size_bytes}
+            if isinstance(data, dict):
+                summary["top_keys"] = list(data.keys())[:20]
+                summary["record_count"] = len(data)
+            elif isinstance(data, list):
+                summary["record_count"] = len(data)
+                if data and isinstance(data[0], dict):
+                    summary["item_keys"] = list(data[0].keys())[:10]
+            else:
+                summary["record_count"] = 1
+
+            result["files"][path.name] = summary
             result["file_count"] += 1
+            result["total_size_bytes"] += size_bytes
         except Exception as e:
             result["errors"].append(f"Failed to load {path.name}: {e}")
 
@@ -208,7 +220,7 @@ def load_evidence_files(data_dir: str) -> str:
 
 
 @tool
-def save_evidence(data_dir: str, filename: str, data: str) -> str:
+def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) -> str:
     """Save evidence data as a JSON file in the evidence/ subdirectory.
 
     Creates the evidence/ directory if it doesn't exist.
@@ -216,11 +228,15 @@ def save_evidence(data_dir: str, filename: str, data: str) -> str:
     Args:
         data_dir: Base directory for evidence storage
         filename: Filename (e.g., "ot_TGFB1.json", "assessment_results.json")
-        data: JSON string of data to save
+        data: JSON string or dict/list of data to save
 
     Returns:
         JSON with save status and file path
     """
+    # Normalize dict/list to JSON string (Ollama may pass raw objects)
+    if isinstance(data, (dict, list)):
+        data = json.dumps(data)
+
     base = _resolve_data_dir(data_dir)
     evidence_dir = base / "evidence"
     evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -232,23 +248,134 @@ def save_evidence(data_dir: str, filename: str, data: str) -> str:
         "errors": [],
     }
 
+    # Overwrite protection: prevent LLM from replacing non-empty evidence with empty data
+    _PROTECTED_FILES = {"stage2_evidence.json", "known_drugs.json", "gene_manifest.json"}
+    if filename in _PROTECTED_FILES and file_path.exists():
+        try:
+            existing = json.loads(file_path.read_text())
+            new_parsed = json.loads(data) if isinstance(data, str) else data
+            if isinstance(existing, dict) and isinstance(new_parsed, dict):
+                existing_has_data = any(
+                    v for v in existing.values()
+                    if isinstance(v, (dict, list)) and len(v) > 0
+                )
+                new_is_empty = all(
+                    not v or (isinstance(v, (dict, list)) and len(v) == 0)
+                    for v in new_parsed.values()
+                    if isinstance(v, (dict, list))
+                )
+                if existing_has_data and new_is_empty:
+                    result["saved"] = False
+                    result["errors"].append(
+                        f"BLOCKED: refusing to overwrite non-empty {filename} with empty data. "
+                        "Existing file preserved. Use load_evidence_files() to read the data."
+                    )
+                    return json.dumps(result, indent=2)
+        except Exception:
+            pass  # if we can't read existing, allow overwrite
+
     try:
         parsed = json.loads(data)
         with open(file_path, "w") as f:
             json.dump(parsed, f, indent=2)
         result["saved"] = True
     except json.JSONDecodeError as e:
-        # Try saving as raw string if not valid JSON
+        # Try repairing trailing commas before falling back to raw text
+        repaired = re.sub(r',\s*([}\]])', r'\1', data)
         try:
+            parsed = json.loads(repaired)
             with open(file_path, "w") as f:
-                f.write(data)
+                json.dump(parsed, f, indent=2)
             result["saved"] = True
             result["errors"].append(
-                f"Warning: data was not valid JSON, saved as raw text to {file_path}"
+                "Repaired trailing commas in JSON before saving"
             )
-        except Exception as write_err:
-            result["errors"].append(f"Failed to save: {write_err}")
+        except (json.JSONDecodeError, Exception):
+            # Final fallback: save as raw text
+            try:
+                with open(file_path, "w") as f:
+                    f.write(data)
+                result["saved"] = True
+                result["errors"].append(
+                    f"Warning: data was not valid JSON, saved as raw text to {file_path}"
+                )
+            except Exception as write_err:
+                result["errors"].append(f"Failed to save: {write_err}")
     except Exception as e:
         result["errors"].append(f"Failed to save: {e}")
 
     return json.dumps(result, indent=2)
+
+
+@tool
+def validate_evidence_completeness(data_dir: str) -> str:
+    """Check that evidence files are non-empty before report generation.
+
+    Returns a structured report of which data sources succeeded/failed,
+    with an overall readiness flag. Call this BEFORE writing drug.md.
+    """
+    base = _resolve_data_dir(data_dir)
+    evidence_dir = base / "evidence"
+
+    checks: dict = {
+        "stage1_evidence": {"file": "stage1_evidence.json", "status": "missing", "record_count": 0},
+        "stage1_confidence": {"file": "stage1_confidence.json", "status": "missing", "record_count": 0},
+        "stage2_evidence": {"file": "stage2_evidence.json", "status": "missing", "record_count": 0, "non_empty_genes": 0},
+        "known_drugs": {"file": "known_drugs.json", "status": "missing", "record_count": 0},
+        "gene_manifest": {"file": "gene_manifest.json", "status": "missing", "record_count": 0},
+    }
+
+    for key, check in checks.items():
+        path = evidence_dir / check["file"]
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text())
+            check["status"] = "present"
+            if isinstance(data, dict):
+                check["record_count"] = len(data)
+                if key == "stage2_evidence":
+                    non_empty = sum(
+                        1 for v in data.values()
+                        if isinstance(v, dict) and any(
+                            isinstance(sub, (list, dict)) and len(sub) > 0
+                            for sub in v.values()
+                        )
+                    )
+                    check["non_empty_genes"] = non_empty
+                    if non_empty == 0 and len(data) > 0:
+                        check["status"] = "present_but_empty"
+            elif isinstance(data, list):
+                check["record_count"] = len(data)
+            if check.get("record_count", 0) == 0 and check["status"] == "present":
+                check["status"] = "present_but_empty"
+        except Exception as e:
+            check["status"] = f"parse_error: {e}"
+
+    # Count ot_*.json files
+    ot_files = list(evidence_dir.glob("ot_*.json")) if evidence_dir.exists() else []
+
+    has_stage2_data = checks["stage2_evidence"].get("non_empty_genes", 0) > 0
+    has_stage1_data = (
+        checks["stage1_evidence"]["status"] == "present"
+        and checks["stage1_evidence"]["record_count"] > 0
+    )
+
+    warnings = []
+    if not has_stage1_data:
+        warnings.append("Stage 1 evidence empty or missing — Census cross-validation may have failed")
+    if not has_stage2_data:
+        warnings.append("Stage 2 evidence empty or missing — OpenTargets/GWAS data may not have been saved")
+    if not ot_files:
+        warnings.append("No ot_*.json per-gene files found")
+
+    return json.dumps({
+        "data_dir": str(base),
+        "evidence_dir": str(evidence_dir),
+        "checks": checks,
+        "ot_gene_file_count": len(ot_files),
+        "has_stage1_data": has_stage1_data,
+        "has_stage2_data": has_stage2_data,
+        "ready_for_report": has_stage1_data or has_stage2_data,
+        "warnings": warnings,
+    }, indent=2)

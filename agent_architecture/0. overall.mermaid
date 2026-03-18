@@ -1,0 +1,84 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Helvetica, Arial",
+    "primaryColor": "#f5f7fa",
+    "primaryBorderColor": "#c9d1d9",
+    "lineColor": "#9aa4b2",
+    "secondaryColor": "#eef2f7",
+    "tertiaryColor": "#ffffff"
+  }
+}}%%
+
+flowchart TB
+
+%% ======================
+%% Layer 1: Control
+%% ======================
+SA[Supervisor Agent]:::agent
+
+%% ======================
+%% Layer 2: Expert Agents
+%% ======================
+subgraph EA[Expert Agents Layer]
+    direction TB
+    PB[Pipeline Builder]:::agent
+    PE[Pipeline Executor]:::agent
+
+    subgraph BI[Biological Interpreter]
+        DT[Drug Target Analyzer]:::agent
+    end
+end
+
+%% ======================
+%% Layer 3: Capability Layer
+%% ======================
+subgraph CL[Capability Layer]
+    SK["Skills<br/>(Structured Knowledge Prompts)"]:::capability
+    MCP["MCP Protocol<br/>(Tool Interface)"]:::capability
+end
+
+%% ======================
+%% Layer 4: Resource Layer
+%% ======================
+subgraph RL[Resource Layer]
+    TOOLS[MCP Servers / Tools]:::resource
+    DB[(Biological Databases)]:::resource
+end
+
+%% ======================
+%% Core Orchestration
+%% ======================
+SA <--> |Orchestration| EA
+
+%% ======================
+%% Internal Agent Flow
+%% ======================
+PB --> PE --> BI
+
+%% ======================
+%% Capability Usage
+%% ======================
+EA -->|Uses Skills| SK
+SK -.->|"Injection<br/>(Progressive Disclosure)"| EA
+
+EA <-->|Tool Calling| MCP
+SK -.->|Guides Tool Usage| MCP
+
+%% ======================
+%% Resource Access
+%% ======================
+MCP <--> TOOLS
+SK -.->|Retrieval Instruction| DB
+
+%% ======================
+%% Style Classes
+%% ======================
+
+classDef agent fill:#f4f6f8,stroke:#9aa4b2,stroke-width:2px,rx:18,ry:18,color:#1f2933
+classDef capability fill:#fff8e1,stroke:#ffcc80,stroke-width:1.5px,rx:14,ry:14,color:#1f2933
+classDef resource fill:#f3e5f5,stroke:#ce93d8,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+
+class SA,PB,PE,DT agent
+class SK,MCP capability
+class TOOLS,DB resource
