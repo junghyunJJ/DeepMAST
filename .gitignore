@@ -54,4 +54,8 @@ CLAUDE.md
 .omx
 
 CLAUDE.md
-docs/
+docs/*
+!docs/benchmarks/
+docs/benchmarks/*
+!docs/benchmarks/drugtarget_skill_ablation/
+!docs/benchmarks/drugtarget_skill_ablation/**

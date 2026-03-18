@@ -1,0 +1,146 @@
+[
+  {
+    "case_id": "chembl_approved_antibody_signal",
+    "benchmark_type": "chembl_micro",
+    "source_type": "curated_perturbation",
+    "input_bundle": {
+      "disease": "breast cancer",
+      "gene_symbol": "VEGFA",
+      "chembl_summary": {
+        "mechanism_of_action": "Anti-VEGF antibody mechanism with clear angiogenesis relevance.",
+        "activity_summary": "Potent matched activity reported in the low-nanomolar range.",
+        "clinical_phase_summary": "Approved oncology indication and extensive late-stage clinical history.",
+        "safety_summary": "Bleeding and vascular toxicity remain moderate concerns."
+      }
+    },
+    "gold_assessment": {
+      "validated_track": {
+        "existing_drug_evidence": 3,
+        "clinical_trial_activity": 3,
+        "mechanism_relevance": 3,
+        "safety_profile": -1
+      }
+    },
+    "expected_classification": "validated_target",
+    "expected_priority": "high",
+    "judge_focus": [
+      "approved drug evidence",
+      "clinical phase interpretation",
+      "mechanism alignment"
+    ],
+    "rationale_anchors": [
+      "approved",
+      "low-nanomolar",
+      "bleeding"
+    ],
+    "notes": "Supplementary ChEMBL case with approved-modality evidence."
+  },
+  {
+    "case_id": "chembl_phase12_pathway_signal",
+    "benchmark_type": "chembl_micro",
+    "source_type": "curated_perturbation",
+    "input_bundle": {
+      "disease": "breast cancer",
+      "gene_symbol": "TGFB1",
+      "chembl_summary": {
+        "mechanism_of_action": "Pathway-targeting compounds with direct TGF-beta pathway relevance.",
+        "activity_summary": "Consistent sub-100 nM activity is reported for matched assays.",
+        "clinical_phase_summary": "Phase 1-2 programs only; no approved disease-matched therapy.",
+        "safety_summary": "Pleiotropic pathway biology creates moderate safety concerns."
+      }
+    },
+    "gold_assessment": {
+      "validated_track": {
+        "existing_drug_evidence": 2,
+        "clinical_trial_activity": 2,
+        "mechanism_relevance": 3,
+        "safety_profile": -1
+      }
+    },
+    "expected_classification": "validated_target",
+    "expected_priority": "high",
+    "judge_focus": [
+      "phase 1-2 evidence handling",
+      "do not upgrade to approved",
+      "safety interpretation"
+    ],
+    "rationale_anchors": [
+      "phase 1-2",
+      "sub-100 nm",
+      "pleiotropic"
+    ],
+    "notes": "Supplementary ChEMBL case with investigational but not approved evidence."
+  },
+  {
+    "case_id": "chembl_indirect_early_phase_signal",
+    "benchmark_type": "chembl_micro",
+    "source_type": "curated_perturbation",
+    "input_bundle": {
+      "disease": "breast cancer",
+      "gene_symbol": "CD44",
+      "chembl_summary": {
+        "mechanism_of_action": "Mechanistic relevance is direct for adhesion and migration biology.",
+        "activity_summary": "Compounds mostly act on related pathways rather than a clean disease-matched direct target program.",
+        "clinical_phase_summary": "Only a few early phase studies are described.",
+        "safety_summary": "Minimal known safety concerns in the frozen summary."
+      }
+    },
+    "gold_assessment": {
+      "validated_track": {
+        "existing_drug_evidence": 1,
+        "clinical_trial_activity": 1,
+        "mechanism_relevance": 3,
+        "safety_profile": 0
+      }
+    },
+    "expected_classification": "validated_target",
+    "expected_priority": "medium",
+    "judge_focus": [
+      "indirect evidence versus direct target evidence",
+      "early phase interpretation",
+      "mechanism relevance"
+    ],
+    "rationale_anchors": [
+      "related pathways",
+      "few early phase",
+      "minimal known safety concerns"
+    ],
+    "notes": "Supplementary ChEMBL case testing indirect evidence inflation."
+  },
+  {
+    "case_id": "chembl_preclinical_potency_not_clinical_support",
+    "benchmark_type": "chembl_micro",
+    "source_type": "curated_perturbation",
+    "input_bundle": {
+      "disease": "breast cancer",
+      "gene_symbol": "SPP1",
+      "chembl_summary": {
+        "mechanism_of_action": "Mechanistic rationale is plausible but not definitive.",
+        "activity_summary": "Potent preclinical Ki and IC50 values are reported for research compounds only.",
+        "clinical_phase_summary": "No approved indication and no matched clinical trials are reported.",
+        "safety_summary": "No major safety liabilities are obvious from the sparse summary."
+      }
+    },
+    "gold_assessment": {
+      "validated_track": {
+        "existing_drug_evidence": 0,
+        "clinical_trial_activity": 0,
+        "mechanism_relevance": 2,
+        "safety_profile": 0
+      }
+    },
+    "expected_classification": "insufficient_evidence",
+    "expected_priority": "unranked",
+    "judge_focus": [
+      "do not confuse potency with clinical evidence",
+      "unit and assay interpretation",
+      "avoid clinical overclaiming"
+    ],
+    "rationale_anchors": [
+      "preclinical",
+      "no matched clinical trials",
+      "research compounds"
+    ],
+    "notes": "Supplementary ChEMBL case where potency alone should not become drug evidence."
+  }
+]

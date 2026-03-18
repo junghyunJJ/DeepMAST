@@ -29,7 +29,8 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from src.agents.model import create_llm, load_subagent_models_from_env
 from src.agents.deep_interpreter.middleware.write_file_guard import WriteFileArgGuardMiddleware
-from src.agents.shared.skills_middleware import SkillsMiddleware
+from deepagents.backends import FilesystemBackend
+from src.agents.shared.skill_load_harness import SkillLoadHarness
 from src.agents.drug_target.subagents.configs import get_subagents
 from src.agents.drug_target.tools import (
     load_evidence_files,
@@ -42,15 +43,6 @@ from src.agents.drug_target.tools import (
 )
 
 logger = logging.getLogger(__name__)
-
-DRUG_TARGET_SKILLS_GUIDANCE = """
-**How to Use Skills (Progressive Disclosure):**
-
-1. Only consult a listed skill when the stage instructions say it may help.
-2. Use `read_skill_file(skill_path=...)` to load the full `SKILL.md` when needed.
-3. Skills provide interpretation guidance only; all database access must still happen through the provided `@tool` wrappers.
-"""
-
 
 # =============================================================================
 # Orchestrator System Prompt
@@ -150,8 +142,17 @@ class DrugTargetConfig:
         "opentargets-database",
         "gwas-database",
         "chembl-database",
+        "kegg-database",
+        "string-database",
     )
     skills_dir: str | None = None
+    stage_hints: dict[str, str] = field(
+        default_factory=lambda: {
+            "chembl-database": "Stage 3 only",
+            "kegg-database": "Pathway analysis",
+            "string-database": "PPI network queries",
+        }
+    )
     subagent_models: dict[str, str] | None = None
     # init_chat_model format per subagent, e.g.:
     # {"evidence_assessor": "openai:gpt-4.1", "report_writer": "openai:gpt-4.1-mini"}
@@ -205,6 +206,15 @@ def _find_project_root() -> Path:
     )
 
 
+def _build_skill_registry(config: DrugTargetConfig) -> dict[str, str]:
+    """Build skill registry dict from config's allowed skill names."""
+    skills_dir = _resolve_skills_dir(config)
+    return {
+        name: str(skills_dir / name)
+        for name in config.agent_skill_names
+    }
+
+
 def create_drug_target_agent(
     config: DrugTargetConfig | None = None,
 ) -> tuple[Runnable, object | None]:
@@ -234,10 +244,19 @@ def create_drug_target_agent(
     evidence_dir = Path(resolved_data_dir) / "evidence"
     evidence_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Optional Docker backend
-    backend = None
+    # 1. Backend
+    project_root = _find_project_root()
+
     if config.docker_image:
         backend = _create_docker_backend(config, resolved_data_dir)
+        skills_sources = None
+    else:
+        backend = FilesystemBackend(root_dir=project_root, virtual_mode=True)
+        skills_sources = (
+            [str(_resolve_skills_dir(config)) + "/"]
+            if config.enable_progressive_disclosure
+            else None
+        )
 
     # 2. Build orchestrator-level tools
     tools: list = [
@@ -252,26 +271,28 @@ def create_drug_target_agent(
     if config.custom_tools:
         tools.extend(config.custom_tools)
 
-    # 3. Get subagent specs
+    # 3. Get subagent specs (skills go to evidence_assessor only)
     subagent_specs = get_subagents(
         custom_tools=config.custom_tools,
         data_dir=resolved_data_dir,
         disease=config.disease,
         model_overrides=config.subagent_models,
+        skills_sources=skills_sources,
+        skill_registry=(
+            _build_skill_registry(config)
+            if config.enable_progressive_disclosure
+            else None
+        ),
+        stage_hints=(
+            config.stage_hints
+            if config.enable_progressive_disclosure
+            else None
+        ),
     )
 
-    # 4. Create agent
+    # 4. Create agent — orchestrator has NO skills (just delegates)
     llm = create_llm(provider=config.provider)
     checkpointer = MemorySaver() if config.use_checkpointer else None
-    middleware = [WriteFileArgGuardMiddleware()]
-    if config.enable_progressive_disclosure:
-        middleware.append(
-            SkillsMiddleware(
-                skills_dir=_resolve_skills_dir(config),
-                allowed_skill_names=config.agent_skill_names,
-                usage_guidance=DRUG_TARGET_SKILLS_GUIDANCE,
-            )
-        )
 
     # Render system prompt with config values so the LLM knows
     # data_dir / disease without parsing the user message.
@@ -287,9 +308,8 @@ def create_drug_target_agent(
         checkpointer=checkpointer,
         system_prompt=system_prompt,
         backend=backend,
+        middleware=[WriteFileArgGuardMiddleware()],
     )
-    if middleware:
-        create_kwargs["middleware"] = middleware
 
     agent = create_deep_agent(**create_kwargs)
 

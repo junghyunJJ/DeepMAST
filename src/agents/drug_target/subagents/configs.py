@@ -161,6 +161,9 @@ def get_subagents(
     data_dir: str | None = None,
     disease: str | None = None,
     model_overrides: dict[str, BaseChatModel | str] | None = None,
+    skills_sources: list[str] | None = None,
+    skill_registry: dict[str, str] | None = None,
+    stage_hints: dict[str, str] | None = None,
 ) -> list[dict]:
     """Get the subagent configurations for Drug Target Assessment.
 
@@ -175,6 +178,9 @@ def get_subagents(
         model_overrides: Optional per-subagent model overrides.
             Keys are subagent names, values are init_chat_model format strings
             (e.g. "openai:gpt-4.1") or BaseChatModel instances.
+        skills_sources: Native skill discovery paths for evidence_assessor.
+        skill_registry: Skill name → directory path mapping for SkillLoadHarness.
+        stage_hints: Skill name → usage hint mapping for SkillLoadHarness.
 
     Returns:
         List of subagent configuration dictionaries
@@ -220,5 +226,19 @@ def get_subagents(
         mw = list(subagent.get("middleware", []))
         mw.insert(0, WriteFileArgGuardMiddleware())
         subagent["middleware"] = mw
+
+    # Apply skills to evidence_assessor only (it does the DB queries)
+    if skills_sources:
+        for subagent in subagents:
+            if subagent["name"] == "evidence_assessor":
+                subagent["skills"] = skills_sources
+                if skill_registry:
+                    from src.agents.shared.skill_load_harness import SkillLoadHarness
+                    mw = list(subagent.get("middleware", []))
+                    mw.append(SkillLoadHarness(
+                        skill_registry=skill_registry,
+                        stage_hints=stage_hints or {},
+                    ))
+                    subagent["middleware"] = mw
 
     return subagents

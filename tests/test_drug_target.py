@@ -167,9 +167,6 @@ class TestSubagentConfigs:
             "query_kegg_pathways",
             "query_reactome_pathways",
             "query_string_ppi_pair",
-            "query_opentargets_target",
-            "query_opentargets_known_drugs",
-            "query_gwas_gene_trait",
             "query_stage2_gene_panel",
             "query_ensembl_vep_consequence",
             "query_chembl_target_profile",
@@ -209,7 +206,7 @@ class TestSubagentConfigs:
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         prompt = SUBAGENT_CONFIGS["evidence_assessor"]["system_prompt"]
         # Database references
-        for keyword in ("OpenTargets", "GWAS", "DrugBank"):
+        for keyword in ("OpenTargets", "GWAS", "ChEMBL"):
             assert keyword in prompt
         # Rubric references (merged from clinical_assessor)
         assert "rubric" in prompt.lower() or "RUBRIC" in prompt
@@ -300,11 +297,11 @@ class TestEvidenceLoader:
         from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
         raw = load_lr_candidates.invoke({"data_dir": str(mock_data_dir_with_top3)})
         result = json.loads(raw)
-        details = {d["symbol"]: d["is_selected_top3"] for d in result["gene_details"]}
-        assert details["TGFB1"] is True
-        assert details["CD44"] is True
-        assert details["FGF2"] is False
-        assert details["NOTCH1"] is False
+        top3 = set(result["selected_top3_genes"])
+        assert "TGFB1" in top3
+        assert "CD44" in top3
+        assert "FGF2" not in top3
+        assert "NOTCH1" not in top3
 
     def test_load_lr_candidates_missing_file(self, tmp_path):
         from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
@@ -339,12 +336,10 @@ class TestEvidenceLoader:
         assert "EGFR" in result["gene_symbols"]
 
     def test_load_lr_candidates_no_top3_default(self, mock_data_dir):
-        """Without selected_top3_lr.json, all genes should have is_selected_top3=False."""
+        """Without selected_top3_lr.json, selected_top3_genes should be empty."""
         from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
         raw = load_lr_candidates.invoke({"data_dir": str(mock_data_dir)})
         result = json.loads(raw)
-        for detail in result["gene_details"]:
-            assert detail["is_selected_top3"] is False
         assert len(result["selected_top3_genes"]) == 0
         # No errors related to missing top3
         assert not any("selected_top3" in e.lower() for e in result["errors"])
@@ -426,10 +421,11 @@ class TestEvidenceLoader:
         assert result["saved"] is True
         assert (tmp_path / "evidence" / "test_gene.json").exists()
 
-        # Roundtrip: load it back
+        # Roundtrip: load it back (returns summary metadata, not full content)
         raw2 = load_evidence_files.invoke({"data_dir": str(tmp_path)})
         result2 = json.loads(raw2)
-        assert result2["files"]["test_gene.json"]["gene"] == "TGFB1"
+        assert "test_gene.json" in result2["files"]
+        assert "gene" in result2["files"]["test_gene.json"]["top_keys"]
 
     def test_save_evidence_non_json_saved_as_raw(self, tmp_path):
         from src.agents.drug_target.tools.evidence_loader import save_evidence
@@ -816,7 +812,7 @@ class TestStage2Service:
             "executed": True,
         }
 
-    def test_query_stage2_gene_panel_tool_returns_bundle_json(self):
+    def test_query_stage2_gene_panel_tool_returns_bundle_json(self, tmp_path):
         from src.agents.drug_target.tools.stage_domain_tools import query_stage2_gene_panel
 
         payload = {
@@ -844,6 +840,7 @@ class TestStage2Service:
             "source_modes": {"opentargets": "parquet", "gwas": "parquet"},
         }
 
+        data_dir = str(tmp_path)
         with patch(
             "src.agents.drug_target.tools.stage_domain_tools.build_stage2_gene_panel",
             return_value=payload,
@@ -852,42 +849,28 @@ class TestStage2Service:
                 "gene_symbols": ["EGFR"],
                 "disease": "lung cancer",
                 "selected_top3_genes": ["EGFR"],
-                "data_dir": "/tmp/workspace",
+                "data_dir": data_dir,
             })
 
         mock_build.assert_called_once_with(
             ["EGFR"],
             "lung cancer",
             selected_top3_genes=["EGFR"],
-            data_dir="/tmp/workspace",
+            data_dir=data_dir,
         )
-        assert json.loads(raw) == {
-            "disease": "lung cancer",
-            "gene_count": 1,
-            "gene_symbols": ["EGFR"],
-            "gene_summaries": {
-                "EGFR": {
-                    "has_ensembl_id": True,
-                    "ot_executed": True,
-                    "ot_disease_evidence_count": 0,
-                    "ot_associations_count": 0,
-                    "ot_errors": [],
-                    "gwas_executed": True,
-                    "gwas_trait_associations_count": 0,
-                    "gwas_gene_associations_count": 0,
-                    "gwas_errors": [],
-                }
-            },
-            "known_drugs_count": 0,
-            "known_drugs_executed": True,
-            "source_modes": {"opentargets": "parquet", "gwas": "parquet"},
-            "gene_manifest": [{"symbol": "EGFR", "is_selected_top3": True}],
-            "note": (
-                "Full evidence data saved to evidence/ directory. "
-                "Use load_evidence_files() to read detailed per-gene payloads."
-            ),
-            "evidence_dir": "/tmp/workspace/evidence",
-        }
+        result = json.loads(raw)
+        assert result["disease"] == "lung cancer"
+        assert result["gene_count"] == 1
+        assert result["gene_symbols"] == ["EGFR"]
+        assert result["known_drugs_executed"] is True
+        assert result["source_modes"] == {"opentargets": "parquet", "gwas": "parquet"}
+        assert result["gene_manifest"] == [{"symbol": "EGFR", "is_selected_top3": True}]
+        assert result["evidence_dir"] == str(tmp_path / "evidence")
+        # Gene summary
+        egfr = result["gene_summaries"]["EGFR"]
+        assert egfr["has_ensembl_id"] is True
+        assert egfr["ot_executed"] is True
+        assert egfr["gwas_executed"] is True
 
 
 # =========================================================================
@@ -2120,9 +2103,10 @@ class TestIntegration:
         result = create_drug_target_agent(config)
 
         # create_drug_target_agent returns (agent, backend_or_None)
+        from deepagents.backends import FilesystemBackend
         agent, backend = result
         assert agent is mock_agent
-        assert backend is None
+        assert isinstance(backend, FilesystemBackend)
         mock_create_llm.assert_called_once_with(provider="openrouter")
         mock_create_deep_agent.assert_called_once()
 
@@ -2247,11 +2231,11 @@ class TestIntegration:
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
-    def test_create_drug_target_agent_attaches_skills_middleware_when_enabled(
+    def test_create_drug_target_agent_attaches_skills_to_evidence_assessor(
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
-        from src.agents.shared.skills_middleware import SkillsMiddleware
+        from src.agents.shared.skill_load_harness import SkillLoadHarness
 
         mock_create_llm.return_value = MagicMock()
         mock_create_deep_agent.return_value = MagicMock()
@@ -2260,10 +2244,20 @@ class TestIntegration:
         create_drug_target_agent(config)
 
         call_kwargs = mock_create_deep_agent.call_args.kwargs
-        middleware = call_kwargs.get("middleware")
-        assert middleware is not None
+        # Orchestrator middleware has only WriteFileArgGuardMiddleware (no skills)
+        middleware = call_kwargs.get("middleware", [])
         assert len(middleware) == 1
-        assert isinstance(middleware[0], SkillsMiddleware)
+        assert type(middleware[0]).__name__ == "WriteFileArgGuardMiddleware"
+        # evidence_assessor subagent has skills and SkillLoadHarness
+        subagents = call_kwargs.get("subagents", [])
+        ea = next(s for s in subagents if s["name"] == "evidence_assessor")
+        assert "skills" in ea
+        ea_mw = ea.get("middleware", [])
+        harness_mw = [m for m in ea_mw if isinstance(m, SkillLoadHarness)]
+        assert len(harness_mw) == 1
+        # report_writer has NO skills
+        rw = next(s for s in subagents if s["name"] == "report_writer")
+        assert "skills" not in rw
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
@@ -2271,6 +2265,7 @@ class TestIntegration:
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
+        from src.agents.shared.skill_load_harness import SkillLoadHarness
 
         mock_create_llm.return_value = MagicMock()
         mock_create_deep_agent.return_value = MagicMock()
@@ -2282,7 +2277,16 @@ class TestIntegration:
         create_drug_target_agent(config)
 
         call_kwargs = mock_create_deep_agent.call_args.kwargs
-        assert "middleware" not in call_kwargs
+        # Orchestrator still has WriteFileArgGuardMiddleware
+        middleware = call_kwargs.get("middleware", [])
+        assert len(middleware) == 1
+        assert type(middleware[0]).__name__ == "WriteFileArgGuardMiddleware"
+        # No skills on any subagent
+        subagents = call_kwargs.get("subagents", [])
+        for s in subagents:
+            assert "skills" not in s
+            mw = s.get("middleware", [])
+            assert not any(isinstance(m, SkillLoadHarness) for m in mw)
 
 
 # =========================================================================
@@ -2613,3 +2617,106 @@ class TestNovelCandidates:
         assert novel[0]["exploratory_total"] == 9
         assert novel[1]["exploratory_total"] == 5
         assert novel[2]["exploratory_total"] == 4
+
+
+# =========================================================================
+# 11. TestSkillLoadingEndToEnd — Verify skills load from real SKILL.md files
+# =========================================================================
+
+class TestSkillLoadingEndToEnd:
+    """End-to-end verification that SkillLoadHarness loads real project skills."""
+
+    def test_skill_registry_resolves_all_5_skills(self):
+        """_build_skill_registry returns paths to all 5 skill dirs with SKILL.md."""
+        from src.agents.drug_target.agent import _build_skill_registry, DrugTargetConfig
+
+        config = DrugTargetConfig()
+        registry = _build_skill_registry(config)
+
+        expected_names = {
+            "opentargets-database",
+            "gwas-database",
+            "chembl-database",
+            "kegg-database",
+            "string-database",
+        }
+        assert set(registry.keys()) == expected_names
+        for name, path in registry.items():
+            skill_md = Path(path) / "SKILL.md"
+            assert skill_md.exists(), f"Missing SKILL.md for {name} at {skill_md}"
+
+    def test_harness_formats_all_skills_with_descriptions(self):
+        """SkillLoadHarness formats all 5 skills with real descriptions and hints."""
+        from src.agents.drug_target.agent import _build_skill_registry, DrugTargetConfig
+        from src.agents.shared.skill_load_harness import SkillLoadHarness
+
+        config = DrugTargetConfig()
+        harness = SkillLoadHarness(
+            skill_registry=_build_skill_registry(config),
+            stage_hints=config.stage_hints,
+        )
+
+        formatted = harness._format_available_skills()
+
+        # All 5 skills present as bold entries
+        for name in config.agent_skill_names:
+            assert f"**{name}**" in formatted, f"Skill {name} missing from formatted output"
+
+        # Stage hints present for configured skills
+        assert "Stage 3 only" in formatted        # chembl-database
+        assert "Pathway analysis" in formatted     # kegg-database
+        assert "PPI network queries" in formatted  # string-database
+
+        # No skills with missing descriptions
+        assert "(no description)" not in formatted
+
+    @pytest.mark.asyncio
+    async def test_harness_injects_forced_eval_into_system_prompt(self):
+        """awrap_model_call injects forced-eval protocol with all 5 real skills."""
+        from src.agents.drug_target.agent import _build_skill_registry, DrugTargetConfig
+        from src.agents.shared.skill_load_harness import SkillLoadHarness
+
+        config = DrugTargetConfig()
+        harness = SkillLoadHarness(
+            skill_registry=_build_skill_registry(config),
+            stage_hints=config.stage_hints,
+        )
+
+        # Mock request (same pattern as test_skill_load_harness.py)
+        class _Msg:
+            def __init__(self, content):
+                self.content = content
+
+        class _Req:
+            def __init__(self, text):
+                self.system_message = _Msg(text)
+                self.system_prompt = None
+            def override(self, **kw):
+                obj = _Req.__new__(_Req)
+                obj.system_message = self.system_message
+                obj.system_prompt = self.system_prompt
+                for k, v in kw.items():
+                    setattr(obj, k, v)
+                return obj
+
+        captured = None
+
+        async def handler(req):
+            nonlocal captured
+            captured = str(req.system_message.content)
+            return "mock"
+
+        await harness.awrap_model_call(_Req("You are evidence_assessor."), handler)
+
+        assert captured is not None
+        # Original prompt preserved
+        assert "You are evidence_assessor." in captured
+        # Forced-eval 3-step protocol
+        assert "Step 1" in captured
+        assert "Step 2" in captured
+        assert "Step 3" in captured
+        # All 5 skill names injected
+        for name in config.agent_skill_names:
+            assert name in captured, f"Skill {name} missing from injected prompt"
+        # Placeholder fully substituted
+        assert "{{available_skills}}" not in captured

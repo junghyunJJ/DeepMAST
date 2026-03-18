@@ -313,6 +313,9 @@ def _load_completed_keys(run_dir: Path) -> set[tuple[str, str, int]]:
                 continue
             if rec.get("error"):
                 continue
+            # Treat fixed_strategy_fallback as incomplete (LLM was unavailable)
+            if rec.get("search_method") == "fixed_strategy_fallback":
+                continue
             key = (str(rec["method"]), str(rec["case_id"]), int(rec["repeat_index"]))
             completed.add(key)
     return completed
