@@ -293,15 +293,27 @@ def test_load_case_files_and_validate_expected_counts():
     mod = load_module()
 
     stage2_cases = mod.load_cases(mod.CASES_DIR / "stage2_synthesis_cases.json")
+    stage2_v2_cases = mod.load_cases(mod.CASES_DIR / "stage2_interpretation_v2_cases.json")
+    stage2_v3_cases = mod.load_cases(mod.CASES_DIR / "stage2_interpretation_v3_cases.json")
     chembl_cases = mod.load_cases(mod.CASES_DIR / "chembl_micro_cases.json")
+    excerpt_library = mod.load_skill_excerpt_library()
 
-    assert len(stage2_cases) == 10
+    assert len(stage2_cases) == 14
+    assert len(stage2_v2_cases) == 14
+    assert len(stage2_v3_cases) == 14
     assert len(chembl_cases) == 4
+    assert excerpt_library
 
     stage2_ids = {case["case_id"] for case in stage2_cases}
+    stage2_v2_ids = {case["case_id"] for case in stage2_v2_cases}
+    stage2_v3_ids = {case["case_id"] for case in stage2_v3_cases}
     chembl_ids = {case["case_id"] for case in chembl_cases}
 
     assert "real_flt1_breast" in stage2_ids
+    assert "perturbation_approval_scope_mismatch" in stage2_ids
+    assert "real_vegfa_breast" in stage2_v2_ids
+    assert "perturbation_uncertainty_high_mixed_signal" in stage2_v2_ids
+    assert "real_vegfa_breast" in stage2_v3_ids
     assert "perturbation_trait_ambiguity" in stage2_ids
     assert "chembl_preclinical_potency_not_clinical_support" in chembl_ids
 
@@ -318,6 +330,28 @@ def test_load_case_files_and_validate_expected_counts():
     }
     for case in stage2_cases:
         assert required_case_keys.issubset(case)
+
+    for case in stage2_v2_cases:
+        assert case["benchmark_type"] == mod.STAGE2_INTERPRETATION_V2_BENCHMARK
+        assert "input_bundle" in case
+        assert "interpretation_checks" in case
+        assert len(case["interpretation_checks"]) >= 3
+        assert case["overall_conclusion"]["gold_label"]
+        assert case["expected_uncertainty"]["gold_label"]
+
+    for case in stage2_v3_cases:
+        assert case["benchmark_type"] == mod.STAGE2_INTERPRETATION_V3_BENCHMARK
+        assert "input_bundle" in case
+        assert "evidence_refs" in case
+        assert "skill_excerpt_ids" in case
+        assert len(case["probes"]) == 3
+        assert case["secondary_conclusion"]["gold_label"]
+
+    for excerpt_id, excerpt in excerpt_library.items():
+        assert excerpt_id
+        assert excerpt["skill_name"] in {"opentargets-database", "gwas-database"}
+        assert excerpt["text"]
+        assert excerpt["source_line_ref"]
 
 
 def test_parse_benchmark_output_recovers_json_from_code_fence():
@@ -414,3 +448,336 @@ def test_score_chembl_micro_case_uses_validated_track_only():
     assert metrics["exact_match_count"] == 4
     assert metrics["near_match_count"] == 4
     assert metrics["malformed_output"] is False
+
+
+def test_score_stage2_interpretation_v2_output_supports_exact_partial_and_overclaim():
+    mod = load_module()
+    case = next(
+        case
+        for case in mod.load_cases(mod.CASES_DIR / "stage2_interpretation_v2_cases.json")
+        if case["case_id"] == "perturbation_gwas_significance_boundary"
+    )
+
+    parsed_output = {
+        "gene_symbol": "PLXNB2",
+        "interpretation_checks": [
+            {
+                "check_id": "genetic_support",
+                "answer": "suggestive",
+                "justification": "Best association is p = 2e-6 from a single cohort, and there is no independent replication; do not treat as genome-wide significant.",
+            },
+            {
+                "check_id": "clinical_precedence",
+                "answer": "none",
+                "justification": "No approved or clinical disease-matched therapies are reported, and there are no matched clinical trials.",
+            },
+            {
+                "check_id": "tractability_signal",
+                "answer": "clinical_precedent",
+                "justification": "Predicted tractability only; no clinical precedent is actually stated.",
+            },
+        ],
+        "overall_conclusion": {
+            "answer": "exploratory_target",
+            "justification": "Moderate disease association exists, but the genetics remain sub-threshold and unreplicated.",
+        },
+        "uncertainty": {
+            "answer": "high",
+            "justification": "The best association is only p = 2e-6 from a single cohort and lacks independent replication.",
+        },
+        "summary": "Interpret conservatively.",
+    }
+
+    metrics = mod.score_stage2_interpretation_v2_output(case, parsed_output)
+
+    assert metrics["exact_check_count"] == 2
+    assert metrics["partial_credit_accuracy"] == pytest.approx(2.0 / 3.0)
+    assert metrics["interpretation_score"] == pytest.approx((2.0 / 3.0 + 1.0 + 1.0) / 3.0)
+    assert metrics["overall_conclusion_correct"] is True
+    assert metrics["uncertainty_correct"] is True
+    assert metrics["overclaim_rate"] == pytest.approx(1.0 / 3.0)
+    assert metrics["rationale_anchor_coverage"] is not None
+
+
+def test_summarize_trials_v2_uses_case_level_pairing_not_raw_repeat_rows():
+    mod = load_module()
+
+    trials = [
+        {
+            "benchmark_type": mod.STAGE2_INTERPRETATION_V2_BENCHMARK,
+            "case_id": "c1",
+            "model": "openai:gpt-4.1",
+            "repeat_index": 0,
+            "variant": mod.VARIANT_A,
+            "latency_s": 1.0,
+            "tool_history": [],
+            "token_usage": {"total_tokens": 100},
+            "metrics": {
+                "interpretation_score": 0.25,
+                "exact_check_accuracy": 0.25,
+                "partial_credit_accuracy": 0.25,
+                "overall_conclusion_correct": False,
+                "uncertainty_correct": False,
+                "overclaim_rate": 0.5,
+                "malformed_output": False,
+                "rationale_anchor_coverage": 0.5,
+            },
+        },
+        {
+            "benchmark_type": mod.STAGE2_INTERPRETATION_V2_BENCHMARK,
+            "case_id": "c1",
+            "model": "openai:gpt-4.1",
+            "repeat_index": 1,
+            "variant": mod.VARIANT_A,
+            "latency_s": 1.0,
+            "tool_history": [],
+            "token_usage": {"total_tokens": 100},
+            "metrics": {
+                "interpretation_score": 0.75,
+                "exact_check_accuracy": 0.75,
+                "partial_credit_accuracy": 0.75,
+                "overall_conclusion_correct": True,
+                "uncertainty_correct": True,
+                "overclaim_rate": 0.0,
+                "malformed_output": False,
+                "rationale_anchor_coverage": 1.0,
+            },
+        },
+        {
+            "benchmark_type": mod.STAGE2_INTERPRETATION_V2_BENCHMARK,
+            "case_id": "c1",
+            "model": "openai:gpt-4.1",
+            "repeat_index": 0,
+            "variant": mod.VARIANT_B,
+            "latency_s": 1.0,
+            "tool_history": [],
+            "token_usage": {"total_tokens": 100},
+            "metrics": {
+                "interpretation_score": 0.75,
+                "exact_check_accuracy": 0.75,
+                "partial_credit_accuracy": 0.75,
+                "overall_conclusion_correct": True,
+                "uncertainty_correct": True,
+                "overclaim_rate": 0.0,
+                "malformed_output": False,
+                "rationale_anchor_coverage": 1.0,
+            },
+        },
+        {
+            "benchmark_type": mod.STAGE2_INTERPRETATION_V2_BENCHMARK,
+            "case_id": "c1",
+            "model": "openai:gpt-4.1",
+            "repeat_index": 1,
+            "variant": mod.VARIANT_B,
+            "latency_s": 1.0,
+            "tool_history": [],
+            "token_usage": {"total_tokens": 100},
+            "metrics": {
+                "interpretation_score": 1.0,
+                "exact_check_accuracy": 1.0,
+                "partial_credit_accuracy": 1.0,
+                "overall_conclusion_correct": True,
+                "uncertainty_correct": True,
+                "overclaim_rate": 0.0,
+                "malformed_output": False,
+                "rationale_anchor_coverage": 1.0,
+            },
+        },
+    ]
+
+    summary = mod.summarize_trials(trials)
+    paired = summary["paired_tests"]["interpretation_score_case_level"]
+
+    assert summary["benchmark_type"] == mod.STAGE2_INTERPRETATION_V2_BENCHMARK
+    assert paired["pair_unit_count"] == 1
+    assert paired["delta_mean"] == pytest.approx(0.375)
+
+
+def test_build_case_excerpt_guidance_uses_only_requested_excerpts_and_caps_budget():
+    mod = load_module()
+    case = {
+        "skill_excerpt_ids": ["ex1", "ex2", "ex3"],
+        "probes": [
+            {"required_excerpt_ids": ["ex1"]},
+            {"required_excerpt_ids": ["ex2"]},
+            {"required_excerpt_ids": ["ex3"]},
+        ],
+    }
+    excerpt_library = {
+        "ex1": {
+            "skill_name": "gwas-database",
+            "title": "Replication",
+            "text": "one two three four",
+            "source_path": "skills/gwas-database/SKILL.md",
+            "source_line_ref": "L1",
+        },
+        "ex2": {
+            "skill_name": "opentargets-database",
+            "title": "Safety",
+            "text": "five six seven eight",
+            "source_path": "skills/opentargets-database/SKILL.md",
+            "source_line_ref": "L2",
+        },
+        "ex3": {
+            "skill_name": "gwas-database",
+            "title": "Trait mapping",
+            "text": "nine ten eleven twelve",
+            "source_path": "skills/gwas-database/SKILL.md",
+            "source_line_ref": "L3",
+        },
+    }
+
+    guidance = mod.build_case_excerpt_guidance(case, excerpt_library=excerpt_library, max_tokens=9)
+
+    assert "Replication" in guidance
+    assert "Safety" in guidance
+    assert "Trait mapping" not in guidance
+    assert "skills/gwas-database/SKILL.md" in guidance
+
+
+def test_score_stage2_interpretation_v3_output_tracks_weighted_probe_error_and_target_errors():
+    mod = load_module()
+    case = {
+        "benchmark_type": mod.STAGE2_INTERPRETATION_V3_BENCHMARK,
+        "case_id": "c1",
+        "evidence_refs": {"E1": "foo", "E2": "bar", "E3": "baz"},
+        "probes": [
+            {
+                "probe_id": "p1",
+                "options": ["a", "b", "c"],
+                "gold_label": "a",
+                "conservative_labels": ["b"],
+                "target_error_labels": ["c"],
+                "required_evidence_refs": ["E1"],
+            },
+            {
+                "probe_id": "p2",
+                "options": ["a", "b", "c"],
+                "gold_label": "a",
+                "conservative_labels": ["b"],
+                "target_error_labels": ["c"],
+                "required_evidence_refs": ["E2"],
+            },
+            {
+                "probe_id": "p3",
+                "options": ["a", "b", "c"],
+                "gold_label": "a",
+                "conservative_labels": ["b"],
+                "target_error_labels": ["c"],
+                "required_evidence_refs": ["E3"],
+            },
+        ],
+        "secondary_conclusion": {
+            "options": ["supported", "unclear"],
+            "gold_label": "supported",
+            "required_evidence_refs": ["E1", "E2"],
+        },
+    }
+    parsed_output = {
+        "gene_symbol": "GENE",
+        "probe_answers": [
+            {"probe_id": "p1", "answer": "a", "evidence_refs": ["E1"], "justification": "exact"},
+            {"probe_id": "p2", "answer": "b", "evidence_refs": ["E2"], "justification": "conservative"},
+            {"probe_id": "p3", "answer": "c", "evidence_refs": ["E3"], "justification": "target error"},
+        ],
+        "secondary_conclusion": {
+            "answer": "supported",
+            "evidence_refs": ["E1", "E2"],
+            "justification": "supported",
+        },
+    }
+
+    metrics = mod.score_stage2_interpretation_v3_output(case, parsed_output)
+
+    assert metrics["targeted_error_count"] == 1
+    assert metrics["primary_probe_target_error"] is False
+    assert metrics["all_probe_target_error_rate"] == pytest.approx(1.0 / 3.0)
+    assert metrics["weighted_probe_error_score"] == pytest.approx(0.6 * 0.0 + 0.25 * 0.25 + 0.15 * 1.0)
+    assert metrics["secondary_conclusion_accuracy"] == pytest.approx(1.0)
+    assert metrics["evidence_ref_validity_rate"] == pytest.approx(1.0)
+
+
+def test_summarize_trials_v3_uses_a_minus_b_delta_for_weighted_probe_error():
+    mod = load_module()
+    trials = [
+        {
+            "benchmark_type": mod.STAGE2_INTERPRETATION_V3_BENCHMARK,
+            "case_id": "c1",
+            "model": "ollama:qwen3.5:122b",
+            "repeat_index": 0,
+            "variant": mod.VARIANT_A,
+            "latency_s": 1.0,
+            "tool_history": [],
+            "token_usage": {"total_tokens": 100},
+            "metrics": {
+                "weighted_probe_error_score": 0.8,
+                "primary_probe_target_error_rate": 1.0,
+                "all_probe_target_error_rate": 0.5,
+                "major_error_rate": 0.0,
+                "evidence_ref_validity_rate": 1.0,
+                "secondary_conclusion_accuracy": 1.0,
+                "malformed_output": False,
+            },
+        },
+        {
+            "benchmark_type": mod.STAGE2_INTERPRETATION_V3_BENCHMARK,
+            "case_id": "c1",
+            "model": "ollama:qwen3.5:122b",
+            "repeat_index": 0,
+            "variant": mod.VARIANT_B,
+            "latency_s": 1.0,
+            "tool_history": [],
+            "token_usage": {"total_tokens": 100},
+            "metrics": {
+                "weighted_probe_error_score": 0.2,
+                "primary_probe_target_error_rate": 0.0,
+                "all_probe_target_error_rate": 0.0,
+                "major_error_rate": 0.0,
+                "evidence_ref_validity_rate": 1.0,
+                "secondary_conclusion_accuracy": 1.0,
+                "malformed_output": False,
+            },
+        },
+    ]
+
+    summary = mod.summarize_trials(trials)
+    paired = summary["paired_tests"]["weighted_probe_error_score_case_level"]
+
+    assert summary["benchmark_type"] == mod.STAGE2_INTERPRETATION_V3_BENCHMARK
+    assert paired["pair_unit_count"] == 1
+    assert paired["delta_mean"] == pytest.approx(0.6)
+
+
+def test_select_v3_judge_keys_prefers_nonzero_deltas_and_samples_ties():
+    mod = load_module()
+    trial_pairs = {
+        ("c1", 0, "m"): {
+            mod.VARIANT_A: {"metrics": {"weighted_probe_error_score": 0.8}},
+            mod.VARIANT_B: {"metrics": {"weighted_probe_error_score": 0.2}},
+        },
+        ("c2", 0, "m"): {
+            mod.VARIANT_A: {"metrics": {"weighted_probe_error_score": 0.5}},
+            mod.VARIANT_B: {"metrics": {"weighted_probe_error_score": 0.5}},
+        },
+        ("c3", 0, "m"): {
+            mod.VARIANT_A: {"metrics": {"weighted_probe_error_score": 0.4}},
+            mod.VARIANT_B: {"metrics": {"weighted_probe_error_score": 0.4}},
+        },
+    }
+
+    selected = mod.select_v3_judge_keys(trial_pairs, sample_rate=0.5)
+
+    assert ("c1", 0, "m") in selected
+    assert len(selected) >= 2
+
+
+def test_load_model_configs_from_env_accepts_provider_model_override(monkeypatch: pytest.MonkeyPatch):
+    mod = load_module()
+    monkeypatch.setenv("DRUGTARGET_BENCHMARK_MODELS", "openai:gpt-4.1")
+
+    cfgs = mod.load_model_configs_from_env()
+
+    assert len(cfgs) == 1
+    assert cfgs[0]["label"] == "openai:gpt-4.1"
+    assert cfgs[0]["provider"] == "openai"
+    assert cfgs[0]["model_kwargs"]["model"] == "gpt-4.1"

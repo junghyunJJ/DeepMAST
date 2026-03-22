@@ -1,0 +1,20 @@
+{
+  "n": 9,
+  "A_tools_only": 0,
+  "B_tools_plus_skills": 1,
+  "tie": 8,
+  "sign_test_pvalue": 1.0,
+  "unanimous_rate": 0.7777777777777778,
+  "confidence_counts": {
+    "high": 7,
+    "medium": 1,
+    "low": 1
+  },
+  "mean_deltas": {
+    "grounding_delta": 0.037037037037037035,
+    "rubric_alignment_delta": 0.18518518518518517,
+    "unsupported_claim_penalty_delta": -0.037037037037037035,
+    "overall_delta": 0.18518518518518517
+  },
+  "judge_error_rate": 0.0
+}

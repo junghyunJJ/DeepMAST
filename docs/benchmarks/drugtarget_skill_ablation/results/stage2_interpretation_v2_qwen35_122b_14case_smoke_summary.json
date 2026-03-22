@@ -1,0 +1,43 @@
+{
+  "benchmark_type": "stage2_interpretation_v2",
+  "primary_metric": "interpretation_score",
+  "pair_unit": "model_case",
+  "trial_count": 28,
+  "variants": {
+    "A_tools_only": {
+      "n": 14,
+      "interpretation_score_mean": 0.6815476190476191,
+      "exact_check_accuracy_mean": 0.8452380952380952,
+      "partial_credit_accuracy_mean": 0.9017857142857143,
+      "overall_conclusion_accuracy": 0.35714285714285715,
+      "uncertainty_accuracy": 0.7857142857142857,
+      "overclaim_rate_mean": 0.041666666666666664,
+      "malformed_rate": 0.0,
+      "anchor_coverage_mean": 0.051226551226551224,
+      "latency_s_mean": 35.52911321135694,
+      "tool_call_mean": 0.0,
+      "total_tokens_mean": 2636.3571428571427
+    },
+    "B_tools_plus_skills": {
+      "n": 14,
+      "interpretation_score_mean": 0.6775793650793651,
+      "exact_check_accuracy_mean": 0.8452380952380952,
+      "partial_credit_accuracy_mean": 0.8898809523809523,
+      "overall_conclusion_accuracy": 0.42857142857142855,
+      "uncertainty_accuracy": 0.7142857142857143,
+      "overclaim_rate_mean": 0.06547619047619048,
+      "malformed_rate": 0.0,
+      "anchor_coverage_mean": 0.06259018759018758,
+      "latency_s_mean": 59.63371858321391,
+      "tool_call_mean": 0.0,
+      "total_tokens_mean": 17075.64285714286
+    }
+  },
+  "paired_tests": {
+    "interpretation_score_case_level": {
+      "pair_unit_count": 14,
+      "delta_mean": -0.003968253968253974,
+      "wilcoxon_pvalue": 0.8539232992870668
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "n_decisions": 420,
+  "f1_A": 0.8235,
+  "f1_B": 0.9067,
+  "f1_diff": 0.0831,
+  "mcnemar": {
+    "both_correct": 378,
+    "only_A_correct": 3,
+    "only_B_correct": 21,
+    "both_wrong": 18,
+    "chi2_corrected": 12.0417,
+    "p_corrected": 0.00052,
+    "p_exact": 0.000277
+  },
+  "bootstrap": {
+    "n_resamples": 10000,
+    "ci_lo": 0.0309,
+    "ci_hi": 0.1416,
+    "p_value": 0.0002,
+    "method": "prompt-level resampling, percentile CI"
+  },
+  "cohens_h": 0.2461,
+  "effect_size": "small"
+}

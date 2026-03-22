@@ -552,5 +552,227 @@
       "emt"
     ],
     "notes": "Curated conflict case where strong mechanism should not erase absent genetic support."
+  },
+  {
+    "case_id": "perturbation_approval_scope_mismatch",
+    "benchmark_type": "stage2_synthesis",
+    "source_type": "curated_perturbation",
+    "input_bundle": {
+      "disease": "pancreatic cancer",
+      "gene_symbol": "FGFR2",
+      "selected_top3": false,
+      "opentargets": {
+        "association_score": 0.72,
+        "association_summary": "Target-disease support is plausible in epithelial growth and survival programs.",
+        "tractability_notes": "Approved FGFR inhibitors exist, but approval is confined to adjacent oncology indications rather than the target disease.",
+        "mechanism_notes": "Direct receptor tyrosine kinase signaling relevance is supported.",
+        "clinical_precedence": "Approval exists in cholangiocarcinoma, while pancreatic-cancer evidence is limited and indirect.",
+        "safety_notes": "Moderate class toxicities including hyperphosphatemia and ocular adverse events are known."
+      },
+      "gwas": {
+        "trait_match": "exact pancreatic cancer context",
+        "signal_summary": "Suggestive association only.",
+        "replication_summary": "No replicated exact-disease signal is reported."
+      },
+      "clinical_context": {
+        "approved_drugs": [
+          "Pemigatinib in cholangiocarcinoma"
+        ],
+        "investigational_activity": "No established late-stage pancreatic-cancer program in the frozen bundle.",
+        "safety_profile": "Moderate class toxicity is known."
+      }
+    },
+    "gold_assessment": {
+      "validated_track": {
+        "existing_drug_evidence": 1,
+        "clinical_trial_activity": 0,
+        "mechanism_relevance": 2,
+        "safety_profile": -1
+      },
+      "exploratory_track": {
+        "gwas_genetic_support": 1,
+        "tractability": 2,
+        "biological_plausibility": 2,
+        "novelty_opportunity": 1
+      }
+    },
+    "expected_classification": "exploratory_target",
+    "expected_priority": "medium",
+    "judge_focus": [
+      "approval scope mismatch",
+      "exact-disease clinical precedence",
+      "avoid adjacent-indication inflation"
+    ],
+    "rationale_anchors": [
+      "adjacent oncology indications",
+      "cholangiocarcinoma",
+      "no established late-stage pancreatic-cancer program"
+    ],
+    "notes": "Curated case where approved drugs in another indication should not be treated as exact-disease advanced evidence."
+  },
+  {
+    "case_id": "perturbation_predicted_tractability_only",
+    "benchmark_type": "stage2_synthesis",
+    "source_type": "curated_perturbation",
+    "input_bundle": {
+      "disease": "triple-negative breast cancer",
+      "gene_symbol": "ROR1",
+      "selected_top3": false,
+      "opentargets": {
+        "association_score": 0.62,
+        "association_summary": "Developmental signaling reactivation makes the target biologically plausible in mesenchymal tumor states.",
+        "tractability_notes": "Antibody and small-molecule tractability are predicted only; no approved or disease-matched clinical precedent is established.",
+        "mechanism_notes": "Mechanistically plausible through developmental and stem-like tumor programs.",
+        "clinical_precedence": "No approved or clinical disease-matched therapies are reported.",
+        "safety_notes": "On-target normal tissue liabilities remain uncertain but not dominant in the frozen summary."
+      },
+      "gwas": {
+        "trait_match": "exact triple-negative breast cancer context",
+        "signal_summary": "No convincing human genetics signal is available.",
+        "replication_summary": "No replicated signal is reported."
+      },
+      "clinical_context": {
+        "approved_drugs": [],
+        "investigational_activity": "No matched clinical trials are reported.",
+        "safety_profile": "No dominant safety warning is established."
+      }
+    },
+    "gold_assessment": {
+      "validated_track": {
+        "existing_drug_evidence": 0,
+        "clinical_trial_activity": 0,
+        "mechanism_relevance": 1,
+        "safety_profile": 0
+      },
+      "exploratory_track": {
+        "gwas_genetic_support": 0,
+        "tractability": 1,
+        "biological_plausibility": 2,
+        "novelty_opportunity": 2
+      }
+    },
+    "expected_classification": "novel_candidate",
+    "expected_priority": "low",
+    "judge_focus": [
+      "predicted tractability inflation",
+      "novel-candidate fallback",
+      "avoid inventing clinical precedent"
+    ],
+    "rationale_anchors": [
+      "predicted only",
+      "no matched clinical trials",
+      "no convincing human genetics"
+    ],
+    "notes": "Curated case where predicted druggability should not be mistaken for clinical maturity."
+  },
+  {
+    "case_id": "perturbation_adjacent_phase12_confound",
+    "benchmark_type": "stage2_synthesis",
+    "source_type": "curated_perturbation",
+    "input_bundle": {
+      "disease": "ovarian cancer",
+      "gene_symbol": "DDR1",
+      "selected_top3": false,
+      "opentargets": {
+        "association_score": 0.69,
+        "association_summary": "Extracellular-matrix and invasive-growth signaling supports disease relevance.",
+        "tractability_notes": "Kinase tractability is established with early compounds.",
+        "mechanism_notes": "Mechanistically relevant through matrix signaling and invasion programs.",
+        "clinical_precedence": "Phase 1-2 activity is reported in other solid tumors, but disease-matched ovarian evidence is not established.",
+        "safety_notes": "Moderate class toxicity is plausible but not dominant."
+      },
+      "gwas": {
+        "trait_match": "exact ovarian cancer context",
+        "signal_summary": "Suggestive genetic support only.",
+        "replication_summary": "No replication claim is reported."
+      },
+      "clinical_context": {
+        "approved_drugs": [],
+        "investigational_activity": "Few early phase trials in adjacent oncology settings.",
+        "safety_profile": "Moderate safety concerns are plausible."
+      }
+    },
+    "gold_assessment": {
+      "validated_track": {
+        "existing_drug_evidence": 1,
+        "clinical_trial_activity": 0,
+        "mechanism_relevance": 2,
+        "safety_profile": -1
+      },
+      "exploratory_track": {
+        "gwas_genetic_support": 1,
+        "tractability": 2,
+        "biological_plausibility": 2,
+        "novelty_opportunity": 1
+      }
+    },
+    "expected_classification": "exploratory_target",
+    "expected_priority": "medium",
+    "judge_focus": [
+      "adjacent phase 1-2 evidence interpretation",
+      "exact-disease versus neighboring-indication maturity",
+      "avoid early-phase inflation"
+    ],
+    "rationale_anchors": [
+      "other solid tumors",
+      "disease-matched ovarian evidence is not established",
+      "few early phase trials"
+    ],
+    "notes": "Curated case where adjacent-indication phase 1-2 activity should remain indirect_or_early rather than advanced evidence."
+  },
+  {
+    "case_id": "perturbation_uncertainty_high_mixed_signal",
+    "benchmark_type": "stage2_synthesis",
+    "source_type": "curated_perturbation",
+    "input_bundle": {
+      "disease": "hepatocellular carcinoma",
+      "gene_symbol": "MERTK",
+      "selected_top3": false,
+      "opentargets": {
+        "association_score": 0.66,
+        "association_summary": "Mixed immune and tumor-cell evidence suggests plausible disease relevance.",
+        "tractability_notes": "Small-molecule tractability is plausible and indirect oncology activity exists.",
+        "mechanism_notes": "Mechanistically relevant through macrophage polarization and survival signaling.",
+        "clinical_precedence": "Only indirect early oncology activity is summarized, with no disease-matched advanced program.",
+        "safety_notes": "Moderate immunologic and hepatic safety concerns are possible."
+      },
+      "gwas": {
+        "trait_match": "mixed liver fibrosis and hepatocellular-carcinoma-related traits",
+        "signal_summary": "Signals appear across related liver traits, but exact-disease support is inconsistent.",
+        "replication_summary": "Direction and exact disease alignment remain unresolved."
+      },
+      "clinical_context": {
+        "approved_drugs": [],
+        "investigational_activity": "No disease-matched late-stage activity is reported.",
+        "safety_profile": "Moderate but incompletely characterized safety concerns."
+      }
+    },
+    "gold_assessment": {
+      "validated_track": {
+        "existing_drug_evidence": 1,
+        "clinical_trial_activity": 0,
+        "mechanism_relevance": 2,
+        "safety_profile": -1
+      },
+      "exploratory_track": {
+        "gwas_genetic_support": 0,
+        "tractability": 1,
+        "biological_plausibility": 3,
+        "novelty_opportunity": 2
+      }
+    },
+    "expected_classification": "novel_candidate",
+    "expected_priority": "low",
+    "judge_focus": [
+      "high uncertainty calibration",
+      "mixed-signal restraint",
+      "do not convert related-trait evidence into exact-disease support"
+    ],
+    "rationale_anchors": [
+      "related liver traits",
+      "exact-disease support is inconsistent",
+      "no disease-matched late-stage activity"
+    ],
+    "notes": "Curated mixed-signal case designed to reward high uncertainty rather than overconfident synthesis."
   }
 ]

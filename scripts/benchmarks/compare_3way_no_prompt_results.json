@@ -1,0 +1,29 @@
+{
+  "A_passive": {
+    "f1": 0.5333,
+    "precision": 0.4444,
+    "recall": 0.6667,
+    "specificity": 0.6667,
+    "false_positive_rate": 0.6667,
+    "activation_rate": 1.0,
+    "avg_latency": 574.04
+  },
+  "B_WITH_hints": {
+    "f1": 0.7586,
+    "precision": 1.0,
+    "recall": 0.6111,
+    "specificity": 1.0,
+    "false_positive_rate": 0.0,
+    "activation_rate": 0.7778,
+    "avg_latency": 568.74
+  },
+  "B_NO_hints": {
+    "f1": 0.7179,
+    "precision": 0.6667,
+    "recall": 0.7778,
+    "specificity": 0.8444,
+    "false_positive_rate": 0.1667,
+    "activation_rate": 0.8889,
+    "avg_latency": 571.99
+  }
+}

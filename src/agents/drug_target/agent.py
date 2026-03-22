@@ -142,15 +142,13 @@ class DrugTargetConfig:
         "opentargets-database",
         "gwas-database",
         "chembl-database",
-        "kegg-database",
-        "string-database",
+        # kegg-database: REMOVED — tool-only, accessed via query_kegg_pathways
+        # string-database: REMOVED — tool-only, accessed via query_string_ppi_pair
     )
     skills_dir: str | None = None
     stage_hints: dict[str, str] = field(
         default_factory=lambda: {
             "chembl-database": "Stage 3 only",
-            "kegg-database": "Pathway analysis",
-            "string-database": "PPI network queries",
         }
     )
     subagent_models: dict[str, str] | None = None

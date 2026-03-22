@@ -18,6 +18,7 @@ import random
 import re
 import sys
 import time
+from copy import deepcopy
 from pathlib import Path
 from statistics import mean
 from typing import Any
@@ -93,6 +94,11 @@ DEFAULT_JUDGE_MODEL_CANDIDATES: list[dict[str, Any]] = [
         "model_kwargs": {"model": "qwen3.5:35b", "temperature": 0},
     },
     {
+        "label": "gpt-oss:20b",
+        "provider": "ollama",
+        "model_kwargs": {"model": "gpt-oss:20b", "temperature": 0},
+    },
+    {
         "label": "qwen3.5:122b",
         "provider": "ollama",
         "model_kwargs": {"model": "qwen3.5:122b", "temperature": 0},
@@ -102,10 +108,16 @@ DEFAULT_JUDGE_MODEL_CANDIDATES: list[dict[str, Any]] = [
 VARIANT_A = "A_tools_only"
 VARIANT_B = "B_tools_plus_skills"
 MAIN_STAGE2_BENCHMARK = "stage2_synthesis"
+STAGE2_INTERPRETATION_V2_BENCHMARK = "stage2_interpretation_v2"
+STAGE2_INTERPRETATION_V3_BENCHMARK = "stage2_interpretation_v3"
 CHEMBL_MICRO_BENCHMARK = "chembl_micro"
 RESEARCH_JUDGE_PANEL_SIZE = 3
 DEFAULT_HUMAN_AUDIT_SAMPLE_RATE = 0.2
 RESEARCH_JUDGE_CONFIDENCE = ("low", "medium", "high")
+V3_PROBE_WEIGHTS = {"P1": 0.60, "P2": 0.25, "P3": 0.15}
+V3_ALLOWED_SKILLS = {"opentargets-database", "gwas-database"}
+V3_CASE_FILENAME = "stage2_interpretation_v3_cases.json"
+V3_EXCERPT_LIBRARY_FILENAME = "skill_excerpt_library.json"
 HUMAN_AUDIT_TEMPLATE_FIELDS = [
     "audit_id",
     "reviewer_id",
@@ -122,8 +134,91 @@ HUMAN_AUDIT_TEMPLATE_FIELDS = [
     "rationale",
 ]
 
+V3_PROBE_LAYOUT: dict[str, list[tuple[str, str, str]]] = {
+    "real_flt1_breast": [
+        ("P1", "genetic_support", "replication_inflation"),
+        ("P2", "clinical_precedence", "approval_scope_inflation"),
+        ("P3", "safety_weight", "safety_underweighting"),
+    ],
+    "real_tgfb1_breast": [
+        ("P1", "genetic_support", "gwas_strength_inflation"),
+        ("P2", "clinical_precedence", "approval_scope_inflation"),
+        ("P3", "uncertainty_level", "uncertainty_underestimation"),
+    ],
+    "real_tgfbr2_breast": [
+        ("P1", "clinical_precedence", "approval_scope_inflation"),
+        ("P2", "genetic_support", "gwas_strength_inflation"),
+        ("P3", "uncertainty_level", "uncertainty_underestimation"),
+    ],
+    "real_cd44_breast": [
+        ("P1", "clinical_precedence", "approval_scope_inflation"),
+        ("P2", "genetic_support", "gwas_strength_inflation"),
+        ("P3", "uncertainty_level", "uncertainty_underestimation"),
+    ],
+    "real_spp1_breast": [
+        ("P1", "tractability_signal", "predicted_tractability_inflation"),
+        ("P2", "clinical_precedence", "approval_scope_inflation"),
+        ("P3", "genetic_support", "gwas_strength_inflation"),
+    ],
+    "perturbation_ot_safety_conflict": [
+        ("P1", "safety_weight", "safety_underweighting"),
+        ("P2", "clinical_precedence", "approval_scope_inflation"),
+        ("P3", "genetic_support", "gwas_strength_inflation"),
+    ],
+    "perturbation_gwas_significance_boundary": [
+        ("P1", "genetic_support", "gwas_strength_inflation"),
+        ("P2", "tractability_signal", "predicted_tractability_inflation"),
+        ("P3", "uncertainty_level", "uncertainty_underestimation"),
+    ],
+    "perturbation_trait_ambiguity": [
+        ("P1", "disease_alignment", "trait_alignment_inflation"),
+        ("P2", "genetic_support", "gwas_strength_inflation"),
+        ("P3", "clinical_precedence", "approval_scope_inflation"),
+    ],
+    "perturbation_evidence_conflict": [
+        ("P1", "genetic_support", "gwas_strength_inflation"),
+        ("P2", "clinical_precedence", "approval_scope_inflation"),
+        ("P3", "uncertainty_level", "uncertainty_underestimation"),
+    ],
+    "real_vegfa_breast": [
+        ("P1", "genetic_support", "replication_inflation"),
+        ("P2", "clinical_precedence", "approval_scope_inflation"),
+        ("P3", "safety_weight", "safety_underweighting"),
+    ],
+    "perturbation_approval_scope_mismatch": [
+        ("P1", "approval_scope", "approval_scope_inflation"),
+        ("P2", "clinical_precedence", "approval_scope_inflation"),
+        ("P3", "genetic_support", "gwas_strength_inflation"),
+    ],
+    "perturbation_predicted_tractability_only": [
+        ("P1", "tractability_signal", "predicted_tractability_inflation"),
+        ("P2", "clinical_precedence", "approval_scope_inflation"),
+        ("P3", "genetic_support", "gwas_strength_inflation"),
+    ],
+    "perturbation_adjacent_phase12_confound": [
+        ("P1", "disease_alignment", "approval_scope_inflation"),
+        ("P2", "clinical_precedence", "approval_scope_inflation"),
+        ("P3", "genetic_support", "gwas_strength_inflation"),
+    ],
+    "perturbation_uncertainty_high_mixed_signal": [
+        ("P1", "uncertainty_level", "uncertainty_underestimation"),
+        ("P2", "disease_alignment", "trait_alignment_inflation"),
+        ("P3", "genetic_support", "gwas_strength_inflation"),
+    ],
+}
 
-def _required_case_keys() -> set[str]:
+V3_EXCERPTS_BY_ERROR_FAMILY: dict[str, list[str]] = {
+    "gwas_strength_inflation": ["gwas_pvalue_threshold"],
+    "replication_inflation": ["gwas_replication", "gwas_pvalue_threshold"],
+    "trait_alignment_inflation": ["gwas_trait_alignment"],
+    "approval_scope_inflation": ["ot_clinical_precedence", "ot_tractability_precedence"],
+    "predicted_tractability_inflation": ["ot_tractability_precedence"],
+    "safety_underweighting": ["ot_safety_caution", "ot_relative_score"],
+    "uncertainty_underestimation": ["gwas_study_metadata", "ot_relative_score"],
+}
+
+
+def _required_stage2_case_keys() -> set[str]:
     return {
         "case_id",
         "benchmark_type",
@@ -137,18 +232,539 @@ def _required_case_keys() -> set[str]:
     }
 
 
+def _required_stage2_interpretation_v2_keys() -> set[str]:
+    return {
+        "case_id",
+        "benchmark_type",
+        "base_case_id",
+        "judge_focus",
+        "notes",
+        "case_rationale",
+        "interpretation_checks",
+        "overall_conclusion",
+        "expected_uncertainty",
+    }
+
+
+def _required_v2_check_keys() -> set[str]:
+    return {
+        "check_id",
+        "question",
+        "options",
+        "gold_label",
+        "partial_credit_labels",
+        "overclaim_labels",
+        "required_evidence_anchors",
+    }
+
+
+def _required_stage2_interpretation_v3_keys() -> set[str]:
+    return {
+        "case_id",
+        "benchmark_type",
+        "base_case_id",
+        "judge_focus",
+        "notes",
+        "case_rationale",
+        "input_bundle",
+        "evidence_refs",
+        "skill_excerpt_ids",
+        "probes",
+        "secondary_conclusion",
+    }
+
+
+def _required_v3_probe_keys() -> set[str]:
+    return {
+        "probe_id",
+        "source_check_id",
+        "error_family",
+        "question",
+        "options",
+        "gold_label",
+        "conservative_labels",
+        "target_error_labels",
+        "required_evidence_refs",
+        "required_excerpt_ids",
+    }
+
+
+def _default_v3_excerpt_library() -> dict[str, dict[str, Any]]:
+    return {
+        "gwas_pvalue_threshold": {
+            "excerpt_id": "gwas_pvalue_threshold",
+            "skill_name": "gwas-database",
+            "error_families": ["gwas_strength_inflation", "replication_inflation"],
+            "title": "Genome-wide significance threshold",
+            "text": (
+                "Treat p <= 5×10^-8 as genome-wide significant. Signals above that threshold are "
+                "suggestive and should not be upgraded to genome-wide significance without stronger evidence."
+            ),
+            "source_path": "skills/gwas-database/SKILL.md",
+            "source_line_ref": "307-309,459",
+        },
+        "gwas_replication": {
+            "excerpt_id": "gwas_replication",
+            "skill_name": "gwas-database",
+            "error_families": ["replication_inflation", "uncertainty_underestimation"],
+            "title": "Replication and study metadata matter",
+            "text": (
+                "Check replication across independent studies, along with sample size and ancestry, "
+                "before treating an association as robust or broadly applicable."
+            ),
+            "source_path": "skills/gwas-database/SKILL.md",
+            "source_line_ref": "307-309,440-462",
+        },
+        "gwas_trait_alignment": {
+            "excerpt_id": "gwas_trait_alignment",
+            "skill_name": "gwas-database",
+            "error_families": ["trait_alignment_inflation"],
+            "title": "Trait mapping should use EFO-aligned labels",
+            "text": (
+                "Use mapped EFO trait labels and association records to verify that the GWAS trait truly matches "
+                "the disease context of interest rather than a related phenotype."
+            ),
+            "source_path": "skills/gwas-database/SKILL.md",
+            "source_line_ref": "276,432-433",
+        },
+        "gwas_study_metadata": {
+            "excerpt_id": "gwas_study_metadata",
+            "skill_name": "gwas-database",
+            "error_families": ["uncertainty_underestimation"],
+            "title": "Study metadata informs uncertainty",
+            "text": (
+                "Interpret GWAS evidence with study metadata in mind, especially ancestry, sample size, "
+                "and whether replication populations are reported. Missing or mixed metadata should increase uncertainty."
+            ),
+            "source_path": "skills/gwas-database/SKILL.md",
+            "source_line_ref": "440-462",
+        },
+        "ot_relative_score": {
+            "excerpt_id": "ot_relative_score",
+            "skill_name": "opentargets-database",
+            "error_families": ["safety_underweighting", "uncertainty_underestimation"],
+            "title": "Association scores are relative, not absolute confidence",
+            "text": (
+                "Open Targets scores rank relative evidence strength and should be interpreted with the evidence "
+                "breakdown rather than as stand-alone confidence measures."
+            ),
+            "source_path": "skills/opentargets-database/SKILL.md",
+            "source_line_ref": "220,271-276",
+        },
+        "ot_clinical_precedence": {
+            "excerpt_id": "ot_clinical_precedence",
+            "skill_name": "opentargets-database",
+            "error_families": ["approval_scope_inflation"],
+            "title": "Clinical precedence is not disease match by itself",
+            "text": (
+                "Known drugs and clinical precedence help assess druggability, but exact disease relevance still "
+                "depends on whether the evidence is disease-matched rather than merely adjacent or indirect."
+            ),
+            "source_path": "skills/opentargets-database/SKILL.md",
+            "source_line_ref": "247-254,289-293",
+        },
+        "ot_tractability_precedence": {
+            "excerpt_id": "ot_tractability_precedence",
+            "skill_name": "opentargets-database",
+            "error_families": ["approval_scope_inflation", "predicted_tractability_inflation"],
+            "title": "Prefer discovery or clinical precedence when judging tractability",
+            "text": (
+                "Tractability should distinguish between predicted druggability and discovery or clinical precedence. "
+                "Predicted tractability alone should not be read as clinical maturity."
+            ),
+            "source_path": "skills/opentargets-database/SKILL.md",
+            "source_line_ref": "247-254,289-293",
+        },
+        "ot_safety_caution": {
+            "excerpt_id": "ot_safety_caution",
+            "skill_name": "opentargets-database",
+            "error_families": ["safety_underweighting"],
+            "title": "Safety liabilities are explicit caution flags",
+            "text": (
+                "Multiple safety liabilities, conflicting evidence, or essential targets with broad expression "
+                "are caution flags that should reduce optimism when prioritizing targets."
+            ),
+            "source_path": "skills/opentargets-database/SKILL.md",
+            "source_line_ref": "263-276",
+        },
+    }
+
+
+def load_skill_excerpt_library(path: str | Path | None = None) -> dict[str, dict[str, Any]]:
+    excerpt_path = Path(path) if path is not None else CASES_DIR / V3_EXCERPT_LIBRARY_FILENAME
+    if excerpt_path.exists():
+        payload = json.loads(excerpt_path.read_text(encoding="utf-8"))
+    elif excerpt_path.name == V3_EXCERPT_LIBRARY_FILENAME:
+        payload = _default_v3_excerpt_library()
+    else:
+        raise FileNotFoundError(excerpt_path)
+
+    if not isinstance(payload, dict):
+        raise ValueError("Skill excerpt library must be a JSON object")
+
+    validated: dict[str, dict[str, Any]] = {}
+    required = {"excerpt_id", "skill_name", "error_families", "title", "text", "source_path", "source_line_ref"}
+    for excerpt_id, excerpt in payload.items():
+        if not isinstance(excerpt, dict):
+            raise ValueError(f"Excerpt {excerpt_id} must be an object")
+        missing = required - set(excerpt)
+        if missing:
+            raise ValueError(f"Excerpt {excerpt_id} missing keys: {sorted(missing)}")
+        if excerpt["skill_name"] not in V3_ALLOWED_SKILLS:
+            raise ValueError(f"Excerpt {excerpt_id} uses unsupported skill {excerpt['skill_name']}")
+        if not isinstance(excerpt["text"], str) or not excerpt["text"].strip():
+            raise ValueError(f"Excerpt {excerpt_id} must include non-empty text")
+        if not isinstance(excerpt["source_line_ref"], str) or not excerpt["source_line_ref"].strip():
+            raise ValueError(f"Excerpt {excerpt_id} must include source_line_ref")
+        validated[str(excerpt_id)] = excerpt
+    return validated
+
+
+def _find_v2_check(case: dict[str, Any], check_id: str) -> dict[str, Any]:
+    for check in case.get("interpretation_checks", []):
+        if check.get("check_id") == check_id:
+            return check
+    raise ValueError(f"Case {case['case_id']} missing V2 check {check_id}")
+
+
+def _safety_probe_labels(gold_label: str) -> tuple[list[str], list[str]]:
+    if gold_label == "minimal":
+        return ["moderate"], ["major"]
+    if gold_label == "moderate":
+        return ["major"], ["minimal"]
+    if gold_label == "major":
+        return [], ["minimal"]
+    return [], []
+
+
+def _uncertainty_probe_from_v2(case: dict[str, Any]) -> dict[str, Any]:
+    payload = case["expected_uncertainty"]
+    gold_label = payload["gold_label"]
+    if gold_label == "medium":
+        conservative_labels = ["high"]
+        target_error_labels = ["low"]
+    elif gold_label == "high":
+        conservative_labels = []
+        target_error_labels = ["low", "medium"]
+    else:
+        conservative_labels = ["medium"]
+        target_error_labels = ["high"]
+    return {
+        "question": payload["question"],
+        "options": payload["options"],
+        "gold_label": gold_label,
+        "conservative_labels": conservative_labels,
+        "target_error_labels": target_error_labels,
+        "required_evidence_anchors": payload.get("required_evidence_anchors", []),
+    }
+
+
+def _build_v3_probe(
+    *,
+    case: dict[str, Any],
+    probe_id: str,
+    source_check_id: str,
+    error_family: str,
+) -> dict[str, Any]:
+    if source_check_id == "uncertainty_level":
+        source = _uncertainty_probe_from_v2(case)
+    else:
+        source = _find_v2_check(case, source_check_id)
+
+    conservative_labels = list(source.get("partial_credit_labels", source.get("conservative_labels", [])))
+    target_error_labels = list(source.get("overclaim_labels", source.get("target_error_labels", [])))
+
+    if error_family == "safety_underweighting":
+        conservative_labels, target_error_labels = _safety_probe_labels(source["gold_label"])
+
+    return {
+        "probe_id": probe_id,
+        "source_check_id": source_check_id,
+        "error_family": error_family,
+        "question": source["question"],
+        "options": list(source["options"]),
+        "gold_label": source["gold_label"],
+        "conservative_labels": conservative_labels,
+        "target_error_labels": target_error_labels,
+        "required_excerpt_ids": list(V3_EXCERPTS_BY_ERROR_FAMILY.get(error_family, [])),
+        "required_evidence_anchors": list(source.get("required_evidence_anchors", [])),
+    }
+
+
+def _resolve_evidence_refs_for_v3_case(case: dict[str, Any]) -> tuple[dict[str, str], list[dict[str, Any]], dict[str, Any]]:
+    anchors: list[str] = []
+    for probe in case["probes"]:
+        anchors.extend(probe.get("_anchor_buffer", []))
+    secondary = deepcopy(case["secondary_conclusion"])
+    anchors.extend(secondary.get("_anchor_buffer", []))
+
+    evidence_refs: dict[str, str] = {}
+    reverse: dict[str, str] = {}
+    for anchor in anchors:
+        if anchor in reverse:
+            continue
+        ref_id = f"E{len(reverse) + 1}"
+        reverse[anchor] = ref_id
+        evidence_refs[ref_id] = anchor
+
+    resolved_probes: list[dict[str, Any]] = []
+    for probe in case["probes"]:
+        probe = deepcopy(probe)
+        probe["required_evidence_refs"] = [reverse[anchor] for anchor in probe.pop("_anchor_buffer", []) if anchor in reverse]
+        resolved_probes.append(probe)
+
+    secondary["required_evidence_refs"] = [
+        reverse[anchor] for anchor in secondary.pop("_anchor_buffer", []) if anchor in reverse
+    ]
+    return evidence_refs, resolved_probes, secondary
+
+
+def _build_stage2_interpretation_v3_cases() -> list[dict[str, Any]]:
+    v2_cases = load_cases(CASES_DIR / "stage2_interpretation_v2_cases.json")
+    resolved: list[dict[str, Any]] = []
+    for case in v2_cases:
+        layout = V3_PROBE_LAYOUT.get(case["case_id"])
+        if not layout:
+            continue
+
+        probes = [
+            _build_v3_probe(case=case, probe_id=probe_id, source_check_id=source_check_id, error_family=error_family)
+            for probe_id, source_check_id, error_family in layout
+        ]
+        for probe in probes:
+            probe["_anchor_buffer"] = list(probe.pop("required_evidence_anchors", []))
+
+        secondary = {
+            "question": case["overall_conclusion"]["question"],
+            "options": list(case["overall_conclusion"]["options"]),
+            "gold_label": case["overall_conclusion"]["gold_label"],
+            "_anchor_buffer": list(case["overall_conclusion"].get("required_evidence_anchors", [])),
+        }
+        evidence_refs, resolved_probes, resolved_secondary = _resolve_evidence_refs_for_v3_case(
+            {"probes": probes, "secondary_conclusion": secondary}
+        )
+        skill_excerpt_ids: list[str] = []
+        for probe in resolved_probes:
+            for excerpt_id in probe["required_excerpt_ids"]:
+                if excerpt_id not in skill_excerpt_ids:
+                    skill_excerpt_ids.append(excerpt_id)
+
+        resolved.append(
+            {
+                "case_id": case["case_id"],
+                "benchmark_type": STAGE2_INTERPRETATION_V3_BENCHMARK,
+                "base_case_id": case["base_case_id"],
+                "source_type": case["source_type"],
+                "input_bundle": case["input_bundle"],
+                "judge_focus": case["judge_focus"],
+                "notes": case["notes"],
+                "case_rationale": case["case_rationale"],
+                "evidence_refs": evidence_refs,
+                "skill_excerpt_ids": skill_excerpt_ids,
+                "probes": resolved_probes,
+                "secondary_conclusion": resolved_secondary,
+            }
+        )
+    return resolved
+
+
+def _validate_v3_probe(case_id: str, probe: dict[str, Any], excerpt_library: dict[str, dict[str, Any]]) -> None:
+    missing = _required_v3_probe_keys() - set(probe)
+    if missing:
+        raise ValueError(f"V3 case {case_id} probe missing keys: {sorted(missing)}")
+    options = probe["options"]
+    if not isinstance(options, list) or len(options) < 2 or not all(isinstance(item, str) and item for item in options):
+        raise ValueError(f"V3 case {case_id} probe {probe.get('probe_id')} has invalid options")
+    if probe["gold_label"] not in options:
+        raise ValueError(f"V3 case {case_id} probe {probe.get('probe_id')} has invalid gold_label")
+    for key in ("conservative_labels", "target_error_labels", "required_evidence_refs", "required_excerpt_ids"):
+        value = probe[key]
+        if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+            raise ValueError(f"V3 case {case_id} probe {probe.get('probe_id')} has invalid {key}")
+    for label in probe["conservative_labels"] + probe["target_error_labels"]:
+        if label not in options:
+            raise ValueError(f"V3 case {case_id} probe {probe.get('probe_id')} uses out-of-range label {label}")
+    for excerpt_id in probe["required_excerpt_ids"]:
+        if excerpt_id not in excerpt_library:
+            raise ValueError(f"V3 case {case_id} probe {probe.get('probe_id')} references unknown excerpt {excerpt_id}")
+
+
+def _validate_v3_secondary_conclusion(case_id: str, payload: dict[str, Any]) -> None:
+    required = {"question", "options", "gold_label", "required_evidence_refs"}
+    missing = required - set(payload)
+    if missing:
+        raise ValueError(f"V3 case {case_id} secondary_conclusion missing keys: {sorted(missing)}")
+    if payload["gold_label"] not in payload["options"]:
+        raise ValueError(f"V3 case {case_id} secondary_conclusion has invalid gold_label")
+
+
+def build_case_excerpt_guidance(
+    case: dict[str, Any],
+    *,
+    excerpt_library: dict[str, dict[str, Any]] | None = None,
+    max_tokens: int = 500,
+) -> str:
+    library = excerpt_library or load_skill_excerpt_library()
+    ordered_ids: list[str] = []
+    for probe in case.get("probes", []):
+        for excerpt_id in probe.get("required_excerpt_ids", []):
+            if excerpt_id not in ordered_ids:
+                ordered_ids.append(excerpt_id)
+    for excerpt_id in case.get("skill_excerpt_ids", []):
+        if excerpt_id not in ordered_ids:
+            ordered_ids.append(excerpt_id)
+
+    blocks: list[str] = []
+    token_budget = 0
+    for excerpt_id in ordered_ids:
+        excerpt = library.get(excerpt_id)
+        if not excerpt:
+            continue
+        excerpt_tokens = len(str(excerpt["text"]).split())
+        if blocks and token_budget + excerpt_tokens > max_tokens:
+            continue
+        token_budget += excerpt_tokens
+        blocks.append(
+            f"### {excerpt['title']}\n"
+            f"Skill: {excerpt['skill_name']}\n"
+            f"Source: {excerpt['source_path']} ({excerpt['source_line_ref']})\n"
+            f"{excerpt['text']}"
+        )
+
+    if not blocks:
+        return ""
+    return (
+        "## Relevant Skill Excerpts\n"
+        "Use the excerpted guidance below for interpretation only. Do not add facts beyond the frozen evidence bundle.\n\n"
+        + "\n\n".join(blocks)
+    )
+
+def _validate_v2_check(case_id: str, check: dict[str, Any]) -> None:
+    missing = _required_v2_check_keys() - set(check)
+    if missing:
+        raise ValueError(f"V2 case {case_id} check missing keys: {sorted(missing)}")
+
+    options = check["options"]
+    if not isinstance(options, list) or not options or not all(isinstance(item, str) and item for item in options):
+        raise ValueError(f"V2 case {case_id} check {check.get('check_id')} has invalid options")
+
+    for key in ("partial_credit_labels", "overclaim_labels", "required_evidence_anchors"):
+        value = check[key]
+        if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+            raise ValueError(f"V2 case {case_id} check {check.get('check_id')} has invalid {key}")
+
+    gold_label = check["gold_label"]
+    if not isinstance(gold_label, str) or gold_label not in options:
+        raise ValueError(f"V2 case {case_id} check {check.get('check_id')} has invalid gold_label")
+
+    invalid_partial = [label for label in check["partial_credit_labels"] if label not in options]
+    if invalid_partial:
+        raise ValueError(
+            f"V2 case {case_id} check {check.get('check_id')} has partial_credit_labels outside options: {invalid_partial}"
+        )
+
+    invalid_overclaim = [label for label in check["overclaim_labels"] if label not in options]
+    if invalid_overclaim:
+        raise ValueError(
+            f"V2 case {case_id} check {check.get('check_id')} has overclaim_labels outside options: {invalid_overclaim}"
+        )
+
+
+def _validate_v2_answer_spec(case_id: str, key: str, payload: dict[str, Any]) -> None:
+    required = {"question", "options", "gold_label"}
+    missing = required - set(payload)
+    if missing:
+        raise ValueError(f"V2 case {case_id} {key} missing keys: {sorted(missing)}")
+    options = payload["options"]
+    if not isinstance(options, list) or not options or not all(isinstance(item, str) and item for item in options):
+        raise ValueError(f"V2 case {case_id} {key} has invalid options")
+    if not isinstance(payload["gold_label"], str) or payload["gold_label"] not in options:
+        raise ValueError(f"V2 case {case_id} {key} has invalid gold_label")
+
+
+def _load_stage2_base_case_map() -> dict[str, dict[str, Any]]:
+    base_cases = load_cases(CASES_DIR / "stage2_synthesis_cases.json")
+    return {case["case_id"]: case for case in base_cases if case["benchmark_type"] == MAIN_STAGE2_BENCHMARK}
+
+
+def _resolve_stage2_interpretation_v2_case(
+    case: dict[str, Any],
+    *,
+    stage2_base_cases: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    case_id = case["case_id"]
+    base_case_id = case["base_case_id"]
+    if base_case_id not in stage2_base_cases:
+        raise ValueError(f"V2 case {case_id} references unknown base_case_id {base_case_id}")
+
+    checks = case["interpretation_checks"]
+    if not isinstance(checks, list) or len(checks) < 3:
+        raise ValueError(f"V2 case {case_id} must define at least 3 interpretation_checks")
+    seen_check_ids: set[str] = set()
+    for check in checks:
+        if not isinstance(check, dict):
+            raise ValueError(f"V2 case {case_id} has a non-object interpretation check: {check!r}")
+        _validate_v2_check(case_id, check)
+        check_id = check["check_id"]
+        if check_id in seen_check_ids:
+            raise ValueError(f"V2 case {case_id} has duplicate check_id {check_id}")
+        seen_check_ids.add(check_id)
+
+    if not isinstance(case["case_rationale"], str) or not case["case_rationale"].strip():
+        raise ValueError(f"V2 case {case_id} must include a non-empty case_rationale")
+
+    if not isinstance(case["judge_focus"], list) or not all(isinstance(item, str) for item in case["judge_focus"]):
+        raise ValueError(f"V2 case {case_id} must include a string list judge_focus")
+
+    overall = case["overall_conclusion"]
+    expected_uncertainty = case["expected_uncertainty"]
+    if not isinstance(overall, dict):
+        raise ValueError(f"V2 case {case_id} overall_conclusion must be an object")
+    if not isinstance(expected_uncertainty, dict):
+        raise ValueError(f"V2 case {case_id} expected_uncertainty must be an object")
+    _validate_v2_answer_spec(case_id, "overall_conclusion", overall)
+    _validate_v2_answer_spec(case_id, "expected_uncertainty", expected_uncertainty)
+
+    base_case = deepcopy(stage2_base_cases[base_case_id])
+    resolved = {
+        "case_id": case_id,
+        "benchmark_type": STAGE2_INTERPRETATION_V2_BENCHMARK,
+        "base_case_id": base_case_id,
+        "source_type": base_case["source_type"],
+        "input_bundle": base_case["input_bundle"],
+        "judge_focus": case["judge_focus"],
+        "notes": case["notes"],
+        "case_rationale": case["case_rationale"],
+        "interpretation_checks": checks,
+        "overall_conclusion": overall,
+        "expected_uncertainty": expected_uncertainty,
+    }
+    return resolved
+
+
 def load_cases(path: str | Path) -> list[dict[str, Any]]:
     """Load and lightly validate a frozen benchmark case file."""
     case_path = Path(path)
+    if not case_path.exists() and case_path.name == V3_CASE_FILENAME:
+        return _build_stage2_interpretation_v3_cases()
     payload = json.loads(case_path.read_text(encoding="utf-8"))
     if not isinstance(payload, list):
         raise ValueError(f"Expected a JSON list in {case_path}")
 
-    required = _required_case_keys()
     seen_ids: set[str] = set()
+    resolved_cases: list[dict[str, Any]] = []
+    stage2_base_cases: dict[str, dict[str, Any]] | None = None
+    excerpt_library: dict[str, dict[str, Any]] | None = None
     for case in payload:
         if not isinstance(case, dict):
             raise ValueError(f"Case in {case_path} is not an object: {case!r}")
+        benchmark_type = case.get("benchmark_type")
+        if benchmark_type == STAGE2_INTERPRETATION_V2_BENCHMARK:
+            required = _required_stage2_interpretation_v2_keys()
+        elif benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
+            required = _required_stage2_interpretation_v3_keys()
+        else:
+            required = _required_stage2_case_keys()
         missing = required - set(case)
         if missing:
             raise ValueError(f"Case {case.get('case_id', '<unknown>')} missing keys: {sorted(missing)}")
@@ -156,7 +772,51 @@ def load_cases(path: str | Path) -> list[dict[str, Any]]:
         if case_id in seen_ids:
             raise ValueError(f"Duplicate case_id {case_id} in {case_path}")
         seen_ids.add(case_id)
-    return payload
+        if benchmark_type == STAGE2_INTERPRETATION_V2_BENCHMARK:
+            if stage2_base_cases is None:
+                stage2_base_cases = _load_stage2_base_case_map()
+            resolved_cases.append(
+                _resolve_stage2_interpretation_v2_case(
+                    case,
+                    stage2_base_cases=stage2_base_cases,
+                )
+            )
+        elif benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
+            if excerpt_library is None:
+                excerpt_library = load_skill_excerpt_library()
+            if not isinstance(case.get("judge_focus"), list) or not all(
+                isinstance(item, str) and item for item in case["judge_focus"]
+            ):
+                raise ValueError(f"V3 case {case_id} must include a string list judge_focus")
+            if not isinstance(case.get("case_rationale"), str) or not case["case_rationale"].strip():
+                raise ValueError(f"V3 case {case_id} must include a non-empty case_rationale")
+            if not isinstance(case.get("evidence_refs"), dict) or not case["evidence_refs"]:
+                raise ValueError(f"V3 case {case_id} must define evidence_refs")
+            if not isinstance(case.get("skill_excerpt_ids"), list):
+                raise ValueError(f"V3 case {case_id} must define skill_excerpt_ids")
+            for excerpt_id in case["skill_excerpt_ids"]:
+                if excerpt_id not in excerpt_library:
+                    raise ValueError(f"V3 case {case_id} references unknown excerpt {excerpt_id}")
+            probes = case.get("probes")
+            if not isinstance(probes, list) or len(probes) != 3:
+                raise ValueError(f"V3 case {case_id} must define exactly 3 probes")
+            for probe in probes:
+                _validate_v3_probe(case_id, probe, excerpt_library)
+                for evidence_ref in probe["required_evidence_refs"]:
+                    if evidence_ref not in case["evidence_refs"]:
+                        raise ValueError(
+                            f"V3 case {case_id} probe {probe.get('probe_id')} references unknown evidence ref {evidence_ref}"
+                        )
+            _validate_v3_secondary_conclusion(case_id, case["secondary_conclusion"])
+            for evidence_ref in case["secondary_conclusion"]["required_evidence_refs"]:
+                if evidence_ref not in case["evidence_refs"]:
+                    raise ValueError(
+                        f"V3 case {case_id} secondary_conclusion references unknown evidence ref {evidence_ref}"
+                    )
+            resolved_cases.append(case)
+        else:
+            resolved_cases.append(case)
+    return resolved_cases
 
 
 async def render_skill_prompt(
@@ -264,6 +924,27 @@ def enforce_skill_read_requirement(
 
 
 def _benchmark_json_schema_text(benchmark_type: str) -> str:
+    if benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
+        return json.dumps(
+            {
+                "gene_symbol": "GENE",
+                "probe_answers": [
+                    {
+                        "probe_id": "P1",
+                        "answer": "suggestive",
+                        "evidence_refs": ["E1", "E2"],
+                        "justification": "...",
+                    }
+                ],
+                "secondary_conclusion": {
+                    "answer": "exploratory_target",
+                    "evidence_refs": ["E3"],
+                    "justification": "...",
+                },
+            },
+            indent=2,
+        )
+
     if benchmark_type == CHEMBL_MICRO_BENCHMARK:
         return json.dumps(
             {
@@ -273,6 +954,30 @@ def _benchmark_json_schema_text(benchmark_type: str) -> str:
                     "clinical_trial_activity": {"score": 0, "rationale": "..."},
                     "mechanism_relevance": {"score": 0, "rationale": "..."},
                     "safety_profile": {"score": 0, "rationale": "..."},
+                },
+                "summary": "...",
+            },
+            indent=2,
+        )
+
+    if benchmark_type == STAGE2_INTERPRETATION_V2_BENCHMARK:
+        return json.dumps(
+            {
+                "gene_symbol": "GENE",
+                "interpretation_checks": [
+                    {
+                        "check_id": "genetic_support",
+                        "answer": "suggestive",
+                        "justification": "...",
+                    }
+                ],
+                "overall_conclusion": {
+                    "answer": "exploratory_target",
+                    "justification": "...",
+                },
+                "uncertainty": {
+                    "answer": "medium",
+                    "justification": "...",
                 },
                 "summary": "...",
             },
@@ -304,6 +1009,23 @@ def _benchmark_json_schema_text(benchmark_type: str) -> str:
 
 def build_system_prompt(benchmark_type: str) -> str:
     """Build the benchmark system prompt."""
+    if benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
+        return (
+            "You are benchmarking whether relevant SKILL.md excerpts reduce targeted interpretation errors.\n\n"
+            "Use only the frozen evidence bundle and the provided E* evidence references.\n"
+            "If skill excerpts are present, use them as interpretation guidance only.\n"
+            "Do not invent new database facts, trial phases, disease mappings, replication status, or approval scope.\n"
+            "Answer exactly three probes and one secondary conclusion.\n"
+            "For every answer, cite only the relevant E* evidence references from the prompt.\n"
+            "Prefer conservative answers when the bundle is ambiguous.\n\n"
+            "Primary goal:\n"
+            "- Avoid targeted interpretation errors around GWAS strength, replication, disease alignment, approval scope,\n"
+            "  predicted tractability, safety weighting, and uncertainty.\n"
+            "- Keep justifications short, evidence-bound, and limited to the cited E* refs.\n\n"
+            "Return a single JSON object and nothing else.\n"
+            f"Schema:\n{_benchmark_json_schema_text(benchmark_type)}"
+        )
+
     if benchmark_type == CHEMBL_MICRO_BENCHMARK:
         return (
             "You are benchmarking ChEMBL evidence interpretation for drug-target assessment.\n\n"
@@ -315,6 +1037,22 @@ def build_system_prompt(benchmark_type: str) -> str:
             "- clinical_trial_activity: no_trials(0) | few_early_phase(1) | multiple_or_advanced(2) | extensive(3)\n"
             "- mechanism_relevance: unclear(0) | plausible(1) | well_supported(2) | direct_mechanism(3)\n"
             "- safety_profile: major_concerns(-2) | moderate_concerns(-1) | minimal_or_none(0)\n\n"
+            "Return a single JSON object and nothing else.\n"
+            f"Schema:\n{_benchmark_json_schema_text(benchmark_type)}"
+        )
+
+    if benchmark_type == STAGE2_INTERPRETATION_V2_BENCHMARK:
+        return (
+            "You are benchmarking whether exposed SKILL.md guidance improves Stage 2 interpretation and evidence synthesis.\n\n"
+            "Use only the evidence in the user message.\n"
+            "If skill documents are available, they are interpretation guidance only.\n"
+            "Do not invent any new database facts, trial phases, ontology mappings, or GWAS strength claims.\n"
+            "Answer each interpretation check by choosing exactly one of the allowed labels for that check.\n"
+            "Keep each justification short and evidence-bound.\n"
+            "If the frozen bundle is ambiguous, reflect that in the uncertainty field rather than making a stronger claim.\n\n"
+            "Primary goal:\n"
+            "- Make careful interpretation calls on genetics, clinical precedence, safety, tractability, and disease alignment.\n"
+            "- Avoid stronger-than-supported claims, especially around replication, disease matching, and approval status.\n\n"
             "Return a single JSON object and nothing else.\n"
             f"Schema:\n{_benchmark_json_schema_text(benchmark_type)}"
         )
@@ -353,6 +1091,67 @@ def build_user_prompt(case: dict[str, Any]) -> str:
     """Create the case-specific user prompt."""
     bundle = json.dumps(case["input_bundle"], indent=2, ensure_ascii=False)
     focus = ", ".join(case.get("judge_focus", []))
+    if case["benchmark_type"] == STAGE2_INTERPRETATION_V3_BENCHMARK:
+        evidence_lines = [f"- {ref_id}: {text}" for ref_id, text in case["evidence_refs"].items()]
+        probe_lines: list[str] = []
+        for probe in case["probes"]:
+            options = " | ".join(probe["options"])
+            required_refs = ", ".join(probe["required_evidence_refs"])
+            probe_lines.append(
+                f"{probe['probe_id']} [{probe['error_family']}]\n"
+                f"Question: {probe['question']}\n"
+                f"Allowed answers: {options}\n"
+                f"Relevant evidence refs: {required_refs}"
+            )
+
+        conclusion_options = " | ".join(case["secondary_conclusion"]["options"])
+        conclusion_refs = ", ".join(case["secondary_conclusion"]["required_evidence_refs"])
+        return (
+            f"Case ID: {case['case_id']}\n"
+            f"Benchmark type: {case['benchmark_type']}\n"
+            f"Judge focus: {focus}\n"
+            f"Notes: {case['notes']}\n"
+            f"Case rationale: {case['case_rationale']}\n\n"
+            "Evidence references:\n"
+            f"{chr(10).join(evidence_lines)}\n\n"
+            "Answer these probes using only the cited E* evidence refs:\n"
+            f"{chr(10).join(probe_lines)}\n\n"
+            "Secondary conclusion:\n"
+            f"Question: {case['secondary_conclusion']['question']}\n"
+            f"Allowed answers: {conclusion_options}\n"
+            f"Relevant evidence refs: {conclusion_refs}\n\n"
+            f"Evidence bundle:\n{bundle}"
+        )
+    if case["benchmark_type"] == STAGE2_INTERPRETATION_V2_BENCHMARK:
+        check_lines: list[str] = []
+        for index, check in enumerate(case["interpretation_checks"], start=1):
+            options = " | ".join(check["options"])
+            check_lines.append(
+                f"{index}. `{check['check_id']}`\n"
+                f"   Question: {check['question']}\n"
+                f"   Allowed answers: {options}"
+            )
+
+        overall_options = " | ".join(case["overall_conclusion"]["options"])
+        uncertainty_options = " | ".join(case["expected_uncertainty"]["options"])
+        return (
+            f"Case ID: {case['case_id']}\n"
+            f"Benchmark type: {case['benchmark_type']}\n"
+            f"Judge focus: {focus}\n"
+            f"Notes: {case['notes']}\n"
+            f"Case rationale: {case['case_rationale']}\n\n"
+            "Evaluate the frozen evidence bundle below.\n"
+            "Use only the provided evidence and return JSON only.\n\n"
+            "Interpretation checks:\n"
+            f"{chr(10).join(check_lines)}\n\n"
+            "Overall conclusion:\n"
+            f"- Question: {case['overall_conclusion']['question']}\n"
+            f"- Allowed answers: {overall_options}\n\n"
+            "Uncertainty call:\n"
+            f"- Question: {case['expected_uncertainty']['question']}\n"
+            f"- Allowed answers: {uncertainty_options}\n\n"
+            f"Evidence bundle:\n{bundle}"
+        )
     return (
         f"Case ID: {case['case_id']}\n"
         f"Benchmark type: {case['benchmark_type']}\n"
@@ -442,6 +1241,19 @@ def _extract_score(value: Any) -> int | None:
 
 def _collect_rationale_text(parsed_output: dict[str, Any]) -> str:
     parts: list[str] = []
+    checks = parsed_output.get("interpretation_checks")
+    if isinstance(checks, list):
+        for check in checks:
+            if isinstance(check, dict):
+                justification = check.get("justification")
+                if justification:
+                    parts.append(str(justification))
+    for key in ("overall_conclusion", "uncertainty"):
+        payload = parsed_output.get(key)
+        if isinstance(payload, dict):
+            justification = payload.get("justification")
+            if justification:
+                parts.append(str(justification))
     for track_name in ("validated_track", "exploratory_track"):
         track = parsed_output.get(track_name, {})
         if isinstance(track, dict):
@@ -458,11 +1270,268 @@ def _collect_rationale_text(parsed_output: dict[str, Any]) -> str:
 
 def _score_anchor_coverage(case: dict[str, Any], parsed_output: dict[str, Any]) -> float | None:
     anchors = case.get("rationale_anchors") or []
+    if case.get("benchmark_type") == STAGE2_INTERPRETATION_V2_BENCHMARK:
+        anchors = []
+        for check in case.get("interpretation_checks", []):
+            anchors.extend(check.get("required_evidence_anchors", []))
+        anchors.extend(case.get("overall_conclusion", {}).get("required_evidence_anchors", []))
+        anchors.extend(case.get("expected_uncertainty", {}).get("required_evidence_anchors", []))
     if not anchors:
         return None
     text = _collect_rationale_text(parsed_output)
     hits = sum(1 for anchor in anchors if str(anchor).lower() in text)
     return hits / len(anchors)
+
+
+def _answers_by_check_id(parsed_output: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    checks = parsed_output.get("interpretation_checks")
+    if not isinstance(checks, list):
+        return {}
+    check_map: dict[str, dict[str, Any]] = {}
+    for item in checks:
+        if not isinstance(item, dict):
+            continue
+        check_id = item.get("check_id")
+        if isinstance(check_id, str) and check_id:
+            check_map[check_id] = item
+    return check_map
+
+
+def _answers_by_probe_id(parsed_output: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    probes = parsed_output.get("probe_answers")
+    if not isinstance(probes, list):
+        return {}
+    probe_map: dict[str, dict[str, Any]] = {}
+    for item in probes:
+        if not isinstance(item, dict):
+            continue
+        probe_id = item.get("probe_id")
+        if isinstance(probe_id, str) and probe_id:
+            probe_map[probe_id] = item
+    return probe_map
+
+
+def _v3_support_score(
+    *,
+    answer: str,
+    gold_label: str,
+    conservative_labels: list[str],
+    target_error_labels: list[str],
+    options: list[str],
+) -> float:
+    if answer == gold_label:
+        return 1.0
+    if answer in conservative_labels:
+        return 0.75
+    if answer in target_error_labels:
+        return 0.0
+    if answer in options:
+        return 0.25
+    return 0.0
+
+
+def score_stage2_interpretation_v3_output(
+    case: dict[str, Any],
+    parsed_output: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not isinstance(parsed_output, dict):
+        return {
+            "malformed_output": True,
+            "weighted_probe_error_score": 1.0,
+            "probe_support_score": 0.0,
+            "targeted_error_count": 0,
+            "primary_probe_target_error": False,
+            "primary_probe_target_error_rate": 0.0,
+            "all_probe_target_error_rate": 0.0,
+            "major_error_rate": 1.0,
+            "evidence_ref_validity_rate": 0.0,
+            "secondary_conclusion_accuracy": 0.0,
+            "validation_errors": ["No parsed JSON output"],
+            "error_family_breakdown": {},
+        }
+
+    validation_errors: list[str] = []
+    predicted_probes = _answers_by_probe_id(parsed_output)
+    support_scores: list[float] = []
+    targeted_error_count = 0
+    primary_probe_target_error = False
+    valid_ref_count = 0
+    cited_ref_count = 0
+    error_family_breakdown: dict[str, float] = {}
+
+    for probe in case["probes"]:
+        probe_id = probe["probe_id"]
+        predicted = predicted_probes.get(probe_id)
+        if not isinstance(predicted, dict):
+            validation_errors.append(f"Missing probe {probe_id}")
+            support_scores.append(0.0)
+            error_family_breakdown[probe.get("error_family", probe_id)] = 1.0
+            if probe_id == "P1":
+                primary_probe_target_error = True
+            continue
+
+        answer = predicted.get("answer")
+        if answer not in probe["options"]:
+            validation_errors.append(f"Invalid answer for probe {probe_id}")
+        evidence_refs = predicted.get("evidence_refs")
+        if not isinstance(evidence_refs, list) or not all(isinstance(item, str) for item in evidence_refs):
+            validation_errors.append(f"Invalid evidence_refs for probe {probe_id}")
+            evidence_refs = []
+        justification = predicted.get("justification")
+        if not isinstance(justification, str) or not justification.strip():
+            validation_errors.append(f"Missing justification for probe {probe_id}")
+
+        support_score = _v3_support_score(
+            answer=str(answer),
+            gold_label=probe["gold_label"],
+            conservative_labels=probe["conservative_labels"],
+            target_error_labels=probe["target_error_labels"],
+            options=probe["options"],
+        )
+        support_scores.append(support_score)
+        is_target_error = answer in probe["target_error_labels"]
+        if is_target_error:
+            targeted_error_count += 1
+        if probe_id == "P1":
+            primary_probe_target_error = is_target_error
+        error_family_breakdown[probe.get("error_family", probe_id)] = 1.0 - support_score
+
+        for ref in evidence_refs:
+            cited_ref_count += 1
+            if ref in case["evidence_refs"] and ref in probe["required_evidence_refs"]:
+                valid_ref_count += 1
+
+    secondary_accuracy = 0.0
+    secondary = parsed_output.get("secondary_conclusion")
+    if not isinstance(secondary, dict):
+        validation_errors.append("Missing secondary_conclusion")
+    else:
+        answer = secondary.get("answer")
+        if answer not in case["secondary_conclusion"]["options"]:
+            validation_errors.append("Invalid secondary_conclusion answer")
+        evidence_refs = secondary.get("evidence_refs")
+        if not isinstance(evidence_refs, list) or not all(isinstance(item, str) for item in evidence_refs):
+            validation_errors.append("Invalid secondary_conclusion evidence_refs")
+            evidence_refs = []
+        justification = secondary.get("justification")
+        if not isinstance(justification, str) or not justification.strip():
+            validation_errors.append("Missing secondary_conclusion justification")
+        secondary_accuracy = 1.0 if answer == case["secondary_conclusion"]["gold_label"] else 0.0
+        for ref in evidence_refs:
+            cited_ref_count += 1
+            if ref in case["evidence_refs"] and ref in case["secondary_conclusion"]["required_evidence_refs"]:
+                valid_ref_count += 1
+
+    weighted_probe_error_score = 0.0
+    for index, score in enumerate(support_scores, start=1):
+        weighted_probe_error_score += V3_PROBE_WEIGHTS.get(f"P{index}", 0.0) * (1.0 - score)
+
+    probe_count = max(1, len(case["probes"]))
+    return {
+        "malformed_output": bool(validation_errors),
+        "weighted_probe_error_score": weighted_probe_error_score,
+        "probe_support_score": _mean(support_scores) or 0.0,
+        "targeted_error_count": targeted_error_count,
+        "primary_probe_target_error": primary_probe_target_error,
+        "primary_probe_target_error_rate": 1.0 if primary_probe_target_error else 0.0,
+        "all_probe_target_error_rate": targeted_error_count / probe_count,
+        "major_error_rate": 1.0 if primary_probe_target_error else 0.0,
+        "evidence_ref_validity_rate": (valid_ref_count / cited_ref_count) if cited_ref_count else 0.0,
+        "secondary_conclusion_accuracy": secondary_accuracy,
+        "validation_errors": validation_errors,
+        "error_family_breakdown": error_family_breakdown,
+    }
+
+
+def score_stage2_interpretation_v2_output(
+    case: dict[str, Any],
+    parsed_output: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Score a targeted interpretation output against V2 gold labels."""
+    if not isinstance(parsed_output, dict):
+        return {
+            "malformed_output": True,
+            "interpretation_score": 0.0,
+            "exact_check_count": 0,
+            "exact_check_accuracy": 0.0,
+            "partial_credit_accuracy": 0.0,
+            "overclaim_rate": 0.0,
+            "overall_conclusion_correct": False,
+            "uncertainty_correct": False,
+            "validation_errors": ["No parsed JSON output"],
+            "rationale_anchor_coverage": None,
+        }
+
+    validation_errors: list[str] = []
+    exact_count = 0
+    partial_credit_total = 0.0
+    overclaim_count = 0
+    checks = case.get("interpretation_checks", [])
+    predicted_checks = _answers_by_check_id(parsed_output)
+
+    for check in checks:
+        check_id = check["check_id"]
+        predicted = predicted_checks.get(check_id)
+        if not isinstance(predicted, dict):
+            validation_errors.append(f"Missing interpretation check {check_id}")
+            continue
+        answer = predicted.get("answer")
+        justification = predicted.get("justification")
+        if answer not in check["options"]:
+            validation_errors.append(f"Invalid answer for {check_id}")
+            continue
+        if not isinstance(justification, str) or not justification.strip():
+            validation_errors.append(f"Missing justification for {check_id}")
+        if answer == check["gold_label"]:
+            exact_count += 1
+            partial_credit_total += 1.0
+        elif answer in check.get("partial_credit_labels", []):
+            partial_credit_total += 0.5
+        if answer in check.get("overclaim_labels", []):
+            overclaim_count += 1
+
+    overall = parsed_output.get("overall_conclusion")
+    overall_correct = False
+    if not isinstance(overall, dict):
+        validation_errors.append("Missing overall_conclusion")
+    else:
+        if overall.get("answer") not in case["overall_conclusion"]["options"]:
+            validation_errors.append("Invalid overall_conclusion answer")
+        if not isinstance(overall.get("justification"), str) or not overall.get("justification", "").strip():
+            validation_errors.append("Missing overall_conclusion justification")
+        overall_correct = overall.get("answer") == case["overall_conclusion"]["gold_label"]
+
+    uncertainty = parsed_output.get("uncertainty")
+    uncertainty_correct = False
+    if not isinstance(uncertainty, dict):
+        validation_errors.append("Missing uncertainty")
+    else:
+        if uncertainty.get("answer") not in case["expected_uncertainty"]["options"]:
+            validation_errors.append("Invalid uncertainty answer")
+        if not isinstance(uncertainty.get("justification"), str) or not uncertainty.get("justification", "").strip():
+            validation_errors.append("Missing uncertainty justification")
+        uncertainty_correct = uncertainty.get("answer") == case["expected_uncertainty"]["gold_label"]
+
+    check_count = max(1, len(checks))
+    partial_credit_accuracy = partial_credit_total / check_count
+    interpretation_score = (
+        partial_credit_accuracy
+        + (1.0 if overall_correct else 0.0)
+        + (1.0 if uncertainty_correct else 0.0)
+    ) / 3.0
+    return {
+        "malformed_output": bool(validation_errors),
+        "interpretation_score": interpretation_score,
+        "check_count": check_count,
+        "exact_check_count": exact_count,
+        "exact_check_accuracy": exact_count / check_count,
+        "partial_credit_accuracy": partial_credit_accuracy,
+        "overclaim_rate": overclaim_count / check_count,
+        "overall_conclusion_correct": overall_correct,
+        "uncertainty_correct": uncertainty_correct,
+        "validation_errors": validation_errors,
+        "rationale_anchor_coverage": _score_anchor_coverage(case, parsed_output),
+    }
 
 
 def score_stage2_output(
@@ -673,7 +1742,10 @@ async def run_single_trial(
 ) -> dict[str, Any]:
     """Run one benchmark trial for a single case and variant."""
     benchmark_type = case["benchmark_type"]
-    if variant == VARIANT_A:
+    if benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
+        skill_registry = {}
+        stage_hints = {}
+    elif variant == VARIANT_A:
         skill_registry = {}
         stage_hints = {}
     elif benchmark_type == CHEMBL_MICRO_BENCHMARK:
@@ -684,17 +1756,24 @@ async def run_single_trial(
         stage_hints = {}
 
     base_system_prompt = build_system_prompt(benchmark_type)
-    system_prompt = await render_skill_prompt(
-        base_system_prompt,
-        skill_registry=skill_registry,
-        stage_hints=stage_hints,
-    )
-    preloaded_guidance = preload_skill_guidance(skill_registry)
-    system_prompt = append_preloaded_skill_guidance(
-        system_prompt,
-        variant=variant,
-        preloaded_guidance=preloaded_guidance,
-    )
+    if benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
+        system_prompt = base_system_prompt
+        if variant == VARIANT_B:
+            excerpt_guidance = build_case_excerpt_guidance(case)
+            if excerpt_guidance:
+                system_prompt = f"{system_prompt}\n\n{excerpt_guidance}"
+    else:
+        system_prompt = await render_skill_prompt(
+            base_system_prompt,
+            skill_registry=skill_registry,
+            stage_hints=stage_hints,
+        )
+        preloaded_guidance = preload_skill_guidance(skill_registry)
+        system_prompt = append_preloaded_skill_guidance(
+            system_prompt,
+            variant=variant,
+            preloaded_guidance=preloaded_guidance,
+        )
     user_prompt = build_user_prompt(case)
 
     start = time.monotonic()
@@ -716,7 +1795,11 @@ async def run_single_trial(
     except Exception as exc:
         error = str(exc)
 
-    if benchmark_type == CHEMBL_MICRO_BENCHMARK:
+    if benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
+        metrics = score_stage2_interpretation_v3_output(case, parsed_output)
+    elif benchmark_type == STAGE2_INTERPRETATION_V2_BENCHMARK:
+        metrics = score_stage2_interpretation_v2_output(case, parsed_output)
+    elif benchmark_type == CHEMBL_MICRO_BENCHMARK:
         metrics = score_chembl_output(case, parsed_output)
     else:
         metrics = score_stage2_output(case, parsed_output)
@@ -741,9 +1824,140 @@ def _mean(values: list[float]) -> float | None:
     return float(mean(values))
 
 
+def _primary_trial_score(trial: dict[str, Any]) -> float:
+    metrics = trial["metrics"]
+    if "weighted_probe_error_score" in metrics:
+        return float(1.0 - metrics["weighted_probe_error_score"])
+    if "interpretation_score" in metrics:
+        return float(metrics["interpretation_score"])
+    return float(metrics.get("exact_match_rate", 0.0))
+
+
+def _summarize_stage2_interpretation_v3_trials(trials: list[dict[str, Any]]) -> dict[str, Any]:
+    summary: dict[str, Any] = {
+        "benchmark_type": STAGE2_INTERPRETATION_V3_BENCHMARK,
+        "primary_metric": "weighted_probe_error_score",
+        "pair_unit": "model_case",
+        "trial_count": len(trials),
+        "variants": {},
+        "paired_tests": {},
+    }
+
+    for variant in (VARIANT_A, VARIANT_B):
+        variant_trials = [trial for trial in trials if trial["variant"] == variant]
+        metrics = [trial["metrics"] for trial in variant_trials]
+        summary["variants"][variant] = {
+            "n": len(variant_trials),
+            "weighted_probe_error_score_mean": _mean([m["weighted_probe_error_score"] for m in metrics]),
+            "probe_support_score_mean": _mean([m.get("probe_support_score", 0.0) for m in metrics]),
+            "primary_probe_target_error_rate_mean": _mean([m["primary_probe_target_error_rate"] for m in metrics]),
+            "all_probe_target_error_rate_mean": _mean([m["all_probe_target_error_rate"] for m in metrics]),
+            "major_error_rate_mean": _mean([m["major_error_rate"] for m in metrics]),
+            "evidence_ref_validity_rate_mean": _mean([m["evidence_ref_validity_rate"] for m in metrics]),
+            "secondary_conclusion_accuracy": _mean([m["secondary_conclusion_accuracy"] for m in metrics]),
+            "malformed_rate": _mean([1.0 if m["malformed_output"] else 0.0 for m in metrics]),
+            "latency_s_mean": _mean([trial["latency_s"] for trial in variant_trials]),
+            "tool_call_mean": _mean([float(len(trial["tool_history"])) for trial in variant_trials]),
+            "total_tokens_mean": _mean(
+                [float(trial["token_usage"].get("total_tokens", 0)) for trial in variant_trials]
+            ),
+        }
+
+    pairs: dict[tuple[str, str], dict[str, list[float]]] = {}
+    for trial in trials:
+        model = str(trial.get("model", ""))
+        key = (model, trial["case_id"])
+        pairs.setdefault(key, {VARIANT_A: [], VARIANT_B: []})[trial["variant"]].append(
+            float(trial["metrics"]["weighted_probe_error_score"])
+        )
+
+    a_values: list[float] = []
+    b_values: list[float] = []
+    for pair in pairs.values():
+        if pair[VARIANT_A] and pair[VARIANT_B]:
+            a_values.append(float(mean(pair[VARIANT_A])))
+            b_values.append(float(mean(pair[VARIANT_B])))
+
+    summary["paired_tests"]["weighted_probe_error_score_case_level"] = {
+        "pair_unit_count": len(a_values),
+        "delta_mean": _mean([a - b for a, b in zip(a_values, b_values)]),
+        "wilcoxon_pvalue": (
+            float(wilcoxon(a_values, b_values).pvalue)
+            if wilcoxon is not None and len(a_values) > 1 and any(a != b for a, b in zip(a_values, b_values))
+            else None
+        ),
+    }
+    return summary
+
+
+def _summarize_stage2_interpretation_v2_trials(trials: list[dict[str, Any]]) -> dict[str, Any]:
+    summary: dict[str, Any] = {
+        "benchmark_type": STAGE2_INTERPRETATION_V2_BENCHMARK,
+        "primary_metric": "interpretation_score",
+        "pair_unit": "model_case",
+        "trial_count": len(trials),
+        "variants": {},
+        "paired_tests": {},
+    }
+
+    for variant in (VARIANT_A, VARIANT_B):
+        variant_trials = [trial for trial in trials if trial["variant"] == variant]
+        metrics = [trial["metrics"] for trial in variant_trials]
+        summary["variants"][variant] = {
+            "n": len(variant_trials),
+            "interpretation_score_mean": _mean([m["interpretation_score"] for m in metrics]),
+            "exact_check_accuracy_mean": _mean([m["exact_check_accuracy"] for m in metrics]),
+            "partial_credit_accuracy_mean": _mean([m["partial_credit_accuracy"] for m in metrics]),
+            "overall_conclusion_accuracy": _mean(
+                [1.0 if m.get("overall_conclusion_correct") else 0.0 for m in metrics]
+            ),
+            "uncertainty_accuracy": _mean([1.0 if m.get("uncertainty_correct") else 0.0 for m in metrics]),
+            "overclaim_rate_mean": _mean([m["overclaim_rate"] for m in metrics]),
+            "malformed_rate": _mean([1.0 if m["malformed_output"] else 0.0 for m in metrics]),
+            "anchor_coverage_mean": _mean(
+                [m["rationale_anchor_coverage"] for m in metrics if m["rationale_anchor_coverage"] is not None]
+            ),
+            "latency_s_mean": _mean([trial["latency_s"] for trial in variant_trials]),
+            "tool_call_mean": _mean([float(len(trial["tool_history"])) for trial in variant_trials]),
+            "total_tokens_mean": _mean(
+                [float(trial["token_usage"].get("total_tokens", 0)) for trial in variant_trials]
+            ),
+        }
+
+    pairs: dict[tuple[str, str], dict[str, list[float]]] = {}
+    for trial in trials:
+        model = str(trial.get("model", ""))
+        key = (model, trial["case_id"])
+        pairs.setdefault(key, {VARIANT_A: [], VARIANT_B: []})[trial["variant"]].append(_primary_trial_score(trial))
+
+    a_values: list[float] = []
+    b_values: list[float] = []
+    for pair in pairs.values():
+        if pair[VARIANT_A] and pair[VARIANT_B]:
+            a_values.append(float(mean(pair[VARIANT_A])))
+            b_values.append(float(mean(pair[VARIANT_B])))
+
+    summary["paired_tests"]["interpretation_score_case_level"] = {
+        "pair_unit_count": len(a_values),
+        "delta_mean": _mean([b - a for a, b in zip(a_values, b_values)]),
+        "wilcoxon_pvalue": (
+            float(wilcoxon(a_values, b_values).pvalue)
+            if wilcoxon is not None and len(a_values) > 1 and any(a != b for a, b in zip(a_values, b_values))
+            else None
+        ),
+    }
+    return summary
+
+
 def summarize_trials(trials: list[dict[str, Any]]) -> dict[str, Any]:
     """Aggregate deterministic trial metrics by variant."""
+    if trials and trials[0].get("benchmark_type") == STAGE2_INTERPRETATION_V3_BENCHMARK:
+        return _summarize_stage2_interpretation_v3_trials(trials)
+    if trials and trials[0].get("benchmark_type") == STAGE2_INTERPRETATION_V2_BENCHMARK:
+        return _summarize_stage2_interpretation_v2_trials(trials)
+
     summary: dict[str, Any] = {
+        "benchmark_type": trials[0].get("benchmark_type") if trials else None,
         "trial_count": len(trials),
         "variants": {},
         "paired_tests": {},
@@ -804,6 +2018,73 @@ def _build_research_judge_prompt(
     prompt_a: dict[str, Any],
     prompt_b: dict[str, Any],
 ) -> str:
+    if case["benchmark_type"] == STAGE2_INTERPRETATION_V3_BENCHMARK:
+        probe_lines = []
+        for probe in case["probes"]:
+            probe_lines.append(
+                f"{probe['probe_id']} [{probe['error_family']}]\n"
+                f"Question: {probe['question']}\n"
+                f"Allowed answers: {' | '.join(probe['options'])}\n"
+                f"Relevant evidence refs: {', '.join(probe['required_evidence_refs'])}"
+            )
+        evidence_refs = "\n".join(f"- {ref_id}: {text}" for ref_id, text in case["evidence_refs"].items())
+        return (
+            "You are a blinded research judge evaluating two targeted interpretation outputs.\n"
+            "Judge only targeted interpretation errors, evidence grounding, and overclaim restraint.\n"
+            "Ignore writing style.\n\n"
+            "Return JSON only with this schema:\n"
+            "{\n"
+            '  "output_a": {"targeted_error_probe_ids": ["P1"], "grounding": 0, "unsupported_claim_penalty": 0, "major_error": false, "notes": "..."},\n'
+            '  "output_b": {"targeted_error_probe_ids": [], "grounding": 0, "unsupported_claim_penalty": 0, "major_error": false, "notes": "..."},\n'
+            '  "confidence": "low",\n'
+            '  "rationale": "..."\n'
+            "}\n\n"
+            f"Case ID: {case['case_id']}\n"
+            f"Judge focus: {', '.join(case.get('judge_focus', []))}\n"
+            f"Case rationale: {case.get('case_rationale', '')}\n\n"
+            f"Evidence references:\n{evidence_refs}\n\n"
+            "Probe definitions:\n"
+            f"{chr(10).join(probe_lines)}\n\n"
+            f"Output A:\n{prompt_a['raw_output']}\n\n"
+            f"Output B:\n{prompt_b['raw_output']}\n"
+        )
+    if case["benchmark_type"] == STAGE2_INTERPRETATION_V2_BENCHMARK:
+        return (
+            "You are a blinded research judge evaluating two targeted interpretation outputs.\n"
+            "Score each output independently against the frozen evidence bundle.\n"
+            "Judge only interpretation correctness, evidence grounding, and restraint against overclaiming.\n"
+            "Do not compare writing style.\n\n"
+            "Rubric:\n"
+            "- grounding: 0..3\n"
+            "  0 = detached from the bundle\n"
+            "  1 = partly grounded with notable omissions\n"
+            "  2 = mostly grounded with minor gaps\n"
+            "  3 = strongly grounded and evidence-faithful\n"
+            "- rubric_alignment: 0..3\n"
+            "  0 = interpretation checks are substantially misread\n"
+            "  1 = partially aligned with important interpretation mistakes\n"
+            "  2 = mostly aligned with minor mistakes\n"
+            "  3 = strongly aligned with the benchmark interpretation rubric\n"
+            "- unsupported_claim_penalty: 0 | -1 | -2\n"
+            "  0 = no unsupported claims\n"
+            "  -1 = minor stronger-than-supported claim\n"
+            "  -2 = material overclaiming or disease-mismatch inflation\n"
+            "- major_error: true | false\n"
+            "  true only for a material factual or interpretive error\n\n"
+            "Return JSON only with this schema:\n"
+            "{\n"
+            '  "output_a": {"grounding": 0, "rubric_alignment": 0, "unsupported_claim_penalty": 0, "major_error": false, "notes": "..."},\n'
+            '  "output_b": {"grounding": 0, "rubric_alignment": 0, "unsupported_claim_penalty": 0, "major_error": false, "notes": "..."},\n'
+            '  "confidence": "low",\n'
+            '  "rationale": "..."\n'
+            "}\n\n"
+            f"Case ID: {case['case_id']}\n"
+            f"Judge focus: {', '.join(case.get('judge_focus', []))}\n"
+            f"Case rationale: {case.get('case_rationale', '')}\n\n"
+            f"Evidence bundle:\n{json.dumps(case['input_bundle'], indent=2, ensure_ascii=False)}\n\n"
+            f"Output A:\n{prompt_a['raw_output']}\n\n"
+            f"Output B:\n{prompt_b['raw_output']}\n"
+        )
     return (
         "You are a blinded research judge evaluating two benchmark outputs.\n"
         "Score each output independently against the provided evidence bundle.\n"
@@ -841,7 +2122,11 @@ def _build_research_judge_prompt(
     )
 
 
-def _validate_research_judge_output(parsed_output: dict[str, Any] | None) -> list[str]:
+def _validate_research_judge_output(
+    parsed_output: dict[str, Any] | None,
+    *,
+    benchmark_type: str = MAIN_STAGE2_BENCHMARK,
+) -> list[str]:
     if not isinstance(parsed_output, dict):
         return ["Judge output is not a JSON object"]
 
@@ -859,21 +2144,26 @@ def _validate_research_judge_output(parsed_output: dict[str, Any] | None) -> lis
             errors.append(f"Missing {key}")
             continue
         grounding = payload.get("grounding")
-        alignment = payload.get("rubric_alignment")
         penalty = payload.get("unsupported_claim_penalty")
         major_error = payload.get("major_error")
         notes = payload.get("notes")
 
         if grounding not in {0, 1, 2, 3}:
             errors.append(f"{key}.grounding out of range")
-        if alignment not in {0, 1, 2, 3}:
-            errors.append(f"{key}.rubric_alignment out of range")
         if penalty not in {0, -1, -2}:
             errors.append(f"{key}.unsupported_claim_penalty out of range")
         if not isinstance(major_error, bool):
             errors.append(f"{key}.major_error must be boolean")
         if not isinstance(notes, str):
             errors.append(f"{key}.notes missing")
+        if benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
+            targeted_errors = payload.get("targeted_error_probe_ids")
+            if not isinstance(targeted_errors, list) or not all(isinstance(item, str) for item in targeted_errors):
+                errors.append(f"{key}.targeted_error_probe_ids invalid")
+        else:
+            alignment = payload.get("rubric_alignment")
+            if alignment not in {0, 1, 2, 3}:
+                errors.append(f"{key}.rubric_alignment out of range")
     return errors
 
 
@@ -881,7 +2171,7 @@ def _judge_output_overall(payload: dict[str, Any]) -> int:
     return int(payload["grounding"]) + int(payload["rubric_alignment"]) + int(payload["unsupported_claim_penalty"])
 
 
-def _judge_winner_from_rubric(parsed_output: dict[str, Any]) -> str:
+def _judge_winner_from_rubric(parsed_output: dict[str, Any], *, benchmark_type: str = MAIN_STAGE2_BENCHMARK) -> str:
     output_a = parsed_output["output_a"]
     output_b = parsed_output["output_b"]
     major_a = bool(output_a["major_error"])
@@ -890,6 +2180,21 @@ def _judge_winner_from_rubric(parsed_output: dict[str, Any]) -> str:
         return "B"
     if major_b and not major_a:
         return "A"
+
+    if benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
+        errors_a = len(output_a.get("targeted_error_probe_ids", []))
+        errors_b = len(output_b.get("targeted_error_probe_ids", []))
+        if errors_a < errors_b:
+            return "A"
+        if errors_b < errors_a:
+            return "B"
+        score_a = int(output_a["grounding"]) + int(output_a["unsupported_claim_penalty"])
+        score_b = int(output_b["grounding"]) + int(output_b["unsupported_claim_penalty"])
+        if score_a - score_b >= 2:
+            return "A"
+        if score_b - score_a >= 2:
+            return "B"
+        return "tie"
 
     score_a = _judge_output_overall(output_a)
     score_b = _judge_output_overall(output_b)
@@ -940,7 +2245,7 @@ async def run_single_research_judge(
     error: str | None = None
     try:
         parsed = parse_benchmark_output(getattr(response, "content", response))
-        validation_errors = _validate_research_judge_output(parsed)
+        validation_errors = _validate_research_judge_output(parsed, benchmark_type=case["benchmark_type"])
     except Exception as exc:
         error = str(exc)
         validation_errors = [error]
@@ -949,7 +2254,7 @@ async def run_single_research_judge(
     winner = "tie"
     deltas: dict[str, float] = {}
     if not validation_errors and isinstance(parsed, dict):
-        winner_blinded = _judge_winner_from_rubric(parsed)
+        winner_blinded = _judge_winner_from_rubric(parsed, benchmark_type=case["benchmark_type"])
         winner = label_map.get(winner_blinded, "tie") if winner_blinded in {"A", "B"} else "tie"
 
         if label_map["A"] == VARIANT_A:
@@ -958,14 +2263,29 @@ async def run_single_research_judge(
         else:
             payload_a = parsed["output_b"]
             payload_b = parsed["output_a"]
-        deltas = {
-            "grounding_delta": float(payload_b["grounding"] - payload_a["grounding"]),
-            "rubric_alignment_delta": float(payload_b["rubric_alignment"] - payload_a["rubric_alignment"]),
-            "unsupported_claim_penalty_delta": float(
-                payload_b["unsupported_claim_penalty"] - payload_a["unsupported_claim_penalty"]
-            ),
-            "overall_delta": float(_judge_output_overall(payload_b) - _judge_output_overall(payload_a)),
-        }
+        if case["benchmark_type"] == STAGE2_INTERPRETATION_V3_BENCHMARK:
+            errors_a = len(payload_a.get("targeted_error_probe_ids", []))
+            errors_b = len(payload_b.get("targeted_error_probe_ids", []))
+            deltas = {
+                "grounding_delta": float(payload_b["grounding"] - payload_a["grounding"]),
+                "unsupported_claim_penalty_delta": float(
+                    payload_b["unsupported_claim_penalty"] - payload_a["unsupported_claim_penalty"]
+                ),
+                "targeted_error_count_delta": float(errors_b - errors_a),
+                "overall_delta": float(
+                    (payload_b["grounding"] + payload_b["unsupported_claim_penalty"] - errors_b)
+                    - (payload_a["grounding"] + payload_a["unsupported_claim_penalty"] - errors_a)
+                ),
+            }
+        else:
+            deltas = {
+                "grounding_delta": float(payload_b["grounding"] - payload_a["grounding"]),
+                "rubric_alignment_delta": float(payload_b["rubric_alignment"] - payload_a["rubric_alignment"]),
+                "unsupported_claim_penalty_delta": float(
+                    payload_b["unsupported_claim_penalty"] - payload_a["unsupported_claim_penalty"]
+                ),
+                "overall_delta": float(_judge_output_overall(payload_b) - _judge_output_overall(payload_a)),
+            }
 
     return {
         "case_id": case["case_id"],
@@ -1075,24 +2395,66 @@ def summarize_research_panel(
         "unsupported_claim_penalty_delta": _mean(
             [row["deltas"].get("unsupported_claim_penalty_delta", 0.0) for row in valid_rows]
         ),
+        "targeted_error_count_delta": _mean(
+            [row["deltas"].get("targeted_error_count_delta", 0.0) for row in valid_rows]
+        ),
         "overall_delta": _mean([row["deltas"].get("overall_delta", 0.0) for row in valid_rows]),
     }
     summary["judge_error_rate"] = _mean([1.0 if row["validation_errors"] else 0.0 for row in judge_rows]) or 0.0
     return summary
 
 
-def _deterministic_exact_match_leader(
+def _deterministic_metric_leader(
     *,
     trial_a: dict[str, Any],
     trial_b: dict[str, Any],
 ) -> str:
-    exact_a = float(trial_a["metrics"]["exact_match_rate"])
-    exact_b = float(trial_b["metrics"]["exact_match_rate"])
-    if exact_a > exact_b:
+    if trial_a.get("benchmark_type") == STAGE2_INTERPRETATION_V3_BENCHMARK:
+        score_a = float(trial_a["metrics"]["weighted_probe_error_score"])
+        score_b = float(trial_b["metrics"]["weighted_probe_error_score"])
+        if score_a < score_b:
+            return VARIANT_A
+        if score_b < score_a:
+            return VARIANT_B
+        return "tie"
+
+    score_a = _primary_trial_score(trial_a)
+    score_b = _primary_trial_score(trial_b)
+    if score_a > score_b:
         return VARIANT_A
-    if exact_b > exact_a:
+    if score_b > score_a:
         return VARIANT_B
     return "tie"
+
+
+def select_v3_judge_keys(
+    trial_pairs: dict[tuple[str, int, str], dict[str, dict[str, Any]]],
+    *,
+    sample_rate: float = DEFAULT_HUMAN_AUDIT_SAMPLE_RATE,
+) -> set[tuple[str, int, str]]:
+    selected: set[tuple[str, int, str]] = set()
+    tie_keys: list[tuple[str, int, str]] = []
+    for key, pair in trial_pairs.items():
+        trial_a = pair.get(VARIANT_A)
+        trial_b = pair.get(VARIANT_B)
+        if not trial_a or not trial_b:
+            continue
+        delta = float(trial_a["metrics"]["weighted_probe_error_score"]) - float(
+            trial_b["metrics"]["weighted_probe_error_score"]
+        )
+        if abs(delta) > 1e-12:
+            selected.add(key)
+        else:
+            tie_keys.append(key)
+
+    if tie_keys:
+        count = max(1, math.ceil(len(tie_keys) * sample_rate))
+        ranked = sorted(
+            tie_keys,
+            key=lambda item: hashlib.sha256(f"v3-judge:{item[2]}:{item[0]}:{item[1]}".encode("utf-8")).hexdigest(),
+        )
+        selected.update(ranked[:count])
+    return selected
 
 
 def _stable_sample_bucket(items: list[dict[str, Any]], sample_rate: float, *, salt: str) -> list[dict[str, Any]]:
@@ -1121,7 +2483,7 @@ def select_human_audit_cases(
     for verdict in panel_verdicts:
         key = (verdict["case_id"], verdict["repeat_index"], verdict["model"])
         pair = trial_pairs[key]
-        deterministic_leader = _deterministic_exact_match_leader(
+        deterministic_leader = _deterministic_metric_leader(
             trial_a=pair[VARIANT_A],
             trial_b=pair[VARIANT_B],
         )
@@ -1265,6 +2627,124 @@ def render_markdown_summary(
     judgment_summary: dict[str, Any] | None = None,
 ) -> str:
     """Render a compact publication-ready markdown summary."""
+    if summary.get("benchmark_type") == STAGE2_INTERPRETATION_V3_BENCHMARK:
+        variants = summary.get("variants", {})
+        lines = [
+            f"# {benchmark_title}",
+            "",
+            "## Deterministic Metrics",
+            "",
+            "| Variant | N | Weighted Probe Error | Probe Support | Primary Probe Target Error | All Probe Target Error | Major Error | Evidence Ref Validity | Secondary Conclusion Acc | Tool Calls | Tokens |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+        for variant in (VARIANT_A, VARIANT_B):
+            row = variants.get(variant, {})
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        variant,
+                        str(row.get("n") or 0),
+                        _fmt_num(row.get("weighted_probe_error_score_mean")),
+                        _fmt_num(row.get("probe_support_score_mean")),
+                        _fmt_pct(row.get("primary_probe_target_error_rate_mean")),
+                        _fmt_pct(row.get("all_probe_target_error_rate_mean")),
+                        _fmt_pct(row.get("major_error_rate_mean")),
+                        _fmt_pct(row.get("evidence_ref_validity_rate_mean")),
+                        _fmt_pct(row.get("secondary_conclusion_accuracy")),
+                        _fmt_num(row.get("tool_call_mean")),
+                        _fmt_num(row.get("total_tokens_mean")),
+                    ]
+                )
+                + " |"
+            )
+
+        paired = summary.get("paired_tests", {}).get("weighted_probe_error_score_case_level", {})
+        if paired:
+            lines.extend(
+                [
+                    "",
+                    "## Primary Endpoint",
+                    "",
+                    f"- Pair unit count: `{paired.get('pair_unit_count', 0)}`",
+                    f"- Case-level weighted probe error delta (A - B): `{_fmt_num(paired.get('delta_mean'))}`",
+                    f"- Wilcoxon p-value: `{_fmt_num(paired.get('wilcoxon_pvalue'))}`",
+                ]
+            )
+
+        if judgment_summary:
+            lines.extend(
+                [
+                    "",
+                    "## Blinded Judge",
+                    "",
+                    f"- `{VARIANT_A}` wins: `{judgment_summary.get(VARIANT_A, 0)}`",
+                    f"- `{VARIANT_B}` wins: `{judgment_summary.get(VARIANT_B, 0)}`",
+                    f"- `tie`: `{judgment_summary.get('tie', 0)}`",
+                    f"- Sign-test p-value: `{_fmt_num(judgment_summary.get('sign_test_pvalue'))}`",
+                ]
+            )
+        return "\n".join(lines) + "\n"
+
+    if summary.get("benchmark_type") == STAGE2_INTERPRETATION_V2_BENCHMARK:
+        variants = summary.get("variants", {})
+        lines = [
+            f"# {benchmark_title}",
+            "",
+            "## Deterministic Metrics",
+            "",
+            "| Variant | N | Interpretation Score | Exact Check Acc | Partial Credit Acc | Overall Conclusion Acc | Uncertainty Acc | Overclaim Rate | Anchor Coverage | Tool Calls | Tokens |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+        for variant in (VARIANT_A, VARIANT_B):
+            row = variants.get(variant, {})
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        variant,
+                        str(row.get("n") or 0),
+                        _fmt_pct(row.get("interpretation_score_mean")),
+                        _fmt_pct(row.get("exact_check_accuracy_mean")),
+                        _fmt_pct(row.get("partial_credit_accuracy_mean")),
+                        _fmt_pct(row.get("overall_conclusion_accuracy")),
+                        _fmt_pct(row.get("uncertainty_accuracy")),
+                        _fmt_pct(row.get("overclaim_rate_mean")),
+                        _fmt_pct(row.get("anchor_coverage_mean")),
+                        _fmt_num(row.get("tool_call_mean")),
+                        _fmt_num(row.get("total_tokens_mean")),
+                    ]
+                )
+                + " |"
+            )
+
+        paired = summary.get("paired_tests", {}).get("interpretation_score_case_level", {})
+        if paired:
+            lines.extend(
+                [
+                    "",
+                    "## Primary Endpoint",
+                    "",
+                    f"- Pair unit count: `{paired.get('pair_unit_count', 0)}`",
+                    f"- Case-level interpretation delta mean (B - A): `{_fmt_num(paired.get('delta_mean'))}`",
+                    f"- Wilcoxon p-value: `{_fmt_num(paired.get('wilcoxon_pvalue'))}`",
+                ]
+            )
+
+        if judgment_summary:
+            lines.extend(
+                [
+                    "",
+                    "## Blinded Judge",
+                    "",
+                    f"- `{VARIANT_A}` wins: `{judgment_summary.get(VARIANT_A, 0)}`",
+                    f"- `{VARIANT_B}` wins: `{judgment_summary.get(VARIANT_B, 0)}`",
+                    f"- `tie`: `{judgment_summary.get('tie', 0)}`",
+                    f"- Sign-test p-value: `{_fmt_num(judgment_summary.get('sign_test_pvalue'))}`",
+                ]
+            )
+        return "\n".join(lines) + "\n"
+
     variants = summary.get("variants", {})
     lines = [
         f"# {benchmark_title}",
@@ -1344,8 +2824,9 @@ def render_research_markdown_summary(
                 f"- Judge error rate: `{_fmt_pct(panel_summary.get('judge_error_rate'))}`",
                 f"- Confidence counts: `high={confidence_counts.get('high', 0)}`, `medium={confidence_counts.get('medium', 0)}`, `low={confidence_counts.get('low', 0)}`",
                 f"- Mean B-A grounding delta: `{_fmt_num(mean_deltas.get('grounding_delta'))}`",
-                f"- Mean B-A rubric delta: `{_fmt_num(mean_deltas.get('rubric_alignment_delta'))}`",
                 f"- Mean B-A unsupported-claim delta: `{_fmt_num(mean_deltas.get('unsupported_claim_penalty_delta'))}`",
+                f"- Mean B-A targeted-error-count delta: `{_fmt_num(mean_deltas.get('targeted_error_count_delta'))}`",
+                f"- Mean B-A rubric delta: `{_fmt_num(mean_deltas.get('rubric_alignment_delta'))}`",
                 f"- Mean B-A overall delta: `{_fmt_num(mean_deltas.get('overall_delta'))}`",
             ]
         )
@@ -1388,10 +2869,22 @@ def load_model_configs_from_env() -> list[dict[str, Any]]:
 
     allowed = {cfg["label"]: cfg for cfg in DEFAULT_MODEL_CONFIGS}
     selected: list[dict[str, Any]] = []
-    for label in [part.strip() for part in raw.split(",") if part.strip()]:
-        if label not in allowed:
-            raise ValueError(f"Unknown benchmark model label: {label}")
-        selected.append(allowed[label])
+    for token in [part.strip() for part in raw.split(",") if part.strip()]:
+        if token in allowed:
+            selected.append(allowed[token])
+            continue
+
+        provider, sep, model_name = token.partition(":")
+        if not sep or not provider.strip() or not model_name.strip():
+            raise ValueError(f"Unknown benchmark model label: {token}")
+        selected.append(
+            {
+                "label": token,
+                "provider": provider.strip(),
+                "model_kwargs": {"model": model_name.strip(), "temperature": 0},
+                "repeats": 1,
+            }
+        )
     return selected
 
 
@@ -1499,7 +2992,15 @@ async def run_benchmark(
                 key = (trial["case_id"], int(trial.get("repeat_index", 0)), trial["model"])
                 trial_index.setdefault(key, {})[trial["variant"]] = trial
 
+            selected_judge_keys = (
+                select_v3_judge_keys(trial_index)
+                if benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK
+                else set(trial_index)
+            )
+
             for (case_id, repeat_index, model_label), pair in trial_index.items():
+                if (case_id, repeat_index, model_label) not in selected_judge_keys:
+                    continue
                 if VARIANT_A not in pair or VARIANT_B not in pair:
                     continue
                 judge_rows_for_pair: list[dict[str, Any]] = []

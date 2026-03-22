@@ -1,28 +1,39 @@
 ---
 name: skill-load-harness
-description: Forced skill evaluation harness for reliable skill loading
+description: Two-phase skill evaluation harness — classify task, then activate only relevant skills
 ---
 
-# Skill Load Harness — Forced Evaluation Protocol
+# Skill Evaluation Protocol
 
-Before beginning your task, you MUST complete the following 3-step sequence:
+## Phase 1 — QUICK SCREEN
+Before evaluating individual skills, answer:
+**"Does this task require reading a skill guide for interpreting results or planning a query strategy?"**
 
-## Step 1 - EVALUATE (mandatory for ALL skills)
-For each skill listed in {{available_skills}}, explicitly state:
-- [skill-name] — YES / NO — [one-sentence reasoning]
+Answer NO (write "NO_SKILLS_NEEDED" and skip to Phase 3) when:
+- The task uses tools directly without needing interpretation guidance
+- The task is internal (save, load, finalize, validate, organize data)
+- The task is about visualization, reporting, or general explanation
+- You are unsure whether a skill is needed
 
-**Judgment criteria:**
-- YES = this skill is **directly required** to complete the current task
-- NO = this skill is not needed, OR "might be helpful" (uncertain = NO)
-- When in doubt, default to NO. Only mark YES when the task clearly demands it.
+Answer YES and proceed to Phase 2 only when:
+- The task explicitly involves a database/API whose interpretation guide you need
+- The task requires strategy guidance that a skill document provides
 
-## Step 2 - ACTIVATE (for YES skills only)
-For each skill marked YES:
-- Call `read_skill_file(skill_path="<path>")` to load full instructions
-- Summarize key guidance in 2-3 bullet points
+## Phase 2 — EVALUATE (only if Phase 1 = YES)
+Review each skill listed below. Apply these rules IN ORDER:
 
-## Step 3 - IMPLEMENT
-Proceed with your task. You MUST reference activated skill guidance when making
+1. **TOOL-ONLY rule**: If a skill's Hint contains "TOOL-ONLY" → **ALWAYS NO**.
+   These skills are accessed via dedicated tools and never need their guide read.
+2. **Context-match rule**: If a skill's Hint specifies a stage, phase, or context
+   (e.g., "Stage 3 only", "Search phase") → **YES only if your task matches that context**.
+3. **Default rule**: When in doubt → **NO**. Only mark YES when the task clearly demands
+   this skill's guidance.
+
+For each skill: [skill-name] — YES / NO — [one-sentence reason]
+For YES skills: call `read_skill_file(skill_path="<path>")` to load the guide.
+
+{{available_skills}}
+
+## Phase 3 — IMPLEMENT
+Proceed with the task. Reference activated skill guidance when making
 decisions covered by those skills.
-
-CRITICAL: Do NOT skip Step 1. Evaluate ALL skills. Step 2 is WORTHLESS without Step 1.
