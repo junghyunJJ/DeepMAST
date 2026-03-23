@@ -6,7 +6,7 @@
     "specificity": 0.99,
     "false_positive_rate": 0.025,
     "activation_rate": 0.8167,
-    "avg_latency": 21.0
+    "avg_latency": 20.94
   },
   "B_NO_hints": {
     "f1": 0.9483,
@@ -15,6 +15,6 @@
     "specificity": 0.9933,
     "false_positive_rate": 0.0125,
     "activation_rate": 0.9333,
-    "avg_latency": 24.59
+    "avg_latency": 24.49
   }
 }

@@ -1,0 +1,43 @@
+{
+  "benchmark_type": "stage2_interpretation_v3",
+  "primary_metric": "weighted_probe_error_score",
+  "pair_unit": "model_case",
+  "trial_count": 140,
+  "variants": {
+    "A_tools_only": {
+      "n": 70,
+      "weighted_probe_error_score_mean": 0.0375,
+      "probe_support_score_mean": 0.9357142857142857,
+      "primary_probe_target_error_rate_mean": 0.0,
+      "all_probe_target_error_rate_mean": 0.047619047619047616,
+      "major_error_rate_mean": 0.0,
+      "evidence_ref_validity_rate_mean": 1.0,
+      "secondary_conclusion_accuracy": 0.2857142857142857,
+      "malformed_rate": 0.0,
+      "latency_s_mean": 25.494584214299852,
+      "tool_call_mean": 0.0,
+      "total_tokens_mean": 2176.1857142857143
+    },
+    "B_tools_plus_skills": {
+      "n": 70,
+      "weighted_probe_error_score_mean": 0.03642857142857143,
+      "probe_support_score_mean": 0.9380952380952381,
+      "primary_probe_target_error_rate_mean": 0.0,
+      "all_probe_target_error_rate_mean": 0.047619047619047616,
+      "major_error_rate_mean": 0.0,
+      "evidence_ref_validity_rate_mean": 1.0,
+      "secondary_conclusion_accuracy": 0.3,
+      "malformed_rate": 0.0,
+      "latency_s_mean": 29.19802355762939,
+      "tool_call_mean": 0.04285714285714286,
+      "total_tokens_mean": 2651.657142857143
+    }
+  },
+  "paired_tests": {
+    "weighted_probe_error_score_case_level": {
+      "pair_unit_count": 14,
+      "delta_mean": 0.0010714285714285715,
+      "wilcoxon_pvalue": 0.15729920705028505
+    }
+  }
+}

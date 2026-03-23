@@ -15,17 +15,39 @@ MODULE_PATH = (
     / "drugtarget_skill_ablation"
     / "benchmark_core.py"
 )
+V3_SWEEP_MODULE_PATH = (
+    PROJECT_ROOT
+    / "docs"
+    / "benchmarks"
+    / "drugtarget_skill_ablation"
+    / "benchmark_stage2_interpretation_v3_sweep.py"
+)
+V3_REJUDGE_MODULE_PATH = (
+    PROJECT_ROOT
+    / "docs"
+    / "benchmarks"
+    / "drugtarget_skill_ablation"
+    / "benchmark_stage2_interpretation_v3_rejudge.py"
+)
+V4_RUNNER_MODULE_PATH = (
+    PROJECT_ROOT
+    / "docs"
+    / "benchmarks"
+    / "drugtarget_skill_ablation"
+    / "benchmark_stage2_interpretation_v4.py"
+)
 
 
-def load_module():
-    spec = importlib.util.spec_from_file_location(
-        "drugtarget_skill_ablation_benchmark_core",
-        MODULE_PATH,
-    )
+def _load_module_from_path(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def load_module():
+    return _load_module_from_path("drugtarget_skill_ablation_benchmark_core", MODULE_PATH)
 
 
 @pytest.mark.asyncio
@@ -295,18 +317,23 @@ def test_load_case_files_and_validate_expected_counts():
     stage2_cases = mod.load_cases(mod.CASES_DIR / "stage2_synthesis_cases.json")
     stage2_v2_cases = mod.load_cases(mod.CASES_DIR / "stage2_interpretation_v2_cases.json")
     stage2_v3_cases = mod.load_cases(mod.CASES_DIR / "stage2_interpretation_v3_cases.json")
+    stage2_v4_cases = mod.load_cases(mod.CASES_DIR / "stage2_interpretation_v4_cases.json")
     chembl_cases = mod.load_cases(mod.CASES_DIR / "chembl_micro_cases.json")
     excerpt_library = mod.load_skill_excerpt_library()
+    rule_library = mod.load_skill_rule_library()
 
     assert len(stage2_cases) == 14
     assert len(stage2_v2_cases) == 14
     assert len(stage2_v3_cases) == 14
+    assert len(stage2_v4_cases) >= 6
     assert len(chembl_cases) == 4
     assert excerpt_library
+    assert rule_library
 
     stage2_ids = {case["case_id"] for case in stage2_cases}
     stage2_v2_ids = {case["case_id"] for case in stage2_v2_cases}
     stage2_v3_ids = {case["case_id"] for case in stage2_v3_cases}
+    stage2_v4_ids = {case["case_id"] for case in stage2_v4_cases}
     chembl_ids = {case["case_id"] for case in chembl_cases}
 
     assert "real_flt1_breast" in stage2_ids
@@ -314,6 +341,7 @@ def test_load_case_files_and_validate_expected_counts():
     assert "real_vegfa_breast" in stage2_v2_ids
     assert "perturbation_uncertainty_high_mixed_signal" in stage2_v2_ids
     assert "real_vegfa_breast" in stage2_v3_ids
+    assert "perturbation_trait_ambiguity" in stage2_v4_ids
     assert "perturbation_trait_ambiguity" in stage2_ids
     assert "chembl_preclinical_potency_not_clinical_support" in chembl_ids
 
@@ -347,11 +375,73 @@ def test_load_case_files_and_validate_expected_counts():
         assert len(case["probes"]) == 3
         assert case["secondary_conclusion"]["gold_label"]
 
+    for case in stage2_v4_cases:
+        assert case["benchmark_type"] == mod.STAGE2_INTERPRETATION_V4_BENCHMARK
+        assert "input_bundle" in case
+        assert "rule_ids" in case
+        assert len(case["probes"]) == 3
+        assert case["secondary_conclusion"]["gold_label"]
+        assert case["source_type"] == "v4_overlay"
+
     for excerpt_id, excerpt in excerpt_library.items():
         assert excerpt_id
         assert excerpt["skill_name"] in {"opentargets-database", "gwas-database"}
         assert excerpt["text"]
         assert excerpt["source_line_ref"]
+
+    for rule_id, rule in rule_library.items():
+        assert rule_id
+        assert rule["skill_name"] in {"opentargets-database", "gwas-database"}
+        assert rule["directive"]
+        assert rule["source_line_ref"]
+
+
+def test_build_case_rule_guidance_uses_only_requested_rules_and_caps_budget():
+    mod = load_module()
+    case = {
+        "rule_ids": ["r1", "r2", "r3"],
+        "probes": [
+            {"required_rule_ids": ["r1"]},
+            {"required_rule_ids": ["r2"]},
+            {"required_rule_ids": ["r3"]},
+        ],
+    }
+    rule_library = {
+        "r1": {
+            "rule_id": "r1",
+            "skill_name": "gwas-database",
+            "error_family": "gwas_strength_inflation",
+            "title": "GWAS threshold",
+            "directive": "Do not upgrade suggestive p-values to genome-wide significance.",
+            "source_path": "skills/gwas-database/SKILL.md",
+            "source_line_ref": "L1",
+        },
+        "r2": {
+            "rule_id": "r2",
+            "skill_name": "opentargets-database",
+            "error_family": "safety_underweighting",
+            "title": "Safety",
+            "directive": "Safety liabilities must reduce optimism.",
+            "source_path": "skills/opentargets-database/SKILL.md",
+            "source_line_ref": "L2",
+        },
+        "r3": {
+            "rule_id": "r3",
+            "skill_name": "gwas-database",
+            "error_family": "trait_alignment_inflation",
+            "title": "Trait mapping",
+            "directive": "Related traits are not automatically disease matched.",
+            "source_path": "skills/gwas-database/SKILL.md",
+            "source_line_ref": "L3",
+        },
+    }
+
+    guidance = mod.build_case_rule_guidance(case, rule_library=rule_library, max_tokens=16)
+
+    assert "GWAS threshold" in guidance
+    assert "Safety" in guidance
+    assert "Trait mapping" not in guidance
+    assert "skills/gwas-database/SKILL.md" in guidance
 
 
 def test_parse_benchmark_output_recovers_json_from_code_fence():
@@ -697,6 +787,96 @@ def test_score_stage2_interpretation_v3_output_tracks_weighted_probe_error_and_t
     assert metrics["evidence_ref_validity_rate"] == pytest.approx(1.0)
 
 
+def test_score_stage2_interpretation_v4_output_tracks_rule_validity_and_target_errors():
+    mod = load_module()
+    case = {
+        "benchmark_type": mod.STAGE2_INTERPRETATION_V4_BENCHMARK,
+        "case_id": "c1",
+        "evidence_refs": {"E1": "foo", "E2": "bar", "E3": "baz"},
+        "rule_ids": ["R1", "R2", "R3"],
+        "probes": [
+            {
+                "probe_id": "P1",
+                "error_family": "gwas_strength_inflation",
+                "options": ["a", "b", "c"],
+                "gold_label": "a",
+                "conservative_labels": ["b"],
+                "target_error_labels": ["c"],
+                "required_rule_ids": ["R1"],
+                "required_evidence_refs": ["E1"],
+            },
+            {
+                "probe_id": "P2",
+                "error_family": "approval_scope_inflation",
+                "options": ["a", "b", "c"],
+                "gold_label": "a",
+                "conservative_labels": ["b"],
+                "target_error_labels": ["c"],
+                "required_rule_ids": ["R2"],
+                "required_evidence_refs": ["E2"],
+            },
+            {
+                "probe_id": "P3",
+                "error_family": "uncertainty_underestimation",
+                "options": ["a", "b", "c"],
+                "gold_label": "a",
+                "conservative_labels": ["b"],
+                "target_error_labels": ["c"],
+                "required_rule_ids": ["R3"],
+                "required_evidence_refs": ["E3"],
+            },
+        ],
+        "secondary_conclusion": {
+            "options": ["supported", "unclear"],
+            "gold_label": "supported",
+            "required_evidence_refs": ["E1", "E2"],
+            "required_rule_ids": ["R1", "R2"],
+        },
+    }
+    parsed_output = {
+        "gene_symbol": "GENE",
+        "probe_answers": [
+            {
+                "probe_id": "P1",
+                "answer": "a",
+                "applied_rule_ids": ["R1"],
+                "evidence_refs": ["E1"],
+                "justification": "exact",
+            },
+            {
+                "probe_id": "P2",
+                "answer": "b",
+                "applied_rule_ids": ["R2"],
+                "evidence_refs": ["E2"],
+                "justification": "conservative",
+            },
+            {
+                "probe_id": "P3",
+                "answer": "c",
+                "applied_rule_ids": ["R3"],
+                "evidence_refs": ["E3"],
+                "justification": "target error",
+            },
+        ],
+        "secondary_conclusion": {
+            "answer": "supported",
+            "applied_rule_ids": ["R1", "R2"],
+            "evidence_refs": ["E1", "E2"],
+            "justification": "supported",
+        },
+    }
+
+    metrics = mod.score_stage2_interpretation_v4_output(case, parsed_output)
+
+    assert metrics["targeted_error_count"] == 1
+    assert metrics["primary_probe_target_error"] is False
+    assert metrics["all_probe_target_error_rate"] == pytest.approx(1.0 / 3.0)
+    assert metrics["weighted_target_error_score"] == pytest.approx(0.6 * 0.0 + 0.25 * 0.25 + 0.15 * 1.0)
+    assert metrics["rule_application_validity_rate"] == pytest.approx(1.0)
+    assert metrics["secondary_conclusion_accuracy"] == pytest.approx(1.0)
+    assert metrics["evidence_ref_validity_rate"] == pytest.approx(1.0)
+
+
 def test_summarize_trials_v3_uses_a_minus_b_delta_for_weighted_probe_error():
     mod = load_module()
     trials = [
@@ -748,6 +928,65 @@ def test_summarize_trials_v3_uses_a_minus_b_delta_for_weighted_probe_error():
     assert paired["delta_mean"] == pytest.approx(0.6)
 
 
+def test_summarize_trials_v4_uses_a_minus_b_delta_for_weighted_target_error():
+    mod = load_module()
+    trials = [
+        {
+            "benchmark_type": mod.STAGE2_INTERPRETATION_V4_BENCHMARK,
+            "case_id": "c1",
+            "model": "ollama:qwen3.5:35b",
+            "repeat_index": 0,
+            "variant": mod.VARIANT_A,
+            "latency_s": 1.0,
+            "tool_history": [],
+            "token_usage": {"total_tokens": 100},
+            "metrics": {
+                "weighted_target_error_score": 0.8,
+                "primary_probe_target_error_rate": 1.0,
+                "all_probe_target_error_rate": 0.5,
+                "major_error_rate": 0.0,
+                "rule_application_validity_rate": 1.0,
+                "evidence_ref_validity_rate": 1.0,
+                "secondary_conclusion_accuracy": 1.0,
+                "malformed_output": False,
+            },
+        },
+        {
+            "benchmark_type": mod.STAGE2_INTERPRETATION_V4_BENCHMARK,
+            "case_id": "c1",
+            "model": "ollama:qwen3.5:35b",
+            "repeat_index": 0,
+            "variant": mod.VARIANT_B,
+            "latency_s": 1.0,
+            "tool_history": [],
+            "token_usage": {"total_tokens": 100},
+            "metrics": {
+                "weighted_target_error_score": 0.2,
+                "primary_probe_target_error_rate": 0.0,
+                "all_probe_target_error_rate": 0.0,
+                "major_error_rate": 0.0,
+                "rule_application_validity_rate": 1.0,
+                "evidence_ref_validity_rate": 1.0,
+                "secondary_conclusion_accuracy": 1.0,
+                "malformed_output": False,
+            },
+        },
+    ]
+
+    summary = mod.summarize_trials(trials)
+    paired = summary["paired_tests"]["weighted_target_error_score_case_level"]
+
+    assert summary["benchmark_type"] == mod.STAGE2_INTERPRETATION_V4_BENCHMARK
+    assert paired["pair_unit_count"] == 1
+    assert paired["delta_mean"] == pytest.approx(0.6)
+
+
+def test_v4_runner_module_loads():
+    mod = _load_module_from_path("drugtarget_v4_runner", V4_RUNNER_MODULE_PATH)
+
+    assert hasattr(mod, "main")
+
+
 def test_select_v3_judge_keys_prefers_nonzero_deltas_and_samples_ties():
     mod = load_module()
     trial_pairs = {
@@ -781,3 +1020,28 @@ def test_load_model_configs_from_env_accepts_provider_model_override(monkeypatch
     assert cfgs[0]["label"] == "openai:gpt-4.1"
     assert cfgs[0]["provider"] == "openai"
     assert cfgs[0]["model_kwargs"]["model"] == "gpt-4.1"
+
+
+def test_v3_sweep_runner_parses_temperatures_and_builds_stems():
+    mod = _load_module_from_path("drugtarget_v3_sweep", V3_SWEEP_MODULE_PATH)
+
+    assert mod._parse_temperature_list("0.0, 0.2,0.30,0.4") == [0.0, 0.2, 0.3, 0.4]
+    assert mod._temperature_token(0.0) == "t00"
+    assert mod._temperature_token(0.3) == "t03"
+    assert mod._build_stem("stage2_interpretation_v3_qwen35_122b", 0.3, 5) == (
+        "stage2_interpretation_v3_qwen35_122b_t03_r5"
+    )
+
+
+def test_v3_rejudge_runner_parses_judge_models():
+    mod = _load_module_from_path("drugtarget_v3_rejudge", V3_REJUDGE_MODULE_PATH)
+
+    judge_cfgs = mod._parse_judge_models(
+        "ollama:qwen3.5:35b,ollama:gpt-oss:20b,ollama:qwen3:30b"
+    )
+
+    assert [cfg["label"] for cfg in judge_cfgs] == [
+        "ollama:qwen3.5:35b",
+        "ollama:gpt-oss:20b",
+        "ollama:qwen3:30b",
+    ]

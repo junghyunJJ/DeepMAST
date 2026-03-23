@@ -33,6 +33,7 @@ from src.agents.drug_target.tools import (
     query_pubmed_clinical_limitations,
     run_compare_census_lr_pair,
     finalize_stage1_artifacts,
+    compute_rubric_scores,
     read_skill_file,
     # Assessment tools
     save_target_assessment,
@@ -86,6 +87,7 @@ SUBAGENT_CONFIGS = {
             # Stage 2: Target Validation (batch only — individual tools removed to prevent token bloat)
             query_stage2_gene_panel,
             query_ensembl_vep_consequence,
+            compute_rubric_scores,
             # Stage 3: Deep Dive
             query_chembl_target_profile,
             query_pubmed_clinical_limitations,

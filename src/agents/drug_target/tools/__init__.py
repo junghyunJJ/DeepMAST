@@ -35,6 +35,9 @@ from src.agents.drug_target.tools.stage_domain_tools import (
 from src.agents.drug_target.tools.census_lr_validation_tools import (
     run_compare_census_lr_pair,
 )
+from src.agents.drug_target.tools.stage_logic import (
+    compute_rubric_scores,
+)
 from src.agents.drug_target.tools.skill_reader import (
     read_skill_file,
 )
@@ -76,6 +79,7 @@ __all__ = [
     "run_compare_census_lr_pair",
     "read_skill_file",
     "finalize_stage1_artifacts",
+    "compute_rubric_scores",
     # Output contract
     "save_target_assessment",
     "save_drug_md",

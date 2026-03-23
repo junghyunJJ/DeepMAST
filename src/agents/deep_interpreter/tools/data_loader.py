@@ -21,6 +21,7 @@ ANALYSIS_FILES = {
     # Part 1: Spatial & Pathway
     "1_1_spatial": {
         "figure": "1.cluster_spatial.png",
+        "figure_glob": "1.cluster_spatial_by_*.png",  # sample_key variant
         "display_name": "1-1 Spatial Clustering",
         "description": "Spatial distribution of clusters",
     },
@@ -76,11 +77,13 @@ ANALYSIS_FILES = {
     # Part 3: L-R Interactions
     "3_10_spatial_lr": {
         "figure": "10.spatial_plot_interections.png",
+        "figure_glob": "10.spatial_plot_interections_*.png",  # per-sample variants
         "display_name": "3-10 Spatial L-R",
         "description": "Spatial L-R expression patterns",
     },
     "3_11_lr_summary": {
         "figure": "11.lr_interections.png",
+        "figure_glob": "11.lr_interections_*.png",  # per-sample variants
         "data": "sel_interest_sig_liana.csv",
         "display_name": "3-11 L-R Summary",
         "description": "L-R interaction summary",
@@ -255,6 +258,13 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     for analysis_name, file_config in ANALYSIS_FILES.items():
         figure_path = data_path / file_config["figure"]
         has_figure = figure_path.exists()
+
+        # Fallback: try sample_key variant glob if primary figure not found
+        if not has_figure and "figure_glob" in file_config:
+            alt = sorted(data_path.glob(file_config["figure_glob"]))
+            if alt:
+                figure_path = alt[0]  # Use first match as representative
+                has_figure = True
 
         has_data = True
         data_path_str = None
@@ -458,7 +468,13 @@ def get_figure_path(data_dir: str, analysis_name: str) -> Optional[str]:
         return None
 
     config = ANALYSIS_FILES[analysis_name]
-    figure_path = Path(data_dir).expanduser().resolve() / config["figure"]
+    data_path = Path(data_dir).expanduser().resolve()
+    figure_path = data_path / config["figure"]
+
+    if not figure_path.exists() and "figure_glob" in config:
+        alt = sorted(data_path.glob(config["figure_glob"]))
+        if alt:
+            return str(alt[0])
 
     return str(figure_path) if figure_path.exists() else None
 

@@ -110,6 +110,7 @@ VARIANT_B = "B_tools_plus_skills"
 MAIN_STAGE2_BENCHMARK = "stage2_synthesis"
 STAGE2_INTERPRETATION_V2_BENCHMARK = "stage2_interpretation_v2"
 STAGE2_INTERPRETATION_V3_BENCHMARK = "stage2_interpretation_v3"
+STAGE2_INTERPRETATION_V4_BENCHMARK = "stage2_interpretation_v4"
 CHEMBL_MICRO_BENCHMARK = "chembl_micro"
 RESEARCH_JUDGE_PANEL_SIZE = 3
 DEFAULT_HUMAN_AUDIT_SAMPLE_RATE = 0.2
@@ -118,6 +119,24 @@ V3_PROBE_WEIGHTS = {"P1": 0.60, "P2": 0.25, "P3": 0.15}
 V3_ALLOWED_SKILLS = {"opentargets-database", "gwas-database"}
 V3_CASE_FILENAME = "stage2_interpretation_v3_cases.json"
 V3_EXCERPT_LIBRARY_FILENAME = "skill_excerpt_library.json"
+V4_CASE_FILENAME = "stage2_interpretation_v4_cases.json"
+V4_RULE_LIBRARY_FILENAME = "skill_rule_library.json"
+V4_ALLOWED_SKILLS = {"opentargets-database", "gwas-database"}
+V4_PROBE_WEIGHTS = {"P1": 0.60, "P2": 0.25, "P3": 0.15}
+V4_PHASE1_CASE_IDS = [
+    "real_tgfb1_breast",
+    "real_tgfbr2_breast",
+    "real_cd44_breast",
+    "real_spp1_breast",
+    "perturbation_ot_safety_conflict",
+    "perturbation_gwas_significance_boundary",
+    "perturbation_trait_ambiguity",
+    "perturbation_evidence_conflict",
+    "perturbation_approval_scope_mismatch",
+    "perturbation_predicted_tractability_only",
+    "perturbation_adjacent_phase12_confound",
+    "perturbation_uncertainty_high_mixed_signal",
+]
 HUMAN_AUDIT_TEMPLATE_FIELDS = [
     "audit_id",
     "reviewer_id",
@@ -289,6 +308,37 @@ def _required_v3_probe_keys() -> set[str]:
     }
 
 
+def _required_stage2_interpretation_v4_keys() -> set[str]:
+    return {
+        "case_id",
+        "benchmark_type",
+        "source_type",
+        "base_case_id",
+        "input_bundle",
+        "judge_focus",
+        "notes",
+        "case_rationale",
+        "evidence_refs",
+        "rule_ids",
+        "probes",
+        "secondary_conclusion",
+    }
+
+
+def _required_v4_probe_keys() -> set[str]:
+    return {
+        "probe_id",
+        "error_family",
+        "question",
+        "options",
+        "gold_label",
+        "conservative_labels",
+        "target_error_labels",
+        "required_rule_ids",
+        "required_evidence_refs",
+    }
+
+
 def _default_v3_excerpt_library() -> dict[str, dict[str, Any]]:
     return {
         "gwas_pvalue_threshold": {
@@ -417,6 +467,35 @@ def load_skill_excerpt_library(path: str | Path | None = None) -> dict[str, dict
         if not isinstance(excerpt["source_line_ref"], str) or not excerpt["source_line_ref"].strip():
             raise ValueError(f"Excerpt {excerpt_id} must include source_line_ref")
         validated[str(excerpt_id)] = excerpt
+    return validated
+
+
+def load_skill_rule_library(path: str | Path | None = None) -> dict[str, dict[str, Any]]:
+    rule_path = Path(path) if path is not None else CASES_DIR / V4_RULE_LIBRARY_FILENAME
+    if not rule_path.exists():
+        raise FileNotFoundError(rule_path)
+
+    payload = json.loads(rule_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("Skill rule library must be a JSON object")
+
+    validated: dict[str, dict[str, Any]] = {}
+    required = {"rule_id", "skill_name", "error_families", "title", "directive", "source_path", "source_line_ref"}
+    for rule_id, rule in payload.items():
+        if not isinstance(rule, dict):
+            raise ValueError(f"Rule {rule_id} must be an object")
+        missing = required - set(rule)
+        if missing:
+            raise ValueError(f"Rule {rule_id} missing keys: {sorted(missing)}")
+        if rule["skill_name"] not in V4_ALLOWED_SKILLS:
+            raise ValueError(f"Rule {rule_id} uses unsupported skill {rule['skill_name']}")
+        if not isinstance(rule["directive"], str) or not rule["directive"].strip():
+            raise ValueError(f"Rule {rule_id} must include a non-empty directive")
+        if len(rule["directive"].split()) > 24:
+            raise ValueError(f"Rule {rule_id} directive exceeds 24 words")
+        if rule["directive"].count(".") + rule["directive"].count("!") + rule["directive"].count("?") > 1:
+            raise ValueError(f"Rule {rule_id} directive must be a single sentence")
+        validated[str(rule_id)] = rule
     return validated
 
 
@@ -598,6 +677,43 @@ def _validate_v3_secondary_conclusion(case_id: str, payload: dict[str, Any]) -> 
         raise ValueError(f"V3 case {case_id} secondary_conclusion has invalid gold_label")
 
 
+def _validate_v4_probe(case_id: str, probe: dict[str, Any], rule_library: dict[str, dict[str, Any]]) -> None:
+    missing = _required_v4_probe_keys() - set(probe)
+    if missing:
+        raise ValueError(f"V4 case {case_id} probe missing keys: {sorted(missing)}")
+    options = probe["options"]
+    if not isinstance(options, list) or len(options) < 2 or not all(isinstance(item, str) and item for item in options):
+        raise ValueError(f"V4 case {case_id} probe {probe.get('probe_id')} has invalid options")
+    if probe["gold_label"] not in options:
+        raise ValueError(f"V4 case {case_id} probe {probe.get('probe_id')} has invalid gold_label")
+    for key in ("conservative_labels", "target_error_labels", "required_rule_ids", "required_evidence_refs"):
+        value = probe[key]
+        if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+            raise ValueError(f"V4 case {case_id} probe {probe.get('probe_id')} has invalid {key}")
+    for label in probe["conservative_labels"] + probe["target_error_labels"]:
+        if label not in options:
+            raise ValueError(f"V4 case {case_id} probe {probe.get('probe_id')} uses out-of-range label {label}")
+    for rule_id in probe["required_rule_ids"]:
+        if rule_id not in rule_library:
+            raise ValueError(f"V4 case {case_id} probe {probe.get('probe_id')} references unknown rule {rule_id}")
+
+
+def _validate_v4_secondary_conclusion(case_id: str, payload: dict[str, Any], rule_library: dict[str, dict[str, Any]]) -> None:
+    required = {"question", "options", "gold_label", "required_rule_ids", "required_evidence_refs"}
+    missing = required - set(payload)
+    if missing:
+        raise ValueError(f"V4 case {case_id} secondary_conclusion missing keys: {sorted(missing)}")
+    if payload["gold_label"] not in payload["options"]:
+        raise ValueError(f"V4 case {case_id} secondary_conclusion has invalid gold_label")
+    for key in ("required_rule_ids", "required_evidence_refs"):
+        value = payload[key]
+        if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+            raise ValueError(f"V4 case {case_id} secondary_conclusion has invalid {key}")
+    for rule_id in payload["required_rule_ids"]:
+        if rule_id not in rule_library:
+            raise ValueError(f"V4 case {case_id} secondary_conclusion references unknown rule {rule_id}")
+
+
 def build_case_excerpt_guidance(
     case: dict[str, Any],
     *,
@@ -636,6 +752,55 @@ def build_case_excerpt_guidance(
     return (
         "## Relevant Skill Excerpts\n"
         "Use the excerpted guidance below for interpretation only. Do not add facts beyond the frozen evidence bundle.\n\n"
+        + "\n\n".join(blocks)
+    )
+
+
+def build_case_rule_guidance(
+    case: dict[str, Any],
+    *,
+    rule_library: dict[str, dict[str, Any]] | None = None,
+    max_tokens: int = 120,
+) -> str:
+    library = rule_library or load_skill_rule_library()
+    ordered_ids: list[str] = []
+    for probe in case.get("probes", []):
+        for rule_id in probe.get("required_rule_ids", []):
+            if rule_id not in ordered_ids:
+                ordered_ids.append(rule_id)
+    for rule_id in case.get("secondary_conclusion", {}).get("required_rule_ids", []):
+        if rule_id not in ordered_ids:
+            ordered_ids.append(rule_id)
+    for rule_id in case.get("rule_ids", []):
+        if rule_id not in ordered_ids:
+            ordered_ids.append(rule_id)
+
+    blocks: list[str] = []
+    token_budget = 0
+    for rule_id in ordered_ids:
+        rule = library.get(rule_id)
+        if not rule:
+            continue
+        rule_tokens = len(str(rule["directive"]).split())
+        if blocks and token_budget + rule_tokens > max_tokens:
+            continue
+        token_budget += rule_tokens
+        error_families = ", ".join(rule.get("error_families", []))
+        blocks.append(
+            f"### {rule['title']}\n"
+            f"Rule ID: {rule_id}\n"
+            f"Skill: {rule['skill_name']}\n"
+            f"Error families: {error_families}\n"
+            f"Source: {rule['source_path']} ({rule['source_line_ref']})\n"
+            f"Directive: {rule['directive']}"
+        )
+
+    if not blocks:
+        return ""
+    return (
+        "## Relevant Skill Rules\n"
+        "Use the distilled rules below as interpretation policy only. "
+        "Do not add facts beyond the frozen evidence bundle.\n\n"
         + "\n\n".join(blocks)
     )
 
@@ -763,6 +928,8 @@ def load_cases(path: str | Path) -> list[dict[str, Any]]:
             required = _required_stage2_interpretation_v2_keys()
         elif benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
             required = _required_stage2_interpretation_v3_keys()
+        elif benchmark_type == STAGE2_INTERPRETATION_V4_BENCHMARK:
+            required = _required_stage2_interpretation_v4_keys()
         else:
             required = _required_stage2_case_keys()
         missing = required - set(case)
@@ -812,6 +979,56 @@ def load_cases(path: str | Path) -> list[dict[str, Any]]:
                 if evidence_ref not in case["evidence_refs"]:
                     raise ValueError(
                         f"V3 case {case_id} secondary_conclusion references unknown evidence ref {evidence_ref}"
+                    )
+            resolved_cases.append(case)
+        elif benchmark_type == STAGE2_INTERPRETATION_V4_BENCHMARK:
+            rule_library = load_skill_rule_library()
+            if case_id not in V4_PHASE1_CASE_IDS:
+                raise ValueError(f"V4 case {case_id} is outside the frozen Phase 1 primary set")
+            if case.get("source_type") != "v4_overlay":
+                raise ValueError(f"V4 case {case_id} must have source_type=v4_overlay")
+            if not isinstance(case.get("judge_focus"), list) or not all(
+                isinstance(item, str) and item for item in case["judge_focus"]
+            ):
+                raise ValueError(f"V4 case {case_id} must include a string list judge_focus")
+            if not isinstance(case.get("case_rationale"), str) or not case["case_rationale"].strip():
+                raise ValueError(f"V4 case {case_id} must include a non-empty case_rationale")
+            if not isinstance(case.get("evidence_refs"), dict) or not case["evidence_refs"]:
+                raise ValueError(f"V4 case {case_id} must define evidence_refs")
+            if not isinstance(case.get("rule_ids"), list) or not case["rule_ids"]:
+                raise ValueError(f"V4 case {case_id} must define non-empty rule_ids")
+            for rule_id in case["rule_ids"]:
+                if rule_id not in rule_library:
+                    raise ValueError(f"V4 case {case_id} references unknown rule {rule_id}")
+            probes = case.get("probes")
+            if not isinstance(probes, list) or len(probes) != 3:
+                raise ValueError(f"V4 case {case_id} must define exactly 3 probes")
+            expected_probe_ids = ["P1", "P2", "P3"]
+            actual_probe_ids = [probe.get("probe_id") for probe in probes]
+            if actual_probe_ids != expected_probe_ids:
+                raise ValueError(f"V4 case {case_id} must use ordered probe IDs {expected_probe_ids}")
+            for probe in probes:
+                _validate_v4_probe(case_id, probe, rule_library)
+                for evidence_ref in probe["required_evidence_refs"]:
+                    if evidence_ref not in case["evidence_refs"]:
+                        raise ValueError(
+                            f"V4 case {case_id} probe {probe.get('probe_id')} references unknown evidence ref {evidence_ref}"
+                        )
+                for rule_id in probe["required_rule_ids"]:
+                    if rule_id not in case["rule_ids"]:
+                        raise ValueError(
+                            f"V4 case {case_id} probe {probe.get('probe_id')} references rule outside case rule_ids: {rule_id}"
+                        )
+            _validate_v4_secondary_conclusion(case_id, case["secondary_conclusion"], rule_library)
+            for evidence_ref in case["secondary_conclusion"]["required_evidence_refs"]:
+                if evidence_ref not in case["evidence_refs"]:
+                    raise ValueError(
+                        f"V4 case {case_id} secondary_conclusion references unknown evidence ref {evidence_ref}"
+                    )
+            for rule_id in case["secondary_conclusion"]["required_rule_ids"]:
+                if rule_id not in case["rule_ids"]:
+                    raise ValueError(
+                        f"V4 case {case_id} secondary_conclusion references rule outside case rule_ids: {rule_id}"
                     )
             resolved_cases.append(case)
         else:
@@ -924,6 +1141,28 @@ def enforce_skill_read_requirement(
 
 
 def _benchmark_json_schema_text(benchmark_type: str) -> str:
+    if benchmark_type == STAGE2_INTERPRETATION_V4_BENCHMARK:
+        return json.dumps(
+            {
+                "gene_symbol": "GENE",
+                "probe_answers": [
+                    {
+                        "probe_id": "P1",
+                        "answer": "suggestive",
+                        "applied_rule_ids": ["R_GWAS_SIG"],
+                        "evidence_refs": ["E1", "E2"],
+                        "justification": "...",
+                    }
+                ],
+                "secondary_conclusion": {
+                    "answer": "exploratory_target",
+                    "applied_rule_ids": ["R_GWAS_SIG", "R_OT_RELATIVE"],
+                    "evidence_refs": ["E3"],
+                    "justification": "...",
+                },
+            },
+            indent=2,
+        )
     if benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
         return json.dumps(
             {
@@ -1009,6 +1248,22 @@ def _benchmark_json_schema_text(benchmark_type: str) -> str:
 
 def build_system_prompt(benchmark_type: str) -> str:
     """Build the benchmark system prompt."""
+    if benchmark_type == STAGE2_INTERPRETATION_V4_BENCHMARK:
+        return (
+            "You are benchmarking whether distilled skill rules reduce targeted interpretation errors.\n\n"
+            "Use only the frozen evidence bundle, the provided E* evidence references, and the provided rule checklist.\n"
+            "If rules are present, apply them as interpretation policy only.\n"
+            "Do not invent new database facts, trial phases, disease mappings, replication status, or approval scope.\n"
+            "Answer exactly three probes and one secondary conclusion.\n"
+            "For every answer, cite only the relevant E* evidence refs and the rule IDs you actually applied.\n"
+            "Prefer conservative answers when the bundle is ambiguous.\n\n"
+            "Primary goal:\n"
+            "- Avoid targeted interpretation errors around GWAS strength, replication, disease alignment, approval scope,\n"
+            "  predicted tractability, safety weighting, and uncertainty.\n"
+            "- Keep justifications short, evidence-bound, and limited to the cited E* refs.\n\n"
+            "Return a single JSON object and nothing else.\n"
+            f"Schema:\n{_benchmark_json_schema_text(benchmark_type)}"
+        )
     if benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
         return (
             "You are benchmarking whether relevant SKILL.md excerpts reduce targeted interpretation errors.\n\n"
@@ -1091,6 +1346,41 @@ def build_user_prompt(case: dict[str, Any]) -> str:
     """Create the case-specific user prompt."""
     bundle = json.dumps(case["input_bundle"], indent=2, ensure_ascii=False)
     focus = ", ".join(case.get("judge_focus", []))
+    if case["benchmark_type"] == STAGE2_INTERPRETATION_V4_BENCHMARK:
+        evidence_lines = [f"- {ref_id}: {text}" for ref_id, text in case["evidence_refs"].items()]
+        probe_lines: list[str] = []
+        for probe in case["probes"]:
+            options = " | ".join(probe["options"])
+            required_refs = ", ".join(probe["required_evidence_refs"])
+            required_rules = ", ".join(probe["required_rule_ids"])
+            probe_lines.append(
+                f"{probe['probe_id']} [{probe['error_family']}]\n"
+                f"Question: {probe['question']}\n"
+                f"Allowed answers: {options}\n"
+                f"Relevant evidence refs: {required_refs}\n"
+                f"Relevant rule IDs: {required_rules}"
+            )
+
+        conclusion_options = " | ".join(case["secondary_conclusion"]["options"])
+        conclusion_refs = ", ".join(case["secondary_conclusion"]["required_evidence_refs"])
+        conclusion_rules = ", ".join(case["secondary_conclusion"]["required_rule_ids"])
+        return (
+            f"Case ID: {case['case_id']}\n"
+            f"Benchmark type: {case['benchmark_type']}\n"
+            f"Judge focus: {focus}\n"
+            f"Notes: {case['notes']}\n"
+            f"Case rationale: {case['case_rationale']}\n\n"
+            "Evidence references:\n"
+            f"{chr(10).join(evidence_lines)}\n\n"
+            "Answer these probes using only the cited E* evidence refs and any applicable rule IDs:\n"
+            f"{chr(10).join(probe_lines)}\n\n"
+            "Secondary conclusion:\n"
+            f"Question: {case['secondary_conclusion']['question']}\n"
+            f"Allowed answers: {conclusion_options}\n"
+            f"Relevant evidence refs: {conclusion_refs}\n"
+            f"Relevant rule IDs: {conclusion_rules}\n\n"
+            f"Evidence bundle:\n{bundle}"
+        )
     if case["benchmark_type"] == STAGE2_INTERPRETATION_V3_BENCHMARK:
         evidence_lines = [f"- {ref_id}: {text}" for ref_id, text in case["evidence_refs"].items()]
         probe_lines: list[str] = []
@@ -1443,6 +1733,190 @@ def score_stage2_interpretation_v3_output(
     }
 
 
+def _v4_malformed_metrics(validation_errors: list[str]) -> dict[str, Any]:
+    return {
+        "malformed_output": True,
+        "weighted_target_error_score": 1.0,
+        "probe_support_score": 0.0,
+        "targeted_error_count": 3,
+        "target_error_rate": 1.0,
+        "primary_probe_target_error": True,
+        "primary_probe_target_error_rate": 1.0,
+        "all_probe_target_error_rate": 1.0,
+        "major_error_rate": 1.0,
+        "rule_application_validity_rate": 0.0,
+        "evidence_ref_validity_rate": 0.0,
+        "secondary_conclusion_accuracy": 0.0,
+        "validation_errors": validation_errors,
+        "error_family_breakdown": {},
+    }
+
+
+def _mean_scored_ids(
+    ids: list[str],
+    *,
+    required_ids: list[str],
+    valid_ids: list[str],
+) -> float:
+    if not ids:
+        return 0.0
+    scores: list[float] = []
+    valid_id_set = set(valid_ids)
+    required_id_set = set(required_ids)
+    for item in ids:
+        if item in required_id_set:
+            scores.append(1.0)
+        elif item in valid_id_set:
+            scores.append(0.5)
+        else:
+            scores.append(0.0)
+    return _mean(scores) or 0.0
+
+
+def score_stage2_interpretation_v4_output(
+    case: dict[str, Any],
+    parsed_output: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not isinstance(parsed_output, dict):
+        return _v4_malformed_metrics(["No parsed JSON output"])
+
+    validation_errors: list[str] = []
+    predicted_probes = _answers_by_probe_id(parsed_output)
+    support_scores: list[float] = []
+    targeted_error_count = 0
+    primary_probe_target_error = False
+    rule_validity_scores: list[float] = []
+    evidence_validity_scores: list[float] = []
+    error_family_breakdown: dict[str, float] = {}
+    case_rule_ids = [str(rule_id) for rule_id in case.get("rule_ids", [])]
+    case_evidence_refs = list(case.get("evidence_refs", {}).keys())
+
+    for probe in case["probes"]:
+        probe_id = probe["probe_id"]
+        predicted = predicted_probes.get(probe_id)
+        if not isinstance(predicted, dict):
+            validation_errors.append(f"Missing probe {probe_id}")
+            continue
+
+        answer = predicted.get("answer")
+        if answer not in probe["options"]:
+            validation_errors.append(f"Invalid answer for probe {probe_id}")
+
+        applied_rule_ids = predicted.get("applied_rule_ids")
+        if not isinstance(applied_rule_ids, list) or not all(isinstance(item, str) for item in applied_rule_ids):
+            validation_errors.append(f"Invalid applied_rule_ids for probe {probe_id}")
+            applied_rule_ids = []
+        else:
+            applied_rule_ids = list(dict.fromkeys(applied_rule_ids))
+            unknown_rules = [rule_id for rule_id in applied_rule_ids if rule_id not in case_rule_ids]
+            if unknown_rules:
+                validation_errors.append(f"Unknown applied_rule_ids for probe {probe_id}: {unknown_rules}")
+
+        evidence_refs = predicted.get("evidence_refs")
+        if not isinstance(evidence_refs, list) or not all(isinstance(item, str) for item in evidence_refs):
+            validation_errors.append(f"Invalid evidence_refs for probe {probe_id}")
+            evidence_refs = []
+
+        justification = predicted.get("justification")
+        if not isinstance(justification, str) or not justification.strip():
+            validation_errors.append(f"Missing justification for probe {probe_id}")
+
+        support_score = _v3_support_score(
+            answer=str(answer),
+            gold_label=probe["gold_label"],
+            conservative_labels=probe["conservative_labels"],
+            target_error_labels=probe["target_error_labels"],
+            options=probe["options"],
+        )
+        support_scores.append(support_score)
+        is_target_error = answer in probe["target_error_labels"]
+        if is_target_error:
+            targeted_error_count += 1
+        if probe_id == "P1":
+            primary_probe_target_error = is_target_error
+        error_family_breakdown[probe.get("error_family", probe_id)] = 1.0 - support_score
+
+        rule_validity_scores.append(
+            _mean_scored_ids(
+                applied_rule_ids,
+                required_ids=probe["required_rule_ids"],
+                valid_ids=case_rule_ids,
+            )
+        )
+        evidence_validity_scores.append(
+            _mean_scored_ids(
+                evidence_refs,
+                required_ids=probe["required_evidence_refs"],
+                valid_ids=case_evidence_refs,
+            )
+        )
+
+    secondary_accuracy = 0.0
+    secondary = parsed_output.get("secondary_conclusion")
+    if not isinstance(secondary, dict):
+        validation_errors.append("Missing secondary_conclusion")
+    else:
+        answer = secondary.get("answer")
+        if answer not in case["secondary_conclusion"]["options"]:
+            validation_errors.append("Invalid secondary_conclusion answer")
+        applied_rule_ids = secondary.get("applied_rule_ids")
+        if not isinstance(applied_rule_ids, list) or not all(isinstance(item, str) for item in applied_rule_ids):
+            validation_errors.append("Invalid secondary_conclusion applied_rule_ids")
+            applied_rule_ids = []
+        else:
+            applied_rule_ids = list(dict.fromkeys(applied_rule_ids))
+            unknown_rules = [rule_id for rule_id in applied_rule_ids if rule_id not in case_rule_ids]
+            if unknown_rules:
+                validation_errors.append(f"Unknown secondary_conclusion applied_rule_ids: {unknown_rules}")
+        evidence_refs = secondary.get("evidence_refs")
+        if not isinstance(evidence_refs, list) or not all(isinstance(item, str) for item in evidence_refs):
+            validation_errors.append("Invalid secondary_conclusion evidence_refs")
+            evidence_refs = []
+        justification = secondary.get("justification")
+        if not isinstance(justification, str) or not justification.strip():
+            validation_errors.append("Missing secondary_conclusion justification")
+        secondary_accuracy = 1.0 if answer == case["secondary_conclusion"]["gold_label"] else 0.0
+        rule_validity_scores.append(
+            _mean_scored_ids(
+                applied_rule_ids,
+                required_ids=case["secondary_conclusion"]["required_rule_ids"],
+                valid_ids=case_rule_ids,
+            )
+        )
+        evidence_validity_scores.append(
+            _mean_scored_ids(
+                evidence_refs,
+                required_ids=case["secondary_conclusion"]["required_evidence_refs"],
+                valid_ids=case_evidence_refs,
+            )
+        )
+
+    if validation_errors:
+        return _v4_malformed_metrics(validation_errors)
+
+    weighted_target_error_score = 0.0
+    for index, score in enumerate(support_scores, start=1):
+        weighted_target_error_score += V4_PROBE_WEIGHTS.get(f"P{index}", 0.0) * (1.0 - score)
+
+    probe_count = max(1, len(case["probes"]))
+    return {
+        "malformed_output": False,
+        "weighted_target_error_score": weighted_target_error_score,
+        "probe_support_score": _mean(support_scores) or 0.0,
+        "targeted_error_count": targeted_error_count,
+        "target_error_rate": targeted_error_count / probe_count,
+        "primary_probe_target_error": primary_probe_target_error,
+        "primary_probe_target_error_rate": 1.0 if primary_probe_target_error else 0.0,
+        "all_probe_target_error_rate": targeted_error_count / probe_count,
+        "major_error_rate": 1.0 if primary_probe_target_error else 0.0,
+        "rule_application_validity_rate": _mean(rule_validity_scores) or 0.0,
+        "evidence_ref_validity_rate": _mean(evidence_validity_scores) or 0.0,
+        "secondary_conclusion_accuracy": secondary_accuracy,
+        "validation_errors": [],
+        "error_family_breakdown": error_family_breakdown,
+    }
+
+
 def score_stage2_interpretation_v2_output(
     case: dict[str, Any],
     parsed_output: dict[str, Any] | None,
@@ -1742,7 +2216,7 @@ async def run_single_trial(
 ) -> dict[str, Any]:
     """Run one benchmark trial for a single case and variant."""
     benchmark_type = case["benchmark_type"]
-    if benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
+    if benchmark_type in {STAGE2_INTERPRETATION_V3_BENCHMARK, STAGE2_INTERPRETATION_V4_BENCHMARK}:
         skill_registry = {}
         stage_hints = {}
     elif variant == VARIANT_A:
@@ -1756,7 +2230,13 @@ async def run_single_trial(
         stage_hints = {}
 
     base_system_prompt = build_system_prompt(benchmark_type)
-    if benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
+    if benchmark_type == STAGE2_INTERPRETATION_V4_BENCHMARK:
+        system_prompt = base_system_prompt
+        if variant == VARIANT_B:
+            rule_guidance = build_case_rule_guidance(case)
+            if rule_guidance:
+                system_prompt = f"{system_prompt}\n\n{rule_guidance}"
+    elif benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
         system_prompt = base_system_prompt
         if variant == VARIANT_B:
             excerpt_guidance = build_case_excerpt_guidance(case)
@@ -1795,7 +2275,9 @@ async def run_single_trial(
     except Exception as exc:
         error = str(exc)
 
-    if benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
+    if benchmark_type == STAGE2_INTERPRETATION_V4_BENCHMARK:
+        metrics = score_stage2_interpretation_v4_output(case, parsed_output)
+    elif benchmark_type == STAGE2_INTERPRETATION_V3_BENCHMARK:
         metrics = score_stage2_interpretation_v3_output(case, parsed_output)
     elif benchmark_type == STAGE2_INTERPRETATION_V2_BENCHMARK:
         metrics = score_stage2_interpretation_v2_output(case, parsed_output)
@@ -1826,11 +2308,73 @@ def _mean(values: list[float]) -> float | None:
 
 def _primary_trial_score(trial: dict[str, Any]) -> float:
     metrics = trial["metrics"]
+    if "weighted_target_error_score" in metrics:
+        return float(1.0 - metrics["weighted_target_error_score"])
     if "weighted_probe_error_score" in metrics:
         return float(1.0 - metrics["weighted_probe_error_score"])
     if "interpretation_score" in metrics:
         return float(metrics["interpretation_score"])
     return float(metrics.get("exact_match_rate", 0.0))
+
+
+def _summarize_stage2_interpretation_v4_trials(trials: list[dict[str, Any]]) -> dict[str, Any]:
+    summary: dict[str, Any] = {
+        "benchmark_type": STAGE2_INTERPRETATION_V4_BENCHMARK,
+        "primary_metric": "weighted_target_error_score",
+        "pair_unit": "model_case",
+        "trial_count": len(trials),
+        "variants": {},
+        "paired_tests": {},
+    }
+
+    for variant in (VARIANT_A, VARIANT_B):
+        variant_trials = [trial for trial in trials if trial["variant"] == variant]
+        metrics = [trial["metrics"] for trial in variant_trials]
+        summary["variants"][variant] = {
+            "n": len(variant_trials),
+            "weighted_target_error_score_mean": _mean([m["weighted_target_error_score"] for m in metrics]),
+            "probe_support_score_mean": _mean([m.get("probe_support_score", 0.0) for m in metrics]),
+            "primary_probe_target_error_rate_mean": _mean([m["primary_probe_target_error_rate"] for m in metrics]),
+            "all_probe_target_error_rate_mean": _mean([m["all_probe_target_error_rate"] for m in metrics]),
+            "major_error_rate_mean": _mean([m["major_error_rate"] for m in metrics]),
+            "rule_application_validity_rate_mean": _mean(
+                [m["rule_application_validity_rate"] for m in metrics]
+            ),
+            "evidence_ref_validity_rate_mean": _mean([m["evidence_ref_validity_rate"] for m in metrics]),
+            "secondary_conclusion_accuracy": _mean([m["secondary_conclusion_accuracy"] for m in metrics]),
+            "malformed_rate": _mean([1.0 if m["malformed_output"] else 0.0 for m in metrics]),
+            "latency_s_mean": _mean([trial["latency_s"] for trial in variant_trials]),
+            "tool_call_mean": _mean([float(len(trial["tool_history"])) for trial in variant_trials]),
+            "total_tokens_mean": _mean(
+                [float(trial["token_usage"].get("total_tokens", 0)) for trial in variant_trials]
+            ),
+        }
+
+    pairs: dict[tuple[str, str], dict[str, list[float]]] = {}
+    for trial in trials:
+        model = str(trial.get("model", ""))
+        key = (model, trial["case_id"])
+        pairs.setdefault(key, {VARIANT_A: [], VARIANT_B: []})[trial["variant"]].append(
+            float(trial["metrics"]["weighted_target_error_score"])
+        )
+
+    a_values: list[float] = []
+    b_values: list[float] = []
+    for pair in pairs.values():
+        if pair[VARIANT_A] and pair[VARIANT_B]:
+            a_values.append(float(mean(pair[VARIANT_A])))
+            b_values.append(float(mean(pair[VARIANT_B])))
+
+    summary["paired_tests"]["weighted_target_error_score_case_level"] = {
+        "pair_unit_count": len(a_values),
+        "delta_mean": _mean([a - b for a, b in zip(a_values, b_values)]),
+        "wilcoxon_pvalue": (
+            float(wilcoxon(a_values, b_values).pvalue)
+            if wilcoxon is not None and len(a_values) > 1 and any(a != b for a, b in zip(a_values, b_values))
+            else None
+        ),
+    }
+    return summary
 
 
 def _summarize_stage2_interpretation_v3_trials(trials: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1951,6 +2495,8 @@ def _summarize_stage2_interpretation_v2_trials(trials: list[dict[str, Any]]) -> 
 
 def summarize_trials(trials: list[dict[str, Any]]) -> dict[str, Any]:
     """Aggregate deterministic trial metrics by variant."""
+    if trials and trials[0].get("benchmark_type") == STAGE2_INTERPRETATION_V4_BENCHMARK:
+        return _summarize_stage2_interpretation_v4_trials(trials)
     if trials and trials[0].get("benchmark_type") == STAGE2_INTERPRETATION_V3_BENCHMARK:
         return _summarize_stage2_interpretation_v3_trials(trials)
     if trials and trials[0].get("benchmark_type") == STAGE2_INTERPRETATION_V2_BENCHMARK:
@@ -2627,6 +3173,65 @@ def render_markdown_summary(
     judgment_summary: dict[str, Any] | None = None,
 ) -> str:
     """Render a compact publication-ready markdown summary."""
+    if summary.get("benchmark_type") == STAGE2_INTERPRETATION_V4_BENCHMARK:
+        variants = summary.get("variants", {})
+        lines = [
+            f"# {benchmark_title}",
+            "",
+            "## Deterministic Metrics",
+            "",
+            "| Variant | N | Weighted Target Error | Probe Support | Primary Probe Target Error | All Probe Target Error | Rule Validity | Evidence Ref Validity | Secondary Conclusion Acc | Tool Calls | Tokens |",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        ]
+        for variant in (VARIANT_A, VARIANT_B):
+            row = variants.get(variant, {})
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        variant,
+                        str(row.get("n") or 0),
+                        _fmt_num(row.get("weighted_target_error_score_mean")),
+                        _fmt_num(row.get("probe_support_score_mean")),
+                        _fmt_pct(row.get("primary_probe_target_error_rate_mean")),
+                        _fmt_pct(row.get("all_probe_target_error_rate_mean")),
+                        _fmt_pct(row.get("rule_application_validity_rate_mean")),
+                        _fmt_pct(row.get("evidence_ref_validity_rate_mean")),
+                        _fmt_pct(row.get("secondary_conclusion_accuracy")),
+                        _fmt_num(row.get("tool_call_mean")),
+                        _fmt_num(row.get("total_tokens_mean")),
+                    ]
+                )
+                + " |"
+            )
+
+        paired = summary.get("paired_tests", {}).get("weighted_target_error_score_case_level", {})
+        if paired:
+            lines.extend(
+                [
+                    "",
+                    "## Primary Endpoint",
+                    "",
+                    f"- Pair unit count: `{paired.get('pair_unit_count', 0)}`",
+                    f"- Case-level weighted target error delta (A - B): `{_fmt_num(paired.get('delta_mean'))}`",
+                    f"- Wilcoxon p-value: `{_fmt_num(paired.get('wilcoxon_pvalue'))}`",
+                ]
+            )
+
+        if judgment_summary:
+            lines.extend(
+                [
+                    "",
+                    "## Blinded Judge",
+                    "",
+                    f"- `{VARIANT_A}` wins: `{judgment_summary.get(VARIANT_A, 0)}`",
+                    f"- `{VARIANT_B}` wins: `{judgment_summary.get(VARIANT_B, 0)}`",
+                    f"- `tie`: `{judgment_summary.get('tie', 0)}`",
+                    f"- Sign-test p-value: `{_fmt_num(judgment_summary.get('sign_test_pvalue'))}`",
+                ]
+            )
+        return "\n".join(lines) + "\n"
+
     if summary.get("benchmark_type") == STAGE2_INTERPRETATION_V3_BENCHMARK:
         variants = summary.get("variants", {})
         lines = [

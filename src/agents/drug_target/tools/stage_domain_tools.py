@@ -95,7 +95,19 @@ def query_cellxgene_lr_context(
         result["errors"].append(f"cellxgene_census unavailable: {exc}")
         return _as_json(result)
 
-    disease_safe = disease.replace("\\", "\\\\").replace("'", "\\'")
+    # Auto-resolve disease name against Census MONDO vocabulary
+    try:
+        from src.agents.drug_target.tools.census_lr_validation_tools import _resolve_disease_name
+        resolved, mode = _resolve_disease_name(disease, organism)
+        if resolved:
+            result["disease_resolved"] = resolved
+            result["disease_resolution_mode"] = mode
+            disease_safe = resolved.replace("\\", "\\\\").replace("'", "\\'")
+        else:
+            disease_safe = disease.replace("\\", "\\\\").replace("'", "\\'")
+    except Exception:
+        disease_safe = disease.replace("\\", "\\\\").replace("'", "\\'")
+
     try:
         with cellxgene_census.open_soma(census_version=_DEFAULT_CENSUS_VERSION) as census:
             obs = cellxgene_census.get_obs(
@@ -170,9 +182,11 @@ def list_census_diseases(organism: str = "homo_sapiens") -> str:
             )
         logger.info("Census summary_cell_counts: shape=%s, columns=%s",
                      summary_df.shape, list(summary_df.columns))
-        org_display = organism.replace("_", " ").lower()
+        # Match organism with both underscore and space formats (Census uses underscores)
+        org_underscore = organism.replace(" ", "_").lower()
+        org_space = organism.replace("_", " ").lower()
         mask = (
-            (summary_df["organism"].str.lower() == org_display)
+            (summary_df["organism"].str.lower().str.replace(" ", "_") == org_underscore)
             & (summary_df["category"] == "disease")
         )
         diseases_df = summary_df[mask].sort_values("total_cell_count", ascending=False)

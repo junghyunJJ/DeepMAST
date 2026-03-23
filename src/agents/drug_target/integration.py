@@ -5,6 +5,7 @@ subagent calls to delegate the entire Step 9.5 drug target assessment
 to the DrugTargetAgent.
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -74,7 +75,7 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
             disease=disease,
         )
 
-        agent, backend = create_drug_target_agent(config)
+        agent, backend = await asyncio.to_thread(create_drug_target_agent, config)
 
         try:
             # Natural language message — data_dir and disease are already
@@ -94,61 +95,67 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
                 config={"configurable": {"thread_id": str(uuid.uuid4())}},
             )
         finally:
-            if backend:
+            if backend and hasattr(backend, "cleanup"):
                 backend.cleanup()
 
-        stage1_result = finalize_stage1_workspace(
+        stage1_result = await asyncio.to_thread(
+            finalize_stage1_workspace,
             resolved_dir,
             disease=disease,
             rerun_missing_census=True,
         )
-        target_assessment_validation = validate_target_assessment_file(resolved_dir)
+        target_assessment_validation = await asyncio.to_thread(
+            validate_target_assessment_file, resolved_dir
+        )
 
-        # Read drug.md
-        if stage1_result["success"] and target_assessment_validation["valid"] and drug_md_path.exists():
-            content = drug_md_path.read_text()
-            target_assessment = None
-            if target_assessment_path.exists():
-                try:
-                    target_assessment = json.loads(target_assessment_path.read_text())
-                except Exception as parse_err:
-                    logger.warning(
-                        "Failed to parse target_assessment.json at %s: %s",
-                        target_assessment_path,
-                        parse_err,
+        # Read drug.md — wrap file I/O in thread to avoid blocking async loop
+        def _read_results():
+            if stage1_result["success"] and target_assessment_validation["valid"] and drug_md_path.exists():
+                content = drug_md_path.read_text()
+                target_assessment = None
+                if target_assessment_path.exists():
+                    try:
+                        target_assessment = json.loads(target_assessment_path.read_text())
+                    except Exception as parse_err:
+                        logger.warning(
+                            "Failed to parse target_assessment.json at %s: %s",
+                            target_assessment_path,
+                            parse_err,
+                        )
+                return json.dumps({
+                    "success": True,
+                    "drug_md": content,
+                    "drug_md_path": str(drug_md_path),
+                    "target_assessment": target_assessment,
+                    "stage1_validation": stage1_result["post_validation"],
+                    "target_assessment_validation": target_assessment_validation,
+                    "target_assessment_path": (
+                        str(target_assessment_path) if target_assessment_path.exists() else None
+                    ),
+                })
+            else:
+                errors: list[str] = []
+                if not stage1_result["success"]:
+                    errors.append(
+                        "Stage1 artifacts incomplete: "
+                        + "; ".join(stage1_result["post_validation"]["errors"])
                     )
-            return json.dumps({
-                "success": True,
-                "drug_md": content,
-                "drug_md_path": str(drug_md_path),
-                "target_assessment": target_assessment,
-                "stage1_validation": stage1_result["post_validation"],
-                "target_assessment_validation": target_assessment_validation,
-                "target_assessment_path": (
-                    str(target_assessment_path) if target_assessment_path.exists() else None
-                ),
-            })
-        else:
-            errors: list[str] = []
-            if not stage1_result["success"]:
-                errors.append(
-                    "Stage1 artifacts incomplete: "
-                    + "; ".join(stage1_result["post_validation"]["errors"])
-                )
-            if not target_assessment_validation["valid"]:
-                errors.append(
-                    "target_assessment validation failed: "
-                    + "; ".join(target_assessment_validation["errors"])
-                )
-            if not drug_md_path.exists():
-                errors.append("drug.md was not generated")
-            return json.dumps({
-                "success": False,
-                "error": " | ".join(errors) if errors else "DrugTargetAgent artifacts incomplete",
-                "drug_md": None,
-                "stage1_validation": stage1_result["post_validation"],
-                "target_assessment_validation": target_assessment_validation,
-            })
+                if not target_assessment_validation["valid"]:
+                    errors.append(
+                        "target_assessment validation failed: "
+                        + "; ".join(target_assessment_validation["errors"])
+                    )
+                if not drug_md_path.exists():
+                    errors.append("drug.md was not generated")
+                return json.dumps({
+                    "success": False,
+                    "error": " | ".join(errors) if errors else "DrugTargetAgent artifacts incomplete",
+                    "drug_md": None,
+                    "stage1_validation": stage1_result["post_validation"],
+                    "target_assessment_validation": target_assessment_validation,
+                })
+
+        return await asyncio.to_thread(_read_results)
 
     except Exception as e:
         logger.error("Drug target assessment failed: %s", e, exc_info=True)

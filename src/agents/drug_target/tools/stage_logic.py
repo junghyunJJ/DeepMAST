@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 from typing import Any
+
+from langchain_core.tools import tool
 
 
 _ONCOLOGY_KEYWORDS = (
@@ -430,6 +434,10 @@ def compute_stage1_confidence(stage1_evidence: dict[str, Any]) -> dict[str, Any]
     if not tvr:
         cellxgene = stage1_evidence.get("cellxgene", {})
         available = {g.upper() for g in cellxgene.get("available_genes", [])}
+        # Fallback to legacy format when cellxgene.available_genes is empty
+        if not available:
+            legacy = stage1_evidence.get("legacy_stage1", {}).get("cellxgene_context", {})
+            available = {g.upper() for g in legacy.get("available_genes", [])}
         ligand_name = stage1_evidence.get("ligand", "").upper()
         receptor_name = stage1_evidence.get("receptor", "").upper()
         genes_found = sum(1 for g in [ligand_name, receptor_name] if g and g in available)
@@ -705,3 +713,429 @@ def _check_opentargets_approved(
             if entry.get("approved_drug") is True or entry.get("has_drug") is True:
                 return True
     return False
+
+
+# -------------------------------------------------------------------------
+# Deterministic Rubric Scoring Tool
+# -------------------------------------------------------------------------
+
+def _score_existing_drug_evidence(gene: str, drug_rows: list[dict],
+                                   disease_evidence: list[dict] | None = None) -> int:
+    """Score existing_drug_evidence (0-3) from known_drugs + disease_evidence."""
+    gene_upper = gene.upper()
+    max_phase = 0
+
+    # Check known_drugs rows (disease-level)
+    for row in drug_rows:
+        target_sym = (row.get("target", {}).get("approvedSymbol") or "").upper()
+        if target_sym == gene_upper:
+            phase = row.get("phase", 0) or 0
+            max_phase = max(max_phase, phase)
+
+    # Check disease_evidence known_drug entries (gene-level from OT)
+    for ev in (disease_evidence or []):
+        if ev.get("datatypeId") == "known_drug":
+            cp = ev.get("clinicalPhase") or ev.get("clinical_phase") or 0
+            try:
+                max_phase = max(max_phase, int(cp))
+            except (ValueError, TypeError):
+                pass
+
+    if max_phase >= 3:
+        return 3
+    if max_phase >= 1:
+        return 2
+    # Check indirect: any drug row targeting same gene family
+    for row in drug_rows:
+        target_sym = (row.get("target", {}).get("approvedSymbol") or "").upper()
+        if target_sym and gene_upper[:3] in target_sym:
+            return 1
+    return 0
+
+
+def _score_clinical_trial_activity(disease_evidence: list[dict]) -> int:
+    """Score clinical_trial_activity (0-3) from OT disease_evidence."""
+    trial_sources = {"chembl", "clinicaltrials"}
+    trial_count = sum(
+        1 for e in disease_evidence
+        if (e.get("datasourceId", "") or "").lower() in trial_sources
+    )
+    if trial_count >= 3:
+        return 3
+    if trial_count >= 1:
+        return 2
+    # Check for any genetic/literature evidence as weak signal
+    if any(e.get("datatypeId") == "genetic_association" for e in disease_evidence):
+        return 1
+    return 0
+
+
+def _score_mechanism_relevance(disease_evidence: list[dict]) -> int:
+    """Score mechanism_relevance (0-3) from OT disease_evidence."""
+    has_pathway = any(
+        e.get("datatypeId") in ("affected_pathway", "known_drug")
+        for e in disease_evidence
+    )
+    has_genetic = any(
+        e.get("datatypeId") == "genetic_association"
+        for e in disease_evidence
+    )
+    has_literature = any(
+        e.get("datatypeId") == "literature"
+        for e in disease_evidence
+    )
+    if has_pathway and has_genetic:
+        return 3
+    if has_pathway or has_genetic:
+        return 2
+    if has_literature:
+        return 1
+    return 0
+
+
+def _score_safety_profile(safety_liabilities: list | None) -> int:
+    """Score safety_profile (-2 to 0) from OT safetyLiabilities."""
+    if not safety_liabilities:
+        return 0
+    count = len(safety_liabilities)
+    if count >= 2:
+        return -2
+    if count >= 1:
+        return -1
+    return 0
+
+
+def _score_gwas_support(gwas_data: dict | None) -> int:
+    """Score gwas_support (0-3) from stage2_evidence GWAS data.
+
+    Checks both gene_associations (gene-specific SNPs) and
+    trait_associations (disease-level GWAS hits) for p-values.
+    Also checks disease_specific_hits for gene-in-trait evidence.
+    """
+    if not gwas_data:
+        return 0
+
+    min_pval = 1.0
+    total_hits = 0
+
+    # 1. gene_associations (gene-specific mapped SNPs)
+    gene_assocs = gwas_data.get("gene_associations", [])
+    for assoc in gene_assocs:
+        pval = assoc.get("p_value") or assoc.get("pvalue") or assoc.get("p-value")
+        if pval is not None:
+            try:
+                min_pval = min(min_pval, float(pval))
+            except (ValueError, TypeError):
+                pass
+        # Check nested associations for pvalue
+        for nested in assoc.get("associations", []):
+            pval = nested.get("pvalue") or nested.get("p_value")
+            if pval is not None:
+                try:
+                    min_pval = min(min_pval, float(pval))
+                except (ValueError, TypeError):
+                    pass
+    total_hits += len(gene_assocs)
+
+    # 2. disease_specific_hits (gene SNPs found in disease GWAS)
+    dsh = gwas_data.get("disease_specific_hits", {})
+    n_gene_in_trait = dsh.get("n_gene_in_trait", 0) or 0
+    n_gene_snps = dsh.get("n_gene_snps_in_disease", 0) or 0
+    total_hits += n_gene_in_trait + n_gene_snps
+
+    # 3. trait_associations as fallback signal (disease-level)
+    trait_assocs = gwas_data.get("trait_associations", [])
+    if trait_assocs and min_pval >= 1.0:
+        # Use trait-level p-values as weaker evidence
+        for assoc in trait_assocs[:20]:
+            pval = assoc.get("pvalue") or assoc.get("p_value")
+            if pval is not None:
+                try:
+                    min_pval = min(min_pval, float(pval))
+                except (ValueError, TypeError):
+                    pass
+
+    # Scoring
+    if min_pval < 5e-8 and (total_hits >= 2 or len(gene_assocs) >= 2):
+        return 3
+    if min_pval < 5e-8:
+        return 2
+    if min_pval < 1e-5 or total_hits >= 1:
+        return 1
+    return 0
+
+
+def _score_tractability(tractability: list[dict] | None) -> int:
+    """Score tractability (0-3) from OT tractability data across ALL modalities.
+
+    Considers SM (small molecule), AB (antibody), PR (PROTAC), OC (other).
+    Takes the best score across all modalities.
+    """
+    if not tractability:
+        return 0
+    # Collect per-modality labels
+    modality_labels: dict[str, dict[str, bool]] = {}
+    for entry in tractability:
+        mod = (entry.get("modality") or "").upper()
+        label = (entry.get("id") or entry.get("top_category") or "").lower()
+        value = entry.get("value", False)
+        if mod not in modality_labels:
+            modality_labels[mod] = {}
+        modality_labels[mod][label] = value
+
+    best = 0
+    for _mod, labels in modality_labels.items():
+        if labels.get("approved drug", False):
+            best = max(best, 3)
+        elif labels.get("advanced clinical", False):
+            best = max(best, 2)
+        elif labels.get("phase 1 clinical", False):
+            best = max(best, 2)
+        elif labels.get("structure with ligand", False) or labels.get("high-quality ligand", False):
+            best = max(best, 1)
+        elif labels.get("druggable family", False):
+            best = max(best, 1)
+        elif any(v for v in labels.values()):
+            best = max(best, 1)
+    return best
+
+
+def _score_biological_plausibility(disease_evidence: list[dict]) -> int:
+    """Score biological_plausibility (0-3) from OT disease_evidence scores."""
+    if not disease_evidence:
+        return 0
+    max_score = max((e.get("score", 0) or 0) for e in disease_evidence)
+    if max_score >= 0.7:
+        return 3
+    if max_score >= 0.4:
+        return 2
+    if max_score > 0:
+        return 1
+    return 0
+
+
+def _score_novelty_opportunity(associations: list[dict],
+                                associations_truncated: bool = False) -> int:
+    """Score novelty_opportunity (0-3) inverse of how well-established the target is.
+
+    When truncated=True, actual count exceeds what's returned.
+    Apply normal scoring on visible count but cap at 1 (can't be truly novel
+    if associations were truncated, meaning 20+ exist).
+    """
+    count = len(associations) if associations else 0
+    if count <= 5:
+        score = 3
+    elif count <= 15:
+        score = 2
+    elif count <= 30:
+        score = 1
+    else:
+        score = 0
+    # If truncated, at least 20+ associations exist → cap novelty at 1
+    if associations_truncated and score > 1:
+        score = 1
+    return score
+
+
+def _classify_target(validated_total: int, exploratory_total: int,
+                     existing_drug: int, gwas: int, tractability: int,
+                     bio_plausibility: int, novelty: int) -> str:
+    """Classify target based on rubric pass logic."""
+    # Validated track pass
+    validated_pass = (existing_drug >= 2) or (existing_drug >= 1 and validated_total >= 2)
+    # Exploratory track pass
+    exploratory_pass = (gwas >= 1) and (tractability >= 1 or bio_plausibility >= 2)
+
+    if validated_pass:
+        return "validated_target"
+    if exploratory_pass:
+        return "exploratory_target"
+    if bio_plausibility >= 2 or novelty >= 2:
+        return "novel_candidate"
+    return "insufficient_evidence"
+
+
+def _assign_priority(classification: str, validated_total: int,
+                     exploratory_total: int, combined_total: int) -> str:
+    """Assign priority based on classification and scores."""
+    if classification == "insufficient_evidence":
+        return "unranked"
+    if classification == "validated_target":
+        if combined_total >= 6:
+            return "high"
+        if combined_total >= 3:
+            return "medium"
+        return "low"
+    # exploratory or novel
+    if exploratory_total >= 8:
+        return "high"
+    if exploratory_total >= 5:
+        return "medium"
+    return "low"
+
+
+@tool
+def compute_rubric_scores(data_dir: str) -> str:
+    """Compute deterministic rubric scores for ALL genes from Stage 2 evidence.
+
+    Reads ot_*.json, known_drugs.json, stage2_evidence.json from evidence/.
+    Saves updated assessment_results.json and rubric_scores.csv.
+    Returns summary JSON.
+    """
+    import csv
+    import glob
+
+    data_path = Path(data_dir).expanduser().resolve()
+    evidence_dir = data_path / "evidence"
+
+    # Load known_drugs
+    kd_path = evidence_dir / "known_drugs.json"
+    drug_rows: list[dict] = []
+    if kd_path.exists():
+        kd = json.loads(kd_path.read_text())
+        drugs_data = kd.get("drugs", {})
+        if isinstance(drugs_data, dict):
+            drug_rows = drugs_data.get("rows", [])
+        elif isinstance(drugs_data, list):
+            drug_rows = drugs_data
+
+    # Load stage2_evidence for GWAS data
+    s2_path = evidence_dir / "stage2_evidence.json"
+    stage2: dict = {}
+    if s2_path.exists():
+        stage2 = json.loads(s2_path.read_text())
+
+    # Find all ot_*.json files
+    ot_files = sorted(glob.glob(str(evidence_dir / "ot_*.json")))
+    if not ot_files:
+        return json.dumps({"error": "No ot_*.json files found", "genes_scored": 0})
+
+    results: list[dict] = []
+
+    for ot_path_str in ot_files:
+        ot_path = Path(ot_path_str)
+        gene = ot_path.stem.replace("ot_", "")
+        ot = json.loads(ot_path.read_text())
+
+        if not ot.get("executed", False):
+            continue
+
+        disease_evidence = ot.get("disease_evidence", [])
+        target_info = ot.get("target_info", {})
+        tractability_data = target_info.get("tractability", [])
+        safety_data = target_info.get("safetyLiabilities", [])
+        associations = ot.get("associations", [])
+
+        # GWAS from stage2_evidence
+        gwas_data = None
+        if isinstance(stage2, dict):
+            gene_s2 = stage2.get(gene, {})
+            if isinstance(gene_s2, dict):
+                gwas_data = gene_s2.get("gwas", {})
+
+        # Score 8 criteria
+        existing_drug = _score_existing_drug_evidence(gene, drug_rows, disease_evidence)
+        clinical_trial = _score_clinical_trial_activity(disease_evidence)
+        mechanism = _score_mechanism_relevance(disease_evidence)
+        safety = _score_safety_profile(safety_data)
+        gwas = _score_gwas_support(gwas_data)
+        tract = _score_tractability(tractability_data)
+        bio_plaus = _score_biological_plausibility(disease_evidence)
+        novelty = _score_novelty_opportunity(associations, ot.get("associations_truncated", False))
+
+        validated_total = existing_drug + clinical_trial + mechanism + safety
+        exploratory_total = gwas + tract + bio_plaus + novelty
+        combined_total = validated_total + exploratory_total
+
+        classification = _classify_target(
+            validated_total, exploratory_total,
+            existing_drug, gwas, tract, bio_plaus, novelty,
+        )
+        priority = _assign_priority(
+            classification, validated_total, exploratory_total, combined_total,
+        )
+
+        row = {
+            "gene": gene,
+            "existing_drug_evidence": existing_drug,
+            "clinical_trial_activity": clinical_trial,
+            "mechanism_relevance": mechanism,
+            "safety_profile": safety,
+            "validated_total": validated_total,
+            "gwas_support": gwas,
+            "tractability": tract,
+            "biological_plausibility": bio_plaus,
+            "novelty_opportunity": novelty,
+            "exploratory_total": exploratory_total,
+            "combined_total": combined_total,
+            "classification": classification,
+            "priority": priority,
+            "ot_disease_evidence_count": len(disease_evidence),
+            "ot_associations_count": len(associations),
+        }
+        results.append(row)
+
+    # Sort by exploratory_total descending, tiebreak: bio_plausibility → tractability → combined
+    results.sort(
+        key=lambda r: (
+            r["exploratory_total"],
+            r["biological_plausibility"],
+            r["tractability"],
+            r["combined_total"],
+        ),
+        reverse=True,
+    )
+
+    # Stage 3 candidate selection: top N by exploratory_total (unified ranking)
+    stage3_max = 7
+    eligible = [r for r in results if r["classification"] != "insufficient_evidence"]
+    stage3_genes = {r["gene"] for r in eligible[:stage3_max]}
+    for r in results:
+        r["stage3_candidate"] = r["gene"] in stage3_genes
+
+    # Save assessment_results.json
+    assessment = {
+        "assessment_date": __import__("datetime").datetime.now().isoformat(),
+        "disease": stage2.get("_disease", "unknown") if isinstance(stage2, dict) else "unknown",
+        "rubric_assessment": results,
+        "stage3_candidates": [
+            {"gene": r["gene"], "exploratory_total": r["exploratory_total"],
+             "combined_total": r["combined_total"],
+             "priority": r["priority"], "classification": r["classification"]}
+            for r in results if r["stage3_candidate"]
+        ],
+        "summary": {
+            "total_genes": len(results),
+            "stage3_count": len(stage3_genes),
+            "insufficient_count": sum(1 for r in results if r["classification"] == "insufficient_evidence"),
+        },
+    }
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps(assessment, indent=2, ensure_ascii=False) + "\n"
+    )
+
+    # Save CSV
+    csv_path = evidence_dir / "rubric_scores.csv"
+    fieldnames = [
+        "gene", "existing_drug_evidence", "clinical_trial_activity",
+        "mechanism_relevance", "safety_profile", "validated_total",
+        "gwas_support", "tractability", "biological_plausibility",
+        "novelty_opportunity", "exploratory_total", "combined_total",
+        "classification", "priority", "stage3_candidate",
+    ]
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(results)
+
+    return json.dumps({
+        "success": True,
+        "genes_scored": len(results),
+        "stage3_count": len(stage3_genes),
+        "csv_path": str(csv_path),
+        "assessment_path": str(evidence_dir / "assessment_results.json"),
+        "stage3_candidates": [
+            {"gene": r["gene"], "exploratory": r["exploratory_total"], "combined": r["combined_total"]}
+            for r in results if r["stage3_candidate"]
+        ],
+    }, indent=2)

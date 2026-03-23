@@ -38,7 +38,7 @@ def _get_drug_target_graph() -> Runnable:
     )
 
     agent, backend = create_drug_target_agent(config)
-    if backend:
+    if backend and hasattr(backend, "cleanup"):
         import atexit
         atexit.register(backend.cleanup)
     return agent

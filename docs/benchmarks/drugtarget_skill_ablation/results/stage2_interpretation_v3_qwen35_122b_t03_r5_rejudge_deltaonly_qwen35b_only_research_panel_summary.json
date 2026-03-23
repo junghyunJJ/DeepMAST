@@ -1,0 +1,21 @@
+{
+  "n": 4,
+  "A_tools_only": 0,
+  "B_tools_plus_skills": 0,
+  "tie": 4,
+  "sign_test_pvalue": null,
+  "unanimous_rate": 0.0,
+  "confidence_counts": {
+    "high": 0,
+    "medium": 0,
+    "low": 4
+  },
+  "mean_deltas": {
+    "grounding_delta": 0.0,
+    "rubric_alignment_delta": 0.0,
+    "unsupported_claim_penalty_delta": 0.0,
+    "targeted_error_count_delta": 1.0,
+    "overall_delta": -1.0
+  },
+  "judge_error_rate": 0.75
+}

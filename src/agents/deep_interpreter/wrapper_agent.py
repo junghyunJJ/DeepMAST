@@ -25,6 +25,7 @@ Pattern Reference: STPipelineBuilderAgent (st_pipeline_info_agent.py)
 
 import asyncio
 import base64
+import glob
 import json
 import logging
 import os
@@ -558,7 +559,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         sample_key = state.get("sample_key")
         interest_sample = state.get("interest_sample")
         save_path = state["data_directory"]
-        lrdata_path = f"{save_path}/lrdata.h5ad"
+        lrdata_path = self._resolve_lrdata_path(save_path, interest_sample) or f"{save_path}/lrdata.h5ad"
 
         if step == 1:
             args = {"filename": filename, "cluster_key": cluster_key, "save_path": save_path}
@@ -610,7 +611,8 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
     def _build_step_args_9_11(self, step: int, state: dict, sel_factor: str) -> dict:
         """Build MCP tool arguments for Steps 9-11."""
         save_path = state["data_directory"]
-        lrdata_path = f"{save_path}/lrdata.h5ad"
+        interest_sample = state.get("interest_sample")
+        lrdata_path = self._resolve_lrdata_path(save_path, interest_sample) or f"{save_path}/lrdata.h5ad"
         csv_path = f"{save_path}/sig_liana.csv"
         cluster_key = state["cluster_key"]
         sample_key = state.get("sample_key")
@@ -673,7 +675,8 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
 
         return {}
 
-    def _build_step_message(self, step, step_config, status, save_path, error_msg, total_steps=8):
+    def _build_step_message(self, step, step_config, status, save_path, error_msg,
+                             total_steps=8, sample_key=None):
         """Build multimodal message with progress bar and base64 figure."""
         content_parts = []
 
@@ -688,9 +691,10 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             text += f"Failed: {error_msg}"
         content_parts.append({"type": "text", "text": text})
 
-        # Image(s) using Base64ContentBlock format
+        # Image(s) using Base64ContentBlock format (sample_key-aware)
         if status in ("completed", "skipped"):
-            for fig_name in step_config["figures"]:
+            resolved_figures = self._resolve_step_figures(step, step_config, save_path, sample_key)
+            for fig_name in resolved_figures:
                 fig_path = f"{save_path}/{fig_name}"
                 if os.path.exists(fig_path):
                     try:
@@ -710,7 +714,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
 
         return content_parts
 
-    def _read_and_resize(self, fig_path, max_bytes=2_000_000):
+    def _read_and_resize(self, fig_path, max_bytes=500_000):
         """Read figure, resize if >2MB to limit checkpoint growth."""
         file_size = os.path.getsize(fig_path)
         if file_size <= max_bytes:
@@ -730,16 +734,80 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             with open(fig_path, "rb") as f:
                 return f.read()
 
-    def _check_step_outputs_exist(self, step_config: dict, save_path: str) -> bool:
+    def _check_step_outputs_exist(self, step_config: dict, save_path: str,
+                                   step: int = 0, sample_key: str | None = None,
+                                   interest_sample: str | None = None) -> bool:
         """Check if ALL expected output files for a step exist on disk.
 
         Uses data_files as canonical indicator. For figure-only steps (no data_files),
-        falls back to checking figures.
+        resolves sample_key-aware figure names via _resolve_step_figures().
         """
-        expected = step_config.get("data_files", []) or step_config.get("figures", [])
-        if not expected:
+        data_files = step_config.get("data_files", [])
+        if data_files:
+            for f in data_files:
+                if f == "lrdata.h5ad":
+                    if not self._resolve_lrdata_path(save_path, interest_sample):
+                        return False
+                elif not os.path.exists(f"{save_path}/{f}"):
+                    return False
+            return True
+        # Figure-only steps: resolve actual filenames for sample_key case
+        figures = self._resolve_step_figures(step, step_config, save_path, sample_key)
+        if not figures:
             return False  # No outputs defined — cannot skip
-        return all(os.path.exists(f"{save_path}/{f}") for f in expected)
+        return all(os.path.exists(f"{save_path}/{f}") for f in figures)
+
+    def _resolve_step_figures(self, step: int, step_config: dict,
+                              save_path: str, sample_key: str | None) -> list[str]:
+        """Resolve actual figure filenames, accounting for sample_key variants.
+
+        Step 1 with sample_key: deterministic (column name in filename).
+        Steps 10-11 with sample_key: glob-based discovery (per-sample files).
+        All others or no sample_key: returns step_config["figures"] as-is.
+        """
+        if not sample_key:
+            return step_config["figures"]
+
+        if step == 1:
+            return ["1.cluster_spatial_by_type.png"]
+
+        if step == 10:
+            # Glob pattern matches: 10.spatial_plot_interections_{sample_value}.png
+            pattern = f"{save_path}/10.spatial_plot_interections_*.png"
+            matches = sorted(glob.glob(pattern))
+            if matches:
+                result = [os.path.basename(m) for m in matches]
+                logger.debug("Step 10 resolved %d figures via glob: %s", len(result), result)
+                return result
+            return step_config["figures"]  # Fallback for pre-execution / display context
+
+        if step == 11:
+            # Glob pattern matches: 11.lr_interections_{sample_value}.png
+            pattern = f"{save_path}/11.lr_interections_*.png"
+            matches = sorted(glob.glob(pattern))
+            if matches:
+                result = [os.path.basename(m) for m in matches]
+                logger.debug("Step 11 resolved %d figures via glob: %s", len(result), result)
+                return result
+            return step_config["figures"]
+
+        return step_config["figures"]
+
+    def _resolve_lrdata_path(self, save_path: str, interest_sample: str | None = None) -> str | None:
+        """Resolve lrdata h5ad path, supporting interest_sample suffix.
+
+        Resolution order (no glob to avoid blocking scandir in async context):
+        1. {save_path}/lrdata.h5ad (backward compat)
+        2. {save_path}/lrdata_{interest_sample}.h5ad
+        """
+        default = f"{save_path}/lrdata.h5ad"
+        if os.path.exists(default):
+            return default
+        if interest_sample:
+            specific = f"{save_path}/lrdata_{interest_sample}.h5ad"
+            if os.path.exists(specific):
+                return specific
+        return None
 
     # ===== Node Initialization =====
 
@@ -1155,11 +1223,13 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         current_step = state.get("current_analysis_step") or 1
         step_config = self.ANALYSIS_STEPS[current_step - 1]
         save_path = state["data_directory"]
+        sample_key = state.get("sample_key")
 
         # Dependency check: Steps 7-8 need lrdata.h5ad from Step 6
         if current_step in (7, 8):
-            lrdata_path = f"{save_path}/lrdata.h5ad"
-            if not os.path.exists(lrdata_path):
+            interest_sample = state.get("interest_sample")
+            lrdata_path = await asyncio.to_thread(self._resolve_lrdata_path, save_path, interest_sample)
+            if not lrdata_path:
                 message_content = [{"type": "text",
                     "text": f"**Step {current_step}/8: {step_config['desc']}** - SKIPPED (lrdata.h5ad not found, Step 6 may have failed)"}]
                 is_last = current_step >= 8
@@ -1173,11 +1243,17 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         configurable = (config or {}).get("configurable", {})
         force_rerun = configurable.get("force_rerun", False)
 
-        if not force_rerun and self._check_step_outputs_exist(step_config, save_path):
+        if not force_rerun and await asyncio.to_thread(
+            self._check_step_outputs_exist,
+            step_config, save_path, current_step, sample_key,
+            state.get("interest_sample"),
+        ):
             if self.is_debug:
                 print(f"Step {current_step}/8: {step_config['desc']} - SKIPPED (cached)")
-            message_content = self._build_step_message(
-                current_step, step_config, "skipped", save_path, None
+            message_content = await asyncio.to_thread(
+                self._build_step_message,
+                current_step, step_config, "skipped", save_path, None,
+                8, sample_key,
             )
             is_last = current_step >= 8
             update = {
@@ -1189,7 +1265,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             return update
 
         # Build tool args
-        tool_args = self._build_step_args(current_step, state)
+        tool_args = await asyncio.to_thread(self._build_step_args, current_step, state)
 
         # Get MCP server paths
         sp_python = os.getenv("SP_ENRICH_MCP_PYTHON")
@@ -1228,8 +1304,10 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             print(f"Step {current_step}/8: {step_config['desc']} - {status}")
 
         # Build multimodal message with base64 figure
-        message_content = self._build_step_message(
-            current_step, step_config, status, save_path, error_msg
+        message_content = await asyncio.to_thread(
+            self._build_step_message,
+            current_step, step_config, status, save_path, error_msg,
+            8, sample_key,
         )
 
         is_last = current_step >= 8
@@ -1254,130 +1332,133 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         """
         save_path = state["data_directory"]
 
-        # Read analysis outputs — required CSVs
-        try:
-            celltype_csv = pd.read_csv(f"{save_path}/sig_clusterwithcelltyp.csv")
-        except FileNotFoundError:
-            celltype_csv = pd.DataFrame({"note": ["celltype analysis was skipped (no celltype_key)"]})
+        # All CSV reads + summary building in thread to avoid blocking async loop
+        def _read_csvs_and_build_summary():
+            # Read analysis outputs — required CSVs
+            try:
+                celltype_csv = pd.read_csv(f"{save_path}/sig_clusterwithcelltyp.csv")
+            except FileNotFoundError:
+                celltype_csv = pd.DataFrame({"note": ["celltype analysis was skipped (no celltype_key)"]})
 
-        try:
-            factor_csv = pd.read_csv(f"{save_path}/res_liana_cluster_factor.csv")
-        except FileNotFoundError:
-            raise ValueError(
-                f"res_liana_cluster_factor.csv not found in {save_path}. "
-                "Steps 1-8 may not have completed successfully."
+            try:
+                factor_csv = pd.read_csv(f"{save_path}/res_liana_cluster_factor.csv")
+            except FileNotFoundError:
+                raise ValueError(
+                    f"res_liana_cluster_factor.csv not found in {save_path}. "
+                    "Steps 1-8 may not have completed successfully."
+                )
+
+            # Read additional CSVs — all optional, gracefully skip if missing
+            nhood_csv = None
+            try:
+                nhood_csv = pd.read_csv(f"{save_path}/res_nhood_enrichment.csv")
+            except FileNotFoundError:
+                logger.debug("res_nhood_enrichment.csv not found — skipping neighborhood enrichment context")
+
+            pathway_csv = None
+            try:
+                pathway_csv = pd.read_csv(f"{save_path}/sig_PathwayEnrich_decoupler.csv")
+            except FileNotFoundError:
+                logger.debug("sig_PathwayEnrich_decoupler.csv not found — skipping pathway enrichment context")
+
+            misty_csv = None
+            try:
+                misty_csv = pd.read_csv(f"{save_path}/res_SpatialRelationship_MISTy.csv")
+            except FileNotFoundError:
+                logger.debug("res_SpatialRelationship_MISTy.csv not found — skipping MISTy context")
+
+            pathway_factor_csv = None
+            try:
+                pathway_factor_csv = pd.read_csv(f"{save_path}/sig_liana_pathway_factor.csv")
+            except FileNotFoundError:
+                logger.debug("sig_liana_pathway_factor.csv not found — skipping factor-pathway context")
+
+            # sig_liana.csv — summarize only (can be 1000+ rows)
+            liana_summary = None
+            try:
+                liana_df = pd.read_csv(f"{save_path}/sig_liana.csv")
+                summary_lines = []
+                factor_cols_liana = [c for c in liana_df.columns if c.startswith("Factor")]
+                if factor_cols_liana:
+                    pair_counts = {f: int(liana_df[f].notna().sum()) for f in factor_cols_liana}
+                    summary_lines.append(f"Significant L-R pairs per factor: {pair_counts}")
+                morans_col = None
+                for candidate in ["morans_r", "MoransR", "morans_R", "Morans_R"]:
+                    if candidate in liana_df.columns:
+                        morans_col = candidate
+                        break
+                if morans_col:
+                    top5 = liana_df.nlargest(5, morans_col)
+                    interaction_col = "interaction" if "interaction" in top5.columns else top5.columns[0]
+                    top5_str = top5[[interaction_col, morans_col]].to_string(index=False)
+                    summary_lines.append(f"Top 5 L-R pairs by Moran's R:\n{top5_str}")
+                pathway_col = None
+                for candidate in ["pathway", "Pathway", "pathway_name"]:
+                    if candidate in liana_df.columns:
+                        pathway_col = candidate
+                        break
+                if pathway_col:
+                    n_pathways = liana_df[pathway_col].nunique()
+                    summary_lines.append(f"Unique pathways represented: {n_pathways}")
+                summary_lines.append(f"Total significant L-R pairs: {len(liana_df)}")
+                liana_summary = "\n".join(summary_lines)
+            except FileNotFoundError:
+                logger.debug("sig_liana.csv not found — skipping L-R landscape summary")
+
+            summary = self._build_research_summary(
+                celltype_csv, factor_csv, state,
+                nhood_csv=nhood_csv,
+                pathway_csv=pathway_csv,
+                misty_csv=misty_csv,
+                pathway_factor_csv=pathway_factor_csv,
+                liana_summary=liana_summary,
             )
 
-        # Read additional CSVs — all optional, gracefully skip if missing
-        nhood_csv = None
-        try:
-            nhood_csv = pd.read_csv(f"{save_path}/res_nhood_enrichment.csv")
-        except FileNotFoundError:
-            logger.debug("res_nhood_enrichment.csv not found — skipping neighborhood enrichment context")
+            # Resolve pre-populated interest targets
+            pre_celltypes = state.get("interest_celltypes") or []
+            pre_clusters = state.get("interest_clusters") or []
+            user_preference_context = ""
+            resolved_clusters: list[str] = []
 
-        pathway_csv = None
-        try:
-            pathway_csv = pd.read_csv(f"{save_path}/sig_PathwayEnrich_decoupler.csv")
-        except FileNotFoundError:
-            logger.debug("sig_PathwayEnrich_decoupler.csv not found — skipping pathway enrichment context")
+            if pre_celltypes or pre_clusters:
+                resolved_clusters, resolved_celltypes = self._resolve_celltype_cluster_mapping(
+                    save_path, pre_celltypes, pre_clusters,
+                )
+                parts = []
+                if pre_celltypes:
+                    parts.append(f"- Pre-selected cell types: {pre_celltypes}")
+                if pre_clusters:
+                    parts.append(f"- Pre-selected clusters: {pre_clusters}")
+                if resolved_clusters and resolved_clusters != pre_clusters:
+                    parts.append(f"- Auto-resolved clusters (from cell types): {resolved_clusters}")
+                if resolved_celltypes and resolved_celltypes != pre_celltypes:
+                    parts.append(f"- Auto-resolved cell types (from clusters): {resolved_celltypes}")
+                user_preference_context = "\n".join(parts)
 
-        misty_csv = None
-        try:
-            misty_csv = pd.read_csv(f"{save_path}/res_SpatialRelationship_MISTy.csv")
-        except FileNotFoundError:
-            logger.debug("res_SpatialRelationship_MISTy.csv not found — skipping MISTy context")
+                if self.is_debug:
+                    print(f"Pre-populated targets resolved: clusters={resolved_clusters}, celltypes={resolved_celltypes}")
 
-        pathway_factor_csv = None
-        try:
-            pathway_factor_csv = pd.read_csv(f"{save_path}/sig_liana_pathway_factor.csv")
-        except FileNotFoundError:
-            logger.debug("sig_liana_pathway_factor.csv not found — skipping factor-pathway context")
+            # Compute data-driven factor suggestion
+            computed_factor_hint = ""
+            if pre_clusters or (pre_celltypes and resolved_clusters):
+                effective_clusters = resolved_clusters if resolved_clusters else pre_clusters
+                best_factor, factor_analysis = self._suggest_factor(
+                    factor_csv, [str(c) for c in effective_clusters], detailed=True,
+                )
+                computed_factor_hint = (
+                    f"\n\nDATA-DRIVEN FACTOR ANALYSIS:\n{factor_analysis}\n"
+                    "Use this mathematical analysis to recommend the correct NMF factor. "
+                    "Do NOT override this with pathway narrative alone."
+                )
 
-        # sig_liana.csv — summarize only (can be 1000+ rows)
-        liana_summary = None
-        try:
-            liana_df = pd.read_csv(f"{save_path}/sig_liana.csv")
-            summary_lines = []
-            # Count of significant L-R pairs per factor
-            factor_cols_liana = [c for c in liana_df.columns if c.startswith("Factor")]
-            if factor_cols_liana:
-                # Each factor column has scores; count non-null entries per factor
-                pair_counts = {f: int(liana_df[f].notna().sum()) for f in factor_cols_liana}
-                summary_lines.append(f"Significant L-R pairs per factor: {pair_counts}")
-            # Top 5 L-R pairs by Moran's R score (if column exists)
-            morans_col = None
-            for candidate in ["morans_r", "MoransR", "morans_R", "Morans_R"]:
-                if candidate in liana_df.columns:
-                    morans_col = candidate
-                    break
-            if morans_col:
-                top5 = liana_df.nlargest(5, morans_col)
-                interaction_col = "interaction" if "interaction" in top5.columns else top5.columns[0]
-                top5_str = top5[[interaction_col, morans_col]].to_string(index=False)
-                summary_lines.append(f"Top 5 L-R pairs by Moran's R:\n{top5_str}")
-            # Unique pathway count
-            pathway_col = None
-            for candidate in ["pathway", "Pathway", "pathway_name"]:
-                if candidate in liana_df.columns:
-                    pathway_col = candidate
-                    break
-            if pathway_col:
-                n_pathways = liana_df[pathway_col].nunique()
-                summary_lines.append(f"Unique pathways represented: {n_pathways}")
-            summary_lines.append(f"Total significant L-R pairs: {len(liana_df)}")
-            liana_summary = "\n".join(summary_lines)
-        except FileNotFoundError:
-            logger.debug("sig_liana.csv not found — skipping L-R landscape summary")
+                if self.is_debug:
+                    print(f"Computed factor: {best_factor}\n{factor_analysis}")
 
-        summary = self._build_research_summary(
-            celltype_csv, factor_csv, state,
-            nhood_csv=nhood_csv,
-            pathway_csv=pathway_csv,
-            misty_csv=misty_csv,
-            pathway_factor_csv=pathway_factor_csv,
-            liana_summary=liana_summary,
+            return summary, user_preference_context, computed_factor_hint
+
+        summary, user_preference_context, computed_factor_hint = await asyncio.to_thread(
+            _read_csvs_and_build_summary
         )
-
-        # Resolve pre-populated interest targets for LLM prompt enrichment
-        pre_celltypes = state.get("interest_celltypes") or []
-        pre_clusters = state.get("interest_clusters") or []
-        user_preference_context = ""
-        resolved_clusters: list[str] = []
-
-        if pre_celltypes or pre_clusters:
-            resolved_clusters, resolved_celltypes = self._resolve_celltype_cluster_mapping(
-                save_path, pre_celltypes, pre_clusters,
-            )
-            # Build context string for LLM prompt
-            parts = []
-            if pre_celltypes:
-                parts.append(f"- Pre-selected cell types: {pre_celltypes}")
-            if pre_clusters:
-                parts.append(f"- Pre-selected clusters: {pre_clusters}")
-            if resolved_clusters and resolved_clusters != pre_clusters:
-                parts.append(f"- Auto-resolved clusters (from cell types): {resolved_clusters}")
-            if resolved_celltypes and resolved_celltypes != pre_celltypes:
-                parts.append(f"- Auto-resolved cell types (from clusters): {resolved_celltypes}")
-            user_preference_context = "\n".join(parts)
-
-            if self.is_debug:
-                print(f"Pre-populated targets resolved: clusters={resolved_clusters}, celltypes={resolved_celltypes}")
-
-        # Compute data-driven factor suggestion when pre-populated clusters available
-        computed_factor_hint = ""
-        if pre_clusters or (pre_celltypes and resolved_clusters):
-            effective_clusters = resolved_clusters if resolved_clusters else pre_clusters
-            best_factor, factor_analysis = self._suggest_factor(
-                factor_csv, [str(c) for c in effective_clusters], detailed=True,
-            )
-            computed_factor_hint = (
-                f"\n\nDATA-DRIVEN FACTOR ANALYSIS:\n{factor_analysis}\n"
-                "Use this mathematical analysis to recommend the correct NMF factor. "
-                "Do NOT override this with pathway narrative alone."
-            )
-
-            if self.is_debug:
-                print(f"Computed factor: {best_factor}\n{factor_analysis}")
 
         # LLM suggests interest_clusters and interest_celltypes based on disease context
         disease = state.get("disease", "unknown")
@@ -1589,7 +1670,8 @@ Please provide your selections as JSON or natural language."""
 
         # Authoritative resolution (post-HITL) — distinct from prompt-enrichment
         # resolution in prepare_research_summary_node
-        parsed_clusters, parsed_celltypes = self._resolve_celltype_cluster_mapping(
+        parsed_clusters, parsed_celltypes = await asyncio.to_thread(
+            self._resolve_celltype_cluster_mapping,
             save_path, parsed_celltypes, parsed_clusters,
         )
 
@@ -1643,7 +1725,7 @@ Please provide your selections as JSON or natural language."""
 
         # Read factor CSV for suggestion computation
         try:
-            factor_csv = pd.read_csv(f"{save_path}/res_liana_cluster_factor.csv")
+            factor_csv = await asyncio.to_thread(pd.read_csv, f"{save_path}/res_liana_cluster_factor.csv")
         except FileNotFoundError:
             logger.warning(
                 "res_liana_cluster_factor.csv not found in %s. "
@@ -1771,13 +1853,14 @@ Available factors: {available_factors}
         step_idx = current_step - 9  # 0, 1, 2
         step_config = self.ANALYSIS_STEPS_9_11[step_idx]
         save_path = state["data_directory"]
+        sample_key = state.get("sample_key")
 
         # Validate sel_factor on first entry (step 9 only)
         sel_factor = state["sel_factor"]
         if current_step == 9:
             csv_path = f"{save_path}/sig_liana.csv"
             try:
-                sig_headers = pd.read_csv(csv_path, index_col=0, nrows=0)
+                sig_headers = await asyncio.to_thread(pd.read_csv, csv_path, index_col=0, nrows=0)
                 available = [c for c in sig_headers.columns if c.startswith("Factor")]
                 if sel_factor not in available and available:
                     sel_factor = available[0]
@@ -1801,11 +1884,17 @@ Available factors: {available_factors}
         configurable = (config or {}).get("configurable", {})
         force_rerun = configurable.get("force_rerun", False)
 
-        if not force_rerun and self._check_step_outputs_exist(step_config, save_path):
+        if not force_rerun and await asyncio.to_thread(
+            self._check_step_outputs_exist,
+            step_config, save_path, current_step, sample_key,
+            state.get("interest_sample"),
+        ):
             if self.is_debug:
                 print(f"Step {current_step}/11: {step_config['desc']} - SKIPPED (cached)")
-            message_content = self._build_step_message(
-                current_step, step_config, "skipped", save_path, None, total_steps=11
+            message_content = await asyncio.to_thread(
+                self._build_step_message,
+                current_step, step_config, "skipped", save_path, None,
+                11, sample_key,
             )
             is_last = current_step >= 11
             update = {
@@ -1817,7 +1906,7 @@ Available factors: {available_factors}
             return update
 
         # Build tool args
-        tool_args = self._build_step_args_9_11(current_step, state, sel_factor)
+        tool_args = await asyncio.to_thread(self._build_step_args_9_11, current_step, state, sel_factor)
 
         # Get MCP server paths
         sp_python = os.getenv("SP_ENRICH_MCP_PYTHON")
@@ -1856,8 +1945,10 @@ Available factors: {available_factors}
             print(f"Step {current_step}/11: {step_config['desc']} - {status}")
 
         # Build multimodal message
-        message_content = self._build_step_message(
-            current_step, step_config, status, save_path, error_msg, total_steps=11
+        message_content = await asyncio.to_thread(
+            self._build_step_message,
+            current_step, step_config, status, save_path, error_msg,
+            11, sample_key,
         )
 
         is_last = current_step >= 11
@@ -1887,13 +1978,27 @@ Available factors: {available_factors}
 
         logger.info("Step 9.5: Running drug target assessment pipeline")
 
+        # 0. Write targets.json so Drug Target agent can read interest_celltypes
+        targets_content = {
+            "interest_celltypes": state.get("interest_celltypes") or [],
+            "interest_clusters": state.get("interest_clusters") or [],
+            "sel_factor": state.get("sel_factor"),
+            "data_directory": str(save_path),
+        }
+        targets_path = Path(save_path) / "targets.json"
+        if not targets_path.exists():
+            targets_path.write_text(json.dumps(targets_content, indent=2, ensure_ascii=False))
+            logger.info("Step 9.5: Wrote targets.json with interest_celltypes=%s",
+                        targets_content["interest_celltypes"])
+
         # 1. Generate lr_candidates.json via prioritizer
         drug_target_error = None
         try:
             # Lazy import to break circular dependency (wrapper → lr_prioritizer)
             from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
-            lr_result_json = prioritize_top_lr_pairs.invoke(
-                {"data_dir": save_path, "candidate_count": 30}
+            lr_result_json = await asyncio.to_thread(
+                prioritize_top_lr_pairs.invoke,
+                {"data_dir": save_path, "candidate_count": 30},
             )
             lr_result = json.loads(lr_result_json)
             candidate_count = len(lr_result.get("pairs", []))
@@ -1936,11 +2041,18 @@ Available factors: {available_factors}
 
         # 4. Delete cached Step 10-11 figures only when we have better data to regenerate with
         if featured_pairs:
-            for fig_name in ["10.spatial_plot_interections.png", "11.lr_interections.png"]:
-                fig_path = Path(save_path) / fig_name
-                if fig_path.exists():
-                    fig_path.unlink()
-                    logger.info(f"Deleted cached {fig_name} for featured pair regeneration")
+            def _delete_cached_figs():
+                figs_to_delete = [
+                    Path(save_path) / "10.spatial_plot_interections.png",
+                    Path(save_path) / "11.lr_interections.png",
+                ]
+                figs_to_delete += [Path(p) for p in glob.glob(f"{save_path}/10.spatial_plot_interections_*.png")]
+                figs_to_delete += [Path(p) for p in glob.glob(f"{save_path}/11.lr_interections_*.png")]
+                for fig_path in figs_to_delete:
+                    if fig_path.exists():
+                        fig_path.unlink()
+                        logger.info(f"Deleted cached {fig_path.name} for featured pair regeneration")
+            await asyncio.to_thread(_delete_cached_figs)
 
         # Build status message
         status_parts = ["**Step 9.5: Drug Target Assessment**"]

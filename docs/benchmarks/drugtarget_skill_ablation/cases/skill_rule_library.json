@@ -1,0 +1,92 @@
+{
+  "R_GWAS_SIGNIFICANCE": {
+    "rule_id": "R_GWAS_SIGNIFICANCE",
+    "skill_name": "gwas-database",
+    "error_families": [
+      "gwas_strength_inflation"
+    ],
+    "title": "GWAS significance threshold",
+    "directive": "Do not upgrade suggestive or sub-threshold associations to strong exact-disease genetics.",
+    "source_path": "skills/gwas-database/SKILL.md",
+    "source_line_ref": "307-309,459"
+  },
+  "R_GWAS_REPLICATION": {
+    "rule_id": "R_GWAS_REPLICATION",
+    "skill_name": "gwas-database",
+    "error_families": [
+      "replication_inflation"
+    ],
+    "title": "Replication is required for robustness",
+    "directive": "Treat missing independent replication as a reason to avoid robustness claims and increase uncertainty.",
+    "source_path": "skills/gwas-database/SKILL.md",
+    "source_line_ref": "307-309,440-462"
+  },
+  "R_GWAS_TRAIT_ALIGNMENT": {
+    "rule_id": "R_GWAS_TRAIT_ALIGNMENT",
+    "skill_name": "gwas-database",
+    "error_families": [
+      "trait_alignment_inflation"
+    ],
+    "title": "Related traits are not disease-matched evidence",
+    "directive": "Do not treat related GWAS traits as exact-disease support without explicit disease-matched mapping.",
+    "source_path": "skills/gwas-database/SKILL.md",
+    "source_line_ref": "276,432-433"
+  },
+  "R_GWAS_METADATA_UNCERTAINTY": {
+    "rule_id": "R_GWAS_METADATA_UNCERTAINTY",
+    "skill_name": "gwas-database",
+    "error_families": [
+      "uncertainty_underestimation"
+    ],
+    "title": "Metadata gaps should raise uncertainty",
+    "directive": "Missing replication, ancestry, or study metadata should raise uncertainty rather than confidence.",
+    "source_path": "skills/gwas-database/SKILL.md",
+    "source_line_ref": "440-462"
+  },
+  "R_OT_RELATIVE_SCORE": {
+    "rule_id": "R_OT_RELATIVE_SCORE",
+    "skill_name": "opentargets-database",
+    "error_families": [
+      "uncertainty_underestimation",
+      "safety_underweighting"
+    ],
+    "title": "Open Targets scores are relative",
+    "directive": "Interpret Open Targets scores as relative rankings, not stand-alone confidence or validation.",
+    "source_path": "skills/opentargets-database/SKILL.md",
+    "source_line_ref": "220,271-276"
+  },
+  "R_OT_CLINICAL_SCOPE": {
+    "rule_id": "R_OT_CLINICAL_SCOPE",
+    "skill_name": "opentargets-database",
+    "error_families": [
+      "approval_scope_inflation"
+    ],
+    "title": "Clinical precedent must be disease-matched",
+    "directive": "Do not treat adjacent-indication or indirect clinical activity as exact-disease approval or maturity.",
+    "source_path": "skills/opentargets-database/SKILL.md",
+    "source_line_ref": "247-254,289-293"
+  },
+  "R_OT_TRACTABILITY_PRECEDENCE": {
+    "rule_id": "R_OT_TRACTABILITY_PRECEDENCE",
+    "skill_name": "opentargets-database",
+    "error_families": [
+      "approval_scope_inflation",
+      "predicted_tractability_inflation"
+    ],
+    "title": "Predicted tractability is not clinical maturity",
+    "directive": "Predicted tractability alone does not establish clinical precedent, maturity, or validated drug evidence.",
+    "source_path": "skills/opentargets-database/SKILL.md",
+    "source_line_ref": "247-254,289-293"
+  },
+  "R_OT_SAFETY_CAUTION": {
+    "rule_id": "R_OT_SAFETY_CAUTION",
+    "skill_name": "opentargets-database",
+    "error_families": [
+      "safety_underweighting"
+    ],
+    "title": "Safety liabilities reduce prioritization optimism",
+    "directive": "Safety liabilities or essentiality concerns should reduce prioritization optimism rather than be ignored.",
+    "source_path": "skills/opentargets-database/SKILL.md",
+    "source_line_ref": "263-276"
+  }
+}

@@ -321,7 +321,7 @@ def create_drug_target_graph() -> Runnable:
         Compiled Deep Agent graph.
     """
     agent, backend = create_drug_target_agent(DrugTargetConfig())
-    if backend:
+    if backend and hasattr(backend, "cleanup"):
         import atexit
         atexit.register(backend.cleanup)
     return agent

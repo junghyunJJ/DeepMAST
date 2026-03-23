@@ -144,7 +144,12 @@ a) **Ensembl VEP** (oncology OR GWAS variants available):
 
 ### Inline Rubric Assessment (after Stage 2 → Featured & Novel Selection)
 
-Apply DRUG_TARGET_RUBRIC scoring for EACH target gene.
+**CRITICAL: Call `compute_rubric_scores(data_dir)` IMMEDIATELY after `query_stage2_gene_panel`.**
+This tool deterministically scores ALL genes from the ot_*.json evidence files and saves
+`assessment_results.json` + `rubric_scores.csv`. Do NOT manually score genes — the tool
+handles all 8 criteria for every gene automatically.
+
+After calling `compute_rubric_scores`, review its output to identify Featured and Novel candidates.
 RUBRIC scores determine two tracks: Featured Candidates and Novel Candidates.
 
 #### Track Separation
