@@ -1045,7 +1045,6 @@ async def render_skill_prompt(
     """Apply SkillLoadHarness to a base system prompt."""
     harness = SkillLoadHarness(
         skill_registry=skill_registry,
-        stage_hints=stage_hints or {},
     )
 
     class _MockRequest:

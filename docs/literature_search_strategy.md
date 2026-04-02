@@ -1,7 +1,7 @@
 # Literature Search Strategy (search_literature_dynamic)
 
-> 최종 업데이트: 2025-01-28
-> 버전: v2.0 (Simplified - Alias pre-fetch 제거)
+> 최종 업데이트: 2026-03-25
+> 버전: v2.1 (BioMCP Think 제거, 파라미터 업데이트)
 
 ---
 
@@ -28,13 +28,6 @@ CCI (Cell-Cell Interaction) 분석 결과 해석을 위한 **LLM 기반 동적 �
 ### 2.1 Flow Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ Step 0: BioMCP Think (전략 수립)                                              │
-│   - Context Analysis → Search Keywords → Expected Results                    │
-│   - Token cost: ~500 tokens                                                  │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ Iteration 0: Initial Search                                                  │
 │                                                                              │
@@ -90,9 +83,6 @@ CCI (Cell-Cell Interaction) 분석 결과 해석을 위한 **LLM 기반 동적 �
 
 ```
 search_literature_dynamic()
-├── _execute_biomcp_think()          # Step 0: 전략 수립
-│   └── _think_with_biomcp()         # BioMCP think tool 호출
-│
 ├── create_llm()                     # LLM 인스턴스 생성
 │
 ├── [Iteration Loop]
@@ -119,39 +109,7 @@ search_literature_dynamic()
 
 ## 3. 핵심 컴포넌트 상세
 
-### 3.1 BioMCP Think (전략 수립)
-
-```python
-# 3단계 사고 과정
-async def _think_with_biomcp(...):
-    # Step 1: Context Analysis
-    await think_tool.ainvoke({
-        "thought": "Context analysis for literature search...",
-        "thoughtNumber": 1,
-        "totalThoughts": 3,
-    })
-
-    # Step 2: Search Keywords
-    await think_tool.ainvoke({
-        "thought": "Derive search keywords from context...",
-        "thoughtNumber": 2,
-    })
-
-    # Step 3: Expected Results
-    await think_tool.ainvoke({
-        "thought": "Expected biological mechanisms...",
-        "thoughtNumber": 3,
-    })
-```
-
-**출력 예시:**
-```
-Context: Genes: ADAM10, ADAM17, ACKR3... Pathways: Androgen, MAPK...
-Keywords: metalloprotease, chemokine receptor, androgen signaling...
-Expected: EMT-related mechanisms, tumor microenvironment interactions...
-```
-
-### 3.2 LLM Query Generation
+### 3.1 LLM Query Generation
 
 **프롬프트 구조:**
 ```
@@ -162,7 +120,6 @@ LITERATURE_QUERY_GENERATION_PROMPT
 │   ├── pathways: {pathways}
 │   ├── celltypes: {celltypes}
 │   └── disease: {disease}
-├── Strategic Context (BioMCP Think 결과)
 ├── Query Generation Guidelines
 │   ├── Gene-centric queries (최소 3개)
 │   ├── Pathway-centric queries (최소 2개)
@@ -181,7 +138,7 @@ LITERATURE_QUERY_GENERATION_PROMPT
 ]
 ```
 
-### 3.3 60/40 Slot Allocation
+### 3.2 60/40 Slot Allocation
 
 ```python
 remaining_slots = max_results - len(all_papers)  # 예: 30
@@ -204,7 +161,7 @@ pathway_results_per_query = max(3, pathway_slots // len(pathway_queries))  # ~4�
 2. Pathway queries 실행 (40% 슬롯)
 3. PMID 기반 중복 제거
 
-### 3.4 Smart Pattern Matching (Coverage 계산)
+### 3.3 Smart Pattern Matching (Coverage 계산)
 
 ```python
 def _generate_gene_patterns(gene: str) -> list[str]:
@@ -254,7 +211,7 @@ def _generate_pathway_patterns(pathway: str) -> list[str]:
     }
 ```
 
-### 3.5 BioMCP 자동 Alias 처리
+### 3.4 BioMCP 자동 Alias 처리
 
 > **핵심**: BioMCP article_searcher가 내부적으로 유전자 alias를 자동 처리
 
@@ -330,6 +287,17 @@ def search_literature_dynamic(
     target_gene_coverage: float = 0.6,     # 목표 유전자 커버리지 (60%)
     target_pathway_coverage: float = 0.5,  # 목표 패스웨이 커버리지 (50%)
     max_iterations: int = 3,       # 최대 반복 횟수
+    enforce_disease_match: bool = True,    # 질병 관련성 후필터링
+    output_path: str = "",         # 결과 파일 자동저장 경로
+    data_dir: str = "",            # 데이터 디렉토리 (env var 우선)
+    rerank_mode: str = "off",      # "off" 또는 "llm" (2차 리랭킹)
+    rerank_top_n: int = 12,        # 리랭킹 대상 최대 수
+    rerank_min_confidence: float = 0.70,   # 리랭킹 최소 신뢰도
+    llm_provider: str = "",        # LLM 프로바이더 오버라이드 (예: "openai")
+    sort_by_journal_quality: bool = True,  # SJR 저널 품질 정렬
+    coverage_weighted_sort: bool = False,  # 커버리지 가중 정렬
+    query_cache: list[dict] | None = None, # 캐시된 쿼리 재사용
+    record_queries: bool = False,  # 생성된 쿼리 기록 여부
 ) -> dict:
 ```
 
@@ -360,7 +328,7 @@ def search_literature_dynamic(
         "celltypes_covered": [...],
         "total_papers": 30
     },
-    "think_success": True,          # BioMCP think 성공 여부
+    "think_success": True,          # backward-compat 필드 (항상 True)
     "iterations": 2,                # 실행된 iteration 수
     "coverage_history": [           # iteration별 커버리지 추이
         {"iteration": 0, "papers": 0, "gene_coverage": 0.0, "pathway_coverage": 0.0},
@@ -423,16 +391,18 @@ Input:
 # Public API
 search_literature_dynamic()          # Sync 버전 (@tool)
 search_literature_dynamic_async()    # Async 버전
+generate_biomedical_context()        # PLANNER용 BioMCP think (@tool, 별도 기능)
 
 # Internal
-_execute_biomcp_think()              # BioMCP think 실행
-_think_with_biomcp()                 # BioMCP think async
 _search_with_biomcp()                # BioMCP article_searcher 실행
 _parse_llm_queries()                 # LLM 응답 JSON 파싱
 _validate_generated_queries()        # 쿼리 유효성 검증
 _calculate_coverage()                # 커버리지 계산
 _generate_gene_patterns()            # 유전자 패턴 생성
 _generate_pathway_patterns()         # 패스웨이 패턴 생성
+_compute_paper_coverage_score()      # 논문별 커버리지 점수
+_greedy_coverage_sort()              # 커버리지 가중 정렬
+_think_with_biomcp_for_planner()     # PLANNER용 BioMCP think (generate_biomedical_context 내부)
 ```
 
 ---
@@ -443,7 +413,8 @@ _generate_pathway_patterns()         # 패스웨이 패턴 생성
 |------|------|----------|
 | v1.0 | 2025-01-28 | 초기 구현 (search_literature_dynamic) |
 | v1.5 | 2025-01-28 | Iterative gap-filling, 60/40 allocation 추가 |
-| **v2.0** | **2025-01-28** | **Alias pre-fetch 제거 (BioMCP 자동 처리)** |
+| v2.0 | 2025-01-28 | Alias pre-fetch 제거 (BioMCP 자동 처리) |
+| **v2.1** | **2026-03-25** | **BioMCP Think (Step 0) dead code 제거, 파라미터 업데이트 (rerank, auto-save, query_cache 등)** |
 
 ### v2.0 단순화 내용
 
@@ -460,6 +431,28 @@ _generate_pathway_patterns()         # 패스웨이 패턴 생성
 - ACKR3 검색 → CXCR7 논문도 자동 반환
 - 불필요한 gene_getter API 호출 제거
 - ~36줄 코드 감소
+
+### v2.1 단순화 내용
+
+**제거된 코드:**
+```python
+# Step 0: BioMCP Think (전략 수립) — dead code 제거
+# async def _think_with_biomcp(genes, pathways, celltypes, disease, biomcp_url)
+# def _execute_biomcp_think(genes, pathways, celltypes, disease)
+```
+
+**이유:**
+- `search_literature_dynamic_async`에서 이미 호출하지 않고 있었음 (`think_success = True` 하드코딩)
+- LLM Query Generation이 직접 맥락을 처리하므로 별도 think 단계 불필요
+- ~105줄 dead code 제거
+- 참고: `_think_with_biomcp_for_planner()`는 PLANNER용 별도 함수로 유지됨
+
+**추가된 파라미터 문서화:**
+- `enforce_disease_match`: 질병 관련성 후필터링
+- `output_path` / `data_dir`: 결과 자동 저장
+- `rerank_mode` / `rerank_top_n` / `rerank_min_confidence`: LLM 리랭킹
+- `sort_by_journal_quality` / `coverage_weighted_sort`: 정렬 옵션
+- `query_cache` / `record_queries`: 쿼리 캐시 및 재현성
 
 ---
 

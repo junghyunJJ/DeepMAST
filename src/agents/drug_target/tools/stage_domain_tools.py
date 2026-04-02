@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import logging
 import sqlite3
 import threading
-from pathlib import Path
 from typing import Any
 
 import os
@@ -24,32 +22,14 @@ from src.agents.drug_target.tools.stage2_service import (
     write_stage2_artifacts,
 )
 
+from src.agents.drug_target.tools._skill_loader import load_skill_module as _load_skill_module
+
 logger = logging.getLogger(__name__)
 
-_SKILLS_DIR = Path(__file__).resolve().parents[4] / "skills"
 _TIMEOUT = 30
 _DEFAULT_CENSUS_VERSION = os.getenv("CENSUS_VERSION", "2025-11-08")
 
-_module_cache: dict[tuple[str, str], Any] = {}
 _CHEMBL_LOCK = threading.Lock()
-_MODULE_CACHE_LOCK = threading.Lock()
-
-
-def _load_skill_module(skill_name: str, script_name: str, module_name: str):
-    cache_key = (skill_name, script_name)
-    with _MODULE_CACHE_LOCK:
-        if cache_key in _module_cache:
-            return _module_cache[cache_key]
-        script_path = _SKILLS_DIR / skill_name / "scripts" / script_name
-        if not script_path.exists():
-            raise FileNotFoundError(f"Skill script not found: {script_path}")
-        spec = importlib.util.spec_from_file_location(module_name, script_path)
-        if spec is None or spec.loader is None:
-            raise ImportError(f"Could not load module spec for {script_path}")
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        _module_cache[cache_key] = mod
-        return mod
 
 
 def _as_json(payload: dict[str, Any]) -> str:
@@ -97,7 +77,7 @@ def query_cellxgene_lr_context(
 
     # Auto-resolve disease name against Census MONDO vocabulary
     try:
-        from src.agents.drug_target.tools.census_lr_validation_tools import _resolve_disease_name
+        from src.agents.drug_target.tools.census_batch_core import _resolve_disease_name
         resolved, mode = _resolve_disease_name(disease, organism)
         if resolved:
             result["disease_resolved"] = resolved
@@ -129,6 +109,13 @@ def query_cellxgene_lr_context(
                     value_filter="is_primary_data == True",
                     column_names=["cell_type"],
                 )
+                # OOM guard: cap fallback cell count (consistent with census_batch_core)
+                if len(obs) > 2_000_000:
+                    result["errors"].append(
+                        f"Fallback returned {len(obs)} cells, exceeding safe limit (2M). "
+                        "Aborting to prevent OOM. Fix the disease name via list_census_diseases()."
+                    )
+                    return _as_json(result)
 
             var = cellxgene_census.get_var(
                 census,
@@ -184,7 +171,6 @@ def list_census_diseases(organism: str = "homo_sapiens") -> str:
                      summary_df.shape, list(summary_df.columns))
         # Match organism with both underscore and space formats (Census uses underscores)
         org_underscore = organism.replace(" ", "_").lower()
-        org_space = organism.replace("_", " ").lower()
         mask = (
             (summary_df["organism"].str.lower().str.replace(" ", "_") == org_underscore)
             & (summary_df["category"] == "disease")
@@ -518,8 +504,6 @@ def query_chembl_target_profile(gene_symbol: str, max_drugs: int = 10) -> str:
     return _as_json(result)
 
 
-_chembl_fallback = _query_chembl_drugs
-
 
 @tool
 def query_pubmed_clinical_limitations(target_name: str, max_results: int = 5) -> str:
@@ -646,16 +630,6 @@ def query_stage2_gene_panel(
 
     # Resolve data_dir with fallback to env var
     resolved_dir = _resolve_data_dir(data_dir)
-
-    # Auto-finalize Stage 1 if not already done
-    s1_conf = resolved_dir / "evidence" / "stage1_confidence.json"
-    if not s1_conf.exists() or s1_conf.stat().st_size <= 10:
-        logger.info("Auto-finalizing Stage 1 before Stage 2 batch...")
-        try:
-            from src.agents.drug_target.tools.stage1_normalization import finalize_stage1_workspace
-            finalize_stage1_workspace(str(resolved_dir))
-        except Exception as exc:
-            logger.warning("Stage 1 auto-finalize failed (continuing): %s", exc)
 
     bundle = build_stage2_gene_panel(
         gene_symbols,

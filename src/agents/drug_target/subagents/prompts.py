@@ -24,7 +24,15 @@ For each stage, follow this cycle:
 2. **EXECUTE**: Call @tool functions directly
 3. **REFLECT** (think_tool): Assess coverage -- any genes missing? API failures? Gaps to fill?
 
-## 3-Stage Funnel Workflow
+## Reordered 3-Stage Funnel Workflow
+
+**CRITICAL: Stage 2 runs FIRST (all genes), then gene selection, then Stage 1
+(FEATURED pairs only), then Stage 3 (FEATURED genes only).**
+
+```
+Phase 0 → Stage 2 (ALL genes) → Rubric Scoring → Gene Selection (combined_total >= 10) →
+Gene→Pair Mapping → Stage 1 (FEATURED pairs) → Stage 1 Gate → Stage 3
+```
 
 ### Phase 0: Load Input Data
 1. Call `load_lr_candidates(data_dir)` to get:
@@ -47,72 +55,9 @@ For each stage, follow this cycle:
    Use `census_disease` (not the raw `disease`) for ALL subsequent
    Census queries in Stage 1.
 
-### Stage 1: Biological Context (ALL L-R pairs)
+### Stage 2: Target Validation & Scoring (ALL unique genes — RUNS FIRST)
 
-Use `sequential_thinking` to PLAN your query strategy first.
-
-## PERFORMANCE: Minimize LLM Round Trips
-
-For EACH L-R pair in Stage 1, issue ALL independent tool calls in a SINGLE batch.
-Do NOT call tools one at a time — the framework supports parallel tool execution.
-Each model→tools round trip costs ~2 minutes with large models.
-
-- **Batch 1** (all independent, call together): query_cellxgene_lr_context,
-  query_kegg_pathways(ligand), query_kegg_pathways(receptor),
-  query_reactome_pathways(ligand), query_reactome_pathways(receptor),
-  query_string_ppi_pair
-- **Batch 2** (depends on Census result from Batch 1): run_compare_census_lr_pair + save_evidence
-
-Target: 2-3 round trips per pair, NOT 6-8.
-
-For EACH L-R pair:
-a) **Cellxgene Census** -- call `query_cellxgene_lr_context` using `census_disease`
-   (from Phase 0 mapping) as the disease argument. Check the `disease_matched` flag
-   in the response: if `false`, the disease name was not found in Census and results
-   fell back to ALL cells -- re-check your Phase 0 mapping and consider retrying
-   with the corrected Census label. Review the `top_cell_types` list.
-
-   **CRITICAL: Cell type name mapping** -- Compare `interest_celltypes` from targets.json
-   against `top_cell_types` from Census. ST analysis labels often differ from Census
-   CL ontology labels (e.g., "Tumor Cell" → "malignant cell", "Immune cell" → "leukocyte").
-   Identify the best-matching Census cell type for each interest_celltype.
-   Use the matched Census name (not the original interest_celltype) when calling
-   `run_compare_census_lr_pair` in step (d).
-
-b) **KEGG/Reactome** -- call `query_kegg_pathways` and `query_reactome_pathways`
-   for BOTH the ligand AND receptor genes separately.
-   Store results as:
-     "kegg_pathways": {"ligand_pathways": [...], "receptor_pathways": [...]}
-     "reactome_pathways": {"ligand_pathways": [...], "receptor_pathways": [...]}
-   This enables shared-pathway detection for biological plausibility scoring.
-c) **STRING** -- call `query_string_ppi_pair` to confirm established PPI.
-d) **[DeepMAST Enhancement] Census cross-validation** -- call `run_compare_census_lr_pair`
-   using `census_disease` (from Phase 0) as the disease argument, and
-   the **Census-matched cell type name** identified in step (a), NOT the raw
-   `interest_celltypes` string. Both disease and cell type must use Census
-   vocabulary for accurate z-test results.
-
-**SAVE IMMEDIATELY** after each L-R pair: `save_evidence(data_dir, "stage1_{LIGAND}_{RECEPTOR}.json", data)`
-
-### Stage 1 Confidence Scoring (after Stage 1, before Stage 2)
-
-After completing Stage 1 for ALL L-R pairs, you MUST call:
-`finalize_stage1_artifacts(data_dir, disease=census_disease, target_cell_type=<the Census-matched cell type you used for Stage 1>, rerun_missing_census=true)`
-
-This tool performs the canonical Stage 1 closeout:
-- fills any missing Census CSVs deterministically
-- normalizes all per-pair Stage 1 JSON files
-- rebuilds `stage1_evidence.json`, `stage1_confidence.json`, and `stage1_audit.json`
-- validates that the Stage 1 pair-set exactly matches `lr_candidates.json`
-
-Do NOT proceed to Stage 2 unless `finalize_stage1_artifacts` returns success=true.
-Do NOT hand-write or manually reconstruct `stage1_confidence.json`.
-
-All pairs proceed to Stage 2 regardless of Stage 1 confidence.
-
-### Stage 2: Target Validation & Scoring (ALL unique genes from ALL pairs)
-
-Before starting Stage 2 interpretation, read the following skill guides if you need
+Before starting Stage 2, read the following skill guides if you need
 help with evidence weighting, ontology mapping, or result interpretation:
 - `read_skill_file("skills/opentargets-database/SKILL.md")`
 - `read_skill_file("skills/gwas-database/SKILL.md")`
@@ -135,95 +80,143 @@ stage2_evidence.json, known_drugs.json, gene_manifest.json, and ot_{GENE}.json p
 Verify by calling `load_evidence_files(data_dir)` afterward.
 Do NOT call save_evidence to overwrite these files — they contain the real database results.
 
-a) **Ensembl VEP** (oncology OR GWAS variants available):
-   Collect rs IDs from each gene's `stage2_evidence[GENE]["gwas"]["gene_associations"]`.
-   Call `query_ensembl_vep_consequence(variant_ids)` to predict
-   functional consequence (LoF, missense, synonymous).
-   Use `classify_vep_consequence()` to categorize impact severity.
-   VEP results inform mechanism_relevance and biological_plausibility scores.
+a) **Ensembl VEP** runs automatically during `query_stage2_gene_panel`.
+   Results are stored in `stage2_evidence[GENE]["vep"]` with impact_summary.
+   VEP high/moderate impact variants boost biological_plausibility.
+   No manual VEP calls needed.
 
-### Inline Rubric Assessment (after Stage 2 → Featured & Novel Selection)
+### Rubric Scoring & Gene Selection (after Stage 2)
 
 **CRITICAL: Call `compute_rubric_scores(data_dir)` IMMEDIATELY after `query_stage2_gene_panel`.**
 This tool deterministically scores ALL genes from the ot_*.json evidence files and saves
 `assessment_results.json` + `rubric_scores.csv`. Do NOT manually score genes — the tool
 handles all 8 criteria for every gene automatically.
 
-After calling `compute_rubric_scores`, review its output to identify Featured and Novel candidates.
-RUBRIC scores determine two tracks: Featured Candidates and Novel Candidates.
+The tool selects genes with **combined_total >= 10** (excluding insufficient_evidence) as
+`stage3_candidates`. These are your FEATURED genes for Stage 1 and Stage 3.
 
-#### Track Separation
+After calling `compute_rubric_scores`, review its output:
+- `stage3_candidates`: list of genes selected for deep assessment
+- Use these genes to determine which L-R pairs need Stage 1
 
-**Featured Candidates** — Targets with existing drug evidence (existing_drug_evidence >= 1):
-- Ranked by combined_total (validated_total + exploratory_total) descending
-- These are known/validated therapeutic targets worth investigating further
+#### Gene → L-R Pair Mapping (CRITICAL)
 
-**Novel Candidates** — Targets with NO existing drug evidence (existing_drug_evidence == 0):
-- Ranked by exploratory_total (gwas + tractability + bio_plausibility + novelty) descending
-- These are newly discovered targets from ST CCI analysis
-- Novel Tier 1: Has GWAS support OR known tractability (more promising)
-- Novel Tier 2: No GWAS/tractability, supported only by ST + PPI evidence
+From the `stage3_candidates` gene list, identify ALL L-R pairs from `lr_pairs`
+(returned by `load_lr_candidates`) where the **ligand OR receptor** is a FEATURED gene.
+These are your **FEATURED pairs** — only these pairs need Stage 1.
 
-Dynamically allocate slots based on data quality:
-- Total Featured + Novel combined: 5-7 targets for Deep Dive
-- If few validated targets exist, allocate more Novel slots
-- If many validated targets exist, still include at least 1 Novel
+Example: If CXCR4 is in stage3_candidates, and lr_pairs contains
+CXCL12_CXCR4 and CCL5_CXCR4, BOTH pairs are FEATURED and need Stage 1.
 
-Both Featured AND Novel candidates proceed to Stage 3 Deep Dive.
+#### Rubric Reference (for interpreting compute_rubric_scores output)
 
-1. Score each gene on 8 criteria (each criterion gets score + rationale)
-2. classify_target() → insufficient_evidence targets are excluded
-3. Separate into Featured (drug evidence >= 1) and Novel (drug evidence == 0) pools
-4. Featured + Novel selected candidates → proceed to Stage 3
+Each row in druggability_matrix includes validated_track and exploratory_track scores.
 
-Each row in druggability_matrix must include validated_track and exploratory_track dictionaries.
+**Validated Track (Clinical Evidence)**
+- **existing_drug_evidence** (-5 to +5): gene-level drugs(+1/each) minus disease-level drugs(-1/each). Positive=repurposing opportunity, negative=saturated, zero=unknown druggability
+- **clinical_trial_activity** (-5 to +5): gene-level trials(+1/each) minus disease-level trials(-1/each). Positive=active target with novel indication, negative=saturated
+- **safety_profile** (-3 to 0): major_clinical(-3) | clinical_concerns(-2) | preclinical_only(-1) | minimal_or_none(0)
 
-#### Validated Track (Clinical Evidence)
-- **existing_drug_evidence** (0-3): Known drugs for this gene/disease?
-  Scale: none(0) | indirect_evidence(1) | Phase 1-2(2) | Phase 3+/approved(3)
-- **clinical_trial_activity** (0-3): Active trial landscape?
-  Scale: no_trials(0) | few_early_phase(1) | multiple_or_advanced(2) | extensive(3)
-- **mechanism_relevance** (0-3): Target mechanism relevant to L-R interaction?
-  Scale: unclear(0) | plausible(1) | well_supported(2) | direct_mechanism(3)
-- **safety_profile** (-2 to 0): Known safety concerns?
-  Scale: major_concerns(-2) | moderate_concerns(-1) | minimal_or_none(0)
+**Exploratory Track (Genetic/Biological Evidence)**
+- **gwas_genetic_support** (0-3): no_disease_gwas(0) | proximity_only(1) | direct_disease_link(2) | genome_wide_significant_overlap(3)
+- **tractability** (0-3): unknown(0) | predicted(1) | clinical_precedent(2) | approved_modality(3)
+- **biological_plausibility** (0-5): no_qualifying_evidence(0) | single_evidence_type(1) | single_high_confidence(2) | multiple_types(3) | broad_evidence(4) | comprehensive_multi_evidence(5)
+- **novelty_opportunity** (0-5): well_established(0) | explored(1) | moderate(2) | emerging(3) | rare(4) | completely_novel(5)
 
-Pass logic: existing_drug_evidence >= 2 OR (existing_drug_evidence >= 1 AND clinical_trial_activity >= 1)
+**Classification**: validated_target | exploratory_target | novel_candidate | insufficient_evidence
+**Priority**: high | medium | low | unranked
 
-#### Exploratory Track (Genetic/Biological Evidence)
-- **gwas_genetic_support** (0-3): GWAS evidence linking gene to disease?
-  Scale: no_signal(0) | suggestive(1) | genome_wide_significant(2) | replicated(3)
-- **tractability** (0-3): Is this target druggable?
-  Scale: unknown(0) | predicted(1) | clinical_precedent(2) | approved_modality(3)
-- **biological_plausibility** (0-3): Biological rationale strength?
-  Scale: weak(0) | moderate(1) | strong(2) | compelling_multi_evidence(3)
-- **novelty_opportunity** (0-3): How novel as therapeutic target?
-  Scale: well_established(0) | moderately_explored(1) | emerging(2) | novel(3)
+### Stage 1: Biological Context (FEATURED pairs ONLY)
 
-Pass logic: gwas_genetic_support >= 1 AND (tractability >= 1 OR biological_plausibility >= 2)
+**CRITICAL: Run Stage 1 ONLY for L-R pairs containing FEATURED genes
+(from stage3_candidates).  Do NOT run Stage 1 for all 30 pairs.**
 
-#### Classification
-- **validated_target**: Passes validated_track
-- **exploratory_target**: Fails validated but passes exploratory_track
-- **novel_candidate**: Fails both but has biological_plausibility >= 2 or novelty_opportunity >= 2
-- **insufficient_evidence**: Does not meet any criteria
+Use `sequential_thinking` to PLAN your query strategy first.
 
-#### Priority
-- **high**: validated_target with total >= 6, OR exploratory_target with total >= 8
-- **medium**: validated_target with total >= 3, OR exploratory_target with total >= 5
-- **low**: Passes either track but below medium threshold
-- **unranked**: insufficient_evidence
+## PERFORMANCE: Minimize LLM Round Trips
 
-For each criterion, provide BOTH a numeric score AND a rationale string.
+For EACH FEATURED L-R pair, issue ALL independent tool calls in a SINGLE batch.
+Do NOT call tools one at a time — the framework supports parallel tool execution.
+Each model→tools round trip costs ~2 minutes with large models.
 
-Save assessment results:
--> `save_evidence(data_dir, "assessment_results.json", structured_assessment_per_gene)`
--> `save_evidence(data_dir, "gwas_interpretation.json", gwas_biological_interpretation)`
--> `save_evidence(data_dir, "clinical_landscape.json", clinical_landscape_analysis)`
+- **Batch 1** (per pair, all independent, call together): query_cellxgene_lr_context,
+  query_kegg_pathways(ligand), query_kegg_pathways(receptor),
+  query_reactome_pathways(ligand), query_reactome_pathways(receptor),
+  query_string_ppi_pair
+- **Batch 2** (single call for ALL FEATURED pairs): `run_batch_census_lr_pairs` with
+  all pairs at once + `save_evidence` per pair
 
-Use `validate_quality` on a summary of findings (threshold >= 0.7).
+Target: N+1 round trips total (N Batch-1 calls + 1 Batch-2 call), NOT 2N+1.
 
-### Stage 3: Deep Dive (FEATURED AND NOVEL CANDIDATES)
+For EACH FEATURED L-R pair:
+a) **Cellxgene Census** -- call `query_cellxgene_lr_context` using `census_disease`
+   (from Phase 0 mapping) as the disease argument. Check the `disease_matched` flag
+   in the response: if `false`, the disease name was not found in Census and results
+   fell back to ALL cells -- re-check your Phase 0 mapping and consider retrying
+   with the corrected Census label. Review the `top_cell_types` list.
+
+   **CRITICAL: Cell type name mapping** -- Compare `interest_celltypes` from targets.json
+   against `top_cell_types` from Census. ST analysis labels often differ from Census
+   CL ontology labels (e.g., "Tumor Cell" → "malignant cell", "Immune cell" → "leukocyte").
+   Identify the best-matching Census cell type for each interest_celltype.
+   Use the matched Census name (not the original interest_celltype) when calling
+   `run_batch_census_lr_pairs` in step (d).
+
+b) **KEGG/Reactome** -- call `query_kegg_pathways` and `query_reactome_pathways`
+   for BOTH the ligand AND receptor genes separately.
+   Store results as:
+     "kegg_pathways": {"ligand_pathways": [...], "receptor_pathways": [...]}
+     "reactome_pathways": {"ligand_pathways": [...], "receptor_pathways": [...]}
+   This enables shared-pathway detection for biological plausibility scoring.
+c) **STRING** -- call `query_string_ppi_pair` to confirm established PPI.
+d) **[DeepMAST Enhancement] Census cross-validation** -- After completing Batch 1 for
+   ALL FEATURED pairs, call `run_batch_census_lr_pairs` ONCE with ALL pairs:
+   - `pairs_json`: JSON array of [ligand, receptor] pairs, e.g. `[["CXCL12","CXCR4"],["FGF2","FGFR1"]]`
+   - `disease`: use `census_disease` (from Phase 0)
+   - `target_cell_type`: use the **Census-matched cell type name** from step (a)
+   This opens Census ONCE and computes all pairs in a single query (~14x faster).
+   If `run_batch_census_lr_pairs` is unavailable, fall back to per-pair `run_compare_census_lr_pair`.
+
+**SAVE IMMEDIATELY** after each L-R pair: `save_evidence(data_dir, "stage1_{LIGAND}--{RECEPTOR}.json", data)`
+
+**YOU MUST COMPLETE Stage 1 FOR EVERY FEATURED PAIR.**  Do NOT skip pairs or
+move to Stage 3 early.  The Stage 1 Gate tool will block progression if any
+pairs are missing.
+
+### Stage 1 Finalization (after ALL FEATURED pairs complete)
+
+After completing Stage 1 for ALL FEATURED L-R pairs, call:
+`finalize_stage1_artifacts(data_dir, disease=census_disease,
+  target_cell_type=<Census-matched cell type>,
+  rerun_missing_census=true,
+  pair_subset_json=[["LIGAND1","RECEPTOR1"],["LIGAND2","RECEPTOR2"]])
+
+**IMPORTANT**: Pass pair_subset_json as a raw JSON array, NOT wrapped in quotes.`
+
+Pass ONLY the FEATURED pairs as `pair_subset_json` so validation checks the
+subset, not all 30 pairs. Format: JSON array of [ligand, receptor] arrays.
+
+This tool:
+- fills any missing Census CSVs deterministically
+- normalizes per-pair Stage 1 JSON files
+- rebuilds `stage1_evidence.json`, `stage1_confidence.json`, and `stage1_audit.json`
+- validates that the FEATURED pair subset is complete
+
+Do NOT hand-write or manually reconstruct `stage1_confidence.json`.
+
+### Stage 1 Gate (MANDATORY before Stage 3)
+
+**YOU MUST call `validate_stage1_gate(data_dir)` before proceeding to Stage 3.**
+
+This tool checks that `stage1_{LIGAND}--{RECEPTOR}.json` exists for EVERY
+L-R pair that contains a FEATURED gene.
+
+- If `success=true`: proceed to Stage 3.
+- If `success=false`: the response lists `missing_pairs`.  You MUST complete
+  Stage 1 for those pairs, then call `validate_stage1_gate` again.
+- **Do NOT proceed to Stage 3 until `validate_stage1_gate` returns success=true.**
+
+### Stage 3: Deep Dive (FEATURED genes only)
 
 Before calling `query_chembl_target_profile`, read the ChEMBL skill guide to understand activity values, target relevance, and compound evidence interpretation:
 - `read_skill_file("skills/chembl-database/SKILL.md")`
@@ -231,11 +224,23 @@ Before calling `query_chembl_target_profile`, read the ChEMBL skill guide to und
 Do NOT read separate pathway, STRING, or Census skill documents for this workflow.
 Those stages remain tool-driven.
 
-For EACH Featured and Novel Candidate:
+For EACH FEATURED gene (from stage3_candidates):
 a) **ChEMBL** -- call `query_chembl_target_profile` to retrieve known drugs via ChEMBL REST API.
-b) IF max clinical phase >= 2:
-   - Call `query_pubmed_clinical_limitations` to scan latest clinical trial
-     adverse events and efficacy summaries.
+b) **Literature** -- call `search_literature_dynamic` to find relevant papers via BioMCP/PubMed
+   with LLM-powered iterative coverage improvement:
+   ```
+   search_literature_dynamic(
+       genes=[GENE],
+       pathways=[],        # leave empty or add known pathways for this gene
+       celltypes=[],       # leave empty — Stage 3 focuses on gene+disease, not cell types
+       disease=DISEASE,
+       max_results=10,
+       max_iterations=2,
+       output_path="evidence/stage3_lit_{GENE}.json",
+       data_dir=DATA_DIR,
+   )
+   ```
+   This returns papers with PMIDs, titles, years, and coverage metrics.
 
 **SAVE**: `save_evidence(data_dir, "stage3_{GENE}.json", deep_dive_data)`
 
@@ -244,13 +249,11 @@ Use `think_tool` to REFLECT on overall coverage and quality.
 ## Important Rules
 - **SAVE AFTER EVERY STAGE per L-R pair/gene** -- never accumulate data without saving
 - Use stage gates explicitly:
-  - VEP: oncology OR GWAS variants available (germline consequence annotation)
-  - PubMed deep dive: max clinical phase >= 2 only
-- Featured candidates are determined by rubric scoring (combined_total), NOT by external selection
-- Featured set: validated targets ranked by combined_total; Novel set: new targets ranked by exploratory_total
+  - Stage 1 Gate: `validate_stage1_gate` MUST pass before Stage 3
+  - VEP: automatically executed for all genes (germline consequence annotation)
+- Featured candidates are determined by rubric scoring (combined_total >= 10)
 - Handle API failures gracefully -- save partial results and note errors
 - Stage 2 batching happens through `query_stage2_gene_panel(...)`
-- Every rubric score MUST have an explicit rationale grounded in evidence
 - Do NOT hallucinate evidence -- if data is missing, score conservatively
 
 ## EVIDENCE INTEGRITY (CRITICAL)
@@ -281,34 +284,42 @@ persist the structured JSON contract as target_assessment.json first.
 2. **EXECUTE**: Write drug.md sections
 3. **REFLECT** (think_tool): Check quality -- comprehensive? Clear? Are featured candidates properly highlighted?
 
-## IMPORTANT: Evidence Access
-- ALWAYS use `load_evidence_files(data_dir=...)` to load evidence data
-- NEVER use `read_file` to read evidence/*.json directly — these files may not
-  exist at the path you expect, and load_evidence_files returns all evidence
-  in a structured format with metadata summaries
-- Use `save_evidence` / `load_evidence_files` as the canonical read/write interface
+## IMPORTANT: Evidence Access & Reference Card
+- ALWAYS call `build_evidence_summary(data_dir=...)` FIRST — this generates the
+  **Reference Card**, a structured JSON with ALL authoritative values
+- The Reference Card is your SINGLE SOURCE OF TRUTH for:
+  - Rubric scores (INTEGERS, not decimals), classification, priority
+  - PMIDs (exact numbers from pubmed_papers)
+  - Drug names, ChEMBL IDs, max clinical phase
+  - STRING PPI scores, pathway names, Census results
+- NEVER generate values from memory — if a value is not in the Reference Card,
+  write "Data not available"
 
 ## Workflow
 
-### Phase 1: Load All Assessment Data
-Call `load_lr_candidates(data_dir)` first so you have the exact input ligand/receptor pair-set
-and the declared disease context from `lr_candidates.json`.
+### Phase 1: Load Data + Build Reference Card
+1. Call `load_lr_candidates(data_dir)` for input pair-set and disease context
+2. Call `build_evidence_summary(data_dir)` — **this is your Reference Card**
+3. Call `load_evidence_files(data_dir)` for additional detail if needed
 
-Call `load_evidence_files(data_dir)` to get:
-- stage1_evidence.json / stage1_confidence.json / stage1_*.json (Stage 1 canonical evidence)
-- stage2_evidence.json / known_drugs.json / gene_manifest.json / ot_*.json (Stage 2 canonical evidence)
-- stage3_*.json or stage3_deep_dive_featured_candidates.json when available (Stage 3 deep dives)
-- rubric_scores.json / assessment_results.json / gene_drug_scores.json as optional supporting summaries
+The Reference Card contains per-gene rubric scores, drugs, PMIDs, pathways,
+STRING PPI, and Census results — pre-extracted from evidence files.
+Use these values DIRECTLY. Do NOT re-derive, round, or normalize them.
 
-Do NOT treat legacy summary files such as `gwas_interpretation.json` or
-`clinical_landscape.json` as required. If they are absent, continue using the
-canonical Stage 1/2/3 evidence files above.
+### Phase 2: Read and Expand the Draft
+`build_evidence_summary` has already written a DRAFT of drug.md to disk.
+This draft contains all correct values (scores, PMIDs as hyperlinks, drug names, pathways)
+with `<!-- EXPAND: ... -->` placeholder comments where narrative is needed.
 
-### Phase 2: Plan Document Structure
-Use `sequential_thinking` to plan:
-- Which findings are most important?
-- How to organize for maximum clarity?
-- Where to place featured candidate deep-dives?
+**Your job:**
+1. Call `read_file(path=data_dir + "/drug.md")` to read the draft
+2. For EACH `<!-- EXPAND: ... -->` comment, replace it with 2-4 sentences of
+   biological interpretation relevant to the disease context
+3. Do NOT change any numbers, PMIDs, drug names, or classifications in the draft
+4. Do NOT remove any PMID hyperlinks — they are all verified correct
+5. Save the expanded version via `save_drug_md(data_dir, content=<expanded>)`
+
+Use `sequential_thinking` to plan which expansions to prioritize.
 
 ### Phase 3: Save Structured JSON Contract
 Call `save_target_assessment` with:
@@ -321,6 +332,13 @@ Do NOT invent, merge, or swap ligands/receptors across pairs.
 
 ### Phase 4: Write drug.md
 
+## DOCUMENT LENGTH REQUIREMENTS
+- Target: **200-250 lines, 10,000-15,000 characters**
+- Each FEATURED gene deep dive: at least **30-40 lines** with detailed analysis
+- Druggability matrix: include ALL genes from `all_genes_druggability`
+- Do NOT write a brief summary — write a **comprehensive assessment report**
+- Include ALL PMIDs from the Reference Card as hyperlinks (see CITATION FORMAT below)
+
 The document MUST follow this 4-section structure:
 
 #### 1. Executive Summary
@@ -330,36 +348,48 @@ The document MUST follow this 4-section structure:
 - Top validated and exploratory targets
 - Key therapeutic opportunities and recommended next steps
 
-#### 2. Pan-Disease Target Druggability Matrix (Stage 1 & 2)
-A markdown table with ALL assessed L-R pairs:
+#### 2. Pan-Disease Target Druggability Matrix (Stage 2 + Stage 1 for FEATURED)
+A full 14-column rubric table and Scoring Legend are **pre-built by the template**.
 ```
-| Rank | L-R Pair | Track | OT Association Score | Max Clinical Phase | ST Colocalization Score | Genetic Flag (VEP/GWAS) | Tractability (OT) |
+| Gene | Drug Ev. | Trial | Safety | Val. Total | GWAS | Tract. | Bio. Plaus. | Novelty | Expl. Total | Combined | Classification | Priority | Stage3 |
 ```
-- Track column: `[FEATURED]` or `[NOVEL]` or empty
-- **[FEATURED] and [NOVEL] rows are BOLDED** and listed FIRST in the table
-- Sort: featured first (by combined_total), then novel (by exploratory_total), then rest
-- Note: Featured AND Novel candidates proceed to Stage 3
+**DO NOT modify the table or Scoring Legend** — they contain exact values from evidence files.
+All values come from the Reference Card `all_genes_druggability` array.
+Do NOT invent "OT Association Score" or "ST Colocalization Score" columns —
+these fields do not exist in the evidence.
+- **Stage3 candidate rows are BOLDED** and listed FIRST in the table
+- Sort: stage3 candidates first (by combined_total), then rest (by combined_total)
+- The Scoring Legend subsection explains each column's meaning, range, data source,
+  scoring logic, and interpretation — do NOT alter it
+- Only expand the `<!-- EXPAND -->` comment above the table with 2-3 interpretive sentences
 
 #### 3. [FEATURED] Candidate Deep Dives (Stage 3)
-For EACH Featured Candidate, a dedicated subsection:
-- **Header**: `### [FEATURED] {GENE} -- Priority: {PRIORITY}`
+For EACH Featured Candidate, a dedicated subsection (30-40 lines minimum per gene):
+- **Header**: `### [FEATURED] {GENE} — Classification: {CLASSIFICATION} | Priority: {PRIORITY}`
+  (Copy classification and priority EXACTLY from Reference Card)
 
-**A. Clinical & Safety Profile (Stage 3)**
-- Known Drugs (ChEMBL)
-- Toxicity & ADMET (ChEMBL)
-- Latest Clinical Insights (PubMed -- conditional, if Phase >= 2)
+**A. Clinical & Drug Profile (from Reference Card `stage3.drugs`)**
+- List ALL drugs with ChEMBL ID, mechanism, max phase, indications
+- Format: `**{drug_name}** (ChEMBL: {chembl_id}) — {mechanism}, Max Phase: {max_phase}`
+- If no drugs: "No known drugs targeting this gene"
 
-**B. Biological Context & Pathway (Stage 1 Validation)**
-- STRING PPI Validation
-- Primary Pathway (KEGG/Reactome)
-- Census cross-validation results
+**B. Literature Evidence (from Reference Card `stage3.pmids`)**
+- List ALL PMIDs as hyperlinks with titles
+- Format: `- [PMID: {pmid}](https://pubmed.ncbi.nlm.nih.gov/{pmid}/) — "{title}"`
+- Briefly summarize key findings from each paper title
+- If no PMIDs: "No PubMed citations available"
 
-**C. Rubric Assessment Summary**
-- Validated track scores with rationale
-- Exploratory track scores with rationale
-- Classification and priority
-- GWAS evidence summary
-- Therapeutic recommendation
+**C. Biological Context & Pathway (from Reference Card `stage1_pairs`)**
+- STRING PPI: score and interaction_found status
+- KEGG pathways (ligand + receptor separately)
+- Reactome pathways (ligand + receptor separately)
+- Census cross-validation results if available
+
+**D. Rubric Assessment (from Reference Card `rubric` — INTEGERS only)**
+- Validated track: existing_drug_evidence, clinical_trial_activity, safety_profile → validated_total
+- Exploratory track: gwas_support, tractability, biological_plausibility, novelty_opportunity → exploratory_total
+- Combined total, classification, priority
+- Therapeutic recommendation based on evidence
 
 #### 4. [NOVEL] Candidate Deep Dives (Stage 3)
 For EACH Novel Candidate, a dedicated subsection:
@@ -393,40 +423,70 @@ For EACH Novel Candidate, a dedicated subsection:
   - **Insufficient Evidence**: Require additional data
 - Recommended next steps
 
-### Phase 5: Quality Check
-Use `think_tool` to REFLECT on the document:
-- Is it comprehensive? All sections present?
-- Are [FEATURED] candidates prominently highlighted?
-- Is evidence accurately represented?
-- Are recommendations actionable?
+### Phase 5: Reflection (MANDATORY before saving)
+Use `think_tool` to verify the drug.md content against the Reference Card:
+- Every PMID in the text matches a PMID from the Reference Card's `pmids` arrays
+- Every rubric score is an INTEGER matching the Reference Card (not decimal)
+- Classification and priority labels are EXACT copies from the Reference Card
+- No "OT Association Score" or "ST Colocalization Score" columns (these don't exist)
+- Drug names and ChEMBL IDs match the Reference Card exactly
+- Pathway names match the Reference Card's `kegg_pathways`/`reactome_pathways`
 
+If you find discrepancies, FIX them before proceeding.
+
+### Phase 6: Validation Loop (MANDATORY — ZERO TOLERANCE)
+After calling `save_drug_md`, you MUST enter this validation loop:
+
+1. Call `validate_drug_md(data_dir)`
+2. If `issue_count > 0`:
+   a. Read each issue in the `issues` array
+   b. Fix EVERY issue in the drug.md content:
+      - FABRICATED_PMID: Remove the fake PMID, replace with correct one
+        from Reference Card or write "No citation available"
+      - WRONG_CLASSIFICATION: Replace with exact value from Reference Card
+      - DECIMAL_RUBRIC_SCORES: Replace with integer from Reference Card
+      - FABRICATED_COLUMN: Remove the column entirely
+   c. Call `save_drug_md(data_dir, content=<fixed content>)` again
+   d. Call `validate_drug_md(data_dir)` again
+   e. REPEAT from step 2 until `issue_count == 0`
+3. Only when `validate_drug_md` returns `valid=true` AND `issue_count=0`,
+   proceed to Phase 7 (Quality Check)
+
+NEVER skip this loop. NEVER proceed with issues remaining.
+Maximum iterations: 5 (if still failing after 5 rounds, include remaining
+issues as a warning section at the end of drug.md).
+
+### Phase 7: Quality Check
 Use `validate_quality` (threshold >= 0.7) on a summary of the drug.md.
 
-## Featured Candidate Selection (CRITICAL)
-Featured candidates are determined by rubric scoring (combined_total from
-validated_track + exploratory_track). Genes with highest scores receive
-[FEATURED] label and dedicated sections. Rules:
-1. **Dedicated subsections** with detailed mechanism discussion (Section 3 or 4)
-2. **"[FEATURED]"** or **"[NOVEL]"** label in tables and headers based on track
-3. **Priority placement** -- listed FIRST in every section and table
-4. **Bold/highlighted rows** in the druggability matrix
-5. **Cross-reference** to Part 3 L-R interpretation findings
+## PMID INTEGRITY (ZERO TOLERANCE)
+- ONLY use PMIDs from the Reference Card's `pmids` arrays
+- NEVER generate PMIDs from memory — they will be wrong
+- If no PMID exists for a finding, write "No citation available"
+- Each PMID you cite MUST appear in the Reference Card
+- You MUST include ALL PMIDs from the Reference Card — do NOT omit them
+
+## CITATION FORMAT
+- Every PMID MUST be a clickable PubMed hyperlink:
+  `[PMID: 32299818](https://pubmed.ncbi.nlm.nih.gov/32299818/)`
+- Include the paper title after the link when available:
+  `[PMID: 32299818](https://pubmed.ncbi.nlm.nih.gov/32299818/) — "Safety and Tolerability of Bintrafusp Alfa..."`
+- In each gene's Deep Dive section, list ALL PMIDs from that gene's Reference Card entry
+- Group citations under a "**References**" subsection within each Deep Dive
+
+## RUBRIC SCORE INTEGRITY
+- Rubric scores are INTEGERS (e.g., exploratory_total=10, combined_total=9)
+- Do NOT convert to decimals (e.g., 0.85, 1.70 are WRONG)
+- Copy classification and priority EXACTLY from Reference Card
+- Do NOT re-classify genes yourself — use the Reference Card values
 
 ## EVIDENCE INTEGRITY (CRITICAL)
-- MUST call `validate_evidence_completeness(data_dir)` before writing drug.md.
-  If `ready_for_report` is False, include a prominent warning in the Executive Summary
-  stating which evidence sources are missing.
-- ONLY report data that exists in evidence/*.json files
-- If stage2_evidence.json contains empty arrays for a gene: report "No OpenTargets/GWAS
-  data available" — do NOT fabricate association scores, p-values, or odds ratios
-- If known_drugs.json has empty drug lists: report "No known drugs identified" —
-  do NOT describe drugs from your training knowledge
-- If ChEMBL queries failed (check stage3_*.json for errors): state "ChEMBL query
-  failed" — do NOT invent drug mechanisms or clinical trial data
-- Quantitative claims require a traceable source file. If you cannot point to the
-  specific JSON key, do not include the claim.
-- Include a "Data Completeness" section in Section 5 noting which tool calls
-  succeeded vs failed and any data gaps
+- ONLY report data that exists in the Reference Card or evidence files
+- If a gene has no drugs: report "No known drugs identified" — do NOT invent
+- If ChEMBL queries failed: state "ChEMBL query failed" — do NOT fabricate
+- If no PMID exists: write "No citation available" — do NOT invent PMIDs
+- Quantitative claims require a traceable source in the Reference Card
+- Include a "Data Completeness" section in Section 5 noting any data gaps
 
 ## Output
 First write `target_assessment.json` using `save_target_assessment`.

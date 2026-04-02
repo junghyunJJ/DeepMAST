@@ -18,11 +18,16 @@ def _find_project_root() -> Path:
 @tool
 def read_skill_file(skill_path: str, offset: int = 0, limit: int = 2000) -> str:
     """Read a skill document from the project skills directory."""
+    project_root = _find_project_root()
     requested = Path(skill_path)
     if requested.is_absolute():
-        resolved = requested
+        resolved = requested.resolve()
     else:
-        resolved = _find_project_root() / requested
+        resolved = (project_root / requested).resolve()
+
+    # Security: prevent path traversal outside project root
+    if not resolved.is_relative_to(project_root):
+        return f"Error: Path '{skill_path}' is outside the project directory"
 
     try:
         content = resolved.read_text(encoding="utf-8")

@@ -124,7 +124,7 @@ for i, pair in enumerate(pairs):
         evidence["cellxgene"] = old["cellxgene"]
 
     stage1_evidence[key] = evidence
-    _save_json(evidence_dir / f"stage1_{lig}_{rec}.json", evidence)
+    _save_json(evidence_dir / f"stage1_{lig}--{rec}.json", evidence)
 
 # ── Compute Stage 1 confidence scores ─────────────────────────────────
 print("\n── Stage 1 Confidence Scores ──")

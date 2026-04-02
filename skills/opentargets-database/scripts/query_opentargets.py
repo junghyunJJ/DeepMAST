@@ -228,7 +228,7 @@ def get_target_disease_evidence(ensembl_id: str, efo_id: str,
     query = """
       query evidences($ensemblId: String!, $efoId: String!, $datasourceIds: [String!]) {
         disease(efoId: $efoId) {
-          evidences(ensemblIds: [$ensemblId], datasourceIds: $datasourceIds, size: 100) {
+          evidences(ensemblIds: [$ensemblId], datasourceIds: $datasourceIds, size: 200) {
             rows {
               datasourceId
               datatypeId
@@ -248,7 +248,24 @@ def get_target_disease_evidence(ensembl_id: str, efo_id: str,
         variables["datasourceIds"] = datasource_ids
 
     result = execute_query(query, variables)
-    return result.get("disease", {}).get("evidences", {}).get("rows", [])
+    rows = result.get("disease", {}).get("evidences", {}).get("rows", [])
+
+    # Supplement with genetic sources if none present in initial results
+    if not datasource_ids and not any(
+        r.get("datatypeId") == "genetic_association" for r in rows
+    ):
+        _GENETIC_SOURCES = [
+            "ot_genetics_portal", "eva", "gene2phenotype",
+            "genomics_england", "uniprot_literature",
+        ]
+        genetic_vars = {"ensemblId": ensembl_id, "efoId": efo_id,
+                        "datasourceIds": _GENETIC_SOURCES}
+        genetic_result = execute_query(query, genetic_vars)
+        genetic_rows = genetic_result.get("disease", {}).get("evidences", {}).get("rows", [])
+        if genetic_rows:
+            rows.extend(genetic_rows)
+
+    return rows
 
 
 def get_known_drugs_for_disease(efo_id: str) -> Dict[str, Any]:
@@ -289,6 +306,35 @@ def get_known_drugs_for_disease(efo_id: str) -> Dict[str, Any]:
 
     result = execute_query(query, {"efoId": efo_id})
     return result.get("disease", {}).get("knownDrugs", {})
+
+
+def get_drugs_for_target(ensembl_id: str) -> Dict[str, Any]:
+    """
+    Get drugs targeting a specific gene (across all diseases).
+
+    Args:
+        ensembl_id: Ensembl gene ID (e.g., "ENSG00000090339")
+
+    Returns:
+        Dictionary with count and rows of drug candidates
+    """
+    query = """
+      query targetDrugs($ensemblId: String!) {
+        target(ensemblId: $ensemblId) {
+          drugAndClinicalCandidates {
+            count
+            rows {
+              maxClinicalStage
+              drug { id name maximumClinicalStage drugType }
+              diseases { diseaseFromSource disease { id name } }
+            }
+          }
+        }
+      }
+    """
+
+    result = execute_query(query, {"ensemblId": ensembl_id})
+    return result.get("target", {}).get("drugAndClinicalCandidates", {})
 
 
 def get_drug_info(chembl_id: str) -> Dict[str, Any]:

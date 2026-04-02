@@ -1,0 +1,84 @@
+%%{init: {
+  "securityLevel": "loose",
+  "theme": "base",
+  "flowchart": {
+    "nodeSpacing": 60,
+    "rankSpacing": 80,
+    "curve": "basis",
+    "htmlLabels": true,
+    "wrappingWidth": 220
+  },
+  "themeVariables": {
+    "fontFamily": "Helvetica, Arial",
+    "fontSize": "14px",
+    "primaryColor": "#f5f7fa",
+    "primaryBorderColor": "#c9d1d9",
+    "primaryTextColor": "#1f2933",
+    "lineColor": "#9aa4b2",
+    "secondaryColor": "#eef2f7",
+    "tertiaryColor": "#ffffff",
+    "edgeLabelBackground": "#f5f7faee"
+  }
+}}%%
+
+graph LR
+
+%% ================================================================
+%% LEFT: Skills (expanded with descriptive content)
+%% ================================================================
+SK["<b style='font-size:15px'>Skills</b> <i>(SKILL.md)</i>
+<br/><br/><span style='color:#1a7f37'>&#8594; Thought 단계에 주입</span>
+<br/><br/><b>제공:</b> 절차적 지식
+<br/>Progressive Disclosure
+<br/>SOP / 도메인 워크플로우
+<br/><br/><i style='color:#1a7f37'>&quot;어떻게 생각할 것인가&quot;</i>"]:::skills
+
+%% ================================================================
+%% CENTER-TOP: Agent
+%% ================================================================
+AG["<b style='font-size:16px'>Agent</b>"]:::agent
+
+%% ================================================================
+%% RIGHT-TOP: MCP Tools (expanded with descriptive content)
+%% ================================================================
+MCP["<b style='font-size:15px'>MCP Servers</b>
+<br/><br/><span style='color:#6639ba'>&#8594; Action 단계에서 호출</span>
+<br/><br/><b>제공:</b> 실행 가능한 능력
+<br/>Thought &#8594; Action 원자 단위
+<br/>API / 외부 서비스 호출
+<br/><br/><i style='color:#6639ba'>&quot;무엇을 할 수 있는가&quot;</i>"]:::mcptools
+
+%% ================================================================
+%% RIGHT-BOTTOM: LangChain / LangGraph Tools (compact)
+%% ================================================================
+LC["<b style='font-size:14px'>LangChain /<br/>LangGraph Tools</b>"]:::lctools
+
+%% ================================================================
+%% Solid Edges
+%% ================================================================
+SK -->|"inject<br/>(<i>progressive disclosure</i>)"| AG
+AG <-->|"tool calling<br/>(MCP)"| MCP
+AG -->|"tool calling"| LC
+
+%% ================================================================
+%% Dashed Edges: Skills instructs tool usage
+%% ================================================================
+SK -. "instructs to use" .-> MCP
+SK -. "instructs to use" .-> LC
+
+%% ================================================================
+%% Style Classes
+%% ================================================================
+classDef skills fill:#e6f9ed,stroke:#2ea043,stroke-width:2.5px,color:#1f2933,rx:12,ry:12
+classDef agent fill:#f4f6f8,stroke:#9aa4b2,stroke-width:2.5px,color:#1f2933,rx:10,ry:10
+classDef mcptools fill:#ede7f6,stroke:#8957e5,stroke-width:2.5px,color:#1f2933,rx:12,ry:12
+classDef lctools fill:#ede7f6,stroke:#8957e5,stroke-width:2.5px,color:#1f2933,rx:12,ry:12
+
+%% ================================================================
+%% Link Styles
+%% ================================================================
+linkStyle 0 stroke:#2ea043,stroke-width:2.5px
+linkStyle 1 stroke:#9aa4b2,stroke-width:2px
+linkStyle 2 stroke:#8957e5,stroke-width:2px
+linkStyle 3 stroke:#9aa4b2,stroke-width:1.5px,stroke-dasharray:6 4
+linkStyle 4 stroke:#9aa4b2,stroke-width:1.5px,stroke-dasharray:6 4

@@ -22,11 +22,8 @@ Answer YES and proceed to Phase 2 only when:
 ## Phase 2 — EVALUATE (only if Phase 1 = YES)
 Review each skill listed below. Apply these rules IN ORDER:
 
-1. **TOOL-ONLY rule**: If a skill's Hint contains "TOOL-ONLY" → **ALWAYS NO**.
-   These skills are accessed via dedicated tools and never need their guide read.
-2. **Context-match rule**: If a skill's Hint specifies a stage, phase, or context
-   (e.g., "Stage 3 only", "Search phase") → **YES only if your task matches that context**.
-3. **Default rule**: When in doubt → **NO**. Only mark YES when the task clearly demands
+1. **Context-match rule**: **YES** only if the task clearly requires this skill's guidance.
+2. **Default rule**: When in doubt → **NO**. Only mark YES when the task clearly demands
    this skill's guidance.
 
 For each skill: [skill-name] — YES / NO — [one-sentence reason]

@@ -37,13 +37,13 @@ def _write_pair_csv(
 
 
 def test_parse_stage1_pair_from_filename():
-    ligand, receptor = parse_stage1_pair_from_filename("stage1_KDR_FLT1.json")
+    ligand, receptor = parse_stage1_pair_from_filename("stage1_KDR--FLT1.json")
     assert ligand == "KDR"
     assert receptor == "FLT1"
 
 
 def test_load_stage1_json_repairs_trailing_brace(tmp_path: Path):
-    stage1_path = tmp_path / "stage1_KDR_FLT1.json"
+    stage1_path = tmp_path / "stage1_KDR--FLT1.json"
     stage1_path.write_text('{"string_ppi": {"max_combined_score": 0.9}}}', encoding="utf-8")
 
     data, repairs = load_stage1_json(stage1_path)
@@ -204,7 +204,7 @@ def test_resolve_stage1_context_uses_metadata_and_existing_stage1_fallback(tmp_p
         json.dumps({"disease": "lung carcinoma"}),
         encoding="utf-8",
     )
-    (evidence_dir / "stage1_KDR_FLT1.json").write_text(
+    (evidence_dir / "stage1_KDR--FLT1.json").write_text(
         json.dumps(
             {
                 "ligand": "KDR",
@@ -245,7 +245,7 @@ def test_rebuild_stage1_artifacts_writes_aggregates_and_normalized_files(tmp_pat
     evidence_dir = data_dir / "evidence"
     evidence_dir.mkdir(parents=True)
 
-    stage1_path = evidence_dir / "stage1_KDR_FLT1.json"
+    stage1_path = evidence_dir / "stage1_KDR--FLT1.json"
     stage1_path.write_text(
         json.dumps(
             {
@@ -316,7 +316,7 @@ def test_validate_stage1_artifacts_reports_missing_csv_and_aggregates(tmp_path: 
         json.dumps({"interest_celltypes": ["mammary gland epithelial cell"]}),
         encoding="utf-8",
     )
-    (evidence_dir / "stage1_KDR_FLT1.json").write_text(
+    (evidence_dir / "stage1_KDR--FLT1.json").write_text(
         json.dumps({"string_ppi": {"max_combined_score": 0.994}}),
         encoding="utf-8",
     )
@@ -347,7 +347,7 @@ def test_finalize_stage1_workspace_reruns_missing_csv_and_writes_canonical_outpu
         json.dumps({"interest_celltypes": ["mammary gland epithelial cell"]}),
         encoding="utf-8",
     )
-    (evidence_dir / "stage1_KDR_FLT1.json").write_text(
+    (evidence_dir / "stage1_KDR--FLT1.json").write_text(
         json.dumps(
             {
                 "string_ppi": {"interaction_found": True, "max_combined_score": 0.994},

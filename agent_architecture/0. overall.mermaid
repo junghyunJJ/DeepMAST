@@ -1,4 +1,5 @@
 %%{init: {
+  "securityLevel": "loose",
   "theme": "base",
   "themeVariables": {
     "fontFamily": "Helvetica, Arial",
@@ -15,70 +16,86 @@ flowchart TB
 %% ======================
 %% Layer 1: Control
 %% ======================
-SA[Supervisor Agent]:::agent
+SA["Supervisor Agent"]:::agent
 
 %% ======================
 %% Layer 2: Expert Agents
 %% ======================
-subgraph EA[Expert Agents Layer]
+subgraph EA["Expert Agents Layer"]
     direction TB
-    PB[Pipeline Builder]:::agent
-    PE[Pipeline Executor]:::agent
+    PB["Pipeline Builder"]:::agent
+    PE["Pipeline Executor"]:::agent
 
-    subgraph BI[Biological Interpreter]
-        DT[Drug Target Analyzer]:::agent
+
+    subgraph DA["Deep Agents Layer"]
+        direction LR
+        BI["Biological Interpreter"]:::subagent
+        DT["Drug Target Discovery"]:::subagent
+        %% BI ~~~ DT
     end
 end
 
 %% ======================
 %% Layer 3: Capability Layer
 %% ======================
-subgraph CL[Capability Layer]
-    SK["Skills<br/>(Structured Knowledge Prompts)"]:::capability
-    MCP["MCP Protocol<br/>(Tool Interface)"]:::capability
+subgraph CL["Capability Layer"]
+    SK["Skills<br/>(<i>Domain<br/>Prompts</i>)"]:::green
+    MCP[["MCP Protocol<br/>(<i>Tool Interface</i>)"]]:::tool
 end
 
 %% ======================
 %% Layer 4: Resource Layer
 %% ======================
-subgraph RL[Resource Layer]
-    TOOLS[MCP Servers / Tools]:::resource
-    DB[(Biological Databases)]:::resource
+subgraph RL["Resource Layer"]
+    TOOLS[["MCP Servers"]]:::tool
+    DB[("Biological Databases")]:::resource
 end
 
 %% ======================
 %% Core Orchestration
 %% ======================
-SA <--> |Orchestration| EA
+SA <-->|"Orchestration"| EA
 
 %% ======================
 %% Internal Agent Flow
 %% ======================
 PB --> PE --> BI
-
+PE --> DT
+DT --> BI
 %% ======================
 %% Capability Usage
 %% ======================
-EA -->|Uses Skills| SK
-SK -.->|"Injection<br/>(Progressive Disclosure)"| EA
+EA -->|"Uses Skills"| SK
+SK -.->|"Injection"| EA
 
-EA <-->|Tool Calling| MCP
-SK -.->|Guides Tool Usage| MCP
+EA <-->|"Tool Calling"| MCP
+SK -.->|"Guides Tool Usage"| MCP
 
 %% ======================
 %% Resource Access
 %% ======================
 MCP <--> TOOLS
-SK -.->|Retrieval Instruction| DB
+SK -.->|"Retrieval Instruction"| DB
+
+%% ======================
+%% Layer Alignment (invisible links)
+%% ======================
+EA ~~~ CL
+%%CL ~~~ RL
 
 %% ======================
 %% Style Classes
 %% ======================
+classDef agent fill:#e3f2fd,stroke:#64b5f6,stroke-width:2px,rx:18,ry:18,color:#1f2933
+classDef tool fill:#eceff1,stroke:#b0bec5,stroke-width:1.5px,rx:10,ry:10,color:#1f2933
+classDef resource fill:#fff8e1,stroke:#ffcc80,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+classDef subagent fill:#ffffff,stroke:#ce93d8,stroke-width:1.5px,color:#1f2933
+classDef green fill:#e8f5e9,stroke:#81c784,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
 
-classDef agent fill:#f4f6f8,stroke:#9aa4b2,stroke-width:2px,rx:18,ry:18,color:#1f2933
-classDef capability fill:#fff8e1,stroke:#ffcc80,stroke-width:1.5px,rx:14,ry:14,color:#1f2933
-classDef resource fill:#f3e5f5,stroke:#ce93d8,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
-
-class SA,PB,PE,DT agent
-class SK,MCP capability
-class TOOLS,DB resource
+%% Subgraph styles
+style EA fill:#f8fbff,stroke:#9aa4b2,stroke-width:2px,stroke-dasharray: 5 5,rx:16,ry:16
+style DA fill:#fdf8ff,stroke:#ce93d8,stroke-width:1.5px,stroke-dasharray: 5 5,rx:14,ry:14
+style BI fill:#f3e5f5,stroke:#ce93d8,stroke-width:2px,rx:18,ry:18
+style DT fill:#f3e5f5,stroke:#ce93d8,stroke-width:2px,rx:18,ry:18
+style CL fill:#f7fcf7,stroke:#81c784,stroke-width:1.5px,stroke-dasharray: 4 4,rx:12,ry:12
+style RL fill:#fffdf5,stroke:#ffcc80,stroke-width:1.5px,stroke-dasharray: 4 4,rx:12,ry:12

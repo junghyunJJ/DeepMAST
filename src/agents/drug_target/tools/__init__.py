@@ -34,9 +34,14 @@ from src.agents.drug_target.tools.stage_domain_tools import (
 )
 from src.agents.drug_target.tools.census_lr_validation_tools import (
     run_compare_census_lr_pair,
+    run_batch_census_lr_pairs,
 )
+from src.agents.drug_target.tools.stage2_service import extract_lr_pairs
 from src.agents.drug_target.tools.stage_logic import (
     compute_rubric_scores,
+    validate_stage1_gate,
+    build_evidence_summary,
+    validate_drug_md,
 )
 from src.agents.drug_target.tools.skill_reader import (
     read_skill_file,
@@ -58,6 +63,7 @@ def __getattr__(name):
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
+    "extract_lr_pairs",
     # Evidence loader
     "load_lr_candidates",
     "load_evidence_files",
@@ -77,9 +83,13 @@ __all__ = [
     "query_chembl_target_profile",
     "query_pubmed_clinical_limitations",
     "run_compare_census_lr_pair",
+    "run_batch_census_lr_pairs",
     "read_skill_file",
     "finalize_stage1_artifacts",
     "compute_rubric_scores",
+    "validate_stage1_gate",
+    "build_evidence_summary",
+    "validate_drug_md",
     # Output contract
     "save_target_assessment",
     "save_drug_md",

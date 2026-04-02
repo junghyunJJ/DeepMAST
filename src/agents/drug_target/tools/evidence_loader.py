@@ -19,6 +19,10 @@ from src.agents.drug_target.tools.stage_logic import (
     infer_oncology_flag,
     normalize_st_colocalization_score,
 )
+from src.agents.drug_target.tools.stage2_service import extract_lr_pairs
+
+# Module-level constant for overwrite protection (used in save_evidence)
+_SAVE_PROTECTED_FILES = {"stage2_evidence.json", "known_drugs.json", "gene_manifest.json"}
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +100,7 @@ def load_lr_candidates(data_dir: str, disease: str = "") -> str:
     result["oncology_flag"] = infer_oncology_flag(result["disease"])
 
     # Extract L-R pairs and gene symbols
-    pairs = lr_data.get("pairs", lr_data.get("lr_pairs", lr_data.get("candidates", lr_data.get("candidate_pairs", []))))
+    pairs = extract_lr_pairs(lr_data)
     all_genes = set()
     for pair in pairs:
         ligand = pair.get("ligand", pair.get("source", ""))
@@ -249,8 +253,7 @@ def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) ->
     }
 
     # Overwrite protection: prevent LLM from replacing non-empty evidence with empty data
-    _PROTECTED_FILES = {"stage2_evidence.json", "known_drugs.json", "gene_manifest.json"}
-    if filename in _PROTECTED_FILES and file_path.exists():
+    if filename in _SAVE_PROTECTED_FILES and file_path.exists():
         try:
             existing = json.loads(file_path.read_text())
             new_parsed = json.loads(data) if isinstance(data, str) else data
@@ -290,17 +293,12 @@ def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) ->
             result["errors"].append(
                 "Repaired trailing commas in JSON before saving"
             )
-        except (json.JSONDecodeError, Exception):
-            # Final fallback: save as raw text
-            try:
-                with open(file_path, "w") as f:
-                    f.write(data)
-                result["saved"] = True
-                result["errors"].append(
-                    f"Warning: data was not valid JSON, saved as raw text to {file_path}"
-                )
-            except Exception as write_err:
-                result["errors"].append(f"Failed to save: {write_err}")
+        except Exception as repair_err:
+            result["saved"] = False
+            result["errors"].append(
+                f"Data is not valid JSON even after trailing-comma repair: {repair_err}. "
+                "File NOT saved. Please pass valid JSON to save_evidence."
+            )
     except Exception as e:
         result["errors"].append(f"Failed to save: {e}")
 

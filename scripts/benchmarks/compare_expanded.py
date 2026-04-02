@@ -444,76 +444,100 @@ def _run_statistical_analysis(
     else:
         print("  No discordant pairs — cannot run McNemar's test")
 
-    # --- Bootstrap F1 CI ---
-    print(f"\n--- Bootstrap F1 Difference (BCa, 10000 resamples) ---")
-
+    # --- Bootstrap All Metrics ---
     y_true = np.array([int(d[0]) for d in a_decisions])
     y_pred_a = np.array([int(d[1]) for d in a_decisions])
     y_pred_b = np.array([int(d[1]) for d in b_decisions])
 
-    def _f1(y_t, y_p):
+    def _compute_metrics(y_t, y_p):
+        """Compute all metrics from ground truth and predictions."""
         tp = ((y_t == 1) & (y_p == 1)).sum()
         fp = ((y_t == 0) & (y_p == 1)).sum()
         fn = ((y_t == 1) & (y_p == 0)).sum()
+        tn = ((y_t == 0) & (y_p == 0)).sum()
         prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
         rec = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        return 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
+        f1 = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
+        spec = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
+        act = (tp + fp) / len(y_t) if len(y_t) > 0 else 0.0
+        return {"f1": f1, "precision": prec, "recall": rec,
+                "specificity": spec, "fpr": fpr, "activation_rate": act}
 
-    f1_a_obs = _f1(y_true, y_pred_a)
-    f1_b_obs = _f1(y_true, y_pred_b)
-    f1_diff_obs = f1_b_obs - f1_a_obs
+    obs_a = _compute_metrics(y_true, y_pred_a)
+    obs_b = _compute_metrics(y_true, y_pred_b)
 
-    print(f"  Observed F1_A: {f1_a_obs:.4f}")
-    print(f"  Observed F1_B: {f1_b_obs:.4f}")
-    print(f"  Observed diff: {f1_diff_obs:+.4f}")
+    metric_keys = ["f1", "precision", "recall", "specificity", "fpr", "activation_rate"]
+    metric_labels = {"f1": "F1", "precision": "Precision", "recall": "Recall",
+                     "specificity": "Specificity", "fpr": "FP Rate",
+                     "activation_rate": "Activation Rate"}
 
     # Bootstrap at prompt level (resample 140 prompts, 3 skills each)
     n_prompts = n_decisions // len(all_skills)
     n_skills = len(all_skills)
     rng = np.random.default_rng(42)
     n_boot = 10000
-    boot_diffs = []
+
+    boot_diffs = {k: [] for k in metric_keys}
 
     for _ in range(n_boot):
         idx_prompts = rng.choice(n_prompts, size=n_prompts, replace=True)
         idx = np.concatenate([idx_prompts * n_skills + s for s in range(n_skills)])
-        f1_a_b = _f1(y_true[idx], y_pred_a[idx])
-        f1_b_b = _f1(y_true[idx], y_pred_b[idx])
-        boot_diffs.append(f1_b_b - f1_a_b)
+        m_a = _compute_metrics(y_true[idx], y_pred_a[idx])
+        m_b = _compute_metrics(y_true[idx], y_pred_b[idx])
+        for k in metric_keys:
+            boot_diffs[k].append(m_b[k] - m_a[k])
 
-    boot_diffs = np.array(boot_diffs)
+    for k in metric_keys:
+        boot_diffs[k] = np.array(boot_diffs[k])
 
-    # Percentile CI
-    ci_lo = np.percentile(boot_diffs, 2.5)
-    ci_hi = np.percentile(boot_diffs, 97.5)
-    # Bootstrap p-value
-    boot_p = (boot_diffs <= 0).mean()
+    print(f"\n--- Bootstrap All Metrics (prompt-level resampling, n={n_boot}) ---")
+    print(f"\n  {'Metric':<20} {'A':>8} {'B':>8} {'Diff':>8} {'95% CI':>22} {'p':>10}")
+    print(f"  {'-'*78}")
 
-    print(f"\n  Bootstrap (prompt-level resampling, n={n_boot}):")
-    print(f"  95% CI (percentile): [{ci_lo:+.4f}, {ci_hi:+.4f}]")
-    print(f"  Bootstrap p-value:   {boot_p:.6f}")
-    print(f"  Mean diff:           {boot_diffs.mean():+.4f}")
-    print(f"  Std diff:            {boot_diffs.std():.4f}")
+    bootstrap_results = {}
+    for k in metric_keys:
+        ci_lo = np.percentile(boot_diffs[k], 2.5)
+        ci_hi = np.percentile(boot_diffs[k], 97.5)
+        # For FPR, improvement means decrease, so flip p-value direction
+        if k == "fpr":
+            boot_p = (boot_diffs[k] >= 0).mean()
+        else:
+            boot_p = (boot_diffs[k] <= 0).mean()
+        diff = obs_b[k] - obs_a[k]
+        sig = "***" if boot_p < 0.001 else "**" if boot_p < 0.01 else "*" if boot_p < 0.05 else ""
+        print(f"  {metric_labels[k]:<20} {obs_a[k]:>7.1%} {obs_b[k]:>7.1%} {diff:>+7.1%} "
+              f"[{ci_lo:>+.4f}, {ci_hi:>+.4f}]  {boot_p:>8.6f} {sig}")
+        bootstrap_results[k] = {
+            "A": round(obs_a[k], 4),
+            "B": round(obs_b[k], 4),
+            "diff": round(diff, 4),
+            "ci_lo": round(ci_lo, 4),
+            "ci_hi": round(ci_hi, 4),
+            "p_value": round(boot_p, 6),
+        }
 
-    if ci_lo > 0:
-        print(f"  => CI entirely above 0: B is SIGNIFICANTLY better than A")
-    else:
-        print(f"  => CI includes 0: difference NOT significant at 95%")
-
-    # --- Cohen's h (effect size) ---
-    print(f"\n--- Effect Size (Cohen's h) ---")
+    # --- Cohen's h (effect size on F1) ---
+    f1_a_obs = obs_a["f1"]
+    f1_b_obs = obs_b["f1"]
+    f1_diff_obs = f1_b_obs - f1_a_obs
     h = 2 * np.arcsin(np.sqrt(f1_b_obs)) - 2 * np.arcsin(np.sqrt(f1_a_obs))
     size = "large" if abs(h) >= 0.8 else "medium" if abs(h) >= 0.5 else "small"
+
+    print(f"\n--- Effect Size (Cohen's h on F1) ---")
     print(f"  Cohen's h = {h:.4f} ({size} effect)")
 
     # --- Summary ---
     print(f"\n{'=' * 72}")
     print("STATISTICAL SUMMARY")
     print(f"{'=' * 72}")
-    print(f"  F1 difference:        {f1_diff_obs:+.1%} ({f1_a_obs:.1%} → {f1_b_obs:.1%})")
+    print(f"  F1 difference:        {f1_diff_obs:+.1%} ({f1_a_obs:.1%} -> {f1_b_obs:.1%})")
+    f1_ci_lo = bootstrap_results["f1"]["ci_lo"]
+    f1_ci_hi = bootstrap_results["f1"]["ci_hi"]
+    f1_boot_p = bootstrap_results["f1"]["p_value"]
     print(f"  McNemar exact p:      {exact_p:.6f}" if (only_a + only_b > 0) else "  McNemar: N/A")
-    print(f"  Bootstrap 95% CI:     [{ci_lo:+.4f}, {ci_hi:+.4f}]")
-    print(f"  Bootstrap p:          {boot_p:.6f}")
+    print(f"  Bootstrap 95% CI:     [{f1_ci_lo:+.4f}, {f1_ci_hi:+.4f}]")
+    print(f"  Bootstrap p:          {f1_boot_p:.6f}")
     print(f"  Cohen's h:            {h:.4f} ({size})")
 
     # Save statistical results
@@ -534,10 +558,8 @@ def _run_statistical_analysis(
         },
         "bootstrap": {
             "n_resamples": n_boot,
-            "ci_lo": round(ci_lo, 4),
-            "ci_hi": round(ci_hi, 4),
-            "p_value": round(boot_p, 6),
             "method": "prompt-level resampling, percentile CI",
+            "metrics": bootstrap_results,
         },
         "cohens_h": round(h, 4),
         "effect_size": size,

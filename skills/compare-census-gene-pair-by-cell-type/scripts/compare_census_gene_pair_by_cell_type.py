@@ -23,6 +23,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from typing import Dict, Iterable
 
+import numpy as np
 import cellxgene_census
 import tiledbsoma as soma
 
@@ -220,23 +221,19 @@ def main() -> None:
             var_query=soma.AxisQuery(value_filter=var_filter),
         )
 
+        # Per-batch vectorized processing (bounded memory, no collect-all)
         state_by_cell: Dict[int, int] = {}
         nonzero_rows = 0
         for batch in query.X("raw").tables():
             cell_ids = batch["soma_dim_0"].to_numpy()
             gene_ids = batch["soma_dim_1"].to_numpy()
             nonzero_rows += len(cell_ids)
-
-            for cell_id, gene_id in zip(cell_ids, gene_ids):
-                if gene_id == gene_a_id:
-                    bit = 1
-                elif gene_id == gene_b_id:
-                    bit = 2
-                else:
-                    continue
-                key = int(cell_id)
-                state_by_cell[key] = state_by_cell.get(key, 0) | bit
-
+            mask_a = gene_ids == gene_a_id
+            mask_b = gene_ids == gene_b_id
+            for cid in cell_ids[mask_a]:
+                state_by_cell[int(cid)] = state_by_cell.get(int(cid), 0) | 1
+            for cid in cell_ids[mask_b]:
+                state_by_cell[int(cid)] = state_by_cell.get(int(cid), 0) | 2
         query.close()
 
     gene_a_pos_by_cell_type: Dict[str, int] = defaultdict(int)

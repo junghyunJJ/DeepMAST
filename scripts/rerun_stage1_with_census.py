@@ -170,7 +170,7 @@ def main() -> None:
         lig, rec = pair["ligand"], pair["receptor"]
         key = f"{lig}_{rec}"
         pair_key = f"{lig}^{rec}"
-        ev_path = evidence_dir / f"stage1_{key}.json"
+        ev_path = evidence_dir / f"stage1_{lig}--{rec}.json"
 
         if ev_path.exists():
             evidence, _ = load_stage1_json(ev_path)

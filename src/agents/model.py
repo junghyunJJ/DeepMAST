@@ -91,10 +91,10 @@ def create_google_llm(**kwargs) -> ChatGoogleGenerativeAI:
     Create Google Gemini LLM instance
     
     Args:
-        model: Model name (default: gemini-2.0-flash)
+        model: Model name (default: gemini-3.1-flash-lite-preview)
         temperature: Temperature setting (default: 0)
     """
-    model = kwargs.get("model", os.getenv("GOOGLE_MODEL", "gemini-2.0-flash"))
+    model = kwargs.get("model", os.getenv("GOOGLE_MODEL", "gemini-3.1-flash-lite-preview"))
     temperature = kwargs.get("temperature", 0)
     
     return ChatGoogleGenerativeAI(
@@ -112,9 +112,6 @@ def create_ollama_llm(**kwargs) -> ChatOllama:
         base_url: Ollama server URL (default: http://localhost:6000)
         temperature: Temperature setting (default: 0)
     """
-    # model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "gpt-oss:20b"))
-    # model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3.5:35b"))
-    
     model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3.5:35b"))
 
     base_url = kwargs.get("base_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:6000"))
@@ -137,9 +134,10 @@ def create_ollama_llm(**kwargs) -> ChatOllama:
     )
     # Set profile so deepagents SummarizationMiddleware triggers at 85% of
     # actual context window instead of defaulting to 170K tokens (unreachable).
+    effective_output = num_predict if num_predict > 0 else num_ctx // 4
     llm.profile = {
-        "max_input_tokens": num_ctx - num_predict,
-        "max_output_tokens": num_predict,
+        "max_input_tokens": num_ctx - effective_output,
+        "max_output_tokens": effective_output,
     }
     return llm
 

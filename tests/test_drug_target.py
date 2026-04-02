@@ -116,9 +116,8 @@ def valid_assessment():
         "validated_track": {
             "existing_drug_evidence": {"score": 2, "rationale": "Galunisertib Phase 2"},
             "clinical_trial_activity": {"score": 2, "rationale": "Multiple active trials"},
-            "mechanism_relevance": {"score": 3, "rationale": "Direct TGF-beta pathway"},
             "safety_profile": {"score": -1, "rationale": "Moderate immunosuppression risk"},
-            "total": 6,
+            "total": 3,
             "pass": True,
         },
         "exploratory_track": {
@@ -130,7 +129,7 @@ def valid_assessment():
             "pass": True,
         },
         "classification": "validated_target",
-        "priority": "high",
+        "priority": "medium",
         "summary": "TGFB1 is a validated target with Phase 2 drug evidence.",
     }
 
@@ -170,8 +169,8 @@ class TestSubagentConfigs:
             "query_stage2_gene_panel",
             "query_ensembl_vep_consequence",
             "query_chembl_target_profile",
-            "query_pubmed_clinical_limitations",
             "run_compare_census_lr_pair",
+            "run_batch_census_lr_pairs",
             "read_skill_file",
             "think_tool",
             "validate_quality",
@@ -223,7 +222,7 @@ class TestSubagentConfigs:
     def test_workflow_description_uses_all_unique_genes_for_stage2(self):
         from src.agents.drug_target.subagents.configs import WORKFLOW_DESCRIPTION
 
-        assert "Stage 2 (ALL unique genes)" in WORKFLOW_DESCRIPTION
+        assert "ALL unique genes" in WORKFLOW_DESCRIPTION
 
     def test_evidence_assessor_prompt_mentions_census_and_gwas(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -369,7 +368,6 @@ class TestEvidenceLoader:
             "validated_track": {
                 "existing_drug_evidence": {"score": 2, "rationale": "test"},
                 "clinical_trial_activity": {"score": 1, "rationale": "test"},
-                "mechanism_relevance": {"score": 2, "rationale": "test"},
                 "safety_profile": {"score": 0, "rationale": "test"},
             },
             "exploratory_track": {
@@ -579,6 +577,10 @@ class TestStage2Service:
                         "disease": "lung cancer",
                         "executed": True,
                         "errors": [],
+                    },
+                    "vep": {
+                        "source": "ensembl_vep",
+                        "variants": [],
                     },
                 },
             },
@@ -889,7 +891,7 @@ class TestStageContracts:
                 "receptor": receptor,
                 "open_targets_score": 0.5,
                 "validated_track": dict(zip(
-                    ("existing_drug_evidence", "clinical_trial_activity", "mechanism_relevance", "safety_profile"),
+                    ("existing_drug_evidence", "clinical_trial_activity", "safety_profile"),
                     vt_scores,
                 )),
                 "exploratory_track": dict(zip(
@@ -900,13 +902,13 @@ class TestStageContracts:
 
         matrix = [
             # Featured pool (drug_evidence >= 1)
-            _row("A", "B", (3, 3, 3, 0), (3, 3, 3, 3)),   # combined=21
-            _row("C", "D", (2, 2, 2, -1), (2, 2, 2, 2)),   # combined=13
-            _row("E", "F", (1, 1, 2, 0), (1, 1, 2, 1)),    # combined=9
-            _row("G", "H", (1, 0, 1, 0), (1, 1, 1, 1)),    # combined=6
+            _row("A", "B", (3, 3, 0), (3, 3, 3, 3)),   # combined=18
+            _row("C", "D", (2, 2, -1), (2, 2, 2, 2)),   # combined=11
+            _row("E", "F", (1, 1, 0), (1, 1, 2, 1)),    # combined=7
+            _row("G", "H", (1, 0, 0), (1, 1, 1, 1)),    # combined=5
             # Novel pool (drug_evidence == 0)
-            _row("I", "J", (0, 1, 1, 0), (1, 1, 1, 0)),    # exploratory_total=3
-            _row("K", "L", (0, 0, 1, 0), (0, 0, 1, 0)),    # exploratory_total=1
+            _row("I", "J", (0, 1, 0), (1, 1, 1, 0)),    # exploratory_total=3
+            _row("K", "L", (0, 0, 0), (0, 0, 1, 0)),    # exploratory_total=1
         ]
 
         ranked = rank_featured_candidates(matrix)
@@ -916,7 +918,7 @@ class TestStageContracts:
         # Featured: drug_evidence >= 1 rows
         assert 2 <= len(featured) <= 5
         assert featured[0]["ligand"] == "A"
-        assert featured[0]["combined_total"] == 21
+        assert featured[0]["combined_total"] == 18
         assert all(not r["is_novel"] for r in featured)
 
         # Novel: drug_evidence == 0 rows
@@ -929,13 +931,9 @@ class TestStageContracts:
             assert "is_novel" in r
 
     def test_stage_gate_rules(self):
-        from src.agents.drug_target.tools.stage_logic import (
-            should_run_pubmed,
-            should_run_vep,
-        )
+        from src.agents.drug_target.tools.stage_logic import should_run_pubmed
 
-        assert should_run_vep(oncology_flag=True, has_gwas_variants=True) is True
-        assert should_run_vep(oncology_flag=False, has_gwas_variants=True) is True
+        # VEP now runs automatically for all genes (no gate needed)
         assert should_run_pubmed("Phase 2") is True
         assert should_run_pubmed("phase 1") is False
 
@@ -948,7 +946,7 @@ class TestStageContracts:
                 "receptor": receptor,
                 "open_targets_score": 0.5,
                 "validated_track": dict(zip(
-                    ("existing_drug_evidence", "clinical_trial_activity", "mechanism_relevance", "safety_profile"),
+                    ("existing_drug_evidence", "clinical_trial_activity", "safety_profile"),
                     vt_scores,
                 )),
                 "exploratory_track": dict(zip(
@@ -959,13 +957,13 @@ class TestStageContracts:
 
         matrix = [
             # Featured pool (drug_evidence >= 1)
-            _row("A", "B", (2, 2, 3, 0), (2, 2, 3, 2)),    # validated_target, combined=16
-            _row("C", "D", (1, 1, 2, 0), (1, 2, 2, 1)),    # validated_target, combined=10
+            _row("A", "B", (2, 2, 0), (2, 2, 3, 2)),    # validated_target, combined=13
+            _row("C", "D", (1, 1, 0), (1, 2, 2, 1)),    # validated_target, combined=8
             # Novel pool (drug_evidence == 0, eligible)
-            _row("E", "F", (0, 0, 1, 0), (2, 1, 2, 1)),    # exploratory_target, exploratory_total=6
+            _row("E", "F", (0, 0, 0), (2, 1, 2, 1)),    # exploratory_target, exploratory_total=6
             # insufficient_evidence — must NOT be featured or novel
-            _row("G", "H", (0, 0, 0, 0), (0, 0, 0, 0)),    # insufficient_evidence, combined=0
-            _row("I", "J", (0, 0, 1, 0), (0, 0, 1, 0)),    # insufficient_evidence, combined=2
+            _row("G", "H", (0, 0, 0), (0, 0, 0, 0)),    # insufficient_evidence, combined=0
+            _row("I", "J", (0, 0, 0), (0, 0, 1, 0)),    # insufficient_evidence, combined=1
         ]
 
         ranked = rank_featured_candidates(matrix, min_featured=2, max_featured=5)
@@ -1064,18 +1062,26 @@ class TestVepTool:
         assert result["executed"] is False
         assert "VEP query failed" in result["errors"][0]
 
-    def test_vep_gate_or_logic(self):
-        """VEP runs when oncology OR GWAS variants available."""
-        from src.agents.drug_target.tools.stage_logic import should_run_vep
+    def test_vep_functional_impact_detection(self):
+        """VEP impact detection identifies high and moderate impact variants."""
+        from src.agents.drug_target.tools.stage_logic import _has_vep_functional_impact
 
-        # Both conditions met
-        assert should_run_vep(oncology_flag=True, has_gwas_variants=True) is True
-        # Only oncology
-        assert should_run_vep(oncology_flag=True, has_gwas_variants=False) is True
-        # Only GWAS
-        assert should_run_vep(oncology_flag=False, has_gwas_variants=True) is True
-        # Neither
-        assert should_run_vep(oncology_flag=False, has_gwas_variants=False) is False
+        # High impact
+        assert _has_vep_functional_impact(
+            {"executed": True, "impact_summary": {"high_impact": 1, "low_impact": 5}}
+        ) is True
+        # Moderate impact
+        assert _has_vep_functional_impact(
+            {"executed": True, "impact_summary": {"moderate_impact": 3, "low_impact": 10}}
+        ) is True
+        # Low impact only
+        assert _has_vep_functional_impact(
+            {"executed": True, "impact_summary": {"low_impact": 13}}
+        ) is False
+        # Not executed
+        assert _has_vep_functional_impact({"executed": False}) is False
+        # None
+        assert _has_vep_functional_impact(None) is False
 
     def test_classify_vep_consequence(self):
         """classify_vep_consequence categorizes impact severity."""
@@ -1146,7 +1152,7 @@ class TestRubricScoring:
         from src.agents.drug_target.tools.stage_logic import validate_rubric_assessment
         errors = validate_rubric_assessment({"validated_track": {
             "existing_drug_evidence": 1, "clinical_trial_activity": 1,
-            "mechanism_relevance": 1, "safety_profile": 0,
+            "safety_profile": 0,
         }})
         assert any("exploratory_track" in e for e in errors)
 
@@ -1155,7 +1161,7 @@ class TestRubricScoring:
         errors = validate_rubric_assessment({
             "validated_track": {
                 "existing_drug_evidence": 2,
-                # missing clinical_trial_activity, mechanism_relevance, safety_profile
+                # missing clinical_trial_activity, safety_profile
             },
             "exploratory_track": {
                 "gwas_genetic_support": 1, "tractability": 1,
@@ -1170,7 +1176,6 @@ class TestRubricScoring:
             "validated_track": {
                 "existing_drug_evidence": {"score": 2, "rationale": ""},
                 "clinical_trial_activity": {"score": 1, "rationale": ""},
-                "mechanism_relevance": {"score": 2, "rationale": ""},
                 "safety_profile": {"score": 1, "rationale": "should be <=0"},
             },
             "exploratory_track": {
@@ -1186,9 +1191,8 @@ class TestRubricScoring:
         from src.agents.drug_target.tools.stage_logic import validate_rubric_assessment
         errors = validate_rubric_assessment({
             "validated_track": {
-                "existing_drug_evidence": {"score": 5, "rationale": "too high"},
+                "existing_drug_evidence": {"score": 6, "rationale": "too high"},
                 "clinical_trial_activity": {"score": 1, "rationale": ""},
-                "mechanism_relevance": {"score": 2, "rationale": ""},
                 "safety_profile": {"score": 0, "rationale": ""},
             },
             "exploratory_track": {
@@ -1206,7 +1210,7 @@ class TestRubricScoring:
         from src.agents.drug_target.tools.stage_logic import compute_validated_track
         result = compute_validated_track({"validated_track": {
             "existing_drug_evidence": 2, "clinical_trial_activity": 0,
-            "mechanism_relevance": 1, "safety_profile": 0,
+            "safety_profile": 0,
         }})
         assert result["pass"] is True
 
@@ -1214,7 +1218,7 @@ class TestRubricScoring:
         from src.agents.drug_target.tools.stage_logic import compute_validated_track
         result = compute_validated_track({"validated_track": {
             "existing_drug_evidence": 1, "clinical_trial_activity": 1,
-            "mechanism_relevance": 0, "safety_profile": 0,
+            "safety_profile": 0,
         }})
         assert result["pass"] is True
 
@@ -1222,7 +1226,7 @@ class TestRubricScoring:
         from src.agents.drug_target.tools.stage_logic import compute_validated_track
         result = compute_validated_track({"validated_track": {
             "existing_drug_evidence": 0, "clinical_trial_activity": 3,
-            "mechanism_relevance": 3, "safety_profile": 0,
+            "safety_profile": 0,
         }})
         assert result["pass"] is False
 
@@ -1230,7 +1234,7 @@ class TestRubricScoring:
         from src.agents.drug_target.tools.stage_logic import compute_validated_track
         result = compute_validated_track({"validated_track": {
             "existing_drug_evidence": 1, "clinical_trial_activity": 0,
-            "mechanism_relevance": 3, "safety_profile": 0,
+            "safety_profile": 0,
         }})
         assert result["pass"] is False
 
@@ -1238,9 +1242,9 @@ class TestRubricScoring:
         from src.agents.drug_target.tools.stage_logic import compute_validated_track
         result = compute_validated_track({"validated_track": {
             "existing_drug_evidence": 3, "clinical_trial_activity": 2,
-            "mechanism_relevance": 3, "safety_profile": -2,
+            "safety_profile": -2,
         }})
-        assert result["total"] == 6  # 3+2+3+(-2)
+        assert result["total"] == 3  # 3+2+(-2)
         assert result["pass"] is True
 
     # --- Exploratory track pass logic ---
@@ -1253,27 +1257,38 @@ class TestRubricScoring:
         }})
         assert result["pass"] is True
 
-    def test_exploratory_pass_gwas_1_bio_2(self):
+    def test_exploratory_pass_gwas_1_bio_3(self):
         from src.agents.drug_target.tools.stage_logic import compute_exploratory_track
         result = compute_exploratory_track({"exploratory_track": {
             "gwas_genetic_support": 1, "tractability": 0,
-            "biological_plausibility": 2, "novelty_opportunity": 0,
+            "biological_plausibility": 3, "novelty_opportunity": 0,
         }})
         assert result["pass"] is True
 
-    def test_exploratory_fail_no_gwas(self):
+    def test_exploratory_pass_no_gwas_but_tract_2(self):
+        """tractability >= 2 alone is enough for exploratory pass."""
         from src.agents.drug_target.tools.stage_logic import compute_exploratory_track
         result = compute_exploratory_track({"exploratory_track": {
-            "gwas_genetic_support": 0, "tractability": 3,
-            "biological_plausibility": 3, "novelty_opportunity": 3,
+            "gwas_genetic_support": 0, "tractability": 2,
+            "biological_plausibility": 0, "novelty_opportunity": 0,
         }})
-        assert result["pass"] is False
+        assert result["pass"] is True
 
-    def test_exploratory_fail_gwas_1_but_no_tract_or_bio(self):
+    def test_exploratory_pass_gwas_1_alone(self):
+        """gwas >= 1 alone is enough for exploratory pass."""
         from src.agents.drug_target.tools.stage_logic import compute_exploratory_track
         result = compute_exploratory_track({"exploratory_track": {
             "gwas_genetic_support": 1, "tractability": 0,
-            "biological_plausibility": 1, "novelty_opportunity": 3,
+            "biological_plausibility": 0, "novelty_opportunity": 0,
+        }})
+        assert result["pass"] is True
+
+    def test_exploratory_fail_all_below_threshold(self):
+        """No single criterion meets the exploratory threshold."""
+        from src.agents.drug_target.tools.stage_logic import compute_exploratory_track
+        result = compute_exploratory_track({"exploratory_track": {
+            "gwas_genetic_support": 0, "tractability": 1,
+            "biological_plausibility": 2, "novelty_opportunity": 3,
         }})
         assert result["pass"] is False
 
@@ -1288,7 +1303,7 @@ class TestRubricScoring:
         assessment = {
             "validated_track": {
                 "existing_drug_evidence": 0, "clinical_trial_activity": 0,
-                "mechanism_relevance": 1, "safety_profile": 0,
+                "safety_profile": 0,
             },
             "exploratory_track": {
                 "gwas_genetic_support": 2, "tractability": 2,
@@ -1297,12 +1312,28 @@ class TestRubricScoring:
         }
         assert classify_target(assessment) == "exploratory_target"
 
-    def test_classify_novel_candidate_via_bio_plausibility(self):
+    def test_classify_exploratory_via_bio_plausibility(self):
+        """bio >= 3 alone triggers exploratory_target (no gwas needed)."""
         from src.agents.drug_target.tools.stage_logic import classify_target
         assessment = {
             "validated_track": {
                 "existing_drug_evidence": 0, "clinical_trial_activity": 0,
-                "mechanism_relevance": 1, "safety_profile": 0,
+                "safety_profile": 0,
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 0, "tractability": 0,
+                "biological_plausibility": 3, "novelty_opportunity": 0,
+            },
+        }
+        assert classify_target(assessment) == "exploratory_target"
+
+    def test_classify_novel_candidate_via_bio_2(self):
+        """bio >= 2 (but < 3) triggers novel_candidate."""
+        from src.agents.drug_target.tools.stage_logic import classify_target
+        assessment = {
+            "validated_track": {
+                "existing_drug_evidence": 0, "clinical_trial_activity": 0,
+                "safety_profile": 0,
             },
             "exploratory_track": {
                 "gwas_genetic_support": 0, "tractability": 0,
@@ -1316,11 +1347,11 @@ class TestRubricScoring:
         assessment = {
             "validated_track": {
                 "existing_drug_evidence": 0, "clinical_trial_activity": 0,
-                "mechanism_relevance": 0, "safety_profile": 0,
+                "safety_profile": 0,
             },
             "exploratory_track": {
                 "gwas_genetic_support": 0, "tractability": 0,
-                "biological_plausibility": 0, "novelty_opportunity": 2,
+                "biological_plausibility": 0, "novelty_opportunity": 3,
             },
         }
         assert classify_target(assessment) == "novel_candidate"
@@ -1330,7 +1361,7 @@ class TestRubricScoring:
         assessment = {
             "validated_track": {
                 "existing_drug_evidence": 0, "clinical_trial_activity": 0,
-                "mechanism_relevance": 0, "safety_profile": 0,
+                "safety_profile": 0,
             },
             "exploratory_track": {
                 "gwas_genetic_support": 0, "tractability": 0,
@@ -1343,37 +1374,37 @@ class TestRubricScoring:
 
     def test_priority_high_validated(self, valid_assessment):
         from src.agents.drug_target.tools.stage_logic import compute_priority
-        # valid_assessment: validated total=6 -> high
+        # valid_assessment: combined_total = validated(3) + exploratory(7) = 10 -> high
         assert compute_priority(valid_assessment) == "high"
 
     def test_priority_medium_validated(self):
         from src.agents.drug_target.tools.stage_logic import compute_priority
         assessment = {
             "validated_track": {
-                "existing_drug_evidence": 2, "clinical_trial_activity": 0,
-                "mechanism_relevance": 1, "safety_profile": 0,
+                "existing_drug_evidence": 2, "clinical_trial_activity": 1,
+                "safety_profile": 0,
             },
             "exploratory_track": {
                 "gwas_genetic_support": 0, "tractability": 0,
                 "biological_plausibility": 0, "novelty_opportunity": 0,
             },
         }
-        # total=3 -> medium
-        assert compute_priority(assessment) == "medium"
+        # existing_drug=2>=1, validated_total=3>=3 -> validated_target; combined=3 < 5 -> low
+        assert compute_priority(assessment) == "low"
 
     def test_priority_high_exploratory(self):
         from src.agents.drug_target.tools.stage_logic import compute_priority
         assessment = {
             "validated_track": {
                 "existing_drug_evidence": 0, "clinical_trial_activity": 0,
-                "mechanism_relevance": 0, "safety_profile": 0,
+                "safety_profile": 0,
             },
             "exploratory_track": {
-                "gwas_genetic_support": 2, "tractability": 2,
-                "biological_plausibility": 2, "novelty_opportunity": 2,
+                "gwas_genetic_support": 3, "tractability": 2,
+                "biological_plausibility": 4, "novelty_opportunity": 3,
             },
         }
-        # exploratory total=8 -> high
+        # exploratory total=12 -> high
         assert compute_priority(assessment) == "high"
 
     def test_priority_medium_exploratory(self):
@@ -1381,14 +1412,14 @@ class TestRubricScoring:
         assessment = {
             "validated_track": {
                 "existing_drug_evidence": 0, "clinical_trial_activity": 0,
-                "mechanism_relevance": 0, "safety_profile": 0,
+                "safety_profile": 0,
             },
             "exploratory_track": {
-                "gwas_genetic_support": 1, "tractability": 2,
-                "biological_plausibility": 1, "novelty_opportunity": 1,
+                "gwas_genetic_support": 2, "tractability": 1,
+                "biological_plausibility": 3, "novelty_opportunity": 2,
             },
         }
-        # exploratory total=5 -> medium
+        # exploratory total=8 -> medium (threshold: >=7 medium, >=12 high)
         assert compute_priority(assessment) == "medium"
 
     def test_priority_unranked_insufficient(self):
@@ -1396,7 +1427,7 @@ class TestRubricScoring:
         assessment = {
             "validated_track": {
                 "existing_drug_evidence": 0, "clinical_trial_activity": 0,
-                "mechanism_relevance": 0, "safety_profile": 0,
+                "safety_profile": 0,
             },
             "exploratory_track": {
                 "gwas_genetic_support": 0, "tractability": 0,
@@ -1410,11 +1441,11 @@ class TestRubricScoring:
         assessment = {
             "validated_track": {
                 "existing_drug_evidence": 0, "clinical_trial_activity": 0,
-                "mechanism_relevance": 0, "safety_profile": 0,
+                "safety_profile": 0,
             },
             "exploratory_track": {
                 "gwas_genetic_support": 0, "tractability": 0,
-                "biological_plausibility": 2, "novelty_opportunity": 0,
+                "biological_plausibility": 3, "novelty_opportunity": 0,
             },
         }
         assert compute_priority(assessment) == "low"
@@ -1427,7 +1458,6 @@ class TestRubricScoring:
             "validated_track": {
                 "existing_drug_evidence": {"score": 2, "rationale": "Phase 2"},
                 "clinical_trial_activity": {"score": 2, "rationale": "Active"},
-                "mechanism_relevance": {"score": 3, "rationale": "Direct"},
                 "safety_profile": {"score": -1, "rationale": "Moderate risk"},
             },
             "exploratory_track": {
@@ -1439,10 +1469,239 @@ class TestRubricScoring:
         }
         vt = compute_validated_track(assessment)
         et = compute_exploratory_track(assessment)
-        assert vt["total"] == 6  # 2+2+3+(-1)
+        assert vt["total"] == 3  # 2+2+(-1)
         assert vt["pass"] is True
         assert et["total"] == 7  # 1+2+3+1
         assert et["pass"] is True
+
+
+class TestScoreGwasSupport:
+    """Unit tests for disease-specific _score_gwas_support scoring."""
+
+    def test_none_returns_0(self):
+        from src.agents.drug_target.tools.stage_logic import _score_gwas_support
+        assert _score_gwas_support(None) == 0
+
+    def test_empty_dict_returns_0(self):
+        from src.agents.drug_target.tools.stage_logic import _score_gwas_support
+        assert _score_gwas_support({}) == 0
+
+    def test_gene_associations_only_no_disease_hits_returns_0(self):
+        """gene_associations without disease_specific_hits should score 0."""
+        from src.agents.drug_target.tools.stage_logic import _score_gwas_support
+        gwas = {
+            "gene_associations": [
+                {"rsId": "rs123", "p_value": 1e-10},
+                {"rsId": "rs456", "p_value": 2e-9},
+            ],
+            # No disease_specific_hits
+        }
+        assert _score_gwas_support(gwas) == 0
+
+    def test_disease_specific_hits_empty_counts_returns_0(self):
+        from src.agents.drug_target.tools.stage_logic import _score_gwas_support
+        gwas = {
+            "disease_specific_hits": {
+                "n_gene_in_trait": 0,
+                "n_gene_snps_in_disease": 0,
+                "n_proximity_hits": 0,
+            }
+        }
+        assert _score_gwas_support(gwas) == 0
+
+    def test_proximity_hits_only_returns_1(self):
+        from src.agents.drug_target.tools.stage_logic import _score_gwas_support
+        gwas = {
+            "disease_specific_hits": {
+                "n_gene_in_trait": 0,
+                "n_gene_snps_in_disease": 0,
+                "n_proximity_hits": 3,
+            }
+        }
+        assert _score_gwas_support(gwas) == 1
+
+    def test_gene_in_trait_returns_2(self):
+        from src.agents.drug_target.tools.stage_logic import _score_gwas_support
+        gwas = {
+            "disease_specific_hits": {
+                "n_gene_in_trait": 2,
+                "n_gene_snps_in_disease": 0,
+                "n_proximity_hits": 0,
+            }
+        }
+        assert _score_gwas_support(gwas) == 2
+
+    def test_gene_snps_weak_pvalue_returns_2(self):
+        """gene_snps_in_disease present but p-value not genome-wide significant."""
+        from src.agents.drug_target.tools.stage_logic import _score_gwas_support
+        gwas = {
+            "disease_specific_hits": {
+                "n_gene_in_trait": 0,
+                "n_gene_snps_in_disease": 1,
+                "n_proximity_hits": 0,
+                "gene_snps_in_disease": [
+                    {"rsId": "rs789", "pvalue": 1e-5},
+                ],
+            }
+        }
+        assert _score_gwas_support(gwas) == 2
+
+    def test_gene_snps_genome_wide_significant_returns_3(self):
+        from src.agents.drug_target.tools.stage_logic import _score_gwas_support
+        gwas = {
+            "disease_specific_hits": {
+                "n_gene_in_trait": 0,
+                "n_gene_snps_in_disease": 2,
+                "n_proximity_hits": 0,
+                "gene_snps_in_disease": [
+                    {"rsId": "rs111", "pvalue": 3e-9},
+                    {"rsId": "rs222", "associations": [{"pvalue": 1e-10}]},
+                ],
+            }
+        }
+        assert _score_gwas_support(gwas) == 3
+
+    def test_combined_evidence_highest_tier_wins(self):
+        """When multiple signals exist, highest tier wins."""
+        from src.agents.drug_target.tools.stage_logic import _score_gwas_support
+        gwas = {
+            "disease_specific_hits": {
+                "n_gene_in_trait": 1,
+                "n_gene_snps_in_disease": 1,
+                "n_proximity_hits": 5,
+                "gene_snps_in_disease": [
+                    {"rsId": "rs333", "pvalue": 2e-8},
+                ],
+            }
+        }
+        assert _score_gwas_support(gwas) == 3  # gene_snps with p < 5e-8
+
+
+class TestScoreBiologicalPlausibility:
+    """Unit tests for _score_biological_plausibility breadth-weighted scoring (0-5)."""
+
+    def test_empty_evidence_returns_0(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        assert _score_biological_plausibility([]) == 0
+
+    def test_only_excluded_types_returns_0(self):
+        """known_drug and genetic_association should be filtered out."""
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [
+            {"datatypeId": "known_drug", "score": 0.9},
+            {"datatypeId": "genetic_association", "score": 0.8},
+        ]
+        assert _score_biological_plausibility(evidence) == 0
+
+    def test_single_type_low_score(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [{"datatypeId": "literature", "score": 0.3}]
+        assert _score_biological_plausibility(evidence) == 1
+
+    def test_single_type_high_score_gets_bonus(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [{"datatypeId": "affected_pathway", "score": 0.8}]
+        assert _score_biological_plausibility(evidence) == 2  # 1 type + 1 bonus
+
+    def test_two_types_no_bonus(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [
+            {"datatypeId": "literature", "score": 0.3},
+            {"datatypeId": "animal_model", "score": 0.5},
+        ]
+        assert _score_biological_plausibility(evidence) == 2  # 2 types, max < 0.7
+
+    def test_two_types_with_bonus(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [
+            {"datatypeId": "literature", "score": 0.8},
+            {"datatypeId": "somatic_mutation", "score": 0.4},
+        ]
+        assert _score_biological_plausibility(evidence) == 3  # 2 + 1 bonus
+
+    def test_three_types_no_bonus(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [
+            {"datatypeId": "affected_pathway", "score": 0.5},
+            {"datatypeId": "literature", "score": 0.3},
+            {"datatypeId": "animal_model", "score": 0.2},
+        ]
+        assert _score_biological_plausibility(evidence) == 3  # min(5, 3+0)
+
+    def test_three_types_with_bonus(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [
+            {"datatypeId": "affected_pathway", "score": 0.8},
+            {"datatypeId": "literature", "score": 0.5},
+            {"datatypeId": "animal_model", "score": 0.3},
+        ]
+        assert _score_biological_plausibility(evidence) == 4  # min(5, 3+1)
+
+    def test_four_types_no_bonus(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [
+            {"datatypeId": "affected_pathway", "score": 0.5},
+            {"datatypeId": "literature", "score": 0.3},
+            {"datatypeId": "animal_model", "score": 0.4},
+            {"datatypeId": "somatic_mutation", "score": 0.2},
+        ]
+        assert _score_biological_plausibility(evidence) == 4  # min(5, 4+0)
+
+    def test_four_types_with_bonus(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [
+            {"datatypeId": "affected_pathway", "score": 0.9},
+            {"datatypeId": "literature", "score": 0.5},
+            {"datatypeId": "animal_model", "score": 0.4},
+            {"datatypeId": "somatic_mutation", "score": 0.3},
+        ]
+        assert _score_biological_plausibility(evidence) == 5  # min(5, 4+1)
+
+    def test_mixed_qualifying_and_excluded(self):
+        """Only qualifying types should contribute to score."""
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [
+            {"datatypeId": "known_drug", "score": 0.9},
+            {"datatypeId": "genetic_association", "score": 0.8},
+            {"datatypeId": "literature", "score": 0.3},
+        ]
+        assert _score_biological_plausibility(evidence) == 1
+
+    def test_vep_boost_adds_one(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [{"datatypeId": "literature", "score": 0.3}]
+        vep = {"executed": True, "impact_summary": {"high_impact": 2}}
+        assert _score_biological_plausibility(evidence, vep) == 2  # 1 + 1
+
+    def test_vep_boost_caps_at_5(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [
+            {"datatypeId": "affected_pathway", "score": 0.9},
+            {"datatypeId": "literature", "score": 0.5},
+            {"datatypeId": "animal_model", "score": 0.4},
+            {"datatypeId": "somatic_mutation", "score": 0.3},
+        ]
+        vep = {"executed": True, "impact_summary": {"high_impact": 1}}
+        # 4 types + 1 bonus = 5, + VEP = still 5 (capped)
+        assert _score_biological_plausibility(evidence, vep) == 5
+
+    def test_vep_no_boost_when_no_high_impact(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [{"datatypeId": "literature", "score": 0.3}]
+        vep = {"executed": True, "impact_summary": {"high_impact": 0, "moderate_impact": 5}}
+        assert _score_biological_plausibility(evidence, vep) == 1
+
+    def test_vep_boost_on_zero_base(self):
+        """VEP boost should work even when no qualifying disease evidence."""
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        vep = {"executed": True, "impact_summary": {"high_impact": 1}}
+        assert _score_biological_plausibility([], vep) == 1  # 0 + 1
+
+    def test_score_boundary_0_7(self):
+        """Score of exactly 0.7 should trigger the bonus."""
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+        evidence = [{"datatypeId": "animal_model", "score": 0.7}]
+        assert _score_biological_plausibility(evidence) == 2  # 1 type + 1 bonus
 
 
 class TestCompareCensusTool:
@@ -1747,7 +2006,6 @@ class TestCompareCensusTool:
                     "validated_track": {
                         "existing_drug_evidence": 2,
                         "clinical_trial_activity": 2,
-                        "mechanism_relevance": 3,
                         "safety_profile": 0,
                     },
                     "exploratory_track": {
@@ -1771,7 +2029,7 @@ class TestCompareCensusTool:
         assert payload["project_meta"]["disease_focus"] == "breast cancer"
         assert payload["druggability_matrix"][0]["is_featured"] is True
         assert payload["druggability_matrix"][0]["is_novel"] is False
-        assert payload["druggability_matrix"][0]["combined_total"] == 15
+        assert payload["druggability_matrix"][0]["combined_total"] == 12
 
     def test_save_target_assessment_rejects_pair_set_mismatch(self, tmp_path):
         from src.agents.drug_target.tools.assessment_output import save_target_assessment
@@ -1792,7 +2050,6 @@ class TestCompareCensusTool:
                     "validated_track": {
                         "existing_drug_evidence": 2,
                         "clinical_trial_activity": 2,
-                        "mechanism_relevance": 3,
                         "safety_profile": 0,
                     },
                     "exploratory_track": {
@@ -2483,7 +2740,7 @@ class TestNovelCandidates:
             "receptor": receptor,
             "open_targets_score": 0.5,
             "validated_track": dict(zip(
-                ("existing_drug_evidence", "clinical_trial_activity", "mechanism_relevance", "safety_profile"),
+                ("existing_drug_evidence", "clinical_trial_activity", "safety_profile"),
                 vt_scores,
             )),
             "exploratory_track": dict(zip(
@@ -2498,11 +2755,11 @@ class TestNovelCandidates:
 
         matrix = [
             # Featured pool (drug_evidence >= 1)
-            self._row("A", "B", (2, 2, 3, 0), (1, 1, 2, 1)),   # featured
+            self._row("A", "B", (2, 2, 0), (1, 1, 2, 1)),   # featured
             # Novel pool (drug_evidence == 0), different exploratory totals
-            self._row("C", "D", (0, 0, 1, 0), (2, 1, 2, 1)),   # exploratory_total=6
-            self._row("E", "F", (0, 0, 1, 0), (1, 2, 3, 2)),   # exploratory_total=8
-            self._row("G", "H", (0, 0, 1, 0), (0, 0, 2, 1)),   # exploratory_total=3
+            self._row("C", "D", (0, 0, 0), (2, 1, 2, 1)),   # exploratory_total=6
+            self._row("E", "F", (0, 0, 0), (1, 2, 3, 2)),   # exploratory_total=8
+            self._row("G", "H", (0, 0, 0), (0, 0, 3, 1)),   # exploratory_total=4, novel (bio>=3)
         ]
 
         ranked = rank_featured_candidates(matrix, min_featured=1, max_featured=3, min_novel=1, max_novel=3)
@@ -2522,11 +2779,11 @@ class TestNovelCandidates:
 
         matrix = [
             # Novel with GWAS support → Tier 1
-            self._row("A", "B", (0, 0, 1, 0), (2, 0, 2, 1)),   # gwas=2 → tier 1
+            self._row("A", "B", (0, 0, 0), (2, 0, 3, 1)),   # gwas=2, bio=3 → tier 1
             # Novel with tractability → Tier 1
-            self._row("C", "D", (0, 0, 1, 0), (0, 2, 2, 1)),   # tract=2 → tier 1
+            self._row("C", "D", (0, 0, 0), (0, 2, 3, 1)),   # tract=2, bio=3 → tier 1
             # Novel without GWAS or tractability → Tier 2
-            self._row("E", "F", (0, 0, 1, 0), (0, 0, 2, 2)),   # gwas=0, tract=0 → tier 2
+            self._row("E", "F", (0, 0, 0), (0, 0, 3, 2)),   # gwas=0, tract=0, bio=3 → tier 2
         ]
 
         ranked = rank_featured_candidates(matrix, min_featured=0, max_featured=0, min_novel=1, max_novel=3)
@@ -2543,11 +2800,11 @@ class TestNovelCandidates:
 
         matrix = [
             # Featured (drug_evidence >= 1)
-            self._row("A", "B", (3, 2, 3, 0), (2, 2, 3, 1)),   # validated
-            self._row("C", "D", (1, 1, 2, 0), (1, 1, 2, 1)),   # validated
+            self._row("A", "B", (3, 2, 0), (2, 2, 3, 1)),   # validated
+            self._row("C", "D", (1, 1, 0), (1, 1, 2, 1)),   # validated
             # Novel (drug_evidence == 0)
-            self._row("E", "F", (0, 0, 2, 0), (2, 1, 3, 2)),   # exploratory
-            self._row("G", "H", (0, 0, 1, 0), (0, 0, 2, 2)),   # novel_candidate
+            self._row("E", "F", (0, 0, 0), (2, 1, 3, 2)),   # exploratory
+            self._row("G", "H", (0, 0, 0), (0, 0, 3, 2)),   # novel_candidate (bio>=3)
         ]
 
         ranked = rank_featured_candidates(matrix, min_featured=2, max_featured=3, min_novel=1, max_novel=2)
@@ -2572,12 +2829,12 @@ class TestNovelCandidates:
 
         matrix = [
             # Only 1 featured candidate
-            self._row("A", "B", (2, 1, 2, 0), (1, 1, 2, 1)),   # drug_evidence=2
+            self._row("A", "B", (2, 1, 0), (1, 1, 2, 1)),   # drug_evidence=2
             # 4 novel candidates
-            self._row("C", "D", (0, 0, 1, 0), (2, 2, 3, 2)),   # exploratory_total=9
-            self._row("E", "F", (0, 0, 1, 0), (1, 2, 2, 1)),   # exploratory_total=6
-            self._row("G", "H", (0, 0, 1, 0), (1, 1, 2, 1)),   # exploratory_total=5
-            self._row("I", "J", (0, 0, 1, 0), (0, 0, 2, 1)),   # exploratory_total=3
+            self._row("C", "D", (0, 0, 0), (2, 2, 3, 2)),   # exploratory_total=9
+            self._row("E", "F", (0, 0, 0), (1, 2, 2, 1)),   # exploratory_total=6
+            self._row("G", "H", (0, 0, 0), (1, 1, 2, 1)),   # exploratory_total=5
+            self._row("I", "J", (0, 0, 0), (0, 0, 3, 1)),   # exploratory_total=4, novel (bio>=3)
         ]
 
         ranked = rank_featured_candidates(
@@ -2598,9 +2855,9 @@ class TestNovelCandidates:
         from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
 
         matrix = [
-            self._row("A", "B", (0, 0, 2, 0), (2, 2, 3, 2)),   # exploratory_total=9
-            self._row("C", "D", (0, 0, 1, 0), (1, 1, 2, 1)),   # exploratory_total=5
-            self._row("E", "F", (0, 0, 1, 0), (0, 0, 2, 2)),   # exploratory_total=4
+            self._row("A", "B", (0, 0, 0), (2, 2, 3, 2)),   # exploratory_total=9
+            self._row("C", "D", (0, 0, 0), (1, 1, 2, 1)),   # exploratory_total=5
+            self._row("E", "F", (0, 0, 0), (0, 0, 2, 2)),   # exploratory_total=4
         ]
 
         ranked = rank_featured_candidates(

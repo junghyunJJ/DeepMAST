@@ -96,8 +96,8 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--provider",
-        default="openrouter",
-        help="LLM provider (default: openrouter).",
+        default="ollama",
+        help="LLM provider (default: ollama).",
     )
     p.add_argument(
         "--no-debug",
@@ -109,6 +109,13 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=150,
         help="Timeout in minutes (default: 150).",
+    )
+    p.add_argument(
+        "--census",
+        action="store_true",
+        default=True,
+        help="Enable Census API tools (query_cellxgene_lr_context, run_compare_census_lr_pair). "
+             "Disabled by default due to slow API response times.",
     )
     return p.parse_args()
 
@@ -235,10 +242,12 @@ async def run_traced(args: argparse.Namespace) -> int:
         data_dir=str(data_dir),
         disease=args.disease,
         use_checkpointer=True,
+        enable_census=args.census,
     )
     agent, backend = create_drug_target_agent(config)
     print(f"[CONFIG] Agent created (provider={args.provider})")
     print(f"[CONFIG] Disease: {args.disease}")
+    print(f"[CONFIG] Census API: {'ENABLED' if args.census else 'DISABLED'}")
 
     # ── Stream with tracing ───────────────────────────────────────────
     initial_message = (
@@ -302,7 +311,7 @@ async def run_traced(args: argparse.Namespace) -> int:
         traceback.print_exc()
     finally:
         trace_log_fp.close()
-        if backend:
+        if backend and hasattr(backend, "cleanup"):
             backend.cleanup()
 
     elapsed = time.time() - start

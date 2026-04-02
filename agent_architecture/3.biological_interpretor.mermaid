@@ -1,4 +1,5 @@
 %%{init: {
+  "securityLevel": "loose",
   "theme": "base",
   "themeVariables": {
     "fontFamily": "Helvetica, Arial",
@@ -13,126 +14,122 @@
 flowchart TB
 
 %% ======================
+%% Biological Interpreter Input
+%% ======================
+START(["Start"]):::terminal -->
+ST[/"Inputs<br/>(Preprocessed ST Data)"/]:::io_white
+
+STCCI[["ST-CCI analysis</br>MCP"]]:::tool
+CCI["Cell-Cell Interaction</br> Analysis Results"]
+%% LR["Ligand-Receptor Candidates"]
+
+%% ======================
 %% Biological Interpreter
 %% ======================
-subgraph BI[Biological Interpreter]
-    ST[Load Preprocessed ST Data]:::module
-    STCCI[[ST-CCI Tool]]:::tool
-    CCI[Cell–Cell Interaction Results]:::module
-    LR[Ligand–Receptor Candidates]:::module
-end
+subgraph INPUT["Biological Interpreter"]
+    P("Planner subagent"):::subagent
+    S("Searcher subagent"):::subagent
+    I("Interpreter subagent"):::subagent
+    R("Reporter subagent"):::subagent
 
-%% ======================
-%% AI-driven Interpretation Engine
-%% ======================
-subgraph AI[AI-driven Interpretation Engine]
-    P[Planner Agent]:::agent
-    S[Searcher Agent]:::agent
-    I[Interpreter Agent]:::agent
-    R[Reporter Agent]:::agent
-end
-
-%% ======================
-%% Evidence Sources
-%% ======================
-subgraph ES[Evidence Sources]
-
-    subgraph LIT[Biomedical Literature]
+    subgraph LIT["Biomedical Literature"]
         direction TB
-        DPS[[Dynamic Paper Search]]:::tool
-        AR[[Agentic RAG]]:::tool
-    end
-
-
-subgraph DB[Drug & Genetic Databases]
-    direction LR
-
-    subgraph DB1[Single-cell / Expression]
-        scdb[(CellxGene Census)]
-    end
-
-    subgraph DB2[Pathway / Network]
-        pathwaydb[(KEGG/Reactome)]
-        ppidb[(STRING)]
-    end
-
-    subgraph DB3[Genetics / Targets]
-        ot[(OpenTargets)]
-        gwasdb[(GWAS Catalog)]
-        chembl[(ChEMBL)]
-        vepdb[(Ensembl VEP)]
+        DPS[["Dynamic Paper Search"]]:::tool
+        RAG[["Full-text RAG"]]:::tool
     end
 end
-end
+
 
 %% ======================
-%% Drug Target Discovery Engine
+%% Drug Target Discovery
 %% ======================
-subgraph DT[Drug Target Discovery Engine]
+subgraph DT["Drug Target Discovery"]
 
-    subgraph EA[Evidence Assessor Agent]
+    subgraph EA_SUB["Evidence Assessor subagent"]
         direction TB
-        F1[Stage 1<br/>Biological Context]:::agent
-        F2[Stage 2<br/>Validation & Scoring]:::agent
-        F3[Stage 3<br/>Deep Evidence Analysis]:::agent
+        F2("Stage 1<br/>Validation & Scoring<br/>(<i>ALL genes</i>)")
+        %% SEL{"Gene Selection<br/>(<i>FEATURED</i>)"}:::decision
+        F1("Stage 2<br/>Biological Context<br/>(<i>FEATURED pairs</i>)")
+        F3("Stage 3<br/>Deep Evidence<br/>(<i>FEATURED genes</i>)")
+
+            %% subgraph DBGRP["Drug & Genetic Databases"]
+        subgraph DBGRP["Databases"]
+            direction TB
+            DB_GT[("OpenTargets<br/>GWAS DB<br/>VEP")]:::resource
+            DB_PW[("KEGG<br/>Reactome<br/>STRING")]:::resource
+            DB_SC[("Single-cell<br/>Census")]:::resource
+            DB_DR[("ChEMBL")]:::resource
+            %%DB_AR[("PubMed<br/>PubTator3")]:::resource
+        end
     end
 
-    RS[Results Summary Agent]:::agent
+    %% DPS2[["Dynamic Paper Search"]]:::tool
+    SKILL_hypo[["hypothesis<br/>generation"]]:::resource
+    RW("Reportse subagnet"):::subagent
 
 end
 
 %% ======================
 %% Outputs
 %% ======================
-subgraph OUT[Outputs]
-    REP[Biological Interpretation Report]:::output
-    RANK[Ranked Drug Targets]:::output
-end
+DTDS[\"Drug Target Discovery summary"\]:::io_white
+REP[\"Biological Interpretation Report"\]:::io_white
+END(["End"]):::terminal
 
 %% ======================
 %% Flow
 %% ======================
+ST --> STCCI --> CCI
 
-ST --> STCCI --> CCI --> LR
-
-%% 🔥 Hypothesis Initialization 강조
-LR --> P
+%% Hypothesis Initialization
+CCI --> P
+CCI --> F2
 
 P --> S --> I --> R
-
-%% Literature loop
+%% Literature access
 S --> LIT
-DPS --> AR
-AR -.-> DPS
+LIT --> I
+DPS --> RAG
+RAG -.-> DPS
 
-%% 🔥 Multi-source retrieval 강조
-%%S -.->|Database Query| DB
-EA --> DB
+%% Reordered 3-stage funnel
+%% F2 -->|"Scoring"| SEL -->|"FEATURED"| F1 -->|"Filtering"| F3 -->|"Prioritization"| RANK
+F2 -->|"Scoring"| F1 -->|"Filtering"| F3 --> RW
 
-%% Drug target pipeline
-LR --> EA
+%% DB access (per-stage)
+%%F2 <--> DB_GT
+%%F1 <--> DB_PW
+%%F1 <--> DB_SC
+%%F3 <--> DB_DR
 
-%% 🔥 Funnel-like progression
-F1 -->|Refinement| F2 -->|Filtering| F3 -->|Prioritization| RS
-
-RS --> RANK
+DB_GT --> F2
+DB_PW --> F1
+DB_SC --> F1
+DB_DR --> F3
 
 %% Outputs
 R --> REP
-RANK --> REP
+SKILL_hypo --> RW
+RW --> DTDS
+DTDS --> R
+REP --> END
 
 %% ======================
 %% Style Classes
 %% ======================
-
 classDef module fill:#ffffff,stroke:#c9d1d9,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
-classDef agent fill:#f4f6f8,stroke:#9aa4b2,stroke-width:2px,rx:18,ry:18,color:#1f2933
-classDef tool fill:#eceff1,stroke:#b0bec5,stroke-width:1.2px,rx:10,ry:10,color:#1f2933
-classDef database fill:#f3e5f5,stroke:#ce93d8,stroke-width:1.5px,rx:10,ry:10,color:#1f2933
-classDef output fill:#e8f5e9,stroke:#81c784,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+classDef subagent fill:#fdf8ff,stroke:#ce93d8,stroke-width:1.5px,stroke-dasharray: 5 5,rx:14,ry:14
+classDef tool fill:#eceff1,stroke:#b0bec5,stroke-width:1.5px,rx:10,ry:10,color:#1f2933
+classDef resource fill:#e8f5e9,stroke:#81c784,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+classDef decision fill:#e8f5e9,stroke:#81c784,stroke-width:1.8px,color:#1f2933
+classDef terminal fill:#1f2933,stroke:#1f2933,stroke-width:2px,color:#ffffff
+classDef io_white fill:#ffffff,stroke:#7b8a9a,stroke-width:2px,rx:14,ry:14,color:#1f2933
 
-class ST,CCI,LR module
-class P,S,I,R,F1,F2,F3,RS agent
-class STCCI,DPS,AR tool
-class scdb,pathwaydb,ppidb,ot,gwasdb,chembl,vepdb database
-class REP,RANK output
+%% Subagent edges: purple dotted
+
+%% Subgraph styles
+style INPUT fill:#f3e5f5,stroke:#ce93d8,stroke-width:2px,rx:18,ry:18
+style LIT fill:#f8fbff,stroke:#b0bec5,stroke-width:1.5px,rx:12,ry:12
+style DT fill:#f3e5f5,stroke:#ce93d8,stroke-width:2px,rx:18,ry:18
+style EA_SUB fill:#fdf8ff,stroke:#ce93d8,stroke-width:1.5px,stroke-dasharray: 5 5,rx:14,ry:14
+style DBGRP fill:#f7fcf7,stroke:#81c784,stroke-width:1.5px,stroke-dasharray: 4 4,rx:12,ry:12

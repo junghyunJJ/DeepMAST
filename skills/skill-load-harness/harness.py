@@ -7,7 +7,6 @@ to explicitly evaluate each available skill before proceeding with its task.
 Usage:
     harness = SkillLoadHarness(
         skill_registry={"opentargets-database": "skills/opentargets-database"},
-        stage_hints={"chembl-database": "Stage 3 only"},
     )
     # Add to middleware list when creating a DeepAgent subagent
 """
@@ -41,17 +40,13 @@ class SkillLoadHarness(AgentMiddleware):
 
     Args:
         skill_registry: Mapping of skill names to their directory paths.
-        stage_hints: Optional mapping of skill names to usage hints
-            (e.g. "Stage 3 only") shown alongside each skill entry.
     """
 
     def __init__(
         self,
         skill_registry: dict[str, str],
-        stage_hints: dict[str, str] | None = None,
     ) -> None:
         self.skill_registry = skill_registry
-        self.stage_hints = stage_hints or {}
         self._prompt_template = self._load_prompt_template()
 
     def _load_prompt_template(self) -> str:
@@ -137,10 +132,7 @@ class SkillLoadHarness(AgentMiddleware):
         for name, path in self.skill_registry.items():
             skill_md = Path(path) / "SKILL.md"
             desc = self._load_skill_description(skill_md)
-            hint = ""
-            if name in self.stage_hints:
-                hint = f"\n  Hint: {self.stage_hints[name]}"
-            lines.append(f"- **{name}**: {desc}\n  Path: `{skill_md}`{hint}")
+            lines.append(f"- **{name}**: {desc}\n  Path: `{skill_md}`")
         return "\n".join(lines)
 
     @staticmethod

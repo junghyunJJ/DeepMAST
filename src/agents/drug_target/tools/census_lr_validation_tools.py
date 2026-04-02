@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import logging
 import re
@@ -10,6 +11,13 @@ from pathlib import Path
 from typing import Any
 
 from langchain_core.tools import tool
+
+from src.agents.drug_target.tools.census_batch_core import (
+    _resolve_disease_name,
+    batch_census_lr_pairs,
+    write_census_csv,
+    sanitize_for_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -157,43 +165,6 @@ def _resolve_interest_cell_type(
     return None, "none"
 
 
-def _resolve_disease_name(
-    requested: str,
-    organism: str = "homo_sapiens",
-) -> tuple[str | None, str]:
-    """Fuzzy-match disease name against Census MONDO vocabulary."""
-    try:
-        from src.agents.drug_target.tools.stage_domain_tools import list_census_diseases
-
-        raw = list_census_diseases.invoke({"organism": organism})
-        diseases_result = json.loads(raw)
-        if not diseases_result.get("executed") or not diseases_result.get("diseases"):
-            return None, "none"
-
-        candidates = diseases_result["diseases"]
-    except Exception:
-        return None, "none"
-
-    req = requested.strip().lower()
-
-    # Exact match (case-insensitive)
-    exact = [c for c in candidates if c["label"].strip().lower() == req]
-    if exact:
-        return exact[0]["label"], "exact"
-
-    # Substring match — request contained in label or vice versa
-    partial = [
-        c
-        for c in candidates
-        if req in c["label"].strip().lower() or c["label"].strip().lower() in req
-    ]
-    if partial:
-        best = max(partial, key=lambda x: x["total_cell_count"])
-        return best["label"], "fuzzy"
-
-    return None, "none"
-
-
 @tool
 def run_compare_census_lr_pair(
     data_dir: str,
@@ -242,9 +213,11 @@ def run_compare_census_lr_pair(
     if not csv_path:
         evidence_dir = Path(result["data_dir"]) / "evidence"
         evidence_dir.mkdir(parents=True, exist_ok=True)
+        # Use resolved_cell_type for CSV naming (updated after fuzzy resolution)
+        csv_ct = result.get("resolved_cell_type", target_cell_type)
         csv_name = (
             f"census_{_sanitize_token(gene_a)}_{_sanitize_token(gene_b)}_"
-            f"{_sanitize_token(target_cell_type)}.csv"
+            f"{_sanitize_token(csv_ct)}.csv"
         )
         csv_path = str(evidence_dir / csv_name)
 
@@ -325,5 +298,115 @@ def run_compare_census_lr_pair(
         return json.dumps(result, indent=2)
 
 
-__all__ = ["run_compare_census_lr_pair"]
+@tool
+def run_batch_census_lr_pairs(
+    data_dir: str,
+    disease: str,
+    pairs_json: str,
+    target_cell_type: str,
+    organism: str = "homo_sapiens",
+    census_version: str = "2025-11-08",
+    max_cells: int = 1_000_000,
+) -> str:
+    """Batch Census L-R co-expression validation for multiple pairs at once.
+
+    Opens Census ONCE, fetches all unique genes in a single query, then
+    computes per-pair z-test statistics in-memory. ~14x faster than
+    calling run_compare_census_lr_pair per pair.
+
+    Args:
+        data_dir: Path to the data directory (evidence/ subdirectory used for CSVs).
+        disease: Disease label for Census obs filter.
+        pairs_json: JSON array of [gene_a, gene_b] pairs,
+            e.g. '[["CXCL12","CXCR4"],["FGF2","FGFR1"]]'
+        target_cell_type: Cell type for target-vs-rest comparison.
+        organism: Census organism key.
+        census_version: Pinned Census release.
+        max_cells: Hard cap on cell count to prevent OOM.
+
+    Returns:
+        JSON object with batch_size, success_count, and per-pair results
+        matching run_compare_census_lr_pair schema.
+    """
+    result: dict = {
+        "batch_size": 0,
+        "success_count": 0,
+        "results": [],
+        "errors": [],
+    }
+
+    # Robust pairs_json parsing (handles Qwen/Ollama double-serialized JSON)
+    pairs_raw = pairs_json
+    if isinstance(pairs_raw, str):
+        try:
+            pairs_raw = json.loads(pairs_raw)
+        except (json.JSONDecodeError, TypeError):
+            pass
+        # Handle double-serialized
+        if isinstance(pairs_raw, str):
+            try:
+                pairs_raw = json.loads(pairs_raw)
+            except (json.JSONDecodeError, TypeError):
+                result["errors"].append(f"Could not parse pairs_json: {pairs_json[:200]}")
+                return json.dumps(sanitize_for_json(result), indent=2)
+
+    if not isinstance(pairs_raw, list):
+        result["errors"].append(f"pairs_json must be a JSON array, got {type(pairs_raw).__name__}")
+        return json.dumps(sanitize_for_json(result), indent=2)
+
+    pairs = [(p[0], p[1]) for p in pairs_raw if isinstance(p, (list, tuple)) and len(p) >= 2]
+    result["batch_size"] = len(pairs)
+
+    if not pairs:
+        result["errors"].append("No valid pairs found in pairs_json")
+        return json.dumps(sanitize_for_json(result), indent=2)
+
+    data_path = Path(data_dir).expanduser().resolve()
+    evidence_dir = data_path / "evidence"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        batch_results, csv_data = batch_census_lr_pairs(
+            pairs=pairs,
+            disease=disease,
+            target_cell_type=target_cell_type,
+            organism=organism,
+            census_version=census_version,
+            max_cells=max_cells,
+        )
+
+        # Write per-pair CSV files and populate results
+        for pair_result in batch_results:
+            gene_a = pair_result.get("gene_a", "")
+            gene_b = pair_result.get("gene_b", "")
+            pair_key = (gene_a, gene_b)
+
+            # Write CSV — use resolved_cell_type so Stage 1 validation finds the file
+            resolved_ct = pair_result.get("resolved_cell_type", target_cell_type)
+            csv_name = (
+                f"census_{_sanitize_token(gene_a)}_{_sanitize_token(gene_b)}_"
+                f"{_sanitize_token(resolved_ct)}.csv"
+            )
+            csv_path = evidence_dir / csv_name
+            csv_rows = csv_data.get(pair_key, [])
+            if csv_rows:
+                write_census_csv(csv_path, csv_rows)
+
+            pair_result["data_dir"] = str(data_path)
+            pair_result["csv_file"] = csv_name
+            pair_result["csv_exists"] = csv_path.exists()
+            result["results"].append(pair_result)
+
+            if pair_result.get("executed"):
+                result["success_count"] += 1
+
+    except MemoryError as exc:
+        result["errors"].append(str(exc))
+    except Exception as exc:
+        result["errors"].append(f"Batch Census failed: {exc}")
+
+    return json.dumps(sanitize_for_json(result), indent=2)
+
+
+__all__ = ["run_compare_census_lr_pair", "run_batch_census_lr_pairs"]
 

@@ -1,0 +1,146 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Helvetica, Arial",
+    "primaryColor": "#f5f7fa",
+    "primaryBorderColor": "#c9d1d9",
+    "lineColor": "#9aa4b2",
+    "secondaryColor": "#eef2f7",
+    "tertiaryColor": "#ffffff"
+  }
+}}%%
+
+flowchart TD
+
+%% ==============================
+%% Title Annotation
+%% ==============================
+title["<b>search_literature_dynamic v2.1</b>"]:::title
+
+%% ==============================
+%% Input / Initialization
+%% ==============================
+INPUT["Inputs<br/><i>genes, pathways, celltypes,<br/>disease, max_results, options</i>"]:::input
+LLM["create_llm( )<br/><i>GPT-4.1-mini / configured provider</i>"]:::module
+
+%% ==============================
+%% Iteration Loop
+%% ==============================
+subgraph LOOP["Iteration Loop  (max 3 iterations)"]
+    direction TB
+
+    COV["_calculate_coverage( )<br/><i>gene patterns + pathway keywords</i>"]:::module
+
+    EARLY{"Early Termination<br/>Check"}:::decision
+    EARLY_YES(["Terminate Loop"]):::terminal_minor
+
+    %% ==============================
+    %% Query Generation Subgraph
+    %% ==============================
+    subgraph QGEN["Query Generation"]
+        direction TB
+        ITER_CHECK{"Iteration = 0 ?"}:::decision
+        BROAD["LITERATURE_QUERY_GENERATION_PROMPT<br/><i>LLM generates 5-7 broad queries</i>"]:::llm
+        GAP["GAP_FILLING_QUERY_PROMPT<br/><i>LLM generates 3-5 targeted queries<br/>for missing genes / pathways</i>"]:::llm
+    end
+
+    PARSE["_parse_llm_queries( )<br/><i>Parse JSON array from LLM response</i>"]:::module
+    VALIDATE["_validate_generated_queries( )<br/><i>Validate query structure</i>"]:::module
+
+    %% ==============================
+    %% 60/40 Slot Allocation Subgraph
+    %% ==============================
+    subgraph ALLOC["Query Slot Allocation (60 / 40)"]
+        direction TB
+        CLASSIFY["Classify queries<br/><i>gene queries vs pathway queries</i>"]:::module
+        GENE_SLOT["Gene Queries<br/><b>60 %</b> of paper slots<br/><i>~18 of 30</i>"]:::slot_gene
+        PATH_SLOT["Pathway Queries<br/><b>40 %</b> of paper slots<br/><i>~12 of 30</i>"]:::slot_path
+    end
+
+    SEARCH["_search_with_biomcp( )<br/><i>BioMCP article_searcher</i><br/><i>gene-alias resolution + PMID dedup</i>"]:::tool
+
+end
+
+%% ==============================
+%% Post-processing
+%% ==============================
+subgraph POST["Post-processing"]
+    direction TB
+    DISEASE["Disease Relevance<br/>Post-filter"]:::module
+    SJR["Journal Quality Sort<br/><i>SJR score</i>"]:::module
+    RERANK["LLM Reranking<br/><i>rerank_mode = llm</i>"]:::optional
+    COVSORT["Coverage-weighted<br/>Greedy Sort"]:::optional
+end
+
+%% ==============================
+%% Output
+%% ==============================
+OUT_CHECK{"output_path<br/>provided ?"}:::decision
+OUT_FILE["Auto-save full results<br/>Return compact summary"]:::output
+OUT_DICT["Return full results dict<br/><i>papers, queries, coverage,<br/>coverage_history</i>"]:::output
+
+%% ==============================
+%% Flow Connections
+%% ==============================
+
+title ~~~ INPUT
+INPUT --> LLM
+LLM --> COV
+
+%% Inside Iteration Loop
+COV --> EARLY
+EARLY -->|"gene coverage ≥ 60%<br/>AND pathway coverage ≥ 50%<br/>OR papers ≥ max"| EARLY_YES
+EARLY -->|"Continue"| ITER_CHECK
+
+ITER_CHECK -->|"Yes (iter 0)"| BROAD
+ITER_CHECK -->|"No (iter 1-2)"| GAP
+
+BROAD --> PARSE
+GAP --> PARSE
+PARSE --> VALIDATE
+VALIDATE --> CLASSIFY
+
+CLASSIFY --> GENE_SLOT
+CLASSIFY --> PATH_SLOT
+GENE_SLOT --> SEARCH
+PATH_SLOT --> SEARCH
+
+%% Loop back
+SEARCH -->|"Next iteration"| COV
+
+%% Exit loop to post-processing
+EARLY_YES --> DISEASE
+SEARCH -->|"Final iteration"| DISEASE
+
+%% Post-processing chain (Disease + SJR required, Rerank + CovSort optional)
+DISEASE --> SJR
+SJR -.-> RERANK
+RERANK -.-> COVSORT
+
+%% Output
+COVSORT --> OUT_CHECK
+OUT_CHECK -->|"Yes"| OUT_FILE
+OUT_CHECK -->|"No"| OUT_DICT
+
+
+%% ==============================
+%% Style Classes
+%% ==============================
+
+classDef title fill:none,stroke:none,color:#1f2933,font-size:16px
+classDef input fill:#e8edf3,stroke:#7b8a9a,stroke-width:2px,rx:14,ry:14,color:#1f2933
+classDef module fill:#ffffff,stroke:#c9d1d9,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+classDef llm fill:#e3f2fd,stroke:#64b5f6,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+classDef decision fill:#fff8e1,stroke:#ffcc80,stroke-width:1.8px,color:#1f2933
+classDef tool fill:#eceff1,stroke:#b0bec5,stroke-width:1.5px,rx:10,ry:10,color:#1f2933
+classDef optional fill:#f5f5f5,stroke:#bdbdbd,stroke-width:1.2px,stroke-dasharray: 5 5,rx:10,ry:10,color:#616161
+classDef output fill:#e8f5e9,stroke:#81c784,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+classDef terminal_minor fill:#546e7a,color:#ffffff,stroke:#546e7a,stroke-width:1.5px,rx:15,ry:15
+classDef slot_gene fill:#e3f2fd,stroke:#42a5f5,stroke-width:1.5px,rx:10,ry:10,color:#1f2933
+classDef slot_path fill:#f3e5f5,stroke:#ab47bc,stroke-width:1.5px,rx:10,ry:10,color:#1f2933
+
+%% Subgraph styles
+style LOOP fill:#f9fafb,stroke:#9aa4b2,stroke-width:2px,rx:16,ry:16
+style QGEN fill:#f5f8fc,stroke:#b0c4de,stroke-width:1.5px,stroke-dasharray: 4 4,rx:12,ry:12
+style ALLOC fill:#faf5fc,stroke:#d1a8e0,stroke-width:1.5px,stroke-dasharray: 4 4,rx:12,ry:12
+style POST fill:#f9fafb,stroke:#9aa4b2,stroke-width:1.5px,rx:12,ry:12

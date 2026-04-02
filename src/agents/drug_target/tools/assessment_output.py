@@ -10,6 +10,7 @@ from langchain_core.tools import tool
 
 from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir
 from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
+from src.agents.drug_target.tools.stage2_service import extract_lr_pairs
 
 
 def _parse_json_param(raw: str | dict | list, field_name: str, errors: list[str]) -> Any:
@@ -36,13 +37,7 @@ def _load_input_pairs(base: Path) -> list[tuple[str, str]]:
     except Exception:
         return []
 
-    pairs = (
-        lr_data.get("pairs")
-        or lr_data.get("lr_pairs")
-        or lr_data.get("candidates")
-        or lr_data.get("candidate_pairs")
-        or []
-    )
+    pairs = extract_lr_pairs(lr_data)
     loaded: list[tuple[str, str]] = []
     seen: set[tuple[str, str]] = set()
     for pair in pairs:
@@ -315,9 +310,13 @@ def save_drug_md(data_dir: str, content: str | dict | list) -> str:
         data_dir: Directory to save to
         content: Full markdown content of the drug target report
     """
-    # Ollama may pass raw dict/list instead of JSON string
+    # Reject non-string content — dict/list would produce JSON, not markdown
     if isinstance(content, (dict, list)):
-        content = json.dumps(content, indent=2)
+        return json.dumps({
+            "error": "drug.md content must be a markdown string, not a dict/list. "
+                     "Please pass the full markdown text as a string.",
+            "saved": False,
+        })
     resolved = _resolve_data_dir(data_dir)
     drug_md_path = resolved / "drug.md"
     drug_md_path.write_text(content, encoding="utf-8")

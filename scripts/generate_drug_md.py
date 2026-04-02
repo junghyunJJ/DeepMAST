@@ -123,7 +123,7 @@ def _build_stage1_table(evidence: dict) -> str:
             continue
         # Find matching detail file
         ligand, receptor = pair_key.split("^", 1)
-        detail_key = f"stage1_{ligand}_{receptor}"
+        detail_key = f"stage1_{ligand}--{receptor}"
         detail = details.get(detail_key, {})
 
         # STRING PPI
@@ -250,7 +250,7 @@ def _build_stage1_context_notes(evidence: dict) -> str:
         if "^" not in pair_key:
             continue
         ligand, receptor = pair_key.split("^", 1)
-        detail = details.get(f"stage1_{ligand}_{receptor}", {})
+        detail = details.get(f"stage1_{ligand}--{receptor}", {})
         annotation = detail.get("stage1_annotations", {})
         if not annotation.get("microenvironment_candidate"):
             continue

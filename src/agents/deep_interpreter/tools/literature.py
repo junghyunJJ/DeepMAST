@@ -1812,114 +1812,6 @@ def _greedy_coverage_sort(
     return selected
 
 
-async def _think_with_biomcp(
-    genes: list[str],
-    pathways: list[str],
-    celltypes: list[str],
-    disease: str,
-    biomcp_url: str = DEFAULT_BIOMCP_URL,
-) -> dict:
-    """Execute 3-step strategic thinking via BioMCP think tool.
-
-    Follows biomcp-reference-search skill workflow:
-    - Step 1: Context Analysis
-    - Step 2: Search Keywords derivation
-    - Step 3: Expected Results
-
-    Args:
-        genes: List of gene symbols
-        pathways: List of pathways
-        celltypes: List of cell types
-        disease: Disease context
-        biomcp_url: BioMCP server URL
-
-    Returns:
-        Dictionary with strategic_context string and success flag
-    """
-    try:
-        tools = await get_biomcp_tools(biomcp_url)
-
-        think_tool = find_tool_by_name(tools, "think")
-
-        if think_tool is None:
-            logger.warning("BioMCP think tool not found")
-            return {"strategic_context": "", "success": False}
-
-        # Build context summary
-        context = f"""
-Genes: {', '.join(genes[:20]) if genes else 'None'}
-Pathways: {', '.join(pathways[:10]) if pathways else 'None'}
-Cell types: {', '.join(celltypes) if celltypes else 'None'}
-Disease: {disease or 'Not specified'}
-Analysis type: CCI (Cell-Cell Interaction) from spatial transcriptomics
-"""
-
-        results = []
-
-        # Step 1: Context Analysis
-        step1 = await think_tool.ainvoke({
-            "thought": f"Context analysis for literature search: {context}",
-            "thoughtNumber": 1,
-            "totalThoughts": 3,
-            "nextThoughtNeeded": True,
-        })
-        results.append(f"Context: {step1}")
-
-        # Step 2: Search Keywords
-        step2 = await think_tool.ainvoke({
-            "thought": "Derive search keywords from context: prioritize genes by biological relevance, identify key mechanisms",
-            "thoughtNumber": 2,
-            "totalThoughts": 3,
-            "nextThoughtNeeded": True,
-        })
-        results.append(f"Keywords: {step2}")
-
-        # Step 3: Expected Results
-        step3 = await think_tool.ainvoke({
-            "thought": "Expected biological mechanisms and interpretation direction for CCI analysis",
-            "thoughtNumber": 3,
-            "totalThoughts": 3,
-            "nextThoughtNeeded": False,
-        })
-        results.append(f"Expected: {step3}")
-
-        strategic_context = "\n".join(results)
-        logger.info(f"BioMCP think completed successfully (3 steps)")
-
-        return {
-            "strategic_context": strategic_context,
-            "success": True,
-        }
-
-    except Exception as e:
-        logger.warning(f"BioMCP think failed: {e}")
-        invalidate_client(f"biomcp_{biomcp_url}")
-        return {"strategic_context": "", "success": False}
-
-
-def _execute_biomcp_think(
-    genes: list[str],
-    pathways: list[str],
-    celltypes: list[str],
-    disease: str,
-) -> dict:
-    """Sync wrapper for _think_with_biomcp.
-
-    Args:
-        genes: List of gene symbols
-        pathways: List of pathways
-        celltypes: List of cell types
-        disease: Disease context
-
-    Returns:
-        Dictionary with strategic_context string and success flag
-    """
-    try:
-        return run_async(_think_with_biomcp(genes, pathways, celltypes, disease), timeout=30)
-    except Exception as e:
-        logger.warning(f"BioMCP think execution failed: {e}")
-        return {"strategic_context": "", "success": False}
-
 
 async def _think_with_biomcp_for_planner(
     celltypes: list[str],
@@ -2210,7 +2102,7 @@ async def search_literature_dynamic_async(
     normalized_rerank_mode = _normalize_rerank_mode(rerank_mode)
     rerank_totals = {"applied_count": 0, "dropped_count": 0}
 
-    # Keep output schema backward-compatible even though strategic think is skipped.
+    # Backward-compatible: think_success kept for output schema stability.
     think_success = True
 
     # Note: pre-fetch aliases removed - BioMCP article_searcher

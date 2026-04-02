@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 import math
 import re
 from pathlib import Path
@@ -11,7 +12,12 @@ from statistics import NormalDist
 from typing import Any
 
 from langchain_core.tools import tool
+from src.agents.drug_target.tools.stage2_service import extract_lr_pairs
 
+from src.agents.drug_target.tools.census_batch_core import (
+    batch_census_lr_pairs as _batch_census_lr_pairs,
+    write_census_csv as _write_census_csv,
+)
 from src.agents.drug_target.tools.census_lr_validation_tools import (
     run_compare_census_lr_pair,
 )
@@ -86,13 +92,7 @@ def _extract_census_context(payload: dict[str, Any]) -> dict[str, str]:
 def _load_input_lr_pairs(data_dir: str | Path) -> list[tuple[str, str]]:
     data_dir = Path(data_dir)
     lr_data = _read_json_if_exists(data_dir / "lr_candidates.json")
-    pairs = (
-        lr_data.get("pairs")
-        or lr_data.get("lr_pairs")
-        or lr_data.get("candidates")
-        or lr_data.get("candidate_pairs")
-        or []
-    )
+    pairs = extract_lr_pairs(lr_data)
 
     unique_pairs: list[tuple[str, str]] = []
     seen: set[tuple[str, str]] = set()
@@ -116,7 +116,7 @@ def _pair_key(ligand: str, receptor: str) -> str:
 
 
 def _stage1_detail_path(evidence_dir: Path, ligand: str, receptor: str) -> Path:
-    return evidence_dir / f"stage1_{ligand.upper()}_{receptor.upper()}.json"
+    return evidence_dir / f"stage1_{ligand.upper()}--{receptor.upper()}.json"
 
 
 def _stage1_csv_path(
@@ -131,16 +131,16 @@ def _stage1_csv_path(
 
 
 def parse_stage1_pair_from_filename(path: str | Path) -> tuple[str, str]:
-    """Recover ligand/receptor symbols from a stage1_<ligand>_<receptor>.json file."""
+    """Recover ligand/receptor symbols from a stage1_<ligand>--<receptor>.json file."""
     stem = Path(path).stem
     if not stem.startswith("stage1_"):
         raise ValueError(f"Not a Stage1 file: {path}")
 
     pair = stem.removeprefix("stage1_")
-    if "_" not in pair:
+    if "--" not in pair:
         raise ValueError(f"Cannot infer ligand/receptor from: {path}")
 
-    ligand, receptor = pair.split("_", 1)
+    ligand, receptor = pair.split("--", 1)
     if not ligand or not receptor:
         raise ValueError(f"Invalid Stage1 filename: {path}")
     return ligand.upper(), receptor.upper()
@@ -312,7 +312,8 @@ def resolve_stage1_context(
 
 
 def _parse_census_csv(csv_path: Path, target_cell_type: str) -> dict[str, Any] | None:
-    rows = list(csv.DictReader(csv_path.open()))
+    with csv_path.open() as f:
+        rows = list(csv.DictReader(f))
 
     target_rows = [r for r in rows if r["cell_type"].strip() == target_cell_type]
     rest_rows = [r for r in rows if r["cell_type"].strip() != target_cell_type]
@@ -359,14 +360,15 @@ def _parse_census_csv(csv_path: Path, target_cell_type: str) -> dict[str, Any] |
 
 def _load_census_summary_rows(csv_path: Path) -> list[dict[str, Any]]:
     rows = []
-    for row in csv.DictReader(csv_path.open()):
-        rows.append({
-            "cell_type": row["cell_type"].strip(),
-            "n_cells": int(row["n_cells"]),
-            "gene_a_pct": float(row["gene_a_pct"]),
-            "gene_b_pct": float(row["gene_b_pct"]),
-            "coexp_pct": float(row["coexp_pct"]),
-        })
+    with csv_path.open() as f:
+        for row in csv.DictReader(f):
+            rows.append({
+                "cell_type": row["cell_type"].strip(),
+                "n_cells": int(row["n_cells"]),
+                "gene_a_pct": float(row["gene_a_pct"]),
+                "gene_b_pct": float(row["gene_b_pct"]),
+                "coexp_pct": float(row["coexp_pct"]),
+            })
     return rows
 
 
@@ -630,8 +632,14 @@ def rebuild_stage1_artifacts(
     *,
     target_cell_type: str | None = None,
     disease: str | None = None,
+    pair_subset: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Normalize all per-pair Stage1 files and rebuild aggregated artifacts."""
+    """Normalize per-pair Stage1 files and rebuild aggregated artifacts.
+
+    Args:
+        pair_subset: If provided, rebuild only for these (ligand, receptor)
+            pairs.  Files for pairs outside the subset are ignored.
+    """
     data_dir = Path(data_dir)
     evidence_dir = data_dir / "evidence"
     context = resolve_stage1_context(
@@ -645,6 +653,22 @@ def rebuild_stage1_artifacts(
         path for path in evidence_dir.glob("stage1_*.json")
         if path.name not in STAGE1_SKIP_FILES
     )
+    # When pair_subset is provided, keep only files matching the subset.
+    if pair_subset is not None:
+        subset_keys = {_pair_key(lig, rec) for lig, rec in pair_subset}
+        filtered: list[Path] = []
+        for path in stage1_files:
+            # Filename pattern: stage1_{LIGAND}--{RECEPTOR}.json
+            stem = path.stem  # e.g. "stage1_CXCL12--CXCR4"
+            parts = stem.split("_", 1)  # ["stage1", "CXCL12--CXCR4"]
+            if len(parts) == 2:
+                pair_part = parts[1]  # "CXCL12--CXCR4"
+                gene_parts = pair_part.split("--", 1)
+                if len(gene_parts) == 2:
+                    key = _pair_key(gene_parts[0], gene_parts[1])
+                    if key in subset_keys:
+                        filtered.append(path)
+        stage1_files = filtered
 
     stage1_evidence: dict[str, Any] = {}
     stage1_confidence: dict[str, Any] = {}
@@ -721,8 +745,15 @@ def validate_stage1_artifacts(
     *,
     disease: str | None = None,
     target_cell_type: str | None = None,
+    pair_subset: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Validate that Stage1 artifacts are complete for the current input pairs."""
+    """Validate that Stage1 artifacts are complete for the expected input pairs.
+
+    Args:
+        pair_subset: If provided, validate only these (ligand, receptor) pairs
+            instead of all pairs from lr_candidates.json.  Used when Stage 1
+            runs only for FEATURED pairs after Stage 2 gene selection.
+    """
     data_dir = Path(data_dir)
     evidence_dir = data_dir / "evidence"
     try:
@@ -747,7 +778,7 @@ def validate_stage1_artifacts(
             "aggregate_pair_mismatches": {},
             "errors": [str(exc)],
         }
-    expected_pairs = _load_input_lr_pairs(data_dir)
+    expected_pairs = pair_subset if pair_subset is not None else _load_input_lr_pairs(data_dir)
     expected_pair_keys = {_pair_key(ligand, receptor) for ligand, receptor in expected_pairs}
     aggregate_paths = {
         "stage1_evidence": evidence_dir / "stage1_evidence.json",
@@ -783,7 +814,9 @@ def validate_stage1_artifacts(
         if detail.get("receptor") != receptor:
             missing_fields.append("receptor_value_mismatch")
         census_validation = detail.get("census_validation", {})
-        if not isinstance(census_validation, dict) or "target_vs_rest" not in census_validation:
+        if isinstance(census_validation, dict) and census_validation.get("executed") is False:
+            pass  # Census disabled or explicitly not executed — skip validation
+        elif not isinstance(census_validation, dict) or "target_vs_rest" not in census_validation:
             missing_fields.append("census_validation.target_vs_rest")
         if missing_fields:
             schema_mismatches[pair_key] = missing_fields
@@ -851,6 +884,11 @@ def validate_stage1_artifacts(
     }
 
 
+logger = logging.getLogger(__name__)
+
+_MAX_CONCURRENT_CENSUS = 3  # Each Census subprocess uses ~2.5 GB RAM
+
+
 def _rerun_missing_census_csvs(
     data_dir: Path,
     *,
@@ -858,10 +896,13 @@ def _rerun_missing_census_csvs(
     missing_csv_files: list[str],
 ) -> list[dict[str, Any]]:
     evidence_dir = data_dir / "evidence"
-    reruns: list[dict[str, Any]] = []
+
+    # Separate valid pairs from invalid ones (validation is cheap, do first)
+    to_run: list[tuple[str, str, str, Path]] = []  # (csv_name, ligand, receptor, csv_path)
+    skipped: list[dict[str, Any]] = []
     for csv_name in missing_csv_files:
         if not csv_name.startswith("census_") or not csv_name.endswith(".csv"):
-            reruns.append({
+            skipped.append({
                 "csv_file": csv_name,
                 "executed": False,
                 "errors": ["Unrecognized census CSV naming pattern"],
@@ -871,7 +912,7 @@ def _rerun_missing_census_csvs(
         stem = csv_name.removeprefix("census_").removesuffix(".csv")
         prefix = f"_{_sanitize_token(context['csv_target_cell_type'])}"
         if not stem.endswith(prefix):
-            reruns.append({
+            skipped.append({
                 "csv_file": csv_name,
                 "executed": False,
                 "errors": ["CSV file does not match resolved Stage1 target cell type"],
@@ -879,26 +920,60 @@ def _rerun_missing_census_csvs(
             continue
         pair_token = stem[: -len(prefix)]
         if "_" not in pair_token:
-            reruns.append({
+            skipped.append({
                 "csv_file": csv_name,
                 "executed": False,
                 "errors": ["Could not infer ligand/receptor from CSV filename"],
             })
             continue
         ligand, receptor = pair_token.split("_", 1)
-        csv_path = evidence_dir / csv_name
-        raw = run_compare_census_lr_pair.invoke({
-            "data_dir": str(data_dir),
-            "disease": context["disease"],
-            "gene_a": ligand.upper(),
-            "gene_b": receptor.upper(),
-            "target_cell_type": context["requested_target_cell_type"],
-            "output_csv": str(csv_path),
-        })
-        result = json.loads(raw)
-        result["csv_file"] = csv_name
-        result["csv_exists"] = csv_path.exists()
-        reruns.append(result)
+        to_run.append((csv_name, ligand, receptor, evidence_dir / csv_name))
+
+    # Batch Census: single call for all missing pairs
+    reruns: list[dict[str, Any]] = list(skipped)
+    if to_run:
+        pairs = [(ligand.upper(), receptor.upper()) for _, ligand, receptor, _ in to_run]
+        csv_paths = {(ligand.upper(), receptor.upper()): csv_path for _, ligand, receptor, csv_path in to_run}
+        csv_names = {(ligand.upper(), receptor.upper()): csv_name for csv_name, ligand, receptor, _ in to_run}
+        try:
+            batch_results, csv_data = _batch_census_lr_pairs(
+                pairs=pairs,
+                disease=context["disease"],
+                target_cell_type=context.get("resolved_target_cell_type") or context["requested_target_cell_type"],
+            )
+            for result in batch_results:
+                pair_key = (result["gene_a"], result["gene_b"])
+                csv_name = csv_names.get(pair_key, "")
+                csv_path = csv_paths.get(pair_key)
+                # Write CSV file
+                if csv_path and pair_key in csv_data and csv_data[pair_key]:
+                    _write_census_csv(csv_path, csv_data[pair_key])
+                result["csv_file"] = csv_name
+                result["csv_exists"] = csv_path.exists() if csv_path else False
+                reruns.append(result)
+        except Exception as exc:
+            logger.warning("Batch Census failed, falling back to per-pair: %s", exc)
+            for csv_name, ligand, receptor, csv_path in to_run:
+                try:
+                    raw = run_compare_census_lr_pair.invoke({
+                        "data_dir": str(data_dir),
+                        "disease": context["disease"],
+                        "gene_a": ligand.upper(),
+                        "gene_b": receptor.upper(),
+                        "target_cell_type": context["requested_target_cell_type"],
+                        "output_csv": str(csv_path),
+                    })
+                    result = json.loads(raw)
+                    result["csv_file"] = csv_name
+                    result["csv_exists"] = csv_path.exists()
+                    reruns.append(result)
+                except Exception as fallback_exc:
+                    logger.warning("Census rerun failed for %s: %s", csv_name, fallback_exc)
+                    reruns.append({
+                        "csv_file": csv_name,
+                        "executed": False,
+                        "errors": [f"Fallback error: {fallback_exc}"],
+                    })
     return reruns
 
 
@@ -908,13 +983,20 @@ def finalize_stage1_workspace(
     disease: str | None = None,
     target_cell_type: str | None = None,
     rerun_missing_census: bool = True,
+    pair_subset: list[tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """Deterministically finalize Stage1 artifacts for the current workspace."""
+    """Deterministically finalize Stage1 artifacts for the current workspace.
+
+    Args:
+        pair_subset: If provided, finalize only these (ligand, receptor) pairs
+            instead of all pairs from lr_candidates.json.
+    """
     data_dir = _resolve_data_dir(str(data_dir))
     pre_validation = validate_stage1_artifacts(
         data_dir,
         disease=disease,
         target_cell_type=target_cell_type,
+        pair_subset=pair_subset,
     )
     if not pre_validation.get("context"):
         return {
@@ -943,11 +1025,13 @@ def finalize_stage1_workspace(
         data_dir,
         disease=pre_validation["context"]["disease"],
         target_cell_type=pre_validation["context"]["requested_target_cell_type"],
+        pair_subset=pair_subset,
     )
     post_validation = validate_stage1_artifacts(
         data_dir,
         disease=pre_validation["context"]["disease"],
         target_cell_type=pre_validation["context"]["requested_target_cell_type"],
+        pair_subset=pair_subset,
     )
 
     return {
@@ -972,18 +1056,54 @@ def finalize_stage1_artifacts(
     disease: str | None = None,
     target_cell_type: str | None = None,
     rerun_missing_census: bool = True,
+    pair_subset_json: str = "",
 ) -> str:
     """Repair, rebuild, and validate canonical Stage1 artifacts.
 
     Returns a compact summary (success flag, counts, file paths, errors)
     instead of full validation payloads to keep ToolMessage size small.
     Full details are written to evidence/stage1_*.json files on disk.
+
+    Args:
+        pair_subset_json: Optional JSON array of [ligand, receptor] pairs,
+            e.g. '[["CXCL12","CXCR4"],["FGF2","FGFR1"]]'.
+            When provided, only these pairs are validated/rebuilt instead of
+            all pairs from lr_candidates.json.  Use this after Stage 2 gene
+            selection when Stage 1 was run only for FEATURED pairs.
     """
+    pair_subset = None
+    if pair_subset_json:
+        try:
+            # Handle langchain-ollama already parsed string into list
+            if isinstance(pair_subset_json, list):
+                raw = pair_subset_json
+            else:
+                cleaned = str(pair_subset_json).strip()
+                # Strip surrounding single quotes (Qwen3.5/Ollama pattern)
+                if cleaned.startswith("'") and cleaned.endswith("'"):
+                    cleaned = cleaned[1:-1]
+                # Handle double-serialized JSON (string-wrapped JSON)
+                if cleaned.startswith('"') and cleaned.endswith('"'):
+                    try:
+                        cleaned = json.loads(cleaned)
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                raw = json.loads(cleaned) if isinstance(cleaned, str) else cleaned
+            pair_subset = [(str(p[0]), str(p[1])) for p in raw]
+        except (json.JSONDecodeError, IndexError, TypeError, ValueError):
+            truncated = str(pair_subset_json)[:200]
+            return json.dumps({
+                "success": False,
+                "error": f"Invalid pair_subset_json (first 200 chars): {truncated}. "
+                         "Expected JSON array of [ligand, receptor] arrays.",
+            })
+
     result = finalize_stage1_workspace(
         data_dir,
         disease=disease,
         target_cell_type=target_cell_type,
         rerun_missing_census=rerun_missing_census,
+        pair_subset=pair_subset,
     )
 
     # Build compact summary to avoid multi-MB ToolMessage payloads

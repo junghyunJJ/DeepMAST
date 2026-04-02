@@ -19,6 +19,7 @@ from src.agents.drug_target.tools.assessment_output import (
 from src.agents.drug_target.tools.stage1_normalization import (
     finalize_stage1_workspace,
 )
+from src.agents.drug_target.tools.stage2_service import extract_lr_pairs
 
 logger = logging.getLogger(__name__)
 
@@ -55,18 +56,17 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
             "drug_md": None,
         })
 
+    _prev_disable_rc = os.environ.get("DISABLE_RUN_COMPRESSION")
     try:
         # Lazy import to break circular dependency
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
 
         # Get provider from environment
         provider = os.getenv("LLM_PROVIDER", "openrouter")
-        if os.getenv("LANGSMITH_TRACING", "").lower() == "true" and not os.getenv(
-            "DISABLE_RUN_COMPRESSION"
-        ):
+        if os.getenv("LANGSMITH_TRACING", "").lower() == "true" and not _prev_disable_rc:
             os.environ["DISABLE_RUN_COMPRESSION"] = "true"
             logger.info(
-                "Enabled DISABLE_RUN_COMPRESSION for drug-target runtime while keeping LANGSMITH_TRACING=true"
+                "Temporarily set DISABLE_RUN_COMPRESSION for drug-target runtime"
             )
 
         config = DrugTargetConfig(
@@ -98,11 +98,33 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
             if backend and hasattr(backend, "cleanup"):
                 backend.cleanup()
 
+        # Determine pair_subset from stage3_candidates (Stage 2 selects FEATURED genes
+        # before Stage 1 runs, so Stage 1 only covers FEATURED pairs).
+        pair_subset = None
+        assessment_path = Path(resolved_dir) / "evidence" / "assessment_results.json"
+        if assessment_path.exists():
+            try:
+                assessment = json.loads(assessment_path.read_text())
+                stage3_genes = [c["gene"] for c in assessment.get("stage3_candidates", [])]
+                if stage3_genes:
+                    from src.agents.drug_target.tools.stage_logic import map_featured_genes_to_pairs
+                    lr_path = Path(resolved_dir) / "lr_candidates.json"
+                    lr_data = json.loads(lr_path.read_text())
+                    lr_pairs = extract_lr_pairs(lr_data)
+                    featured = map_featured_genes_to_pairs(stage3_genes, lr_pairs)
+                    pair_subset = [
+                        ((p.get("ligand") or "").upper(), (p.get("receptor") or "").upper())
+                        for p in featured
+                    ]
+            except Exception as exc:
+                logger.warning("Could not determine pair_subset for finalize: %s", exc)
+
         stage1_result = await asyncio.to_thread(
             finalize_stage1_workspace,
             resolved_dir,
             disease=disease,
             rerun_missing_census=True,
+            pair_subset=pair_subset,
         )
         target_assessment_validation = await asyncio.to_thread(
             validate_target_assessment_file, resolved_dir
@@ -164,6 +186,12 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
             "error": str(e),
             "drug_md": None,
         })
+    finally:
+        # Restore DISABLE_RUN_COMPRESSION to its original state
+        if _prev_disable_rc is None:
+            os.environ.pop("DISABLE_RUN_COMPRESSION", None)
+        else:
+            os.environ["DISABLE_RUN_COMPRESSION"] = _prev_disable_rc
 
 
 __all__ = ["run_drug_target_assessment"]

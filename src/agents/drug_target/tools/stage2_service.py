@@ -2,35 +2,18 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import logging
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
+import requests
+
+from src.agents.drug_target.tools._skill_loader import load_skill_module as _load_skill_module
+
 logger = logging.getLogger(__name__)
-
-_SKILLS_DIR = Path(__file__).resolve().parents[4] / "skills"
-_MODULE_CACHE: dict[tuple[str, str], Any] = {}
-
-
-def _load_skill_module(skill_name: str, script_name: str, module_name: str) -> Any:
-    cache_key = (skill_name, script_name)
-    if cache_key in _MODULE_CACHE:
-        return _MODULE_CACHE[cache_key]
-
-    script_path = _SKILLS_DIR / skill_name / "scripts" / script_name
-    if not script_path.exists():
-        raise FileNotFoundError(f"Skill script not found: {script_path}")
-
-    spec = importlib.util.spec_from_file_location(module_name, script_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Could not load module spec for {script_path}")
-
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    _MODULE_CACHE[cache_key] = mod
-    return mod
 
 
 def _try_load_ot_module() -> tuple[Any, str]:
@@ -72,11 +55,16 @@ def normalize_gene_symbols(gene_symbols: list[str] | tuple[str, ...] | str) -> l
     return sorted(normalized)
 
 
-def _extract_pairs(lr_data: dict[str, Any]) -> list[dict[str, Any]]:
+def extract_lr_pairs(lr_data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract L-R pairs from lr_candidates.json data using the canonical 4-key fallback chain."""
     return lr_data.get(
         "pairs",
         lr_data.get("lr_pairs", lr_data.get("candidates", lr_data.get("candidate_pairs", []))),
     )
+
+
+# Backward-compat alias
+_extract_pairs = extract_lr_pairs
 
 
 def load_stage2_inputs(data_dir: str | Path) -> dict[str, Any]:
@@ -87,7 +75,7 @@ def load_stage2_inputs(data_dir: str | Path) -> dict[str, Any]:
         raise FileNotFoundError(f"lr_candidates.json not found at {lr_path}")
 
     lr_data = json.loads(lr_path.read_text(encoding="utf-8"))
-    pairs = _extract_pairs(lr_data)
+    pairs = extract_lr_pairs(lr_data)
 
     genes: set[str] = set()
     for pair in pairs:
@@ -183,7 +171,9 @@ def _load_cached_stage2_bundle(
     expected_manifest = build_gene_manifest(genes, selected_top3_genes)
     if gene_manifest != expected_manifest:
         return None
-    if not isinstance(stage2_evidence, dict) or sorted(stage2_evidence) != genes:
+    # Compare only gene keys (skip metadata keys like _disease)
+    evidence_keys = sorted(k for k in stage2_evidence if not k.startswith("_"))
+    if not isinstance(stage2_evidence, dict) or evidence_keys != genes:
         return None
     if not isinstance(known_drugs, dict) or known_drugs.get("disease") != disease:
         return None
@@ -195,7 +185,11 @@ def _load_cached_stage2_bundle(
 
         ot_payload = payload.get("opentargets")
         gwas_payload = payload.get("gwas")
+        vep_payload = payload.get("vep")
         if not isinstance(ot_payload, dict) or not isinstance(gwas_payload, dict):
+            return None
+        # Require VEP data in cache (invalidate old caches without VEP)
+        if not isinstance(vep_payload, dict):
             return None
         if ot_payload.get("gene_symbol") != gene or gwas_payload.get("gene_symbol") != gene:
             return None
@@ -208,7 +202,7 @@ def _load_cached_stage2_bundle(
     return {
         "disease": disease,
         "gene_symbols": genes,
-        "stage2_evidence": stage2_evidence,
+        "stage2_evidence": {k: v for k, v in stage2_evidence.items() if not k.startswith("_")},
         "known_drugs": known_drugs,
         "gene_manifest": gene_manifest,
         "source_modes": {
@@ -323,11 +317,35 @@ def query_opentargets_target_data(
             )[:20]
             result["associations_truncated"] = True
         if len(result["disease_evidence"]) > 30:
-            result["disease_evidence"] = result["disease_evidence"][:30]
+            # Diversity-aware truncation: keep at least 1 entry per datatypeId
+            by_type: dict[str, list] = {}
+            for ev in result["disease_evidence"]:
+                by_type.setdefault(ev.get("datatypeId", "unknown"), []).append(ev)
+            kept: list[dict] = []
+            n_types = max(len(by_type), 1)
+            per_type_quota = max(1, 30 // n_types)
+            for _dt, entries in by_type.items():
+                entries.sort(key=lambda x: x.get("score", 0), reverse=True)
+                kept.extend(entries[:min(per_type_quota, len(entries))])
+            kept_ids = {id(e) for e in kept}
+            remaining = [e for e in result["disease_evidence"] if id(e) not in kept_ids]
+            remaining.sort(key=lambda x: x.get("score", 0), reverse=True)
+            kept.extend(remaining[: max(0, 30 - len(kept))])
+            result["disease_evidence"] = kept[:30]
             result["disease_evidence_truncated"] = True
 
         if disease_context.get("efo_id"):
             result["efo_id"] = disease_context["efo_id"]
+
+        # Target-level drugs (across all diseases) for druggability scoring
+        try:
+            if hasattr(mod, "get_drugs_for_target"):
+                result["target_drugs"] = mod.get_drugs_for_target(ensembl_id)
+            else:
+                result["target_drugs"] = {"count": 0, "rows": []}
+        except Exception as drug_exc:
+            result["target_drugs"] = {"count": 0, "rows": [], "error": str(drug_exc)}
+
         result["executed"] = True
     except Exception as exc:
         result["errors"].append(f"OpenTargets query failed: {exc}")
@@ -422,6 +440,89 @@ def _unavailable_gwas_result(
     }
 
 
+def _query_vep_for_gene(gwas_data: dict[str, Any]) -> dict[str, Any]:
+    """Extract rs IDs from GWAS gene_associations and query Ensembl VEP."""
+    from src.agents.drug_target.tools.stage_logic import classify_vep_consequence
+
+    result: dict[str, Any] = {
+        "executed": False, "variants": [], "impact_summary": {}, "errors": [],
+    }
+
+    rs_ids = [
+        assoc.get("rsId", "")
+        for assoc in gwas_data.get("gene_associations", [])
+        if assoc.get("rsId", "").startswith("rs")
+    ]
+    if not rs_ids:
+        result["errors"].append("No rs IDs found in gene_associations")
+        return result
+
+    rs_ids = rs_ids[:50]  # Ensembl batch limit
+
+    url = "https://rest.ensembl.org/vep/human/id"
+    headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    try:
+        resp = requests.post(
+            url, headers=headers,
+            data=json.dumps({"ids": rs_ids}), timeout=90,
+        )
+        resp.raise_for_status()
+        for row in resp.json():
+            consequence = row.get("most_severe_consequence", "")
+            result["variants"].append({
+                "input": row.get("input"),
+                "id": row.get("id"),
+                "most_severe_consequence": consequence,
+                "impact_class": classify_vep_consequence(consequence),
+            })
+        result["executed"] = True
+        impacts = Counter(v["impact_class"] for v in result["variants"])
+        result["impact_summary"] = dict(impacts)
+    except Exception as exc:
+        result["errors"].append(f"VEP query failed: {exc}")
+
+    return result
+
+
+def _proximity_match(
+    gene_assocs: list[dict],
+    trait_assocs: list[dict],
+    window: int = 500_000,
+) -> list[dict]:
+    """Find trait SNPs within ±window bp of any gene-associated locus."""
+    gene_regions: list[tuple[str, int]] = []
+    for ga in gene_assocs:
+        for loc in ga.get("locations", []):
+            chrom = loc.get("chromosome") or loc.get("chromosomeName")
+            pos = loc.get("position") or loc.get("chromosomePosition")
+            if chrom and pos:
+                gene_regions.append((str(chrom), int(pos)))
+    if not gene_regions:
+        return []
+
+    nearby: list[dict] = []
+    seen: set[str] = set()
+    for ta in trait_assocs:
+        rsid = ta.get("rsId", "")
+        if rsid in seen:
+            continue
+        # Parse chr:pos format (e.g., "chr11:1219991")
+        if ":" in rsid:
+            raw = rsid.replace("chr", "")
+            parts = raw.split(":")
+            if len(parts) == 2:
+                try:
+                    t_chrom, t_pos = parts[0], int(parts[1])
+                    for g_chrom, g_pos in gene_regions:
+                        if str(t_chrom) == str(g_chrom) and abs(t_pos - g_pos) <= window:
+                            nearby.append(ta)
+                            seen.add(rsid)
+                            break
+                except (ValueError, TypeError):
+                    pass
+    return nearby
+
+
 def query_gwas_gene_trait_data(
     gene_symbol: str,
     disease: str,
@@ -467,11 +568,14 @@ def query_gwas_gene_trait_data(
             gene_snps_in_disease = [
                 assoc for assoc in gene_assocs if assoc.get("rsId") in trait_rsids
             ]
+            proximity_hits = _proximity_match(gene_assocs, trait_assocs)
             result["disease_specific_hits"] = {
                 "gene_in_trait_associations": gene_in_trait,
                 "gene_snps_in_disease": gene_snps_in_disease,
+                "proximity_hits": proximity_hits,
                 "n_gene_in_trait": len(gene_in_trait),
                 "n_gene_snps_in_disease": len(gene_snps_in_disease),
+                "n_proximity_hits": len(proximity_hits),
             }
             result["executed"] = True
 
@@ -527,9 +631,24 @@ def build_stage2_gene_panel(
     except Exception as exc:
         gwas_error = f"GWAS setup failed: {exc}"
 
-    stage2_evidence: dict[str, dict[str, Any]] = {}
-    for gene in genes:
-        stage2_evidence[gene] = {
+    def _query_single_gene(gene: str) -> tuple[str, dict[str, Any]]:
+        """Query OT + GWAS + VEP for a single gene (thread-safe)."""
+        gwas_data = (
+            query_gwas_gene_trait_data(
+                gene,
+                disease,
+                mod=gwas_mod,
+                disease_context=gwas_disease_context,
+            )
+            if gwas_error is None
+            else _unavailable_gwas_result(gene, disease, gwas_error)
+        )
+        try:
+            vep_data = _query_vep_for_gene(gwas_data)
+        except Exception as vep_exc:
+            logger.warning("VEP query failed for %s: %s", gene, vep_exc)
+            vep_data = {"source": "ensembl_vep", "error": str(vep_exc), "variants": []}
+        return gene, {
             "opentargets": (
                 query_opentargets_target_data(
                     gene,
@@ -540,17 +659,28 @@ def build_stage2_gene_panel(
                 if ot_error is None
                 else _unavailable_opentargets_result(gene, disease, ot_error)
             ),
-            "gwas": (
-                query_gwas_gene_trait_data(
-                    gene,
-                    disease,
-                    mod=gwas_mod,
-                    disease_context=gwas_disease_context,
-                )
-                if gwas_error is None
-                else _unavailable_gwas_result(gene, disease, gwas_error)
-            ),
+            "gwas": gwas_data,
+            "vep": vep_data,
         }
+
+    _MAX_CONCURRENT_GENES = 5
+    stage2_evidence: dict[str, dict[str, Any]] = {}
+    with ThreadPoolExecutor(max_workers=_MAX_CONCURRENT_GENES) as executor:
+        futures = {executor.submit(_query_single_gene, gene): gene for gene in genes}
+        for future in as_completed(futures):
+            gene = futures[future]
+            try:
+                _, result = future.result()
+                stage2_evidence[gene] = result
+            except Exception as exc:
+                logger.warning("Stage2 query failed for %s: %s", gene, exc)
+                stage2_evidence[gene] = {
+                    "opentargets": _unavailable_opentargets_result(
+                        gene, disease, f"Thread error: {exc}"
+                    ),
+                    "gwas": _unavailable_gwas_result(gene, disease, f"Thread error: {exc}"),
+                    "vep": {"source": "ensembl_vep", "error": str(exc), "variants": []},
+                }
 
     return {
         "disease": disease,
@@ -635,7 +765,10 @@ def write_stage2_artifacts(result_bundle: dict[str, Any], evidence_dir: str | Pa
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         written_paths.append(path)
 
-    _write_json(out_dir / "stage2_evidence.json", stage2_evidence)
+    # Include disease metadata for downstream scoring
+    stage2_with_meta = dict(stage2_evidence)
+    stage2_with_meta["_disease"] = result_bundle.get("disease", "unknown")
+    _write_json(out_dir / "stage2_evidence.json", stage2_with_meta)
     _write_json(out_dir / "known_drugs.json", result_bundle.get("known_drugs", {}))
     _write_json(out_dir / "gene_manifest.json", result_bundle.get("gene_manifest", []))
 

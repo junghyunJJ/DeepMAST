@@ -177,7 +177,20 @@ def _build_target_disease_records(
     if len(disease_df) == 0:
         return []
 
-    disease_df = disease_df.sort_values("score", ascending=False).head(100)
+    # Diversity-aware sampling: ensure each datatypeId is represented
+    if "datatypeId" in disease_df.columns and disease_df["datatypeId"].nunique() > 1:
+        per_type = (
+            disease_df.groupby("datatypeId", group_keys=False)
+            .apply(lambda g: g.nlargest(min(5, len(g)), "score"))
+        )
+        remaining_idx = disease_df.index.difference(per_type.index)
+        filler = disease_df.loc[remaining_idx].nlargest(
+            max(0, 100 - len(per_type)), "score"
+        )
+        disease_df = pd.concat([per_type, filler])
+        disease_df = disease_df[~disease_df.index.duplicated(keep="first")].head(100)
+    else:
+        disease_df = disease_df.sort_values("score", ascending=False).head(100)
     records = []
     for _, row in disease_df.iterrows():
         rec = {
@@ -470,6 +483,64 @@ def get_known_drugs_for_disease(efo_id: str) -> Dict[str, Any]:
     except Exception as exc:
         logger.error("Known drugs parquet read failed: %s", exc)
         return {"uniqueDrugs": 0, "uniqueTargets": 0, "rows": []}
+
+
+def get_drugs_for_target(ensembl_id: str) -> Dict[str, Any]:
+    """Get drugs targeting a specific gene across all diseases from evidence parquet.
+
+    Mirrors the API's target.drugAndClinicalCandidates structure.
+    Filters evidence where targetId matches and drugId is not null,
+    groups by drugId, and collects associated diseases per drug.
+    """
+    try:
+        ev = _get_target_evidence_df(ensembl_id)
+        if "drugId" not in ev.columns:
+            return {"count": 0, "rows": []}
+
+        drug_ev = ev[ev["drugId"].notna()].copy()
+        if len(drug_ev) == 0:
+            return {"count": 0, "rows": []}
+
+        disease_ids = drug_ev["diseaseId"].dropna().unique().tolist()
+        disease_names = _disease_id_to_name(disease_ids)
+
+        rows = []
+        for drug_id, grp in drug_ev.groupby("drugId"):
+            if pd.isna(drug_id):
+                continue
+
+            max_phase = None
+            if "clinicalPhase" in grp.columns:
+                phases = grp["clinicalPhase"].dropna()
+                if len(phases) > 0:
+                    max_phase = int(phases.max())
+
+            diseases = []
+            seen: set = set()
+            for _, r in grp.iterrows():
+                did = r.get("diseaseId")
+                if pd.notna(did) and did not in seen:
+                    seen.add(did)
+                    diseases.append({
+                        "diseaseFromSource": disease_names.get(did, did),
+                        "disease": {"id": did, "name": disease_names.get(did, did)},
+                    })
+
+            rows.append({
+                "maxClinicalStage": max_phase,
+                "drug": {
+                    "id": str(drug_id),
+                    "name": str(drug_id),  # Parquet has no drug names
+                    "maximumClinicalStage": max_phase,
+                    "drugType": None,
+                },
+                "diseases": diseases,
+            })
+
+        return {"count": len(rows), "rows": rows}
+    except Exception as exc:
+        logger.error("get_drugs_for_target parquet read failed: %s", exc)
+        return {"count": 0, "rows": []}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────

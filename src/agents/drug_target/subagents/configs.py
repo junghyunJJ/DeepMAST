@@ -15,27 +15,34 @@ from langchain_core.tools import BaseTool
 
 from src.agents.deep_interpreter.middleware.write_file_guard import WriteFileArgGuardMiddleware
 from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
+from src.agents.deep_interpreter.tools.literature import search_literature_dynamic
 from src.agents.drug_target.tools import (
     # Evidence I/O tools
     load_lr_candidates,
     save_evidence,
     load_evidence_files,
     validate_evidence_completeness,
-    # Stage-specific domain tools
+    # Stage 2: Target Validation (runs FIRST)
+    query_stage2_gene_panel,
+    query_ensembl_vep_consequence,
+    compute_rubric_scores,
+    # Stage 1: Biological Context (FEATURED pairs only)
     query_cellxgene_lr_context,
     list_census_diseases,
     query_kegg_pathways,
     query_reactome_pathways,
     query_string_ppi_pair,
-    query_ensembl_vep_consequence,
-    query_stage2_gene_panel,
-    query_chembl_target_profile,
-    query_pubmed_clinical_limitations,
     run_compare_census_lr_pair,
+    run_batch_census_lr_pairs,
     finalize_stage1_artifacts,
-    compute_rubric_scores,
+    validate_stage1_gate,
+    # Stage 3: Deep Dive
+    query_chembl_target_profile,
     read_skill_file,
-    # Assessment tools
+    # Report: Reference Card + Validation
+    build_evidence_summary,
+    validate_drug_md,
+    # Assessment output
     save_target_assessment,
     save_drug_md,
     # Common tools
@@ -59,14 +66,11 @@ SUBAGENT_CONFIGS = {
     "evidence_assessor": {
         "name": "evidence_assessor",
         "description": (
-            "3-stage funnel with Stage 1 confidence filtering: biological context -> "
-            "confidence filtering -> validation & scoring -> "
-            "deep dive. Includes inline rubric assessment. "
-            "Loads lr_candidates.json (top-30 L-R pairs), then systematically "
-            "queries databases via @tool wrappers (OpenTargets, GWAS, Cellxgene, "
-            "KEGG/Reactome, STRING, VEP, ChEMBL, PubMed, "
-            "Census cross-validation). Applies DRUG_TARGET_RUBRIC scoring to select "
-            "Featured Candidates after Stage 2. "
+            "Reordered 3-stage funnel: Stage 2 first (all genes: OpenTargets/GWAS) -> "
+            "rubric scoring (combined_total >= 10) -> gene selection -> "
+            "Stage 1 (FEATURED pairs only: Cellxgene, KEGG/Reactome, STRING, Census) -> "
+            "Stage 1 gate validation -> Stage 3 (FEATURED genes: ChEMBL, PubMed). "
+            "Includes inline rubric assessment via compute_rubric_scores. "
             "Uses Plan->Execute->Reflect cycle per stage."
         ),
         "system_prompt": SUBAGENT_PROMPTS["evidence_assessor"],
@@ -77,20 +81,22 @@ SUBAGENT_CONFIGS = {
             load_evidence_files,
             # Phase 0: Disease vocabulary matching
             list_census_diseases,
-            # Stage 1: Biological Context
+            # Stage 2: Target Validation (runs FIRST — batch all genes)
+            query_stage2_gene_panel,
+            query_ensembl_vep_consequence,
+            compute_rubric_scores,
+            # Stage 1: Biological Context (FEATURED pairs only, after gene selection)
             query_cellxgene_lr_context,
             query_kegg_pathways,
             query_reactome_pathways,
             query_string_ppi_pair,
             run_compare_census_lr_pair,
+            run_batch_census_lr_pairs,
             finalize_stage1_artifacts,
-            # Stage 2: Target Validation (batch only — individual tools removed to prevent token bloat)
-            query_stage2_gene_panel,
-            query_ensembl_vep_consequence,
-            compute_rubric_scores,
-            # Stage 3: Deep Dive
+            validate_stage1_gate,
+            # Stage 3: Deep Dive (FEATURED genes only)
             query_chembl_target_profile,
-            query_pubmed_clinical_limitations,
+            search_literature_dynamic,
             read_skill_file,
             # Cognitive
             sequential_thinking,
@@ -114,6 +120,8 @@ SUBAGENT_CONFIGS = {
             load_lr_candidates,
             load_evidence_files,
             validate_evidence_completeness,
+            build_evidence_summary,
+            validate_drug_md,
             save_target_assessment,
             save_drug_md,
             sequential_thinking,
@@ -131,17 +139,18 @@ SUBAGENT_CONFIGS = {
 WORKFLOW_ORDER = ["evidence_assessor", "report_writer"]
 
 WORKFLOW_DESCRIPTION = """
-Drug Target Assessment 2-Agent Workflow (3-Stage Funnel):
+Drug Target Assessment 2-Agent Workflow (Reordered 3-Stage Funnel):
 
 1. EVIDENCE_ASSESSOR (Plan->Execute->Reflect per stage)
-   Stage 1 (ALL L-R pairs): Cellxgene + KEGG/Reactome + STRING + Census cross-validation
-   Stage 1 Filtering: confidence score >= 0.4 (graduated relaxation if < 5 pass)
-   Stage 2 (ALL unique genes): batch OpenTargets + batch GWAS + VEP (conditional)
-     -> Inline DRUG_TARGET_RUBRIC scoring after Stage 2
-     -> RUBRIC combined_total based featured selection (top 3-5)
-   Stage 3 (FEATURED only): ChEMBL + PubMed clinical limitations (conditional)
+   Stage 2 FIRST (ALL unique genes): batch OpenTargets + batch GWAS + VEP (conditional)
+     -> Inline DRUG_TARGET_RUBRIC scoring (compute_rubric_scores)
+     -> Top 7 by exploratory_total → FEATURED gene selection
+     -> Gene→Pair mapping to identify FEATURED L-R pairs
+   Stage 1 (FEATURED pairs ONLY): Cellxgene + KEGG/Reactome + STRING + Census
+     -> Stage 1 gate validation (validate_stage1_gate)
+   Stage 3 (FEATURED genes only): ChEMBL + PubMed clinical limitations (conditional)
    Outputs: evidence/*.json (per stage, per L-R pair/gene)
-            assessment_results.json, gwas_interpretation.json, clinical_landscape.json
+            assessment_results.json, rubric_scores.csv
 
 2. REPORT_WRITER (Plan->Execute->Reflect)
    - Generates target_assessment.json (structured contract)
@@ -163,9 +172,9 @@ def get_subagents(
     data_dir: str | None = None,
     disease: str | None = None,
     model_overrides: dict[str, BaseChatModel | str] | None = None,
+    enable_census: bool = True,
     skills_sources: list[str] | None = None,
     skill_registry: dict[str, str] | None = None,
-    stage_hints: dict[str, str] | None = None,
 ) -> list[dict]:
     """Get the subagent configurations for Drug Target Assessment.
 
@@ -182,7 +191,6 @@ def get_subagents(
             (e.g. "openai:gpt-4.1") or BaseChatModel instances.
         skills_sources: Native skill discovery paths for evidence_assessor.
         skill_registry: Skill name → directory path mapping for SkillLoadHarness.
-        stage_hints: Skill name → usage hint mapping for SkillLoadHarness.
 
     Returns:
         List of subagent configuration dictionaries
@@ -191,6 +199,31 @@ def get_subagents(
         {**SUBAGENT_CONFIGS["evidence_assessor"], "tools": list(SUBAGENT_CONFIGS["evidence_assessor"]["tools"])},
         {**SUBAGENT_CONFIGS["report_writer"], "tools": list(SUBAGENT_CONFIGS["report_writer"]["tools"])},
     ]
+
+    # Remove Census tools when disabled (too slow for some providers)
+    if not enable_census:
+        _census_tool_names = {
+            "query_cellxgene_lr_context",
+            "list_census_diseases",
+            "run_compare_census_lr_pair",
+            "run_batch_census_lr_pairs",
+        }
+        for subagent in subagents:
+            if subagent["name"] == "evidence_assessor":
+                subagent["tools"] = [
+                    t for t in subagent["tools"]
+                    if getattr(t, "name", None) not in _census_tool_names
+                ]
+                subagent["system_prompt"] += (
+                    "\n\n## Census API: DISABLED\n"
+                    "Census tools (`query_cellxgene_lr_context`, `list_census_diseases`, "
+                    "`run_compare_census_lr_pair`, `run_batch_census_lr_pairs`) are NOT available in this run.\n"
+                    "- In Stage 1 Batch 1: call ONLY query_kegg_pathways, "
+                    "query_reactome_pathways, query_string_ppi_pair.\n"
+                    "- Skip steps (a) and (d) entirely.\n"
+                    "- Skip Batch 2 (Census cross-validation).\n"
+                    "- In finalize_stage1_artifacts, set `rerun_missing_census=false`.\n"
+                )
 
     # Apply per-subagent model overrides
     if model_overrides:
@@ -239,7 +272,6 @@ def get_subagents(
                     mw = list(subagent.get("middleware", []))
                     mw.append(SkillLoadHarness(
                         skill_registry=skill_registry,
-                        stage_hints=stage_hints or {},
                     ))
                     subagent["middleware"] = mw
 

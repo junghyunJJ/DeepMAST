@@ -30,7 +30,6 @@ from langgraph.checkpoint.memory import MemorySaver
 from src.agents.model import create_llm, load_subagent_models_from_env
 from src.agents.deep_interpreter.middleware.write_file_guard import WriteFileArgGuardMiddleware
 from deepagents.backends import FilesystemBackend
-from src.agents.shared.skill_load_harness import SkillLoadHarness
 from src.agents.drug_target.subagents.configs import get_subagents
 from src.agents.drug_target.tools import (
     load_evidence_files,
@@ -68,10 +67,11 @@ structured data. Do NOT use `ls` or `read_file` to check the directory.
 ## Workflow
 Execute subagents strictly in this order via the `task` tool:
 
-1. **evidence_assessor**: Pass the load_lr_candidates output. Runs the 3-stage funnel:
-   - Stage 1 (ALL pairs): Biological context (Cellxgene, KEGG/Reactome, STRING, Census)
-   - Stage 2 (ALL unique genes): batch validation & scoring (OpenTargets, GWAS, VEP) + inline rubric
-   - Stage 3 (FEATURED only): Deep dive (ChEMBL, PubMed)
+1. **evidence_assessor**: Pass the load_lr_candidates output. Runs the reordered 3-stage funnel:
+   - Stage 2 (ALL unique genes): batch validation & scoring (OpenTargets, GWAS, VEP) + rubric scoring
+   - Gene selection: combined_total >= 10 → FEATURED genes → map to L-R pairs
+   - Stage 1 (FEATURED pairs only): Biological context (Cellxgene, KEGG/Reactome, STRING, Census)
+   - Stage 3 (FEATURED genes only): Deep dive (ChEMBL, PubMed)
 2. **report_writer**: Generates drug.md with [FEATURED] Candidate emphasis.
    The report_writer MUST first save target_assessment.json via
    `save_target_assessment`, then call `save_drug_md` to save drug.md.
@@ -137,6 +137,7 @@ class DrugTargetConfig:
     use_checkpointer: bool = False
     custom_tools: Sequence[BaseTool] = field(default_factory=list)
     docker_image: str | None = None
+    enable_census: bool = True
     enable_progressive_disclosure: bool = True
     agent_skill_names: tuple[str, ...] = (
         "opentargets-database",
@@ -146,11 +147,6 @@ class DrugTargetConfig:
         # string-database: REMOVED — tool-only, accessed via query_string_ppi_pair
     )
     skills_dir: str | None = None
-    stage_hints: dict[str, str] = field(
-        default_factory=lambda: {
-            "chembl-database": "Stage 3 only",
-        }
-    )
     subagent_models: dict[str, str] | None = None
     # init_chat_model format per subagent, e.g.:
     # {"evidence_assessor": "openai:gpt-4.1", "report_writer": "openai:gpt-4.1-mini"}
@@ -275,14 +271,10 @@ def create_drug_target_agent(
         data_dir=resolved_data_dir,
         disease=config.disease,
         model_overrides=config.subagent_models,
+        enable_census=config.enable_census,
         skills_sources=skills_sources,
         skill_registry=(
             _build_skill_registry(config)
-            if config.enable_progressive_disclosure
-            else None
-        ),
-        stage_hints=(
-            config.stage_hints
             if config.enable_progressive_disclosure
             else None
         ),
@@ -314,21 +306,7 @@ def create_drug_target_agent(
     return agent, backend
 
 
-def create_drug_target_graph() -> Runnable:
-    """Create Drug Target graph for LangGraph deployment.
-
-    Returns:
-        Compiled Deep Agent graph.
-    """
-    agent, backend = create_drug_target_agent(DrugTargetConfig())
-    if backend and hasattr(backend, "cleanup"):
-        import atexit
-        atexit.register(backend.cleanup)
-    return agent
-
-
 __all__ = [
     "create_drug_target_agent",
-    "create_drug_target_graph",
     "DrugTargetConfig",
 ]
