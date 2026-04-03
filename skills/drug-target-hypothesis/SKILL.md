@@ -1,6 +1,6 @@
 ---
 name: drug-target-hypothesis
-description: Generate biological mechanism hypotheses from drug target assessment evidence. Use when you have completed Stage 1-3 evidence collection and rubric scoring and need to formulate testable mechanistic hypotheses about drug targets, therapeutic strategies, cross-target interactions, and novel pathways. Data-driven — focuses on evidence insights not literature search. For general scientific hypothesis generation use hypothesis-generation; for automated LLM-driven hypothesis testing on datasets use hypogenic.
+description: Generate biological mechanism hypotheses from drug target assessment evidence. Use when you have completed Stage 1-3 evidence collection and rubric scoring and need to formulate testable mechanistic hypotheses about drug targets, therapeutic strategies, cross-target interactions, and novel pathways. Data-driven — focuses on evidence insights not literature search. For general scientific hypothesis generation use hypothesis-generation; for automated LLM-driven hypothesis testing on datasets use hypogenic. For iterative quality improvement of generated hypotheses use evolution-reasoning.
 metadata:
     skill-author: K-Dense Inc.
 ---
@@ -221,6 +221,26 @@ Score = 0.30 × Evidence_Coverage + 0.30 × Specificity + 0.20 × Novelty + 0.20
 
 ---
 
+### Phase 4.5: Evolutionary Refinement (Conditional)
+
+**Trigger conditions** — apply this phase if ANY of the following are true:
+- Best composite score < 0.7
+- Fewer than 3 hypotheses survived Phase 4 filtering
+- An entire thematic category was eliminated after the balance check
+
+If triggered, use the `evolution-reasoning` skill:
+1. Call `read_skill_file(skill_path="skills/evolution-reasoning")` to load the refinement protocol
+2. Pass surviving hypotheses as items with their UCB scores as dimensions:
+   - dimensions: `{Evidence_Coverage: 0.30, Specificity: 0.30, Novelty: 0.20, Actionability: 0.20}`
+   - threshold: 0.7
+   - generation_limit: 2
+3. Follow the skill's 4-phase protocol (Initialize, Critique & Score, Select & Mutate, Termination)
+4. Replace Phase 4 output with the refined hypotheses
+
+If NOT triggered (best composite >= 0.7 AND >= 3 hypotheses AND all categories represented), skip directly to Phase 5.
+
+---
+
 ### Phase 5: Markdown Report Output
 
 Generate the hypothesis report using the template from `assets/hypothesis_report_template.md`.
@@ -275,4 +295,5 @@ Every generated report must meet these standards:
 - `hypothesis-generation` — General scientific hypothesis generation with LaTeX PDF output and 8-step manual workflow
 - `hypogenic` — Automated LLM-driven hypothesis generation and testing on tabular datasets (HypoGeniC/HypoRefine)
 - `pubmed-eutils-search` — PubMed literature search (can supplement hypotheses with additional literature if needed)
+- `evolution-reasoning` — Iterative quality improvement via evolutionary critique-and-refine cycles. Use after UCB scoring when hypothesis quality is below threshold.
 - `html-report-generator` — Can integrate hypothesis report as a tab in the HTML drug target report

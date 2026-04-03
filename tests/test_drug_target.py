@@ -144,7 +144,7 @@ class TestSubagentConfigs:
     def test_evidence_assessor_has_minimum_tools(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         tools = SUBAGENT_CONFIGS["evidence_assessor"]["tools"]
-        assert len(tools) >= 15
+        assert len(tools) >= 12  # Stage 3 tools moved to deep_diver
 
     def test_report_writer_has_minimum_tools(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -168,7 +168,6 @@ class TestSubagentConfigs:
             "query_string_ppi_pair",
             "query_stage2_gene_panel",
             "query_ensembl_vep_consequence",
-            "query_chembl_target_profile",
             "run_compare_census_lr_pair",
             "run_batch_census_lr_pairs",
             "read_skill_file",
@@ -176,21 +175,25 @@ class TestSubagentConfigs:
             "validate_quality",
         }
         assert expected.issubset(names)
+        # Stage 3 tools must NOT be in evidence_assessor
+        assert "query_chembl_target_profile" not in names
+        assert "search_literature_dynamic" not in names
+        assert "validate_stage3_gate" not in names
 
     def test_workflow_order(self):
         from src.agents.drug_target.subagents.configs import WORKFLOW_ORDER
-        assert WORKFLOW_ORDER == ["evidence_assessor", "report_writer"]
+        assert WORKFLOW_ORDER == ["evidence_assessor", "deep_diver", "hypothesis_writer", "report_writer"]
 
-    def test_get_subagents_returns_2(self):
+    def test_get_subagents_returns_4(self):
         from src.agents.drug_target.subagents.configs import get_subagents
         subagents = get_subagents()
-        assert len(subagents) == 2
+        assert len(subagents) == 4
 
     def test_get_subagents_order(self):
         from src.agents.drug_target.subagents.configs import get_subagents
         subagents = get_subagents()
         names = [s["name"] for s in subagents]
-        assert names == ["evidence_assessor", "report_writer"]
+        assert names == ["evidence_assessor", "deep_diver", "hypothesis_writer", "report_writer"]
 
     def test_custom_tools_appended_to_all_subagents(self):
         from src.agents.drug_target.subagents.configs import get_subagents
@@ -204,25 +207,29 @@ class TestSubagentConfigs:
     def test_evidence_assessor_prompt_mentions_databases_and_rubric(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         prompt = SUBAGENT_CONFIGS["evidence_assessor"]["system_prompt"]
-        # Database references
-        for keyword in ("OpenTargets", "GWAS", "ChEMBL"):
+        # Database references (ChEMBL moved to deep_diver)
+        for keyword in ("OpenTargets", "GWAS"):
             assert keyword in prompt
         # Rubric references (merged from clinical_assessor)
         assert "rubric" in prompt.lower() or "RUBRIC" in prompt
         assert "validated" in prompt.lower()
         assert "exploratory" in prompt.lower()
 
-    def test_evidence_assessor_prompt_mentions_3_stages(self):
+    def test_evidence_assessor_prompt_mentions_2_stages(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         prompt = SUBAGENT_CONFIGS["evidence_assessor"]["system_prompt"]
         assert "Stage 1" in prompt
         assert "Stage 2" in prompt
-        assert "Stage 3" in prompt
+        assert "2-Stage Funnel" in prompt
 
-    def test_workflow_description_uses_all_unique_genes_for_stage2(self):
+    def test_workflow_description_mentions_4_agents(self):
         from src.agents.drug_target.subagents.configs import WORKFLOW_DESCRIPTION
 
-        assert "ALL unique genes" in WORKFLOW_DESCRIPTION
+        assert "4-Agent Workflow" in WORKFLOW_DESCRIPTION
+        assert "EVIDENCE_ASSESSOR" in WORKFLOW_DESCRIPTION
+        assert "DEEP_DIVER" in WORKFLOW_DESCRIPTION
+        assert "HYPOTHESIS_WRITER" in WORKFLOW_DESCRIPTION
+        assert "REPORT_WRITER" in WORKFLOW_DESCRIPTION
 
     def test_evidence_assessor_prompt_mentions_census_and_gwas(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -236,6 +243,66 @@ class TestSubagentConfigs:
         assert "Featured Candidate" in prompt
         assert "drug.md" in prompt
 
+    def test_deep_diver_has_stage3_tools(self):
+        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
+        tools = SUBAGENT_CONFIGS["deep_diver"]["tools"]
+        names = {t.name for t in tools}
+        assert "query_chembl_target_profile" in names
+        assert "search_literature_dynamic" in names
+        assert "validate_stage3_gate" in names
+        assert "save_evidence" in names
+        assert "load_evidence_files" in names
+        assert "read_skill_file" in names
+
+    def test_deep_diver_prompt_contains_stage3(self):
+        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
+        prompt = SUBAGENT_CONFIGS["deep_diver"]["system_prompt"]
+        assert "Stage 3" in prompt
+        assert "ChEMBL" in prompt
+        assert "validate_stage3_gate" in prompt
+        assert "Plan" in prompt and "Execute" in prompt and "Reflect" in prompt
+
+    def test_hypothesis_writer_has_evidence_tools(self):
+        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
+        tools = SUBAGENT_CONFIGS["hypothesis_writer"]["tools"]
+        names = {t.name for t in tools}
+        assert "load_evidence_files" in names
+        assert "read_skill_file" in names
+        assert "save_evidence" in names
+        assert "think_tool" in names
+        assert "sequential_thinking" in names
+
+    def test_hypothesis_writer_has_no_db_tools(self):
+        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
+        tools = SUBAGENT_CONFIGS["hypothesis_writer"]["tools"]
+        names = {t.name for t in tools}
+        # No database query tools
+        db_tools = {
+            "query_chembl_target_profile",
+            "search_literature_dynamic",
+            "query_stage2_gene_panel",
+            "query_cellxgene_lr_context",
+            "query_kegg_pathways",
+            "query_reactome_pathways",
+            "query_string_ppi_pair",
+        }
+        assert names.isdisjoint(db_tools)
+
+    def test_hypothesis_writer_prompt_contains_ucb(self):
+        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
+        prompt = SUBAGENT_CONFIGS["hypothesis_writer"]["system_prompt"]
+        assert "UCB" in prompt
+        assert "hypothesis" in prompt.lower()
+        assert "hypothesis_report.json" in prompt
+        assert "Evidence_Coverage" in prompt
+        assert "Specificity" in prompt
+
+    def test_subagent_prompts_registry_has_4_entries(self):
+        from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
+        assert len(SUBAGENT_PROMPTS) == 4
+        assert set(SUBAGENT_PROMPTS.keys()) == {
+            "evidence_assessor", "deep_diver", "hypothesis_writer", "report_writer",
+        }
 
 
 # =========================================================================
@@ -425,7 +492,7 @@ class TestEvidenceLoader:
         assert "test_gene.json" in result2["files"]
         assert "gene" in result2["files"]["test_gene.json"]["top_keys"]
 
-    def test_save_evidence_non_json_saved_as_raw(self, tmp_path):
+    def test_save_evidence_non_json_rejected(self, tmp_path):
         from src.agents.drug_target.tools.evidence_loader import save_evidence
         raw = save_evidence.invoke({
             "data_dir": str(tmp_path),
@@ -433,9 +500,8 @@ class TestEvidenceLoader:
             "data": "This is not valid JSON",
         })
         result = json.loads(raw)
-        assert result["saved"] is True
-        content = (tmp_path / "evidence" / "notes.json").read_text()
-        assert content == "This is not valid JSON"
+        assert result["saved"] is False
+        assert any("not valid JSON" in e for e in result["errors"])
 
 
 # =========================================================================
@@ -2362,7 +2428,8 @@ class TestIntegration:
         # create_drug_target_agent returns (agent, backend_or_None)
         from deepagents.backends import FilesystemBackend
         agent, backend = result
-        assert agent is mock_agent
+        # Agent is now wrapped with .with_config(recursion_limit=2000)
+        assert agent is mock_agent.with_config.return_value
         assert isinstance(backend, FilesystemBackend)
         mock_create_llm.assert_called_once_with(provider="openrouter")
         mock_create_deep_agent.assert_called_once()
@@ -2444,7 +2511,7 @@ class TestIntegration:
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
-    def test_create_agent_passes_subagents_with_2_entries(
+    def test_create_agent_passes_subagents_with_4_entries(
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
@@ -2457,7 +2524,7 @@ class TestIntegration:
 
         call_kwargs = mock_create_deep_agent.call_args
         subagents = call_kwargs.kwargs.get("subagents") or call_kwargs[1].get("subagents")
-        assert len(subagents) == 2
+        assert len(subagents) == 4
 
     def test_shared_skills_middleware_filters_allowed_skill_names(self, tmp_path):
         import asyncio
@@ -2492,7 +2559,6 @@ class TestIntegration:
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
-        from src.agents.shared.skill_load_harness import SkillLoadHarness
 
         mock_create_llm.return_value = MagicMock()
         mock_create_deep_agent.return_value = MagicMock()
@@ -2501,17 +2567,17 @@ class TestIntegration:
         create_drug_target_agent(config)
 
         call_kwargs = mock_create_deep_agent.call_args.kwargs
-        # Orchestrator middleware has only WriteFileArgGuardMiddleware (no skills)
+        # Orchestrator middleware: WriteFileArgGuard + ReadFileBlock + SubagentErrorGuard
         middleware = call_kwargs.get("middleware", [])
-        assert len(middleware) == 1
-        assert type(middleware[0]).__name__ == "WriteFileArgGuardMiddleware"
-        # evidence_assessor subagent has skills and SkillLoadHarness
+        assert len(middleware) == 3
+        mw_names = [type(m).__name__ for m in middleware]
+        assert "WriteFileArgGuardMiddleware" in mw_names
+        assert "ReadFileBlockMiddleware" in mw_names
+        assert "SubagentErrorGuardMiddleware" in mw_names
+        # evidence_assessor subagent has skills attached
         subagents = call_kwargs.get("subagents", [])
         ea = next(s for s in subagents if s["name"] == "evidence_assessor")
         assert "skills" in ea
-        ea_mw = ea.get("middleware", [])
-        harness_mw = [m for m in ea_mw if isinstance(m, SkillLoadHarness)]
-        assert len(harness_mw) == 1
         # report_writer has NO skills
         rw = next(s for s in subagents if s["name"] == "report_writer")
         assert "skills" not in rw
@@ -2534,10 +2600,13 @@ class TestIntegration:
         create_drug_target_agent(config)
 
         call_kwargs = mock_create_deep_agent.call_args.kwargs
-        # Orchestrator still has WriteFileArgGuardMiddleware
+        # Orchestrator still has all 3 guard middlewares
         middleware = call_kwargs.get("middleware", [])
-        assert len(middleware) == 1
-        assert type(middleware[0]).__name__ == "WriteFileArgGuardMiddleware"
+        assert len(middleware) == 3
+        mw_names = [type(m).__name__ for m in middleware]
+        assert "WriteFileArgGuardMiddleware" in mw_names
+        assert "ReadFileBlockMiddleware" in mw_names
+        assert "SubagentErrorGuardMiddleware" in mw_names
         # No skills on any subagent
         subagents = call_kwargs.get("subagents", [])
         for s in subagents:
@@ -2703,13 +2772,15 @@ class TestCensusDiseaseTool:
 
     def test_evidence_assessor_prompt_mentions_selected_skill_reads(self):
         """Prompt contains stage-specific progressive disclosure guidance."""
-        from src.agents.drug_target.subagents.prompts import EVIDENCE_ASSESSOR_PROMPT
+        from src.agents.drug_target.subagents.prompts import EVIDENCE_ASSESSOR_PROMPT, DEEP_DIVER_PROMPT
 
         assert "read_skill_file" in EVIDENCE_ASSESSOR_PROMPT
         assert "query_stage2_gene_panel" in EVIDENCE_ASSESSOR_PROMPT
         assert "opentargets-database" in EVIDENCE_ASSESSOR_PROMPT
         assert "gwas-database" in EVIDENCE_ASSESSOR_PROMPT
-        assert "chembl-database" in EVIDENCE_ASSESSOR_PROMPT
+        # chembl-database moved to deep_diver prompt
+        assert "chembl-database" not in EVIDENCE_ASSESSOR_PROMPT
+        assert "chembl-database" in DEEP_DIVER_PROMPT
         assert "cellxgene-census" not in EVIDENCE_ASSESSOR_PROMPT
 
     def test_read_skill_file_reads_project_relative_skill_doc(self, tmp_path):
@@ -2903,26 +2974,20 @@ class TestSkillLoadingEndToEnd:
             assert skill_md.exists(), f"Missing SKILL.md for {name} at {skill_md}"
 
     def test_harness_formats_all_skills_with_descriptions(self):
-        """SkillLoadHarness formats all 5 skills with real descriptions and hints."""
+        """SkillLoadHarness formats all 5 skills with real descriptions."""
         from src.agents.drug_target.agent import _build_skill_registry, DrugTargetConfig
         from src.agents.shared.skill_load_harness import SkillLoadHarness
 
         config = DrugTargetConfig()
         harness = SkillLoadHarness(
             skill_registry=_build_skill_registry(config),
-            stage_hints=config.stage_hints,
         )
 
         formatted = harness._format_available_skills()
 
-        # All 5 skills present as bold entries
+        # All 3 skills present as bold entries
         for name in config.agent_skill_names:
             assert f"**{name}**" in formatted, f"Skill {name} missing from formatted output"
-
-        # Stage hints present for configured skills
-        assert "Stage 3 only" in formatted        # chembl-database
-        assert "Pathway analysis" in formatted     # kegg-database
-        assert "PPI network queries" in formatted  # string-database
 
         # No skills with missing descriptions
         assert "(no description)" not in formatted
@@ -2936,7 +3001,6 @@ class TestSkillLoadingEndToEnd:
         config = DrugTargetConfig()
         harness = SkillLoadHarness(
             skill_registry=_build_skill_registry(config),
-            stage_hints=config.stage_hints,
         )
 
         # Mock request (same pattern as test_skill_load_harness.py)
@@ -2968,11 +3032,11 @@ class TestSkillLoadingEndToEnd:
         assert captured is not None
         # Original prompt preserved
         assert "You are evidence_assessor." in captured
-        # Forced-eval 3-step protocol
-        assert "Step 1" in captured
-        assert "Step 2" in captured
-        assert "Step 3" in captured
-        # All 5 skill names injected
+        # Forced-eval 3-phase protocol
+        assert "Phase 1" in captured
+        assert "Phase 2" in captured
+        assert "Phase 3" in captured
+        # All 3 skill names injected
         for name in config.agent_skill_names:
             assert name in captured, f"Skill {name} missing from injected prompt"
         # Placeholder fully substituted

@@ -66,6 +66,7 @@ def _load_ztest_functions():
     if spec is None or spec.loader is None:
         raise ImportError(f"Could not load module spec for {script_path}")
     mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod  # Required for @dataclass to resolve module
     spec.loader.exec_module(mod)
     return mod.ZTestResult, mod.two_proportion_z_test
 
@@ -132,15 +133,18 @@ def _resolve_disease_name(
 
 
 def _ztest_to_dict(zr) -> dict[str, Any]:
-    """Convert ZTestResult to dict. Uses float('inf') for infinite risk_ratio."""
-    return {
+    """Convert ZTestResult to dict. Emits None for inf/NaN values."""
+    result = {
         "target_pct": round(zr.p_target, 6),
         "rest_pct": round(zr.p_rest, 6),
         "diff": round(zr.diff, 6),
-        "risk_ratio": round(zr.risk_ratio, 4) if not math.isinf(zr.risk_ratio) else float("inf"),
+        "risk_ratio": round(zr.risk_ratio, 4) if not math.isinf(zr.risk_ratio) else None,
         "z": round(zr.z, 4) if not math.isnan(zr.z) else None,
         "p_value": zr.p_value if not math.isnan(zr.p_value) else None,
     }
+    if math.isinf(zr.risk_ratio):
+        result["risk_ratio_capped"] = True
+    return result
 
 
 def _json_safe(obj):
@@ -192,6 +196,9 @@ def _compute_pair_census(
     expr_b = np.asarray(adata.X[:, b_idx].todense()).flatten() > 0
     coexpr = expr_a & expr_b
 
+    # Flag low-confidence when a gene has zero expression across all cells
+    low_confidence = not expr_a.any() or not expr_b.any()
+
     # Target vs rest mask
     target_mask = cell_types == target_cell_type
     rest_mask = ~target_mask
@@ -233,7 +240,7 @@ def _compute_pair_census(
         int(coexpr[rest_mask].sum()), n_rest,
     )
 
-    return {
+    pair_result: dict[str, Any] = {
         "executed": True,
         "errors": [],
         "target_vs_rest": {
@@ -244,6 +251,9 @@ def _compute_pair_census(
         "n_target_cells": n_target,
         "n_rest_cells": n_rest,
     }
+    if low_confidence:
+        pair_result["low_confidence"] = True
+    return pair_result
 
 
 # ---------------------------------------------------------------------------

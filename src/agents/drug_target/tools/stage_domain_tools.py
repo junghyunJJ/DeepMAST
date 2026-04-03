@@ -6,6 +6,7 @@ import json
 import logging
 import sqlite3
 import threading
+import time
 from typing import Any
 
 import os
@@ -256,7 +257,18 @@ def query_reactome_pathways(gene_symbol: str, max_results: int = 5) -> str:
     try:
         mod = _load_skill_module("reactome-database", "reactome_query.py", "reactome_query")
         client = mod.ReactomeClient()
-        rows = client.search_pathways(gene_symbol) or []
+        rows = None
+        for attempt in range(3):
+            try:
+                rows = client.search_pathways(gene_symbol) or []
+                break
+            except (ConnectionResetError, requests.ConnectionError):
+                if attempt < 2:
+                    time.sleep(2 ** attempt)
+                else:
+                    raise
+        if rows is None:
+            rows = []
         pathways = []
         for row in rows:
             # Accept both old ("schemaClass") and new ("type") response formats

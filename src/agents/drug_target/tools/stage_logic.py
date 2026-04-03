@@ -1308,6 +1308,59 @@ def validate_stage1_gate(data_dir: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Stage 3 Gate — checks that Stage 3 evidence files exist for all candidates
+# ---------------------------------------------------------------------------
+
+
+@tool
+def validate_stage3_gate(data_dir: str) -> str:
+    """Validate Stage 3 completeness for all stage3_candidates.
+
+    Reads assessment_results.json for stage3_candidates and checks that
+    ``evidence/stage3_{GENE}.json`` exists for every candidate gene.
+
+    Returns success=true only when ALL expected files are present.
+    Call this after Stage 3 completes to verify no genes were skipped.
+    If ``success`` is false, complete Stage 3 for the ``missing_genes``
+    first, then re-call.
+    """
+    data_dir_path = Path(data_dir).expanduser().resolve()
+    evidence_dir = data_dir_path / "evidence"
+
+    # 1. Load stage3_candidates
+    assessment_path = evidence_dir / "assessment_results.json"
+    if not assessment_path.exists():
+        return json.dumps({
+            "success": False,
+            "error": "assessment_results.json not found — run compute_rubric_scores first.",
+        })
+    assessment = json.loads(assessment_path.read_text())
+    stage3_genes = [c["gene"] for c in assessment.get("stage3_candidates", [])]
+    if not stage3_genes:
+        return json.dumps({
+            "success": False,
+            "error": "No stage3_candidates in assessment_results.json.",
+        })
+
+    # 2. Check stage3 files
+    found: list[str] = []
+    missing: list[str] = []
+    for gene in stage3_genes:
+        stage3_file = evidence_dir / f"stage3_{gene}.json"
+        if stage3_file.exists():
+            found.append(gene)
+        else:
+            missing.append(gene)
+
+    return json.dumps({
+        "success": len(missing) == 0,
+        "total": len(stage3_genes),
+        "found": len(found),
+        "missing_genes": missing,
+    }, indent=2)
+
+
+# ---------------------------------------------------------------------------
 # Reference Card — authoritative evidence summary for report_writer
 # ---------------------------------------------------------------------------
 

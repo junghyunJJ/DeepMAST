@@ -1,11 +1,13 @@
 """Subagent configurations for Drug Target Assessment Agent.
 
-Two-subagent architecture with 3-stage funnel:
-- evidence_assessor: 3-stage funnel (biological context -> validation & scoring ->
-  deep dive) with inline rubric assessment
+Four-subagent architecture with staged funnel:
+- evidence_assessor: 2-stage funnel (Stage 2: validation & scoring ->
+  Stage 1: biological context) with inline rubric assessment
+- deep_diver: Stage 3 deep dive (ChEMBL + PubMed) for FEATURED genes
+- hypothesis_writer: Hypothesis generation with UCB scoring from all evidence
 - report_writer: Generate drug.md with featured candidate emphasis
 
-Workflow order: evidence_assessor -> report_writer
+Workflow order: evidence_assessor -> deep_diver -> hypothesis_writer -> report_writer
 """
 
 from typing import Callable, Sequence
@@ -36,6 +38,7 @@ from src.agents.drug_target.tools import (
     run_batch_census_lr_pairs,
     finalize_stage1_artifacts,
     validate_stage1_gate,
+    validate_stage3_gate,
     # Stage 3: Deep Dive
     query_chembl_target_profile,
     read_skill_file,
@@ -59,19 +62,20 @@ __all__ = [
 
 
 # =============================================================================
-# 2-Subagent Configuration Definitions
+# 4-Subagent Configuration Definitions
 # =============================================================================
 
 SUBAGENT_CONFIGS = {
     "evidence_assessor": {
         "name": "evidence_assessor",
         "description": (
-            "Reordered 3-stage funnel: Stage 2 first (all genes: OpenTargets/GWAS) -> "
+            "Reordered 2-stage funnel: Stage 2 first (all genes: OpenTargets/GWAS) -> "
             "rubric scoring (combined_total >= 10) -> gene selection -> "
             "Stage 1 (FEATURED pairs only: Cellxgene, KEGG/Reactome, STRING, Census) -> "
-            "Stage 1 gate validation -> Stage 3 (FEATURED genes: ChEMBL, PubMed). "
+            "Stage 1 gate validation. "
             "Includes inline rubric assessment via compute_rubric_scores. "
-            "Uses Plan->Execute->Reflect cycle per stage."
+            "Uses Plan->Execute->Reflect cycle per stage. "
+            "Stage 3 (ChEMBL, PubMed) is handled by the deep_diver subagent."
         ),
         "system_prompt": SUBAGENT_PROMPTS["evidence_assessor"],
         "tools": [
@@ -94,11 +98,49 @@ SUBAGENT_CONFIGS = {
             run_batch_census_lr_pairs,
             finalize_stage1_artifacts,
             validate_stage1_gate,
-            # Stage 3: Deep Dive (FEATURED genes only)
-            query_chembl_target_profile,
-            search_literature_dynamic,
             read_skill_file,
             # Cognitive
+            sequential_thinking,
+            think_tool,
+            validate_quality,
+        ],
+    },
+    "deep_diver": {
+        "name": "deep_diver",
+        "description": (
+            "Stage 3 deep dive for FEATURED genes. Queries ChEMBL for drug profiles "
+            "and PubMed for literature evidence. Produces stage3_{GENE}.json and "
+            "stage3_lit_{GENE}.json for each stage3_candidate. "
+            "Validates completeness via validate_stage3_gate."
+        ),
+        "system_prompt": SUBAGENT_PROMPTS["deep_diver"],
+        "tools": [
+            # I/O
+            load_evidence_files,
+            save_evidence,
+            # Stage 3: Deep Dive
+            query_chembl_target_profile,
+            search_literature_dynamic,
+            validate_stage3_gate,
+            read_skill_file,
+            # Cognitive
+            sequential_thinking,
+            think_tool,
+            validate_quality,
+        ],
+    },
+    "hypothesis_writer": {
+        "name": "hypothesis_writer",
+        "description": (
+            "Hypothesis generation from Stage 1-3 evidence. Reads all evidence files, "
+            "generates 4-6 mechanistic hypotheses across 4 thematic categories, "
+            "applies gap detection and UCB scoring, outputs hypothesis_report.json."
+        ),
+        "system_prompt": SUBAGENT_PROMPTS["hypothesis_writer"],
+        "tools": [
+            load_evidence_files,
+            read_skill_file,
+            save_evidence,
             sequential_thinking,
             think_tool,
             validate_quality,
@@ -122,6 +164,7 @@ SUBAGENT_CONFIGS = {
             validate_evidence_completeness,
             build_evidence_summary,
             validate_drug_md,
+            validate_stage3_gate,
             save_target_assessment,
             save_drug_md,
             sequential_thinking,
@@ -136,29 +179,43 @@ SUBAGENT_CONFIGS = {
 # Workflow Order
 # =============================================================================
 
-WORKFLOW_ORDER = ["evidence_assessor", "report_writer"]
+WORKFLOW_ORDER = ["evidence_assessor", "deep_diver", "hypothesis_writer", "report_writer"]
 
 WORKFLOW_DESCRIPTION = """
-Drug Target Assessment 2-Agent Workflow (Reordered 3-Stage Funnel):
+Drug Target Assessment 4-Agent Workflow (Staged Funnel):
 
 1. EVIDENCE_ASSESSOR (Plan->Execute->Reflect per stage)
    Stage 2 FIRST (ALL unique genes): batch OpenTargets + batch GWAS + VEP (conditional)
      -> Inline DRUG_TARGET_RUBRIC scoring (compute_rubric_scores)
-     -> Top 7 by exploratory_total → FEATURED gene selection
+     -> Gene selection (combined_total >= 10) → FEATURED genes
      -> Gene→Pair mapping to identify FEATURED L-R pairs
    Stage 1 (FEATURED pairs ONLY): Cellxgene + KEGG/Reactome + STRING + Census
      -> Stage 1 gate validation (validate_stage1_gate)
-   Stage 3 (FEATURED genes only): ChEMBL + PubMed clinical limitations (conditional)
    Outputs: evidence/*.json (per stage, per L-R pair/gene)
             assessment_results.json, rubric_scores.csv
+   Gate: assessment_results.json must exist with stage3_candidates
 
-2. REPORT_WRITER (Plan->Execute->Reflect)
+2. DEEP_DIVER (Plan->Execute->Reflect)
+   Stage 3 (FEATURED genes only): ChEMBL + PubMed literature
+   Outputs: stage3_{GENE}.json, stage3_lit_{GENE}.json per gene
+   Gate: validate_stage3_gate must return success
+
+3. HYPOTHESIS_WRITER (Plan->Execute->Reflect)
+   Reads all Stage 1-3 evidence files
+   Generates 4-6 mechanistic hypotheses across 4 thematic categories
+   Applies gap detection and UCB scoring
+   Outputs: hypothesis_report.json
+   Gate: hypothesis_report.json must exist
+
+4. REPORT_WRITER (Plan->Execute->Reflect)
    - Generates target_assessment.json (structured contract)
-   - Generates drug.md with 4-section structure:
+   - Generates drug.md with structure:
      1. Executive Summary
      2. Pan-Disease Target Druggability Matrix
      3. [FEATURED] Candidate Deep Dives
-     4. Pipeline Execution Summary & Recommendations
+     3.5. Hypothesis-Driven Analysis (if hypothesis_report.json exists)
+     4. [NOVEL] Candidate Deep Dives
+     5. Pipeline Execution Summary & Recommendations
    - Quality validation (threshold >= 0.7)
 """
 
@@ -178,9 +235,11 @@ def get_subagents(
 ) -> list[dict]:
     """Get the subagent configurations for Drug Target Assessment.
 
-    Returns 2 subagents in workflow order:
-    1. evidence_assessor - 3-stage funnel with inline rubric assessment
-    2. report_writer - drug.md generation
+    Returns 4 subagents in workflow order:
+    1. evidence_assessor - 2-stage funnel with inline rubric assessment
+    2. deep_diver - Stage 3 deep dive (ChEMBL + PubMed)
+    3. hypothesis_writer - hypothesis generation with UCB scoring
+    4. report_writer - drug.md generation
 
     Args:
         custom_tools: Optional list of additional tools to include in all subagents
@@ -189,15 +248,15 @@ def get_subagents(
         model_overrides: Optional per-subagent model overrides.
             Keys are subagent names, values are init_chat_model format strings
             (e.g. "openai:gpt-4.1") or BaseChatModel instances.
-        skills_sources: Native skill discovery paths for evidence_assessor.
+        skills_sources: Native skill discovery paths for evidence_assessor and deep_diver.
         skill_registry: Skill name → directory path mapping for SkillLoadHarness.
 
     Returns:
         List of subagent configuration dictionaries
     """
     subagents = [
-        {**SUBAGENT_CONFIGS["evidence_assessor"], "tools": list(SUBAGENT_CONFIGS["evidence_assessor"]["tools"])},
-        {**SUBAGENT_CONFIGS["report_writer"], "tools": list(SUBAGENT_CONFIGS["report_writer"]["tools"])},
+        {**SUBAGENT_CONFIGS[name], "tools": list(SUBAGENT_CONFIGS[name]["tools"])}
+        for name in WORKFLOW_ORDER
     ]
 
     # Remove Census tools when disabled (too slow for some providers)
@@ -262,10 +321,11 @@ def get_subagents(
         mw.insert(0, WriteFileArgGuardMiddleware())
         subagent["middleware"] = mw
 
-    # Apply skills to evidence_assessor only (it does the DB queries)
+    # Apply skills to evidence_assessor and deep_diver (they do DB queries)
     if skills_sources:
+        _skill_subagents = {"evidence_assessor", "deep_diver"}
         for subagent in subagents:
-            if subagent["name"] == "evidence_assessor":
+            if subagent["name"] in _skill_subagents:
                 subagent["skills"] = skills_sources
                 if skill_registry:
                     from src.agents.shared.skill_load_harness import SkillLoadHarness

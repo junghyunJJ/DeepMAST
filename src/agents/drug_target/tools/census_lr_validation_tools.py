@@ -13,6 +13,7 @@ from typing import Any
 from langchain_core.tools import tool
 
 from src.agents.drug_target.tools.census_batch_core import (
+    DEFAULT_CENSUS_VERSION,
     _resolve_disease_name,
     batch_census_lr_pairs,
     write_census_csv,
@@ -140,6 +141,66 @@ def _parse_available_celltypes(output: str) -> list[dict[str, Any]]:
     return candidates
 
 
+def _auto_discover_pairs(data_dir: str) -> list[list[str]] | None:
+    """Auto-discover L-R pairs from assessment_results.json + lr_candidates.json.
+
+    Returns a list of [ligand, receptor] arrays, or None if files are missing.
+    Filters lr_candidates pairs to those where ligand OR receptor is in
+    stage3_candidates gene list.
+    """
+    data_path = Path(data_dir).expanduser().resolve()
+    evidence_dir = data_path / "evidence"
+
+    # Read assessment_results.json for stage3_candidates
+    assessment_path = evidence_dir / "assessment_results.json"
+    if not assessment_path.exists():
+        return None
+    try:
+        assessment = json.loads(assessment_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    stage3 = assessment.get("stage3_candidates", [])
+    if not stage3:
+        return None
+    featured_genes = {
+        (c.get("gene") or "").upper()
+        for c in stage3
+        if isinstance(c, dict) and c.get("gene")
+    }
+    if not featured_genes:
+        return None
+
+    # Read lr_candidates.json for all L-R pairs
+    lr_path = data_path / "lr_candidates.json"
+    if not lr_path.exists():
+        return None
+    try:
+        lr_data = json.loads(lr_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    all_pairs = lr_data.get("pairs", [])
+    if not all_pairs:
+        return None
+
+    # Filter to pairs where ligand OR receptor is in stage3_candidates
+    discovered: list[list[str]] = []
+    seen: set[tuple[str, str]] = set()
+    for p in all_pairs:
+        if not isinstance(p, dict):
+            continue
+        ligand = (p.get("ligand") or "").upper()
+        receptor = (p.get("receptor") or "").upper()
+        if not ligand or not receptor:
+            continue
+        if ligand in featured_genes or receptor in featured_genes:
+            key = (ligand, receptor)
+            if key not in seen:
+                seen.add(key)
+                discovered.append([ligand, receptor])
+
+    return discovered if discovered else None
+
+
 def _resolve_interest_cell_type(
     requested: str,
     candidates: list[dict[str, Any]],
@@ -182,6 +243,8 @@ def run_compare_census_lr_pair(
     timeout_sec: int = 600,
 ) -> str:
     """Run compare_census_gene_pair_by_cell_type.py with fail-soft behavior."""
+    # Override LLM-provided census_version with pinned default
+    census_version = DEFAULT_CENSUS_VERSION
     result: dict[str, Any] = {
         "data_dir": str(Path(data_dir).expanduser().resolve()),
         "script_path": str(_script_path()),
@@ -302,8 +365,8 @@ def run_compare_census_lr_pair(
 def run_batch_census_lr_pairs(
     data_dir: str,
     disease: str,
-    pairs_json: str,
-    target_cell_type: str,
+    pairs_json: str = "",
+    target_cell_type: str = "",
     organism: str = "homo_sapiens",
     census_version: str = "2025-11-08",
     max_cells: int = 1_000_000,
@@ -318,16 +381,21 @@ def run_batch_census_lr_pairs(
         data_dir: Path to the data directory (evidence/ subdirectory used for CSVs).
         disease: Disease label for Census obs filter.
         pairs_json: JSON array of [gene_a, gene_b] pairs,
-            e.g. '[["CXCL12","CXCR4"],["FGF2","FGFR1"]]'
+            e.g. '[["CXCL12","CXCR4"],["FGF2","FGFR1"]]'.
+            When empty, pairs are auto-discovered from data_dir
+            (assessment_results.json stage3_candidates + lr_candidates.json).
         target_cell_type: Cell type for target-vs-rest comparison.
         organism: Census organism key.
-        census_version: Pinned Census release.
+        census_version: Pinned Census release (ignored; always uses DEFAULT_CENSUS_VERSION).
         max_cells: Hard cap on cell count to prevent OOM.
 
     Returns:
         JSON object with batch_size, success_count, and per-pair results
         matching run_compare_census_lr_pair schema.
     """
+    # Override LLM-provided census_version with pinned default
+    census_version = DEFAULT_CENSUS_VERSION
+
     result: dict = {
         "batch_size": 0,
         "success_count": 0,
@@ -335,20 +403,32 @@ def run_batch_census_lr_pairs(
         "errors": [],
     }
 
-    # Robust pairs_json parsing (handles Qwen/Ollama double-serialized JSON)
+    # Auto-discover pairs from data_dir when pairs_json is empty
     pairs_raw = pairs_json
-    if isinstance(pairs_raw, str):
-        try:
-            pairs_raw = json.loads(pairs_raw)
-        except (json.JSONDecodeError, TypeError):
-            pass
-        # Handle double-serialized
+    if not pairs_raw or (isinstance(pairs_raw, str) and not pairs_raw.strip()):
+        pairs_raw = _auto_discover_pairs(data_dir)
+        if pairs_raw is None:
+            result["errors"].append(
+                "pairs_json is empty and auto-discovery failed: "
+                "need assessment_results.json (with stage3_candidates) "
+                "and lr_candidates.json in data_dir."
+            )
+            return json.dumps(sanitize_for_json(result), indent=2)
+        result["pairs_auto_discovered"] = True
+    else:
+        # Robust pairs_json parsing (handles Qwen/Ollama double-serialized JSON)
         if isinstance(pairs_raw, str):
             try:
                 pairs_raw = json.loads(pairs_raw)
             except (json.JSONDecodeError, TypeError):
-                result["errors"].append(f"Could not parse pairs_json: {pairs_json[:200]}")
-                return json.dumps(sanitize_for_json(result), indent=2)
+                pass
+            # Handle double-serialized
+            if isinstance(pairs_raw, str):
+                try:
+                    pairs_raw = json.loads(pairs_raw)
+                except (json.JSONDecodeError, TypeError):
+                    result["errors"].append(f"Could not parse pairs_json: {pairs_json[:200]}")
+                    return json.dumps(sanitize_for_json(result), indent=2)
 
     if not isinstance(pairs_raw, list):
         result["errors"].append(f"pairs_json must be a JSON array, got {type(pairs_raw).__name__}")

@@ -25,6 +25,9 @@ from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir
 from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
 
 
+# Circuit-breaker: track consecutive finalize failures per data_dir
+_FINALIZE_CALL_COUNT: dict[str, int] = {}
+
 DEFAULT_CENSUS_DISEASE = "breast carcinoma"
 DEFAULT_TARGET_CELL_TYPE = "mammary gland epithelial cell"
 DEFAULT_LEGACY_TARGET_CELL_TYPE = "malignant cell"
@@ -1098,6 +1101,9 @@ def finalize_stage1_artifacts(
                          "Expected JSON array of [ligand, receptor] arrays.",
             })
 
+    # Circuit-breaker: resolve canonical key for tracking
+    _cb_key = str(Path(data_dir).expanduser().resolve())
+
     result = finalize_stage1_workspace(
         data_dir,
         disease=disease,
@@ -1106,11 +1112,30 @@ def finalize_stage1_artifacts(
         pair_subset=pair_subset,
     )
 
+    # Circuit-breaker: track consecutive failures per data_dir
+    is_success = result.get("success", False)
+    # Check whether Stage 3 can still proceed despite finalize failure
+    assessment_exists = (Path(data_dir).expanduser().resolve() / "evidence" / "assessment_results.json").exists()
+    if is_success:
+        _FINALIZE_CALL_COUNT.pop(_cb_key, None)
+    else:
+        _FINALIZE_CALL_COUNT[_cb_key] = _FINALIZE_CALL_COUNT.get(_cb_key, 0) + 1
+        if _FINALIZE_CALL_COUNT[_cb_key] >= 3:
+            return json.dumps({
+                "abort": True,
+                "message": (
+                    "Circuit breaker triggered: 3 consecutive finalize failures. "
+                    "Check Stage 1 evidence files manually."
+                ),
+                "success": False,
+                "stage3_can_proceed": assessment_exists,
+            })
+
     # Build compact summary to avoid multi-MB ToolMessage payloads
     pre = result.get("pre_validation", {})
     post = result.get("post_validation", {})
-    compact = {
-        "success": result.get("success", False),
+    compact: dict[str, Any] = {
+        "success": is_success,
         "context": result.get("context", {}),
         "rebuild": result.get("rebuild", {}),
         "rerun_missing_census": result.get("rerun_missing_census", False),
@@ -1136,4 +1161,8 @@ def finalize_stage1_artifacts(
             "errors": post.get("errors", []),
         },
     }
+    # When finalize fails but assessment_results.json exists, signal that
+    # Stage 3 can still proceed (it depends on rubric scores, not Stage 1 artifacts).
+    if not is_success and assessment_exists:
+        compact["stage3_can_proceed"] = True
     return json.dumps(compact, indent=2)

@@ -40,6 +40,7 @@ from src.agents.drug_target.tools.stage2_service import extract_lr_pairs
 from src.agents.drug_target.tools.stage_logic import (
     compute_rubric_scores,
     validate_stage1_gate,
+    validate_stage3_gate,
     build_evidence_summary,
     validate_drug_md,
 )
@@ -88,6 +89,7 @@ __all__ = [
     "finalize_stage1_artifacts",
     "compute_rubric_scores",
     "validate_stage1_gate",
+    "validate_stage3_gate",
     "build_evidence_summary",
     "validate_drug_md",
     # Output contract

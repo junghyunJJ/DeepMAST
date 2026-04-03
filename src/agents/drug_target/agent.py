@@ -1,9 +1,11 @@
 """Drug Target Assessment Agent using DeepAgents framework.
 
-2-Subagent Architecture with 3-Stage Funnel:
-1. EVIDENCE_ASSESSOR: 3-stage funnel (biological context -> validation & scoring ->
-   deep dive) with inline rubric assessment
-2. REPORT_WRITER: Generate drug.md with featured candidate emphasis
+4-Subagent Architecture with Staged Funnel:
+1. EVIDENCE_ASSESSOR: 2-stage funnel (Stage 2: validation & scoring ->
+   Stage 1: biological context) with inline rubric assessment
+2. DEEP_DIVER: Stage 3 deep dive (ChEMBL + PubMed) for FEATURED genes
+3. HYPOTHESIS_WRITER: Hypothesis generation with UCB scoring from all evidence
+4. REPORT_WRITER: Generate drug.md with featured candidate emphasis
 
 All database queries are wrapped as @tool functions that run on the host process.
 Docker backend is OPTIONAL — set docker_image in DrugTargetConfig to enable
@@ -28,7 +30,11 @@ from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import MemorySaver
 
 from src.agents.model import create_llm, load_subagent_models_from_env
-from src.agents.deep_interpreter.middleware.write_file_guard import WriteFileArgGuardMiddleware
+from src.agents.deep_interpreter.middleware.write_file_guard import (
+    WriteFileArgGuardMiddleware,
+    ReadFileBlockMiddleware,
+    SubagentErrorGuardMiddleware,
+)
 from deepagents.backends import FilesystemBackend
 from src.agents.drug_target.subagents.configs import get_subagents
 from src.agents.drug_target.tools import (
@@ -49,8 +55,8 @@ logger = logging.getLogger(__name__)
 
 ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE = """You are the Drug Target Assessment orchestrator.
 
-Your task is to coordinate 2 specialized subagents to produce a comprehensive
-therapeutic target assessment report (drug.md) using a 3-stage funnel approach.
+Your task is to coordinate 4 specialized subagents to produce a comprehensive
+therapeutic target assessment report (drug.md) using a staged funnel approach.
 
 ## Pre-configured Context
 - **Data directory**: `{data_dir}`
@@ -67,24 +73,59 @@ structured data. Do NOT use `ls` or `read_file` to check the directory.
 ## Workflow
 Execute subagents strictly in this order via the `task` tool:
 
-1. **evidence_assessor**: Pass the load_lr_candidates output. Runs the reordered 3-stage funnel:
+1. **evidence_assessor**: Pass the load_lr_candidates output. Runs the 2-stage funnel:
    - Stage 2 (ALL unique genes): batch validation & scoring (OpenTargets, GWAS, VEP) + rubric scoring
    - Gene selection: combined_total >= 10 → FEATURED genes → map to L-R pairs
    - Stage 1 (FEATURED pairs only): Biological context (Cellxgene, KEGG/Reactome, STRING, Census)
-   - Stage 3 (FEATURED genes only): Deep dive (ChEMBL, PubMed)
-2. **report_writer**: Generates drug.md with [FEATURED] Candidate emphasis.
-   The report_writer MUST first save target_assessment.json via
-   `save_target_assessment`, then call `save_drug_md` to save drug.md.
+   - Stage 1 gate validation
+   Gate: After completion, verify `assessment_results.json` exists with `stage3_candidates`.
+
+2. **deep_diver**: Stage 3 deep dive for FEATURED genes.
+   - Queries ChEMBL for drug profiles and PubMed for literature evidence
+   - Produces `stage3_{{GENE}}.json` and `stage3_lit_{{GENE}}.json` per gene
+   Gate: `validate_stage3_gate` must return success before completing.
+   **ZERO-CANDIDATE SHORT-CIRCUIT**: If `stage3_candidates` in `assessment_results.json`
+   is empty, SKIP deep_diver AND hypothesis_writer — go directly to report_writer.
+
+3. **hypothesis_writer**: Reads all Stage 1-3 evidence files.
+   - Generates 4-6 mechanistic hypotheses with UCB scoring
+   - Outputs `hypothesis_report.json`
+   Gate: `hypothesis_report.json` must exist after completion.
+
+4. **report_writer**: Generates the final report.
+   - Saves `target_assessment.json` via `save_target_assessment`
+   - Saves `drug.md` via `save_drug_md`
+   - Integrates hypothesis analysis if `hypothesis_report.json` exists
 
 CRITICAL: After load_lr_candidates returns, you MUST immediately call the `task` tool
 to delegate to evidence_assessor. Do NOT call load_lr_candidates again. Do NOT stop.
-Example: task(subagent_type="evidence_assessor", instruction="Run the full 3-stage
+Example: task(subagent_type="evidence_assessor", instruction="Run the full 2-stage
 evidence assessment for {disease}. Data dir: {data_dir}. <paste lr_candidates output>")
 
-After evidence_assessor completes, IMMEDIATELY call:
-task(subagent_type="report_writer", instruction="Generate drug.md report. Data dir: {data_dir}.")
+After each subagent completes, IMMEDIATELY call the next one in sequence.
 
-You MUST NOT terminate until BOTH subagents have completed.
+You MUST NOT terminate until ALL FOUR subagents have completed (or until the
+zero-candidate short-circuit skips deep_diver and hypothesis_writer).
+
+## ============================================================
+## MANDATORY EXECUTION PROTOCOL (READ THIS BEFORE EVERY ACTION)
+## ============================================================
+You MUST execute ALL 4 subagents using the `task` tool in this EXACT order:
+  1. task(subagent_type="evidence_assessor", ...) → Stage 1+2
+  2. task(subagent_type="deep_diver", ...)         → Stage 3
+  3. task(subagent_type="hypothesis_writer", ...)   → Hypothesis generation
+  4. task(subagent_type="report_writer", ...)       → Final report
+
+ABSOLUTE RULES — VIOLATION OF ANY RULE IS A CRITICAL FAILURE:
+- After each task() returns, IMMEDIATELY call the NEXT task(). No exceptions.
+- NEVER use read_file to read evidence files — subagents handle their own I/O.
+- NEVER try to write drug.md yourself — the report_writer subagent does this.
+- NEVER use ls, read_file, or write_file between subagent calls.
+- Do NOT summarize or analyze subagent results — just pass them to the next subagent.
+- Do NOT stop until all 4 task() calls have been made and returned.
+- If a subagent returns an error, STILL call the next subagent in sequence.
+- Your ONLY tools are: load_lr_candidates (once, at start) and task (4 times, in order).
+## ============================================================
 
 ## Input
 - lr_candidates.json: Top-30 L-R pairs from CCI analysis
@@ -93,15 +134,18 @@ You MUST NOT terminate until BOTH subagents have completed.
 ## Output
 - target_assessment.json: Structured contract output (schema-aligned)
 - drug.md: Publication-quality therapeutic target assessment report
+- hypothesis_report.json: Ranked mechanistic hypotheses with UCB scores
 - evidence/*.json: Intermediate evidence files
 
 ## Rules
 - ALWAYS start with `load_lr_candidates` -- never skip this step
 - After load_lr_candidates, IMMEDIATELY call `task` for evidence_assessor -- do NOT stop
-- Execute subagents in ORDER: evidence_assessor -> report_writer
+- Execute subagents in ORDER: evidence_assessor -> deep_diver -> hypothesis_writer -> report_writer
+- Zero-candidate short-circuit: skip deep_diver + hypothesis_writer if no stage3_candidates
 - Each subagent uses Plan->Execute->Reflect cycle
 - [FEATURED] candidates are determined by rubric scoring (combined_total)
 - The final drug.md must be self-contained markdown for HTML report integration
+- NEVER use read_file, write_file, or ls — delegate ALL file I/O to subagents via task()
 """
 
 
@@ -143,8 +187,8 @@ class DrugTargetConfig:
         "opentargets-database",
         "gwas-database",
         "chembl-database",
-        # kegg-database: REMOVED — tool-only, accessed via query_kegg_pathways
-        # string-database: REMOVED — tool-only, accessed via query_string_ppi_pair
+        "kegg-database",
+        "string-database",
     )
     skills_dir: str | None = None
     subagent_models: dict[str, str] | None = None
@@ -155,7 +199,7 @@ class DrugTargetConfig:
     def __post_init__(self):
         if self.subagent_models is None:
             self.subagent_models = load_subagent_models_from_env(
-                ["evidence_assessor", "report_writer"]
+                ["evidence_assessor", "deep_diver", "hypothesis_writer", "report_writer"]
             )
 
 
@@ -215,7 +259,7 @@ def create_drug_target_agent(
     """Create the Drug Target Assessment agent using DeepAgents framework.
 
     Creates a fully configured agent with:
-    - 2 specialized subagents (evidence_assessor, report_writer)
+    - 4 specialized subagents (evidence_assessor, deep_diver, hypothesis_writer, report_writer)
     - All database queries via @tool wrappers (host-side by default)
     - Optional DockerBackend when docker_image is set in config
 
@@ -265,7 +309,7 @@ def create_drug_target_agent(
     if config.custom_tools:
         tools.extend(config.custom_tools)
 
-    # 3. Get subagent specs (skills go to evidence_assessor only)
+    # 3. Get subagent specs (skills go to evidence_assessor + deep_diver)
     subagent_specs = get_subagents(
         custom_tools=config.custom_tools,
         data_dir=resolved_data_dir,
@@ -298,10 +342,17 @@ def create_drug_target_agent(
         checkpointer=checkpointer,
         system_prompt=system_prompt,
         backend=backend,
-        middleware=[WriteFileArgGuardMiddleware()],
+        middleware=[
+            WriteFileArgGuardMiddleware(),
+            ReadFileBlockMiddleware(),        # Fix 2: block read_file at orchestrator level
+            SubagentErrorGuardMiddleware(),   # Fix 4: catch GraphRecursionError from subagents
+        ],
     )
 
     agent = create_deep_agent(**create_kwargs)
+    # Fix 3: Override default recursion_limit (1000) to accommodate
+    # 4 subagents × ~250 steps + orchestrator overhead ≈ 1100; 2000 for margin.
+    agent = agent.with_config({"recursion_limit": 2000})
 
     return agent, backend
 
