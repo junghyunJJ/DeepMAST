@@ -692,9 +692,39 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
         except Exception:
             pass  # Non-critical: prioritizer falls back to no exclusion
 
+        # Extract top L-R pairs for pair-specific literature search
+        MAX_SEARCH_PAIRS = 15
+        lr_pairs = []
+        if liana_df is not None:
+            pair_cols = all(c in liana_df.columns for c in ['ligand', 'receptor'])
+            if pair_cols:
+                sort_col = 'combinedscore' if 'combinedscore' in liana_df.columns else None
+                sorted_df = liana_df.sort_values(sort_col, ascending=False) if sort_col else liana_df
+                seen = set()
+                for _, row in sorted_df.iterrows():
+                    lig, rec = str(row['ligand']).strip(), str(row['receptor']).strip()
+                    key = f"{lig}^{rec}"
+                    if key not in seen and lig and rec:
+                        seen.add(key)
+                        entry = {"ligand": lig, "receptor": rec}
+                        if sort_col and sort_col in row.index:
+                            entry["score"] = round(float(row[sort_col]), 4)
+                        lr_pairs.append(entry)
+                    if len(lr_pairs) >= MAX_SEARCH_PAIRS:
+                        break
+
+        # Persist lr_pairs for file-based injection (same pattern as top_search_genes.json)
+        try:
+            lr_pairs_file = data_path / "lr_pairs_search.json"
+            with open(lr_pairs_file, "w") as f:
+                json.dump({"pairs": lr_pairs, "count": len(lr_pairs)}, f, indent=2)
+        except Exception:
+            pass  # Non-critical
+
         return {
             "genes": top_genes,  # Top N by hybrid score for search
             "all_genes": all_genes_sorted,  # Full list for reference
+            "lr_pairs": lr_pairs,
             "pathways": sorted(list(pathways)),
             "celltypes": sorted(list(celltypes)),
             "source": source_file or "no LIANA files found",
@@ -703,11 +733,13 @@ def _extract_search_context(data_path: Path, context_type: str = None) -> dict:
             "note": (
                 f"Top {len(top_genes)} genes by hybrid score (0.7×max_combinedscore + 0.3×freq) from {source_file or 'LIANA files'}. "
                 f"Full gene set: {len(all_genes_sorted)} unique genes. "
-                "Use 'genes' for search, 'all_genes' for complete reference."
+                f"Top {len(lr_pairs)} L-R pairs for pair-specific search. "
+                "Use 'genes' for search, 'all_genes' for complete reference, 'lr_pairs' for pair-level queries."
             ),
             "stats": {
                 "total_genes": len(all_genes_sorted),
                 "search_genes": len(top_genes),
+                "search_pairs": len(lr_pairs),
                 "total_pathways": len(pathways),
                 "total_celltypes": len(celltypes),
             }

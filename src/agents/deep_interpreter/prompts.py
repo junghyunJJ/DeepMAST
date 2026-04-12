@@ -295,7 +295,9 @@ Given the analysis context below, generate optimal PubMed search queries that ca
 - **Pathways**: {pathways}
 - **Cell types**: {celltypes}
 - **Disease**: {disease}
+- **L-R Pairs**: {lr_pairs}
 {gene_aliases}
+{search_strategy}
 
 ## Query Generation Guidelines
 
@@ -304,9 +306,9 @@ Given the analysis context below, generate optimal PubMed search queries that ca
 - BioMCP automatically resolves gene aliases (e.g., ACKR3 → CXCR7), so use official symbols
 - Use pathway-specific keywords to improve pathway coverage
 
-### Required Query Distribution (6-9 total queries):
+### Required Query Distribution (7-9 total queries):
 
-1. **Gene-centric queries (at least 2-3 queries)**:
+1. **Gene-centric queries (2 queries)**:
    - Search priority genes with disease context
    - Use official gene symbols (aliases are resolved automatically)
    - Include gene function keywords (receptor, ligand, protease, etc.)
@@ -322,9 +324,16 @@ Given the analysis context below, generate optimal PubMed search queries that ca
    - Add keywords: "tumor microenvironment", "immune infiltration", "cell composition", "spatial distribution"
    - For cancer-specific cell types (e.g., DCIS, invasive carcinoma), include histological terms
 
-4. **Integrated queries (1-2 queries)**:
+4. **Integrated queries (1 query)**:
    - Combine key genes with pathway AND cell type context
    - Include spatial transcriptomics and cell-cell interaction terms
+
+5. **L-R pair interaction queries (1-2 queries, when L-R pairs provided)**:
+   - Search SPECIFIC ligand-receptor pairs with both genes in `genes` field
+   - Include interaction keywords: "signaling axis", "ligand-receptor", "cell-cell communication"
+   - Combine with disease context for specificity
+   - Each query targets 1-2 pairs maximum
+   - If no L-R pairs provided (shows "None"), skip this category entirely
 
 ## Output Format
 
@@ -333,8 +342,8 @@ Return a JSON array of search query objects. Each object should have:
 - `diseases`: List of disease terms
 - `keywords`: List of free-text keywords (REQUIRED for pathway/cell type-centric queries)
 
-Generate 6-9 diverse search strategies:
-- **At least 2-3 queries** with non-empty `genes` field
+Generate 7-9 diverse search strategies:
+- **At least 2 queries** with non-empty `genes` field (plus 1-2 pair queries when pairs provided)
 - **At least 2 queries** with pathway names in `keywords` field
 - **At least 1-2 queries** with cell type names in `keywords` field
 
@@ -348,6 +357,8 @@ Generate 6-9 diverse search strategies:
   {{"genes": [], "diseases": ["breast cancer"], "keywords": ["MAPK signaling", "ERK pathway", "PI3K/AKT", "tumor progression"]}},
   {{"genes": [], "diseases": ["breast cancer"], "keywords": ["macrophage", "tumor-associated macrophage", "TAM", "immune infiltration"]}},
   {{"genes": [], "diseases": ["breast cancer"], "keywords": ["DCIS", "ductal carcinoma in situ", "preinvasive", "tumor progression"]}},
+  {{"genes": ["CXCL12", "ACKR3"], "diseases": ["breast cancer"], "keywords": ["chemokine signaling axis", "ligand-receptor interaction"]}},
+  {{"genes": ["ADAM10", "NOTCH1"], "diseases": ["breast cancer"], "keywords": ["Notch signaling", "ligand receptor", "shedding"]}},
   {{"genes": [], "diseases": ["breast cancer"], "keywords": ["spatial transcriptomics", "cell-cell interaction", "tumor microenvironment"]}}
 ]
 ```

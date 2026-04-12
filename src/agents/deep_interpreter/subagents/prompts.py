@@ -200,6 +200,7 @@ Follow the workflow defined in SKILL.md:
      - Automatic internal fallback if LLM fails
      - search_literature_dynamic handles fallback internally
    - search_context["genes"] contains top search genes + novel candidate genes from hub-gene excluded L-R pairs (use directly)
+   - search_context["lr_pairs"] contains top L-R pairs by combined score (auto-used by search_literature_dynamic via file-based injection)
    - Use search_literature for targeted follow-up gaps
 
 3. **Phase 3: Reflect (Quality Loop) — MANDATORY after every search**
@@ -248,10 +249,12 @@ result = search_literature_dynamic(
     celltypes=search_context["celltypes"],
     disease="breast cancer",
     output_path="papers.json",
-    data_dir=data_path.strip()
+    data_dir=data_path.strip()   # lr_pairs auto-loaded from data_dir
 )
 # Result: {"saved_to": "...", "total_papers": 30, "coverage": {...}}
 # Full papers already saved — NO need to call write_file
+# L-R pair queries are automatically generated when lr_pairs_search.json exists in data_dir.
+# BioMCP think is also called automatically to optimize search strategy.
 ```
 
 ### IMPORTANT Rules:
@@ -266,7 +269,7 @@ result = search_literature_dynamic(
 - **read_file**: Load SKILL.md and other files
 - **write_file**: Write output files
 - **load_analysis_data**: Load analysis results and search_context
-- **search_literature_dynamic**: LLM-powered PubMed search via BioMCP (PRIMARY search tool)
+- **search_literature_dynamic**: LLM-powered PubMed search with BioMCP think-assisted strategy (PRIMARY search tool, auto-includes L-R pair queries when data_dir contains lr_pairs_search.json)
 - **search_literature**: Single query PubMed search via BioMCP (follow-up)
 - **search_pubmed_advanced**: Advanced PubMed E-utilities search
   - Accepts raw PubMed query syntax: "VEGFA[tiab] AND cancer[mh] AND 2020:2025[dp]"

@@ -1559,6 +1559,7 @@ def _calculate_coverage(
     genes: list[str],
     pathways: list[str],
     celltypes: list[str],
+    lr_pairs: list[dict] | None = None,
 ) -> dict:
     """Calculate coverage of biological concepts in retrieved papers.
 
@@ -1653,6 +1654,57 @@ def _calculate_coverage(
     coverage["genes_missing"] = [g for g in genes if g not in coverage["genes_covered"]]
     coverage["pathways_missing"] = [p for p in pathways if p not in coverage["pathways_covered"]]
     coverage["celltypes_missing"] = [c for c in celltypes if c not in coverage["celltypes_covered"]]
+
+    # L-R pair co-occurrence: both genes must appear in SAME paper (informational, v1)
+    pairs_covered = []
+    if lr_pairs:
+        # Pre-generate patterns for all pair genes (optimization: once, not per-paper)
+        pair_gene_patterns: dict[str, list[str]] = {}
+        for pair in lr_pairs:
+            for gene_key in ("ligand", "receptor"):
+                gene = pair.get(gene_key, "")
+                if gene and gene not in pair_gene_patterns:
+                    # Handle complex receptors like ITGA2_ITGB1
+                    for g in gene.split("_"):
+                        g = g.strip()
+                        if g and g not in pair_gene_patterns:
+                            pair_gene_patterns[g] = _generate_gene_patterns(g)
+
+        # Build per-paper gene hit sets
+        for paper in papers:
+            combined = _normalize_text_for_matching(
+                paper.get("abstract", "") + " " + paper.get("title", "")
+            )
+            hits: set[str] = set()
+            for gene, patterns in pair_gene_patterns.items():
+                for pattern in patterns:
+                    if len(pattern) <= 3:
+                        if re.search(rf'\b{re.escape(pattern)}\b', combined):
+                            hits.add(gene)
+                            break
+                    elif pattern in combined:
+                        hits.add(gene)
+                        break
+
+            # Check pair co-occurrence in this paper
+            for pair in lr_pairs:
+                lig = pair.get("ligand", "")
+                rec = pair.get("receptor", "")
+                pair_key = f"{lig}^{rec}"
+                if pair_key in pairs_covered:
+                    continue
+                # For complex receptors (ITGA2_ITGB1), check any subunit
+                rec_genes = [g.strip() for g in rec.split("_") if g.strip()] if "_" in rec else [rec]
+                if lig in hits and any(rg in hits for rg in rec_genes):
+                    pairs_covered.append(pair_key)
+
+        coverage["pairs_covered"] = pairs_covered
+        coverage["pairs_coverage_pct"] = len(pairs_covered) / len(lr_pairs) * 100
+        coverage["pairs_missing"] = [
+            f"{p.get('ligand')}^{p.get('receptor')}"
+            for p in lr_pairs
+            if f"{p.get('ligand')}^{p.get('receptor')}" not in pairs_covered
+        ]
 
     return coverage
 
@@ -1950,6 +2002,92 @@ def generate_biomedical_context(
         return {"strategic_context": "", "success": False}
 
 
+def _format_lr_pairs_for_prompt(pairs: list[dict] | None) -> str:
+    """Format L-R pairs for the query generation prompt."""
+    if not pairs:
+        return "None"
+    return ", ".join(
+        f"{p['ligand']}-{p['receptor']}" + (f" (score: {p['score']:.2f})" if 'score' in p else "")
+        for p in pairs[:10]  # Limit to 10 in prompt for token control
+    )
+
+
+async def _think_search_strategy(
+    genes: list[str],
+    pathways: list[str],
+    celltypes: list[str],
+    disease: str,
+    lr_pairs: list[dict] | None = None,
+    biomcp_url: str = DEFAULT_BIOMCP_URL,
+) -> str:
+    """Execute a single BioMCP think call to plan search strategy for SEARCHER.
+
+    Unlike _think_with_biomcp_for_planner (3-step chain for PLANNER interpretation),
+    this is a 1-step strategic call focused on literature search optimization:
+    which gene combinations yield the best results, which keywords disambiguate
+    common gene names, and which biological contexts narrow the search.
+
+    Called ONCE per search_literature_dynamic_async invocation, BEFORE the
+    iteration loop. Output is injected into the LLM query generation prompt.
+
+    Args:
+        genes: Gene list from analysis
+        pathways: Pathway list from analysis
+        celltypes: Cell type list from analysis
+        disease: Disease context
+        lr_pairs: L-R pairs (if available from file)
+        biomcp_url: BioMCP server URL
+
+    Returns:
+        Search strategy text wrapped in section header (empty string on failure)
+    """
+    try:
+        tools = await get_biomcp_tools(biomcp_url)
+        think_tool_biomcp = find_tool_by_name(tools, "think")
+
+        if think_tool_biomcp is None:
+            logger.debug("BioMCP think tool not found for search strategy")
+            return ""
+
+        # Build compact context for the think call
+        genes_str = ", ".join(genes[:15]) if genes else "none"
+        pathways_str = ", ".join(pathways[:8]) if pathways else "none"
+        celltypes_str = ", ".join(celltypes[:8]) if celltypes else "none"
+        pairs_str = ", ".join(
+            f"{p['ligand']}-{p['receptor']}" for p in (lr_pairs or [])[:8]
+        ) or "none"
+
+        result = await asyncio.wait_for(
+            think_tool_biomcp.ainvoke({
+                "thought": (
+                    f"Search strategy for {disease or 'unspecified disease'}: "
+                    f"I need to find literature covering genes [{genes_str}], "
+                    f"pathways [{pathways_str}], cell types [{celltypes_str}], "
+                    f"and L-R pairs [{pairs_str}]. "
+                    f"What are the best PubMed search strategies? Consider: "
+                    f"(1) which gene combinations co-occur in papers, "
+                    f"(2) alternative gene names or symbols that improve recall, "
+                    f"(3) which pathway-disease keyword combinations are most specific, "
+                    f"(4) whether any L-R pairs are well-studied vs. novel."
+                ),
+                "thoughtNumber": 1,
+                "totalThoughts": 1,
+                "nextThoughtNeeded": False,
+            }),
+            timeout=15,
+        )
+
+        strategy = str(result).strip()
+        if strategy:
+            logger.info(f"BioMCP search strategy think completed ({len(strategy)} chars)")
+            return f"\n## Search Strategy Context\n{strategy}\n"
+        return ""
+
+    except Exception as e:
+        logger.warning(f"BioMCP search strategy think failed (non-critical): {e}")
+        return ""
+
+
 @tool
 def search_literature_dynamic(
     genes: list[str],
@@ -2014,6 +2152,18 @@ def search_literature_dynamic(
         If output_path is provided: Compact summary with saved_to, total_papers,
         coverage, paper_titles (first 10), and a message.
     """
+    # Auto-read lr_pairs from data_dir if available (file-based injection)
+    _lr_pairs = None
+    if data_dir:
+        _lr_pairs_file = Path(data_dir) / "lr_pairs_search.json"
+        if _lr_pairs_file.exists():
+            try:
+                with open(_lr_pairs_file) as f:
+                    _lr_pairs = json.load(f).get("pairs", [])
+                logger.debug(f"Auto-loaded {len(_lr_pairs)} L-R pairs from {_lr_pairs_file}")
+            except Exception:
+                pass  # Non-critical: search proceeds without pair data
+
     return run_async(
         search_literature_dynamic_async(
             genes=genes,
@@ -2035,6 +2185,7 @@ def search_literature_dynamic(
             coverage_weighted_sort=coverage_weighted_sort,
             query_cache=query_cache,
             record_queries=record_queries,
+            lr_pairs=_lr_pairs,
         ),
         timeout=300,
     )
@@ -2061,6 +2212,7 @@ async def search_literature_dynamic_async(
     coverage_weighted_sort: bool = False,
     query_cache: list[dict] | None = None,
     record_queries: bool = False,
+    lr_pairs: list[dict] | None = None,
 ) -> dict:
     """Async version of search_literature_dynamic with ITERATIVE coverage improvement.
 
@@ -2111,11 +2263,25 @@ async def search_literature_dynamic_async(
     llm = create_llm(provider=llm_provider) if llm_provider else create_llm()
     recorded_iter0_queries: list[dict] = []
 
+    # v2: BioMCP think for search strategy (single call, pre-loop)
+    search_strategy_context = ""
+    if query_cache is None:  # Skip think when replaying cached queries
+        search_strategy_context = await _think_search_strategy(
+            genes=genes,
+            pathways=pathways,
+            celltypes=celltypes,
+            disease=disease,
+            lr_pairs=lr_pairs,
+            biomcp_url=biomcp_url,
+        )
+        if search_strategy_context:
+            think_success = True
+
     for iteration in range(max_iterations):
         logger.info(f"=== Async Iteration {iteration + 1}/{max_iterations} ===")
 
         # Calculate current coverage
-        current_coverage = _calculate_coverage(all_papers, genes, pathways, celltypes)
+        current_coverage = _calculate_coverage(all_papers, genes, pathways, celltypes, lr_pairs=lr_pairs)
         covered_genes = set(current_coverage.get("genes_covered", []))
         covered_pathways = set(current_coverage.get("pathways_covered", []))
 
@@ -2154,6 +2320,8 @@ async def search_literature_dynamic_async(
                     celltypes=", ".join(celltypes) if celltypes else "None",
                     disease=disease or "Not specified",
                     gene_aliases="",  # BioMCP article_searcher handles aliases internally
+                    lr_pairs=_format_lr_pairs_for_prompt(lr_pairs),
+                    search_strategy=search_strategy_context,
                 )
         else:
             # Gap-filling search for missing genes/pathways
@@ -2370,7 +2538,7 @@ async def search_literature_dynamic_async(
             final_papers = all_papers[:max_results]
     else:
         final_papers = all_papers[:max_results]
-    final_coverage = _calculate_coverage(final_papers, genes, pathways, celltypes)
+    final_coverage = _calculate_coverage(final_papers, genes, pathways, celltypes, lr_pairs=lr_pairs)
 
     coverage_history.append({
         "iteration": "final",
