@@ -183,11 +183,17 @@ class SubagentErrorGuardMiddleware(AgentMiddleware):
                     request.tool_call.get("name", "unknown"),
                     exc,
                 )
+                tool_args = request.tool_call.get("args", {})
+                subagent_type = ""
+                if isinstance(tool_args, dict):
+                    subagent_type = tool_args.get("subagent_type", "unknown")
                 return ToolMessage(
                     content=(
-                        f"Subagent hit step limit and could not complete. "
+                        f"CRITICAL: Subagent '{subagent_type}' hit recursion limit "
+                        f"and could NOT complete all tasks. "
                         f"Error: {type(exc).__name__}. "
-                        f"Continue to the next subagent in sequence."
+                        f"BEFORE proceeding, call check_stage1_completion(data_dir) "
+                        f"to verify pipeline integrity."
                     ),
                     tool_call_id=request.tool_call.get("id", ""),
                 )
@@ -207,11 +213,17 @@ class SubagentErrorGuardMiddleware(AgentMiddleware):
                     request.tool_call.get("name", "unknown"),
                     exc,
                 )
+                tool_args = request.tool_call.get("args", {})
+                subagent_type = ""
+                if isinstance(tool_args, dict):
+                    subagent_type = tool_args.get("subagent_type", "unknown")
                 return ToolMessage(
                     content=(
-                        f"Subagent hit step limit and could not complete. "
+                        f"CRITICAL: Subagent '{subagent_type}' hit recursion limit "
+                        f"and could NOT complete all tasks. "
                         f"Error: {type(exc).__name__}. "
-                        f"Continue to the next subagent in sequence."
+                        f"BEFORE proceeding, call check_stage1_completion(data_dir) "
+                        f"to verify pipeline integrity."
                     ),
                     tool_call_id=request.tool_call.get("id", ""),
                 )

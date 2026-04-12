@@ -1,0 +1,561 @@
+{# ===========================================================================
+   DeepMAST Drug Target Assessment Report — Jinja2 Template
+
+   CSS classes: skills/html-report-generator/assets/theme.css
+   JS functions: skills/html-report-generator/assets/interactive.js
+
+   Context variables expected:
+     title, disease, css, js, generation_date,
+     executive_summary, matrix, deep_dives, pipeline_summary
+   =========================================================================== #}
+
+{# ===== Macros ===== #}
+
+{% macro classification_badge(classification, priority) -%}
+<span class="classification-badge {{ classification|classification_badge }}">
+  {{ classification|replace("_", " ")|title }}
+</span>
+<span class="priority-badge {{ priority|priority_badge }}">
+  {{ priority|title }}
+</span>
+{%- endmacro %}
+
+{% macro drug_card_macro(drug) %}
+<div class="drug-card">
+    <h4>{{ drug.name }}
+        <span class="drug-phase {{ drug.max_phase|phase_class }}">Phase {{ drug.max_phase }}</span>
+    </h4>
+    <p><strong>ChEMBL:</strong> <a href="https://www.ebi.ac.uk/chembl/compound_report_card/{{ drug.chembl_id }}/" target="_blank">{{ drug.chembl_id }}</a></p>
+    {% if drug.mechanism and drug.mechanism != "mechanism not available" %}
+    <p><strong>Mechanism:</strong> {{ drug.mechanism }}</p>
+    {% endif %}
+    {% if drug.indications and drug.indications != "N/A" %}
+    <p><strong>Indications:</strong> {{ drug.indications }}</p>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro score_cell(value, column) -%}
+<td class="{{ value|score_class(column) }}">{{ value }}</td>
+{%- endmacro %}
+
+{% macro literature_card(ref) %}
+<div class="paper-card">
+    <div class="paper-title">
+        <a href="{{ ref.url }}" target="_blank">{{ ref.title }}</a>
+    </div>
+    <p style="color: var(--text-secondary); font-size: 0.9em;">
+        <a href="{{ ref.url }}" class="reference" target="_blank">PMID: {{ ref.pmid }}</a>
+    </p>
+</div>
+{% endmacro %}
+
+{% macro bio_context_table(pairs) %}
+<div class="table-container">
+    <table>
+        <thead><tr>
+            <th>L-R Pair</th>
+            <th>STRING PPI</th>
+            <th>Interaction</th>
+            <th>Census RR</th>
+            <th>Census p-value</th>
+        </tr></thead>
+        <tbody>
+        {% for p in pairs %}
+        <tr>
+            <td><strong>{{ p.pair }}</strong></td>
+            <td>{{ "%.3f"|format(p.string_score) }}</td>
+            <td>{{ p.interaction }}</td>
+            <td>{{ p.census_risk_ratio }}</td>
+            <td>{{ p.census_p_value }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endmacro %}
+
+{% macro rubric_card(rubric) %}
+<div class="rubric-summary">
+    <div class="summary-box" style="margin-bottom: 0;">
+        <h4>Validated Track</h4>
+        <table>
+            <tr><td>Drug Evidence</td><td class="{{ rubric.get('existing_drug_evidence', 0)|score_class('') }}"><strong>{{ rubric.get('existing_drug_evidence', 0) }}</strong></td></tr>
+            <tr><td>Clinical Trial Activity</td><td><strong>{{ rubric.get('clinical_trial_activity', 0) }}</strong></td></tr>
+            <tr><td>Safety Profile</td><td class="{{ rubric.get('safety_profile', 0)|score_class('safety_profile') }}"><strong>{{ rubric.get('safety_profile', 0) }}</strong></td></tr>
+            <tr style="border-top: 2px solid var(--border);"><td><strong>Validated Total</strong></td><td class="{{ rubric.get('validated_total', 0)|score_class('validated_total') }}"><strong>{{ rubric.get('validated_total', 0) }}</strong></td></tr>
+        </table>
+    </div>
+    <div class="summary-box" style="margin-bottom: 0;">
+        <h4>Exploratory Track</h4>
+        <table>
+            <tr><td>GWAS Support</td><td><strong>{{ rubric.get('gwas_support', 0) }}</strong></td></tr>
+            <tr><td>Tractability</td><td><strong>{{ rubric.get('tractability', 0) }}</strong></td></tr>
+            <tr><td>Biological Plausibility</td><td><strong>{{ rubric.get('biological_plausibility', 0) }}</strong></td></tr>
+            <tr><td>Novelty / Opportunity</td><td><strong>{{ rubric.get('novelty_opportunity', 0) }}</strong></td></tr>
+            <tr style="border-top: 2px solid var(--border);"><td><strong>Exploratory Total</strong></td><td class="{{ rubric.get('exploratory_total', 0)|score_class('exploratory_total') }}"><strong>{{ rubric.get('exploratory_total', 0) }}</strong></td></tr>
+        </table>
+    </div>
+</div>
+{% if rubric.get('combined_total') is not none %}
+<div style="text-align: center; margin-top: 12px; font-size: 1.1em;">
+    <strong>Combined Total: <span class="{{ rubric.combined_total|score_class('combined_total') }}" style="font-size: 1.3em;">{{ rubric.combined_total }}</span></strong>
+</div>
+{% endif %}
+{% endmacro %}
+
+{# ===== HTML Document ===== #}
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+{{ css }}
+
+/* === Drug Report Specific Additions === */
+.classification-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 600;
+    margin-right: 4px;
+}
+.priority-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+.badge-validated { background: rgba(129, 140, 248, 0.2); color: #818CF8; }
+.badge-exploratory { background: rgba(251, 191, 36, 0.2); color: #FBBF24; }
+.badge-novel { background: rgba(52, 211, 153, 0.2); color: #34D399; }
+.badge-insufficient { background: rgba(156, 163, 175, 0.2); color: #9CA3AF; }
+.badge-high { background: rgba(248, 113, 113, 0.15); color: #F87171; }
+.badge-medium { background: rgba(251, 191, 36, 0.15); color: #FBBF24; }
+.badge-low { background: rgba(156, 163, 175, 0.15); color: #9CA3AF; }
+.badge-unranked { background: rgba(107, 114, 128, 0.15); color: #6B7280; }
+
+.matrix-table th { font-size: 0.82em; white-space: nowrap; padding: 8px 6px; }
+.matrix-table td { text-align: center; font-size: 0.88em; padding: 6px; }
+.matrix-table td:first-child { text-align: left; font-weight: 500; white-space: nowrap; }
+.matrix-table tr.featured-row { background: rgba(129, 140, 248, 0.06); }
+
+.score-high { color: #34D399; font-weight: bold; }
+.score-medium { color: #818CF8; font-weight: bold; }
+.score-low { color: #FBBF24; }
+.score-minimal { color: var(--text-muted); }
+.score-critical { color: #F87171; font-weight: bold; }
+.score-warning { color: #FBBF24; }
+
+.drug-phase-4 { background: #34D399; color: #000; padding: 2px 8px; border-radius: 8px; font-size: 0.75em; font-weight: 600; }
+.drug-phase-3 { background: #818CF8; color: #fff; padding: 2px 8px; border-radius: 8px; font-size: 0.75em; font-weight: 600; }
+.drug-phase-2 { background: #FBBF24; color: #000; padding: 2px 8px; border-radius: 8px; font-size: 0.75em; font-weight: 600; }
+.drug-phase-1 { background: #9CA3AF; color: #000; padding: 2px 8px; border-radius: 8px; font-size: 0.75em; font-weight: 600; }
+.drug-phase-preclinical { background: #4B5563; color: #D1D5DB; padding: 2px 8px; border-radius: 8px; font-size: 0.75em; font-weight: 600; }
+
+.rubric-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.rubric-summary table { width: 100%; }
+.rubric-summary td { padding: 4px 8px; }
+.rubric-summary td:last-child { text-align: right; }
+
+.candidate-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 15px 0; }
+.candidate-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    transition: transform 0.2s;
+}
+.candidate-card:hover { transform: translateY(-2px); }
+.candidate-card h4 { margin: 0 0 8px 0; color: var(--color-primary); }
+
+.gene-divider { border: none; border-top: 1px solid var(--border); margin: 30px 0; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 15px 0; }
+.stat-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+}
+.stat-card .stat-value { font-size: 2em; font-weight: 700; color: var(--color-primary); }
+.stat-card .stat-label { font-size: 0.85em; color: var(--text-secondary); margin-top: 4px; }
+
+.legend-section { margin-top: 20px; }
+.legend-section summary { cursor: pointer; font-size: 1.1em; font-weight: 600; color: var(--color-primary); }
+.legend-section summary:hover { text-decoration: underline; }
+
+@media (max-width: 768px) {
+    .rubric-summary { grid-template-columns: 1fr; }
+    .candidate-grid { grid-template-columns: 1fr; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media print {
+    .classification-badge, .priority-badge { border: 1px solid #333; }
+    .drug-phase-4, .drug-phase-3, .drug-phase-2, .drug-phase-1 { border: 1px solid #333; background: #eee; color: #000; }
+}
+    </style>
+</head>
+<body>
+<div class="container">
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark theme">&#9681;</button>
+    <h1>{{ title }}</h1>
+    <p class="subtitle">Drug Target Assessment &mdash; {{ disease }}</p>
+
+    {# ===== Executive Summary ===== #}
+    <div class="summary-box">
+        <h3>Executive Summary</h3>
+        {{ executive_summary.text }}
+        {% if executive_summary.featured_candidates %}
+        <div class="key-findings">
+            <h4>Featured Candidates ({{ executive_summary.featured_candidates|length }})</h4>
+            <div class="candidate-grid">
+            {% for c in executive_summary.featured_candidates %}
+            <div class="candidate-card">
+                <h4>{{ c.gene }}</h4>
+                {{ classification_badge(c.classification, c.priority) }}
+                <p style="margin-top: 8px;"><strong>Combined:</strong> <span class="{{ c.combined_total|score_class('combined_total') }}">{{ c.combined_total }}</span></p>
+            </div>
+            {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {# ===== Tab Navigation ===== #}
+    <div class="tabs">
+        <button class="tab-button active" onclick="openTab(event, 'overview')">Overview</button>
+        <button class="tab-button" onclick="openTab(event, 'matrix')">Druggability Matrix</button>
+        <button class="tab-button" onclick="openTab(event, 'deepdives')">Candidate Deep Dives</button>
+        <button class="tab-button" onclick="openTab(event, 'recommendations')">Recommendations</button>
+    </div>
+
+    {# ===== Tab 1: Overview ===== #}
+    <div id="overview" class="tab-content active">
+        <h2>Pipeline Overview</h2>
+
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ pipeline_summary.get('total_genes', matrix.rows|length) }}</div>
+                <div class="stat-label">Genes Assessed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ executive_summary.featured_candidates|length }}</div>
+                <div class="stat-label">Featured Candidates</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ matrix.rows|selectattr('classification', 'equalto', 'validated_target')|list|length }}</div>
+                <div class="stat-label">Validated Targets</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ matrix.rows|selectattr('classification', 'equalto', 'novel_candidate')|list|length }}</div>
+                <div class="stat-label">Novel Candidates</div>
+            </div>
+        </div>
+
+        {# Score distribution summary #}
+        <div class="analysis-section">
+            <h3>Classification Distribution</h3>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Classification</th><th>Count</th><th>Genes</th></tr></thead>
+                    <tbody>
+                    {% set classifications = ['validated_target', 'exploratory_target', 'novel_candidate', 'insufficient_evidence'] %}
+                    {% for cls in classifications %}
+                    {% set genes = matrix.rows|selectattr('classification', 'equalto', cls)|list %}
+                    {% if genes %}
+                    <tr>
+                        <td><span class="classification-badge {{ cls|classification_badge }}">{{ cls|replace("_", " ")|title }}</span></td>
+                        <td>{{ genes|length }}</td>
+                        <td>{{ genes|map(attribute='gene')|join(', ') }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {# Featured candidates detail #}
+        <div class="analysis-section">
+            <h3>Featured Candidates — Stage 3 Deep Dive</h3>
+            <div class="candidate-grid">
+            {% for c in executive_summary.featured_candidates %}
+            <div class="candidate-card">
+                <h4><a href="#gene-{{ c.gene }}" style="color: var(--color-primary); text-decoration: none;">{{ c.gene }}</a></h4>
+                {{ classification_badge(c.classification, c.priority) }}
+                <p style="margin-top: 8px;">
+                    <strong>Combined:</strong> <span class="{{ c.combined_total|score_class('combined_total') }}">{{ c.combined_total }}</span>
+                    &nbsp;|&nbsp;
+                    <strong>Expl:</strong> {{ c.exploratory_total }}
+                </p>
+            </div>
+            {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {# ===== Tab 2: Druggability Matrix ===== #}
+    <div id="matrix" class="tab-content">
+        <h2>Druggability Matrix</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 15px;">
+            Full rubric scoring across {{ matrix.rows|length }} genes. Featured candidates (Stage 3) are highlighted.
+        </p>
+
+        <div class="table-container">
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th>Gene</th>
+                        <th title="existing_drug_evidence">Drug Ev.</th>
+                        <th title="clinical_trial_activity">Trial</th>
+                        <th title="safety_profile">Safety</th>
+                        <th title="validated_total">Val. Total</th>
+                        <th title="gwas_support">GWAS</th>
+                        <th title="tractability">Tract.</th>
+                        <th title="biological_plausibility">Bio. Plaus.</th>
+                        <th title="novelty_opportunity">Novelty</th>
+                        <th title="exploratory_total">Expl. Total</th>
+                        <th title="combined_total">Combined</th>
+                        <th>Classification</th>
+                        <th>Priority</th>
+                        <th>Stage3</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in matrix.rows %}
+                <tr{% if row.is_featured %} class="featured-row"{% endif %}>
+                    <td>{% if row.is_featured %}<strong>{{ row.gene }}</strong>{% else %}{{ row.gene }}{% endif %}</td>
+                    {{ score_cell(row.existing_drug_evidence, '') }}
+                    {{ score_cell(row.clinical_trial_activity, '') }}
+                    {{ score_cell(row.safety_profile, 'safety_profile') }}
+                    {{ score_cell(row.validated_total, 'validated_total') }}
+                    {{ score_cell(row.gwas_support, '') }}
+                    {{ score_cell(row.tractability, '') }}
+                    {{ score_cell(row.biological_plausibility, '') }}
+                    {{ score_cell(row.novelty_opportunity, '') }}
+                    {{ score_cell(row.exploratory_total, 'exploratory_total') }}
+                    {{ score_cell(row.combined_total, 'combined_total') }}
+                    <td>{{ classification_badge(row.classification, row.priority) }}</td>
+                    <td>{{ row.priority }}</td>
+                    <td>{% if row.stage3 %}<strong>Yes</strong>{% endif %}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# Scoring Legend (collapsible) #}
+        {% if matrix.legend %}
+        <details class="legend-section">
+            <summary>Scoring Legend</summary>
+            {% if matrix.legend.validated_track %}
+            <div class="analysis-section" style="margin-top: 15px;">
+                <h4>Validated Track (Clinical Evidence)</h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr>
+                            {% for h in matrix.legend.validated_track[0].keys() %}<th>{{ h }}</th>{% endfor %}
+                        </tr></thead>
+                        <tbody>
+                        {% for row in matrix.legend.validated_track %}
+                        <tr>{% for v in row.values() %}<td>{{ v }}</td>{% endfor %}</tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+            {% if matrix.legend.exploratory_track %}
+            <div class="analysis-section">
+                <h4>Exploratory Track (Genetic &amp; Biological Evidence)</h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr>
+                            {% for h in matrix.legend.exploratory_track[0].keys() %}<th>{{ h }}</th>{% endfor %}
+                        </tr></thead>
+                        <tbody>
+                        {% for row in matrix.legend.exploratory_track %}
+                        <tr>{% for v in row.values() %}<td>{{ v }}</td>{% endfor %}</tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+            {% if matrix.legend.combined_section %}
+            <div class="analysis-section">
+                <h4>Combined Score, Classification &amp; Priority</h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr>
+                            {% for h in matrix.legend.combined_section[0].keys() %}<th>{{ h }}</th>{% endfor %}
+                        </tr></thead>
+                        <tbody>
+                        {% for row in matrix.legend.combined_section %}
+                        <tr>{% for v in row.values() %}<td>{{ v }}</td>{% endfor %}</tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </details>
+        {% endif %}
+    </div>
+
+    {# ===== Tab 3: Candidate Deep Dives ===== #}
+    <div id="deepdives" class="tab-content">
+        <h2>Featured Candidate Deep Dives</h2>
+
+        {% for dive in deep_dives %}
+        <div class="analysis-section" id="gene-{{ dive.gene }}">
+            <h3>{{ dive.gene }} {{ classification_badge(dive.classification, dive.priority) }}</h3>
+
+            {# A. Drug Profile #}
+            <h4>A. Drug Profile</h4>
+            {% if dive.drug_profile.clinical_drugs %}
+            <p style="color: var(--text-secondary); font-size: 0.9em;">Clinical Compounds ({{ dive.drug_profile.clinical_drugs|length }})</p>
+            <div class="target-grid">
+                {% for drug in dive.drug_profile.clinical_drugs %}
+                {{ drug_card_macro(drug) }}
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if dive.drug_profile.preclinical_compounds %}
+            <details style="margin-top: 10px;">
+                <summary style="cursor: pointer; color: var(--text-secondary);">
+                    Preclinical Compounds ({{ dive.drug_profile.preclinical_compounds|length }})
+                </summary>
+                <div class="table-container" style="margin-top: 8px;">
+                    <table>
+                        <thead><tr><th>Name</th><th>ChEMBL</th></tr></thead>
+                        <tbody>
+                        {% for drug in dive.drug_profile.preclinical_compounds %}
+                        <tr>
+                            <td>{{ drug.name }}</td>
+                            <td><a href="https://www.ebi.ac.uk/chembl/compound_report_card/{{ drug.chembl_id }}/" target="_blank">{{ drug.chembl_id }}</a></td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+            {% endif %}
+            {% if not dive.drug_profile.clinical_drugs and not dive.drug_profile.preclinical_compounds %}
+            <p style="color: var(--text-secondary);"><em>No drug data available.</em></p>
+            {% endif %}
+
+            {# B. Biological Context #}
+            <h4>B. Biological Context (Stage 1)</h4>
+            {% if dive.biological_context %}
+            {{ bio_context_table(dive.biological_context) }}
+            {% else %}
+            <p style="color: var(--text-secondary);"><em>No biological context data.</em></p>
+            {% endif %}
+
+            {# D. Rubric Assessment #}
+            <h4>D. Rubric Assessment</h4>
+            {% if dive.rubric %}
+            {{ rubric_card(dive.rubric) }}
+            {% endif %}
+        </div>
+
+        {% if not loop.last %}
+        <hr class="gene-divider">
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    {# ===== Tab 4: Recommendations ===== #}
+    <div id="recommendations" class="tab-content">
+        <h2>Pipeline Execution Summary &amp; Recommendations</h2>
+
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ pipeline_summary.get('total_genes', matrix.rows|length) }}</div>
+                <div class="stat-label">Total Genes Assessed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ pipeline_summary.get('featured_count', executive_summary.featured_candidates|length) }}</div>
+                <div class="stat-label">Featured (Stage 3)</div>
+            </div>
+        </div>
+
+        {% if pipeline_summary.get('featured_genes') %}
+        <div class="summary-box">
+            <h4>Featured Genes</h4>
+            <p>{{ pipeline_summary.featured_genes|join(', ') }}</p>
+        </div>
+        {% endif %}
+
+        {# Validated targets recommendation #}
+        {% set validated = matrix.rows|selectattr('classification', 'equalto', 'validated_target')|selectattr('is_featured')|list %}
+        {% if validated %}
+        <div class="analysis-section">
+            <h3>Validated Target Recommendations</h3>
+            <div class="interpretation">
+                <p>The following <strong>{{ validated|length }} validated targets</strong> have existing drug evidence and clinical activity.
+                These represent immediate opportunities for drug repurposing or combination therapy exploration in {{ disease }}.</p>
+                <ul>
+                {% for v in validated %}
+                    <li><strong>{{ v.gene }}</strong> — Combined Score: {{ v.combined_total }}, {{ v.existing_drug_evidence }} drug evidence, {{ v.clinical_trial_activity }} trial activity</li>
+                {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Novel candidates recommendation #}
+        {% set novels = matrix.rows|selectattr('classification', 'equalto', 'novel_candidate')|list %}
+        {% if novels %}
+        <div class="analysis-section">
+            <h3>Novel Candidate Opportunities</h3>
+            <div class="interpretation">
+                <p><strong>{{ novels|length }} novel candidates</strong> lack known disease associations but show biological plausibility &mdash;
+                potential targets for novel drug discovery or repurposing investigations.</p>
+                <ul>
+                {% for n in novels %}
+                    <li><strong>{{ n.gene }}</strong> — Exploratory Total: {{ n.exploratory_total }}, Bio. Plausibility: {{ n.biological_plausibility }}, Novelty: {{ n.novelty_opportunity }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Scoring methodology summary #}
+        <div class="analysis-section">
+            <h3>Scoring Methodology</h3>
+            <div class="table-container">
+                <table>
+                    <tr><td><strong>Validated Track</strong></td><td>existing_drug_evidence + clinical_trial_activity + safety_profile</td></tr>
+                    <tr><td><strong>Exploratory Track</strong></td><td>gwas_support + tractability + biological_plausibility + novelty_opportunity</td></tr>
+                    <tr><td><strong>Combined Total</strong></td><td>validated_total + exploratory_total</td></tr>
+                    <tr><td><strong>Classification</strong></td><td>Rule-based: validated_target &rarr; exploratory_target &rarr; novel_candidate &rarr; insufficient_evidence</td></tr>
+                    <tr><td><strong>Priority</strong></td><td>Based on Combined/Exploratory totals: high, medium, low, unranked</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="metadata">
+        <p>Generated by DeepMAST Drug Target Assessment Pipeline</p>
+        <p>Date: {{ generation_date }}</p>
+    </div>
+</div>
+<script>
+{{ js }}
+// Default to overview tab for drug reports
+document.addEventListener('DOMContentLoaded', function() {
+    openTab(null, 'overview');
+});
+</script>
+</body>
+</html>

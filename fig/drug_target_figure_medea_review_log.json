@@ -1,0 +1,35 @@
+{
+  "figure_name": "Drug Target Assessment Agent — Medea-style architecture",
+  "target_venue": "Nature Methods",
+  "quality_threshold": 8.5,
+  "generation_method": "Full programmatic (matplotlib + Pillow)",
+  "generation_date": "2026-04-07",
+  "design_spec": "docs/plans/2026-04-07-drug-target-figure-medea-design.md",
+  "script": "scripts/overlay_drug_target_figure.py",
+  "outputs": {
+    "300dpi": "fig/drug_target_figure_medea.png",
+    "600dpi": "fig/drug_target_figure_medea_600dpi.png",
+    "caption": "fig/drug_target_figure_caption.md"
+  },
+  "dimensions": {
+    "width_inches": 7.2,
+    "height_inches": 10.8,
+    "width_mm": 183,
+    "height_mm": 274
+  },
+  "data_sources": {
+    "lr_candidates": "res_bc/lr_candidates.json",
+    "assessment_results": "res_bc/evidence/assessment_results.json",
+    "hypothesis_report": "res_bc/evidence/hypothesis_report.json"
+  },
+  "ai_base_attempted": true,
+  "ai_base_result": "Failed — OPENROUTER_API_KEY not available in subprocess",
+  "fallback_used": "Full programmatic rendering (matplotlib)",
+  "gemini_review": "Skipped — API key not available",
+  "notes": [
+    "Programmatic rendering guarantees text readability at all scales",
+    "Side panel content uses real pipeline outputs from breast cancer case study",
+    "Color palette is Okabe-Ito safe (colorblind accessible)",
+    "Fonts: Helvetica (sans-serif headers), Menlo (monospace data)"
+  ]
+}

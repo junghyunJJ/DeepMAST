@@ -236,6 +236,27 @@ print(df['standard_value'].describe())
 print(df.groupby('standard_type').size())
 ```
 
+### Local subset mode
+
+For repeatable local lookups, this repo can build a parquet subset under `data/chembl/`:
+
+```bash
+python skills/chembl-database/scripts/download_chembl_subset.py
+```
+
+Local subset support is intentionally limited to:
+
+- preclinical target and activity lookup for `human` and `mouse`
+- molecule metadata lookup by ChEMBL ID
+- mechanism and indication enrichment for matched molecules
+
+These remain API-only in v1:
+
+- similarity search
+- substructure search
+- general-purpose molecule browsing outside the local subset
+- Open Targets clinical relationship data such as disease links and trial stage
+
 ## Performance Optimization
 
 ### Caching

@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any
 
 from langchain_core.tools import tool
+from src.agents.drug_target.tools.chembl_resolver import resolve_chembl_molecule
+from src.agents.drug_target.tools.moa_enrichment import enrich_drugs_in_place
 from src.agents.drug_target.tools.stage2_service import extract_lr_pairs
+
+logger = logging.getLogger(__name__)
 
 
 _ONCOLOGY_KEYWORDS = (
@@ -65,27 +70,39 @@ def normalize_st_colocalization_score(value: Any) -> float:
     return _to_float(value, default=0.0)
 
 
-def _extract_pathway_tokens(
-    entries: list[Any],
-    *,
-    id_key: str,
-) -> tuple[set[str], set[str]]:
-    """Extract stable IDs and fallback names from pathway entries."""
-    ids: set[str] = set()
-    names: set[str] = set()
-    for entry in entries:
-        if isinstance(entry, dict):
-            raw_id = str(entry.get(id_key) or "").strip()
-            raw_name = str(entry.get("name") or "").strip()
-            if raw_id:
-                ids.add(raw_id)
-            if raw_name:
-                names.add(raw_name.lower())
-        elif isinstance(entry, str):
-            text = entry.strip()
-            if text:
-                names.add(text.lower())
-    return ids, names
+def compute_stage1_filter(stage1_evidence: dict[str, Any]) -> dict[str, Any]:
+    """Pass/fail filter for Stage 1 L-R pairs.
+
+    Criteria (all must be met):
+      - STRING combined score > 0.8
+      - Census coexpression p-value < 0.05
+      - Census gene_a (ligand) p-value < 0.05
+      - Census gene_b (receptor) p-value < 0.05
+    """
+    string_data = stage1_evidence.get("string_ppi", {})
+    raw_string = float(string_data.get("max_combined_score", 0))
+    string_combined = min(raw_string, 1.0) if raw_string <= 1.0 else min(raw_string / 1000.0, 1.0)
+
+    census = stage1_evidence.get("census_validation", {})
+    tvr = census.get("target_vs_rest", {})
+    coexpr_p = float(tvr.get("coexpression", {}).get("p_value", 1.0))
+    gene_a_p = float(tvr.get("gene_a", {}).get("p_value", 1.0))
+    gene_b_p = float(tvr.get("gene_b", {}).get("p_value", 1.0))
+
+    passed = (
+        string_combined > 0.8
+        and coexpr_p < 0.05
+        and gene_a_p < 0.05
+        and gene_b_p < 0.05
+    )
+
+    return {
+        "passed": passed,
+        "string_combined": round(string_combined, 4),
+        "census_coexpr_pvalue": coexpr_p,
+        "census_gene_a_pvalue": gene_a_p,
+        "census_gene_b_pvalue": gene_b_p,
+    }
 
 
 
@@ -102,6 +119,64 @@ def classify_disease_type(disease: str) -> str:
     if (disease or "").strip():
         return "non_oncology"
     return "unknown"
+
+
+# Key aliases: flat LLM keys -> canonical criterion names
+_VALIDATED_KEY_ALIASES = {
+    "drug_evidence": "existing_drug_evidence",
+    "existing_drug": "existing_drug_evidence",
+    "existing_drug_evidence": "existing_drug_evidence",
+    "trial": "clinical_trial_activity",
+    "clinical_trial": "clinical_trial_activity",
+    "clinical_trial_activity": "clinical_trial_activity",
+    "safety": "safety_profile",
+    "safety_profile": "safety_profile",
+}
+
+_EXPLORATORY_KEY_ALIASES = {
+    "gwas": "gwas_genetic_support",
+    "gwas_support": "gwas_genetic_support",
+    "gwas_genetic_support": "gwas_genetic_support",
+    "tractability": "tractability",
+    "biological_plausibility": "biological_plausibility",
+    "bio_plausibility": "biological_plausibility",
+    "bio_plaus": "biological_plausibility",
+    "novelty": "novelty_opportunity",
+    "novelty_opportunity": "novelty_opportunity",
+}
+
+
+def _normalize_matrix_row_to_tracks(row: dict[str, Any]) -> dict[str, Any]:
+    """Reconstruct validated_track/exploratory_track from flat keys if missing.
+
+    LLMs sometimes pass flat rows (e.g., {"drug_evidence": 3, "gwas": 2})
+    instead of nested dicts (e.g., {"validated_track": {"existing_drug_evidence": 3}}).
+    This normalizer handles both formats.
+    """
+    if isinstance(row.get("validated_track"), dict) and isinstance(row.get("exploratory_track"), dict):
+        return row  # Already has nested dicts, no normalization needed
+
+    normalized = dict(row)
+
+    # Reconstruct validated_track from flat keys
+    if not isinstance(normalized.get("validated_track"), dict):
+        vt: dict[str, Any] = {}
+        for flat_key, canonical in _VALIDATED_KEY_ALIASES.items():
+            if flat_key in normalized and canonical not in vt:
+                vt[canonical] = normalized[flat_key]
+        if vt:
+            normalized["validated_track"] = vt
+
+    # Reconstruct exploratory_track from flat keys
+    if not isinstance(normalized.get("exploratory_track"), dict):
+        et: dict[str, Any] = {}
+        for flat_key, canonical in _EXPLORATORY_KEY_ALIASES.items():
+            if flat_key in normalized and canonical not in et:
+                et[canonical] = normalized[flat_key]
+        if et:
+            normalized["exploratory_track"] = et
+
+    return normalized
 
 
 def rank_featured_candidates(
@@ -129,7 +204,7 @@ def rank_featured_candidates(
 
     scored_rows: list[dict[str, Any]] = []
     for row in druggability_matrix:
-        item = dict(row)
+        item = _normalize_matrix_row_to_tracks(dict(row))
         vt = compute_validated_track(item)
         et = compute_exploratory_track(item)
         classification = classify_target(item)
@@ -378,129 +453,122 @@ def validate_rubric_assessment(assessment: dict[str, Any]) -> list[str]:
 # Stage gating helpers
 # -------------------------------------------------------------------------
 
-def compute_stage1_confidence(stage1_evidence: dict[str, Any]) -> dict[str, Any]:
-    """Compute Stage 1 biological confidence score from evidence signals.
+@tool
+def apply_stage1_filter(data_dir: str) -> str:
+    """Apply Stage 1 pass/fail filter and update stage3_candidates.
 
-    Weighted combination of 4 signals (all normalized to [0, 1]):
-      - STRING PPI (35%): physical interaction evidence
-      - Census coexpression (30%): scRNA cross-validation
-      - Pathway count (20%): KEGG + Reactome pathways
-      - Expression (15%): CELLxGENE gene availability
+    Reads stage1 evidence, applies filtering criteria:
+    - STRING combined score > 0.8
+    - Census coexpression p-value < 0.05
+    - Census gene_a p-value < 0.05
+    - Census gene_b p-value < 0.05
 
-    Returns dict with individual scores, weights, and combined confidence.
+    Saves stage1_filter_results.csv and updates assessment_results.json
+    to keep only genes that appear in at least one passed pair.
     """
-    # STRING PPI: API returns score in 0-1 range (not 0-1000)
-    # Note: required_score *input* param uses 0-1000, but output score column is 0-1
-    string_data = stage1_evidence.get("string_ppi", {})
-    raw_string = float(string_data.get("max_combined_score", 0))
-    string_score = min(raw_string, 1.0) if raw_string <= 1.0 else min(raw_string / 1000.0, 1.0)
+    from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir
 
-    # Census coexpression: p-value gated, then risk_ratio normalized
-    census = stage1_evidence.get("census_validation", {})
-    coexpr = census.get(
-        "coexpression",
-        census.get("target_vs_rest", {}).get("coexpression", {}),
-    )
-    p_val = float(coexpr.get("p_value", 1.0))
-    rr = float(coexpr.get("risk_ratio") or 0.0)
-    census_score = (1.0 if p_val < 0.05 else 0.0) * min(rr / 3.0, 1.0)
+    base = _resolve_data_dir(data_dir)
+    evidence_dir = base / "evidence"
 
-    # Pathway: binary — shared pathway between ligand & receptor
-    kegg = stage1_evidence.get("kegg_pathways", {})
-    kegg_lig_ids, kegg_lig_names = _extract_pathway_tokens(
-        kegg.get("ligand_pathways", []),
-        id_key="pathway_id",
-    )
-    kegg_rec_ids, kegg_rec_names = _extract_pathway_tokens(
-        kegg.get("receptor_pathways", []),
-        id_key="pathway_id",
-    )
+    # 1. Load stage1_evidence.json
+    evidence_path = evidence_dir / "stage1_evidence.json"
+    if not evidence_path.exists():
+        return json.dumps({"success": False, "error": "stage1_evidence.json not found"})
 
-    reactome = stage1_evidence.get("reactome_pathways", {})
-    reactome_lig_ids, reactome_lig_names = _extract_pathway_tokens(
-        reactome.get("ligand_pathways", []),
-        id_key="reactome_id",
-    )
-    reactome_rec_ids, reactome_rec_names = _extract_pathway_tokens(
-        reactome.get("receptor_pathways", []),
-        id_key="reactome_id",
-    )
+    stage1_evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
 
-    has_shared = bool(
-        (kegg_lig_ids & kegg_rec_ids)
-        or (reactome_lig_ids & reactome_rec_ids)
-        or (kegg_lig_names & kegg_rec_names)
-        or (reactome_lig_names & reactome_rec_names)
-    )
+    # 2. Apply filter to each pair
+    results = []
+    passed_genes: set[str] = set()
+    for pair_key, evidence in stage1_evidence.items():
+        parts = pair_key.split("^", 1)
+        if len(parts) != 2:
+            continue
+        ligand, receptor = parts
+        filt = compute_stage1_filter(evidence)
+        filt["ligand"] = ligand
+        filt["receptor"] = receptor
+        # Add census target_vs_rest summary fields
+        census = evidence.get("census_validation", {})
+        tvr = census.get("target_vs_rest", {})
+        for prefix, key in [("gene_a", "gene_a"), ("gene_b", "gene_b"), ("coexpr", "coexpression")]:
+            sub = tvr.get(key, {})
+            filt[f"{prefix}_target_pct"] = round(float(sub.get("target_pct", 0)), 4)
+            filt[f"{prefix}_risk_ratio"] = round(float(sub.get("risk_ratio") or 0), 4)
+        results.append(filt)
+        if filt["passed"]:
+            passed_genes.add(ligand)
+            passed_genes.add(receptor)
 
-    # Backward compatibility: old format (flat "pathways" list) → count-based fallback
-    if (
-        not kegg_lig_ids and not kegg_rec_ids and not reactome_lig_ids and not reactome_rec_ids
-        and not kegg_lig_names and not kegg_rec_names and not reactome_lig_names and not reactome_rec_names
-    ):
-        old_kegg = len(kegg.get("pathways", []))
-        old_reactome = len(reactome.get("pathways", []))
-        pathway_score = min((old_kegg + old_reactome) / 4.0, 1.0)
-    else:
-        pathway_score = 1.0 if has_shared else 0.0
+    # 3. Save CSV
+    import csv
+    csv_path = evidence_dir / "stage1_filter_results.csv"
+    fieldnames = ["ligand", "receptor", "passed", "string_combined",
+                  "census_coexpr_pvalue", "census_gene_a_pvalue", "census_gene_b_pvalue",
+                  "gene_a_target_pct", "gene_a_risk_ratio",
+                  "gene_b_target_pct", "gene_b_risk_ratio",
+                  "coexpr_target_pct", "coexpr_risk_ratio"]
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for r in sorted(results, key=lambda x: (not x["passed"], x["ligand"])):
+            writer.writerow(r)
 
-    # Expression: cell-type-specific expression from Census z-test
-    tvr = census.get("target_vs_rest", {})
-    gene_a_pct = float(tvr.get("gene_a", {}).get("target_pct", 0))
-    gene_b_pct = float(tvr.get("gene_b", {}).get("target_pct", 0))
-    genes_expressed = sum(1 for pct in [gene_a_pct, gene_b_pct] if pct > 0)
-    expression_score = genes_expressed / 2.0
+    # 4. Update assessment_results.json — keep only passed genes in stage3_candidates
+    assessment_path = evidence_dir / "assessment_results.json"
+    updated_assessment = False
+    if assessment_path.exists():
+        assessment = json.loads(assessment_path.read_text(encoding="utf-8"))
+        old_candidates = assessment.get("stage3_candidates", [])
+        new_candidates = [
+            c for c in old_candidates
+            if (c.get("gene") or c.get("gene_symbol", "")).upper() in {g.upper() for g in passed_genes}
+        ]
+        assessment["stage3_candidates"] = new_candidates
+        assessment["stage1_filter_applied"] = True
+        assessment["stage1_filter_passed_genes"] = sorted(passed_genes)
+        # Update summary count to match filtered candidates
+        assessment.setdefault("summary", {})["stage3_count"] = len(new_candidates)
+        # Flip rubric flags for genes removed by filter
+        passed_upper = {g.upper() for g in passed_genes}
+        for row in assessment.get("rubric_assessment", []):
+            gene = (row.get("gene") or "").upper()
+            if gene and gene not in passed_upper:
+                row["stage3_candidate"] = False
+        assessment_path.write_text(json.dumps(assessment, indent=2), encoding="utf-8")
+        updated_assessment = True
 
-    # Backward compat: no census target_vs_rest → old available_genes fallback
-    if not tvr:
-        cellxgene = stage1_evidence.get("cellxgene", {})
-        available = {g.upper() for g in cellxgene.get("available_genes", [])}
-        # Fallback to legacy format when cellxgene.available_genes is empty
-        if not available:
-            legacy = stage1_evidence.get("legacy_stage1", {}).get("cellxgene_context", {})
-            available = {g.upper() for g in legacy.get("available_genes", [])}
-        ligand_name = stage1_evidence.get("ligand", "").upper()
-        receptor_name = stage1_evidence.get("receptor", "").upper()
-        genes_found = sum(1 for g in [ligand_name, receptor_name] if g and g in available)
-        expression_score = genes_found / 2.0
+        # 5. Regenerate rubric_scores.csv to match updated assessment
+        rubric_rows = assessment.get("rubric_assessment", [])
+        if rubric_rows:
+            csv_path_rubric = evidence_dir / "rubric_scores.csv"
+            # SYNC: keep in sync with compute_rubric_scores() fieldnames (~line 1170)
+            rubric_fieldnames = [
+                "gene", "existing_drug_evidence", "clinical_trial_activity",
+                "safety_profile", "validated_total",
+                "gwas_support", "tractability", "biological_plausibility",
+                "novelty_opportunity", "exploratory_total", "combined_total",
+                "classification", "priority", "stage3_candidate",
+            ]
+            with open(csv_path_rubric, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=rubric_fieldnames, extrasaction="ignore")
+                writer.writeheader()
+                writer.writerows(rubric_rows)
 
-    confidence = round(
-        0.35 * string_score
-        + 0.30 * census_score
-        + 0.20 * pathway_score
-        + 0.15 * expression_score,
-        4,
-    )
+    passed_pairs = [r for r in results if r["passed"]]
+    failed_pairs = [r for r in results if not r["passed"]]
 
-    return {
-        "confidence": confidence,
-        "string_score": round(string_score, 4),
-        "census_score": round(census_score, 4),
-        "pathway_score": round(pathway_score, 4),
-        "expression_score": round(expression_score, 4),
-    }
-
-
-def filter_by_stage1_confidence(
-    pairs_with_evidence: list[dict[str, Any]],
-    *,
-    threshold: float = 0.4,
-    min_remaining: int = 5,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Tag L-R pairs by Stage 1 confidence score (no filtering).
-
-    All pairs proceed to Stage 2. Pairs with confidence below *threshold*
-    are tagged with ``stage1_low_confidence=True`` for informational purposes.
-
-    Returns (all_pairs, []).  The second element is always an empty list
-    for backward compatibility.
-    """
-    for p in pairs_with_evidence:
-        conf = p.get("stage1_confidence", {}).get("confidence", 0)
-        if conf < threshold:
-            p["stage1_low_confidence"] = True
-
-    return list(pairs_with_evidence), []
+    return json.dumps({
+        "success": True,
+        "total_pairs": len(results),
+        "passed_pairs": len(passed_pairs),
+        "failed_pairs": len(failed_pairs),
+        "passed_genes": sorted(passed_genes),
+        "csv_path": str(csv_path),
+        "rubric_csv_updated": updated_assessment,
+        "assessment_updated": updated_assessment,
+    })
 
 
 VEP_HIGH_IMPACT = frozenset({
@@ -849,7 +917,7 @@ def _score_safety_profile(safety_liabilities: list | None) -> int:
     for entry in safety_liabilities:
         src = (entry.get("datasource") or "").lower()
         studies = entry.get("studies") or []
-        study_types = [s.get("type", "").lower() for s in studies]
+        study_types = [(s.get("type") or "").lower() for s in studies]
         if src == "pharmgkb" or "clinical" in " ".join(study_types):
             clinical_count += 1
         else:
@@ -1180,6 +1248,7 @@ def compute_rubric_scores(data_dir: str) -> str:
 
     # Save CSV
     csv_path = evidence_dir / "rubric_scores.csv"
+    # SYNC: keep in sync with apply_stage1_filter() rubric_fieldnames
     fieldnames = [
         "gene", "existing_drug_evidence", "clinical_trial_activity",
         "safety_profile", "validated_total",
@@ -1342,27 +1411,245 @@ def validate_stage3_gate(data_dir: str) -> str:
             "error": "No stage3_candidates in assessment_results.json.",
         })
 
-    # 2. Check stage3 files
+    # 2. Check stage3 files — both existence AND data quality
     found: list[str] = []
     missing: list[str] = []
+    genes_with_errors: list[str] = []
     for gene in stage3_genes:
         stage3_file = evidence_dir / f"stage3_{gene}.json"
         if stage3_file.exists():
             found.append(gene)
+            # Check data quality: did the query actually succeed?
+            try:
+                data = json.loads(stage3_file.read_text())
+                has_errors = bool(data.get("errors"))
+                not_executed = not data.get("executed", False)
+                if has_errors and not_executed:
+                    genes_with_errors.append(gene)
+            except (json.JSONDecodeError, OSError):
+                genes_with_errors.append(gene)
         else:
             missing.append(gene)
 
-    return json.dumps({
+    result = {
         "success": len(missing) == 0,
         "total": len(stage3_genes),
         "found": len(found),
+        "completed_genes": found,
         "missing_genes": missing,
-    }, indent=2)
+        "genes_with_errors": genes_with_errors,
+    }
+    if genes_with_errors:
+        result["warning"] = (
+            f"{len(genes_with_errors)} of {len(found)} genes have API errors "
+            f"(no drug data retrieved): {', '.join(genes_with_errors)}. "
+            f"Consider retrying after ChEMBL API recovers."
+        )
+    return json.dumps(result, indent=2)
 
 
 # ---------------------------------------------------------------------------
 # Reference Card — authoritative evidence summary for report_writer
 # ---------------------------------------------------------------------------
+
+
+_chembl_drug_cache: dict[str, dict] = {}
+
+
+def _resolve_chembl_drug(chembl_id: str) -> dict:
+    """Resolve CHEMBL ID to drug name and type via local-first ChEMBL lookup."""
+    if chembl_id in _chembl_drug_cache:
+        return _chembl_drug_cache[chembl_id]
+    result = resolve_chembl_molecule(chembl_id, allow_api_fallback=True)
+    _chembl_drug_cache[chembl_id] = result
+    return result
+
+
+def _prebuild_target_assessment(
+    data_dir_path: Path,
+    evidence_dir: Path,
+    disease_name: str,
+    rubric_by_gene: dict[str, dict],
+    stage3_data: dict[str, dict],
+    stage1_data: dict[str, dict],
+    stage3_genes: list[str] | None = None,
+) -> None:
+    """Pre-build target_assessment.json deterministically from evidence data.
+
+    Mirrors the drug.md pre-build pattern: all factual data is assembled
+    programmatically so the LLM doesn't need to construct the JSON schema.
+    """
+    import logging
+    _log = logging.getLogger(__name__)
+
+    # A. Load L-R pairs
+    lr_path = data_dir_path / "lr_candidates.json"
+    lr_pairs: list[dict] = []
+    if lr_path.exists():
+        lr_data = json.loads(lr_path.read_text(encoding="utf-8"))
+        if isinstance(lr_data, dict):
+            lr_pairs = lr_data.get("pairs", lr_data.get("lr_pairs", []))
+        elif isinstance(lr_data, list):
+            lr_pairs = lr_data
+
+    if not lr_pairs:
+        _log.warning("No L-R pairs found; skipping target_assessment.json pre-build")
+        return
+
+    # B. Build pair-level druggability_matrix
+    #    Each pair uses the RECEPTOR gene's rubric scores (receptor = drug target)
+    pair_matrix: list[dict[str, Any]] = []
+    for pair in lr_pairs:
+        ligand = pair.get("ligand", "")
+        receptor = pair.get("receptor", "")
+        rubric = rubric_by_gene.get(receptor, rubric_by_gene.get(ligand, {}))
+        pair_matrix.append({
+            "ligand": ligand,
+            "receptor": receptor,
+            "existing_drug_evidence": rubric.get("existing_drug_evidence", 0),
+            "clinical_trial_activity": rubric.get("clinical_trial_activity", 0),
+            "safety_profile": rubric.get("safety_profile", 0),
+            "gwas_support": rubric.get("gwas_support", 0),
+            "tractability": rubric.get("tractability", 0),
+            "biological_plausibility": rubric.get("biological_plausibility", 0),
+            "novelty_opportunity": rubric.get("novelty_opportunity", 0),
+        })
+
+    # C. Rank candidates and inject OpenTargets scores
+    ranked_matrix = rank_featured_candidates(pair_matrix)
+
+    # Reconcile pair-level featured/novel with gene-level stage3_candidates:
+    # 1. Remove featured from pairs where NEITHER gene is a stage3_candidate
+    # 2. Ensure EVERY stage3 gene has at least one pair marked is_featured
+    if stage3_genes:
+        s3_set = {g.upper() for g in stage3_genes}
+        # Step 1: Remove non-stage3 featured
+        for row in ranked_matrix:
+            ligand = str(row.get("ligand", "")).strip().upper()
+            receptor = str(row.get("receptor", "")).strip().upper()
+            if ligand not in s3_set and receptor not in s3_set:
+                row["is_featured"] = False
+                row["is_novel"] = False
+                row["rank"] = None
+        # Step 2: Ensure all stage3 genes covered
+        covered = set()
+        for row in ranked_matrix:
+            if not row.get("is_featured"):
+                continue
+            for key in ("ligand", "receptor"):
+                g = str(row.get(key, "")).strip().upper()
+                if g in s3_set:
+                    covered.add(g)
+        missing = s3_set - covered
+        if missing:
+            for row in ranked_matrix:
+                if not missing:
+                    break
+                ligand = str(row.get("ligand", "")).strip().upper()
+                receptor = str(row.get("receptor", "")).strip().upper()
+                for g in (receptor, ligand):
+                    if g in missing:
+                        row["is_featured"] = True
+                        missing.discard(g)
+                        break
+
+    for row in ranked_matrix:
+        if "open_targets_score" in row:
+            continue
+        for gene_key in ("receptor", "ligand"):
+            gene = str(row.get(gene_key, "")).strip().upper()
+            if not gene:
+                continue
+            ot_file = evidence_dir / f"ot_{gene}.json"
+            if ot_file.exists():
+                try:
+                    ot_data = json.loads(ot_file.read_text(encoding="utf-8"))
+                    score = ot_data.get("association_score") or ot_data.get(
+                        "overall_association_score", 0
+                    )
+                    if score:
+                        row["open_targets_score"] = float(score)
+                        break
+                except Exception:
+                    continue
+        if "open_targets_score" not in row:
+            row["open_targets_score"] = 0.0
+
+    # D. Build featured_candidates_deep_dive from stage3/stage1 data
+    #    Both ligand and receptor may be stage3 genes (e.g., ICAM1^MUC1)
+    #    so we collect ALL stage3 genes from featured pairs, then build entries.
+    featured_deep_dive: list[dict[str, Any]] = []
+    seen_genes: set[str] = set()
+    s3_set = {g.upper() for g in (stage3_genes or [])}
+
+    # Collect all stage3 genes that appear in any featured/novel pair
+    candidate_genes: list[str] = []
+    for row in ranked_matrix:
+        if not (row.get("is_featured") or row.get("is_novel")):
+            continue
+        for key in ("receptor", "ligand"):
+            g = str(row.get(key, "")).strip()
+            if g and g.upper() in s3_set and g not in seen_genes:
+                seen_genes.add(g)
+                candidate_genes.append(g)
+
+    for gene in candidate_genes:
+
+        s3 = stage3_data.get(gene, {})
+        # Find stage1 context for this gene
+        string_score = 0.0
+        kegg_pathway = ""
+        for s1_val in stage1_data.values():
+            if not isinstance(s1_val, dict):
+                continue
+            s1_lig = str(s1_val.get("ligand", "")).strip().upper()
+            s1_rec = str(s1_val.get("receptor", "")).strip().upper()
+            if gene.upper() not in (s1_lig, s1_rec):
+                continue
+            ppi = s1_val.get("string_ppi", {})
+            string_score = max(string_score, ppi.get("max_combined_score", 0.0))
+            kegg = s1_val.get("kegg_pathways", {})
+            rec_pws = kegg.get("receptor_pathways", [])
+            if rec_pws and not kegg_pathway:
+                kegg_pathway = rec_pws[0] if isinstance(rec_pws[0], str) else str(rec_pws[0])
+
+        featured_deep_dive.append({
+            "target_gene": gene,
+            "track": "featured" if row.get("is_featured") else "novel",
+            "stage3_clinical_safety": {
+                "known_drugs_drugbank": [
+                    d.get("drug_name", d.get("name", ""))
+                    for d in s3.get("drugs", [])
+                ],
+                "toxicity_admet": s3.get("safety_summary", "No safety data available"),
+                "latest_pubmed_insights": (
+                    ", ".join(
+                        str(p.get("pmid", "")) if isinstance(p, dict) else str(p)
+                        for p in s3.get("pmids", [])[:5]
+                    ) or None
+                ),
+            },
+            "stage1_biological_context": {
+                "string_ppi_score": string_score,
+                "primary_kegg_pathway": kegg_pathway or "No pathway data",
+            },
+        })
+
+    # E. Assemble and save
+    ta_payload = {
+        "project_meta": {
+            "disease_focus": disease_name,
+            "total_input_pairs": len(lr_pairs),
+        },
+        "druggability_matrix": ranked_matrix,
+        "featured_candidates_deep_dive": featured_deep_dive,
+    }
+    ta_path = data_dir_path / "target_assessment.json"
+    ta_path.write_text(json.dumps(ta_payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    _log.info(
+        "Pre-built target_assessment.json: %d pairs, %d deep dives",
+        len(ranked_matrix), len(featured_deep_dive),
+    )
 
 
 @tool
@@ -1404,7 +1691,7 @@ def build_evidence_summary(data_dir: str) -> str:
             "stage3_candidate": row.get("stage3_candidate", False),
         }
 
-    stage3_genes = [c["gene"] for c in assessment.get("stage3_candidates", [])]
+    stage3_genes = [g for c in assessment.get("stage3_candidates", []) if (g := c.get("gene"))]
 
     # 2. Load stage3_*.json → drugs + PMIDs per gene
     stage3_data: dict[str, dict] = {}
@@ -1413,9 +1700,23 @@ def build_evidence_summary(data_dir: str) -> str:
         if not s3_path.exists():
             stage3_data[gene] = {"drugs": [], "pmids": [], "error": "file not found"}
             continue
-        s3 = json.loads(s3_path.read_text())
+        try:
+            s3 = json.loads(s3_path.read_text())
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Corrupt stage3_%s.json: %s", gene, exc)
+            stage3_data[gene] = {"drugs": [], "pmids": [], "error": f"corrupt: {exc}"}
+            continue
         drugs = []
-        for d in s3.get("chembl_drugs", []):
+        # Try multiple keys: chembl_drugs (old format) or matched_drugs (new format)
+        raw_drugs = s3.get("chembl_drugs") or s3.get("matched_drugs") or []
+        # Handle nested dict format: {"executed": true, "matched_drugs": [...]}
+        if isinstance(raw_drugs, dict):
+            raw_drugs = raw_drugs.get("matched_drugs", [])
+        if not isinstance(raw_drugs, list):
+            raw_drugs = []
+        for d in raw_drugs:
+            if not isinstance(d, dict):
+                continue
             drugs.append({
                 "chembl_id": d.get("chembl_id", ""),
                 "drug_name": d.get("drug_name", ""),
@@ -1423,17 +1724,75 @@ def build_evidence_summary(data_dir: str) -> str:
                 "indications": d.get("indications", []),
                 "max_phase": d.get("max_phase"),
             })
-        pmids = []
-        for p in s3.get("pubmed_papers", []):
-            pmid = p.get("pmid", "")
-            if pmid:
-                pmids.append({"pmid": str(pmid), "title": p.get("title", "")})
-        stage3_data[gene] = {"drugs": drugs, "pmids": pmids}
+        # Load clinical drugs from OpenTargets target_drugs (ot_{gene}.json)
+        clinical_drugs = []
+        ot_path = evidence_dir / f"ot_{gene}.json"
+        if ot_path.exists():
+            try:
+                ot = json.loads(ot_path.read_text())
+                ot_rows = ot.get("target_drugs", {})
+                if isinstance(ot_rows, dict):
+                    ot_rows = ot_rows.get("rows", [])
+                if not isinstance(ot_rows, list):
+                    ot_rows = []
+                for r in ot_rows:
+                    d = r.get("drug", {})
+                    chembl_id = d.get("id", "")
+                    if not chembl_id:
+                        continue
+                    resolved = _resolve_chembl_drug(chembl_id)
+                    indications = []
+                    for dis in r.get("diseases", []):
+                        dname = dis.get("disease", {}).get("name", "")
+                        if dname:
+                            indications.append(dname)
+                    clinical_drugs.append({
+                        "chembl_id": chembl_id,
+                        "drug_name": resolved["name"],
+                        "molecule_type": resolved["molecule_type"],
+                        "max_phase": r.get("maxClinicalStage"),
+                        "first_approval": resolved["first_approval"],
+                        "indications": indications,
+                        "mechanism_of_action": None,
+                        "source": "opentargets",
+                    })
+            except Exception:
+                pass
+
+        # Check for stage3 API errors
+        s3_errors = s3.get("errors", [])
+        s3_executed = s3.get("executed", False)
+
+        stage3_data[gene] = {
+            "clinical_drugs": clinical_drugs,
+            "preclinical_compounds": drugs,
+            "drugs": clinical_drugs + drugs,  # backward compat
+            "stage3_api_errors": s3_errors if s3_errors else [],
+            "stage3_executed": s3_executed,
+        }
+
+    # 2b. Local-first mechanism-of-action enrichment for all drug dicts.
+    # Uses data/chembl/mechanisms.parquet via the chembl-database skill.
+    # Runs BEFORE featured_cards assembly so _preformat_cards picks up the
+    # populated `mechanism_of_action` field. The `drugs` alias list holds the
+    # same dict references as clinical_drugs + preclinical_compounds, so the
+    # in-place mutations propagate through both views.
+    _moa_filled = 0
+    for _gene_key, _gene_data in stage3_data.items():
+        _moa_filled += enrich_drugs_in_place(
+            _gene_data.get("clinical_drugs", []),
+            _gene_data.get("preclinical_compounds", []),
+        )
+    logger.info(
+        "MoA enrichment: populated %d drug records across %d stage3 genes",
+        _moa_filled,
+        len(stage3_data),
+    )
 
     # 3. Load stage1_*.json → per-pair biological context
     stage1_data: dict[str, dict] = {}
     for s1_path in sorted(evidence_dir.glob("stage1_*.json")):
-        if s1_path.name in ("stage1_evidence.json", "stage1_confidence.json", "stage1_audit.json"):
+        if s1_path.name in ("stage1_evidence.json", "stage1_confidence.json", "stage1_filter.json", "stage1_audit.json"):
             continue
         try:
             s1 = json.loads(s1_path.read_text())
@@ -1512,6 +1871,22 @@ def build_evidence_summary(data_dir: str) -> str:
             "stage3_candidate": row.get("stage3_candidate", False),
         })
 
+    # 6. Load stage1_filter_results.csv for Biological Interaction Filter table
+    import csv as _csv
+    stage1_filter_results = []
+    filter_csv_path = evidence_dir / "stage1_filter_results.csv"
+    if filter_csv_path.exists():
+        with open(filter_csv_path, encoding="utf-8") as _f:
+            for row in _csv.DictReader(_f):
+                stage1_filter_results.append(row)
+
+    # 7. Load hypothesis_report.json (if hypothesis_writer completed)
+    hypothesis_data = {}
+    hypothesis_path = evidence_dir / "hypothesis_report.json"
+    if hypothesis_path.exists():
+        with open(hypothesis_path, encoding="utf-8") as _f:
+            hypothesis_data = json.load(_f)
+
     # Assemble Reference Card
     featured_cards = []
     for gene in stage3_genes:
@@ -1529,11 +1904,65 @@ def build_evidence_summary(data_dir: str) -> str:
         }
         featured_cards.append(card)
 
+    # --- Fix 5: Detect stage3 API failures and build data_limitations ---
+    # Must be computed BEFORE render_drug_md which uses data_limitations
+    data_limitations: list[str] = []
+    stage3_error_genes = [
+        gene for gene in stage3_genes
+        if stage3_data.get(gene, {}).get("stage3_api_errors")
+        and not stage3_data.get(gene, {}).get("stage3_executed", False)
+    ]
+    if stage3_error_genes:
+        data_limitations.append(
+            f"Stage 3 ChEMBL drug profiling was unavailable for "
+            f"{len(stage3_error_genes)} of {len(stage3_genes)} genes "
+            f"({', '.join(stage3_error_genes)}) due to API errors. "
+            f"Drug profiles shown for these genes are from OpenTargets Stage 2 data only."
+        )
+
+    # --- Fix 4: Persist resolved drug names for audit trail ---
+    resolved_drugs_audit: list[dict] = []
+    for gene in stage3_genes:
+        gene_data = stage3_data.get(gene, {})
+        for drug in gene_data.get("clinical_drugs", []):
+            resolved_drugs_audit.append({
+                "gene": gene,
+                "chembl_id": drug.get("chembl_id", ""),
+                "resolved_name": drug.get("drug_name", ""),
+                "molecule_type": drug.get("molecule_type"),
+                "max_phase": drug.get("max_phase"),
+                "source": drug.get("source", "opentargets"),
+            })
+        for drug in gene_data.get("preclinical_compounds", []):
+            resolved_drugs_audit.append({
+                "gene": gene,
+                "chembl_id": drug.get("chembl_id", ""),
+                "resolved_name": drug.get("drug_name", ""),
+                "molecule_type": None,
+                "max_phase": drug.get("max_phase"),
+                "source": "chembl",
+            })
+    resolved_drugs_path = evidence_dir / "resolved_drugs.json"
+    resolved_drugs_path.write_text(
+        json.dumps(resolved_drugs_audit, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
     # Build pre-formatted markdown template
     disease_name = assessment.get("disease", "unknown")
-    md_template = _build_markdown_template(
-        disease_name, stage3_genes, featured_cards,
-        all_genes_matrix, stage1_data,
+    # Lazy import to avoid circular dependency:
+    # stage_logic → drug_report_html → evidence_loader → stage_logic
+    from src.agents.drug_target.tools.drug_report_html import render_drug_md
+
+    md_template = render_drug_md(
+        disease=disease_name,
+        stage3_genes=stage3_genes,
+        featured_cards=featured_cards,
+        all_genes_matrix=all_genes_matrix,
+        stage1_data=stage1_data,
+        stage1_filter_results=stage1_filter_results,
+        hypothesis_data=hypothesis_data,
+        data_limitations=data_limitations,
     )
 
     reference_card = {
@@ -1551,7 +1980,10 @@ def build_evidence_summary(data_dir: str) -> str:
         "stage3_candidates": stage3_genes,
         "featured_genes": featured_cards,
         "all_genes_druggability": all_genes_matrix,
+        "stage1_filter_results": stage1_filter_results,
+        "hypothesis_data": hypothesis_data,
         "known_drugs_disease_level": known_drugs[:20] if isinstance(known_drugs, list) else known_drugs,
+        "data_limitations": data_limitations,
         "markdown_template": md_template,
     }
 
@@ -1559,326 +1991,17 @@ def build_evidence_summary(data_dir: str) -> str:
     draft_path = data_dir_path / "drug.md"
     draft_path.write_text(md_template + "\n", encoding="utf-8")
 
-    # Return a compact card (without the full template) + instructions
-    reference_card["markdown_template"] = (
-        f"DRAFT WRITTEN to {draft_path} ({len(md_template)} chars, "
-        f"{md_template.count(chr(10))} lines, "
-        f"{md_template.count('pubmed.ncbi')} PMID hyperlinks). "
-        f"Read it with read_file, expand each <!-- EXPAND --> comment "
-        f"with 2-4 sentences, then save via save_drug_md."
+    # === Pre-build target_assessment.json ===
+    _prebuild_target_assessment(
+        data_dir_path, evidence_dir, disease_name,
+        rubric_by_gene, stage3_data, stage1_data,
+        stage3_genes,
     )
 
+    # Return full Reference Card with inline template (no read_file needed)
     return json.dumps(reference_card, indent=2, ensure_ascii=False)
 
 
-def _build_markdown_template(
-    disease: str,
-    stage3_genes: list[str],
-    featured_cards: list[dict],
-    all_genes_matrix: list[dict],
-    stage1_data: dict[str, dict],
-) -> str:
-    """Build a pre-formatted markdown template with all correct values."""
-    lines: list[str] = []
-
-    # Section 1: Executive Summary skeleton
-    n_genes = len(all_genes_matrix)
-    n_featured = len(stage3_genes)
-    lines.append(f"# Therapeutic Target Assessment Report — {disease}")
-    lines.append("")
-    lines.append("## 1. Executive Summary")
-    lines.append("")
-    lines.append(f"This report presents a comprehensive therapeutic target assessment for **{disease}** "
-                 f"based on spatial transcriptomics cell-cell interaction (CCI) analysis. "
-                 f"A total of **{n_genes} unique genes** from the top-30 L-R pairs were evaluated "
-                 f"through a 3-stage evidence funnel, yielding **{n_featured} featured candidates** "
-                 f"for deep-dive analysis.")
-    lines.append("")
-    lines.append("### Featured Candidates")
-    lines.append("")
-    for card in featured_cards:
-        gene = card["gene"]
-        r = card.get("rubric", {})
-        lines.append(f"- **{gene}** — Classification: {r.get('classification', 'N/A')}, "
-                     f"Priority: {r.get('priority', 'N/A')}, "
-                     f"Exploratory Total: {r.get('exploratory_total', 'N/A')}, "
-                     f"Combined Total: {r.get('combined_total', 'N/A')}")
-    lines.append("")
-    lines.append("<!-- EXPAND: Add 2-3 sentences summarizing key therapeutic opportunities -->")
-    lines.append("")
-
-    # Section 2: Druggability Matrix (full 14-column rubric table)
-    lines.append("## 2. Druggability Matrix")
-    lines.append("")
-    lines.append("<!-- EXPAND: Add 2-3 sentences interpreting the overall scoring landscape -->")
-    lines.append("")
-    lines.append(
-        "| Gene | Drug Ev. | Trial | Safety | Val. Total "
-        "| GWAS | Tract. | Bio. Plaus. | Novelty | Expl. Total "
-        "| Combined | Classification | Priority | Stage3 |"
-    )
-    lines.append(
-        "|------|--------:|------:|-------:|-----------:"
-        "|-----:|-------:|------------:|--------:|------------:"
-        "|---------:|----------------|----------|--------|"
-    )
-    # Sort: stage3 candidates first (by combined_total desc), then rest (by combined_total desc)
-    featured_rows = sorted(
-        [r for r in all_genes_matrix if r.get("stage3_candidate")],
-        key=lambda r: r.get("combined_total", 0), reverse=True,
-    )
-    other_rows = sorted(
-        [r for r in all_genes_matrix if not r.get("stage3_candidate")],
-        key=lambda r: r.get("combined_total", 0), reverse=True,
-    )
-    for row in featured_rows + other_rows:
-        marker = "**" if row.get("stage3_candidate") else ""
-        lines.append(
-            f"| {marker}{row['gene']}{marker} "
-            f"| {row.get('existing_drug_evidence', 0)} "
-            f"| {row.get('clinical_trial_activity', 0)} "
-            f"| {row.get('safety_profile', 0)} "
-            f"| {row.get('validated_total', 0)} "
-            f"| {row.get('gwas_support', 0)} "
-            f"| {row.get('tractability', 0)} "
-            f"| {row.get('biological_plausibility', 0)} "
-            f"| {row.get('novelty_opportunity', 0)} "
-            f"| {row.get('exploratory_total', 0)} "
-            f"| {row.get('combined_total', 0)} "
-            f"| {row.get('classification', 'N/A')} "
-            f"| {row.get('priority', 'N/A')} "
-            f"| {'Yes' if row.get('stage3_candidate') else ''} |"
-        )
-    lines.append("")
-
-    # Scoring Legend
-    lines.append("### Scoring Legend")
-    lines.append("")
-    lines.append("Each gene is scored on two independent tracks reflecting different "
-                 "types of therapeutic evidence. The **Validated Track** captures existing "
-                 "clinical and drug development activity, while the **Exploratory Track** "
-                 "captures genetic, biological, and novelty signals that suggest untapped "
-                 "therapeutic potential.")
-    lines.append("")
-
-    # Validated Track table
-    lines.append("#### Validated Track (Clinical Evidence)")
-    lines.append("")
-    lines.append("| Column | Full Name | Range | Data Source | Scoring Logic | Interpretation |")
-    lines.append("|--------|-----------|-------|-------------|---------------|----------------|")
-    lines.append(
-        "| Drug Ev. | existing_drug_evidence | -5 to +5 | OpenTargets | "
-        "(gene-level drug count) minus (disease-level drug count), clamped | "
-        "Positive = repurposing opportunity across indications; "
-        "Negative = saturated drug landscape for this disease; "
-        "Zero = no known drugs |"
-    )
-    lines.append(
-        "| Trial | clinical_trial_activity | -5 to +5 | ChEMBL, ClinicalTrials | "
-        "(gene-level clinical programs) minus (disease-level trial entries), clamped | "
-        "Positive = active pipeline with novel indication potential; "
-        "Negative = competitive/crowded trial space |"
-    )
-    lines.append(
-        "| Safety | safety_profile | -3 to 0 | PharmGKB, ToxCast, AOP-Wiki | "
-        "0 = no concerns; -1 = preclinical signals only (ToxCast/AOP-Wiki 3+); "
-        "-2 = clinical concerns (PharmGKB 1-2 entries); "
-        "-3 = major clinical safety issues (PharmGKB 3+) | "
-        "Penalty score: more negative = higher safety risk |"
-    )
-    lines.append(
-        "| Val. Total | validated_total | -13 to +10 | (computed) | "
-        "Sum of Drug Ev. + Trial + Safety | "
-        "Overall clinical readiness; higher = stronger existing drug development evidence |"
-    )
-    lines.append("")
-
-    # Exploratory Track table
-    lines.append("#### Exploratory Track (Genetic & Biological Evidence)")
-    lines.append("")
-    lines.append("| Column | Full Name | Range | Data Source | Scoring Logic | Interpretation |")
-    lines.append("|--------|-----------|-------|-------------|---------------|----------------|")
-    lines.append(
-        "| GWAS | gwas_support | 0-3 | GWAS Catalog | "
-        "0 = no disease-specific GWAS evidence; "
-        "1 = proximity hits only (within 500kb); "
-        "2 = direct disease link (gene-in-trait or gene-SNP overlap); "
-        "3 = genome-wide significant overlap (p < 5e-8) | "
-        "Genetic validation strength for this disease |"
-    )
-    lines.append(
-        "| Tract. | tractability | 0-3 | OpenTargets Tractability | "
-        "0 = unknown druggability; "
-        "1 = predicted structure or druggable family; "
-        "2 = clinical precedent (advanced clinical / Phase 1); "
-        "3 = approved drug exists for this modality | "
-        "How feasible it is to develop a drug against this target |"
-    )
-    lines.append(
-        "| Bio. Plaus. | biological_plausibility | 0-5 | OpenTargets Evidence + Ensembl VEP | "
-        "Count of distinct evidence types (affected_pathway, literature, animal_model, "
-        "somatic_mutation) + bonus if max score >= 0.7, + VEP high-impact variant boost | "
-        "Breadth and strength of biological evidence linking gene to disease |"
-    )
-    lines.append(
-        "| Novelty | novelty_opportunity | 0-5 | OpenTargets Associations | "
-        "Inverse of number of disease associations: "
-        "5 = 0 associations (completely novel, e.g. ST-only discovery); "
-        "4 = 1-2; 3 = 3-5; 2 = 6-15; 1 = 16-30; "
-        "0 = 30+ (well-established target) | "
-        "Higher = less explored, greater opportunity for novel discovery |"
-    )
-    lines.append(
-        "| Expl. Total | exploratory_total | 0-16 | (computed) | "
-        "Sum of GWAS + Tract. + Bio. Plaus. + Novelty | "
-        "Overall exploratory potential; higher = stronger biological rationale for investigation |"
-    )
-    lines.append("")
-
-    # Classification & Priority rules
-    lines.append("#### Combined Score, Classification & Priority")
-    lines.append("")
-    lines.append("| Field | Description |")
-    lines.append("|-------|-------------|")
-    lines.append(
-        "| **Combined** | validated_total + exploratory_total. "
-        "Overall target attractiveness across both tracks. |"
-    )
-    lines.append(
-        "| **Classification** | Rule-based assignment: "
-        "`validated_target` if Drug Ev. >= 3 or (Drug Ev. >= 1 and Val. Total >= 3); "
-        "`exploratory_target` if GWAS >= 1 or Tract. >= 2 or Bio. Plaus. >= 3; "
-        "`novel_candidate` if Bio. Plaus. >= 2 or Novelty >= 3 or (Tract. >= 1 and Novelty >= 2); "
-        "`insufficient_evidence` otherwise. |"
-    )
-    lines.append(
-        "| **Priority** | For validated_target: `high` (Combined >= 10), `medium` (>= 5), `low`. "
-        "For exploratory/novel: `high` (Expl. Total >= 12), `medium` (>= 7), `low`. "
-        "insufficient_evidence is always `unranked`. |"
-    )
-    lines.append(
-        "| **Stage3** | Top 7 genes by exploratory_total are selected as featured candidates "
-        "and proceed to Stage 3 deep-dive analysis (ChEMBL drug profiling + PubMed literature search). |"
-    )
-    lines.append("")
-
-    # Section 3: Featured Candidate Deep Dives
-    lines.append("## 3. Featured Candidate Deep Dives")
-    lines.append("")
-
-    for card in featured_cards:
-        gene = card["gene"]
-        r = card.get("rubric", {})
-        s3 = card.get("stage3", {})
-        pairs = card.get("stage1_pairs", {})
-
-        lines.append(f"### {gene} — Classification: {r.get('classification', 'N/A')} | Priority: {r.get('priority', 'N/A')}")
-        lines.append("")
-
-        # A. Drug Profile
-        lines.append("**A. Drug Profile**")
-        lines.append("")
-        drugs = s3.get("drugs", [])
-        if drugs:
-            for d in drugs:
-                name = d.get("drug_name", "Unknown")
-                cid = d.get("chembl_id", "")
-                moa = d.get("mechanism_of_action") or "mechanism not available"
-                phase = d.get("max_phase", "N/A")
-                raw_ind = d.get("indications", [])
-                indications = ", ".join(
-                    (i.get("name", str(i)) if isinstance(i, dict) else str(i))
-                    for i in raw_ind
-                ) or "N/A"
-                lines.append(f"- **{name}** (ChEMBL: {cid}) — {moa}, Max Phase: {phase}, Indications: {indications}")
-        else:
-            lines.append("- No known drugs targeting this gene")
-        lines.append("")
-        lines.append("<!-- EXPAND: Add 2-3 sentences interpreting the drug landscape -->")
-        lines.append("")
-
-        # B. Literature Evidence
-        lines.append("**B. Literature Evidence**")
-        lines.append("")
-        pmids = s3.get("pmids", [])
-        if pmids:
-            for p in pmids:
-                pmid = p.get("pmid", "")
-                title = p.get("title", "")
-                lines.append(f"- [PMID: {pmid}](https://pubmed.ncbi.nlm.nih.gov/{pmid}/) — \"{title}\"")
-        else:
-            lines.append("- No PubMed citations available")
-        lines.append("")
-        lines.append("<!-- EXPAND: Summarize key findings from the literature -->")
-        lines.append("")
-
-        # C. Biological Context
-        lines.append("**C. Biological Context (Stage 1)**")
-        lines.append("")
-        if pairs:
-            for pair_key, pair_data in pairs.items():
-                lig = pair_data.get("ligand", "")
-                rec = pair_data.get("receptor", "")
-                ppi = pair_data.get("string_ppi", {})
-                score = ppi.get("max_combined_score", "N/A")
-                found = ppi.get("interaction_found", False)
-                lines.append(f"- **{lig}–{rec}**: STRING PPI score={score}, interaction={'confirmed' if found else 'not found'}")
-
-                kegg = pair_data.get("kegg_pathways", {})
-                for role, key in [("ligand", "ligand_pathways"), ("receptor", "receptor_pathways")]:
-                    pws = kegg.get(key, [])
-                    if pws:
-                        pw_str = "; ".join(str(p) for p in pws[:3])
-                        lines.append(f"  - KEGG ({role}): {pw_str}")
-
-                reactome = pair_data.get("reactome_pathways", {})
-                for role, key in [("ligand", "ligand_pathways"), ("receptor", "receptor_pathways")]:
-                    pws = reactome.get(key, [])
-                    if pws:
-                        pw_str = "; ".join(str(p) for p in pws[:3])
-                        lines.append(f"  - Reactome ({role}): {pw_str}")
-
-                census = pair_data.get("census", {})
-                if census.get("risk_ratio") is not None:
-                    lines.append(f"  - Census: risk_ratio={census['risk_ratio']}, p_value={census.get('p_value', 'N/A')}")
-        else:
-            lines.append("- No Stage 1 data available for this gene")
-        lines.append("")
-        lines.append("<!-- EXPAND: Interpret biological context and pathway relevance -->")
-        lines.append("")
-
-        # D. Rubric Assessment
-        lines.append("**D. Rubric Assessment**")
-        lines.append("")
-        lines.append(f"- Validated Track: existing_drug_evidence={r.get('existing_drug_evidence', 0)}, "
-                     f"clinical_trial_activity={r.get('clinical_trial_activity', 0)}, "
-                     f"safety_profile={r.get('safety_profile', 0)} "
-                     f"→ **validated_total={r.get('validated_total', 0)}**")
-        lines.append(f"- Exploratory Track: gwas_support={r.get('gwas_support', 0)}, "
-                     f"tractability={r.get('tractability', 0)}, "
-                     f"biological_plausibility={r.get('biological_plausibility', 0)}, "
-                     f"novelty_opportunity={r.get('novelty_opportunity', 0)} "
-                     f"→ **exploratory_total={r.get('exploratory_total', 0)}**")
-        lines.append(f"- **Combined Total: {r.get('combined_total', 0)}** | "
-                     f"Classification: {r.get('classification', 'N/A')} | "
-                     f"Priority: {r.get('priority', 'N/A')}")
-        lines.append("")
-        lines.append("<!-- EXPAND: Add therapeutic recommendation based on evidence -->")
-        lines.append("")
-        lines.append("---")
-        lines.append("")
-
-    # Section 4: Pipeline Summary
-    lines.append("## 4. Pipeline Execution Summary & Recommendations")
-    lines.append("")
-    lines.append(f"- Total genes assessed: {n_genes}")
-    lines.append(f"- Featured candidates (Stage 3): {n_featured}")
-    lines.append(f"- Featured genes: {', '.join(stage3_genes)}")
-    lines.append("")
-    lines.append("<!-- EXPAND: Add recommendations for validated targets, exploratory targets, and next steps -->")
-    lines.append("")
-
-    return "\n".join(lines)
 
 
 def _extract_census_summary(census: dict | Any) -> dict:
@@ -1954,17 +2077,22 @@ def validate_drug_md(data_dir: str) -> str:
     assessment_path = evidence_dir / "assessment_results.json"
     if assessment_path.exists():
         assessment = json.loads(assessment_path.read_text())
+        stage3_genes = {c.get("gene") for c in assessment.get("stage3_candidates", [])}
+
         for row in assessment.get("rubric_assessment", []):
             gene = row["gene"]
-            if gene.upper() not in drug_text.upper():
+            if gene not in stage3_genes:
                 continue
             true_class = row.get("classification", "")
-            true_priority = row.get("priority", "")
 
-            # Check for wrong classification near gene name
-            gene_sections = drug_text.split(gene)
-            for section in gene_sections[1:]:  # after gene name
-                chunk = section[:500]  # look in nearby text
+            # Use word-boundary regex to avoid CD4 matching CD44/CD47
+            pattern = re.compile(r'\b' + re.escape(gene) + r'\b')
+            found_wrong = False
+
+            for match in pattern.finditer(drug_text):
+                if found_wrong:
+                    break
+                chunk = drug_text[match.end():match.end() + 500]
                 if "validated_target" in chunk.lower() and true_class != "validated_target":
                     issues.append({
                         "type": "WRONG_CLASSIFICATION",
@@ -1973,7 +2101,8 @@ def validate_drug_md(data_dir: str) -> str:
                         "claimed": "validated_target",
                         "actual": true_class,
                     })
-                if "novel_candidate" in chunk.lower() and true_class != "novel_candidate":
+                    found_wrong = True
+                elif "novel_candidate" in chunk.lower() and true_class != "novel_candidate":
                     issues.append({
                         "type": "WRONG_CLASSIFICATION",
                         "severity": "high",
@@ -1981,6 +2110,7 @@ def validate_drug_md(data_dir: str) -> str:
                         "claimed": "novel_candidate",
                         "actual": true_class,
                     })
+                    found_wrong = True
 
     # 3. Decimal rubric score detection (should be integers)
     decimal_scores = re.findall(

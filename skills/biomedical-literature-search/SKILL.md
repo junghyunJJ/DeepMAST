@@ -1,23 +1,28 @@
 ---
 name: biomedical-literature-search
-description: Complete literature search workflow for CCI analysis interpretation using src/agents/deep_interpreter/tools/literature.py::search_literature_dynamic as the primary engine, with a runnable wrapper at scripts/search_literature_dynamic.py. Use when you need phase-based biomedical paper search, coverage checks, and auto-saved outputs.
+description: Complete 4-phase PubMed literature search workflow for cell-cell interaction (CCI) and spatial transcriptomics interpretation. Use when the SEARCHER subagent needs to find papers supporting ligand-receptor interactions, pathway enrichment, gene/marker expression, or disease-context evidence with coverage checks (>=25 papers, >=60% gene coverage, >=50% pathway coverage). Orchestrates `search_literature_dynamic` (primary, LLM-powered, auto-fallback to fixed-strategy) and `search_literature` for targeted follow-up, auto-saving results to `/papers.json`.
+metadata:
+  author: DeepMAST Deep Interpreter
+  version: 1.1.0
 ---
 
 # Biomedical Literature Search Strategy
 
-Complete literature search workflow for interpreting ST/CCI analysis results and generating publication-style output with supporting references.
+Complete 4-phase literature search workflow for interpreting ST/CCI analysis results and generating publication-style output with supporting references.
 
 ## Purpose
 
-This skill provides the **complete workflow** for the SEARCHER subagent. It defines:
+This skill defines the SEARCHER subagent's core workflow:
 - **WHEN** to search (timing by interpretation phase)
 - **WHAT** to search (priority by analysis type)
 - **HOW** to validate (quality criteria)
 - **WHERE** to write outputs (virtual filesystem)
 
+> **Progressive disclosure**: This file contains only the core 4-phase workflow and critical rules. Detailed tool API, advanced E-utilities patterns, part-specific focus, quick reference card, interpretation output format, and a full worked example all live in `references/search_strategies.md`. Read that file on demand.
+
 ## Script Entry Point
 
-Run the skill wrapper from this skill directory:
+Run the primary wrapper from the skill directory:
 
 ```bash
 python scripts/search_literature_dynamic.py \
@@ -29,98 +34,50 @@ python scripts/search_literature_dynamic.py \
   --output-path "papers.json"
 ```
 
-The wrapper calls `src/agents/deep_interpreter/tools/literature.py::search_literature_dynamic`
-directly and prints JSON output.
+The wrapper calls `src/agents/deep_interpreter/tools/literature.py::search_literature_dynamic` and prints JSON output.
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│          This SKILL.md (Workflow Definition)                     │
-│  - Phase 1: Extract Context                                      │
-│  - Phase 2: Search Literature (Dynamic with auto-fallback)       │
-│  - Phase 3: Reflect (Quality Loop)                               │
-│  - Phase 4: Write Output                                         │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ (SEARCHER reads workflow, then calls tools)
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│          Python Tools (Execution Layer)                          │
-│  - load_analysis_data: Load analysis results and search_context  │
-│  - search_literature_dynamic: LLM-powered search (auto-fallback) │
-│  - search_literature: Single query search (follow-up)            │
-│  - think_tool: Reflection (Phase 3)                               │
-│  - read_file / write_file: Virtual filesystem operations         │
-│  - scripts/search_literature_dynamic.py: CLI wrapper for primary │
-│    search_literature_dynamic tool                                │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Virtual Filesystem
+## Virtual Filesystem Contract
 
 | File | Phase | Content |
 |------|-------|---------|
-| `/data_path.txt` | Read | Real data directory path |
-| `/search_context.json` | Phase 1 | Unified search context (all parts) |
-| `/papers.json` | Phase 4 | Search results (all parts) |
+| `/data_path.txt` | Read | Real data directory path (pre-written by orchestrator) |
+| `/search_context.json` | Phase 1 | Unified search context (genes, pathways, celltypes) |
+| `/papers.json` | Phase 2/4 | Auto-saved search results (all parts) |
 
 ---
 
 ## Phase 1: Extract Context
 
 ### Step 1.1: Load Data Path
-Read **/data_path.txt** to get the REAL data directory path.
+Read **`/data_path.txt`** to get the real data directory path.
 
 ### Step 1.2: Load Analysis Data
-Call **load_analysis_data** with the exact path from /data_path.txt.
+Call **`load_analysis_data`** with the exact path from `/data_path.txt`. The tool returns pre-extracted `search_context` fields — do NOT parse raw CSVs manually.
 
-### Step 1.3: Using search_context (MANDATORY)
-The load_analysis_data tool returns pre-extracted search context fields:
+### Step 1.3: Use `search_context` (MANDATORY)
 
-**Unified context (RECOMMENDED):**
-| Part | Context Field | Contains | Output File |
-|------|---------------|----------|-------------|
-| All Parts | `search_context` | genes, pathways, celltypes | `/papers.json` |
+The `load_analysis_data` tool returns a unified context:
 
-**Example search_context:**
-```json
-{
-  "genes": ["ITGB1", "CD44", "APP", "FYN", "ITGAV", "FN1", "TGFB1", "...top 30 by hybrid score (0.7×combinedscore + 0.3×freq)"],
-  "all_genes": ["ACKR3", "ADAM10", "ADAM17", "...all 352 unique genes sorted"],
-  "pathways": ["Androgen", "EGFR", "Estrogen", "Hypoxia", "NFkB", "TGFb", "MAPK", "PI3K"],
-  "celltypes": ["B cells", "Endothelial", "Invasive Tumor", "Stromal", "Macrophages"],
-  "context_type": "lr_interaction",
-  "applicable_parts": [1, 2, 3],
-  "source": "interest_sig_liana.csv",
-  "stats": {"total_genes": 352, "search_genes": 30, "total_pathways": 64, "total_celltypes": 13}
-}
-```
-**Note:** `genes` contains top 30 by hybrid score (0.7×max_combinedscore + 0.3×freq; combinedscore = 0.4×Factor + 0.4×Moran's R + 0.2×GenePT). `all_genes` has the full set for reference.
+| Field | Contains |
+|-------|----------|
+| `genes` | Top 30 by hybrid score (0.7×max_combinedscore + 0.3×freq) — **use directly** |
+| `all_genes` | Full unique gene set (reference only, do NOT use for search) |
+| `pathways` | Pathway names (e.g., EGFR, Hypoxia, TGFb, MAPK, PI3K) |
+| `celltypes` | Cell type names (e.g., B cells, Endothelial, Tumor, Stromal) |
+| `context_type` | `lr_interaction` / `pathway` / `marker` |
+| `applicable_parts` | List of Part numbers (1, 2, 3) |
+| `stats` | `{total_genes, search_genes, total_pathways, total_celltypes}` |
 
 ### Step 1.4: Write Context File
-Write extracted context to **/search_context.json**:
-```json
-{
-  "genes": ["CDH1", "CEACAM5", "ERBB2", "LRIG1", "TGFB1"],
-  "pathways": ["NFkB", "Hypoxia", "TGFb", "MAPK"],
-  "celltypes": ["Invasive Tumor", "Stromal", "Macrophages"],
-  "keywords": ["spatial transcriptomics", "tumor microenvironment"],
-  "disease_context": "breast cancer",
-  "analysis_focus": "Part N specific focus"
-}
-```
+Write the extracted context to **`/search_context.json`** for downstream use.
 
 ---
 
 ## Phase 2: Search Literature
 
 ### Step 2.1: Execute LLM-Powered Dynamic Search (Primary)
-Use **scripts/search_literature_dynamic.py** (primary) which calls
-`search_literature_dynamic` for context-aware, LLM-generated queries:
-- genes: search_context["genes"] (pre-filtered top 30 by hybrid score, use directly)
-- pathways: Priority pathways from search strategy
-- celltypes: Relevant cell types for this Part
-- disease: Disease context (e.g., "breast cancer")
+
+Use **`scripts/search_literature_dynamic.py`** — the CLI wrapper for the primary tool:
 
 ```bash
 python scripts/search_literature_dynamic.py \
@@ -132,85 +89,36 @@ python scripts/search_literature_dynamic.py \
   --output-path "papers.json"
 ```
 
-**Why Dynamic Search First?**
+**Why dynamic search first?**
 - LLM understands biological context and generates optimized queries
-- Better adaptation to Part-specific analysis types (L-R, pathway, spatial)
-- More relevant papers for specialized disease/tissue contexts
-
-### Step 2.1b: Advanced Search with E-utilities (Optional — Gap-Filling)
-
-After `search_literature_dynamic`, if coverage gaps remain in specific areas,
-use `search_pubmed_advanced` for targeted precision searches.
-Use search_context["genes"] (already top 30 by hybrid score):
-
-**When to use:**
-- Gene coverage < 60% after Phase 3.1: Search missing genes with MeSH terms
-- Need recent papers (last 2 years): Use date filter
-- Need specific study types: Use publication type filter
-- Need pathway-specific papers: Use MeSH subheadings
-
-**Example queries:**
-```python
-# MeSH subheading for pathway mechanisms
-search_pubmed_advanced(query="TGF-beta signaling/physiology[mh] AND spatial transcriptomics[tiab]")
-
-# Recent systematic reviews
-search_pubmed_advanced(query="cell-cell interaction[tiab] AND systematic review[pt]", min_date="2023/01/01")
-
-# Specific L-R interaction with date range
-search_pubmed_advanced(query="CDH1[tiab] AND E-cadherin[tiab] AND epithelial mesenchymal[mh]", min_date="2020/01/01")
-
-# Proximity search for co-occurring terms
-search_pubmed_advanced(query='"spatial transcriptomics cell interaction"[TIAB:~5]')
-
-# Multiple genes with publication type filter
-search_pubmed_advanced(
-    query="(VEGFA[tiab] OR TGFB1[tiab]) AND neoplasms[mh] AND review[pt]",
-    min_date="2022/01/01",
-    max_results=10
-)
-```
-
-**Key advantage over BioMCP**: Full control over PubMed query syntax including
-MeSH subheadings, field tags, date ranges, proximity operators, and publication
-type filters. Use this when you know exactly what you're looking for.
-
-For complete E-utilities search syntax reference, see:
-`skills/pubmed-eutils-search/SKILL.md`
+- Adapts to Part-specific analysis types (L-R, pathway, spatial)
+- Better relevance for specialized disease/tissue contexts
 
 ### Step 2.2: Automatic Internal Fallback
-`search_literature_dynamic` handles fallback internally — no manual intervention needed.
+`search_literature_dynamic` handles fallback internally. If LLM query generation fails, it automatically switches to a fixed 4-strategy search.
 
-If the LLM-powered query generation fails (LLM error, parsing failure, timeout),
-the tool automatically falls back to a fixed 4-strategy search internally.
+Check `think_success` in the return value:
+- `think_success: True` — LLM queries used
+- `think_success: False` — internal fallback used
 
-You do **NOT** need to call any fallback tool separately. The `search_literature_dynamic`
-return value includes `think_success` to indicate which path was taken:
-- `think_success: True` — LLM-generated queries were used
-- `think_success: False` — internal fixed-strategy fallback was used
+**You do NOT call a separate fallback tool.**
 
-If coverage is still insufficient after `search_literature_dynamic`, use
-**search_literature** for targeted follow-up searches on specific gaps.
+### Step 2.3: Advanced E-utilities (Optional, Gap-Filling)
 
-### Step 2.3: Tool Returns
-Both tools return:
-- `papers`: List of found papers with PMIDs
-- `total_papers`: Number of unique papers
-- `genes_covered`: Genes found in papers
-- `pathways_covered`: Pathways found in papers
-- `coverage_summary`: Coverage statistics
+If coverage gaps remain after Phase 3 reflection, use `search_pubmed_advanced` for precision MeSH / date / publication-type filters.
 
-**Additional fields from `search_literature_dynamic`:**
-- `generated_queries`: LLM-generated query structures (for debugging)
-- `think_success`: Whether strategic planning succeeded
+→ See `references/search_strategies.md` § "Advanced PubMed E-utilities Patterns" for full syntax. Also cross-references `skills/pubmed-eutils-search/SKILL.md`.
+
+### Step 2.4: Tool Returns
+Compact summary (when `output_path` provided): `saved_to`, `total_papers`, `coverage`, `paper_titles`, `message`.
+
+→ Full API parameters and return fields: `references/search_strategies.md` § "Complete Tool API Reference".
 
 ---
 
 ## Phase 3: Reflect (Quality Loop)
 
-**MANDATORY**: Use **think_tool** for quality validation and gap analysis.
-
-> **Tool**: think_tool provides structured sequential thinking for both strategic planning and quality validation.
+**MANDATORY**: Use **`think_tool`** for quality validation and gap analysis.
 
 ### Quality Criteria
 
@@ -223,46 +131,32 @@ Both tools return:
 
 ### Reflection Workflow
 
-**Reflection Thought 1: Coverage Analysis**
+**Thought 1 — Coverage Analysis**:
 ```python
-# Use think_tool for quality validation
 think_tool(
     reflection="Coverage analysis for Part {N}: "
                "{GENES_COVERED}/{TOTAL_GENES} priority genes covered ({X}%), "
                "{PATHWAYS_COVERED}/{TOTAL_PATHWAYS} pathways covered ({Y}%). "
                "Gaps identified: {MISSING_ITEMS}. "
-               "Expected mechanisms covered: {COVERED_MECHANISMS}. "
-               "Missing mechanisms: {MISSING_MECHANISMS}. "
                "Follow-up search needed: {YES/NO}",
     iteration=1,
     max_iterations=2
 )
 ```
 
-**Reflection Thought 2: Gap-Targeted Strategy** (if coverage < threshold)
+**Thought 2 — Gap-Targeted Strategy** (only if coverage below threshold):
 ```python
 think_tool(
-    reflection="Targeted follow-up strategy: "
-               "Searching for {MISSING_GENES} with synonyms {SYNONYMS}. "
-               "Adding broader terms for {PATHWAY}: '{PATHWAY} signaling {DISEASE}'. "
-               "Alternative queries: {ALTERNATIVE_QUERIES}.",
+    reflection="Targeted follow-up: Searching {MISSING_GENES} with synonyms. "
+               "Broader terms for {PATHWAY}: '{PATHWAY} signaling {DISEASE}'.",
     iteration=2,
     max_iterations=2
 )
 ```
 
-### Coverage Check Logic
-```
-If genes_covered < 60%:
-    -> Add gene synonyms, search individually with search_literature
-If pathways_covered < 50%:
-    -> Search pathway + "signaling" + disease
-If total_papers < 25:
-    -> Broaden disease context, add "spatial transcriptomics"
-```
+### Follow-up Search (only if needed)
 
-### Follow-up Search (if needed)
-Use **search_literature** for targeted single-query searches:
+Use `search_literature` for targeted single-query searches:
 ```python
 search_literature(
     query="SNAI1 EMT breast cancer spatial",
@@ -271,38 +165,18 @@ search_literature(
 )
 ```
 
+→ Full reflection workflow, coverage-check logic, and part-specific priorities: `references/search_strategies.md`.
+
 ---
 
-## Phase 4: Output (Auto-Saved via output_path)
+## Phase 4: Output (Auto-Saved via `output_path`)
 
 ### Papers Are Auto-Saved
-When you call `search_literature_dynamic` with the `output_path` parameter, the tool
-saves complete results (all papers with full abstracts) directly to file. You do **NOT**
-need to call `write_file` for papers — the tool handles it automatically with zero truncation.
+When you call `search_literature_dynamic` with `output_path`, the tool saves complete results (all papers with full abstracts) directly to file. **You do NOT call `write_file` for papers.**
 
-### How to Use output_path
-```bash
-# All parts (unified): auto-saves to DEEP_INTERPRETER_DATA_DIR/papers.json
-python scripts/search_literature_dynamic.py \
-  --genes "ITGB1,CD44,APP,FYN,ITGAV,FN1,TGFB1" \
-  --pathways "Androgen,EGFR,Hypoxia,MAPK,PI3K,TGFb" \
-  --celltypes "B cells,Endothelial,Invasive Tumor,Stromal,Macrophages" \
-  --disease "breast cancer" \
-  --max-results 40 \
-  --output-path "papers.json"
-```
-
-### What the Tool Returns (Compact Summary)
-When `output_path` is provided, the tool returns a compact summary instead of full results:
-- `saved_to`: Absolute path where the file was saved
-- `output_path`: The filename you specified
-- `total_papers`: Number of papers saved
-- `coverage`: Full coverage metrics (genes/pathways percentages)
-- `paper_titles`: First 10 paper titles for quick reference
-- `message`: Confirmation message
+The saved file is guaranteed to have `total_papers == len(papers)` (no truncation). Use `read_file('/papers.json')` if you need to inspect the saved data.
 
 ### Saved File Format
-The auto-saved file contains the complete data:
 ```json
 {
   "papers": [
@@ -319,252 +193,72 @@ The auto-saved file contains the complete data:
     "genes_missing": ["SNAI1"],
     "genes_coverage_pct": 75,
     "pathways_covered": ["EMT", "TGFB"],
-    "pathways_missing": [],
     "pathways_coverage_pct": 100,
     "total_papers": 28
   },
   "search_iterations": 2,
-  "search_queries": [
-    "\"CDH1\"[Gene] AND \"breast cancer\"[Title/Abstract]"
-  ]
+  "search_queries": ["\"CDH1\"[Gene] AND \"breast cancer\"[Title/Abstract]"]
 }
 ```
-
-### Important
-- **ALWAYS** use `output_path` when calling search_literature_dynamic
-- Do **NOT** call `write_file` for papers when using `output_path`
-- The saved file is guaranteed to have `total_papers == len(papers)` (no truncation)
-- Use `read_file('/papers.json')` to inspect saved data
-
----
-
-## Part-Specific Search Focus
-
-| Part | Primary Focus | think_tool Priority | Key Analyses |
-|------|--------------|---------------------|--------------|
-| **Part 1** (Spatial/Pathway) | Spatial patterns, pathway biology | Genes driving spatial organization | 1-1 Spatial, 1-3 Neighborhood, 1-4 Decoupler, 1-5 MISTy |
-| **Part 2** (CCI/NMF) | Cell-cell interaction, NMF patterns | L-R pairs, factor composition | 2-6 LIANA Moran's R, 2-7 NMF, 2-8 Pathway-Factor, 2-9 ctSVG |
-| **Part 3** (L-R Details) | Ligand-receptor biology | Specific L-R mechanisms | 3-10 L-R Visualization, 3-11 L-R Summary |
 
 ---
 
 ## Common Mistakes to Avoid
 
-### FORBIDDEN ACTIONS
-- **DO NOT** use read_file on .csv files - causes context overflow (571KB -> 5KB)
-- **DO NOT** try to parse raw CSV data manually
-- **DO NOT** extract genes from pathway enrichment `name` column - those are pathways, not genes
-- **DO NOT** override search_context["genes"] with all_genes (top 30 is pre-filtered for search)
-- **DO NOT** proceed with < 60% gene coverage without additional searches
-- **DO NOT** skip reflection after search (Phase 4)
+### ❌ FORBIDDEN
+- **DO NOT** use `read_file` on raw `.csv` files — causes context overflow
+- **DO NOT** parse raw CSV data manually
+- **DO NOT** extract genes from pathway enrichment `name` column — those are pathways, not genes
+- **DO NOT** override `search_context["genes"]` with `all_genes` — top 30 is pre-filtered
+- **DO NOT** call `write_file` for papers when using `output_path` — auto-save handles it
+- **DO NOT** proceed with < 60% gene coverage without follow-up searches
+- **DO NOT** skip Phase 3 reflection after search
 
-### CORRECT ACTIONS
-- **USE** search_context field from load_analysis_data - all terms pre-extracted
-- **USE** genes for actual gene symbols: CDH1, CEACAM5, ERBB2, TGFB1, MMP2, VEGFA
-- **USE** pathways for pathway names: NFkB, Hypoxia, TGFb, MAPK, PI3K, Estrogen, EGFR
-- **USE** search_literature_dynamic as PRIMARY search tool
-- **NOTE** search_literature_dynamic handles fallback internally (no separate tool call needed)
-- **USE** think_tool for quality validation AFTER search (Phase 3 Reflect)
-- **RUN** follow-up searches for missing coverage using search_literature
-- **WRITE** /papers.json (unified, all parts)
-
----
-
-## Tool Reference
-
-### search_literature_dynamic (PRIMARY)
-LLM-powered dynamic search with context-aware query generation.
-
-```bash
-python scripts/search_literature_dynamic.py \
-  --genes "CDH1,TGFB1,VIM" \
-  --pathways "EMT,TGFB,WNT" \
-  --celltypes "Tumor,Fibroblast" \
-  --disease "breast cancer" \
-  --max-results 20 \
-  --output-path "papers.json"
-```
-
-Equivalent tool call:
-
-```python
-search_literature_dynamic(
-    genes=["CDH1", "TGFB1", "VIM"],
-    pathways=["EMT", "TGFB", "WNT"],
-    celltypes=["Tumor", "Fibroblast"],
-    disease="breast cancer",
-    max_results=20,
-    output_path="papers.json"  # Auto-saves full results to file
-)
-```
-
-**Parameters**:
-- `output_path` (optional): When provided, saves complete results to `DEEP_INTERPRETER_DATA_DIR/{output_path}` and returns a compact summary. **SEARCHER should always use this.**
-
-**Returns (without output_path)**:
-- `papers`: List of found papers with PMIDs
-- `generated_queries`: LLM-generated query structures
-- `coverage`: Detailed coverage metrics with percentages
-- `think_success`: Whether think_tool succeeded
-
-**Returns (with output_path)**:
-- `saved_to`: Absolute path where file was saved
-- `total_papers`: Number of papers saved
-- `coverage`: Coverage metrics
-- `paper_titles`: First 10 titles for quick reference
-- `message`: Confirmation message
-
-**Use when**:
-- Primary tool for all literature searches
-- Part-specific analysis requiring context understanding
-- Specialized disease/tissue contexts
-
-**Fallback behavior**: Automatically uses internal fixed-strategy search if LLM fails. No separate tool call needed.
-
-### search_literature
-Single-query PubMed search for specific topics.
-
-```python
-search_literature(
-    genes=["APOE", "TREM2"],
-    disease="Alzheimer",
-    keywords=["microglia", "neuroinflammation"],
-    max_results=15
-)
-```
-
-**Use when**: Targeted follow-up search for specific gene/pathway/interaction gaps.
-
-### think_tool (Phase 3: Quality Reflection)
-Structured sequential thinking for quality validation.
-
-```python
-think_tool(
-    reflection="Coverage analysis for Part N...",  # Your thinking content
-    iteration=1,                                    # Current thought number
-    max_iterations=2,                               # Total thoughts planned
-    score_threshold=0.7                             # Optional: quality threshold
-)
-```
-
-**Use when**:
-- Phase 3: Validating coverage and planning follow-up searches (1-2 thoughts)
+### ✅ CORRECT
+- **USE** `search_context` field from `load_analysis_data` — all terms pre-extracted
+- **USE** `search_literature_dynamic` as PRIMARY search tool (handles fallback internally)
+- **USE** `think_tool` for quality validation in Phase 3 (1-2 thoughts)
+- **USE** `search_literature` for targeted follow-up on specific gaps
+- **ALWAYS** pass `output_path="papers.json"` to auto-save
+- **WRITE** unified `/papers.json` (all parts)
 
 ---
 
-## Output Format
+## Troubleshooting
 
-### Interpretation Paragraph
-```
-Our finding of [analysis result] is consistent with previous reports
-demonstrating that [paper's key finding] (Author et al., Year; PMID: xxxxx).
-Furthermore, [expand context] (Author2 et al., Year; PMID: xxxxx).
-```
+### Error: `search_literature_dynamic` returned `think_success: False`
+**Cause**: LLM-powered query generation failed; internal fixed-strategy fallback was used.
+**Solution**: Normal behavior — results are valid. If coverage is still insufficient, run `search_literature` follow-up in Phase 3 on the specific missing genes/pathways.
 
-**Writing Principles**:
-- State analysis result first
-- Use connecting phrases: "consistent with", "in line with", "supports"
-- Cite 2-3 papers per paragraph with PMIDs
-- Include specific statistics from analysis (Moran's R, p-values, FDR)
+### Error: 0 papers returned after disease filter
+**Cause**: `enforce_disease_match=True` filtered out all results because no paper matched the disease context string exactly.
+**Solution**: Retry with `--no-enforce-disease-match` (CLI) or `enforce_disease_match=False` (tool call). Alternatively, use a broader disease term (e.g., "cancer" instead of "triple-negative breast cancer").
 
-### Reference List Format
-```markdown
-## References
+### Error: Gene coverage < 60% after 3 iterations
+**Cause**: Search terms too specific, or gene symbols missing from the PubMed abstracts.
+**Solution**: Use `search_literature(query="GENE synonym disease")` for individual missing genes with known synonyms (e.g., `CDH1` → `"E-cadherin"`, `TGFB1` → `"TGF-beta"`). Accept residual gaps after iteration cap and note them in Phase 3 reflection.
 
-1. Author et al. (Year) Title. Journal. PMID: xxxxx
-   -> Relevance: [How this paper supports the finding]
+### Error: `load_analysis_data` returned empty `search_context`
+**Cause**: `/data_path.txt` points to a wrong directory, or the analysis result files are missing.
+**Solution**: `read_file('/data_path.txt')` to verify. Check that `interest_sig_liana.csv` (or decoupler results) exists at that path. If missing, the PLANNER subagent must rerun data assessment first.
 
-2. Author et al. (Year) Title. Journal. PMID: xxxxx
-   -> Relevance: [How this paper supports the finding]
-```
+### Error: `write_file` refused by `WriteFileArgGuardMiddleware`
+**Cause**: Attempted to manually write papers after calling `search_literature_dynamic` without `output_path`.
+**Solution**: Always pass `output_path="papers.json"` to `search_literature_dynamic`. The tool auto-saves; manual `write_file` for papers is blocked by guard middleware. See "Common Mistakes" above.
 
----
-
-## Quick Reference Card
-
-| Analysis Type | Primary Tool | Follow-up Tool | Key Parameters |
-|--------------|--------------|----------------|----------------|
-| L-R Interaction | `search_literature_dynamic` | `search_literature` | genes=[ligand, receptor], disease |
-| Pathway | `search_literature_dynamic` | `search_literature` | pathways=[...], disease |
-| Gene Markers | `search_literature_dynamic` | `search_literature` | genes=[...], celltypes |
-| Specific Query | `search_literature` | - | query=specific_terms |
-
-### Tool Selection Flow
-```
-search_literature_dynamic (primary — handles fallback internally)
-        │
-        ├─ Success → Use results
-        │
-        └─ Insufficient coverage
-                │
-                └─ search_literature (targeted follow-up for gaps)
-```
-
-| Quality Check | Threshold | Action if Failed |
-|--------------|-----------|------------------|
-| Papers | >= 25 | Broaden search terms |
-| Gene coverage | >= 60% | Add synonyms, search individually |
-| Pathway coverage | >= 50% | Add "signaling", disease context |
-| Max iterations | 3 | Proceed with warning |
-
-| Phase | Tool | Thoughts | Purpose | Output |
-|-------|------|----------|---------|--------|
-| Phase 3 (Reflection) | think_tool | 1-2 thoughts | Validate coverage | /papers.json |
-
-| Thought Type | Key Content | should_continue |
-|--------------|-------------|-------------------|
-| Coverage Reflection | Coverage %, gaps | True if gaps |
-| Follow-up Strategy | Targeted queries | False |
+### Error: Results look irrelevant to the disease context
+**Cause**: LLM generated generic queries without disease anchoring, or `rerank_mode="off"`.
+**Solution**: Enable LLM rerank with `--rerank-mode llm --rerank-top-n 12 --rerank-min-confidence 0.70`. Or supply more specific pathway/celltype context in the arguments.
 
 ---
 
-## Example Workflow
+## Where to Find More
 
-### Input
-> Found enriched Apoe-Trem2 interaction (LIANA score: 2.3, p=0.001) in microglia surrounding amyloid plaques in AD mouse brain.
-
-### Phase 1: Extract Context
-- Analysis type: L-R Interaction
-- Key genes: APOE, TREM2
-- Cell types: Microglia
-- Disease: Alzheimer's disease
-
-### Phase 2: Execute Dynamic Search
-```bash
-python scripts/search_literature_dynamic.py \
-  --genes "APOE,TREM2" \
-  --pathways "TREM2 signaling,microglial activation" \
-  --celltypes "Microglia" \
-  --disease "Alzheimer disease" \
-  --max-results 20 \
-  --output-path "papers.json"
-# Fallback is handled internally — no manual fallback needed
-# Papers auto-saved; result contains compact summary with total_papers, coverage
-```
-
-**Dynamic search benefits in this example:**
-- LLM understands APOE-TREM2 is a well-known AD pathway
-- Generates optimized queries like "TREM2 APOE microglia neurodegeneration"
-- Better coverage of mechanistic papers
-- Automatic internal fallback if LLM fails
-
-### Phase 3: Reflect on Coverage (think_tool)
-```python
-think_tool(reflection="Coverage: 28 papers found. Genes: APOE, TREM2 (100%).
-Pathways: TREM2 signaling (50%). All thresholds met. think_success: True.",
-iteration=1, max_iterations=1)
-```
-- Papers found: 28 (pass)
-- Genes covered: ["APOE", "TREM2"] (100%) (pass)
-- Pathways covered: ["TREM2 signaling"] (50%) (pass)
-- think_success: True (no fallback needed)
-
-### Phase 4: Output (Auto-Saved)
-```python
-# Papers already auto-saved via output_path in Phase 2 — no write_file needed
-# result = {"saved_to": "/path/to/papers.json", "total_papers": 28, "coverage": {...}}
-# Use read_file("/papers.json") if you need to inspect the saved data
-```
-
-### Generated Interpretation
-Our finding of enriched Apoe-Trem2 interaction (LIANA score: 2.3, p=0.001) in plaque-associated microglia is consistent with previous reports demonstrating that the TREM2-APOE pathway drives the transcriptional phenotype of disease-associated microglia (Krasemann et al., 2017; PMID: 28930663). This interaction has been shown to be critical for microglial response to amyloid pathology (Zhou et al., 2020; PMID: 31932797).
+- **Full tool API (parameters, returns, rerank options)** → `references/search_strategies.md` § "Complete Tool API Reference"
+- **Advanced PubMed E-utilities patterns** → `references/search_strategies.md` § "Advanced PubMed E-utilities Patterns"
+- **Part 1/2/3 specific search focus** → `references/search_strategies.md` § "Part-Specific Search Focus"
+- **Analysis-type → tool mapping, phase mapping, quality thresholds** → `references/search_strategies.md` § "Quick Reference Card"
+- **Interpretation paragraph + reference list format (consumed by INTERPRETER)** → `references/search_strategies.md` § "Interpretation Output Format"
+- **Full worked example (Apoe-Trem2 in Alzheimer disease)** → `references/search_strategies.md` § "Full Example"
+- **Gene/pathway/L-R keyword combinations** → `references/search_strategies.md` § "L-R / Pathway / Gene-Marker Search Strategy"
+- **PubMed E-utilities full syntax** → `skills/pubmed-eutils-search/SKILL.md`

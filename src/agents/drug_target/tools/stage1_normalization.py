@@ -22,7 +22,7 @@ from src.agents.drug_target.tools.census_lr_validation_tools import (
     run_compare_census_lr_pair,
 )
 from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir
-from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
+from src.agents.drug_target.tools.stage_logic import compute_stage1_filter
 
 
 # Circuit-breaker: track consecutive finalize failures per data_dir
@@ -37,8 +37,7 @@ MICROENVIRONMENT_TARGET_COEXP_MAX_PCT = 0.1
 MICROENVIRONMENT_SUPPORT_MIN_PCT = 10.0
 STAGE1_SKIP_FILES = frozenset({
     "stage1_evidence.json",
-    "stage1_confidence.json",
-    "stage1_cellxgene_all_pairs.json",
+    "stage1_filter.json",
     "stage1_audit.json",
 })
 
@@ -319,7 +318,17 @@ def _parse_census_csv(csv_path: Path, target_cell_type: str) -> dict[str, Any] |
         rows = list(csv.DictReader(f))
 
     target_rows = [r for r in rows if r["cell_type"].strip() == target_cell_type]
-    rest_rows = [r for r in rows if r["cell_type"].strip() != target_cell_type]
+    # Fuzzy fallback: substring match (safety net if LLM mapping is imprecise)
+    if not target_rows:
+        req = target_cell_type.strip().lower()
+        partial = [
+            r for r in rows
+            if req in r["cell_type"].strip().lower()
+            or r["cell_type"].strip().lower() in req
+        ]
+        if partial:
+            target_rows = [max(partial, key=lambda r: int(r["n_cells"]))]
+    rest_rows = [r for r in rows if r not in target_rows]
     if not target_rows:
         return None
 
@@ -542,36 +551,16 @@ def normalize_stage1_record(
     else:
         normalized.setdefault("census_validation", {"executed": False})
 
-    cellxgene = normalized.get("cellxgene")
-    if not isinstance(cellxgene, dict):
-        cellxgene = {}
-    available = cellxgene.get("available_genes")
-    if not isinstance(available, list):
-        available = []
-    upper_available = {str(g).upper() for g in available if str(g).strip()}
-    if latest_census is not None:
-        upper_available.update({ligand.upper(), receptor.upper()})
-    normalized["cellxgene"] = {
-        **cellxgene,
-        "available_genes": sorted(upper_available),
-        "executed": bool(cellxgene.get("executed", bool(upper_available))),
-    }
+    # Remove legacy fields no longer used
+    normalized.pop("cellxgene", None)
+    normalized.pop("kegg_pathways", None)
+    normalized.pop("reactome_pathways", None)
 
     if legacy_stage1:
         normalized["legacy_stage1"] = legacy_stage1
 
-    microenvironment_support = build_microenvironment_support_from_csv(
-        evidence_dir,
-        ligand,
-        receptor,
-        csv_target_cell_type=csv_target_cell_type,
-        resolved_target_cell_type=resolved_target_cell_type,
-    )
-    if microenvironment_support is not None:
-        normalized["stage1_annotations"] = dict(microenvironment_support)
-
-    confidence = compute_stage1_confidence(normalized)
-    normalized["stage1_confidence"] = confidence
+    stage1_filter = compute_stage1_filter(normalized)
+    normalized["stage1_filter"] = stage1_filter
 
     audit = {
         "pair_key": f"{ligand.upper()}^{receptor.upper()}",
@@ -606,27 +595,8 @@ def normalize_stage1_record(
                 if legacy_stage1 else DEFAULT_LEGACY_TARGET_CELL_TYPE
             ),
         ),
-        "confidence": confidence,
+        "stage1_filter": stage1_filter,
     }
-    if microenvironment_support is not None:
-        audit["microenvironment_support"] = {
-            **microenvironment_support,
-            "target_cell_type": resolved_target_cell_type,
-            "target_coexpression_pct": round(
-                next(
-                    (
-                        row["coexp_pct"]
-                        for row in _load_census_summary_rows(
-                            Path(evidence_dir)
-                            / f"census_{ligand.lower()}_{receptor.lower()}_{_sanitize_token(csv_target_cell_type)}.csv"
-                        )
-                        if row["cell_type"] == resolved_target_cell_type
-                    ),
-                    0.0,
-                ),
-                4,
-            ),
-        }
     return normalized, audit
 
 
@@ -674,7 +644,7 @@ def rebuild_stage1_artifacts(
         stage1_files = filtered
 
     stage1_evidence: dict[str, Any] = {}
-    stage1_confidence: dict[str, Any] = {}
+    stage1_filter_data: dict[str, Any] = {}
     stage1_audit: dict[str, Any] = {}
 
     for path in stage1_files:
@@ -706,27 +676,22 @@ def rebuild_stage1_artifacts(
             "ligand": ligand,
             "receptor": receptor,
             "string_ppi": normalized.get("string_ppi", {}),
-            "kegg_pathways": normalized.get("kegg_pathways", {}),
-            "reactome_pathways": normalized.get("reactome_pathways", {}),
             "census_validation": normalized.get("census_validation", {}),
-            "cellxgene": normalized.get("cellxgene", {}),
-            "stage1_confidence": normalized["stage1_confidence"],
+            "stage1_filter": normalized.get("stage1_filter", {}),
         }
         if "legacy_stage1" in normalized:
             entry["legacy_stage1"] = normalized["legacy_stage1"]
-        if "stage1_annotations" in normalized:
-            entry["stage1_annotations"] = normalized["stage1_annotations"]
 
         stage1_evidence[pair_key] = entry
-        stage1_confidence[pair_key] = normalized["stage1_confidence"]
+        stage1_filter_data[pair_key] = normalized.get("stage1_filter", {})
         stage1_audit[pair_key] = audit
 
     (evidence_dir / "stage1_evidence.json").write_text(
         json.dumps(stage1_evidence, indent=2) + "\n",
         encoding="utf-8",
     )
-    (evidence_dir / "stage1_confidence.json").write_text(
-        json.dumps(stage1_confidence, indent=2) + "\n",
+    (evidence_dir / "stage1_filter.json").write_text(
+        json.dumps(stage1_filter_data, indent=2) + "\n",
         encoding="utf-8",
     )
     (evidence_dir / "stage1_audit.json").write_text(
@@ -738,7 +703,7 @@ def rebuild_stage1_artifacts(
         "context": context,
         "stage1_files": [path.name for path in stage1_files],
         "stage1_evidence": stage1_evidence,
-        "stage1_confidence": stage1_confidence,
+        "stage1_filter": stage1_filter_data,
         "stage1_audit": stage1_audit,
     }
 
@@ -785,7 +750,7 @@ def validate_stage1_artifacts(
     expected_pair_keys = {_pair_key(ligand, receptor) for ligand, receptor in expected_pairs}
     aggregate_paths = {
         "stage1_evidence": evidence_dir / "stage1_evidence.json",
-        "stage1_confidence": evidence_dir / "stage1_confidence.json",
+        "stage1_filter": evidence_dir / "stage1_filter.json",
         "stage1_audit": evidence_dir / "stage1_audit.json",
     }
 
@@ -809,7 +774,7 @@ def validate_stage1_artifacts(
             continue
 
         missing_fields = [
-            field for field in ("ligand", "receptor", "census_validation", "stage1_confidence")
+            field for field in ("ligand", "receptor", "census_validation", "stage1_filter")
             if field not in detail
         ]
         if detail.get("ligand") != ligand:
@@ -1010,7 +975,7 @@ def finalize_stage1_workspace(
             "rebuild": {
                 "stage1_files": [],
                 "stage1_evidence_path": str(Path(data_dir) / "evidence" / "stage1_evidence.json"),
-                "stage1_confidence_path": str(Path(data_dir) / "evidence" / "stage1_confidence.json"),
+                "stage1_confidence_path": str(Path(data_dir) / "evidence" / "stage1_filter.json"),
                 "stage1_audit_path": str(Path(data_dir) / "evidence" / "stage1_audit.json"),
             },
             "pre_validation": pre_validation,
@@ -1045,7 +1010,7 @@ def finalize_stage1_workspace(
         "rebuild": {
             "stage1_files": rebuild["stage1_files"],
             "stage1_evidence_path": str(Path(data_dir) / "evidence" / "stage1_evidence.json"),
-            "stage1_confidence_path": str(Path(data_dir) / "evidence" / "stage1_confidence.json"),
+            "stage1_confidence_path": str(Path(data_dir) / "evidence" / "stage1_filter.json"),
             "stage1_audit_path": str(Path(data_dir) / "evidence" / "stage1_audit.json"),
         },
         "pre_validation": pre_validation,

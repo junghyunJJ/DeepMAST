@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import csv
 import importlib.util
+import re
 import json
 import logging
 import math
@@ -39,6 +40,7 @@ TILEDB_CONFIG = {
 }
 
 DEFAULT_CENSUS_VERSION = os.getenv("CENSUS_VERSION", "2025-11-08")
+MAX_LLM_RESOLUTION_RETRIES = 3
 
 # Maximum cells before aborting to prevent OOM
 DEFAULT_MAX_CELLS = 1_000_000
@@ -93,6 +95,8 @@ def _get_ztest():
 def _resolve_disease_name(
     requested: str,
     organism: str = "homo_sapiens",
+    *,
+    llm=None,
 ) -> tuple[str | None, str]:
     """Fuzzy-match disease name against Census MONDO vocabulary."""
     try:
@@ -123,6 +127,34 @@ def _resolve_disease_name(
     if partial:
         best = max(partial, key=lambda x: x["total_cell_count"])
         return best["label"], "fuzzy"
+
+    # LLM semantic matching fallback (with retry)
+    if llm and candidates:
+        labels = [c["label"] for c in candidates[:30]]
+        prompt = (
+            f"Match the disease '{requested}' to the most equivalent disease "
+            f"from this Census vocabulary list. "
+            f"Return ONLY the exact name from the list, nothing else.\n\n"
+            f"Vocabulary:\n" + "\n".join(f"- {l}" for l in labels)
+        )
+        for attempt in range(MAX_LLM_RESOLUTION_RETRIES):
+            try:
+                response = llm.invoke(prompt)
+                raw_content = response.content or ""
+                cleaned = re.sub(r"<think>.*?</think>", "", raw_content, flags=re.DOTALL)
+                matched = cleaned.strip().strip('"').strip("'")
+                valid = [c for c in candidates if c["label"] == matched]
+                if valid:
+                    return matched, "llm"
+                logger.warning(
+                    "Disease resolution LLM attempt %d/%d: %r not in vocabulary",
+                    attempt + 1, MAX_LLM_RESOLUTION_RETRIES, matched,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Disease resolution LLM attempt %d/%d failed: %s",
+                    attempt + 1, MAX_LLM_RESOLUTION_RETRIES, exc,
+                )
 
     return None, "none"
 
@@ -341,6 +373,7 @@ def batch_census_lr_pairs(
     organism: str = "homo_sapiens",
     census_version: str | None = None,
     max_cells: int = DEFAULT_MAX_CELLS,
+    llm=None,
 ) -> tuple[list[dict[str, Any]], dict[tuple[str, str], list[dict[str, Any]]]]:
     """Batch Census L-R co-expression validation.
 
@@ -368,7 +401,7 @@ def batch_census_lr_pairs(
     disease_resolved = None
     disease_resolution_mode = None
     try:
-        resolved, mode = _resolve_disease_name(disease, organism)
+        resolved, mode = _resolve_disease_name(disease, organism, llm=llm)
         if resolved and resolved != disease:
             disease_resolved = resolved
             disease_resolution_mode = mode
@@ -483,6 +516,46 @@ def batch_census_lr_pairs(
                     "Census batch: resolved cell type %r -> %r (fuzzy, %d cells)",
                     target_cell_type, resolved_cell_type, ct_counts[resolved_cell_type],
                 )
+            elif llm:
+                # LLM semantic matching fallback
+                # Sort by cell count (descending) so the most populated types
+                # are always included — alphabetical [:30] can exclude important
+                # types like "pulmonary alveolar type 2 cell" (position #36).
+                ct_counts_all = {str(ct): int((cell_types == ct).sum()) for ct in unique_cts}
+                sorted_cts = sorted(ct_counts_all, key=ct_counts_all.get, reverse=True)
+                ct_list = sorted_cts[:50]
+                prompt = (
+                    f"Match the cell type abbreviation '{target_cell_type}' to "
+                    f"the most equivalent cell type from this Census vocabulary. "
+                    f"Return ONLY the exact name from the list, nothing else.\n\n"
+                    f"Vocabulary:\n" + "\n".join(f"- {n}" for n in ct_list)
+                )
+                unique_cts_set = {str(ct) for ct in unique_cts}
+                for attempt in range(MAX_LLM_RESOLUTION_RETRIES):
+                    try:
+                        response = llm.invoke(prompt)
+                        raw_content = response.content or ""
+                        # Strip <think>...</think> tags (Qwen3 and other reasoning models)
+                        cleaned = re.sub(r"<think>.*?</think>", "", raw_content, flags=re.DOTALL)
+                        matched = cleaned.strip().strip('"').strip("'")
+                        if matched in unique_cts_set:
+                            resolved_cell_type = matched
+                            cell_type_resolution_mode = "llm"
+                            logger.info(
+                                "Census batch: resolved cell type %r -> %r (llm, attempt %d)",
+                                target_cell_type, resolved_cell_type, attempt + 1,
+                            )
+                            break
+                        else:
+                            logger.warning(
+                                "Census batch: LLM attempt %d/%d returned %r not in vocabulary",
+                                attempt + 1, MAX_LLM_RESOLUTION_RETRIES, matched,
+                            )
+                    except Exception as exc:
+                        logger.warning(
+                            "Census batch: LLM cell type attempt %d/%d failed: %s",
+                            attempt + 1, MAX_LLM_RESOLUTION_RETRIES, exc,
+                        )
             else:
                 logger.warning(
                     "Census batch: cell type %r not found among %d unique types",

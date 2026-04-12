@@ -204,6 +204,8 @@ def _auto_discover_pairs(data_dir: str) -> list[list[str]] | None:
 def _resolve_interest_cell_type(
     requested: str,
     candidates: list[dict[str, Any]],
+    *,
+    llm=None,
 ) -> tuple[str | None, str]:
     if not candidates:
         return None, "none"
@@ -222,6 +224,25 @@ def _resolve_interest_cell_type(
     if partial:
         best = max(partial, key=lambda x: x["n_cells"])
         return best["name"], "fuzzy"
+
+    # LLM semantic matching fallback
+    if llm and candidates:
+        top = sorted(candidates, key=lambda x: x["n_cells"], reverse=True)[:30]
+        names = [c["name"] for c in top]
+        prompt = (
+            f"Match the cell type abbreviation '{requested}' to the most "
+            f"equivalent cell type from this Census vocabulary list. "
+            f"Return ONLY the exact name from the list, nothing else.\n\n"
+            f"Vocabulary:\n" + "\n".join(f"- {n}" for n in names)
+        )
+        try:
+            response = llm.invoke(prompt)
+            matched = response.content.strip().strip('"').strip("'")
+            valid = [c for c in candidates if c["name"] == matched]
+            if valid:
+                return matched, "llm"
+        except Exception:
+            pass
 
     return None, "none"
 

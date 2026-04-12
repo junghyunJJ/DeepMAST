@@ -170,17 +170,29 @@ def load_lr_candidates(data_dir: str, disease: str = "") -> str:
 
 @tool
 def load_evidence_files(data_dir: str) -> str:
-    """List evidence JSON files from the evidence/ subdirectory with metadata summaries.
+    """Load evidence JSON files from the evidence/ subdirectory.
 
-    Returns file names, sizes, top-level keys, and record counts — NOT full content.
-    Use save_evidence / read individual files on-demand for full data.
+    For files up to ~200 KB (stage1_filter.json, assessment_results.json,
+    per-pair stage1_*.json, per-gene ot_*.json / stage3_*.json, rubric
+    auxiliaries, etc.) this returns the FULL PARSED JSON CONTENT so
+    subagents can actually read pass/fail flags, rubric scores, drug
+    names, and filter data directly. Large files above the limit
+    (currently only stage2_evidence.json ~1.5 MB) fall back to a
+    lightweight metadata summary (size_bytes, top_keys, record_count)
+    to protect subagent context window budgets.
 
     Args:
         data_dir: Directory containing evidence/ subdirectory
 
     Returns:
-        JSON with filename -> metadata mapping (size_bytes, top_keys, record_count)
+        JSON with filename -> full content (small files) or
+        metadata summary (large files). Inspect the ``_note`` key on
+        summary entries to distinguish the two.
     """
+    # Files at or below this size get full content; larger files stay
+    # as metadata summaries to protect context window budgets.
+    CONTENT_SIZE_LIMIT = 200_000  # 200 KB
+
     base = _resolve_data_dir(data_dir)
     evidence_dir = base / "evidence"
     result = {
@@ -202,19 +214,30 @@ def load_evidence_files(data_dir: str) -> str:
             with open(path) as f:
                 data = json.load(f)
 
-            # Build lightweight summary instead of embedding full content
-            summary = {"size_bytes": size_bytes}
-            if isinstance(data, dict):
-                summary["top_keys"] = list(data.keys())[:20]
-                summary["record_count"] = len(data)
-            elif isinstance(data, list):
-                summary["record_count"] = len(data)
-                if data and isinstance(data[0], dict):
-                    summary["item_keys"] = list(data[0].keys())[:10]
+            if size_bytes <= CONTENT_SIZE_LIMIT:
+                # Return full JSON content — subagents need actual values
+                # (filter pass/fail flags, rubric scores, drug names, etc.)
+                result["files"][path.name] = data
             else:
-                summary["record_count"] = 1
+                # Large file: metadata summary only (protects context window)
+                summary = {
+                    "size_bytes": size_bytes,
+                    "_note": (
+                        f"content omitted (> {CONTENT_SIZE_LIMIT} bytes); "
+                        "inspect sub-fields via scope-specific tools"
+                    ),
+                }
+                if isinstance(data, dict):
+                    summary["top_keys"] = list(data.keys())[:20]
+                    summary["record_count"] = len(data)
+                elif isinstance(data, list):
+                    summary["record_count"] = len(data)
+                    if data and isinstance(data[0], dict):
+                        summary["item_keys"] = list(data[0].keys())[:10]
+                else:
+                    summary["record_count"] = 1
+                result["files"][path.name] = summary
 
-            result["files"][path.name] = summary
             result["file_count"] += 1
             result["total_size_bytes"] += size_bytes
         except Exception as e:
@@ -317,7 +340,7 @@ def validate_evidence_completeness(data_dir: str) -> str:
 
     checks: dict = {
         "stage1_evidence": {"file": "stage1_evidence.json", "status": "missing", "record_count": 0},
-        "stage1_confidence": {"file": "stage1_confidence.json", "status": "missing", "record_count": 0},
+        "stage1_filter": {"file": "stage1_filter.json", "status": "missing", "record_count": 0},
         "stage2_evidence": {"file": "stage2_evidence.json", "status": "missing", "record_count": 0, "non_empty_genes": 0},
         "known_drugs": {"file": "known_drugs.json", "status": "missing", "record_count": 0},
         "gene_manifest": {"file": "gene_manifest.json", "status": "missing", "record_count": 0},
@@ -377,3 +400,107 @@ def validate_evidence_completeness(data_dir: str) -> str:
         "ready_for_report": has_stage1_data or has_stage2_data,
         "warnings": warnings,
     }, indent=2)
+
+
+@tool
+def check_stage1_completion(data_dir: str) -> str:
+    """Check whether Stage 1 was completed by evidence_assessor.
+
+    Call this AFTER evidence_assessor completes and BEFORE proceeding to
+    deep_diver. Returns a JSON object with stage1_complete flag,
+    stage3_candidates count, and a recommendation for next steps.
+    """
+    base = _resolve_data_dir(data_dir)
+    evidence_dir = base / "evidence"
+
+    result = {
+        "stage1_complete": False,
+        "has_assessment_results": False,
+        "stage3_candidates_count": 0,
+        "stage1_files_found": 0,
+        "recommendation": "",
+    }
+
+    # 1. Check assessment_results.json exists
+    assessment_path = evidence_dir / "assessment_results.json"
+    if not assessment_path.exists():
+        result["recommendation"] = (
+            "assessment_results.json not found. evidence_assessor may not have "
+            "completed rubric scoring. Pipeline data will be incomplete."
+        )
+        return json.dumps(result, indent=2)
+
+    try:
+        assessment = json.loads(assessment_path.read_text())
+    except Exception as e:
+        result["recommendation"] = f"Cannot parse assessment_results.json: {e}"
+        return json.dumps(result, indent=2)
+
+    result["has_assessment_results"] = True
+    stage3_candidates = assessment.get("stage3_candidates", [])
+    result["stage3_candidates_count"] = len(stage3_candidates)
+
+    # 2. Zero candidates = valid state (no featured genes)
+    if not stage3_candidates:
+        result["stage1_complete"] = True
+        result["recommendation"] = (
+            "No stage3_candidates (zero featured genes). "
+            "Skip deep_diver and hypothesis_writer, proceed to report_writer."
+        )
+        return json.dumps(result, indent=2)
+
+    # 3. Check for stage1 evidence files
+    stage1_files = list(evidence_dir.glob("stage1_*.json"))
+    result["stage1_files_found"] = len(stage1_files)
+
+    stage1_evidence_path = evidence_dir / "stage1_evidence.json"
+    has_stage1_aggregate = stage1_evidence_path.exists()
+
+    if stage1_files or has_stage1_aggregate:
+        result["stage1_complete"] = True
+        result["recommendation"] = "Stage 1 complete. Proceed to deep_diver."
+    else:
+        result["stage1_complete"] = False
+        result["recommendation"] = (
+            "WARNING: Stage 1 was NOT completed. No stage1_*.json files found. "
+            "evidence_assessor likely hit recursion limit before Stage 1. "
+            "Proceeding to deep_diver will produce incomplete results."
+        )
+
+    return json.dumps(result, indent=2)
+
+
+@tool
+def check_hypothesis_completion(data_dir: str) -> str:
+    """Check whether hypothesis_writer produced hypothesis_report.json.
+
+    Call this AFTER hypothesis_writer completes and BEFORE report_writer.
+    Returns JSON with completion status and recommendation.
+    """
+    base = _resolve_data_dir(data_dir)
+    evidence_dir = base / "evidence"
+    hyp_path = evidence_dir / "hypothesis_report.json"
+
+    if not hyp_path.exists():
+        return json.dumps({
+            "hypothesis_complete": False,
+            "recommendation": (
+                "hypothesis_report.json not found. hypothesis_writer may have failed. "
+                "Proceed to report_writer — it will generate the report without hypotheses. "
+                "Section 4 will note that hypothesis generation was not completed."
+            ),
+        }, indent=2)
+
+    try:
+        hyp = json.loads(hyp_path.read_text())
+        count = len(hyp.get("hypotheses", []))
+        return json.dumps({
+            "hypothesis_complete": True,
+            "hypothesis_count": count,
+            "recommendation": f"Found {count} hypotheses. Proceed to report_writer.",
+        }, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "hypothesis_complete": False,
+            "recommendation": f"hypothesis_report.json exists but is invalid: {e}",
+        }, indent=2)

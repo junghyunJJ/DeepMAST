@@ -3,7 +3,7 @@
 Four-subagent architecture with staged funnel:
 - evidence_assessor: 2-stage funnel (Stage 2: validation & scoring ->
   Stage 1: biological context) with inline rubric assessment
-- deep_diver: Stage 3 deep dive (ChEMBL + PubMed) for FEATURED genes
+- deep_diver: Stage 3 deep dive (ChEMBL) for FEATURED genes
 - hypothesis_writer: Hypothesis generation with UCB scoring from all evidence
 - report_writer: Generate drug.md with featured candidate emphasis
 
@@ -15,9 +15,11 @@ from typing import Callable, Sequence
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 
-from src.agents.deep_interpreter.middleware.write_file_guard import WriteFileArgGuardMiddleware
+from src.agents.deep_interpreter.middleware.write_file_guard import (
+    WriteFileArgGuardMiddleware,
+    ReadFileBlockMiddleware,
+)
 from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
-from src.agents.deep_interpreter.tools.literature import search_literature_dynamic
 from src.agents.drug_target.tools import (
     # Evidence I/O tools
     load_lr_candidates,
@@ -36,6 +38,7 @@ from src.agents.drug_target.tools import (
     query_string_ppi_pair,
     run_compare_census_lr_pair,
     run_batch_census_lr_pairs,
+    run_stage1_batch,
     finalize_stage1_artifacts,
     validate_stage1_gate,
     validate_stage3_gate,
@@ -96,6 +99,7 @@ SUBAGENT_CONFIGS = {
             query_string_ppi_pair,
             run_compare_census_lr_pair,
             run_batch_census_lr_pairs,
+            run_stage1_batch,
             finalize_stage1_artifacts,
             validate_stage1_gate,
             read_skill_file,
@@ -108,9 +112,8 @@ SUBAGENT_CONFIGS = {
     "deep_diver": {
         "name": "deep_diver",
         "description": (
-            "Stage 3 deep dive for FEATURED genes. Queries ChEMBL for drug profiles "
-            "and PubMed for literature evidence. Produces stage3_{GENE}.json and "
-            "stage3_lit_{GENE}.json for each stage3_candidate. "
+            "Stage 3 deep dive for FEATURED genes. Queries ChEMBL for drug profiles. "
+            "Produces stage3_{GENE}.json for each stage3_candidate. "
             "Validates completeness via validate_stage3_gate."
         ),
         "system_prompt": SUBAGENT_PROMPTS["deep_diver"],
@@ -120,7 +123,6 @@ SUBAGENT_CONFIGS = {
             save_evidence,
             # Stage 3: Deep Dive
             query_chembl_target_profile,
-            search_literature_dynamic,
             validate_stage3_gate,
             read_skill_file,
             # Cognitive
@@ -145,6 +147,7 @@ SUBAGENT_CONFIGS = {
             think_tool,
             validate_quality,
         ],
+        "middleware": [ReadFileBlockMiddleware()],  # Block read_file, force load_evidence_files
     },
     "report_writer": {
         "name": "report_writer",
@@ -167,6 +170,7 @@ SUBAGENT_CONFIGS = {
             validate_stage3_gate,
             save_target_assessment,
             save_drug_md,
+            read_skill_file,
             sequential_thinking,
             think_tool,
             validate_quality,
@@ -196,8 +200,8 @@ Drug Target Assessment 4-Agent Workflow (Staged Funnel):
    Gate: assessment_results.json must exist with stage3_candidates
 
 2. DEEP_DIVER (Plan->Execute->Reflect)
-   Stage 3 (FEATURED genes only): ChEMBL + PubMed literature
-   Outputs: stage3_{GENE}.json, stage3_lit_{GENE}.json per gene
+   Stage 3 (FEATURED genes only): ChEMBL drug profiles
+   Outputs: stage3_{GENE}.json per gene
    Gate: validate_stage3_gate must return success
 
 3. HYPOTHESIS_WRITER (Plan->Execute->Reflect)
@@ -237,7 +241,7 @@ def get_subagents(
 
     Returns 4 subagents in workflow order:
     1. evidence_assessor - 2-stage funnel with inline rubric assessment
-    2. deep_diver - Stage 3 deep dive (ChEMBL + PubMed)
+    2. deep_diver - Stage 3 deep dive (ChEMBL)
     3. hypothesis_writer - hypothesis generation with UCB scoring
     4. report_writer - drug.md generation
 
@@ -323,7 +327,7 @@ def get_subagents(
 
     # Apply skills to evidence_assessor and deep_diver (they do DB queries)
     if skills_sources:
-        _skill_subagents = {"evidence_assessor", "deep_diver"}
+        _skill_subagents = {"evidence_assessor", "deep_diver", "report_writer"}
         for subagent in subagents:
             if subagent["name"] in _skill_subagents:
                 subagent["skills"] = skills_sources

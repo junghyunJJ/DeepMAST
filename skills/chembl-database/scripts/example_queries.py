@@ -13,6 +13,15 @@ Requirements:
 from chembl_webresource_client.new_client import new_client
 
 
+def _normalize_organism(organism):
+    text = (organism or "").strip().lower().replace("_", " ")
+    if text in {"human", "homo sapiens"}:
+        return "Homo sapiens"
+    if text in {"mouse", "mus musculus"}:
+        return "Mus musculus"
+    return organism
+
+
 def get_molecule_info(chembl_id):
     """
     Retrieve detailed information about a molecule by ChEMBL ID.
@@ -83,7 +92,7 @@ def get_target_info(target_chembl_id):
     return target.get(target_chembl_id)
 
 
-def search_targets_by_name(target_name):
+def search_targets_by_name(target_name, organism=None):
     """
     Search for targets by name, keyword, or gene symbol (e.g., 'KDR', 'EGFR').
 
@@ -97,18 +106,24 @@ def search_targets_by_name(target_name):
         List of matching targets
     """
     target = new_client.target
+    allowed_types = {'SINGLE PROTEIN', 'PROTEIN COMPLEX', 'PROTEIN FAMILY'}
+    organism = _normalize_organism(organism)
     # Full-text search matches gene symbols, synonyms, and descriptions
     results = [
         r for r in target.search(target_name)
-        if r.get('target_type') == 'SINGLE PROTEIN'
+        if r.get('target_type') in allowed_types
+        and (not organism or r.get('organism') == organism)
     ]
     if results:
         return results
     # Fallback to pref_name substring filter
-    results = target.filter(
-        target_type='SINGLE PROTEIN',
-        pref_name__icontains=target_name
-    )
+    filters = {
+        'target_type__in': list(allowed_types),
+        'pref_name__icontains': target_name,
+    }
+    if organism:
+        filters['organism'] = organism
+    results = target.filter(**filters)
     return list(results[:100])
 
 

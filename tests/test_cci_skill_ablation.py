@@ -24,6 +24,7 @@ from benchmark_cci_core import (
     VARIANT_A,
     VARIANT_B,
     VARIANT_C,
+    VARIANT_D,
     _build_judge_prompt,
     build_system_prompt,
     build_user_prompt,
@@ -137,8 +138,8 @@ class TestCaseLoading:
 
 
 class TestPromptRendering:
-    def test_three_variants_exist(self):
-        assert len(ALL_VARIANTS) == 3
+    def test_four_variants_exist(self):
+        assert len(ALL_VARIANTS) == 4
 
     def test_variant_a_is_shortest(self):
         a = build_system_prompt(VARIANT_A)
@@ -399,10 +400,10 @@ class TestJudgePrompt:
 
 
 class TestStatistics:
-    def _make_trials(self, a_score=2.0, b_score=3.5, c_score=4.5, n=10):
+    def _make_trials(self, a_score=2.0, b_score=3.5, c_score=4.5, d_score=4.8, n=10):
         trials = []
         jo_template = _perfect_judge_output()
-        for variant, base_score in [(VARIANT_A, a_score), (VARIANT_B, b_score), (VARIANT_C, c_score)]:
+        for variant, base_score in [(VARIANT_A, a_score), (VARIANT_B, b_score), (VARIANT_C, c_score), (VARIANT_D, d_score)]:
             for i in range(n):
                 jo = dict(jo_template)
                 jo["faithfulness"] = max(1, min(5, int(base_score)))
@@ -420,7 +421,7 @@ class TestStatistics:
     def test_summary_trial_count(self):
         trials = self._make_trials(n=5)
         summary = summarize_trials(trials)
-        assert summary["trial_count"] == 15
+        assert summary["trial_count"] == 20
 
     def test_kruskal_wallis_significant_for_large_effect(self):
         trials = self._make_trials(a_score=1.5, b_score=3.0, c_score=4.8, n=15)

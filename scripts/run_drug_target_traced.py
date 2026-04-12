@@ -231,6 +231,11 @@ async def run_traced(args: argparse.Namespace) -> int:
     trace_log_fp = open(trace_log_path, "a")  # append structured markers alongside FileCallbackHandler
     print(f"[CONFIG] Trace log: {trace_log_path}")
 
+    # ── Token usage tracker ──────────────────────────────────────────
+    from scripts.token_tracker import TokenUsageTracker
+    token_tracker = TokenUsageTracker()
+    token_usage_path = data_dir / f"token_usage_{timestamp}.json"
+
     # ── Create agent ──────────────────────────────────────────────────
     from src.agents.drug_target.agent import (
         DrugTargetConfig,
@@ -269,7 +274,7 @@ async def run_traced(args: argparse.Namespace) -> int:
             {"messages": [{"role": "user", "content": initial_message}]},
             config={
                 "configurable": {"thread_id": thread_id},
-                "callbacks": [file_handler],
+                "callbacks": [file_handler, token_tracker],
             },
             stream_mode="updates",
             subgraphs=True,
@@ -304,6 +309,17 @@ async def run_traced(args: argparse.Namespace) -> int:
                 # Capture drug.md content from Command(files=...) state updates
                 _capture_drug_md_from_update(node_data, captured_drug_md_holder)
 
+    except asyncio.CancelledError:
+        elapsed = time.time() - start
+        print(
+            f"\n[CANCELLED at {elapsed:.1f}s] Graph task cancelled — "
+            f"downstream fixup/fallback will decide whether outputs are complete."
+        )
+        trace_log_fp.write(
+            f"\n[CANCELLED] at {elapsed:.1f}s — graceful shutdown, not re-raised\n"
+        )
+        trace_log_fp.flush()
+        # Do NOT re-raise; let the STAGE1-FIXUP / fallback tail run.
     except Exception as e:
         elapsed = time.time() - start
         print(f"\n[ERROR at {elapsed:.1f}s] {type(e).__name__}: {e}")
@@ -316,8 +332,35 @@ async def run_traced(args: argparse.Namespace) -> int:
 
     elapsed = time.time() - start
 
-    # ── Retry on early termination ───────────────────────────────
+    # ── Stage 1 fixup: auto-run if evidence_assessor skipped it ────
     evidence_dir = data_dir / "evidence"
+    assessment_path = evidence_dir / "assessment_results.json"
+    stage1_pair_files = list(evidence_dir.glob("stage1_*--*.json")) if evidence_dir.exists() else []
+    if assessment_path.exists() and len(stage1_pair_files) == 0:
+        print(f"\n[STAGE1-FIXUP] assessment_results.json exists but no stage1 pair files.")
+        print(f"[STAGE1-FIXUP] Running run_stage1_batch programmatically...")
+        try:
+            from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
+            stage1_result_raw = run_stage1_batch.invoke({
+                "data_dir": str(data_dir),
+                "disease": args.disease,
+                "target_cell_type": "",
+                "enable_census": args.census,
+            })
+            stage1_result = json.loads(stage1_result_raw) if isinstance(stage1_result_raw, str) else stage1_result_raw
+            pairs_done = stage1_result.get("pairs_processed", 0)
+            stage1_errors = stage1_result.get("errors", [])
+            print(f"[STAGE1-FIXUP] Completed: {pairs_done} pairs saved")
+            if stage1_errors:
+                print(f"[STAGE1-FIXUP] Errors: {stage1_errors}")
+            with open(trace_log_path, "a") as fp:
+                fp.write(f"\n[STAGE1-FIXUP] run_stage1_batch: {pairs_done} pairs, errors={stage1_errors}\n")
+        except Exception as exc:
+            print(f"[STAGE1-FIXUP] Failed: {exc}")
+            import traceback
+            traceback.print_exc()
+
+    # ── Retry on early termination ───────────────────────────────
     evidence_count = len(list(evidence_dir.glob("*.json"))) if evidence_dir.exists() else 0
     if evidence_count == 0 and elapsed < 300:
         print(f"\n[RETRY] Agent terminated early ({elapsed:.0f}s, 0 evidence files). "
@@ -345,7 +388,7 @@ async def run_traced(args: argparse.Namespace) -> int:
                 {"messages": [{"role": "user", "content": retry_message}]},
                 config={
                     "configurable": {"thread_id": retry_thread_id},
-                    "callbacks": [file_handler],
+                    "callbacks": [file_handler, token_tracker],
                 },
                 stream_mode="updates",
                 subgraphs=True,
@@ -378,6 +421,16 @@ async def run_traced(args: argparse.Namespace) -> int:
 
                     _capture_drug_md_from_update(node_data, captured_drug_md_holder)
 
+        except asyncio.CancelledError:
+            elapsed = time.time() - start
+            print(
+                f"\n[RETRY CANCELLED at {elapsed:.1f}s] Retry graph task cancelled — "
+                f"falling through to fallback write."
+            )
+            trace_log_fp.write(
+                f"\n[RETRY CANCELLED] at {elapsed:.1f}s — graceful shutdown, not re-raised\n"
+            )
+            trace_log_fp.flush()
         except Exception as e:
             elapsed = time.time() - start
             print(f"\n[RETRY ERROR at {elapsed:.1f}s] {type(e).__name__}: {e}")
@@ -433,6 +486,11 @@ async def run_traced(args: argparse.Namespace) -> int:
     if drug_md_exists:
         content = (data_dir / "drug.md").read_text()
         print(f"\n  drug.md: {len(content):,} chars")
+
+    # ── Token usage report ────────────────────────────────────────────
+    token_tracker.print_summary()
+    token_tracker.save_report(token_usage_path)
+    print(f"  Token usage report: {token_usage_path}")
 
     success = drug_md_exists and evidence_count > 0
     print(f"\n  {'SUCCESS' if success else 'PARTIAL'}")

@@ -234,7 +234,7 @@ class TestSubagentConfigs:
     def test_evidence_assessor_prompt_mentions_census_and_gwas(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         prompt = SUBAGENT_CONFIGS["evidence_assessor"]["system_prompt"]
-        assert "Census cross-validation" in prompt or "run_compare_census_lr_pair" in prompt
+        assert "Census" in prompt or "run_stage1_batch" in prompt
         assert "GWAS" in prompt
 
     def test_report_writer_prompt_mentions_featured_candidate(self):
@@ -248,11 +248,11 @@ class TestSubagentConfigs:
         tools = SUBAGENT_CONFIGS["deep_diver"]["tools"]
         names = {t.name for t in tools}
         assert "query_chembl_target_profile" in names
-        assert "search_literature_dynamic" in names
         assert "validate_stage3_gate" in names
         assert "save_evidence" in names
         assert "load_evidence_files" in names
         assert "read_skill_file" in names
+        assert "search_literature_dynamic" not in names
 
     def test_deep_diver_prompt_contains_stage3(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -486,11 +486,14 @@ class TestEvidenceLoader:
         assert result["saved"] is True
         assert (tmp_path / "evidence" / "test_gene.json").exists()
 
-        # Roundtrip: load it back (returns summary metadata, not full content)
+        # Roundtrip: load it back — small files (< 200 KB) return full content;
+        # large files fall back to a metadata summary.
         raw2 = load_evidence_files.invoke({"data_dir": str(tmp_path)})
         result2 = json.loads(raw2)
         assert "test_gene.json" in result2["files"]
-        assert "gene" in result2["files"]["test_gene.json"]["top_keys"]
+        loaded = result2["files"]["test_gene.json"]
+        assert loaded["gene"] == "TGFB1"
+        assert loaded["score"] == 0.95
 
     def test_save_evidence_non_json_rejected(self, tmp_path):
         from src.agents.drug_target.tools.evidence_loader import save_evidence
@@ -525,7 +528,6 @@ class TestToolImports:
         assert stage_domain_tools.query_stage2_gene_panel.name == "query_stage2_gene_panel"
         assert stage_domain_tools.query_ensembl_vep_consequence.name == "query_ensembl_vep_consequence"
         assert stage_domain_tools.query_chembl_target_profile.name == "query_chembl_target_profile"
-        assert stage_domain_tools.query_pubmed_clinical_limitations.name == "query_pubmed_clinical_limitations"
 
     def test_import_census_lr_validation_tools(self):
         from src.agents.drug_target.tools import census_lr_validation_tools
@@ -544,7 +546,7 @@ class TestToolImports:
             "query_string_ppi_pair", "query_ensembl_vep_consequence",
             "query_opentargets_target", "query_opentargets_known_drugs",
             "query_gwas_gene_trait", "query_stage2_gene_panel",
-            "query_chembl_target_profile", "query_pubmed_clinical_limitations",
+            "query_chembl_target_profile",
             "run_compare_census_lr_pair",
             "finalize_stage1_artifacts",
             "read_skill_file",
@@ -2768,7 +2770,8 @@ class TestCensusDiseaseTool:
         from src.agents.drug_target.subagents.prompts import EVIDENCE_ASSESSOR_PROMPT
         assert "list_census_diseases" in EVIDENCE_ASSESSOR_PROMPT
         assert "census_disease" in EVIDENCE_ASSESSOR_PROMPT
-        assert "disease_matched" in EVIDENCE_ASSESSOR_PROMPT
+        # disease_matched is now handled internally by run_stage1_batch
+        assert "run_stage1_batch" in EVIDENCE_ASSESSOR_PROMPT or "disease_matched" in EVIDENCE_ASSESSOR_PROMPT
 
     def test_evidence_assessor_prompt_mentions_selected_skill_reads(self):
         """Prompt contains stage-specific progressive disclosure guidance."""
@@ -3041,3 +3044,216 @@ class TestSkillLoadingEndToEnd:
             assert name in captured, f"Skill {name} missing from injected prompt"
         # Placeholder fully substituted
         assert "{{available_skills}}" not in captured
+
+
+# ===========================================================================
+# 8. Stage 1 Filter CSV Sync
+# ===========================================================================
+
+
+class TestStage1FilterCSVSync:
+    """Verify that apply_stage1_filter regenerates rubric_scores.csv."""
+
+    def test_rubric_csv_updated_after_filter(self, tmp_path):
+        """After apply_stage1_filter, rubric_scores.csv stage3_candidate
+        flags must match assessment_results.json rubric_assessment."""
+        import csv
+        from src.agents.drug_target.tools.stage_logic import apply_stage1_filter
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+
+        # 1. Create mock stage1_evidence.json with 2 pairs, 1 passes / 1 fails
+        stage1_evidence = {
+            "TGFB1^TGFBR2": {
+                "string_ppi": {"max_combined_score": 900},
+                "census_validation": {"target_vs_rest": {
+                    "coexpression": {"p_value": 0.01},
+                    "gene_a": {"p_value": 0.02},
+                    "gene_b": {"p_value": 0.03},
+                }},
+            },
+            "CD74^MIF": {
+                "string_ppi": {"max_combined_score": 100},  # fails: < 0.8*1000
+                "census_validation": {"target_vs_rest": {
+                    "coexpression": {"p_value": 0.5},   # fails
+                    "gene_a": {"p_value": 0.5},
+                    "gene_b": {"p_value": 0.5},
+                }},
+            },
+        }
+        (evidence_dir / "stage1_evidence.json").write_text(json.dumps(stage1_evidence))
+
+        # 2. Create mock assessment_results.json with all genes as candidates
+        assessment = {
+            "rubric_assessment": [
+                {"gene": "TGFB1", "combined_total": 15, "stage3_candidate": True,
+                 "existing_drug_evidence": 4, "clinical_trial_activity": 5,
+                 "safety_profile": 0, "validated_total": 9,
+                 "gwas_support": 0, "tractability": 3, "biological_plausibility": 2,
+                 "novelty_opportunity": 1, "exploratory_total": 6,
+                 "classification": "validated_target", "priority": "high"},
+                {"gene": "TGFBR2", "combined_total": 11, "stage3_candidate": True,
+                 "existing_drug_evidence": 1, "clinical_trial_activity": 5,
+                 "safety_profile": 0, "validated_total": 6,
+                 "gwas_support": 0, "tractability": 3, "biological_plausibility": 1,
+                 "novelty_opportunity": 1, "exploratory_total": 5,
+                 "classification": "validated_target", "priority": "high"},
+                {"gene": "CD74", "combined_total": 12, "stage3_candidate": True,
+                 "existing_drug_evidence": 2, "clinical_trial_activity": 5,
+                 "safety_profile": 0, "validated_total": 7,
+                 "gwas_support": 0, "tractability": 3, "biological_plausibility": 1,
+                 "novelty_opportunity": 1, "exploratory_total": 5,
+                 "classification": "validated_target", "priority": "high"},
+                {"gene": "MIF", "combined_total": 10, "stage3_candidate": True,
+                 "existing_drug_evidence": 1, "clinical_trial_activity": 3,
+                 "safety_profile": 0, "validated_total": 4,
+                 "gwas_support": 0, "tractability": 3, "biological_plausibility": 2,
+                 "novelty_opportunity": 1, "exploratory_total": 6,
+                 "classification": "validated_target", "priority": "high"},
+            ],
+            "stage3_candidates": [
+                {"gene": "TGFB1"}, {"gene": "TGFBR2"},
+                {"gene": "CD74"}, {"gene": "MIF"},
+            ],
+            "summary": {"stage3_count": 4},
+        }
+        (evidence_dir / "assessment_results.json").write_text(json.dumps(assessment))
+
+        # 3. Create initial rubric_scores.csv (pre-filter: all 4 True)
+        rubric_csv = evidence_dir / "rubric_scores.csv"
+        fieldnames = [
+            "gene", "existing_drug_evidence", "clinical_trial_activity",
+            "safety_profile", "validated_total",
+            "gwas_support", "tractability", "biological_plausibility",
+            "novelty_opportunity", "exploratory_total", "combined_total",
+            "classification", "priority", "stage3_candidate",
+        ]
+        with open(rubric_csv, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(assessment["rubric_assessment"])
+
+        # Pre-check: 4 True in CSV
+        with open(rubric_csv) as f:
+            reader = csv.DictReader(f)
+            pre_true = sum(1 for r in reader if r["stage3_candidate"] == "True")
+        assert pre_true == 4
+
+        # 4. Run filter
+        result = json.loads(apply_stage1_filter.invoke({"data_dir": str(tmp_path)}))
+        assert result["success"] is True
+        assert result["rubric_csv_updated"] is True
+
+        # 5. Verify CSV was regenerated with correct flags
+        with open(rubric_csv) as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        true_genes = {r["gene"] for r in rows if r["stage3_candidate"] == "True"}
+        false_genes = {r["gene"] for r in rows if r["stage3_candidate"] == "False"}
+
+        # TGFB1 and TGFBR2 pass (their pair TGFB1^TGFBR2 passes)
+        # CD74 and MIF fail (their pair CD74^MIF fails)
+        assert "TGFB1" in true_genes
+        assert "TGFBR2" in true_genes
+        assert "CD74" in false_genes
+        assert "MIF" in false_genes
+
+        # Verify JSON and CSV agree
+        updated_assessment = json.loads(
+            (evidence_dir / "assessment_results.json").read_text()
+        )
+        json_true_genes = {
+            r["gene"] for r in updated_assessment["rubric_assessment"]
+            if r["stage3_candidate"] is True
+        }
+        assert true_genes == json_true_genes
+
+        # Verify scores unchanged (only flags changed)
+        for row in rows:
+            if row["gene"] == "CD74":
+                assert int(row["combined_total"]) == 12  # score preserved
+
+
+# ===========================================================================
+# 9. C3 + C1 Regression Tests
+# ===========================================================================
+
+
+class TestC3C1Fixes:
+    """Regression tests for C3 (hypothesis_writer middleware) and C1 (score normalization)."""
+
+    def test_hypothesis_writer_has_read_file_block_middleware(self):
+        """C3 regression: hypothesis_writer must block read_file via middleware."""
+        from src.agents.drug_target.subagents.configs import get_subagents
+        subagents = get_subagents()
+        hw = [s for s in subagents if s["name"] == "hypothesis_writer"][0]
+        middleware_types = [type(m).__name__ for m in hw.get("middleware", [])]
+        assert "ReadFileBlockMiddleware" in middleware_types
+
+    def test_rank_featured_candidates_flat_keys(self):
+        """C1 regression: flat-key matrix rows must produce correct scores."""
+        from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
+        flat_row = {
+            "ligand": "ICAM1",
+            "receptor": "MUC1",
+            "gene": "MUC1",
+            "drug_evidence": 5,
+            "trial": 5,
+            "safety": 0,
+            "gwas": 0,
+            "tractability": 2,
+            "biological_plausibility": 2,
+            "novelty": 1,
+        }
+        result = rank_featured_candidates([flat_row])
+        row = result[0]
+        assert row["validated_total"] == 10  # 5 + 5 + 0
+        assert row["exploratory_total"] == 5  # 0 + 2 + 2 + 1
+        assert row["combined_total"] == 15
+        assert row["classification"] == "validated_target"
+        assert row["priority"] == "high"
+
+    def test_rank_featured_candidates_nested_dict_unchanged(self):
+        """C1 backward compat: nested-dict format still works."""
+        from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
+        nested_row = {
+            "ligand": "ICAM1",
+            "receptor": "MUC1",
+            "gene": "MUC1",
+            "validated_track": {
+                "existing_drug_evidence": 5,
+                "clinical_trial_activity": 5,
+                "safety_profile": 0,
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 0,
+                "tractability": 2,
+                "biological_plausibility": 2,
+                "novelty_opportunity": 1,
+            },
+        }
+        result = rank_featured_candidates([nested_row])
+        row = result[0]
+        assert row["validated_total"] == 10
+        assert row["exploratory_total"] == 5
+        assert row["combined_total"] == 15
+
+    def test_rank_featured_candidates_mixed_format(self):
+        """C1 edge case: one track nested dict, other track flat keys."""
+        from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
+        mixed_row = {
+            "ligand": "TEST", "receptor": "TEST", "gene": "TEST",
+            "validated_track": {
+                "existing_drug_evidence": 3,
+                "clinical_trial_activity": 2,
+                "safety_profile": 1,
+            },
+            "gwas": 1, "tractability": 2, "biological_plausibility": 3, "novelty": 2,
+        }
+        result = rank_featured_candidates([mixed_row])
+        row = result[0]
+        assert row["validated_total"] == 6   # 3 + 2 + 1
+        assert row["exploratory_total"] == 8  # 1 + 2 + 3 + 2
+        assert row["combined_total"] == 14

@@ -105,14 +105,14 @@ def create_google_llm(**kwargs) -> ChatGoogleGenerativeAI:
 
 def create_ollama_llm(**kwargs) -> ChatOllama:
     """
-    Create Ollama LLM instance (default: qwen3.5:35b at localhost:6000)
+    Create Ollama LLM instance (default: qwen3.5:122b at localhost:6000)
     
     Args:
-        model: Model name (default: qwen3.5:35b)
+        model: Model name (default: qwen3.5:122b)
         base_url: Ollama server URL (default: http://localhost:6000)
         temperature: Temperature setting (default: 0)
     """
-    model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3.5:35b"))
+    model = kwargs.get("model", os.getenv("OLLAMA_MODEL", "qwen3.5:122b"))
 
     base_url = kwargs.get("base_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:6000"))
     temperature = kwargs.get("temperature", 0)
@@ -185,7 +185,7 @@ def load_subagent_models_from_env(
         SUBAGENT_PLANNER_PROVIDER=openai
         SUBAGENT_PLANNER_MODEL=gpt-4.1-mini
         SUBAGENT_INTERPRETER_PROVIDER=ollama
-        SUBAGENT_INTERPRETER_MODEL=qwen3.5:35b
+        SUBAGENT_INTERPRETER_MODEL=qwen3.5:122b
         SUBAGENT_INTERPRETER_NUM_CTX=65536
 
     Args:

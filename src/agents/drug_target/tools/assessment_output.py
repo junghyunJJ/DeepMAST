@@ -317,6 +317,9 @@ def save_drug_md(data_dir: str, content: str | dict | list) -> str:
                      "Please pass the full markdown text as a string.",
             "saved": False,
         })
+    import re
+    # Strip unexpanded EXPAND placeholders left by timeout
+    content = re.sub(r'\n*<!-- EXPAND:.*?-->\n*', '\n', content)
     resolved = _resolve_data_dir(data_dir)
     drug_md_path = resolved / "drug.md"
     drug_md_path.write_text(content, encoding="utf-8")
