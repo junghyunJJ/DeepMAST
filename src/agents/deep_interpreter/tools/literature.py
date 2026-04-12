@@ -1574,9 +1574,15 @@ def _calculate_coverage(
         genes: Original gene list
         pathways: Original pathway list
         celltypes: Original cell type list
+        lr_pairs: Optional list of L-R pair dicts [{"ligand": str, "receptor": str}, ...].
+            When provided, adds pair co-occurrence tracking to the coverage dict.
 
     Returns:
-        Coverage dictionary with covered items and percentages
+        Coverage dictionary with covered items and percentages.
+        When lr_pairs is provided, also includes:
+        - pairs_covered: List of "LIGAND^RECEPTOR" strings for pairs found in same paper
+        - pairs_coverage_pct: Percentage of provided pairs covered
+        - pairs_missing: List of uncovered pair strings
     """
     coverage = {
         "genes_covered": [],
@@ -1656,7 +1662,7 @@ def _calculate_coverage(
     coverage["celltypes_missing"] = [c for c in celltypes if c not in coverage["celltypes_covered"]]
 
     # L-R pair co-occurrence: both genes must appear in SAME paper (informational, v1)
-    pairs_covered = []
+    pairs_covered_set: set[str] = set()
     if lr_pairs:
         # Pre-generate patterns for all pair genes (optimization: once, not per-paper)
         pair_gene_patterns: dict[str, list[str]] = {}
@@ -1691,19 +1697,19 @@ def _calculate_coverage(
                 lig = pair.get("ligand", "")
                 rec = pair.get("receptor", "")
                 pair_key = f"{lig}^{rec}"
-                if pair_key in pairs_covered:
+                if pair_key in pairs_covered_set:
                     continue
                 # For complex receptors (ITGA2_ITGB1), check any subunit
                 rec_genes = [g.strip() for g in rec.split("_") if g.strip()] if "_" in rec else [rec]
                 if lig in hits and any(rg in hits for rg in rec_genes):
-                    pairs_covered.append(pair_key)
+                    pairs_covered_set.add(pair_key)
 
-        coverage["pairs_covered"] = pairs_covered
-        coverage["pairs_coverage_pct"] = len(pairs_covered) / len(lr_pairs) * 100
+        coverage["pairs_covered"] = sorted(pairs_covered_set)
+        coverage["pairs_coverage_pct"] = len(pairs_covered_set) / len(lr_pairs) * 100
         coverage["pairs_missing"] = [
             f"{p.get('ligand')}^{p.get('receptor')}"
             for p in lr_pairs
-            if f"{p.get('ligand')}^{p.get('receptor')}" not in pairs_covered
+            if f"{p.get('ligand')}^{p.get('receptor')}" not in pairs_covered_set
         ]
 
     return coverage
@@ -2007,7 +2013,7 @@ def _format_lr_pairs_for_prompt(pairs: list[dict] | None) -> str:
     if not pairs:
         return "None"
     return ", ".join(
-        f"{p['ligand']}-{p['receptor']}" + (f" (score: {p['score']:.2f})" if 'score' in p else "")
+        f"{p.get('ligand', '')}-{p.get('receptor', '')}" + (f" (score: {p['score']:.2f})" if 'score' in p else "")
         for p in pairs[:10]  # Limit to 10 in prompt for token control
     )
 
@@ -2085,6 +2091,7 @@ async def _think_search_strategy(
 
     except Exception as e:
         logger.warning(f"BioMCP search strategy think failed (non-critical): {e}")
+        invalidate_client(f"biomcp_{biomcp_url}")
         return ""
 
 
