@@ -234,6 +234,7 @@
         <button class="tab-button active" onclick="openTab(event, 'overview')">Overview</button>
         <button class="tab-button" onclick="openTab(event, 'matrix')">Druggability Matrix</button>
         <button class="tab-button" onclick="openTab(event, 'deepdives')">Candidate Deep Dives</button>
+        <button class="tab-button" onclick="openTab(event, 'hypothesis')">Hypothesis Analysis</button>
         <button class="tab-button" onclick="openTab(event, 'recommendations')">Recommendations</button>
     </div>
 
@@ -461,8 +462,8 @@
             <p style="color: var(--text-secondary);"><em>No biological context data.</em></p>
             {% endif %}
 
-            {# D. Rubric Assessment #}
-            <h4>D. Rubric Assessment</h4>
+            {# C. Rubric Assessment #}
+            <h4>C. Rubric Assessment</h4>
             {% if dive.rubric %}
             {{ rubric_card(dive.rubric) }}
             {% endif %}
@@ -472,9 +473,90 @@
         <hr class="gene-divider">
         {% endif %}
         {% endfor %}
+
+        {# Deep Dive Scoring Legend (collapsible) #}
+        <details class="legend-section" style="margin-top: 30px;">
+            <summary>Scoring Legend</summary>
+            <div class="analysis-section" style="margin-top: 15px;">
+                <h4>Section Guide</h4>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Section</th><th>Content</th><th>Data Source</th></tr></thead>
+                        <tbody>
+                            <tr><td><strong>A. Drug Profile</strong></td><td>Clinical compounds (approved/trial) and preclinical bioactivity hits</td><td>OpenTargets (clinical) + ChEMBL (preclinical)</td></tr>
+                            <tr><td><strong>B. Biological Context</strong></td><td>STRING PPI validation, KEGG/Reactome pathways, Census coexpression</td><td>STRING, CellxGene Census, KEGG, Reactome</td></tr>
+                            <tr><td><strong>C. Rubric Assessment</strong></td><td>14-dimension scoring: Validated Track + Exploratory Track = Combined Total</td><td>Computed from Stage 2 evidence</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="analysis-section">
+                <h4>Stage 1 Filter Criteria</h4>
+                <p style="color: var(--text-secondary);">A pair passes only if ALL four criteria are met:</p>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Criterion</th><th>Threshold</th><th>Data Source</th></tr></thead>
+                        <tbody>
+                            <tr><td>STRING PPI combined score</td><td>&gt; 0.8</td><td>STRING database</td></tr>
+                            <tr><td>Census coexpression p-value</td><td>&lt; 0.05</td><td>CellxGene Census (target vs. rest)</td></tr>
+                            <tr><td>Census gene A (ligand) p-value</td><td>&lt; 0.05</td><td>CellxGene Census (target vs. rest)</td></tr>
+                            <tr><td>Census gene B (receptor) p-value</td><td>&lt; 0.05</td><td>CellxGene Census (target vs. rest)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p style="color: var(--text-secondary); font-size: 0.85em; margin-top: 8px;">
+                    <strong>RR</strong> = Risk Ratio (gene expression enrichment in target cell type vs. rest).
+                    N/A indicates the gene was not detected in non-target cells (denominator = 0).
+                </p>
+            </div>
+        </details>
     </div>
 
-    {# ===== Tab 4: Recommendations ===== #}
+    {# ===== Tab 4: Hypothesis Analysis ===== #}
+    <div id="hypothesis" class="tab-content">
+        <h2>Hypothesis-Driven Analysis</h2>
+
+        {% if hypothesis %}
+        {% for h in hypothesis %}
+        <div class="analysis-section">
+            <h3>{{ h.rank }}. {{ h.title }}</h3>
+            <span class="phase-badge phase-badge-2" style="margin-bottom: 12px; display: inline-block;">{{ h.category }}</span>
+
+            <div class="interpretation">
+                <p>{{ h.core_claim }}</p>
+            </div>
+
+            {% if h.genes %}
+            <h4>Biological Entities</h4>
+            <div class="table-container">
+                <table>
+                    <tr><td><strong>Genes</strong></td><td>{{ h.genes | join(', ') }}</td></tr>
+                    {% if h.pathways %}<tr><td><strong>Pathways</strong></td><td>{{ h.pathways | join(', ') }}</td></tr>{% endif %}
+                    {% if h.cell_types %}<tr><td><strong>Cell Types</strong></td><td>{{ h.cell_types | join(', ') }}</td></tr>{% endif %}
+                    {% if h.drugs %}<tr><td><strong>Drugs</strong></td><td>{{ h.drugs | join(', ') }}</td></tr>{% endif %}
+                </table>
+            </div>
+            {% endif %}
+
+            {% if h.falsifiable_prediction %}
+            <h4>Falsifiable Prediction</h4>
+            <div class="interpretation"><p>{{ h.falsifiable_prediction }}</p></div>
+            {% endif %}
+
+            {% if h.validation_approach %}
+            <h4>Validation Approach</h4>
+            <div class="interpretation"><p>{{ h.validation_approach }}</p></div>
+            {% endif %}
+        </div>
+
+        {% if not loop.last %}<hr class="gene-divider">{% endif %}
+        {% endfor %}
+        {% else %}
+        <p style="color: var(--text-secondary);"><em>No hypothesis analysis available.</em></p>
+        {% endif %}
+    </div>
+
+    {# ===== Tab 5: Recommendations ===== #}
     <div id="recommendations" class="tab-content">
         <h2>Pipeline Execution Summary &amp; Recommendations</h2>
 

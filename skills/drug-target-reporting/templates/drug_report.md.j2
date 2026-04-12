@@ -65,7 +65,7 @@ Each gene is scored on two independent tracks reflecting different types of ther
 | **Combined** | validated_total + exploratory_total. Overall target attractiveness across both tracks. |
 | **Classification** | Rule-based assignment: `validated_target` if Drug Ev. >= 3 or (Drug Ev. >= 1 and Val. Total >= 3); `exploratory_target` if GWAS >= 1 or Tract. >= 2 or Bio. Plaus. >= 3; `novel_candidate` if Bio. Plaus. >= 2 or Novelty >= 3 or (Tract. >= 1 and Novelty >= 2); `insufficient_evidence` otherwise. |
 | **Priority** | For validated_target: `high` (Combined >= 10), `medium` (>= 5), `low`. For exploratory/novel: `high` (Expl. Total >= 12), `medium` (>= 7), `low`. insufficient_evidence is always `unranked`. |
-| **Stage3** | Top 7 genes by exploratory_total are selected as featured candidates and proceed to Stage 3 deep-dive analysis (ChEMBL drug profiling + PubMed literature search). |
+| **Stage3** | Genes with combined_total >= 10 that also appear in stage1_filter_passed_genes are selected as featured candidates and proceed to Stage 3 deep-dive analysis (ChEMBL drug profiling). |
 
 ### 2.2. Biological Interaction Filter Results
 
@@ -143,7 +143,7 @@ Each gene is scored on two independent tracks reflecting different types of ther
 
 <!-- EXPAND: Interpret biological context and pathway relevance -->
 
-**D. Rubric Assessment**
+**C. Rubric Assessment**
 
 - Validated Track: existing_drug_evidence={{ card.rubric.existing_drug_evidence | default(0) }}, clinical_trial_activity={{ card.rubric.clinical_trial_activity | default(0) }}, safety_profile={{ card.rubric.safety_profile | default(0) }} → **validated_total={{ card.rubric.validated_total | default(0) }}**
 - Exploratory Track: gwas_support={{ card.rubric.gwas_support | default(0) }}, tractability={{ card.rubric.tractability | default(0) }}, biological_plausibility={{ card.rubric.biological_plausibility | default(0) }}, novelty_opportunity={{ card.rubric.novelty_opportunity | default(0) }} → **exploratory_total={{ card.rubric.exploratory_total | default(0) }}**

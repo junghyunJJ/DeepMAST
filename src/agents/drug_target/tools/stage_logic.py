@@ -2135,7 +2135,104 @@ def validate_drug_md(data_dir: str) -> str:
                 "detail": f"'{fake_col}' does not exist in evidence files",
             })
 
-    total_checks = len(doc_pmids) + 4  # PMIDs + classification + decimals + columns
+    # 5. Drug approval year validation against resolved_drugs.json
+    resolved_drugs_path = evidence_dir / "resolved_drugs.json"
+    if resolved_drugs_path.exists():
+        try:
+            resolved = json.loads(resolved_drugs_path.read_text())
+        except Exception:
+            resolved = []
+
+        # Build name → first_approval lookup (case-insensitive)
+        approval_lookup: dict[str, int | None] = {}
+        for d in resolved:
+            name = (d.get("resolved_name") or "").strip().upper()
+            if name:
+                approval_lookup[name] = d.get("first_approval")
+
+        # Find approval year claims: "approved (YYYY)", "approved in YYYY",
+        # "(YYYY)" near "approved", "FDA approved YYYY"
+        year_claims = re.findall(
+            r'(?:approved|approval)\s*(?:in\s*)?\(?(\d{4})\)?',
+            drug_text, re.IGNORECASE
+        )
+        # Also match patterns like "drug_name (2018)" near "approved"
+        contextual_years = re.findall(
+            r'(\b[A-Z][A-Z0-9-]+\b)\s*\((?:approved\s+)?(\d{4})\)',
+            drug_text
+        )
+        for drug_name_match, claimed_year in contextual_years:
+            known_approval = approval_lookup.get(drug_name_match.upper())
+            if known_approval is not None and str(known_approval) != claimed_year:
+                issues.append({
+                    "type": "WRONG_APPROVAL_YEAR",
+                    "severity": "high",
+                    "drug": drug_name_match,
+                    "claimed_year": claimed_year,
+                    "actual_year": known_approval,
+                })
+
+        # 6. Clinical vs Preclinical classification check
+        for d in resolved:
+            source = d.get("source", "")
+            max_phase = d.get("max_phase")
+            drug_name = (d.get("resolved_name") or "").strip()
+            if not drug_name or len(drug_name) < 3:
+                continue
+            # Only check preclinical compounds from ChEMBL
+            if source == "chembl" and max_phase in (None, "Preclinical", 0, "0"):
+                drug_name_esc = re.escape(drug_name)
+                pattern = re.compile(
+                    drug_name_esc + r'.{0,200}(?:(?:FDA\s+)?approved|Phase\s+[1-4])',
+                    re.IGNORECASE | re.DOTALL,
+                )
+                if pattern.search(drug_text):
+                    issues.append({
+                        "type": "PRECLINICAL_CALLED_APPROVED",
+                        "severity": "high",
+                        "drug": drug_name,
+                        "actual_phase": max_phase,
+                        "detail": (
+                            f"'{drug_name}' is a preclinical compound (source=chembl) "
+                            f"but described as approved/clinical in drug.md"
+                        ),
+                    })
+
+    # 7. Hypothesis drug claims validation
+    hypothesis_path = evidence_dir / "hypothesis_report.json"
+    if hypothesis_path.exists() and resolved_drugs_path.exists():
+        try:
+            hyp = json.loads(hypothesis_path.read_text())
+        except Exception:
+            hyp = {}
+
+        # Build MOA lookup from resolved drugs
+        moa_lookup: dict[str, str | None] = {}
+        for d in (resolved if 'resolved' in dir() else []):
+            name = (d.get("resolved_name") or "").strip().lower()
+            if name:
+                moa_lookup[name] = d.get("mechanism_of_action")
+
+        for h in hyp.get("hypotheses", []):
+            for drug_claim in h.get("biological_entities", {}).get("drugs", []):
+                # Extract drug name and parenthetical mechanism
+                paren_match = re.match(r'(.+?)\s*\((.+?)\)', drug_claim)
+                if paren_match:
+                    claim_drug = paren_match.group(1).strip().lower()
+                    claim_moa = paren_match.group(2).strip().lower()
+                    known_moa = moa_lookup.get(claim_drug)
+                    # Flag if the drug exists in resolved but MOA doesn't match
+                    if known_moa and claim_moa not in known_moa.lower():
+                        issues.append({
+                            "type": "HYPOTHESIS_WRONG_MOA",
+                            "severity": "medium",
+                            "drug": paren_match.group(1).strip(),
+                            "claimed_moa": paren_match.group(2).strip(),
+                            "actual_moa": known_moa,
+                            "hypothesis": h.get("title", "")[:80],
+                        })
+
+    total_checks = len(doc_pmids) + 7  # PMIDs + classification + decimals + columns + approval + phase + hypothesis
     return json.dumps({
         "valid": len(issues) == 0,
         "total_checks": total_checks,

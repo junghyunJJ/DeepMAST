@@ -51,6 +51,8 @@ from src.agents.drug_target.tools import (
     # Assessment output
     save_target_assessment,
     save_drug_md,
+    # HTML report generation
+    generate_drug_html_report,
     # Common tools
     sequential_thinking,
     think_tool,
@@ -158,7 +160,8 @@ SUBAGENT_CONFIGS = {
             "Pan-Disease Target Druggability Matrix ([FEATURED] rows bolded), "
             "[FEATURED] Candidate Deep Dives (Stage 3), "
             "Pipeline Execution Summary & Recommendations. "
-            "Featured candidates are determined by rubric scoring (combined_total)."
+            "Featured candidates are determined by rubric scoring (combined_total). "
+            "Optionally generates drug_report.html (interactive HTML version)."
         ),
         "system_prompt": SUBAGENT_PROMPTS["report_writer"],
         "tools": [
@@ -174,6 +177,7 @@ SUBAGENT_CONFIGS = {
             sequential_thinking,
             think_tool,
             validate_quality,
+            generate_drug_html_report,
         ],
     },
 }

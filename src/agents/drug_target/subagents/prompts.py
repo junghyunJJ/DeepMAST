@@ -562,6 +562,21 @@ Use `think_tool` to verify the drug.md content against the Reference Card:
 
 If you find discrepancies, FIX them before proceeding.
 
+### Approval Year Rule
+- ONLY write "approved (YEAR)" or "FDA approved in YEAR" if the Reference Card
+  clinical_drugs entry includes a `first_approval` field with that year value.
+- If `first_approval` is null or absent: write "in development" or state
+  the max_phase only (e.g., "Phase 3"). Do NOT guess approval years.
+- NEVER infer or recall approval years from general knowledge.
+
+### Hypothesis Drug Descriptions
+- When transcribing hypothesis biological_entities.drugs, copy the text VERBATIM
+  from hypothesis_report.json. Do NOT modify mechanism descriptions.
+- If a drug name includes a parenthetical mechanism (e.g., "pirfenidone (anti-fibrotic)"),
+  verify the mechanism matches the Reference Card's MOA field for that drug.
+  If no match or no Reference Card entry: omit the parenthetical mechanism
+  and write only the drug name.
+
 ### Phase 6: Validation Loop (MANDATORY — ZERO TOLERANCE)
 After calling `save_drug_md`, you MUST enter this validation loop:
 
@@ -586,6 +601,17 @@ issues as a warning section at the end of drug.md).
 
 ### Phase 7: Quality Check
 Use `validate_quality` (threshold >= 0.7) on a summary of the drug.md.
+
+### Phase 8: Generate HTML Report (Optional — Graceful Degradation)
+After Phase 7 quality check, generate the interactive HTML version:
+
+1. Call `generate_drug_html_report(data_dir=data_dir)`
+2. If the result contains `"generated": true`: note the HTML path in your completion message.
+3. If the result contains `"error"` or an exception occurs: log it but DO NOT fail.
+   drug.md is the primary output. HTML is supplementary.
+
+HTML failure must NEVER cause you to re-run the validation loop, re-save drug.md,
+or report the pipeline as failed.
 
 ## Drug Target Report Writing Skill (CCI-Validated Anti-Hallucination Rules)
 

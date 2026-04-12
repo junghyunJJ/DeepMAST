@@ -53,6 +53,7 @@ def parse_drug_md(md_text: str) -> dict[str, Any]:
         "executive_summary": {"text": "", "featured_candidates": []},
         "matrix": {"headers": [], "rows": [], "legend": {}},
         "deep_dives": [],
+        "hypothesis": [],
         "pipeline_summary": {},
     }
 
@@ -66,7 +67,11 @@ def parse_drug_md(md_text: str) -> dict[str, Any]:
             context["matrix"] = _parse_druggability_matrix(body)
         elif header_line.startswith("3."):
             context["deep_dives"] = _parse_deep_dives(body)
+        elif header_line.startswith("4.") and "Hypothesis" in header_line:
+            context["hypothesis"] = _parse_hypothesis_section(body)
         elif header_line.startswith("4."):
+            context["pipeline_summary"] = _parse_pipeline_summary(body)
+        elif header_line.startswith("5."):
             context["pipeline_summary"] = _parse_pipeline_summary(body)
 
     # Fallback: if no matrix rows but deep dives have rubric data, build rows
@@ -221,8 +226,8 @@ def _parse_scoring_legend(body: str) -> dict[str, Any]:
     """Parse the Scoring Legend section with validated/exploratory track tables."""
     legend: dict[str, Any] = {}
 
-    # Split on #### headers for track sub-sections
-    track_sections = re.split(r"^####\s+", body, flags=re.MULTILINE)
+    # Split on #### or ##### headers for track sub-sections
+    track_sections = re.split(r"^#{4,5}\s+", body, flags=re.MULTILINE)
     for sec in track_sections:
         header = sec.split("\n", 1)[0].strip().lower()
         sec_body = sec.split("\n", 1)[1] if "\n" in sec else ""
@@ -328,11 +333,11 @@ def _parse_deep_dives(body: str) -> list[dict[str, Any]]:
             if letter == "A":
                 dive["drug_profile"] = _parse_drug_profile(sub_body)
             elif letter == "B":
-                dive["literature"] = _parse_literature(sub_body)
-            elif letter == "C":
                 dive["biological_context"] = _parse_bio_context(sub_body)
-            elif letter == "D":
+            elif letter == "C":
                 dive["rubric"] = _parse_rubric_assessment(sub_body)
+            elif letter == "D":
+                dive["rubric"] = _parse_rubric_assessment(sub_body)  # legacy
             i += 3
 
         dives.append(dive)
@@ -455,8 +460,62 @@ def _parse_rubric_assessment(body: str) -> dict[str, Any]:
     return rubric
 
 
+def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
+    """Parse section 4 (Hypothesis-Driven Analysis) into structured list."""
+    hypotheses: list[dict[str, Any]] = []
+
+    # Split on ### 4.N. headings
+    h_sections = re.split(r"^### \d+\.\d+\.\s+", body, flags=re.MULTILINE)
+
+    for i, sec in enumerate(h_sections):
+        if not sec.strip() or i == 0:
+            continue  # skip preamble before first ###
+
+        lines = sec.strip()
+        title = lines.split("\n", 1)[0].strip()
+
+        category_m = re.search(r"\*\*Category:\*\*\s*(.+)", lines)
+        claim_m = re.search(r"\*\*Core Claim:\*\*\s*(.+)", lines)
+        prediction_m = re.search(r"\*\*Falsifiable Prediction:\*\*\s*(.+)", lines)
+        validation_m = re.search(r"\*\*Validation Approach:\*\*\s*(.+)", lines)
+
+        # Parse biological entities
+        genes: list[str] = []
+        pathways: list[str] = []
+        cell_types: list[str] = []
+        drugs: list[str] = []
+
+        genes_m = re.search(r"-\s*Genes:\s*(.+)", lines)
+        if genes_m:
+            genes = [g.strip() for g in genes_m.group(1).split(",")]
+        pathways_m = re.search(r"-\s*Pathways:\s*(.+)", lines)
+        if pathways_m:
+            pathways = [p.strip() for p in pathways_m.group(1).split(",")]
+        cell_m = re.search(r"-\s*Cell Types:\s*(.+)", lines)
+        if cell_m:
+            cell_types = [c.strip() for c in cell_m.group(1).split(",")]
+        drugs_m = re.search(r"-\s*Drugs:\s*(.+)", lines)
+        if drugs_m:
+            drugs = [d.strip() for d in drugs_m.group(1).split(",")]
+
+        hypotheses.append({
+            "rank": i,
+            "title": title,
+            "category": category_m.group(1).strip() if category_m else "",
+            "core_claim": claim_m.group(1).strip() if claim_m else "",
+            "falsifiable_prediction": prediction_m.group(1).strip() if prediction_m else "",
+            "validation_approach": validation_m.group(1).strip() if validation_m else "",
+            "genes": genes,
+            "pathways": pathways,
+            "cell_types": cell_types,
+            "drugs": drugs,
+        })
+
+    return hypotheses
+
+
 def _parse_pipeline_summary(body: str) -> dict[str, Any]:
-    """Parse section 4: pipeline execution summary."""
+    """Parse section 5: pipeline execution summary."""
     summary: dict[str, Any] = {}
 
     m = re.search(r"Total genes assessed:\s*(\d+)", body)
@@ -715,6 +774,7 @@ def _preformat_cards(featured_cards: list[dict]) -> list[dict]:
                 "moa": d.get("mechanism_of_action") or "mechanism not available",
                 "phase": d.get("max_phase") or "Preclinical",
                 "indications": indications,
+                "first_approval": d.get("first_approval"),
             }
 
         clinical_fmt = [_fmt_drug(d) for d in s3.get("clinical_drugs", [])]
@@ -827,6 +887,30 @@ def build_drug_html_context(data_dir: str) -> dict[str, Any]:
     if ta_path.exists():
         _enrich_from_target_assessment(context, ta_path)
 
+    # Fallback: load hypothesis from evidence/hypothesis_report.json if parser missed it
+    if not context.get("hypothesis"):
+        hyp_path = base / "evidence" / "hypothesis_report.json"
+        if hyp_path.exists():
+            try:
+                hyp_data = json.loads(hyp_path.read_text(encoding="utf-8"))
+                context["hypothesis"] = [
+                    {
+                        "rank": h.get("rank", i + 1),
+                        "title": h.get("title", ""),
+                        "category": h.get("category", ""),
+                        "core_claim": h.get("core_claim", ""),
+                        "falsifiable_prediction": h.get("falsifiable_prediction", ""),
+                        "validation_approach": h.get("validation_approach", ""),
+                        "genes": h.get("biological_entities", {}).get("genes", []),
+                        "pathways": h.get("biological_entities", {}).get("pathways", []),
+                        "cell_types": h.get("biological_entities", {}).get("cell_types", []),
+                        "drugs": h.get("biological_entities", {}).get("drugs", []),
+                    }
+                    for i, h in enumerate(hyp_data.get("hypotheses", []))
+                ]
+            except Exception:
+                pass
+
     # Embed CSS/JS
     context["css"] = _load_css()
     context["js"] = _load_js()
@@ -859,8 +943,15 @@ def generate_drug_html_report(data_dir: str) -> str:
     if not drug_md_path.exists():
         return json.dumps({"error": "drug.md not found", "path": str(drug_md_path)})
 
-    context = build_drug_html_context(data_dir)
-    html = render_drug_html(context)
+    try:
+        context = build_drug_html_context(data_dir)
+        html = render_drug_html(context)
+    except Exception as exc:
+        return json.dumps({
+            "generated": False,
+            "error": f"HTML rendering failed: {exc}",
+            "path": str(base / "drug_report.html"),
+        }, indent=2)
 
     output_path = base / "drug_report.html"
     output_path.write_text(html, encoding="utf-8")
