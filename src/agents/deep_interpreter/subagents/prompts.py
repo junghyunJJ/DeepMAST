@@ -179,10 +179,18 @@ SEARCHER_PROMPT = """You are a biomedical literature search expert with expertis
 You search for papers BEFORE the interpreter runs. Your papers will be the ONLY
 citation source for the interpreter. This prevents hallucination.
 
-## MANDATORY: Load Complete Workflow Guide
-Before starting any search, use **read_file** to load your complete workflow guide:
-- Path: `skills/biomedical-literature-search/SKILL.md`
-- This file contains all 5 phases, quality criteria, and best practices
+## MANDATORY: Skill Evaluation Protocol
+The Skill Load Harness will prompt you to evaluate available skills at the start.
+Follow the 3-phase protocol:
+- Phase 1: QUICK SCREEN — answer YES (literature search requires skill guides)
+- Phase 2: EVALUATE — mark `biomedical-literature-search` as YES, then call
+  `read_skill_file(skill_path="<path from harness prompt>")` to load the workflow
+- Phase 3: IMPLEMENT — proceed with the 4-phase search workflow from the loaded SKILL.md
+
+**IMPORTANT: Tool distinction**
+- `read_skill_file` — for skill documents only (e.g., SKILL.md files)
+- `read_file` — for data files only (e.g., /data_path.txt, /papers.json)
+Do NOT use `read_file` to load skill documents.
 
 ## 4-Phase Workflow Summary
 Follow the workflow defined in SKILL.md:
@@ -249,12 +257,13 @@ result = search_literature_dynamic(
     celltypes=search_context["celltypes"],
     disease="breast cancer",
     output_path="papers.json",
-    data_dir=data_path.strip()   # lr_pairs auto-loaded from data_dir
+    data_dir=data_path.strip(),
+    enable_lr_pair_queries=True,   # SEARCHER opts in to L-R pair query injection
 )
 # Result: {"saved_to": "...", "total_papers": 30, "coverage": {...}}
 # Full papers already saved — NO need to call write_file
-# L-R pair queries are automatically generated when lr_pairs_search.json exists in data_dir.
-# BioMCP think is also called automatically to optimize search strategy.
+# L-R pair queries are generated ONLY when enable_lr_pair_queries=True (SEARCHER only).
+# BioMCP think is called automatically to optimize search strategy.
 ```
 
 ### IMPORTANT Rules:
@@ -266,10 +275,11 @@ result = search_literature_dynamic(
 - Use `read_file('/papers.json')` if you need to inspect the saved data
 
 ## Tools Available
-- **read_file**: Load SKILL.md and other files
+- **read_skill_file**: Load skill documents (SKILL.md files)
+- **read_file**: Load data files (/data_path.txt, /papers.json)
 - **write_file**: Write output files
 - **load_analysis_data**: Load analysis results and search_context
-- **search_literature_dynamic**: LLM-powered PubMed search with BioMCP think-assisted strategy (PRIMARY search tool, auto-includes L-R pair queries when data_dir contains lr_pairs_search.json)
+- **search_literature_dynamic**: LLM-powered PubMed search with BioMCP think-assisted strategy (PRIMARY search tool). Set `enable_lr_pair_queries=True` to inject L-R pair queries — SEARCHER only; PLANNER/REPORTER should leave it default (False).
 - **search_literature**: Single query PubMed search via BioMCP (follow-up)
 - **search_pubmed_advanced**: Advanced PubMed E-utilities search
   - Accepts raw PubMed query syntax: "VEGFA[tiab] AND cancer[mh] AND 2020:2025[dp]"

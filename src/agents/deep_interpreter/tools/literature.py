@@ -2116,6 +2116,7 @@ def search_literature_dynamic(
     coverage_weighted_sort: bool = False,
     query_cache: list[dict] | None = None,
     record_queries: bool = False,
+    enable_lr_pair_queries: bool = False,
 ) -> dict:
     """LLM-powered dynamic literature search with ITERATIVE coverage improvement.
 
@@ -2159,9 +2160,11 @@ def search_literature_dynamic(
         If output_path is provided: Compact summary with saved_to, total_papers,
         coverage, paper_titles (first 10), and a message.
     """
-    # Auto-read lr_pairs from data_dir if available (file-based injection)
+    # Auto-read lr_pairs from data_dir ONLY if caller explicitly opted in
+    # (prevents silent pair injection for PLANNER/REPORTER which pass data_dir for
+    # save-path purposes only — fixes Codex adversarial review finding #1)
     _lr_pairs = None
-    if data_dir:
+    if enable_lr_pair_queries and data_dir:
         _lr_pairs_file = Path(data_dir) / "lr_pairs_search.json"
         if _lr_pairs_file.exists():
             try:
@@ -2261,8 +2264,10 @@ async def search_literature_dynamic_async(
     normalized_rerank_mode = _normalize_rerank_mode(rerank_mode)
     rerank_totals = {"applied_count": 0, "dropped_count": 0}
 
-    # Backward-compatible: think_success kept for output schema stability.
-    think_success = True
+    # think_success reflects actual BioMCP think tool outcome.
+    # Initialized to False; set to True only when _think_search_strategy returns content.
+    # (Fixes Codex adversarial review finding #3 — observability gap.)
+    think_success = False
 
     # Note: pre-fetch aliases removed - BioMCP article_searcher
     # automatically handles gene aliases internally (e.g., ACKR3 -> CXCR7)
@@ -2582,6 +2587,20 @@ async def search_literature_dynamic_async(
                 f"Only {len(final_papers)} papers found (target: 15+). Broaden disease context."
             )
         recommended_actions.append("Use think_tool to reflect on gaps before proceeding.")
+
+    # Pair coverage warning (informational only — not a gap-filling trigger in v2)
+    # Fixes Codex adversarial review finding #2 — observability gap when 0 pairs covered.
+    if lr_pairs:
+        pairs_pct = final_coverage.get("pairs_coverage_pct", 0)
+        pairs_covered_count = len(final_coverage.get("pairs_covered", []))
+        logger.info(
+            f"L-R pair coverage: {pairs_covered_count}/{len(lr_pairs)} ({pairs_pct:.1f}%)"
+        )
+        if pairs_pct == 0:
+            recommended_actions.append(
+                f"WARNING: 0/{len(lr_pairs)} L-R pairs covered despite being provided. "
+                f"Consider increasing max_results or verifying pair quality."
+            )
 
     filter_stage = (
         "hybrid_2stage" if normalized_rerank_mode == "llm" else "deterministic_only"
