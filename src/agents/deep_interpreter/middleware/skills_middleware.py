@@ -38,17 +38,9 @@ logger = logging.getLogger(__name__)
 
 
 def _find_project_root() -> Path:
-    """Find project root by looking for pyproject.toml or .git.
-
-    This is more robust than counting parent directories, which can break
-    if the file is moved or the project structure changes.
-    """
-    current = Path(__file__).resolve()
-    for parent in current.parents:
-        if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
-            return parent
-    # Fallback to 5 parents up (original behavior)
-    return Path(__file__).parent.parent.parent.parent.parent
+    """Find project root — delegates to shared utility."""
+    from src.agents.shared.utils import find_project_root
+    return find_project_root()
 
 
 # Project root and skills directory

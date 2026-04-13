@@ -60,6 +60,7 @@ from src.agents.deep_interpreter.tools.standalone_fs import (
     write_file as standalone_write_file,
     read_file as standalone_read_file,
 )
+from src.agents.shared.skill_reader import read_skill_file
 __all__ = [
     # Think tool (think_tool used by subagents; others exported for orchestrator-level use)
     "think_tool",
@@ -109,4 +110,6 @@ __all__ = [
     # Standalone filesystem tools
     "standalone_write_file",
     "standalone_read_file",
+    # Skill reader (shared)
+    "read_skill_file",
 ]

@@ -12,7 +12,7 @@ with 4 specialized subagents (simplified from the original 11).
 Architecture:
 - Main orchestrator: create_deep_agent() with HITL support
 - Subagents: 4 specialized agents covering the full interpretation workflow
-- Middleware: SkillsMiddleware (Progressive Disclosure for search strategies)
+- Middleware: SkillLoadHarness (forced-eval skill activation per subagent)
 - Backend: CompositeBackend with FilesystemBackend for persistent file storage
 
 Hallucination Prevention (maintained from original):
@@ -50,7 +50,7 @@ import os
 from pathlib import Path
 
 from src.agents.model import create_llm, load_subagent_models_from_env
-from src.agents.deep_interpreter.middleware import SkillsMiddleware
+# from src.agents.deep_interpreter.middleware import SkillsMiddleware  # Replaced by subagent-level SkillLoadHarness
 from src.agents.deep_interpreter.prompts import ORCHESTRATOR_SYSTEM_PROMPT
 from src.agents.deep_interpreter.subagents.configs import get_subagents
 from src.agents.deep_interpreter.tools import (
@@ -62,6 +62,22 @@ from src.agents.deep_interpreter.tools import (
     generate_html_report,
     think_tool,
 )
+
+
+from src.agents.shared.utils import find_project_root
+
+
+def _resolve_skills_dir(config: "DeepInterpreterConfig") -> Path:
+    """Resolve the project skills directory."""
+    if config.skills_dir:
+        return Path(config.skills_dir).expanduser().resolve()
+    return find_project_root() / "skills"
+
+
+def _build_skill_registry(config: "DeepInterpreterConfig") -> dict[str, str]:
+    """Build skill registry dict from config's allowed skill names."""
+    skills_dir = _resolve_skills_dir(config)
+    return {name: str(skills_dir / name) for name in config.agent_skill_names}
 
 
 class OverwriteFilesystemBackend(FilesystemBackend):
@@ -121,6 +137,13 @@ class DeepInterpreterConfig:
     # init_chat_model format per subagent, e.g.:
     # {"planner": "openai:gpt-4.1-mini", "interpreter": "ollama:qwen3.5:122b"}
     # If None, auto-loads from SUBAGENT_{NAME}_PROVIDER env vars.
+    enable_progressive_disclosure: bool = True
+    agent_skill_names: tuple[str, ...] = (
+        "biomedical-literature-search",
+        "pubmed-eutils-search",
+        "html-report-generator",
+    )
+    skills_dir: str | None = None
 
     def __post_init__(self):
         if self.subagent_models is None:
@@ -231,10 +254,24 @@ def create_deep_interpreter_agent(
     if config.custom_tools:
         tools.extend(config.custom_tools)
 
-    # Get simplified 4-agent configuration
+    # Build skill registry for subagent-level SkillLoadHarness
+    skill_registry = (
+        _build_skill_registry(config)
+        if config.enable_progressive_disclosure
+        else None
+    )
+    skills_sources = (
+        [str(_resolve_skills_dir(config)) + "/"]
+        if config.enable_progressive_disclosure
+        else None
+    )
+
+    # Get simplified 4-agent configuration with skill injection
     subagents = get_subagents(
         custom_tools=config.custom_tools,
         model_overrides=config.subagent_models,
+        skills_sources=skills_sources,
+        skill_registry=skill_registry,
     )
 
     # Add custom subagents
@@ -250,13 +287,10 @@ def create_deep_interpreter_agent(
     # not on subagent names. HITL is handled by the wrapper agent.
     interrupt_on = {}
 
-    # Create SkillsMiddleware for search strategy guidance
-    # This injects skill metadata into system prompt, enabling Progressive Disclosure:
-    # - Agent sees skill list with paths in system prompt
-    # - Agent reads full SKILL.md when needed for detailed strategies
-    skills_middleware = SkillsMiddleware()
+    # SkillsMiddleware removed — skills now injected per-subagent via SkillLoadHarness
+    # (see get_subagents with skills_sources/skill_registry params)
 
-    # Create the agent with backend factory and middleware
+    # Create the agent with backend factory (no middleware needed at orchestrator level)
     agent = create_deep_agent(
         model=llm,
         tools=tools,
@@ -265,7 +299,7 @@ def create_deep_interpreter_agent(
         interrupt_on=interrupt_on,
         system_prompt=ORCHESTRATOR_SYSTEM_PROMPT,
         backend=backend_factory,
-        middleware=[skills_middleware],
+        middleware=[],
     )
 
     return agent

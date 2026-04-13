@@ -270,15 +270,9 @@ def _resolve_skills_dir(config: DrugTargetConfig) -> Path:
 
 
 def _find_project_root() -> Path:
-    """Find project root by searching parent directories for pyproject.toml or .git."""
-    current = Path(__file__).resolve()
-    for parent in current.parents:
-        if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
-            return parent
-    raise FileNotFoundError(
-        f"Could not find project root from {current}. "
-        "Ensure pyproject.toml or .git exists in a parent directory."
-    )
+    """Find project root — delegates to shared utility."""
+    from src.agents.shared.utils import find_project_root
+    return find_project_root()
 
 
 def _build_skill_registry(config: DrugTargetConfig) -> dict[str, str]:

@@ -2787,14 +2787,16 @@ class TestCensusDiseaseTool:
         assert "cellxgene-census" not in EVIDENCE_ASSESSOR_PROMPT
 
     def test_read_skill_file_reads_project_relative_skill_doc(self, tmp_path):
+        # read_skill_file now lives in src.agents.shared.skill_reader and uses
+        # find_project_root from src.agents.shared.utils. drug_target re-exports it.
         from src.agents.drug_target.tools.skill_reader import read_skill_file
-        import src.agents.drug_target.tools.skill_reader as mod
+        import src.agents.shared.skill_reader as shared_mod
 
         skill_file = tmp_path / "skills" / "opentargets-database" / "SKILL.md"
         skill_file.parent.mkdir(parents=True)
         skill_file.write_text("# OpenTargets\nLine 2\n", encoding="utf-8")
 
-        with patch.object(mod, "_find_project_root", return_value=tmp_path):
+        with patch.object(shared_mod, "find_project_root", return_value=tmp_path):
             raw = read_skill_file.invoke({"skill_path": "skills/opentargets-database/SKILL.md"})
 
         assert "OpenTargets" in raw

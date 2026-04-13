@@ -20,12 +20,9 @@ logger = logging.getLogger(__name__)
 
 
 def _find_project_root() -> Path:
-    """Find project root by looking for pyproject.toml or .git."""
-    current = Path(__file__).resolve()
-    for parent in current.parents:
-        if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
-            return parent
-    return Path.cwd()
+    """Find project root — delegates to shared utility."""
+    from src.agents.shared.utils import find_project_root
+    return find_project_root()
 
 
 PROJECT_ROOT = _find_project_root()

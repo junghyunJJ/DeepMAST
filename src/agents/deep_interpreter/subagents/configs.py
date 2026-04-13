@@ -30,6 +30,8 @@ from src.agents.deep_interpreter.tools import (
     prepare_rag_literature,
     search_literature_fulltext,
     validate_claim_fulltext,
+    # Skill reader (shared)
+    read_skill_file,
 )
     # prioritize_top_lr_pairs and run_drug_target_assessment removed from interpreter:
     # Now executed by wrapper_agent.run_drug_target_node (Step 9.5) before Steps 10-11.
@@ -63,6 +65,7 @@ SUBAGENT_CONFIGS = {
             load_analysis_data,
             search_literature_dynamic,  # PRIMARY: BioMCP (gene alias 확장, LLM 쿼리 생성, 내부 fallback 포함)
             search_pubmed_advanced,     # FALLBACK: BioMCP connection error/timeout 시에만 사용
+            read_skill_file,
         ],
     },
     "searcher": {
@@ -81,6 +84,7 @@ SUBAGENT_CONFIGS = {
             search_literature,           # Follow-up: Single query search
             search_pubmed_advanced,      # E-utilities (MeSH/날짜/pub type)
             think_tool,
+            read_skill_file,
         ],
     },
     "interpreter": {
@@ -144,6 +148,8 @@ SUBAGENT_CONFIGS = {
             validate_claim_fulltext,
             # Think tool for strategic planning and reflection
             think_tool,
+            # Skill reader
+            read_skill_file,
         ],
     },
 }
@@ -152,6 +158,8 @@ SUBAGENT_CONFIGS = {
 def get_subagents(
     custom_tools: Sequence[BaseTool | Callable] | None = None,
     model_overrides: dict[str, BaseChatModel | str] | None = None,
+    skills_sources: list[str] | None = None,
+    skill_registry: dict[str, str] | None = None,
 ) -> list[dict]:
     """Get the subagent configurations for Deep Interpreter.
 
@@ -166,6 +174,8 @@ def get_subagents(
         model_overrides: Optional per-subagent model overrides.
             Keys are subagent names, values are init_chat_model format strings
             (e.g. "openai:gpt-4.1-mini") or BaseChatModel instances.
+        skills_sources: Native skill discovery paths for planner, searcher, and reporter.
+        skill_registry: Skill name → directory path mapping for SkillLoadHarness.
 
     Returns:
         List of subagent configuration dictionaries
@@ -196,6 +206,18 @@ def get_subagents(
         middleware = list(subagent.get("middleware", []))
         middleware.insert(0, WriteFileArgGuardMiddleware())
         subagent["middleware"] = middleware
+
+    # Apply skills AFTER WriteFileArgGuardMiddleware (harness appended at end)
+    if skills_sources:
+        _skill_subagents = {"planner", "searcher", "reporter"}
+        for subagent in subagents:
+            if subagent["name"] in _skill_subagents:
+                subagent["skills"] = skills_sources
+                if skill_registry:
+                    from src.agents.shared.skill_load_harness import SkillLoadHarness
+                    mw = list(subagent.get("middleware", []))
+                    mw.append(SkillLoadHarness(skill_registry=skill_registry))
+                    subagent["middleware"] = mw
 
     return subagents
 
