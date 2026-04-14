@@ -509,6 +509,20 @@ async def _search_with_biomcp(
     """
     articles = []
 
+    # F2: Evidence manifest stamp. Every article returned by this call carries
+    # the originating query fields so downstream coverage can distinguish
+    # "BioMCP retrieval-asserted" hits from "legacy regex-only" hits without
+    # re-running the search. Stamped unconditionally — PLANNER/REPORTER
+    # byte-equivalence is preserved via the REV-7 dead-code chain
+    # (`use_retrieval_tags=False` default in `_calculate_coverage` +
+    # `coverage_weighted_sort=False` default keeps gap-fill pre-check
+    # unreachable on the non-SEARCHER path).
+    _stamp = {
+        "genes": list(genes) if genes else [],
+        "diseases": list(diseases) if diseases else [],
+        "keywords": list(keywords) if keywords else [],
+    }
+
     # Ensure at least one search parameter is provided
     # FIX: Check for actual content, not just truthiness
     # Empty list [] should be treated as "no genes" but still allow search
@@ -564,21 +578,26 @@ async def _search_with_biomcp(
             results = await asyncio.gather(*tasks, return_exceptions=True)
             for pmid, result in zip(pmids, results):
                 if isinstance(result, Exception):
-                    articles.append({
+                    err_article = {
                         "pmid": pmid,
                         "title": f"Article {pmid}",
                         "abstract": "",
-                    })
+                        "matched_via_query": _stamp,
+                    }
+                    articles.append(err_article)
                 else:
                     article = _parse_article(pmid, result)
+                    article["matched_via_query"] = _stamp
                     articles.append(article)
         else:
             for pmid in pmids:
-                articles.append({
+                fallback_article = {
                     "pmid": pmid,
                     "title": f"Article {pmid}",
                     "abstract": "",
-                })
+                    "matched_via_query": _stamp,
+                }
+                articles.append(fallback_article)
 
     except Exception as e:
         # Return empty list on connection failure
@@ -1297,6 +1316,114 @@ async def _execute_fixed_strategy_search_async(
     }
 
 
+def _build_deterministic_gene_queries(
+    genes: list[str],
+    disease: str,
+    chunk_size: int = 5,
+) -> list[dict]:
+    """Chunk genes deterministically so every gene is covered by at least one query.
+
+    Used in iteration 0 of search_literature_dynamic_async to guarantee 100% of
+    input genes appear in at least one query's `genes` field, independent of LLM
+    compliance with the prompt's "2 gene-centric queries" instruction. Closes the
+    36.7% hub-gene coverage ceiling root-caused to the genes[:5] hard cap × 2
+    LLM gene queries = 10 hub gene slots for 30 hub genes.
+
+    Args:
+        genes: Input gene list (typically 30 hub + ~8 novel from data_loader).
+        disease: Disease context to attach to each query.
+        chunk_size: Genes per query (default 5, matches genes[:5] cap).
+
+    Returns:
+        List of query dicts with shape:
+            {"genes": chunk, "diseases": [disease] if disease else [], "keywords": []}
+    """
+    if not genes:
+        return []
+    queries: list[dict] = []
+    for i in range(0, len(genes), chunk_size):
+        chunk = [g for g in genes[i:i + chunk_size] if g]
+        if chunk:
+            queries.append({
+                "genes": chunk,
+                "diseases": [disease] if disease else [],
+                "keywords": [],
+            })
+    return queries
+
+
+def _format_pathway_keyword(part: str) -> str:
+    """Resolve a pathway part to a canonical keyword.
+
+    Returns the first entry of PATHWAY_KEYWORDS whose key is a substring of
+    part.lower() (mirrors _generate_pathway_patterns matching at literature.py
+    :1586). Falls back to f"{part} signaling" for unknown pathways.
+    """
+    part_lower = part.lower()
+    for key, keywords in PATHWAY_KEYWORDS.items():
+        if key in part_lower and keywords:
+            return keywords[0]
+    return f"{part} signaling"
+
+
+def _build_deterministic_pathway_queries(
+    pathways: list[str],
+    disease: str,
+    pathway_to_genes: dict[str, list[str]] | None = None,
+    max_genes_per_query: int = 3,
+) -> list[dict]:
+    """Hybrid per-pathway fan-out: top-N hub genes + pathway keyword.
+
+    F1 follow-up: recovers the pathway coverage regression introduced by Fix A*
+    (84.6% → 76.9%) by emitting one BioMCP query per pathway carrying both the
+    canonical pathway keyword AND the top-N hub genes registered for that
+    pathway in PATHWAY_TO_GENES. Reuses BioMCP's gene-indexed retrieval pipeline
+    so the returned papers are anchored on real pathway members rather than
+    keyword-only fuzzy matches.
+
+    Args:
+        pathways: Input pathway list. Semicolon-combined entries (e.g.
+            "Androgen;MAPK") are split into one query per part.
+        disease: Disease context attached to each query.
+        pathway_to_genes: Override mapping for testing. Defaults to module
+            PATHWAY_TO_GENES.
+        max_genes_per_query: Truncate genes per query (default 3).
+
+    Returns:
+        List of query dicts with shape:
+            {"genes": [...], "diseases": [disease] if disease else [],
+             "keywords": [canonical_keyword]}
+        Unknown pathways yield queries with empty genes list (keyword-only
+        fallback).
+    """
+    if not pathways:
+        return []
+    table = pathway_to_genes if pathway_to_genes is not None else PATHWAY_TO_GENES
+    queries: list[dict] = []
+    for pathway in pathways:
+        if not pathway:
+            continue
+        # Semicolon-split (e.g., "Androgen;MAPK") — one query per part
+        for part in [p.strip() for p in pathway.split(";") if p.strip()]:
+            key = part.lower()
+            # Exact-key lookup first; fall back to substring match so callers
+            # passing "MAPK signaling" still resolve to PATHWAY_TO_GENES["mapk"].
+            genes = list(table.get(key, []))
+            if not genes:
+                for tk, tg in table.items():
+                    if tk in key:
+                        genes = list(tg)
+                        break
+            genes = genes[:max_genes_per_query]
+            keyword = _format_pathway_keyword(part)
+            queries.append({
+                "genes": genes,  # may be [] for unknown pathways
+                "diseases": [disease] if disease else [],
+                "keywords": [keyword],
+            })
+    return queries
+
+
 def _validate_generated_queries(queries: list[dict]) -> list[dict]:
     """Validate and filter LLM-generated queries.
 
@@ -1323,6 +1450,12 @@ def _validate_generated_queries(queries: list[dict]) -> list[dict]:
             diseases = [diseases] if diseases else []
         if isinstance(keywords, str):
             keywords = [keywords] if keywords else []
+
+        # Strip None / empty entries so downstream frozenset dedup (iter-0
+        # pathway fan-out at literature.py:~2688) cannot see stray None values.
+        genes = [g for g in genes if g]
+        diseases = [d for d in diseases if d]
+        keywords = [k for k in keywords if k]
 
         # Must have at least one non-empty field
         if not any([genes, diseases, keywords]):
@@ -1423,6 +1556,32 @@ PATHWAY_KEYWORDS = {
     "wnt": ["beta-catenin", "canonical wnt", "β-catenin"],
     "notch": ["delta-notch", "notch signaling"],
     "jak": ["jak/stat", "stat signaling"],
+    "vegf": ["vegf", "vegfa", "angiogenesis", "vegf signaling"],
+    "tnfa": ["tnf", "tnf-alpha", "tumor necrosis factor", "tnfa signaling"],
+    "trail": ["trail", "tnfsf10", "death receptor", "trail signaling"],
+    "p53": ["p53", "tp53", "p53 tumor suppressor"],
+    "hypoxia": ["hif-1alpha", "hif1a", "hypoxia inducible factor", "hif-1α"],
+}
+
+# Pathway → top hub genes mapping for hybrid deterministic pathway fan-out (F1).
+# Keys MUST mirror PATHWAY_KEYWORDS keys so that table.get(pathway.lower(), [])
+# and _format_pathway_keyword(pathway) agree on the canonical form (REV-9 contract).
+# Used by _build_deterministic_pathway_queries to recover pathway coverage via
+# BioMCP's gene-indexed retrieval pipeline (top-3 hub genes + pathway keyword).
+PATHWAY_TO_GENES: dict[str, list[str]] = {
+    "estrogen": ["ESR1", "ESR2", "PGR"],
+    "tgf":      ["TGFB1", "SMAD4", "ACVR2B"],  # key matches PATHWAY_KEYWORDS["tgf"]
+    "mapk":     ["MAPK1", "MAPK3", "RAF1"],
+    "pi3k":     ["PIK3CA", "AKT1", "PTEN"],
+    "jak":      ["JAK2", "STAT3", "STAT5A"],  # REV-9: matches PATHWAY_KEYWORDS["jak"]
+    "egfr":     ["EGFR", "ERBB2", "ERBB3"],
+    "nfkb":     ["RELA", "NFKB1", "IKBKB"],
+    "androgen": ["AR", "KLK3"],
+    "p53":      ["TP53", "MDM2", "CDKN1A"],
+    "hypoxia":  ["HIF1A", "VHL", "EPAS1"],
+    "vegf":     ["VEGFA", "KDR", "FLT1"],
+    "tnfa":     ["TNF", "TNFRSF1A", "TRADD"],
+    "trail":    ["TNFSF10", "TNFRSF10A", "TNFRSF10B"],
 }
 
 
@@ -1503,6 +1662,23 @@ def _generate_gene_patterns(gene: str, include_biomcp_aliases: bool = True) -> l
             alias_patterns = _generate_gene_patterns(alias, include_biomcp_aliases=False)
             patterns.update(alias_patterns)
 
+    # 6. BioMCP aliases (read-only from pre-warmed _GENE_ALIAS_CACHE).
+    # The cache is populated once per run by search_literature_dynamic_async at
+    # entry time via asyncio.gather over _fetch_gene_aliases_from_biomcp. This
+    # function stays purely synchronous — no run_async, no event-loop re-entry.
+    # Cache misses (cold cache, BioMCP outage) degrade gracefully to the prior
+    # pattern set without raising.
+    if include_biomcp_aliases:
+        cache_key = gene_clean.upper()
+        with _GENE_ALIAS_CACHE_LOCK:
+            cached = list(_GENE_ALIAS_CACHE.get(cache_key, []))
+        for alias in cached:
+            alias_clean = alias.strip()
+            if not alias_clean:
+                continue
+            for p in _generate_gene_patterns(alias_clean, include_biomcp_aliases=False):
+                patterns.add(p)
+
     return list(patterns)
 
 
@@ -1560,6 +1736,8 @@ def _calculate_coverage(
     pathways: list[str],
     celltypes: list[str],
     lr_pairs: list[dict] | None = None,
+    *,
+    use_retrieval_tags: bool = False,
 ) -> dict:
     """Calculate coverage of biological concepts in retrieved papers.
 
@@ -1576,6 +1754,12 @@ def _calculate_coverage(
         celltypes: Original cell type list
         lr_pairs: Optional list of L-R pair dicts [{"ligand": str, "receptor": str}, ...].
             When provided, adds pair co-occurrence tracking to the coverage dict.
+        use_retrieval_tags: F2 two-tier provenance gate. When True, consult each
+            paper's `matched_via_query` stamp (populated by _search_with_biomcp)
+            to pre-accept genes/pathways via BioMCP retrieval assertion, labeling
+            hits as `biomcp_tag+text_confirmed` when text also matches, or
+            `biomcp_tag_only` when only the retrieval stamp agrees. Default False
+            preserves legacy regex-only behavior byte-for-byte for PLANNER/REPORTER.
 
     Returns:
         Coverage dictionary with covered items and percentages.
@@ -1606,9 +1790,32 @@ def _calculate_coverage(
             paper.get("abstract", "") + " " + paper.get("title", "")
         )
 
+        # F2: retrieval-tag gate — two-tier provenance via matched_via_query.
+        # Empty sets when tags disabled or paper is unstamped, preserving legacy
+        # regex-only semantics downstream.
+        mvq = (paper.get("matched_via_query") or {}) if use_retrieval_tags else {}
+        tag_gene_set: set[str] = set(mvq.get("genes") or [])
+        tag_kw_lower: set[str] = {k.lower() for k in (mvq.get("keywords") or []) if k}
+
         # Gene matching with smart patterns
         for gene in genes:
             if gene in coverage["genes_covered"]:
+                continue
+            if use_retrieval_tags and gene in tag_gene_set:
+                # Tier check: does regex/alias text also confirm the stamp?
+                text_matched = False
+                for pattern in gene_patterns[gene]:
+                    if len(pattern) <= 3:
+                        if re.search(rf'\b{re.escape(pattern)}\b', combined):
+                            text_matched = True
+                            break
+                    elif pattern in combined:
+                        text_matched = True
+                        break
+                coverage["genes_covered"].append(gene)
+                coverage["genes_matched_by"][gene] = (
+                    "biomcp_tag+text_confirmed" if text_matched else "biomcp_tag_only"
+                )
                 continue
             for pattern in gene_patterns[gene]:
                 # Use word boundary matching for short patterns to avoid false positives
@@ -1629,6 +1836,31 @@ def _calculate_coverage(
         for pathway in pathways:
             if pathway in coverage["pathways_covered"]:
                 continue
+            if use_retrieval_tags and tag_kw_lower:
+                # Canonical tag match: any pathway pattern against any stamp
+                # keyword. Minimum length 3 guards against over-match from
+                # short pathway pattern fragments (REV-A arch review NIT-A) —
+                # legitimate 3-char pathway names like "wnt"/"erk"/"jak" still
+                # participate; 1-2 char fragments do not.
+                canonical_hit = False
+                for p in pathway_patterns[pathway]:
+                    p_lower = p.lower()
+                    if len(p_lower) < 3:
+                        continue
+                    for sk in tag_kw_lower:
+                        if p_lower in sk or sk in p_lower:
+                            canonical_hit = True
+                            break
+                    if canonical_hit:
+                        break
+                if canonical_hit:
+                    # Tier check: does regex text also confirm?
+                    text_matched = any(p in combined for p in pathway_patterns[pathway])
+                    coverage["pathways_covered"].append(pathway)
+                    coverage["pathways_matched_by"][pathway] = (
+                        "biomcp_tag+text_confirmed" if text_matched else "biomcp_tag_only"
+                    )
+                    continue
             for pattern in pathway_patterns[pathway]:
                 if pattern in combined:
                     coverage["pathways_covered"].append(pathway)
@@ -1742,9 +1974,22 @@ def _compute_paper_coverage_score(
     )
     covered: set[str] = set()
 
+    # F2: retrieval-tag pre-check (REV-2/REV-7, unconditional fallback-safe).
+    # Reachable only via gap-fill validators at :~2764/:~2819, themselves gated
+    # by `coverage_weighted_sort and iteration > 0` — `coverage_weighted_sort`
+    # defaults False on PLANNER/REPORTER so this pre-check is dead code on the
+    # non-SEARCHER path (REV-7 dead-code chain). Empty sets on unstamped papers
+    # make the pre-check a no-op regardless.
+    mvq = paper.get("matched_via_query") or {}
+    tag_genes = set(mvq.get("genes") or [])
+    tag_kws_lower = {k.lower() for k in (mvq.get("keywords") or []) if k}
+
     # Gene matching (reuses existing pattern generator)
     for gene in genes:
         if already_covered and gene in already_covered:
+            continue
+        if gene in tag_genes:
+            covered.add(gene)
             continue
         for pattern in _generate_gene_patterns(gene):
             if len(pattern) <= 3:
@@ -1760,6 +2005,22 @@ def _compute_paper_coverage_score(
     for pathway in pathways:
         if already_covered and pathway in already_covered:
             continue
+        if tag_kws_lower:
+            patterns = _generate_pathway_patterns(pathway)
+            canonical_hit = False
+            for p in patterns:
+                p_lower = p.lower()
+                if len(p_lower) < 3:
+                    continue  # REV-A NIT-A: block 1-2 char over-match
+                for sk in tag_kws_lower:
+                    if p_lower in sk or sk in p_lower:
+                        canonical_hit = True
+                        break
+                if canonical_hit:
+                    break
+            if canonical_hit:
+                covered.add(pathway)
+                continue
         for pattern in _generate_pathway_patterns(pathway):
             if pattern in combined:
                 covered.add(pathway)
@@ -2196,6 +2457,7 @@ def search_literature_dynamic(
             query_cache=query_cache,
             record_queries=record_queries,
             lr_pairs=_lr_pairs,
+            enable_lr_pair_queries=enable_lr_pair_queries,
         ),
         timeout=300,
     )
@@ -2223,6 +2485,7 @@ async def search_literature_dynamic_async(
     query_cache: list[dict] | None = None,
     record_queries: bool = False,
     lr_pairs: list[dict] | None = None,
+    enable_lr_pair_queries: bool = False,
 ) -> dict:
     """Async version of search_literature_dynamic with ITERATIVE coverage improvement.
 
@@ -2269,8 +2532,87 @@ async def search_literature_dynamic_async(
     # (Fixes Codex adversarial review finding #3 — observability gap.)
     think_success = False
 
-    # Note: pre-fetch aliases removed - BioMCP article_searcher
-    # automatically handles gene aliases internally (e.g., ACKR3 -> CXCR7)
+    # SEARCHER-mode auto-enable: enable_lr_pair_queries is set ONLY by SEARCHER
+    # (verified at subagents/prompts.py:261, 282 — PLANNER and REPORTER never
+    # pass it). Coupling the two flags guarantees SEARCHER gets hub-coverage
+    # behavior deterministically (greedy_coverage_sort + iter>0 gap-fill
+    # validator at literature.py:2463/2518), while PLANNER/REPORTER (who never
+    # set enable_lr_pair_queries) retain the original signature defaults
+    # byte-for-byte. Signature defaults remain False at literature.py:2116, 2222.
+    #
+    # Final paper cap: SEARCHER's INTERPRETER consumer expects max_results papers
+    # in the saved papers.json. The candidate pool for the retrieval loop is
+    # separately enlarged below so deterministic singleton fan-out (30 hub gene
+    # queries × ~5 papers each) can run to completion before the per-iter early
+    # break fires. _greedy_coverage_sort then truncates the candidate pool back
+    # down to _final_paper_cap.
+    _final_paper_cap = max_results
+    if enable_lr_pair_queries and not coverage_weighted_sort:
+        logger.info(
+            "SEARCHER mode detected (enable_lr_pair_queries=True); "
+            "forcing coverage_weighted_sort=True"
+        )
+        coverage_weighted_sort = True
+    if enable_lr_pair_queries:
+        # SEARCHER mode candidate pool: ~5x the final cap, floor at 300 (REV-A1)
+        # to absorb F1's hybrid pathway fan-out (~13 extra queries) plus the
+        # singleton hub fan-out (~30 hub queries), so deterministic retrieval
+        # can fully run before early break and _greedy_coverage_sort has enough
+        # material to maximize per-gene + per-pathway coverage in the final
+        # truncation. Math: 13 pathway × 6 + 30 gene singleton × 5 + 8 LLM × 5
+        # ≈ 268 papers; 300 leaves 32-paper headroom before final cap.
+        max_results = max(max_results * 5, 300)
+        logger.info(
+            f"SEARCHER mode candidate pool: max_results internally bumped to "
+            f"{max_results} (final cap kept at {_final_paper_cap})"
+        )
+
+    # F2: REV-1 — single local governs both `_calculate_coverage` call sites
+    # (mid-loop reflection at :~2543 and final truncation at :~2875). Wiring
+    # one but not the other would create silent metric mismatch (break on one,
+    # return another). PLANNER/REPORTER never set enable_lr_pair_queries, so
+    # this stays False for them and their coverage path runs the legacy regex
+    # block byte-for-byte.
+    _use_retrieval_tags = bool(enable_lr_pair_queries)
+
+    # Pre-warm gene alias cache for downstream _generate_gene_patterns calls.
+    # Single parallel batch via existing _fetch_gene_aliases_from_biomcp primitive,
+    # bounded by per-call asyncio.wait_for timeouts so a hung BioMCP gene_getter
+    # call cannot stall the whole search. Eliminates sync→async re-entry from
+    # inside _calculate_coverage and makes coverage matching alias-aware
+    # end-to-end. Recovers ~3 hub genes per the diagnostic (EFNA1, ITGB1, RET on
+    # res_bc_ollama). Degrades gracefully on BioMCP outage/timeout —
+    # _generate_gene_patterns falls back to the prior pattern set.
+    if genes:
+        try:
+            genes_to_warm = genes[:30]
+
+            async def _bounded_fetch(g: str) -> list[str]:
+                try:
+                    return await asyncio.wait_for(
+                        _fetch_gene_aliases_from_biomcp(g, biomcp_url=biomcp_url),
+                        timeout=10.0,
+                    )
+                except Exception:
+                    return []
+
+            warm_results = await asyncio.gather(
+                *[_bounded_fetch(g) for g in genes_to_warm],
+                return_exceptions=True,
+            )
+            warmed = 0
+            with _GENE_ALIAS_CACHE_LOCK:
+                for gene, result in zip(genes_to_warm, warm_results):
+                    if isinstance(result, Exception) or not result:
+                        _GENE_ALIAS_CACHE.setdefault(gene.upper(), [])
+                        continue
+                    _GENE_ALIAS_CACHE[gene.upper()] = list(result)
+                    warmed += 1
+            logger.info(
+                f"Pre-warmed gene alias cache: {warmed}/{len(genes_to_warm)} genes"
+            )
+        except Exception as e:
+            logger.debug(f"Alias pre-warm skipped: {e}")
 
     llm = create_llm(provider=llm_provider) if llm_provider else create_llm()
     recorded_iter0_queries: list[dict] = []
@@ -2293,7 +2635,10 @@ async def search_literature_dynamic_async(
         logger.info(f"=== Async Iteration {iteration + 1}/{max_iterations} ===")
 
         # Calculate current coverage
-        current_coverage = _calculate_coverage(all_papers, genes, pathways, celltypes, lr_pairs=lr_pairs)
+        current_coverage = _calculate_coverage(
+            all_papers, genes, pathways, celltypes,
+            lr_pairs=lr_pairs, use_retrieval_tags=_use_retrieval_tags,
+        )
         covered_genes = set(current_coverage.get("genes_covered", []))
         covered_pathways = set(current_coverage.get("pathways_covered", []))
 
@@ -2403,12 +2748,83 @@ async def search_literature_dynamic_async(
                 logger.warning(f"No valid queries at iteration {iteration}, stopping")
                 break
 
+            # Iter-0 deterministic gene fan-out: prepend gene-singleton queries
+            # so every input gene gets its own focused BioMCP query, regardless of
+            # LLM compliance with the "2 gene-centric queries" prompt instruction.
+            # chunk_size=1 (singleton) — empirically validated by Diagnostic 1 to
+            # achieve 100% per-gene retrieval ceiling. Multi-gene chunks (5×) caused
+            # BioMCP to return papers concentrated on the most-popular gene per
+            # chunk, leaving ~60% of input genes uncovered in title/abstract regex
+            # matching even though the queries technically ran.
+            if iteration == 0:
+                deterministic = _build_deterministic_gene_queries(
+                    genes=genes, disease=disease, chunk_size=1,
+                )
+                if deterministic:
+                    # Exact-set dedup: drop ONLY LLM queries that are byte-identical
+                    # to a deterministic chunk AND add no keywords. Biologically
+                    # enriched queries (e.g., {genes:[TGFB1,SMAD4], keywords:[EMT]})
+                    # always pass through. Supersets of a chunk also pass through.
+                    det_gene_sets = [frozenset(q.get("genes", [])) for q in deterministic]
+                    llm_kept = []
+                    for q in validated_queries:
+                        q_gene_set = frozenset(q.get("genes", []) or [])
+                        has_keywords = bool(q.get("keywords"))
+                        is_redundant = q_gene_set in det_gene_sets and not has_keywords
+                        if not is_redundant:
+                            llm_kept.append(q)
+                    validated_queries = deterministic + llm_kept
+                    det_total_slots = sum(len(q["genes"]) for q in deterministic)
+                    logger.info(
+                        f"Iter-0 fan-out: +{len(deterministic)} deterministic gene queries "
+                        f"({det_total_slots}/{len(genes)} gene slots), "
+                        f"{len(llm_kept)} LLM queries retained"
+                    )
+
             all_queries.extend(validated_queries)
             logger.info(f"Generated {len(validated_queries)} queries for iteration {iteration + 1}")
 
             # Record iteration-0 queries if requested
             if iteration == 0 and record_queries:
                 recorded_iter0_queries = list(validated_queries)
+
+        # F1: Iter-0 hybrid pathway fan-out (REV-4 Option B unconditional).
+        # Runs in BOTH cache-replay AND LLM-generation paths so deterministic
+        # pathway coverage is guaranteed by construction. Gated on
+        # enable_lr_pair_queries (SEARCHER only) so PLANNER/REPORTER call sites
+        # at subagents/configs.py:66, 140 stay byte-unchanged.
+        if iteration == 0 and enable_lr_pair_queries:
+            deterministic_pw = _build_deterministic_pathway_queries(
+                pathways=pathways, disease=disease,
+            )
+            if deterministic_pw:
+                # Exact-set dedup: drop LLM pathway-only queries whose keyword
+                # set is byte-identical to a deterministic chunk AND whose gene
+                # set is empty. Hybrid (gene+keyword) LLM queries pass through.
+                det_pw_keys = [
+                    frozenset(q.get("keywords", []) or []) for q in deterministic_pw
+                ]
+                pw_kept = []
+                for q in validated_queries:
+                    has_genes = bool(q.get("genes"))
+                    kw_set = frozenset(q.get("keywords", []) or [])
+                    is_redundant_pw = (not has_genes) and kw_set in det_pw_keys
+                    if not is_redundant_pw:
+                        pw_kept.append(q)
+                validated_queries = deterministic_pw + pw_kept
+                # Sync all_queries with post-dedup state. At iter 0, all_queries
+                # contains only iter-0 entries (extended by either the replay
+                # branch at the outer cache-if/else or the LLM else-branch above);
+                # rebuilding it keeps telemetry consistent with what executes.
+                all_queries.clear()
+                all_queries.extend(validated_queries)
+                if record_queries:
+                    recorded_iter0_queries = list(validated_queries)
+                logger.info(
+                    f"Iter-0 pathway fan-out: +{len(deterministic_pw)} hybrid "
+                    f"pathway queries ({len(pathways)} pathways), "
+                    f"{len(pw_kept)} LLM queries retained"
+                )
 
         # Separate gene-centric and pathway-centric queries for balanced execution
         gene_queries = [q for q in validated_queries if q.get("genes")]
@@ -2537,20 +2953,27 @@ async def search_literature_dynamic_async(
                 logger.warning(f"Pathway search failed for query {i} at iteration {iteration}: {e}")
                 continue
 
-    # Truncation: coverage-weighted greedy sort or pure SJR sort
+    # Truncation: coverage-weighted greedy sort or pure SJR sort.
+    # _final_paper_cap is the user-facing output cap. In SEARCHER mode, the
+    # internal max_results was bumped earlier so the candidate pool (`all_papers`)
+    # is much larger than the cap; the final selection happens here. In non-
+    # SEARCHER mode, _final_paper_cap == max_results (no-op).
     if sort_by_journal_quality:
         await _ensure_sjr_cache_loaded()
         if coverage_weighted_sort:
             final_papers = _greedy_coverage_sort(
                 all_papers, genes, pathways, celltypes,
-                max_results=max_results, alpha=0.4,
+                max_results=_final_paper_cap, alpha=0.4,
             )
         else:
             all_papers.sort(key=lambda p: p.get("journal_quality", _SJR_DEFAULT_SCORE), reverse=True)
-            final_papers = all_papers[:max_results]
+            final_papers = all_papers[:_final_paper_cap]
     else:
-        final_papers = all_papers[:max_results]
-    final_coverage = _calculate_coverage(final_papers, genes, pathways, celltypes, lr_pairs=lr_pairs)
+        final_papers = all_papers[:_final_paper_cap]
+    final_coverage = _calculate_coverage(
+        final_papers, genes, pathways, celltypes,
+        lr_pairs=lr_pairs, use_retrieval_tags=_use_retrieval_tags,
+    )
 
     coverage_history.append({
         "iteration": "final",

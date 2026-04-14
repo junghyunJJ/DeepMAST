@@ -46,6 +46,19 @@ REQUIRED_CASE_FIELDS = (
     "disease",
 )
 
+# SEARCHER-equivalent dynamic method variants. Module-level so both the
+# `_run_case` dispatch and `_repeats_for` share a single source of truth
+# (REV-A arch review NIT-B).
+_DYNAMIC_METHODS: set[str] = {
+    "dynamic",
+    "dynamic_off",
+    "dynamic_no_disease_filter",
+    "dynamic_no_sjr",
+    "dynamic_lean",
+    "dynamic_coverage_weighted",
+    "dynamic_filter_coverage_weighted",
+}
+
 
 def validate_case(case: dict[str, Any]) -> None:
     """Validate a benchmark case payload."""
@@ -163,12 +176,6 @@ def _run_method_once(
     recommended_actions: list[str] = []
     recorded_query_cache: list[dict] = []
 
-    _DYNAMIC_METHODS = {
-        "dynamic", "dynamic_off", "dynamic_no_disease_filter",
-        "dynamic_no_sjr", "dynamic_lean", "dynamic_coverage_weighted",
-        "dynamic_filter_coverage_weighted",
-    }
-
     if method in _DYNAMIC_METHODS:
         enforce_disease_match = method not in {
             "dynamic_off", "dynamic_no_disease_filter", "dynamic_lean",
@@ -229,11 +236,15 @@ def _run_method_once(
 
     papers = [p for p in papers if isinstance(p, dict)]
     if coverage is None:
+        # F2: honor evidence manifest stamps when benchmarking SEARCHER-equivalent
+        # dynamic modes; legacy baselines keep the default False for
+        # comparability with pre-F2 numbers.
         coverage = _calculate_coverage(
             papers=papers,
             genes=case["genes"],
             pathways=case["pathways"],
             celltypes=case["celltypes"],
+            use_retrieval_tags=(method in _DYNAMIC_METHODS),
         )
     return papers, coverage, query_used, search_method, recommended_actions, recorded_query_cache
 
@@ -396,12 +407,6 @@ def main() -> None:
     if args.resume:
         completed_keys = _load_completed_keys(run_dir)
         print(f"[resume] Found {len(completed_keys)} completed records, skipping them.")
-
-    _DYNAMIC_METHODS = {
-        "dynamic", "dynamic_off", "dynamic_no_disease_filter",
-        "dynamic_no_sjr", "dynamic_lean", "dynamic_coverage_weighted",
-        "dynamic_filter_coverage_weighted",
-    }
 
     def _repeats_for(method: str) -> int:
         return args.dynamic_repeats if method in _DYNAMIC_METHODS else args.baseline_repeats

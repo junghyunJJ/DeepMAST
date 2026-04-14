@@ -259,11 +259,17 @@ result = search_literature_dynamic(
     output_path="papers.json",
     data_dir=data_path.strip(),
     enable_lr_pair_queries=True,   # SEARCHER opts in to L-R pair query injection
+    coverage_weighted_sort=True,   # SEARCHER opts in to hub-coverage truncation (auto-enabled by sentinel, this line is documentation belt-and-suspenders)
 )
 # Result: {"saved_to": "...", "total_papers": 30, "coverage": {...}}
 # Full papers already saved — NO need to call write_file
 # L-R pair queries are generated ONLY when enable_lr_pair_queries=True (SEARCHER only).
+# When enable_lr_pair_queries=True, coverage_weighted_sort is auto-enabled internally
+# regardless of caller value (SEARCHER mode sentinel — keeps PLANNER/REPORTER unaffected).
 # BioMCP think is called automatically to optimize search strategy.
+# Iter-0 also injects deterministic singleton gene queries (one gene per query)
+# so every input gene gets its own focused BioMCP search and appears in at least
+# one query slot, regardless of LLM compliance with the prompt instruction.
 ```
 
 ### IMPORTANT Rules:
