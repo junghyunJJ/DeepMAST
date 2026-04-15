@@ -1,7 +1,7 @@
 """Expanded benchmark: A_passive vs B_NO_hints with 10 prompts per category.
 
 7 categories × 10 prompts × 2 conditions = 140 trials.
-Tests SkillLoadHarness protocol effectiveness without hints.
+Tests SkillActivator protocol effectiveness without hints.
 
 Usage:
     SCALING_MODEL=qwen3.5:35b python scripts/benchmarks/compare_expanded.py

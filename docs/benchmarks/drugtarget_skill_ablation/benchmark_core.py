@@ -2,7 +2,7 @@
 
 This benchmark isolates strategy-layer effects by keeping the runnable surface
 fixed (`read_skill_file` only) while toggling which benchmark cases expose
-SKILL.md documents through SkillLoadHarness.
+SKILL.md documents through SkillActivator.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ from src.agents.drug_target.tools.stage_logic import (
     validate_rubric_assessment,
 )
 from src.agents.model import create_llm
-from src.agents.shared.skill_load_harness import SkillLoadHarness
+from src.agents.shared.skill_activator import SkillActivator
 
 logger = logging.getLogger(__name__)
 
@@ -1042,8 +1042,8 @@ async def render_skill_prompt(
     *,
     stage_hints: dict[str, str] | None = None,
 ) -> str:
-    """Apply SkillLoadHarness to a base system prompt."""
-    harness = SkillLoadHarness(
+    """Apply SkillActivator to a base system prompt."""
+    harness = SkillActivator(
         skill_registry=skill_registry,
     )
 

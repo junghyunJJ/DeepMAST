@@ -1,4 +1,4 @@
-"""Unit tests for SkillLoadHarness middleware.
+"""Unit tests for SkillActivator middleware.
 
 Tests cover:
 - Initialization with skill_registry and stage_hints
@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.agents.shared.skill_load_harness import SkillLoadHarness
+from src.agents.shared.skill_activator import SkillActivator
 
 
 # =============================================================================
@@ -36,16 +36,16 @@ SAMPLE_HINTS = {
 
 
 @pytest.fixture
-def harness() -> SkillLoadHarness:
-    return SkillLoadHarness(
+def harness() -> SkillActivator:
+    return SkillActivator(
         skill_registry=SAMPLE_REGISTRY,
         stage_hints=SAMPLE_HINTS,
     )
 
 
 @pytest.fixture
-def empty_harness() -> SkillLoadHarness:
-    return SkillLoadHarness(skill_registry={})
+def empty_harness() -> SkillActivator:
+    return SkillActivator(skill_registry={})
 
 
 # =============================================================================
@@ -77,18 +77,18 @@ class MockRequest:
 # =============================================================================
 
 
-class TestSkillLoadHarnessInit:
-    """Test SkillLoadHarness initialization."""
+class TestSkillActivatorInit:
+    """Test SkillActivator initialization."""
 
-    def test_creates_with_registry(self, harness: SkillLoadHarness):
+    def test_creates_with_registry(self, harness: SkillActivator):
         assert harness.skill_registry == SAMPLE_REGISTRY
         assert harness.stage_hints == SAMPLE_HINTS
 
     def test_empty_hints_default(self):
-        h = SkillLoadHarness(skill_registry=SAMPLE_REGISTRY)
+        h = SkillActivator(skill_registry=SAMPLE_REGISTRY)
         assert h.stage_hints == {}
 
-    def test_prompt_template_loaded(self, harness: SkillLoadHarness):
+    def test_prompt_template_loaded(self, harness: SkillActivator):
         """SKILL.md body should be loaded (no YAML frontmatter)."""
         assert "{{available_skills}}" in harness._prompt_template
         assert "Step 1 - EVALUATE" in harness._prompt_template
@@ -101,15 +101,15 @@ class TestSkillLoadHarnessInit:
 class TestPromptTemplateLoading:
     """Test SKILL.md template loading edge cases."""
 
-    def test_template_has_no_frontmatter(self, harness: SkillLoadHarness):
+    def test_template_has_no_frontmatter(self, harness: SkillActivator):
         assert not harness._prompt_template.startswith("---")
 
-    def test_template_contains_critical_instruction(self, harness: SkillLoadHarness):
+    def test_template_contains_critical_instruction(self, harness: SkillActivator):
         assert "Do NOT skip Step 1" in harness._prompt_template
 
     def test_fallback_prompt(self):
         """_fallback_prompt should contain the same structure."""
-        fallback = SkillLoadHarness._fallback_prompt()
+        fallback = SkillActivator._fallback_prompt()
         assert "{{available_skills}}" in fallback
         assert "Step 1 - EVALUATE" in fallback
 
@@ -117,27 +117,27 @@ class TestPromptTemplateLoading:
 class TestFormatAvailableSkills:
     """Test _format_available_skills output."""
 
-    def test_formats_all_skills(self, harness: SkillLoadHarness):
+    def test_formats_all_skills(self, harness: SkillActivator):
         result = harness._format_available_skills()
         assert "opentargets-database" in result
         assert "gwas-database" in result
         assert "chembl-database" in result
 
-    def test_includes_stage_hints(self, harness: SkillLoadHarness):
+    def test_includes_stage_hints(self, harness: SkillActivator):
         result = harness._format_available_skills()
         assert "Hint: Stage 3 only" in result
 
-    def test_no_hint_for_unhinted_skill(self, harness: SkillLoadHarness):
+    def test_no_hint_for_unhinted_skill(self, harness: SkillActivator):
         result = harness._format_available_skills()
         lines = result.split("\n")
         ot_line = [l for l in lines if "opentargets-database" in l][0]
         assert "Hint:" not in ot_line
 
-    def test_empty_registry(self, empty_harness: SkillLoadHarness):
+    def test_empty_registry(self, empty_harness: SkillActivator):
         result = empty_harness._format_available_skills()
         assert "No skills registered" in result
 
-    def test_skill_md_paths(self, harness: SkillLoadHarness):
+    def test_skill_md_paths(self, harness: SkillActivator):
         result = harness._format_available_skills()
         assert "SKILL.md" in result
 
@@ -146,7 +146,7 @@ class TestAwrapModelCall:
     """Test system prompt injection via awrap_model_call."""
 
     @pytest.mark.asyncio
-    async def test_injects_forced_eval_block(self, harness: SkillLoadHarness):
+    async def test_injects_forced_eval_block(self, harness: SkillActivator):
         """System prompt should contain the forced-eval protocol."""
         request = MockRequest(system_content="You are a test agent.")
         captured = None
@@ -164,7 +164,7 @@ class TestAwrapModelCall:
         assert "opentargets-database" in captured
 
     @pytest.mark.asyncio
-    async def test_replaces_placeholder(self, harness: SkillLoadHarness):
+    async def test_replaces_placeholder(self, harness: SkillActivator):
         """{{available_skills}} must be replaced with actual skill list."""
         request = MockRequest(system_content="Base prompt.")
         captured = None
@@ -181,7 +181,7 @@ class TestAwrapModelCall:
         assert "gwas-database" in captured
 
     @pytest.mark.asyncio
-    async def test_empty_system_prompt(self, harness: SkillLoadHarness):
+    async def test_empty_system_prompt(self, harness: SkillActivator):
         """Should work even with no existing system prompt."""
         request = MockRequest(system_content="")
         captured = None
@@ -196,7 +196,7 @@ class TestAwrapModelCall:
         assert "Step 1 - EVALUATE" in captured
 
     @pytest.mark.asyncio
-    async def test_empty_registry_injection(self, empty_harness: SkillLoadHarness):
+    async def test_empty_registry_injection(self, empty_harness: SkillActivator):
         """Empty registry should inject block with 'No skills registered'."""
         request = MockRequest(system_content="Base.")
         captured = None
@@ -211,7 +211,7 @@ class TestAwrapModelCall:
         assert "No skills registered" in captured
 
     @pytest.mark.asyncio
-    async def test_handler_receives_modified_request(self, harness: SkillLoadHarness):
+    async def test_handler_receives_modified_request(self, harness: SkillActivator):
         """Handler should receive the modified request and its return value propagated."""
         request = MockRequest(system_content="Original.")
 
@@ -226,16 +226,16 @@ class TestAbforeAgent:
     """Test abefore_agent (should be a no-op)."""
 
     @pytest.mark.asyncio
-    async def test_abefore_agent_noop(self, harness: SkillLoadHarness):
+    async def test_abefore_agent_noop(self, harness: SkillActivator):
         result = await harness.abefore_agent(state=None, runtime=None)
         assert result is None
 
 
 class TestMiddlewareCoexistence:
-    """Test that SkillLoadHarness coexists with WriteFileArgGuardMiddleware."""
+    """Test that SkillActivator coexists with WriteFileArgGuardMiddleware."""
 
     @pytest.mark.asyncio
-    async def test_both_middlewares_in_list(self, harness: SkillLoadHarness):
+    async def test_both_middlewares_in_list(self, harness: SkillActivator):
         """Both middlewares should be instantiable together."""
         from src.agents.deep_interpreter.middleware.write_file_guard import (
             WriteFileArgGuardMiddleware,
@@ -245,4 +245,4 @@ class TestMiddlewareCoexistence:
         middleware_list = [guard, harness]
         assert len(middleware_list) == 2
         assert isinstance(middleware_list[0], WriteFileArgGuardMiddleware)
-        assert isinstance(middleware_list[1], SkillLoadHarness)
+        assert isinstance(middleware_list[1], SkillActivator)

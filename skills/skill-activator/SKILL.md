@@ -1,6 +1,6 @@
 ---
-name: skill-load-harness
-description: Two-phase skill evaluation harness — classify task, then activate only relevant skills
+name: skill-activator
+description: Two-phase skill activator — classify task, then activate only relevant skills
 ---
 
 # Skill Evaluation Protocol

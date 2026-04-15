@@ -175,7 +175,7 @@ def get_subagents(
             Keys are subagent names, values are init_chat_model format strings
             (e.g. "openai:gpt-4.1-mini") or BaseChatModel instances.
         skills_sources: Native skill discovery paths for planner, searcher, and reporter.
-        skill_registry: Skill name → directory path mapping for SkillLoadHarness.
+        skill_registry: Skill name → directory path mapping for SkillActivator.
 
     Returns:
         List of subagent configuration dictionaries
@@ -214,9 +214,9 @@ def get_subagents(
             if subagent["name"] in _skill_subagents:
                 subagent["skills"] = skills_sources
                 if skill_registry:
-                    from src.agents.shared.skill_load_harness import SkillLoadHarness
+                    from src.agents.shared.skill_activator import SkillActivator
                     mw = list(subagent.get("middleware", []))
-                    mw.append(SkillLoadHarness(skill_registry=skill_registry))
+                    mw.append(SkillActivator(skill_registry=skill_registry))
                     subagent["middleware"] = mw
 
     return subagents

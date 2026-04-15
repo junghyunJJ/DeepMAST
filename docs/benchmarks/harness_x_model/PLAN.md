@@ -2,7 +2,7 @@
 
 ## Rev 4 Delta (2026-04-13) — SEARCHER infrastructure update
 
-Incorporates the SEARCHER + `search_literature_dynamic` overhaul from commits `65b93e0`..`81ffee0` (dynamic literature search + deterministic gene/pathway fan-out + retrieval tags + SkillLoadHarness). Production retrieval is no longer LLM-compliance-bottlenecked: the tool now pre-seeds gene-singleton queries, hybrid per-pathway queries with hub genes, and BioMCP gene-alias–aware coverage matching. This changes what the harness effect actually measures and introduces a real ceiling-effect risk that the pilot MUST screen for.
+Incorporates the SEARCHER + `search_literature_dynamic` overhaul from commits `65b93e0`..`81ffee0` (dynamic literature search + deterministic gene/pathway fan-out + retrieval tags + SkillActivator). Production retrieval is no longer LLM-compliance-bottlenecked: the tool now pre-seeds gene-singleton queries, hybrid per-pathway queries with hub genes, and BioMCP gene-alias–aware coverage matching. This changes what the harness effect actually measures and introduces a real ceiling-effect risk that the pilot MUST screen for.
 
 ### Upstream changes (Rev 3 → Rev 4)
 
@@ -12,7 +12,7 @@ Incorporates the SEARCHER + `search_literature_dynamic` overhaul from commits `6
 4. **`PATHWAY_KEYWORDS` + `PATHWAY_TO_GENES` expansion** (`literature.py:~1556-1587`). 13 pathways → hub genes: estrogen, tgf, mapk, pi3k, jak, egfr, nfkb, androgen, p53, hypoxia, vegf, tnfa, trail. New keyword entries: vegf, tnfa, trail, p53, hypoxia.
 5. **BioMCP gene alias pre-warm** (`literature.py:2580-2629`). Parallel `_fetch_gene_aliases_from_biomcp` over top-30 input genes (10s/gene wait_for timeout) populates module-level `_GENE_ALIAS_CACHE`; `_generate_gene_patterns` is now alias-aware end-to-end. Diagnostic recovery: +EFNA1, +ITGB1, +RET on `res_bc_ollama`. Degrades gracefully on outage (empty cache entries).
 6. **Retrieval tag stamp** (`literature.py:509-525, 1793-1862`). Every BioMCP article now carries `matched_via_query = {genes, diseases, keywords}`. `_calculate_coverage(use_retrieval_tags=True)` does two-tier provenance: `biomcp_tag+text_confirmed` (stamp + regex agree) vs `biomcp_tag_only` (stamp alone). Genes are credited via retrieval assertion even when title/abstract regex misses them.
-7. **SkillLoadHarness in Deep Interpreter** (commit `3e2fe8d`; `agent.py:258-275`, `subagents/configs.py`). Skills are injected per-subagent via `SkillLoadHarness` middleware — no more orchestrator-level `SkillsMiddleware`. This benchmark's ON arm is **unaffected**: the single-shot flow still has no tool loop, so both Rev 3 (inline SKILL.md text) and Rev 4 require the same workaround (inline the skill content into the system prompt). The code-path change does not invalidate §3.2 — the strip list (steps 3-6) remains correct because SKILL.md itself was not modified in this work.
+7. **SkillActivator in Deep Interpreter** (commit `3e2fe8d`; `agent.py:258-275`, `subagents/configs.py`). Skills are injected per-subagent via `SkillActivator` middleware — no more orchestrator-level `SkillsMiddleware`. This benchmark's ON arm is **unaffected**: the single-shot flow still has no tool loop, so both Rev 3 (inline SKILL.md text) and Rev 4 require the same workaround (inline the skill content into the system prompt). The code-path change does not invalidate §3.2 — the strip list (steps 3-6) remains correct because SKILL.md itself was not modified in this work.
 
 ### How Rev 4 re-interprets existing sections
 
@@ -35,7 +35,7 @@ The harness effect shifts from "did the LLM generate enough gene-centric queries
 
 ## Context
 
-The existing benchmark (`docs/benchmarks/skills/`) proved SkillLoadHarness improves skill activation F1 from 81.7% → 93.9% (p=0.000003) for the Drug Target Agent with qwen3.5:122b. Two gaps remain: (1) does the harness also help a different agent (Deep Interpreter SEARCHER)? (2) does the improvement translate to better downstream search quality? (3) does model strength moderate the effect?
+The existing benchmark (`docs/benchmarks/skills/`) proved SkillActivator improves skill activation F1 from 81.7% → 93.9% (p=0.000003) for the Drug Target Agent with qwen3.5:122b. Two gaps remain: (1) does the harness also help a different agent (Deep Interpreter SEARCHER)? (2) does the improvement translate to better downstream search quality? (3) does model strength moderate the effect?
 
 This benchmark fills those gaps as **Table 4** in the paper, complementing the existing **Table 3**.
 
@@ -55,7 +55,7 @@ This benchmark fills those gaps as **Table 4** in the paper, complementing the e
 2. Need a medium-fidelity SEARCHER prompt (production prompt references skill loading, confounds harness OFF)
 3. Double-LLM confound: `search_literature_dynamic` internally creates its own LLM for query generation — must use `query_cache` to bypass
 4. Gene input must be enriched beyond [ligand, receptor] to avoid ordinal floor effect
-5. **NEW**: Single-shot JSON flow has no tool loop, so `SkillLoadHarness` cannot trigger `read_skill_file`. ON arm must inline skill text directly.
+5. **NEW**: Single-shot JSON flow has no tool loop, so `SkillActivator` cannot trigger `read_skill_file`. ON arm must inline skill text directly.
 6. **NEW**: Live PubMed/BioMCP traffic across 18h cannot be confounded with model identity → block randomization required
 
 ### Viable Options
@@ -159,7 +159,7 @@ Select genes strategically — prioritize genes with known literature presence.
 
 #### 3.2 Inlined Skill Text for Harness ON arm (P0 fix from Codex #1)
 
-**Critical change**: `SkillLoadHarness` middleware injects "evaluate skills then call `read_skill_file`" instructions, but our single-shot JSON flow has no tool loop. The LLM cannot actually call `read_skill_file`. Therefore the ON arm must receive the **content** of `biomedical-literature-search/SKILL.md` directly inlined.
+**Critical change**: `SkillActivator` middleware injects "evaluate skills then call `read_skill_file`" instructions, but our single-shot JSON flow has no tool loop. The LLM cannot actually call `read_skill_file`. Therefore the ON arm must receive the **content** of `biomedical-literature-search/SKILL.md` directly inlined.
 
 **Procedure to build `prompts/skill_inlined.txt`**:
 1. Read `skills/biomedical-literature-search/SKILL.md`
@@ -577,7 +577,7 @@ Style matches `s_figure_table3_results.R`: firebrick3 for ON, gray60 for OFF, th
 | Bootstrap CI | `compare_expanded.py` | 365-540 |
 | Case loading | `benchmark_cci_core.py` | 971-983 |
 | create_llm("ollama") | `model.py` | 106-142 |
-| SkillLoadHarness class (reference for ON arm content) | `skills/skill-load-harness/harness.py` | full file |
+| SkillActivator class (reference for ON arm content) | `skills/skill-activator/harness.py` | full file |
 | query_cache bypass path | `literature.py` | 2143-2147 |
 | _calculate_coverage (legacy path) | `literature.py` | 1557-1636 |
 | _build_deterministic_gene_queries (Rev 4) | `literature.py` | ~1319 |

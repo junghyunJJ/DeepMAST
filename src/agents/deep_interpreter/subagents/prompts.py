@@ -180,7 +180,7 @@ You search for papers BEFORE the interpreter runs. Your papers will be the ONLY
 citation source for the interpreter. This prevents hallucination.
 
 ## MANDATORY: Skill Evaluation Protocol
-The Skill Load Harness will prompt you to evaluate available skills at the start.
+The Skill Activator will prompt you to evaluate available skills at the start.
 Follow the 3-phase protocol:
 - Phase 1: QUICK SCREEN — answer YES (literature search requires skill guides)
 - Phase 2: EVALUATE — mark `biomedical-literature-search` as YES, then call

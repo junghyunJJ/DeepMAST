@@ -2590,7 +2590,7 @@ class TestIntegration:
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
-        from src.agents.shared.skill_load_harness import SkillLoadHarness
+        from src.agents.shared.skill_activator import SkillActivator
 
         mock_create_llm.return_value = MagicMock()
         mock_create_deep_agent.return_value = MagicMock()
@@ -2614,7 +2614,7 @@ class TestIntegration:
         for s in subagents:
             assert "skills" not in s
             mw = s.get("middleware", [])
-            assert not any(isinstance(m, SkillLoadHarness) for m in mw)
+            assert not any(isinstance(m, SkillActivator) for m in mw)
 
 
 # =========================================================================
@@ -2957,7 +2957,7 @@ class TestNovelCandidates:
 # =========================================================================
 
 class TestSkillLoadingEndToEnd:
-    """End-to-end verification that SkillLoadHarness loads real project skills."""
+    """End-to-end verification that SkillActivator loads real project skills."""
 
     def test_skill_registry_resolves_all_5_skills(self):
         """_build_skill_registry returns paths to all 5 skill dirs with SKILL.md."""
@@ -2979,12 +2979,12 @@ class TestSkillLoadingEndToEnd:
             assert skill_md.exists(), f"Missing SKILL.md for {name} at {skill_md}"
 
     def test_harness_formats_all_skills_with_descriptions(self):
-        """SkillLoadHarness formats all 5 skills with real descriptions."""
+        """SkillActivator formats all 5 skills with real descriptions."""
         from src.agents.drug_target.agent import _build_skill_registry, DrugTargetConfig
-        from src.agents.shared.skill_load_harness import SkillLoadHarness
+        from src.agents.shared.skill_activator import SkillActivator
 
         config = DrugTargetConfig()
-        harness = SkillLoadHarness(
+        harness = SkillActivator(
             skill_registry=_build_skill_registry(config),
         )
 
@@ -3001,14 +3001,14 @@ class TestSkillLoadingEndToEnd:
     async def test_harness_injects_forced_eval_into_system_prompt(self):
         """awrap_model_call injects forced-eval protocol with all 5 real skills."""
         from src.agents.drug_target.agent import _build_skill_registry, DrugTargetConfig
-        from src.agents.shared.skill_load_harness import SkillLoadHarness
+        from src.agents.shared.skill_activator import SkillActivator
 
         config = DrugTargetConfig()
-        harness = SkillLoadHarness(
+        harness = SkillActivator(
             skill_registry=_build_skill_registry(config),
         )
 
-        # Mock request (same pattern as test_skill_load_harness.py)
+        # Mock request (same pattern as test_skill_activator.py)
         class _Msg:
             def __init__(self, content):
                 self.content = content

@@ -12,7 +12,7 @@ with 4 specialized subagents (simplified from the original 11).
 Architecture:
 - Main orchestrator: create_deep_agent() with HITL support
 - Subagents: 4 specialized agents covering the full interpretation workflow
-- Middleware: SkillLoadHarness (forced-eval skill activation per subagent)
+- Middleware: SkillActivator (forced-eval skill activation per subagent)
 - Backend: CompositeBackend with FilesystemBackend for persistent file storage
 
 Hallucination Prevention (maintained from original):
@@ -50,7 +50,7 @@ import os
 from pathlib import Path
 
 from src.agents.model import create_llm, load_subagent_models_from_env
-# from src.agents.deep_interpreter.middleware import SkillsMiddleware  # Replaced by subagent-level SkillLoadHarness
+# from src.agents.deep_interpreter.middleware import SkillsMiddleware  # Replaced by subagent-level SkillActivator
 from src.agents.deep_interpreter.prompts import ORCHESTRATOR_SYSTEM_PROMPT
 from src.agents.deep_interpreter.subagents.configs import get_subagents
 from src.agents.deep_interpreter.tools import (
@@ -254,7 +254,7 @@ def create_deep_interpreter_agent(
     if config.custom_tools:
         tools.extend(config.custom_tools)
 
-    # Build skill registry for subagent-level SkillLoadHarness
+    # Build skill registry for subagent-level SkillActivator
     skill_registry = (
         _build_skill_registry(config)
         if config.enable_progressive_disclosure
@@ -287,7 +287,7 @@ def create_deep_interpreter_agent(
     # not on subagent names. HITL is handled by the wrapper agent.
     interrupt_on = {}
 
-    # SkillsMiddleware removed — skills now injected per-subagent via SkillLoadHarness
+    # SkillsMiddleware removed — skills now injected per-subagent via SkillActivator
     # (see get_subagents with skills_sources/skill_registry params)
 
     # Create the agent with backend factory (no middleware needed at orchestrator level)

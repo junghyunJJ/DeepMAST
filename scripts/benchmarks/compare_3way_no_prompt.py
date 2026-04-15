@@ -1,6 +1,6 @@
 """3-way comparison with MINIMAL system prompt (no skill reading directives).
 
-Tests whether SkillLoadHarness protocol alone is sufficient without
+Tests whether SkillActivator protocol alone is sufficient without
 explicit "read skill X for Stage Y" instructions in the system prompt.
 
 Usage:

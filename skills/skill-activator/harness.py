@@ -1,11 +1,11 @@
-"""Forced-eval skill load harness middleware.
+"""Forced-eval skill activator middleware.
 
 Implements a 3-step forced evaluation protocol (Evaluate → Activate → Implement)
 to replace passive skill listing. Injects a structured prompt that forces the LLM
 to explicitly evaluate each available skill before proceeding with its task.
 
 Usage:
-    harness = SkillLoadHarness(
+    harness = SkillActivator(
         skill_registry={"opentargets-database": "skills/opentargets-database"},
     )
     # Add to middleware list when creating a DeepAgent subagent
@@ -28,11 +28,11 @@ from langchain_core.messages import SystemMessage
 logger = logging.getLogger(__name__)
 
 
-class SkillLoadHarness(AgentMiddleware):
+class SkillActivator(AgentMiddleware):
     """Middleware that forces explicit skill evaluation before task execution.
 
     Instead of passively listing skills (SkillsMiddleware, ~20% activation),
-    this harness injects a 3-step forced evaluation protocol that requires
+    this activator injects a 3-step forced evaluation protocol that requires
     the LLM to explicitly assess each skill's relevance (~84% activation).
 
     The prompt template is loaded from SKILL.md in the same directory,
@@ -69,7 +69,7 @@ class SkillLoadHarness(AgentMiddleware):
     def _fallback_prompt() -> str:
         """Inline fallback if SKILL.md is missing."""
         return (
-            "# Skill Load Harness — Forced Evaluation Protocol\n\n"
+            "# Skill Activator — Forced Evaluation Protocol\n\n"
             "Before beginning your task, you MUST complete the following 3-step sequence:\n\n"
             "## Step 1 - EVALUATE (mandatory for ALL skills)\n"
             "For each skill listed in {{available_skills}}, explicitly state:\n"
