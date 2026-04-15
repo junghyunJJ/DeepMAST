@@ -1,7 +1,7 @@
 """Unit tests for SkillActivator middleware.
 
 Tests cover:
-- Initialization with skill_registry and stage_hints
+- Initialization with skill_registry
 - SKILL.md prompt template loading
 - awrap_model_call: forced-eval block injection into system prompt
 - {{available_skills}} placeholder substitution
@@ -30,17 +30,10 @@ SAMPLE_REGISTRY = {
     "chembl-database": "skills/chembl-database",
 }
 
-SAMPLE_HINTS = {
-    "chembl-database": "Stage 3 only",
-}
-
 
 @pytest.fixture
 def harness() -> SkillActivator:
-    return SkillActivator(
-        skill_registry=SAMPLE_REGISTRY,
-        stage_hints=SAMPLE_HINTS,
-    )
+    return SkillActivator(skill_registry=SAMPLE_REGISTRY)
 
 
 @pytest.fixture
@@ -82,18 +75,16 @@ class TestSkillActivatorInit:
 
     def test_creates_with_registry(self, harness: SkillActivator):
         assert harness.skill_registry == SAMPLE_REGISTRY
-        assert harness.stage_hints == SAMPLE_HINTS
-
-    def test_empty_hints_default(self):
-        h = SkillActivator(skill_registry=SAMPLE_REGISTRY)
-        assert h.stage_hints == {}
 
     def test_prompt_template_loaded(self, harness: SkillActivator):
         """SKILL.md body should be loaded (no YAML frontmatter)."""
         assert "{{available_skills}}" in harness._prompt_template
-        assert "Step 1 - EVALUATE" in harness._prompt_template
-        assert "Step 2 - ACTIVATE" in harness._prompt_template
-        assert "Step 3 - IMPLEMENT" in harness._prompt_template
+        assert "Phase 1" in harness._prompt_template
+        assert "QUICK SCREEN" in harness._prompt_template
+        assert "Phase 2" in harness._prompt_template
+        assert "EVALUATE" in harness._prompt_template
+        assert "Phase 3" in harness._prompt_template
+        assert "IMPLEMENT" in harness._prompt_template
         # Frontmatter should be stripped
         assert "---" not in harness._prompt_template
 
@@ -105,7 +96,8 @@ class TestPromptTemplateLoading:
         assert not harness._prompt_template.startswith("---")
 
     def test_template_contains_critical_instruction(self, harness: SkillActivator):
-        assert "Do NOT skip Step 1" in harness._prompt_template
+        # The "When in doubt → NO" default rule is the critical safety net
+        assert "When in doubt" in harness._prompt_template
 
     def test_fallback_prompt(self):
         """_fallback_prompt should contain the same structure."""
@@ -122,16 +114,6 @@ class TestFormatAvailableSkills:
         assert "opentargets-database" in result
         assert "gwas-database" in result
         assert "chembl-database" in result
-
-    def test_includes_stage_hints(self, harness: SkillActivator):
-        result = harness._format_available_skills()
-        assert "Hint: Stage 3 only" in result
-
-    def test_no_hint_for_unhinted_skill(self, harness: SkillActivator):
-        result = harness._format_available_skills()
-        lines = result.split("\n")
-        ot_line = [l for l in lines if "opentargets-database" in l][0]
-        assert "Hint:" not in ot_line
 
     def test_empty_registry(self, empty_harness: SkillActivator):
         result = empty_harness._format_available_skills()
@@ -160,7 +142,7 @@ class TestAwrapModelCall:
 
         assert captured is not None
         assert "You are a test agent." in captured
-        assert "Step 1 - EVALUATE" in captured
+        assert "Phase 1" in captured
         assert "opentargets-database" in captured
 
     @pytest.mark.asyncio
@@ -193,7 +175,7 @@ class TestAwrapModelCall:
 
         await harness.awrap_model_call(request, handler)
 
-        assert "Step 1 - EVALUATE" in captured
+        assert "Phase 1" in captured
 
     @pytest.mark.asyncio
     async def test_empty_registry_injection(self, empty_harness: SkillActivator):
