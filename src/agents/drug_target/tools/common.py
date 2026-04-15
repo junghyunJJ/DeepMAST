@@ -13,12 +13,14 @@ to avoid circular import through deep_interpreter.__init__.py chain:
 
 import asyncio
 import atexit
+import json
 import logging
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool, tool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
@@ -131,12 +133,159 @@ async def _invoke_sequential_thinking(
     return str(result)
 
 
+# =============================================================================
+# Per-session state for degenerate-loop detection
+# =============================================================================
+# The underlying MCP sequential-thinking tool does not enforce monotonicity.
+# OSS models like qwen3.5 can fall into a degenerate self-reinforcing loop
+# where the same thoughtNumber is resubmitted dozens of times, exhausting the
+# recursion budget without making progress (observed: ~456s / 22 repeats on
+# qwen1 before hypothesis_writer timed out with an empty result).
+#
+# We track (thread_id -> {last_n, repeats, history_len}) to:
+#   1. Reject non-monotonic thought_number values
+#   2. Detect 3+ consecutive calls at the same thought_number and force an
+#      explicit escape message that instructs the model to call save_evidence
+#   3. Cap total thought history at 30 to prevent unbounded drift
+#
+# State is process-local; LangGraph runs one subagent per thread at a time.
+
+_THINKING_STATE: dict[str, dict[str, int]] = {}
+_THINKING_STATE_LOCK = threading.Lock()
+_THINKING_HISTORY_CAP = 30
+_THINKING_REPEAT_LIMIT = 3
+
+
+def _thinking_session_key(config: Optional[RunnableConfig]) -> str:
+    """Derive a stable per-subagent-turn key from RunnableConfig.
+
+    Each LangGraph subagent (evidence_assessor, deep_diver, hypothesis_writer,
+    report_writer) runs sequentially under the same parent thread_id. If the
+    counter is scoped only by thread_id, a fresh subagent's legitimate
+    thoughtNumber=1 gets falsely rejected because the previous subagent left
+    last_n=8 in state.
+
+    We therefore include the current graph node / subagent namespace so each
+    subagent turn starts with a clean counter. ``langgraph_node`` is set by
+    LangGraph while a node is executing; ``checkpoint_ns`` is namespaced by
+    deep-agent subagent path. When neither is present (e.g., tests invoking
+    the tool directly) we fall back to a process-local "default" key.
+    """
+    if not config:
+        return "default"
+    configurable = config.get("configurable", {}) or {}
+    metadata = config.get("metadata", {}) or {}
+    thread_id = configurable.get("thread_id", "default")
+    # Prefer the per-node identifier so each subagent turn has its own counter.
+    # LangGraph exposes this via metadata.langgraph_node during execution;
+    # deep-agents also surfaces a nested checkpoint_ns per subagent.
+    node = (
+        metadata.get("langgraph_node")
+        or configurable.get("langgraph_node")
+        or configurable.get("checkpoint_ns", "")
+    )
+    return f"{thread_id}::{node}"
+
+
+def _reset_thinking_state(session_key: str) -> None:
+    """Reset state for a session key (exposed for tests)."""
+    with _THINKING_STATE_LOCK:
+        _THINKING_STATE.pop(session_key, None)
+
+
+def _check_thinking_monotonicity(
+    session_key: str,
+    thought_number: int,
+) -> Optional[str]:
+    """Return a guard message JSON string if the call must be blocked.
+
+    Returns None if the call is allowed to proceed to the MCP tool.
+
+    Self-heals on ``thought_number == 1``: if a caller submits 1 it is
+    always treated as the start of a fresh thinking sequence, even if
+    the session key matches a previous subagent's counter. This is a
+    second line of defense against overly-coarse session keys that
+    might otherwise false-block a fresh subagent turn.
+    """
+    with _THINKING_STATE_LOCK:
+        # Self-heal: thought_number=1 means "new sequence", always reset.
+        if thought_number <= 1:
+            _THINKING_STATE[session_key] = {
+                "last_n": thought_number,
+                "repeats": 0,
+                "history_len": 1,
+            }
+            return None
+
+        state = _THINKING_STATE.setdefault(
+            session_key,
+            {"last_n": 0, "repeats": 0, "history_len": 0},
+        )
+
+        # Reject non-monotonic regressions (e.g., thoughtNumber=3 after last=5)
+        if thought_number < state["last_n"]:
+            return json.dumps({
+                "error": "non_monotonic_thought_number",
+                "last_thought_number": state["last_n"],
+                "submitted": thought_number,
+                "instruction": (
+                    f"thoughtNumber must be >= {state['last_n']}. "
+                    "If you are done thinking, set nextThoughtNeeded=false and "
+                    "proceed to the next action (for hypothesis_writer: "
+                    "save_evidence(data_dir, 'hypothesis_report.json', ...))."
+                ),
+            })
+
+        # Detect stuck-in-loop (same thoughtNumber, multiple consecutive calls)
+        if thought_number == state["last_n"] and thought_number > 0:
+            state["repeats"] += 1
+            if state["repeats"] >= _THINKING_REPEAT_LIMIT:
+                state["repeats"] = 0  # reset so next distinct call proceeds
+                return json.dumps({
+                    "error": "degenerate_loop_detected",
+                    "thought_number": thought_number,
+                    "repeats": _THINKING_REPEAT_LIMIT,
+                    "instruction": (
+                        f"Detected {_THINKING_REPEAT_LIMIT} consecutive "
+                        "sequential_thinking calls at thoughtNumber="
+                        f"{thought_number}. You are stuck. STOP calling "
+                        "sequential_thinking. Emit your best-effort output "
+                        "now: for hypothesis_writer call "
+                        "save_evidence(data_dir, 'hypothesis_report.json', "
+                        "<your best draft>) IMMEDIATELY. For report_writer "
+                        "call save_drug_md with the current draft. For "
+                        "evidence_assessor/deep_diver proceed to the next "
+                        "tool in the workflow."
+                    ),
+                })
+        else:
+            state["repeats"] = 0
+            state["last_n"] = thought_number
+
+        state["history_len"] += 1
+        if state["history_len"] > _THINKING_HISTORY_CAP:
+            return json.dumps({
+                "error": "thought_history_exceeded",
+                "history_len": state["history_len"],
+                "cap": _THINKING_HISTORY_CAP,
+                "instruction": (
+                    f"thoughtHistoryLength exceeded {_THINKING_HISTORY_CAP}. "
+                    "You must conclude analysis and emit your final output "
+                    "now (save_evidence for hypothesis_writer, save_drug_md "
+                    "for report_writer, or the appropriate stage tool)."
+                ),
+            })
+
+    return None
+
+
 @tool
 def sequential_thinking(
     thought: str,
     thought_number: int = 1,
     total_thoughts: int = 3,
     next_thought_needed: bool = True,
+    config: Optional[RunnableConfig] = None,
 ) -> str:
     """Structured planning and reasoning via sequential thinking.
 
@@ -148,15 +297,33 @@ def sequential_thinking(
 
     This creates a Plan step in the Plan->Execute->Reflect cycle.
 
+    Guardrails (enforced server-side to prevent degenerate loops):
+    - thought_number must be monotonically non-decreasing
+    - 3 consecutive calls at the same thought_number triggers an explicit
+      escape instruction to proceed with save_evidence / save_drug_md
+    - thoughtHistoryLength is capped at 30 per session
+
     Args:
         thought: The current thought/reasoning step content
-        thought_number: Current thought number (1-based)
+        thought_number: Current thought number (1-based, monotonic)
         total_thoughts: Expected total number of thoughts
         next_thought_needed: Whether another thought step follows
+        config: Injected by LangChain tool framework — used to derive
+            a per-subagent-session state key for loop detection.
 
     Returns:
-        The processed thought result from sequential-thinking MCP
+        The processed thought result from sequential-thinking MCP, or
+        an error+instruction JSON when a guard is triggered.
     """
+    session_key = _thinking_session_key(config)
+    guard = _check_thinking_monotonicity(session_key, thought_number)
+    if guard is not None:
+        logger.warning(
+            "sequential_thinking guard triggered (session=%s, n=%d): %s",
+            session_key, thought_number, guard,
+        )
+        return guard
+
     try:
         result = _run_async(_invoke_sequential_thinking(
             thought=thought,

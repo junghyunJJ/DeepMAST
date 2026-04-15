@@ -157,3 +157,21 @@ def test_p53_and_hypoxia_resolve_to_canonical_keywords():
     assert p53_q["keywords"] == [PATHWAY_KEYWORDS["p53"][0]]  # "p53"
     assert hypoxia_q["genes"] == ["HIF1A", "VHL", "EPAS1"]
     assert hypoxia_q["keywords"] == [PATHWAY_KEYWORDS["hypoxia"][0]]  # "hif-1alpha"
+
+
+def test_wnt_resolves_to_canonical_hub_genes():
+    """Closes the PROGENy WNT coverage gap.
+
+    Prior to this fix, PATHWAY_TO_GENES had no "wnt" key and "WNT" inputs
+    fell through substring-matching to an empty genes list — production
+    WNT L-R pairs got keyword-only BioMCP queries with no hub gene anchor.
+    WNT is the 14th PROGENy pathway; this entry completes the dict's
+    PROGENy coverage.
+    """
+    assert "wnt" in PATHWAY_TO_GENES
+    assert "wnt" in PATHWAY_KEYWORDS
+    qs = _build_deterministic_pathway_queries(["WNT"], "breast cancer")
+    assert len(qs) == 1
+    assert qs[0]["genes"] == ["CTNNB1", "WNT3A", "LEF1"]
+    assert qs[0]["keywords"] == [PATHWAY_KEYWORDS["wnt"][0]]  # "beta-catenin"
+    assert qs[0]["diseases"] == ["breast cancer"]

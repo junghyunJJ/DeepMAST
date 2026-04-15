@@ -2232,7 +2232,95 @@ def validate_drug_md(data_dir: str) -> str:
                             "hypothesis": h.get("title", "")[:80],
                         })
 
-    total_checks = len(doc_pmids) + 7  # PMIDs + classification + decimals + columns + approval + phase + hypothesis
+    # 8. Unexpanded EXPAND placeholders — the report_writer must have
+    #    replaced every `<!-- EXPAND: ... -->` marker with real narrative
+    #    before saving. Leftover markers mean Phase 2 (Expand the Draft)
+    #    was skipped.
+    expand_markers = re.findall(r"<!--\s*EXPAND:([^>]*?)-->", drug_text)
+    if expand_markers:
+        preview = [m.strip()[:120] for m in expand_markers[:5]]
+        issues.append({
+            "type": "UNEXPANDED_PLACEHOLDER",
+            "severity": "high",
+            "count": len(expand_markers),
+            "sample_markers": preview,
+            "detail": (
+                "drug.md still contains <!-- EXPAND: --> markers. Each one "
+                "must be replaced with 2-4 sentences of biological "
+                "interpretation (Phase 2 'Expand the Draft')."
+            ),
+        })
+
+    # 9. Uncited quantitative claims — when the text makes a precise
+    #    statistical claim (p-value=, OR=, HR=, logFC=) it MUST also
+    #    cite an evidence file on the same line. This blocks fabricated
+    #    numbers like "OpenTargets: p-value=3.2e-08, OR=2.1" that were
+    #    observed in qwen3 runs and never appeared in any ot_*.json.
+    #
+    # The pattern is intentionally narrow to avoid false positives on
+    # markdown tables and prose "A OR B" usage:
+    #   - requires a key = value form where value has decimal magnitude
+    #     (integer like "OR=2" is too noisy; real stats always carry a
+    #     decimal or scientific notation)
+    #   - skips fenced code blocks and lines that look like markdown
+    #     table rows (start with "|")
+    #   - skips key-only/threshold-definition lines like
+    #     "p_value_threshold: 0.05" that describe cutoffs, not findings
+    quant_pattern = re.compile(
+        r"(?:p[-_ ]?value|pval|odds[ _-]?ratio|"
+        r"(?<![A-Za-z])OR(?![A-Za-z])|"
+        r"hazard[ _-]?ratio|(?<![A-Za-z])HR(?![A-Za-z])|"
+        r"log\s*2?\s*fc|effect[ _-]?size)"
+        r"\s*[=:<>]\s*[-+]?\d+\.\d+(?:[eE][-+]?\d+)?",
+        re.IGNORECASE,
+    )
+    threshold_pattern = re.compile(
+        r"\b(?:threshold|cutoff|limit|min|max)\b",
+        re.IGNORECASE,
+    )
+    citation_pattern = re.compile(
+        r"(?:\.json|\[from\s+[^\]]+\]|PMID[:\s]*\d|stage[123]_[A-Za-z0-9_\-]+)",
+        re.IGNORECASE,
+    )
+    uncited_quant: list[str] = []
+    in_code_fence = False
+    for line in drug_text.splitlines():
+        stripped = line.strip()
+        # Track fenced code blocks (```...```).
+        if stripped.startswith("```"):
+            in_code_fence = not in_code_fence
+            continue
+        if in_code_fence:
+            continue
+        # Skip markdown tables entirely — each row has its own cell
+        # scoping that our regex cannot reason about cleanly.
+        if stripped.startswith("|"):
+            continue
+        # Skip lines that are describing a threshold rather than a finding.
+        if threshold_pattern.search(stripped):
+            continue
+        if len(stripped) < 12:
+            continue
+        if quant_pattern.search(stripped) and not citation_pattern.search(stripped):
+            uncited_quant.append(stripped[:180])
+        if len(uncited_quant) >= 10:
+            break
+    if uncited_quant:
+        issues.append({
+            "type": "UNCITED_QUANTITATIVE",
+            "severity": "high",
+            "count": len(uncited_quant),
+            "sample_lines": uncited_quant,
+            "detail": (
+                "Lines contain precise statistics (p-value=, OR=, HR=, "
+                "logFC=) without citing an evidence file. Every such line "
+                "MUST reference either an evidence filename (e.g. "
+                "stage2_evidence.json, ot_<GENE>.json) or a PMID. Uncited "
+                "statistics are treated as hallucinated."
+            ),
+        })
+
+    total_checks = len(doc_pmids) + 9  # PMIDs + classification + decimals + columns + approval + phase + hypothesis + expand + quant
     return json.dumps({
         "valid": len(issues) == 0,
         "total_checks": total_checks,

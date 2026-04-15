@@ -59,6 +59,8 @@ docs/*
 docs/benchmarks/*
 !docs/benchmarks/drugtarget_skill_ablation/
 !docs/benchmarks/drugtarget_skill_ablation/**
+!docs/benchmarks/harness_x_model/
+!docs/benchmarks/harness_x_model/**
 large_tool_results/
 conversation_history/
 workspace/

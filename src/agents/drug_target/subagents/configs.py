@@ -26,6 +26,7 @@ from src.agents.drug_target.tools import (
     save_evidence,
     load_evidence_files,
     validate_evidence_completeness,
+    validate_evidence_references,
     # Stage 2: Target Validation (runs FIRST)
     query_stage2_gene_panel,
     query_ensembl_vep_consequence,
@@ -145,6 +146,7 @@ SUBAGENT_CONFIGS = {
             load_evidence_files,
             read_skill_file,
             save_evidence,
+            validate_evidence_references,
             sequential_thinking,
             think_tool,
             validate_quality,

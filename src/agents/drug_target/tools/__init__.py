@@ -10,6 +10,7 @@ from src.agents.drug_target.tools.evidence_loader import (
     load_evidence_files,
     save_evidence,
     validate_evidence_completeness,
+    validate_evidence_references,
     check_stage1_completion,
     check_hypothesis_completion,
 )
@@ -75,6 +76,7 @@ __all__ = [
     "load_evidence_files",
     "save_evidence",
     "validate_evidence_completeness",
+    "validate_evidence_references",
     "check_stage1_completion",
     "check_hypothesis_completion",
     # Stage-specific domain tools

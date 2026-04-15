@@ -360,6 +360,115 @@ async def run_traced(args: argparse.Namespace) -> int:
             import traceback
             traceback.print_exc()
 
+    # ── Hypothesis writer fixup: auto-retry if hypothesis_report.json missing
+    # This handles the qwen1-style degenerate-loop failure where
+    # hypothesis_writer exits without saving despite having stage3_candidates.
+    # With the new sequential_thinking guard the degenerate loop should be
+    # bounded, but a narrow re-invocation is still the last line of defense.
+    hypothesis_path = evidence_dir / "hypothesis_report.json"
+    if assessment_path.exists() and not hypothesis_path.exists():
+        try:
+            assessment = json.loads(assessment_path.read_text())
+            stage3_candidates = assessment.get("stage3_candidates", [])
+        except Exception:
+            stage3_candidates = []
+        if stage3_candidates:
+            print(
+                f"\n[HYPOTHESIS-FIXUP] assessment_results.json has "
+                f"{len(stage3_candidates)} stage3_candidates but "
+                f"hypothesis_report.json is missing. Re-running "
+                f"hypothesis_writer via a narrow task instruction."
+            )
+            with open(trace_log_path, "a") as fp:
+                fp.write(
+                    f"\n[HYPOTHESIS-FIXUP] {len(stage3_candidates)} candidates, "
+                    f"hypothesis_report.json missing — retrying narrowly\n"
+                )
+
+            hyp_retry_message = (
+                "The previous run completed Stage 1-3 evidence collection "
+                "but hypothesis_report.json was NOT saved. You MUST now "
+                "invoke ONLY the hypothesis_writer subagent to recover "
+                "hypothesis generation. Do not re-run evidence_assessor "
+                "or deep_diver. Do not re-run report_writer. Emit exactly "
+                "one tool call:\n\n"
+                f"  task(subagent_type=\"hypothesis_writer\", instruction=\""
+                f"Recovery run: load_evidence_files(data_dir='{data_dir}'), "
+                f"generate 4-6 mechanistic hypotheses across MoA / "
+                f"Therapeutic / Cross-Target / Novel Pathway categories, "
+                f"call validate_evidence_references with every filename you "
+                f"plan to cite, then immediately call "
+                f"save_evidence(data_dir='{data_dir}', "
+                f"filename='hypothesis_report.json', data=<the JSON "
+                f"payload>). Do NOT call sequential_thinking more than 6 "
+                f"times. If sequential_thinking returns an error about a "
+                f"degenerate loop, STOP thinking and call save_evidence "
+                f"immediately with your best draft.\")\n\n"
+                "After the hypothesis_writer task returns, emit the "
+                "message 'Hypothesis fixup complete.' and stop."
+            )
+            hyp_retry_thread_id = str(uuid.uuid4())
+            hyp_retry_start = time.time()
+            trace_log_fp = open(trace_log_path, "a")
+
+            try:
+                async for chunk in agent.astream(
+                    {"messages": [{"role": "user", "content": hyp_retry_message}]},
+                    config={
+                        "configurable": {"thread_id": hyp_retry_thread_id},
+                        "callbacks": [file_handler, token_tracker],
+                    },
+                    stream_mode="updates",
+                    subgraphs=True,
+                ):
+                    elapsed = time.time() - start
+                    if elapsed > timeout_seconds:
+                        print(f"\n[HYPOTHESIS-FIXUP TIMEOUT] {args.timeout}m limit reached")
+                        break
+                    # Abandon the fixup if it itself burns > 10 minutes —
+                    # we fall through to the remaining recovery branches.
+                    if time.time() - hyp_retry_start > 600:
+                        print("\n[HYPOTHESIS-FIXUP ABORT] > 600s budget exceeded")
+                        trace_log_fp.write(
+                            "\n[HYPOTHESIS-FIXUP ABORT] > 600s budget exceeded\n"
+                        )
+                        break
+
+                    namespace, update = chunk
+                    node_path = " > ".join(namespace) if namespace else "orchestrator"
+                    for node_name, node_data in update.items():
+                        node_counter += 1
+                        print(
+                            f"\n[{elapsed:7.1f}s] #{node_counter} "
+                            f"[{node_path}] Node: {node_name}"
+                        )
+                        print(f"  {_format_update_summary({node_name: node_data})}")
+                        print(f"  {'─' * 60}")
+                        trace_log_fp.write(f"\n{'═' * 62}\n")
+                        trace_log_fp.write(
+                            f"[{elapsed:7.1f}s] #{node_counter} "
+                            f"[{node_path}] Node: {node_name}\n"
+                        )
+                        trace_log_fp.write(
+                            f"  {_format_update_summary({node_name: node_data})}\n"
+                        )
+                        trace_log_fp.write(f"{'─' * 62}\n")
+                        trace_log_fp.flush()
+                        _capture_drug_md_from_update(node_data, captured_drug_md_holder)
+            except asyncio.CancelledError:
+                print("\n[HYPOTHESIS-FIXUP CANCELLED]")
+            except Exception as exc:
+                print(f"\n[HYPOTHESIS-FIXUP ERROR] {type(exc).__name__}: {exc}")
+                import traceback
+                traceback.print_exc()
+            finally:
+                trace_log_fp.close()
+
+            if hypothesis_path.exists():
+                print("[HYPOTHESIS-FIXUP] SUCCESS — hypothesis_report.json now present")
+            else:
+                print("[HYPOTHESIS-FIXUP] FAILED — hypothesis_report.json still missing")
+
     # ── Retry on early termination ───────────────────────────────
     evidence_count = len(list(evidence_dir.glob("*.json"))) if evidence_dir.exists() else 0
     if evidence_count == 0 and elapsed < 300:

@@ -1582,6 +1582,7 @@ PATHWAY_TO_GENES: dict[str, list[str]] = {
     "vegf":     ["VEGFA", "KDR", "FLT1"],
     "tnfa":     ["TNF", "TNFRSF1A", "TRADD"],
     "trail":    ["TNFSF10", "TNFRSF10A", "TNFRSF10B"],
+    "wnt":      ["CTNNB1", "WNT3A", "LEF1"],  # closes PROGENy WNT coverage gap
 }
 
 

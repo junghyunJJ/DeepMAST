@@ -393,6 +393,34 @@ Filtering rules:
 4. Keep top 3-5 hypotheses
 5. Ensure at least 3 of 4 categories represented
 
+### Phase 4.5: Validate Evidence References (MANDATORY, ANTI-HALLUCINATION)
+
+Before calling save_evidence for hypothesis_report.json you MUST call:
+
+    validate_evidence_references(data_dir, <flat list of every filename cited
+        in any hypothesis's evidence_references field>)
+
+Rules:
+- Pass the COMBINED list from ALL hypotheses (e.g., ["stage1_FN1--ITGB2.json",
+  "stage3_CD47.json", "ot_MUC1.json", ...]).
+- If the response contains `"valid": true`, proceed to Phase 5.
+- If `invalid_references` is non-empty you MUST FIX every entry by either:
+    (a) replacing it with a real filename from `available_files`, or
+    (b) removing the citation entirely if no real file supports the claim.
+- NEVER invent filenames. NEVER cite a file that is not in `available_files`.
+- Stage 1 L-R pair files use the convention `stage1_<LIG>--<REC>.json` with
+  TWO HYPHENS between the ligand and receptor. A single-underscore form
+  such as `stage1_CD4_ITGB2.json` is NOT produced by the pipeline and will
+  be rejected by save_evidence.
+- Re-run `validate_evidence_references` after fixing until it returns
+  `valid: true`.
+
+save_evidence itself ALSO validates hypothesis_report.json and will refuse
+to persist the file if any evidence_references entry cannot be matched to
+a real filename. If save_evidence returns `saved: false` with an
+`invalid_references` list, treat it the same as a Phase 4.5 failure: fix
+the citations and retry.
+
 ### Phase 5: Save Report
 MANDATORY: You MUST call save_evidence even if hypothesis_report.json appears in ls output.
 Files visible in ls may be stale from a previous run. YOUR job is to save YOUR results.
@@ -589,6 +617,15 @@ After calling `save_drug_md`, you MUST enter this validation loop:
       - WRONG_CLASSIFICATION: Replace with exact value from Reference Card
       - DECIMAL_RUBRIC_SCORES: Replace with integer from Reference Card
       - FABRICATED_COLUMN: Remove the column entirely
+      - UNEXPANDED_PLACEHOLDER: Replace each `<!-- EXPAND: ... -->` marker
+        with 2-4 sentences of biological interpretation drawn ONLY from
+        the Reference Card's data for that same section. Do NOT leave any
+        marker in the final draft.
+      - UNCITED_QUANTITATIVE: Every line with a precise statistic
+        (p-value=, OR=, HR=, logFC=) must cite an evidence file on the
+        SAME line. Add a `[from <evidence_file>]` tag using the exact
+        filename from the Reference Card, or remove the number entirely
+        if no evidence file supports it. NEVER invent p-values.
    c. Call `save_drug_md(data_dir, content=<fixed content>)` again
    d. Call `validate_drug_md(data_dir)` again
    e. REPEAT from step 2 until `issue_count == 0`

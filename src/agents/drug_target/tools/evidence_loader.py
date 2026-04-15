@@ -246,11 +246,70 @@ def load_evidence_files(data_dir: str) -> str:
     return json.dumps(result, indent=2)
 
 
+def _list_real_evidence_filenames(evidence_dir: Path) -> set[str]:
+    """Return the set of real filenames currently in evidence/ (no dotfiles)."""
+    if not evidence_dir.exists():
+        return set()
+    return {p.name for p in evidence_dir.iterdir() if not p.name.startswith(".")}
+
+
+def _validate_hypothesis_report_references(
+    parsed: dict,
+    evidence_dir: Path,
+) -> list[str]:
+    """Check hypotheses[*].evidence_references against real evidence/ files.
+
+    Returns a list of human-readable error strings; empty if all references
+    point to files that exist on disk. Purely syntactic — does not verify
+    that the cited file contains the claimed quantitative value, only that
+    the filename exists. Used by save_evidence to block hypothesis_writer
+    from persisting hallucinated filenames like `stage1_CD4_ITGB2.json`
+    (real convention uses `--`, not `_`).
+    """
+    if not isinstance(parsed, dict):
+        return []
+    hypotheses = parsed.get("hypotheses")
+    if not isinstance(hypotheses, list):
+        return []
+    real = _list_real_evidence_filenames(evidence_dir)
+    errors: list[str] = []
+    for idx, hyp in enumerate(hypotheses):
+        if not isinstance(hyp, dict):
+            continue
+        refs = hyp.get("evidence_references", [])
+        if not isinstance(refs, list):
+            continue
+        for ref in refs:
+            if not isinstance(ref, str) or not ref:
+                continue
+            # evidence_references entries may include a qualifier such as
+            # "stage1_FN1--ITGB2.json (passed filter)". Extract the leading
+            # token ending in .json for comparison.
+            token_match = re.search(r"([A-Za-z0-9_.\-]+\.json)", ref)
+            if not token_match:
+                continue
+            token = token_match.group(1)
+            if token not in real:
+                errors.append(
+                    f"hypotheses[{idx}].evidence_references cites '{token}' "
+                    f"which is not in evidence/ directory."
+                )
+    return errors
+
+
 @tool
 def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) -> str:
     """Save evidence data as a JSON file in the evidence/ subdirectory.
 
     Creates the evidence/ directory if it doesn't exist.
+
+    For ``filename == "hypothesis_report.json"``, the function additionally
+    validates every ``hypotheses[*].evidence_references`` entry against the
+    real evidence/ directory contents. If any cited filename is hallucinated
+    (e.g. ``stage1_CD4_ITGB2.json`` with single underscore when the real
+    convention is ``stage1_CD4--ITGB2.json`` with double hyphen, or a file
+    that was never created), the file is NOT saved and the error list is
+    returned so the model can rewrite with real filenames.
 
     Args:
         data_dir: Base directory for evidence storage
@@ -300,19 +359,14 @@ def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) ->
         except Exception:
             pass  # if we can't read existing, allow overwrite
 
+    parsed = None
     try:
         parsed = json.loads(data)
-        with open(file_path, "w") as f:
-            json.dump(parsed, f, indent=2)
-        result["saved"] = True
     except json.JSONDecodeError as e:
         # Try repairing trailing commas before falling back to raw text
         repaired = re.sub(r',\s*([}\]])', r'\1', data)
         try:
             parsed = json.loads(repaired)
-            with open(file_path, "w") as f:
-                json.dump(parsed, f, indent=2)
-            result["saved"] = True
             result["errors"].append(
                 "Repaired trailing commas in JSON before saving"
             )
@@ -322,10 +376,100 @@ def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) ->
                 f"Data is not valid JSON even after trailing-comma repair: {repair_err}. "
                 "File NOT saved. Please pass valid JSON to save_evidence."
             )
+            return json.dumps(result, indent=2)
+
+    # hypothesis_report.json: validate every evidence_references citation
+    # against real files before writing. Prevents hallucinated filenames
+    # from polluting the hypothesis output.
+    if filename == "hypothesis_report.json" and isinstance(parsed, dict):
+        ref_errors = _validate_hypothesis_report_references(parsed, evidence_dir)
+        if ref_errors:
+            real = sorted(_list_real_evidence_filenames(evidence_dir))
+            result["saved"] = False
+            result["errors"].append(
+                "hypothesis_report.json blocked: evidence_references contain "
+                "filenames that do not exist in the evidence/ directory. "
+                "Rewrite each hypothesis's evidence_references using ONLY "
+                "filenames from available_files. The Stage 1 filename "
+                "convention is `stage1_<LIGAND>--<RECEPTOR>.json` with TWO "
+                "hyphens, NOT a single underscore. If you cannot support a "
+                "claim with a real file, remove the citation."
+            )
+            result["invalid_references"] = ref_errors
+            result["available_files"] = real
+            return json.dumps(result, indent=2)
+
+    try:
+        with open(file_path, "w") as f:
+            json.dump(parsed, f, indent=2)
+        result["saved"] = True
     except Exception as e:
         result["errors"].append(f"Failed to save: {e}")
 
     return json.dumps(result, indent=2)
+
+
+@tool
+def validate_evidence_references(data_dir: str, references: list[str]) -> str:
+    """Validate a list of filename citations against the real evidence/ dir.
+
+    Use this tool from hypothesis_writer BEFORE calling save_evidence for
+    hypothesis_report.json. It answers the question "are these filenames
+    real?" so the model can fix hallucinated citations up-front rather than
+    being blocked by save_evidence.
+
+    Args:
+        data_dir: Base data directory (same path passed to save_evidence)
+        references: Flat list of filename strings from all hypotheses'
+            evidence_references fields. Each entry may include a qualifier
+            (e.g. "stage1_FN1--ITGB2.json (passed filter)") — only the
+            leading ``*.json`` token is checked.
+
+    Returns:
+        JSON with:
+          - valid: bool (all references resolved)
+          - invalid_references: list of citations that do not match any file
+          - available_files: sorted list of every real file in evidence/
+          - stage1_pair_files: subset of available_files matching
+            ``stage1_*--*.json`` (the canonical Stage 1 filename convention)
+          - naming_convention: human-readable note about the `--` separator
+    """
+    base = _resolve_data_dir(data_dir)
+    evidence_dir = base / "evidence"
+    real = _list_real_evidence_filenames(evidence_dir)
+
+    invalid: list[str] = []
+    seen_tokens: list[str] = []
+    for ref in references or []:
+        if not isinstance(ref, str) or not ref:
+            continue
+        token_match = re.search(r"([A-Za-z0-9_.\-]+\.json)", ref)
+        if not token_match:
+            invalid.append(ref)
+            continue
+        token = token_match.group(1)
+        seen_tokens.append(token)
+        if token not in real:
+            invalid.append(ref)
+
+    stage1_pair_files = sorted(
+        f for f in real if f.startswith("stage1_") and "--" in f and f.endswith(".json")
+    )
+
+    return json.dumps({
+        "valid": len(invalid) == 0,
+        "checked_references_count": len(seen_tokens),
+        "invalid_references": invalid,
+        "available_files": sorted(real),
+        "stage1_pair_files": stage1_pair_files,
+        "naming_convention": (
+            "Stage 1 L-R pair evidence files use the convention "
+            "`stage1_<LIGAND>--<RECEPTOR>.json` with TWO HYPHENS "
+            "between the ligand and receptor symbols. Single-underscore "
+            "variants like `stage1_CD4_ITGB2.json` are NOT written by the "
+            "pipeline and will be rejected by save_evidence."
+        ),
+    }, indent=2)
 
 
 @tool
