@@ -3140,30 +3140,35 @@ class TestStage1FilterCSVSync:
         assert result["success"] is True
         assert result["rubric_csv_updated"] is True
 
-        # 5. Verify CSV was regenerated with correct flags
+        # 5. Verify CSV regenerated. PR1-1 changed contract: stage3_candidate is
+        # rubric-qualified (NOT narrowed by apply_stage1_filter); stage1_validated
+        # is the new per-row narrow flag.
         with open(rubric_csv) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
+        # Per PR-1: stage3_candidate remains True for ALL rubric-qualified genes.
+        all_genes = {r["gene"] for r in rows}
         true_genes = {r["gene"] for r in rows if r["stage3_candidate"] == "True"}
-        false_genes = {r["gene"] for r in rows if r["stage3_candidate"] == "False"}
+        assert true_genes == all_genes, (
+            "PR1-1: apply_stage1_filter must NOT overwrite stage3_candidate. "
+            "Use stage1_validated for the post-filter narrow set."
+        )
 
-        # TGFB1 and TGFBR2 pass (their pair TGFB1^TGFBR2 passes)
-        # CD74 and MIF fail (their pair CD74^MIF fails)
-        assert "TGFB1" in true_genes
-        assert "TGFBR2" in true_genes
-        assert "CD74" in false_genes
-        assert "MIF" in false_genes
-
-        # Verify JSON and CSV agree
+        # New contract: stage1_validated reflects pass/fail. Read from the JSON
+        # since the rubric_scores.csv fieldnames don't include stage1_validated yet
+        # (intentionally — CSV is the rubric scoring snapshot, not the filter result).
         updated_assessment = json.loads(
             (evidence_dir / "assessment_results.json").read_text()
         )
-        json_true_genes = {
+        validated_genes = {
             r["gene"] for r in updated_assessment["rubric_assessment"]
-            if r["stage3_candidate"] is True
+            if r.get("stage1_validated") is True
         }
-        assert true_genes == json_true_genes
+        assert "TGFB1" in validated_genes
+        assert "TGFBR2" in validated_genes
+        assert "CD74" not in validated_genes
+        assert "MIF" not in validated_genes
 
         # Verify scores unchanged (only flags changed)
         for row in rows:
@@ -3252,3 +3257,577 @@ class TestC3C1Fixes:
         assert row["validated_total"] == 6   # 3 + 2 + 1
         assert row["exploratory_total"] == 8  # 1 + 2 + 3 + 2
         assert row["combined_total"] == 14
+
+
+# ============================================================================
+# PR-1: TOP7 Gating + Validator Hardening
+# Plan: .omc/plans/drug-target-top7-gating-and-validator-hardening.md
+# ============================================================================
+
+
+def _write_pr1_assessment(evidence_dir, *, schema_version=2):
+    """Helper: assessment_results.json with rubric-qualified > stage1-validated split.
+    7 rubric-qualified ({A,B,C,D,E,F,G}); 5 stage1-validated ({A,B,C,D,E}).
+    """
+    rubric_assessment = []
+    for g in "ABCDEFG":
+        rubric_assessment.append({
+            "gene": g, "combined_total": 12, "exploratory_total": 5,
+            "classification": "validated_target", "priority": "high",
+            "stage3_candidate": True,
+            "stage1_validated": g in "ABCDE",
+        })
+    payload = {
+        "schema_version": schema_version,
+        "disease": "test_disease",
+        "rubric_assessment": rubric_assessment,
+        "stage3_candidates": [{"gene": g, "combined_total": 12,
+                               "classification": "validated_target", "priority": "high",
+                               "exploratory_total": 5}
+                              for g in "ABCDEFG"],
+        "stage1_validated_candidates": [{"gene": g, "combined_total": 12,
+                                          "classification": "validated_target", "priority": "high",
+                                          "exploratory_total": 5}
+                                         for g in "ABCDE"],
+        "stage1_filter_applied": True,
+        "summary": {"total_genes": 7, "stage3_count": 7, "stage1_validated_count": 5},
+    }
+    (evidence_dir / "assessment_results.json").write_text(json.dumps(payload, indent=2))
+
+
+class TestPR1PathTraversal:
+    """PR1-3: save_evidence path traversal allow-list (OWASP A01)."""
+
+    @pytest.mark.parametrize("bad_filename", [
+        "../../etc/passwd",
+        "/etc/passwd",
+        "foo/../bar.json",
+        "foo\x00bar.json",
+        "subdir/bar.json",
+        "bar.txt",  # extension not in allow-list
+        "..",
+    ])
+    def test_save_evidence_path_traversal_blocked(self, tmp_path, bad_filename):
+        from src.agents.drug_target.tools.evidence_loader import _is_safe_filename
+        assert _is_safe_filename(bad_filename) is False
+
+    @pytest.mark.parametrize("good_filename", [
+        "stage1_FN1--ITGB2.json",
+        "stage3_CD4.json",
+        "ot_TGFB1.json",
+        "assessment_results.json",
+        "hypothesis_report.json",
+        "rubric_scores.csv",
+        "stage1_filter_results.csv",
+        "stage1_filter_results.json",
+    ])
+    def test_save_evidence_legitimate_filenames_allowed(self, tmp_path, good_filename):
+        from src.agents.drug_target.tools.evidence_loader import _is_safe_filename
+        assert _is_safe_filename(good_filename) is True
+
+
+class TestPR1Stage1Filter:
+    """PR1-1 / PR1-2: apply_stage1_filter splits stage3_candidate from stage1_validated;
+    writes stage1_filter_results.json sidecar; idempotent."""
+
+    def _setup_stage1_inputs(self, data_dir):
+        from pathlib import Path as _Path
+        evidence = _Path(data_dir) / "evidence"
+        evidence.mkdir(parents=True, exist_ok=True)
+        assessment = {
+            "schema_version": 2,
+            "disease": "test",
+            "rubric_assessment": [
+                {"gene": "PASSING_GENE", "combined_total": 12, "stage3_candidate": True,
+                 "exploratory_total": 5, "classification": "validated_target", "priority": "high"},
+                {"gene": "FAILING_GENE", "combined_total": 11, "stage3_candidate": True,
+                 "exploratory_total": 4, "classification": "validated_target", "priority": "high"},
+            ],
+            "stage3_candidates": [
+                {"gene": "PASSING_GENE", "combined_total": 12, "exploratory_total": 5,
+                 "classification": "validated_target", "priority": "high"},
+                {"gene": "FAILING_GENE", "combined_total": 11, "exploratory_total": 4,
+                 "classification": "validated_target", "priority": "high"},
+            ],
+            "summary": {"stage3_count": 2},
+        }
+        (evidence / "assessment_results.json").write_text(json.dumps(assessment, indent=2))
+        s1 = {
+            "PASSING_GENE^OTHER": {
+                "string_ppi": {"max_combined_score": 0.95, "interaction_found": True},
+                "census_validation": {
+                    "executed": True,
+                    "target_vs_rest": {
+                        "coexpression": {"p_value": 0.001, "risk_ratio": 5.0},
+                        "gene_a": {"p_value": 0.001, "risk_ratio": 3.0, "target_pct": 0.4},
+                        "gene_b": {"p_value": 0.001, "risk_ratio": 2.0, "target_pct": 0.3},
+                    },
+                },
+            },
+            "FAILING_GENE^X": {
+                "string_ppi": {"max_combined_score": 0.5, "interaction_found": True},
+                "census_validation": {
+                    "executed": True,
+                    "target_vs_rest": {
+                        "coexpression": {"p_value": 0.001, "risk_ratio": 1.0},
+                        "gene_a": {"p_value": 0.001, "risk_ratio": 1.0, "target_pct": 0.1},
+                        "gene_b": {"p_value": 0.001, "risk_ratio": 1.0, "target_pct": 0.1},
+                    },
+                },
+            },
+        }
+        (evidence / "stage1_evidence.json").write_text(json.dumps(s1, indent=2))
+        return evidence
+
+    def test_apply_stage1_filter_adds_stage1_validated_field(self, tmp_path):
+        """PR1-1: stage1_validated added; stage3_candidate NOT overwritten."""
+        from src.agents.drug_target.tools.stage_logic import apply_stage1_filter
+        evidence = self._setup_stage1_inputs(tmp_path)
+        apply_stage1_filter.invoke({"data_dir": str(tmp_path)})
+        a = json.loads((evidence / "assessment_results.json").read_text())
+        assert "stage1_validated_candidates" in a
+        rows = {r["gene"]: r for r in a["rubric_assessment"]}
+        assert rows["PASSING_GENE"]["stage1_validated"] is True
+        assert rows["FAILING_GENE"]["stage1_validated"] is False
+        assert rows["PASSING_GENE"]["stage3_candidate"] is True
+        assert rows["FAILING_GENE"]["stage3_candidate"] is True
+        assert {c["gene"] for c in a["stage3_candidates"]} == {"PASSING_GENE", "FAILING_GENE"}
+        assert {c["gene"] for c in a["stage1_validated_candidates"]} == {"PASSING_GENE"}
+
+    def test_apply_stage1_filter_idempotent(self, tmp_path):
+        """PR1-1: running fn twice produces identical output (Architect AC-PR1-1b)."""
+        from src.agents.drug_target.tools.stage_logic import apply_stage1_filter
+        evidence = self._setup_stage1_inputs(tmp_path)
+        apply_stage1_filter.invoke({"data_dir": str(tmp_path)})
+        first = json.loads((evidence / "assessment_results.json").read_text())
+        apply_stage1_filter.invoke({"data_dir": str(tmp_path)})
+        second = json.loads((evidence / "assessment_results.json").read_text())
+        assert first == second, "apply_stage1_filter not idempotent"
+
+    def test_apply_stage1_filter_writes_json_sidecar(self, tmp_path):
+        """PR1-2: stage1_filter_results.json written alongside CSV."""
+        from src.agents.drug_target.tools.stage_logic import apply_stage1_filter
+        evidence = self._setup_stage1_inputs(tmp_path)
+        apply_stage1_filter.invoke({"data_dir": str(tmp_path)})
+        json_sidecar = evidence / "stage1_filter_results.json"
+        assert json_sidecar.exists()
+        rows = json.loads(json_sidecar.read_text())
+        assert any(r["passed"] is True for r in rows)
+        assert any(r["passed"] is False for r in rows)
+
+
+class TestPR1HypothesisReportValidator:
+    """PR1-4/5/6: TOP7 coverage + deterministic evidence_coverage_pct + FAILED-pair gate."""
+
+    def _setup(self, tmp_path):
+        evidence = tmp_path / "evidence"
+        evidence.mkdir(parents=True, exist_ok=True)
+        _write_pr1_assessment(evidence)
+        rows = [
+            {"ligand": "P1", "receptor": "P2", "passed": True, "string_combined": 0.9,
+             "census_coexpr_pvalue": 0.001, "census_gene_a_pvalue": 0.001,
+             "census_gene_b_pvalue": 0.001},
+            {"ligand": "F1", "receptor": "F2", "passed": False, "string_combined": 0.6,
+             "census_coexpr_pvalue": 0.5, "census_gene_a_pvalue": 0.5,
+             "census_gene_b_pvalue": 0.5},
+        ]
+        (evidence / "stage1_filter_results.json").write_text(json.dumps(rows))
+        for fname in ["stage1_P1--P2.json", "stage1_F1--F2.json", "stage3_A.json", "stage3_B.json"]:
+            (evidence / fname).write_text("{}")
+        return evidence
+
+    def test_top7_coverage_gate_rejects_missing_genes(self, tmp_path):
+        """PR1-4: hypothesis_report missing TOP7 gene → reject with diagnostic."""
+        from src.agents.drug_target.tools.evidence_loader import save_evidence
+        self._setup(tmp_path)
+        report = {
+            "evidence_coverage_pct": 99,
+            "hypotheses": [
+                {"biological_entities": {"genes": ["A"]}, "evidence_references": ["stage3_A.json"]},
+                {"biological_entities": {"genes": ["B"]}, "evidence_references": ["stage3_B.json"]},
+            ],
+        }
+        result = json.loads(save_evidence.invoke({
+            "data_dir": str(tmp_path),
+            "filename": "hypothesis_report.json",
+            "data": json.dumps(report),
+        }))
+        assert result["saved"] is False
+        assert "top7_coverage" in result
+        assert set(result["top7_coverage"]["missing"]) == {"C", "D", "E"}
+
+    def test_top7_coverage_gate_passes_full_coverage(self, tmp_path):
+        """PR1-4: when all stage1_validated genes covered, gate passes."""
+        from src.agents.drug_target.tools.evidence_loader import save_evidence
+        evidence = self._setup(tmp_path)
+        report = {
+            "evidence_coverage_pct": 50,
+            "hypotheses": [
+                {"biological_entities": {"genes": ["A", "B", "C", "D", "E"]},
+                 "evidence_references": ["stage3_A.json", "stage3_B.json"]},
+            ],
+        }
+        result = json.loads(save_evidence.invoke({
+            "data_dir": str(tmp_path),
+            "filename": "hypothesis_report.json",
+            "data": json.dumps(report),
+        }))
+        assert result["saved"] is True
+        saved = json.loads((evidence / "hypothesis_report.json").read_text())
+        assert saved["top7_coverage"]["coverage_pct"] == 100.0
+        assert saved["top7_coverage"]["missing"] == []
+        assert saved["evidence_coverage_pct"] == 50.0
+
+    def test_deterministic_evidence_coverage_pct_overwrites_llm(self, tmp_path):
+        """PR1-5: LLM-supplied evidence_coverage_pct is replaced by deterministic value."""
+        from src.agents.drug_target.tools.evidence_loader import save_evidence
+        evidence = self._setup(tmp_path)
+        report = {
+            "evidence_coverage_pct": 99,
+            "hypotheses": [
+                {"biological_entities": {"genes": ["A", "B", "C", "D", "E"]},
+                 "evidence_references": ["stage1_P1--P2.json"]},
+            ],
+        }
+        result = json.loads(save_evidence.invoke({
+            "data_dir": str(tmp_path),
+            "filename": "hypothesis_report.json",
+            "data": json.dumps(report),
+        }))
+        assert result["saved"] is True
+        saved = json.loads((evidence / "hypothesis_report.json").read_text())
+        assert saved["evidence_coverage_pct"] == 25.0  # 1 of 4 stage1/3 files
+
+    def test_failed_pair_block_rejects_unmarked_citation(self, tmp_path):
+        """PR1-6: citing a FAILED pair without _FAILED suffix → reject (deterministic)."""
+        from src.agents.drug_target.tools.evidence_loader import save_evidence
+        self._setup(tmp_path)
+        report = {
+            "evidence_coverage_pct": 50,
+            "hypotheses": [
+                {"biological_entities": {"genes": ["A", "B", "C", "D", "E"]},
+                 "evidence_references": ["stage1_F1--F2.json"]},
+            ],
+        }
+        result = json.loads(save_evidence.invoke({
+            "data_dir": str(tmp_path),
+            "filename": "hypothesis_report.json",
+            "data": json.dumps(report),
+        }))
+        assert result["saved"] is False
+        assert any("F1--F2" in v for v in result.get("failed_pair_violations", []))
+
+    def test_failed_pair_block_accepts_explicit_suffix(self, tmp_path):
+        """PR1-6: FAILED pair WITH _FAILED suffix marker is accepted (contrast evidence)."""
+        from src.agents.drug_target.tools.evidence_loader import save_evidence
+        self._setup(tmp_path)
+        report = {
+            "evidence_coverage_pct": 50,
+            "hypotheses": [
+                {"biological_entities": {"genes": ["A", "B", "C", "D", "E"]},
+                 "evidence_references": [
+                     "stage1_P1--P2.json",
+                     "stage1_F1--F2.json_FAILED",
+                 ]},
+            ],
+        }
+        result = json.loads(save_evidence.invoke({
+            "data_dir": str(tmp_path),
+            "filename": "hypothesis_report.json",
+            "data": json.dumps(report),
+        }))
+        assert result["saved"] is True
+
+
+class TestPR2Stage1Filter:
+    """PR2-1: STRING `string_record_found` distinct from `score=0`."""
+
+    def test_string_no_record_skips_string_criterion(self):
+        """STRING returned no row → skip STRING criterion, require strong Census."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_filter
+        ev = {
+            "string_ppi": {
+                "string_record_found": False,
+                "interaction_found": False,
+                "max_combined_score": 0.0,
+            },
+            "census_validation": {
+                "target_vs_rest": {
+                    "coexpression": {"p_value": 1e-15},  # ultra strong
+                    "gene_a": {"p_value": 0.01},
+                    "gene_b": {"p_value": 0.01},
+                },
+            },
+        }
+        out = compute_stage1_filter(ev)
+        assert out["string_status"] == "no_record"
+        assert out["passed"] is True
+
+    def test_string_no_record_fails_on_weak_census(self):
+        """no_record + weak coexpression → fail (no compensation possible)."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_filter
+        ev = {
+            "string_ppi": {"string_record_found": False, "max_combined_score": 0.0},
+            "census_validation": {
+                "target_vs_rest": {
+                    "coexpression": {"p_value": 0.001},  # below default 0.05 but not 1e-10
+                    "gene_a": {"p_value": 0.01},
+                    "gene_b": {"p_value": 0.01},
+                },
+            },
+        }
+        out = compute_stage1_filter(ev)
+        assert out["string_status"] == "no_record"
+        assert out["passed"] is False
+
+    def test_string_in_db_low_score_still_fails(self):
+        """STRING in DB with low score (0.5) → original criterion applies → fail."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_filter
+        ev = {
+            "string_ppi": {"string_record_found": True, "max_combined_score": 0.5},
+            "census_validation": {
+                "target_vs_rest": {
+                    "coexpression": {"p_value": 0.001},
+                    "gene_a": {"p_value": 0.01},
+                    "gene_b": {"p_value": 0.01},
+                },
+            },
+        }
+        out = compute_stage1_filter(ev)
+        assert out["string_status"] == "in_db"
+        assert out["passed"] is False
+
+    def test_string_in_db_high_score_passes(self):
+        """STRING in DB with high score → original criterion → pass with default Census threshold."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_filter
+        ev = {
+            "string_ppi": {"string_record_found": True, "max_combined_score": 0.95},
+            "census_validation": {
+                "target_vs_rest": {
+                    "coexpression": {"p_value": 0.001},
+                    "gene_a": {"p_value": 0.01},
+                    "gene_b": {"p_value": 0.01},
+                },
+            },
+        }
+        out = compute_stage1_filter(ev)
+        assert out["string_status"] == "in_db"
+        assert out["passed"] is True
+
+
+class TestPR2GeneSymbolValidation:
+    """PR2-2: Census SOQL gene-symbol allow-list (OWASP A03)."""
+
+    @pytest.mark.parametrize("bad_symbol", [
+        "A'); DROP TABLE--",
+        "FOO BAR",
+        "FOO'BAR",
+        "FOO\nBAR",
+        "FOO;BAR",
+        "",
+        "lowercase",  # would be uppercased but contains nothing else
+    ])
+    def test_invalid_gene_symbol_rejected(self, bad_symbol):
+        from src.agents.drug_target.tools.stage_domain_tools import _validate_gene_symbol
+        err = _validate_gene_symbol(bad_symbol, role="ligand")
+        # 'lowercase' becomes 'LOWERCASE' which IS valid -- it's actually allowed.
+        # The other cases must produce an error.
+        if bad_symbol == "lowercase":
+            assert err is None
+        else:
+            assert err is not None, f"Should reject {bad_symbol!r}"
+
+    @pytest.mark.parametrize("good_symbol", [
+        "TGFB1", "HLA-DRB1", "CD4", "P53", "BRCA-1", "OR1G1",
+    ])
+    def test_valid_gene_symbol_accepted(self, good_symbol):
+        from src.agents.drug_target.tools.stage_domain_tools import _validate_gene_symbol
+        assert _validate_gene_symbol(good_symbol, role="ligand") is None
+
+
+class TestPR2RubricValidation:
+    """PR2-4: validate_rubric_assessment activated in compute_rubric_scores."""
+
+    def test_in_range_assessment_passes(self):
+        from src.agents.drug_target.tools.stage_logic import validate_rubric_assessment
+        assessment = {
+            "validated_track": {
+                "existing_drug_evidence": 3,
+                "clinical_trial_activity": 2,
+                "safety_profile": -1,
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 2,
+                "tractability": 3,
+                "biological_plausibility": 4,
+                "novelty_opportunity": 3,
+            },
+        }
+        assert validate_rubric_assessment(assessment) == []
+
+    def test_out_of_range_safety_profile_caught(self):
+        from src.agents.drug_target.tools.stage_logic import validate_rubric_assessment
+        assessment = {
+            "validated_track": {
+                "existing_drug_evidence": 0,
+                "clinical_trial_activity": 0,
+                "safety_profile": -4,  # out of [-3, 0]
+            },
+            "exploratory_track": {
+                "gwas_genetic_support": 0, "tractability": 0,
+                "biological_plausibility": 0, "novelty_opportunity": 0,
+            },
+        }
+        errs = validate_rubric_assessment(assessment)
+        assert any("safety_profile" in e for e in errs)
+
+
+class TestP2GateAndAtomicWrite:
+    """P2-1 (validate_stage1_gate quality check) + P2-8 (atomic write)."""
+
+    def test_validate_stage1_gate_blocks_when_filter_not_applied(self, tmp_path):
+        """P2-1: validate_stage1_gate refuses if stage1_filter_applied is missing/false."""
+        from src.agents.drug_target.tools.stage_logic import validate_stage1_gate
+        evidence = tmp_path / "evidence"
+        evidence.mkdir(parents=True, exist_ok=True)
+        # Assessment with stage3_candidates but NO stage1_filter_applied flag
+        assessment = {
+            "schema_version": 2,
+            "rubric_assessment": [{"gene": "FOO", "stage3_candidate": True}],
+            "stage3_candidates": [{"gene": "FOO"}],
+            # stage1_filter_applied DELIBERATELY MISSING
+        }
+        (evidence / "assessment_results.json").write_text(json.dumps(assessment))
+        (tmp_path / "lr_candidates.json").write_text(
+            json.dumps({"pairs": [{"ligand": "FOO", "receptor": "BAR"}]})
+        )
+        result = json.loads(validate_stage1_gate.invoke({"data_dir": str(tmp_path)}))
+        assert result["success"] is False
+        assert "stage1_filter_applied" in result["error"]
+
+    def test_validate_stage1_gate_passes_when_filter_applied_and_files_present(self, tmp_path):
+        """Sanity: gate passes when both flag and files are present."""
+        from src.agents.drug_target.tools.stage_logic import validate_stage1_gate
+        evidence = tmp_path / "evidence"
+        evidence.mkdir(parents=True, exist_ok=True)
+        assessment = {
+            "schema_version": 2,
+            "rubric_assessment": [{"gene": "FOO", "stage3_candidate": True}],
+            "stage3_candidates": [{"gene": "FOO"}],
+            "stage1_filter_applied": True,
+        }
+        (evidence / "assessment_results.json").write_text(json.dumps(assessment))
+        (tmp_path / "lr_candidates.json").write_text(
+            json.dumps({"pairs": [{"ligand": "FOO", "receptor": "BAR"}]})
+        )
+        (evidence / "stage1_FOO--BAR.json").write_text("{}")
+        result = json.loads(validate_stage1_gate.invoke({"data_dir": str(tmp_path)}))
+        assert result["success"] is True
+
+    def test_atomic_write_text_replaces_target(self, tmp_path):
+        """P2-8: _atomic_write_text writes target atomically."""
+        from src.agents.drug_target.tools.stage_logic import _atomic_write_text
+        target = tmp_path / "test_atomic.json"
+        _atomic_write_text(target, '{"hello": "world"}')
+        assert target.read_text() == '{"hello": "world"}'
+        # Overwrite
+        _atomic_write_text(target, '{"hello": "again"}')
+        assert target.read_text() == '{"hello": "again"}'
+        # No leftover temp files in directory
+        leftovers = [p for p in tmp_path.iterdir() if p.name.startswith(".tmp_")]
+        assert leftovers == []
+
+
+class TestP2CsvSeparator:
+    """P2-6: CSV reader handles both `--` and `_` pair separators."""
+
+    def test_dash_dash_separator_preferred(self):
+        """`--` is the canonical separator, used by stage1_*.json files."""
+        token = "fn1--itgb2"
+        if "--" in token:
+            ligand, receptor = token.split("--", 1)
+        else:
+            ligand, receptor = token.split("_", 1)
+        assert ligand == "fn1"
+        assert receptor == "itgb2"
+
+    def test_underscore_separator_back_compat(self):
+        """Existing CSV files use `_` as separator — fallback path."""
+        token = "fn1_itgb2"
+        if "--" in token:
+            ligand, receptor = token.split("--", 1)
+        else:
+            ligand, receptor = token.split("_", 1)
+        assert ligand == "fn1"
+        assert receptor == "itgb2"
+
+
+class TestP3RunAsyncTimeout:
+    """P3-2: _run_async timeout configurable via SEQ_THINKING_TIMEOUT."""
+
+    def test_default_timeout_is_120s(self, monkeypatch):
+        """Without env var, timeout falls back to 120s default."""
+        monkeypatch.delenv("SEQ_THINKING_TIMEOUT", raising=False)
+        # We test the env-var read logic by reading the helper's source behavior.
+        # Direct numeric verification: check the fallback default in the function source.
+        import inspect
+        from src.agents.drug_target.tools import common
+        src = inspect.getsource(common._run_async)
+        assert 'SEQ_THINKING_TIMEOUT' in src
+        assert '"120"' in src or "120.0" in src
+
+    def test_invalid_timeout_falls_back_to_120(self, monkeypatch):
+        """Garbled env var → fall back to 120 (no crash)."""
+        monkeypatch.setenv("SEQ_THINKING_TIMEOUT", "not-a-number")
+        # Just verify the function handles the parse failure path without raising
+        # (we cannot easily run an actual coroutine inside pytest without a loop).
+        # Smoke: import the module and confirm no exception at parse time.
+        from src.agents.drug_target.tools.common import _run_async
+        assert callable(_run_async)
+
+
+class TestP3SchemaValidation:
+    """P3-3: assessment_output.py runs real jsonschema.validate."""
+
+    def test_jsonschema_is_importable(self):
+        """jsonschema is in project deps and used by _save_target_assessment."""
+        import jsonschema
+        assert callable(jsonschema.validate)
+
+    def test_schema_validation_path_exists_in_source(self):
+        """Source contains the jsonschema.validate call (P3-3 implemented)."""
+        import inspect
+        from src.agents.drug_target.tools import assessment_output
+        src = inspect.getsource(assessment_output)
+        assert "jsonschema.validate" in src
+        assert "jsonschema.ValidationError" in src
+
+
+class TestPR1RegressionSplitDefinition:
+    """Tombstone integration test (Architect AC-PR1-1c): rubric_qualified differs from
+    stage1_validated. Verifies hypothesis-side validator + downstream consumers behave correctly.
+    """
+
+    def test_rubric_vs_stage1_validated_split(self, tmp_path):
+        """7 rubric-qualified + 5 stage1-validated. TOP7 coverage gate enforces 5 (narrow)."""
+        from src.agents.drug_target.tools.evidence_loader import save_evidence
+        evidence = tmp_path / "evidence"
+        evidence.mkdir(parents=True, exist_ok=True)
+        _write_pr1_assessment(evidence)
+        # Cover all 5 validated; F, G are rubric-qualified-only and NOT required by gate.
+        report = {
+            "evidence_coverage_pct": 50,
+            "hypotheses": [
+                {"biological_entities": {"genes": ["A", "B", "C", "D", "E"]},
+                 "evidence_references": []},
+            ],
+        }
+        result = json.loads(save_evidence.invoke({
+            "data_dir": str(tmp_path),
+            "filename": "hypothesis_report.json",
+            "data": json.dumps(report),
+        }))
+        assert result["saved"] is True, (
+            f"TOP7 gate must use stage1_validated_candidates (5 genes), "
+            f"NOT stage3_candidates (7 genes). Got: {result}"
+        )

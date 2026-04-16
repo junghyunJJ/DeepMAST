@@ -334,21 +334,38 @@ Read the full skill guide first:
 5. **Check `stage1_filter.json` for each L-R pair's filter status (passed/failed)**
 6. Extract key biological entities: convergent pathways, hub genes, tractable targets
 
-### CRITICAL: Stage 1 Filter Awareness
+### CRITICAL: Stage 1 Filter Awareness (PR1-7 hard rules)
+
 Before referencing ANY stage1 L-R pair in a hypothesis, you MUST check its status
-in `stage1_filter.json`. The Stage 1 filter requires ALL of:
+in `stage1_filter_results.json` (binary pass/fail data; preferred over the older
+`stage1_filter.json` confidence file). The Stage 1 filter requires ALL of:
 - STRING PPI combined score > 0.8
 - Census coexpression p-value < 0.05
 - Census gene A (ligand) p-value < 0.05
 - Census gene B (receptor) p-value < 0.05
 
+**Phase 1.5 — FAILED-pair citation hard rule (DETERMINISTIC GATE)**:
+
+Building a hypothesis's *core_claim* on any L-R pair where
+`stage1_filter_results.json[<L>--<R>].passed == False` is FORBIDDEN.
+
+If you nonetheless need to cite a FAILED pair as **contrast evidence**, you MUST
+append the literal suffix `_FAILED` to the citation string in `evidence_references`,
+e.g., `"stage1_TGFB1--P4HB.json_FAILED"` instead of `"stage1_TGFB1--P4HB.json"`.
+
+The save_evidence validator runs a deterministic file-path cross-reference against
+`stage1_filter_results.json`. If a hypothesis cites a FAILED pair WITHOUT the
+`_FAILED` suffix marker, save_evidence will return `saved=false` with
+`failed_pair_violations` listing the offending citations. **No natural-language
+parsing is performed** — the gate is purely on the citation string suffix.
+
 Rules:
-- If a pair **PASSED** the filter: reference it normally as validated evidence
-- If a pair **FAILED** the filter: you MUST note this explicitly in evidence_references
-  (e.g., "FN1-PLAUR: FAILED stage1 filter (STRING=0.697 < 0.8 threshold)")
-- Do NOT claim "STRING and Census support" for pairs that failed validation
-- Weight PASSED pairs significantly higher than FAILED pairs in evidence_coverage scoring
-- A hypothesis built primarily on FAILED pairs should receive lower specificity scores
+- PASSED pair: reference normally as validated evidence (no suffix needed).
+- FAILED pair as contrast evidence: append `_FAILED` suffix to the filename.
+- FAILED pair as primary mechanism support: NOT ALLOWED. Drop the hypothesis or
+  rebuild it on a PASSED pair.
+- Do NOT claim "STRING and Census support" for any pair with the `_FAILED` suffix.
+- Weight PASSED pairs significantly higher than FAILED pairs in specificity scoring.
 
 ### Phase 2: Hypothesis Generation
 
@@ -390,8 +407,26 @@ Filtering rules:
 1. Remove hypotheses with Specificity < 0.5
 2. Remove hypotheses with composite score < 0.4
 3. Rank remaining by composite score descending
-4. Keep top 3-5 hypotheses
+4. Keep top **max(5, len(stage1_validated_candidates))** hypotheses (PR1-7: relaxed
+   from "3-5" so TOP7 coverage and category balance can both be satisfied).
 5. Ensure at least 3 of 4 categories represented
+
+### Phase 4.75: TOP7 Coverage Hard Gate (PR1-7, DETERMINISTIC)
+
+After Phase 4 filtering, enumerate `stage1_validated_candidates` (preferred) or
+`stage3_candidates` (fallback for `schema_version<2`) from `assessment_results.json`.
+
+For EVERY gene in that list NOT appearing in any retained hypothesis's
+`biological_entities.genes`, you MUST generate one mandatory `[FEATURED-GAP]`
+hypothesis covering it before saving. The `[FEATURED-GAP]` prefix in the title
+signals that this is a coverage-driven hypothesis.
+
+The save_evidence validator computes TOP7 coverage deterministically:
+`covered = {hyp.biological_entities.genes for hyp in hypotheses}` intersected
+with the FEATURED list. If any FEATURED gene is missing, save_evidence returns
+`saved=false` with `top7_coverage.missing` listing the absent genes.
+
+**Number of retained hypotheses MUST be at least max(4, len(FEATURED))**.
 
 ### Phase 4.5: Validate Evidence References (MANDATORY, ANTI-HALLUCINATION)
 
@@ -420,6 +455,28 @@ to persist the file if any evidence_references entry cannot be matched to
 a real filename. If save_evidence returns `saved: false` with an
 `invalid_references` list, treat it the same as a Phase 4.5 failure: fix
 the citations and retry.
+
+### Phase 5.5: Retry Policy on Deterministic Gate Rejection (PR1-7)
+
+If save_evidence returns `saved: false` with EITHER:
+
+- `top7_coverage.missing` non-empty (TOP7 gene NOT covered), OR
+- `failed_pair_violations` non-empty (FAILED pair cited without `_FAILED` suffix),
+
+you MUST follow this retry policy:
+
+1. **Do NOT retry the same payload.** The deterministic gate will reject identically.
+2. For each gene in `top7_coverage.missing`: generate one new `[FEATURED-GAP]` hypothesis
+   whose `biological_entities.genes` includes that gene. Use the gene's `stage3_*.json`
+   and `ot_*.json` evidence as references. Do NOT remove other hypotheses.
+3. For each entry in `failed_pair_violations`: either (a) remove the citation entirely, or
+   (b) append the literal `_FAILED` suffix to the citation string (e.g., transform
+   `"stage1_FN1--PLAUR.json"` into `"stage1_FN1--PLAUR.json_FAILED"`).
+4. **Hard cap: 3 retries total.** If save_evidence still returns `saved: false` after the
+   third retry, append a `## Warnings` markdown section to your hypothesis_report payload
+   listing the remaining unaddressed missing genes / FAILED-pair violations, then call
+   save_evidence one final time. The persist-with-warnings approach surfaces the failure
+   to the operator rather than blocking the entire pipeline.
 
 ### Phase 5: Save Report
 MANDATORY: You MUST call save_evidence even if hypothesis_report.json appears in ls output.

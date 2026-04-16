@@ -887,14 +887,21 @@ def _rerun_missing_census_csvs(
             })
             continue
         pair_token = stem[: -len(prefix)]
-        if "_" not in pair_token:
+        # P2-6: defensive parsing — try `--` first (matches stage1_<L>--<R>.json
+        # convention used everywhere else), fall back to `_` for back-compat with
+        # existing CSV files. Eliminates ambiguity for any future gene symbol
+        # containing `_` (rare but not impossible in HGNC).
+        if "--" in pair_token:
+            ligand, receptor = pair_token.split("--", 1)
+        elif "_" in pair_token:
+            ligand, receptor = pair_token.split("_", 1)
+        else:
             skipped.append({
                 "csv_file": csv_name,
                 "executed": False,
                 "errors": ["Could not infer ligand/receptor from CSV filename"],
             })
             continue
-        ligand, receptor = pair_token.split("_", 1)
         to_run.append((csv_name, ligand, receptor, evidence_dir / csv_name))
 
     # Batch Census: single call for all missing pairs

@@ -54,7 +54,41 @@ _SEQ_THINKING_LOCK = threading.Lock()
 _SEQ_THINKING_CLIENT: Optional[MultiServerMCPClient] = None
 _SEQ_THINKING_TOOLS: Optional[list[BaseTool]] = None
 _EXECUTOR = ThreadPoolExecutor(max_workers=2)
-atexit.register(_EXECUTOR.shutdown, wait=False)
+
+
+def _shutdown_seq_thinking() -> None:
+    """P2-4: graceful shutdown — close MCP client first, then drain executor.
+
+    Pre-fix: ThreadPoolExecutor.shutdown(wait=False) truncated in-flight
+    asyncio.run(coro) calls and never explicitly closed _SEQ_THINKING_CLIENT.
+    Post-fix: close client (if connected), then drain executor with bounded wait.
+    """
+    global _SEQ_THINKING_CLIENT
+    try:
+        client = _SEQ_THINKING_CLIENT
+        if client is not None:
+            close = getattr(client, "aclose", None) or getattr(client, "close", None)
+            if callable(close):
+                try:
+                    if asyncio.iscoroutinefunction(close):
+                        asyncio.run(close())
+                    else:
+                        close()
+                except Exception:
+                    pass
+            _SEQ_THINKING_CLIENT = None
+    except Exception:
+        pass
+    try:
+        # wait=True so threads finish active work; cancel_futures drops queued ones.
+        # Bounded by Python interpreter exit; no separate timeout knob exists on
+        # ThreadPoolExecutor.shutdown — at-exit context naturally bounds wait.
+        _EXECUTOR.shutdown(wait=True, cancel_futures=True)
+    except Exception:
+        pass
+
+
+atexit.register(_shutdown_seq_thinking)
 
 
 def _get_seq_thinking_config() -> dict:
@@ -73,15 +107,29 @@ def _run_async(coro):
 
     When called from an already-running event loop, delegates to a
     ThreadPoolExecutor to avoid deadlock.
+
+    P3-2: timeout is configurable via env var SEQ_THINKING_TIMEOUT (default 120s).
+    On timeout, future.cancel() is called to release executor capacity (best-effort
+    — already-running tasks cannot be cancelled but queued ones can).
     """
+    import concurrent.futures as _cf
+
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
         loop = None
 
     if loop and loop.is_running():
+        try:
+            timeout = float(os.getenv("SEQ_THINKING_TIMEOUT", "120"))
+        except (TypeError, ValueError):
+            timeout = 120.0
         future = _EXECUTOR.submit(asyncio.run, coro)
-        return future.result(timeout=120)
+        try:
+            return future.result(timeout=timeout)
+        except _cf.TimeoutError:
+            future.cancel()
+            raise
     else:
         return asyncio.run(coro)
 

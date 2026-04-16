@@ -5,6 +5,37 @@ from __future__ import annotations
 import json
 import logging
 import re
+from datetime import datetime
+
+# Note: _resolve_data_dir is imported lazily inside each call site below to avoid
+# circular import (evidence_loader.py imports from this module at top level).
+# PR2-3: 5 functions previously used raw Path().expanduser().resolve() — now all 6
+# (incl. apply_stage1_filter) inline-import _resolve_data_dir for env-var fallback
+# and LLM-typo tolerance.
+
+
+def _atomic_write_text(path, content: str, encoding: str = "utf-8") -> None:
+    """P2-8: write to a temp file in the same dir, then rename atomically.
+
+    Prevents partial-write corruption of assessment_results.json (and similar)
+    if the process crashes mid-write or the disk fills. Uses os.replace which
+    is atomic on POSIX and acts as a single rename system call. Same-directory
+    temp file ensures the rename stays within the same filesystem.
+    """
+    import os, tempfile
+    path_str = str(path)
+    parent = os.path.dirname(path_str) or "."
+    fd, tmp_path = tempfile.mkstemp(prefix=".tmp_", suffix=".write", dir=parent)
+    try:
+        with os.fdopen(fd, "w", encoding=encoding) as f:
+            f.write(content)
+        os.replace(tmp_path, path_str)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 from pathlib import Path
 from typing import Any
 
@@ -82,6 +113,14 @@ def compute_stage1_filter(stage1_evidence: dict[str, Any]) -> dict[str, Any]:
     string_data = stage1_evidence.get("string_ppi", {})
     raw_string = float(string_data.get("max_combined_score", 0))
     string_combined = min(raw_string, 1.0) if raw_string <= 1.0 else min(raw_string / 1000.0, 1.0)
+    # PR2-1: distinguish "STRING returned no record" from "low score". Pre-PR2-1
+    # both presented as max_combined_score=0.0 → treated as hard fail. Now: when the
+    # TSV had no row matching the pair, skip the STRING criterion AND require a
+    # stronger Census signal (coexpr_p < 1e-10) as compensation.
+    string_record_found = bool(
+        string_data.get("string_record_found",
+                         string_data.get("interaction_found", True))
+    )
 
     census = stage1_evidence.get("census_validation", {})
     tvr = census.get("target_vs_rest", {})
@@ -89,16 +128,28 @@ def compute_stage1_filter(stage1_evidence: dict[str, Any]) -> dict[str, Any]:
     gene_a_p = float(tvr.get("gene_a", {}).get("p_value", 1.0))
     gene_b_p = float(tvr.get("gene_b", {}).get("p_value", 1.0))
 
-    passed = (
-        string_combined > 0.8
-        and coexpr_p < 0.05
-        and gene_a_p < 0.05
-        and gene_b_p < 0.05
-    )
+    if not string_record_found and string_combined == 0.0:
+        # No STRING record at the configured threshold — skip STRING criterion,
+        # require strong Census signal (1e-10 vs default 0.05).
+        string_status = "no_record"
+        passed = (
+            coexpr_p < 1e-10
+            and gene_a_p < 0.05
+            and gene_b_p < 0.05
+        )
+    else:
+        string_status = "in_db"
+        passed = (
+            string_combined > 0.8
+            and coexpr_p < 0.05
+            and gene_a_p < 0.05
+            and gene_b_p < 0.05
+        )
 
     return {
         "passed": passed,
         "string_combined": round(string_combined, 4),
+        "string_status": string_status,
         "census_coexpr_pvalue": coexpr_p,
         "census_gene_a_pvalue": gene_a_p,
         "census_gene_b_pvalue": gene_b_p,
@@ -504,7 +555,7 @@ def apply_stage1_filter(data_dir: str) -> str:
     # 3. Save CSV
     import csv
     csv_path = evidence_dir / "stage1_filter_results.csv"
-    fieldnames = ["ligand", "receptor", "passed", "string_combined",
+    fieldnames = ["ligand", "receptor", "passed", "string_combined", "string_status",
                   "census_coexpr_pvalue", "census_gene_a_pvalue", "census_gene_b_pvalue",
                   "gene_a_target_pct", "gene_a_risk_ratio",
                   "gene_b_target_pct", "gene_b_risk_ratio",
@@ -515,28 +566,49 @@ def apply_stage1_filter(data_dir: str) -> str:
         for r in sorted(results, key=lambda x: (not x["passed"], x["ligand"])):
             writer.writerow(r)
 
-    # 4. Update assessment_results.json — keep only passed genes in stage3_candidates
+    # 3b. PR1-2: Sidecar JSON for hypothesis_writer (load_evidence_files globs only *.json).
+    # Same row data as the CSV; consumed by the deterministic FAILED-pair block in
+    # save_evidence (PR1-6) and by hypothesis_writer prompt rules (PR1-7).
+    json_sidecar_path = evidence_dir / "stage1_filter_results.json"
+    json_sidecar_path.write_text(
+        json.dumps(
+            sorted(results, key=lambda x: (not x["passed"], x["ligand"])),
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    # 4. Update assessment_results.json (schema_version=2, PR1-9):
+    # PR1-1: SPLIT stage3_candidate (rubric-qualified, NOT overwritten) from
+    # stage1_validated (post-filter narrow). Downstream consumers must read the
+    # field that matches their semantic intent — see Consumer Inventory in plan.
     assessment_path = evidence_dir / "assessment_results.json"
     updated_assessment = False
     if assessment_path.exists():
         assessment = json.loads(assessment_path.read_text(encoding="utf-8"))
-        old_candidates = assessment.get("stage3_candidates", [])
-        new_candidates = [
-            c for c in old_candidates
-            if (c.get("gene") or c.get("gene_symbol", "")).upper() in {g.upper() for g in passed_genes}
-        ]
-        assessment["stage3_candidates"] = new_candidates
-        assessment["stage1_filter_applied"] = True
-        assessment["stage1_filter_passed_genes"] = sorted(passed_genes)
-        # Update summary count to match filtered candidates
-        assessment.setdefault("summary", {})["stage3_count"] = len(new_candidates)
-        # Flip rubric flags for genes removed by filter
+        # Schema version bump (PR1-9)
+        assessment["schema_version"] = 2
+
+        # PR1-1: keep stage3_candidates as the rubric-qualified set (do NOT narrow).
+        # Add stage1_validated_candidates as the post-stage1-filter narrow set.
+        rubric_candidates = assessment.get("stage3_candidates", [])
         passed_upper = {g.upper() for g in passed_genes}
+        validated_candidates = [
+            c for c in rubric_candidates
+            if (c.get("gene") or c.get("gene_symbol", "")).upper() in passed_upper
+        ]
+        assessment["stage1_validated_candidates"] = validated_candidates
+        assessment["stage1_filter_applied"] = True
+        assessment["stage1_filter_passed_genes"] = sorted(passed_genes)  # deprecated, kept for back-compat
+        assessment.setdefault("summary", {})["stage3_count"] = len(rubric_candidates)
+        assessment["summary"]["stage1_validated_count"] = len(validated_candidates)
+
+        # PR1-1: ADD per-row stage1_validated; DO NOT overwrite per-row stage3_candidate.
         for row in assessment.get("rubric_assessment", []):
             gene = (row.get("gene") or "").upper()
-            if gene and gene not in passed_upper:
-                row["stage3_candidate"] = False
-        assessment_path.write_text(json.dumps(assessment, indent=2), encoding="utf-8")
+            row["stage1_validated"] = bool(gene and gene in passed_upper)
+        # P2-8: atomic temp+rename instead of write_text (which is non-atomic).
+        _atomic_write_text(assessment_path, json.dumps(assessment, indent=2))
         updated_assessment = True
 
         # 5. Regenerate rubric_scores.csv to match updated assessment
@@ -1105,8 +1177,10 @@ def compute_rubric_scores(data_dir: str) -> str:
     """
     import csv
     import glob
+    from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir
 
-    data_path = Path(data_dir).expanduser().resolve()
+    # PR2-3: use _resolve_data_dir for env-var fallback when LLM passes empty/wrong path
+    data_path = _resolve_data_dir(data_dir)
     evidence_dir = data_path / "evidence"
 
     # Load known_drugs
@@ -1185,6 +1259,15 @@ def compute_rubric_scores(data_dir: str) -> str:
                 "novelty_opportunity": novelty,
             },
         }
+        # PR2-4: activate the previously-unused validate_rubric_assessment.
+        # Catches scoring-function bugs (out-of-range values) at the source rather than
+        # silently propagating through classify_target / compute_priority.
+        rubric_errors = validate_rubric_assessment(assessment_for_classify)
+        if rubric_errors:
+            raise ValueError(
+                f"Rubric scoring out of range for gene {gene}: {rubric_errors}. "
+                f"This indicates a bug in one of the _score_* functions."
+            )
         classification = classify_target(assessment_for_classify)
         priority = compute_priority(assessment_for_classify)
 
@@ -1225,9 +1308,12 @@ def compute_rubric_scores(data_dir: str) -> str:
     for r in results:
         r["stage3_candidate"] = r["gene"] in stage3_genes
 
-    # Save assessment_results.json
+    # Save assessment_results.json (schema_version=2 since PR-1, see plan PR1-9).
+    # stage3_candidates here is the RUBRIC-QUALIFIED set; apply_stage1_filter later
+    # adds stage1_validated_candidates without narrowing this list.
     assessment = {
-        "assessment_date": __import__("datetime").datetime.now().isoformat(),
+        "schema_version": 2,
+        "assessment_date": datetime.now().isoformat(),
         "disease": stage2.get("_disease", "unknown") if isinstance(stage2, dict) else "unknown",
         "rubric_assessment": results,
         "stage3_candidates": [
@@ -1242,8 +1328,10 @@ def compute_rubric_scores(data_dir: str) -> str:
             "insufficient_count": sum(1 for r in results if r["classification"] == "insufficient_evidence"),
         },
     }
-    (evidence_dir / "assessment_results.json").write_text(
-        json.dumps(assessment, indent=2, ensure_ascii=False) + "\n"
+    # P2-8: atomic temp+rename instead of write_text.
+    _atomic_write_text(
+        evidence_dir / "assessment_results.json",
+        json.dumps(assessment, indent=2, ensure_ascii=False) + "\n",
     )
 
     # Save CSV
@@ -1319,7 +1407,8 @@ def validate_stage1_gate(data_dir: str) -> str:
     Call this BEFORE proceeding to Stage 3.  If ``success`` is false,
     complete Stage 1 for the ``missing_pairs`` first, then re-call.
     """
-    data_dir_path = Path(data_dir).expanduser().resolve()
+    from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir  # PR2-3
+    data_dir_path = _resolve_data_dir(data_dir)
     evidence_dir = data_dir_path / "evidence"
 
     # 1. Load stage3_candidates
@@ -1330,11 +1419,26 @@ def validate_stage1_gate(data_dir: str) -> str:
             "error": "assessment_results.json not found — run compute_rubric_scores first.",
         })
     assessment = json.loads(assessment_path.read_text())
+    # PR1-1a: validate_stage1_gate audits ALL rubric-qualified pairs (including those that
+    # ended up failing). Use stage3_candidates (rubric-qualified) — broader/more conservative.
     stage3_genes = [c["gene"] for c in assessment.get("stage3_candidates", [])]
     if not stage3_genes:
         return json.dumps({
             "success": False,
             "error": "No stage3_candidates in assessment_results.json.",
+        })
+    # P2-1: quality check parity with validate_stage3_gate.
+    # apply_stage1_filter sets stage1_filter_applied=true on success. If absent
+    # OR False, the filter step never ran cleanly — files may exist but the
+    # narrow set is unreliable. Refuse the gate to force a re-run.
+    if not assessment.get("stage1_filter_applied"):
+        return json.dumps({
+            "success": False,
+            "error": (
+                "stage1_filter_applied is False/missing in assessment_results.json. "
+                "Re-run apply_stage1_filter (or run_stage1_batch which calls it) "
+                "before calling validate_stage1_gate."
+            ),
         })
 
     # 2. Load lr_candidates → all pairs
@@ -1393,10 +1497,13 @@ def validate_stage3_gate(data_dir: str) -> str:
     If ``success`` is false, complete Stage 3 for the ``missing_genes``
     first, then re-call.
     """
-    data_dir_path = Path(data_dir).expanduser().resolve()
+    from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir  # PR2-3
+    data_dir_path = _resolve_data_dir(data_dir)
     evidence_dir = data_dir_path / "evidence"
 
-    # 1. Load stage3_candidates
+    # 1. Load validated candidates (post-stage1-filter narrow set; deep_diver runs on this)
+    # PR1-1a: validate_stage3_gate audits deep_diver's actual scope (narrow set).
+    # Fallback to stage3_candidates for schema_version<2.
     assessment_path = evidence_dir / "assessment_results.json"
     if not assessment_path.exists():
         return json.dumps({
@@ -1404,11 +1511,14 @@ def validate_stage3_gate(data_dir: str) -> str:
             "error": "assessment_results.json not found — run compute_rubric_scores first.",
         })
     assessment = json.loads(assessment_path.read_text())
-    stage3_genes = [c["gene"] for c in assessment.get("stage3_candidates", [])]
+    _validated = assessment.get("stage1_validated_candidates")
+    if _validated is None:
+        _validated = assessment.get("stage3_candidates", [])
+    stage3_genes = [c["gene"] for c in _validated]
     if not stage3_genes:
         return json.dumps({
             "success": False,
-            "error": "No stage3_candidates in assessment_results.json.",
+            "error": "No stage1_validated_candidates / stage3_candidates in assessment_results.json.",
         })
 
     # 2. Check stage3 files — both existence AND data quality
@@ -1663,7 +1773,8 @@ def build_evidence_summary(data_dir: str) -> str:
     ALL values in this card are authoritative — use them directly.
     Do NOT modify, round, re-derive, or invent any values.
     """
-    data_dir_path = Path(data_dir).expanduser().resolve()
+    from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir  # PR2-3
+    data_dir_path = _resolve_data_dir(data_dir)
     evidence_dir = data_dir_path / "evidence"
 
     # 1. Load assessment_results.json
@@ -1691,7 +1802,13 @@ def build_evidence_summary(data_dir: str) -> str:
             "stage3_candidate": row.get("stage3_candidate", False),
         }
 
-    stage3_genes = [g for c in assessment.get("stage3_candidates", []) if (g := c.get("gene"))]
+    # PR1-1a (Consumer Inventory): build_evidence_summary feeds into Reference Card
+    # for report_writer. drug.md FEATURED Deep Dive section is the post-filter narrow set.
+    # Use stage1_validated_candidates with fallback to stage3_candidates for schema_version<2.
+    _validated = assessment.get("stage1_validated_candidates")
+    if _validated is None:
+        _validated = assessment.get("stage3_candidates", [])
+    stage3_genes = [g for c in _validated if (g := c.get("gene"))]
 
     # 2. Load stage3_*.json → drugs + PMIDs per gene
     stage3_data: dict[str, dict] = {}
@@ -1851,7 +1968,9 @@ def build_evidence_summary(data_dir: str) -> str:
         elif isinstance(kd, list):
             known_drugs = kd
 
-    # 5. Build all-genes druggability summary from rubric (full 14 columns)
+    # 5. Build all-genes druggability summary from rubric (full 14 columns + stage1_validated)
+    # PR1-1a: emit BOTH stage3_candidate (rubric-qualified) AND stage1_validated (post-filter narrow).
+    # drug_report_html splits FEATURED rows on stage1_validated (post-filter).
     all_genes_matrix = []
     for row in assessment.get("rubric_assessment", []):
         all_genes_matrix.append({
@@ -1869,6 +1988,7 @@ def build_evidence_summary(data_dir: str) -> str:
             "classification": row.get("classification", "unknown"),
             "priority": row.get("priority", "unranked"),
             "stage3_candidate": row.get("stage3_candidate", False),
+            "stage1_validated": row.get("stage1_validated", row.get("stage3_candidate", False)),
         })
 
     # 6. Load stage1_filter_results.csv for Biological Interaction Filter table
@@ -2039,7 +2159,8 @@ def validate_drug_md(data_dir: str) -> str:
     Returns: {valid: bool, total_checks: int, issues: [...]}
     Call this AFTER save_drug_md to catch hallucinations before finalizing.
     """
-    data_dir_path = Path(data_dir).expanduser().resolve()
+    from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir  # PR2-3
+    data_dir_path = _resolve_data_dir(data_dir)
     evidence_dir = data_dir_path / "evidence"
     drug_md_path = data_dir_path / "drug.md"
 
@@ -2074,10 +2195,15 @@ def validate_drug_md(data_dir: str) -> str:
         })
 
     # 2. Classification/Priority validation
+    # PR1-1a: drug.md FEATURED Deep Dive section is post-filter narrow.
+    # Use stage1_validated_candidates with fallback to stage3_candidates for schema_version<2.
     assessment_path = evidence_dir / "assessment_results.json"
     if assessment_path.exists():
         assessment = json.loads(assessment_path.read_text())
-        stage3_genes = {c.get("gene") for c in assessment.get("stage3_candidates", [])}
+        _validated = assessment.get("stage1_validated_candidates")
+        if _validated is None:
+            _validated = assessment.get("stage3_candidates", [])
+        stage3_genes = {c.get("gene") for c in _validated}
 
         for row in assessment.get("rubric_assessment", []):
             gene = row["gene"]
@@ -2136,6 +2262,9 @@ def validate_drug_md(data_dir: str) -> str:
             })
 
     # 5. Drug approval year validation against resolved_drugs.json
+    # P2-7: pre-init `resolved` so the variable always exists, removing the
+    # fragile `'resolved' in dir()` introspection downstream.
+    resolved: list = []
     resolved_drugs_path = evidence_dir / "resolved_drugs.json"
     if resolved_drugs_path.exists():
         try:
@@ -2206,9 +2335,9 @@ def validate_drug_md(data_dir: str) -> str:
         except Exception:
             hyp = {}
 
-        # Build MOA lookup from resolved drugs
+        # Build MOA lookup from resolved drugs (P2-7: `resolved` is always defined now)
         moa_lookup: dict[str, str | None] = {}
-        for d in (resolved if 'resolved' in dir() else []):
+        for d in resolved:
             name = (d.get("resolved_name") or "").strip().lower()
             if name:
                 moa_lookup[name] = d.get("mechanism_of_action")

@@ -57,6 +57,25 @@ _ORGANISM_MAP = {
 }
 
 
+# PR2-2: HGNC-style gene-symbol allow-list. Only A-Z, 0-9, hyphen permitted.
+# Mirrors the disease quote-escape pattern used at lines 94-98.
+# Anchored regex prevents quote/escape injection into Census SOQL filter strings.
+_GENE_SYMBOL_RE = re.compile(r"^[A-Z0-9-]+$")
+
+
+def _validate_gene_symbol(symbol: str, *, role: str = "gene") -> str | None:
+    """Return error string if gene symbol contains injection vectors, else None."""
+    if not isinstance(symbol, str) or not symbol:
+        return f"{role} symbol is empty or non-string: {symbol!r}"
+    upper = symbol.upper()
+    if not _GENE_SYMBOL_RE.match(upper):
+        return (
+            f"{role} symbol {symbol!r} contains characters outside the safe set "
+            f"^[A-Z0-9-]+$. Refusing to interpolate into Census SOQL filter."
+        )
+    return None
+
+
 @tool
 def query_cellxgene_lr_context(
     ligand: str,
@@ -78,6 +97,12 @@ def query_cellxgene_lr_context(
         "available_genes": [],
         "errors": [],
     }
+    # PR2-2: validate gene symbols BEFORE any SOQL interpolation (OWASP A03).
+    for sym, role in [(ligand, "ligand"), (receptor, "receptor")]:
+        err = _validate_gene_symbol(sym, role=role)
+        if err:
+            result["errors"].append(err)
+            return _as_json(result)
     try:
         import cellxgene_census
     except Exception as exc:
@@ -389,7 +414,13 @@ def query_string_ppi_pair(
     species: int = 9606,
     required_score: int = 400,
 ) -> str:
-    """Check STRING interaction evidence for a gene pair."""
+    """Check STRING interaction evidence for a gene pair.
+
+    PR2-1: `string_record_found` is True iff the STRING TSV contained a row
+    matching the exact gene pair (regardless of score). Used by
+    compute_stage1_filter to distinguish "pair not in DB at threshold" (which
+    should NOT be a hard fail) from "pair in DB with low score" (which IS a fail).
+    """
     result = {
         "gene_a": gene_a,
         "gene_b": gene_b,
@@ -397,6 +428,7 @@ def query_string_ppi_pair(
         "required_score": required_score,
         "executed": False,
         "interaction_found": False,
+        "string_record_found": False,
         "max_combined_score": 0.0,
         "ppi_enrichment": None,
         "errors": [],
@@ -440,6 +472,10 @@ def query_string_ppi_pair(
                     target = {gene_a.upper(), gene_b.upper()}
                     if {a_name, b_name} == target:
                         result["interaction_found"] = True
+                        # PR2-1: TSV contained a row matching the exact pair.
+                        # Distinct from "score > 0" — a 0-score row with matching
+                        # names still counts as "in DB", just below threshold.
+                        result["string_record_found"] = True
 
         ppi_raw = str(
             mod.string_ppi_enrichment(
@@ -506,7 +542,6 @@ def query_chembl_target_profile(
     organism: str = "human",
 ) -> str:
     """Retrieve drugs targeting a gene symbol via ChEMBL."""
-    global _chembl_consecutive_failures
     result = {
         "gene_symbol": gene_symbol,
         "executed": False,
@@ -514,8 +549,12 @@ def query_chembl_target_profile(
         "source": "chembl",
         "errors": [],
     }
+    # P2-3: BOTH global declarations now inside the lock.
+    # Pre-fix: `global _chembl_consecutive_failures` was outside, and the variable was
+    # read on line 521 without holding the lock. Benign under LangGraph serialization
+    # but creates a race window if concurrency is added later.
     with _CHEMBL_LOCK:
-        global _chembl_last_failure_time
+        global _chembl_consecutive_failures, _chembl_last_failure_time
         # Circuit breaker: skip if too many consecutive failures,
         # but auto-reset after cooldown period
         if _chembl_consecutive_failures >= _CHEMBL_MAX_CONSECUTIVE:

@@ -273,15 +273,39 @@ def save_target_assessment(
         "featured_candidates_deep_dive": deep_dive_obj,
     }
 
-    # Load schema file for traceability (best-effort, validation is lightweight here).
+    # P3-3: load schema and run REAL jsonschema.validate against payload (was previously
+    # parsed-then-discarded, giving false confidence). _validate_contract still runs
+    # additional domain-specific checks. jsonschema is in the project dependency tree.
     schema_file = _schema_path()
     schema_loaded = schema_file.exists()
     schema_errors: list[str] = []
+    schema_dict: dict | None = None
     if schema_loaded:
         try:
-            _ = json.loads(schema_file.read_text(encoding="utf-8"))
+            schema_dict = json.loads(schema_file.read_text(encoding="utf-8"))
         except Exception as exc:
             schema_errors.append(f"Failed to parse output schema: {exc}")
+        else:
+            try:
+                import jsonschema  # local import keeps cold path light
+                jsonschema.validate(instance=payload, schema=schema_dict)
+            except ImportError:
+                schema_errors.append(
+                    "jsonschema package not installed — falling back to "
+                    "_validate_contract domain checks only."
+                )
+            except jsonschema.ValidationError as exc:
+                # Surface the specific path in the payload that failed validation
+                # so operators can map the error back to the contract violation.
+                where = "/".join(str(p) for p in exc.absolute_path) or "<root>"
+                schema_errors.append(
+                    f"output_schema.json validation failed at {where}: {exc.message}"
+                )
+            except Exception as exc:
+                # Schema-level error (malformed schema file, etc.)
+                schema_errors.append(
+                    f"jsonschema.validate raised unexpected error: {exc}"
+                )
 
     schema_valid = _validate_contract(payload, schema_errors, base=base)
     out_path = base / "target_assessment.json"
