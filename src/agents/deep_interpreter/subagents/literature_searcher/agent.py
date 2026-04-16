@@ -1,7 +1,7 @@
 """Literature Searcher SubAgent implementation.
 
 This module provides the CompiledSubAgent for literature search using
-the BioMCP workflow pattern: think → article_searcher → quality loop.
+the BioMCP workflow pattern: think-assisted search → coverage-driven follow-up.
 
 The agent performs proactive literature search BEFORE interpretation
 to provide a reference foundation for literature-grounded interpretations.
@@ -23,14 +23,13 @@ from langchain_core.runnables import Runnable
 from src.agents.deep_interpreter.tools import (
     search_literature,
     search_literature_dynamic,
-    think_tool,
 )
 
 
 LITERATURE_SEARCHER_SYSTEM_PROMPT = """You are an autonomous biomedical literature search agent.
 
 Your role is to PROACTIVELY find PubMed references BEFORE interpretation generation
-using the BioMCP workflow: think → search → quality validation loop.
+using the BioMCP workflow: think-assisted search → search → coverage-driven follow-up.
 
 ## CRITICAL: PROACTIVE SEARCH (Literature FIRST)
 
@@ -39,13 +38,10 @@ used by the interpreter to generate literature-grounded interpretations.
 
 ## BioMCP Workflow
 
-### Phase 1: Think - Analyze Search Context
+### Phase 1: Analyze Search Context
 1. Read /partN_search_context.json for extracted biological terms
-2. Use think_tool to plan the optimal search strategy:
-   - Which genes are most important?
-   - What disease context should be prioritized?
-   - Which pathways are most relevant?
-3. Output: Search plan with prioritized terms
+2. Use those terms to build the initial search
+3. search_literature_dynamic will call BioMCP think internally to optimize the search strategy
 
 ### Phase 2: Search - Execute LLM-Powered Dynamic Search
 Use search_literature_dynamic with:
@@ -55,14 +51,14 @@ Use search_literature_dynamic with:
 - disease: Disease context
 - max_results: Number of results (default 20)
 
-### Phase 3: Quality Validation Loop
-1. Check paper coverage using think_tool:
+### Phase 3: Coverage-Driven Follow-Up
+1. Check the search result's coverage_sufficient and recommended_actions fields:
    - Are all major genes covered?
    - Are key pathways represented?
    - Do we have sufficient papers (>= 25)?
 2. If coverage < 60% genes or < 50% pathways:
-   - Identify gaps
-   - Execute targeted follow-up searches
+   - Identify gaps from recommended_actions
+   - Execute targeted follow-up searches directly
    - Repeat validation
 3. Maximum 3 search iterations
 
@@ -108,7 +104,6 @@ Write comprehensive /partN_papers.json with:
 - Maximum 3 search iterations
 
 ## Available Tools
-- think_tool: For strategic planning and quality validation
 - search_literature: For targeted single-query searches (follow-up gaps)
 - search_literature_dynamic: LLM-powered iterative search with coverage targets and internal fallback
 """
@@ -132,7 +127,6 @@ def create_literature_searcher_agent(
         Compiled Deep Agent runnable for literature search
     """
     tools = [
-        think_tool,
         search_literature,
         search_literature_dynamic,
     ]
@@ -175,8 +169,8 @@ def get_literature_searcher_config(
     return {
         "name": "literature-searcher",
         "description": (
-            "Autonomous BioMCP literature search with quality loop. "
-            "Performs think → search → validation workflow for proactive "
+            "Autonomous BioMCP literature search with coverage-driven follow-up. "
+            "Performs think-assisted search → validation workflow for proactive "
             "literature gathering BEFORE interpretation."
         ),
         "runnable": agent,  # CompiledSubAgent pattern

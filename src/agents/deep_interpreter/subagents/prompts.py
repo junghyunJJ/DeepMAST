@@ -211,30 +211,17 @@ Follow the workflow defined in SKILL.md:
    - search_context["lr_pairs"] contains top L-R pairs by combined score (auto-used by search_literature_dynamic via file-based injection)
    - Use search_literature for targeted follow-up gaps
 
-3. **Phase 3: Reflect (Quality Loop) — MANDATORY after every search**
-   - Check `coverage_sufficient` field in search results
-   - If `coverage_sufficient: false`, you MUST call think_tool before proceeding:
-
-   ```
-   think_tool(
-       reflection="Coverage analysis for Part {N}: "
-                  "{genes_covered}/{total_genes} genes ({pct}%), "
-                  "{pathways_covered}/{total_pathways} pathways ({pct}%). "
-                  "Gaps: {recommended_actions from search results}. "
-                  "Follow-up strategy: {your plan}",
-       iteration=1,
-       max_iterations=2
-   )
-   ```
-
-   - After think_tool, run follow-up searches for missing items:
-     - Missing genes: use search_literature with gene synonyms
-     - Missing pathways: add "signaling" + disease context
+3. **Phase 3: Coverage-Driven Follow-Up**
+   - Check `coverage_sufficient` and `recommended_actions` in the search results
+   - If `coverage_sufficient: false`, execute the follow-up searches directly from those gaps:
+     - Missing genes: use search_literature with gene synonyms + disease context
+     - Missing pathways: use search_literature or search_pubmed_advanced with "signaling" + disease context
+     - Too few papers: broaden disease context, add key cell types, then rerun search_literature_dynamic once if needed
    - Coverage thresholds: genes >= 60%, pathways >= 50%, papers >= 15
-   - Max 2 reflection iterations, then proceed with warning
-   - If `coverage_sufficient: true`, proceed to Phase 4 (one think_tool call still recommended)
+   - Max 2 follow-up rounds, then proceed with a warning if gaps remain
+   - Do **not** add an extra reflection step here — search_literature_dynamic already computes the coverage analysis and gap recommendations
 
-   **DO NOT skip Phase 3.** The search results include `recommended_actions` — follow them.
+   **DO NOT skip Phase 3.** The search results include `recommended_actions` — follow them directly.
 
 4. **Phase 4: Output (Auto-Saved)**
    - Papers are auto-saved via `output_path` parameter — NO need to call write_file
@@ -290,7 +277,6 @@ result = search_literature_dynamic(
 - **search_pubmed_advanced**: Advanced PubMed E-utilities search
   - Accepts raw PubMed query syntax: "VEGFA[tiab] AND cancer[mh] AND 2020:2025[dp]"
   - Best for: targeted gap-filling, systematic reviews, date-restricted searches
-- **think_tool**: Reflection for quality validation (Phase 3)
 
 ## When to Use Which Search Tool
 | Situation | Tool | Why |
@@ -308,7 +294,7 @@ result = search_literature_dynamic(
 - DO NOT call search tools other than search_literature_dynamic for primary search
 - USE the unified `search_context` from load_analysis_data for ALL parts
 - USE search_literature_dynamic for ALL searches (it handles fallback internally)
-- USE think_tool AFTER searching to validate coverage (Phase 3 Reflect)
+- USE `coverage_sufficient` + `recommended_actions` AFTER searching to drive follow-up coverage fixes
 
 ## Search Context Selection
 | Part | Context Field | Output File |

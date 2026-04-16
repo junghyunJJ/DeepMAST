@@ -2,7 +2,7 @@
 
 Simplified 4-Agent Architecture:
 - PLANNER: Target confirmation + data assessment + interpretation guide (load_analysis_data, search_literature_dynamic, search_pubmed_advanced)
-- SEARCHER: Context extraction + literature search (load_analysis_data, search_literature_dynamic, search_literature, search_pubmed_advanced, think_tool)
+- SEARCHER: Context extraction + literature search (load_analysis_data, search_literature_dynamic, search_literature, search_pubmed_advanced)
 - INTERPRETER: Part 1/2/3 interpretation with inline validation (load_analysis_data, validate_claim_literature, validate_quality, think_tool)
 - REPORTER: Cross-part synthesis + literature validation + HTML report
   (load_analysis_data, generate_html_report, literature search tools, RAG tools)
@@ -83,7 +83,6 @@ SUBAGENT_CONFIGS = {
             search_literature_dynamic,   # PRIMARY: LLM-powered (내부 자동 fallback 포함)
             search_literature,           # Follow-up: Single query search
             search_pubmed_advanced,      # E-utilities (MeSH/날짜/pub type)
-            think_tool,
             read_skill_file,
         ],
     },

@@ -2959,27 +2959,20 @@ class TestNovelCandidates:
 class TestSkillLoadingEndToEnd:
     """End-to-end verification that SkillActivator loads real project skills."""
 
-    def test_skill_registry_resolves_all_5_skills(self):
-        """_build_skill_registry returns paths to all 5 skill dirs with SKILL.md."""
+    def test_skill_registry_resolves_all_configured_skills(self):
+        """_build_skill_registry returns paths to all configured skill dirs with SKILL.md."""
         from src.agents.drug_target.agent import _build_skill_registry, DrugTargetConfig
 
         config = DrugTargetConfig()
         registry = _build_skill_registry(config)
 
-        expected_names = {
-            "opentargets-database",
-            "gwas-database",
-            "chembl-database",
-            "kegg-database",
-            "string-database",
-        }
-        assert set(registry.keys()) == expected_names
+        assert set(registry.keys()) == set(config.agent_skill_names)
         for name, path in registry.items():
             skill_md = Path(path) / "SKILL.md"
             assert skill_md.exists(), f"Missing SKILL.md for {name} at {skill_md}"
 
-    def test_harness_formats_all_skills_with_descriptions(self):
-        """SkillActivator formats all 5 skills with real descriptions."""
+    def test_harness_formats_all_configured_skills_with_descriptions(self):
+        """SkillActivator formats all configured skills with real descriptions."""
         from src.agents.drug_target.agent import _build_skill_registry, DrugTargetConfig
         from src.agents.shared.skill_activator import SkillActivator
 
@@ -2990,7 +2983,7 @@ class TestSkillLoadingEndToEnd:
 
         formatted = harness._format_available_skills()
 
-        # All 3 skills present as bold entries
+        # All configured skills present as bold entries
         for name in config.agent_skill_names:
             assert f"**{name}**" in formatted, f"Skill {name} missing from formatted output"
 
@@ -2999,7 +2992,7 @@ class TestSkillLoadingEndToEnd:
 
     @pytest.mark.asyncio
     async def test_harness_injects_forced_eval_into_system_prompt(self):
-        """awrap_model_call injects forced-eval protocol with all 5 real skills."""
+        """awrap_model_call injects forced-eval protocol with all configured skills."""
         from src.agents.drug_target.agent import _build_skill_registry, DrugTargetConfig
         from src.agents.shared.skill_activator import SkillActivator
 
@@ -3041,7 +3034,7 @@ class TestSkillLoadingEndToEnd:
         assert "Phase 1" in captured
         assert "Phase 2" in captured
         assert "Phase 3" in captured
-        # All 3 skill names injected
+        # All configured skill names injected
         for name in config.agent_skill_names:
             assert name in captured, f"Skill {name} missing from injected prompt"
         # Placeholder fully substituted
