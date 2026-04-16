@@ -43,7 +43,12 @@ def create_deep_interpreter_graph(
     - FilesystemMiddleware for context management
     - TodoListMiddleware for task tracking
     - SubAgentMiddleware for specialized subagents (4 subagents: planner, searcher, interpreter, reporter)
-    - Quality validation loop (think_tool, max 3 iterations)
+    - Reflection/quality policy (per-subagent):
+        * INTERPRETER: think_tool is the active reflection loop (score_threshold=0.8, max_iterations=3);
+          validate_quality(use_llm=False) is the deterministic objective checkpoint.
+        * REPORTER:    think_tool x3 strategic-planning passes + think_tool quality reflection are
+          prompt-mandatory (soft); validate_quality is secondary/non-gating.
+        * SEARCHER:    reflection-free; guarded by tests/deep_interpreter/test_searcher_reflection_policy.py.
     - CompositeBackend with FilesystemBackend for persistent file storage
 
     NOTE: This variant expects targets to be pre-selected. For interactive

@@ -56,16 +56,26 @@ PART3_MESSAGE = {
                 "- /interpretation_guide.md\n"
                 "- /data_path.txt\n\n"
                 "Output: **/part3_final.md** (MUST be written via write_file tool)\n\n"
-                "## MANDATORY WORKFLOW:\n"
+                "## MANDATORY WORKFLOW (Phase 4 Steps A-E):\n"
                 "1. read_file('/data_path.txt') to get data directory\n"
                 "2. read_file('/interpretation_guide.md') for context\n"
                 "3. read_file('/papers.json') to load citation source\n"
-                "4. load_analysis_data(data_dir=...) to get Part 3 analysis data\n"
-                "5. prioritize_top_lr_pairs(data_dir=...) to get candidate L-R pairs\n"
-                "6. Select top 3 most interesting L-R pairs and document selection reasoning\n"
-                "7. Write detailed interpretation for ALL 3 analyses (3-9, 3-10, 3-11)\n"
-                "8. validate_quality(interpretation=...) — target score >= 0.8\n"
-                "9. **write_file(file_path='/part3_final.md', content=...)** to save output\n\n"
+                "4. load_analysis_data(data_dir=..., file_name='target_assessment.json') to read "
+                "pre-computed featured candidates (per prompts.py:618-624). The wrapper Step 9.5 "
+                "has already executed drug target scoring, so no additional scoring tool is needed.\n"
+                "5. Identify featured candidates from druggability_matrix (is_featured=true) and "
+                "document selection reasoning\n"
+                "6. Step A — Draft detailed interpretation for ALL 3 analyses (3-9, 3-10, 3-11) "
+                "focused on the featured L-R pairs\n"
+                "7. Step B — MANDATORY think_tool(reflection=<self-critique>, score_threshold=0.8, "
+                "max_iterations=3). think_tool is the ACTIVE reflection/completeness loop.\n"
+                "8. Step C — Revise the draft if think_tool.should_continue=True; return to Step B.\n"
+                "9. Step D — validate_quality(interpretation=..., use_llm=False) as the deterministic "
+                "objective checkpoint (layered under the think_tool loop). Do NOT pass "
+                "score_threshold here — it is not a validate_quality kwarg.\n"
+                "10. Step E — Consumer-side gate: if result['score'] < 0.8, return to Step B. "
+                "Max 3 total iterations across Steps B-D.\n"
+                "11. **write_file(file_path='/part3_final.md', content=...)** to save output\n\n"
                 "## CRITICAL RULE:\n"
                 "You MUST call the **write_file** tool to save /part3_final.md.\n"
                 "Do NOT just output the interpretation as text — it must be persisted to disk.\n\n"
@@ -191,8 +201,8 @@ def verify_output():
         if not found:
             missing.append(section)
 
-    # 4. Part-3–specific: L-R pair selection evidence
-    lr_keywords = ["prioritize_top_lr_pairs", "selected", "top 3",
+    # 4. Part-3–specific: featured L-R pair selection evidence
+    lr_keywords = ["featured", "selected", "top 3",
                    "candidate", "selection criteria", "novel"]
     has_lr_evidence = any(kw in content_lower for kw in lr_keywords)
     print(f"\n[{'OK' if has_lr_evidence else 'MISS'}] L-R pair selection documented")

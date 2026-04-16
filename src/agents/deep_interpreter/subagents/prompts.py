@@ -470,27 +470,63 @@ For EACH claim with a PMID citation:
    - Revise the claim to match paper content
    - OR mark as **(Novel Finding - based on data analysis)** if biologically valid but unsupported
 
-### Phase 4: Inline Quality Check
+### Phase 4: Reflection-Driven Quality Loop (MANDATORY ordering: Steps A–E)
 
-After writing the interpretation, call **validate_quality** tool to score:
+`think_tool` is the ACTIVE reflection/completeness loop for INTERPRETER. `validate_quality`
+is an OBJECTIVE deterministic rubric checkpoint layered under that loop — NOT the primary
+reflection mechanism. You MUST follow Steps A → B → C → D → E in order.
+
+**Step A — Draft.** Produce the Part N interpretation draft grounded in `/papers.json`
+citations (and full-text RAG context when `rag_mode=True`).
+
+**Step B — Reflect (MANDATORY).** Call `think_tool` with a one-paragraph self-critique
+of the draft's completeness, depth, mechanism clarity, and citation coverage. Pass
+`score_threshold=0.8` as an explicit call-site argument:
+
+```python
+think_tool(
+    reflection="<one-paragraph self-critique of draft completeness, mechanism depth, "
+               "quantitative coverage, and citation grounding>",
+    score_threshold=0.8,
+    max_iterations=3,
+)
+```
+
+**Step C — Revise if needed.** If `think_tool` returns `should_continue=True`
+(reflection-side score < 0.8), revise the draft to address the feedback and return to
+Step B. This is the primary revision/completeness reflection loop.
+
+**Step D — Deterministic checkpoint.** After the `think_tool` reflection loop settles,
+call `validate_quality` with `use_llm=False` — this disables LLM averaging so the
+check is a purely deterministic regex/count rubric (statistics, references, mechanism
+keywords, specificity, depth, structure). This avoids a duplicate reflection-tool MCP
+call since Step B already performed the LLM-side semantic check:
+
+```python
+validate_quality(
+    interpretation=revised_draft,
+    references=papers_list,
+    use_llm=False,
+)
+```
+
+Note: `validate_quality` does NOT accept `score_threshold` — its signature is
+`(interpretation, references, use_llm=True)`. Do NOT pass `score_threshold` here;
+the 0.8 gate is applied in Step E as a consumer-side comparison.
+
+**Step E — Gate (Consumer-side comparison).** If `result['score'] < 0.8`, return to
+Step B (the `think_tool` reflection loop) with feedback targeting the weak rubric
+dimension. The 0.8 threshold is a **consumer-side comparison** against the returned
+score — it is NOT a parameter passed into `validate_quality`. Maximum 3 total
+iterations across Steps B–D.
+
+**Deterministic rubric dimensions scored by `validate_quality(use_llm=False)`:**
 - **statistics_score**: >= 0.8 (at least 4 quantitative statistics per analysis)
 - **references_score**: >= 0.8 (at least 4 PMIDs per analysis)
 - **mechanism_score**: >= 0.8 (detailed biological mechanism with cascades)
 - **specificity_score**: >= 0.8 (no vague language)
 - **depth_score**: >= 0.7 (at least 150 words per analysis section)
 - **structure_score**: >= 0.7 (all required headings present)
-
-Usage:
-```python
-validate_quality(interpretation=part_interpretation_text)
-```
-
-If overall score < 0.8:
-- Identify weak areas from the feedback
-- Strengthen interpretation with more statistics, references, and depth
-- Ensure all required markdown sections are present
-- Re-run quality check
-- Maximum 3 iterations per Part
 
 ### Phase 5: Write Final Interpretation
 
@@ -688,8 +724,12 @@ Focus on: Specific mechanisms of the featured L-R pairs, source→target relatio
 ### Core Tools
 - **load_analysis_data**: Load analysis results from data directory
 - **validate_claim_literature**: Verify claim-paper alignment (Abstract mode)
-- **validate_quality**: Score interpretation quality
-- **think_tool**: Reflect on interpretation quality and completeness
+- **think_tool**: ACTIVE reflection/completeness loop (Phase 4 Steps B–C). Call with
+  `score_threshold=0.8`, `max_iterations=3`. Drives the revision cycle.
+- **validate_quality**: OBJECTIVE deterministic rubric checkpoint (Phase 4 Step D).
+  Call with `use_llm=False` — this is a layered checkpoint under the `think_tool`
+  reflection loop, not the primary reflection mechanism. The 0.8 gate is a
+  consumer-side comparison (Step E), not a tool kwarg.
 
 ### RAG Tools (use when rag_mode=True)
 - **prepare_rag_literature**: Download full-text papers and index for RAG search
