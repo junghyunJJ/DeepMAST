@@ -212,7 +212,8 @@ def fix_bd005_error_handling(content: str) -> tuple[str, str]:
     if parsed is None:
         return content, ""
     _, body = parsed
-    if re.search(r"(?im)^#{1,6}\s*(common\s+issues|error\s+handling|troubleshooting)\b", body):
+    body_outside_fences = FENCED_BLOCK_RE.sub("", body)
+    if re.search(r"(?im)^#{1,6}\s*(common\s+issues|error\s+handling|troubleshooting)\b", body_outside_fences):
         return content, ""
     template = "\n\n## Common Issues\n\n### Example Error\nDescribe common error and resolution.\n"
     new_content = content.rstrip("\n") + template
@@ -224,7 +225,8 @@ def fix_bd006_examples(content: str) -> tuple[str, str]:
     if parsed is None:
         return content, ""
     _, body = parsed
-    if re.search(r"(?im)^#{1,6}\s*examples?\b", body):
+    body_outside_fences = FENCED_BLOCK_RE.sub("", body)
+    if re.search(r"(?im)^#{1,6}\s*examples?\b", body_outside_fences):
         return content, ""
     template = "\n\n## Examples\n\nExample 1: Describe a typical usage.\n"
     new_content = content.rstrip("\n") + template

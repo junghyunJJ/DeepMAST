@@ -244,6 +244,17 @@ class TestFixBD005:
         _, diff = fix_bd005_error_handling(content)
         assert diff == ""
 
+    def test_skips_when_in_fenced_block(self, tmp_path):
+        body = (
+            "# Skill\n\n## Instructions\n1. Do things.\n\n"
+            "```markdown\n## Common Issues\nThis is inside a fenced block.\n```\n"
+        )
+        sd = make_skill(tmp_path, folder="fenced-errors", name="fenced-errors", body=body)
+        content = _read_skill(sd)
+        new_content, diff = fix_bd005_error_handling(content)
+        assert "## Common Issues" in new_content
+        assert diff != "", "Should append section because heading is only inside fenced block"
+
 
 # ---------------------------------------------------------------------------
 # BD-006: examples section
@@ -264,6 +275,18 @@ class TestFixBD006:
         content = _read_skill(sd)
         _, diff = fix_bd006_examples(content)
         assert diff == ""
+
+    def test_skips_when_in_fenced_block(self, tmp_path):
+        body = (
+            "# Skill\n\n## Instructions\n1. Do things.\n\n"
+            "## Common Issues\n### Err\nFix it.\n\n"
+            "```markdown\n## Examples\nThis is inside a fenced block.\n```\n"
+        )
+        sd = make_skill(tmp_path, folder="fenced-examples", name="fenced-examples", body=body)
+        content = _read_skill(sd)
+        new_content, diff = fix_bd006_examples(content)
+        assert "## Examples" in new_content
+        assert diff != "", "Should append section because heading is only inside fenced block"
 
 
 # ---------------------------------------------------------------------------
