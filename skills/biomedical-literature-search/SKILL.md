@@ -97,10 +97,6 @@ python scripts/search_literature_dynamic.py \
 ### Step 2.2: Automatic Internal Fallback
 `search_literature_dynamic` handles fallback internally. If LLM query generation fails, it automatically switches to a fixed 4-strategy search.
 
-Check `think_success` in the return value:
-- `think_success: True` — LLM queries used
-- `think_success: False` — internal fallback used
-
 **You do NOT call a separate fallback tool.**
 
 ### Step 2.3: Advanced E-utilities (Optional, Gap-Filling)
@@ -225,10 +221,6 @@ The saved file is guaranteed to have `total_papers == len(papers)` (no truncatio
 ---
 
 ## Troubleshooting
-
-### Error: `search_literature_dynamic` returned `think_success: False`
-**Cause**: LLM-powered query generation failed; internal fixed-strategy fallback was used.
-**Solution**: Normal behavior — results are valid. If coverage is still insufficient, run `search_literature` follow-up in Phase 3 on the specific missing genes/pathways.
 
 ### Error: 0 papers returned after disease filter
 **Cause**: `enforce_disease_match=True` filtered out all results because no paper matched the disease context string exactly.

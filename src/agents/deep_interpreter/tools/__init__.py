@@ -17,7 +17,6 @@ from src.agents.deep_interpreter.tools.literature import (
     search_literature_async,
     search_literature_dynamic_async,
     format_references,
-    generate_biomedical_context,
 )
 from src.agents.deep_interpreter.tools.quality import (
     validate_quality,
@@ -81,7 +80,6 @@ __all__ = [
     "search_literature_async",
     "search_literature_dynamic_async",
     "format_references",
-    "generate_biomedical_context",
     # Quality
     "validate_quality",
     "validate_claim_literature",

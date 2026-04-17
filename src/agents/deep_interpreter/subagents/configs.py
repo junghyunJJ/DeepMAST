@@ -268,7 +268,6 @@ Deep Interpreter 4-Agent Workflow:
 1. PLANNER (target-selector + strategic-planner consolidated)
    - Reads /targets.json
    - Loads analysis data
-   - Generates biomedical context via BioMCP think (optional enrichment)
    - Literature initialization via search_literature_dynamic (20 papers for grounding, internal fallback)
    - Fallback: search_pubmed_advanced (BioMCP connection error/timeout 시에만 사용)
    - Data assessment + analysis coverage checklist (inline reasoning)

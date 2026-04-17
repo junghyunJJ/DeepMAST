@@ -253,7 +253,6 @@ result = search_literature_dynamic(
 # L-R pair queries are generated ONLY when enable_lr_pair_queries=True (SEARCHER only).
 # When enable_lr_pair_queries=True, coverage_weighted_sort is auto-enabled internally
 # regardless of caller value (SEARCHER mode sentinel — keeps PLANNER/REPORTER unaffected).
-# BioMCP think is called automatically to optimize search strategy.
 # Iter-0 also injects deterministic singleton gene queries (one gene per query)
 # so every input gene gets its own focused BioMCP search and appears in at least
 # one query slot, regardless of LLM compliance with the prompt instruction.
@@ -272,7 +271,7 @@ result = search_literature_dynamic(
 - **read_file**: Load data files (/data_path.txt, /papers.json)
 - **write_file**: Write output files
 - **load_analysis_data**: Load analysis results and search_context
-- **search_literature_dynamic**: LLM-powered PubMed search with BioMCP think-assisted strategy (PRIMARY search tool). Set `enable_lr_pair_queries=True` to inject L-R pair queries — SEARCHER only; PLANNER/REPORTER should leave it default (False).
+- **search_literature_dynamic**: LLM-powered PubMed search (PRIMARY search tool). Set `enable_lr_pair_queries=True` to inject L-R pair queries — SEARCHER only; PLANNER/REPORTER should leave it default (False).
 - **search_literature**: Single query PubMed search via BioMCP (follow-up)
 - **search_pubmed_advanced**: Advanced PubMed E-utilities search
   - Accepts raw PubMed query syntax: "VEGFA[tiab] AND cancer[mh] AND 2020:2025[dp]"

@@ -15,6 +15,7 @@ import math
 import os
 import re
 import threading
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -49,12 +50,80 @@ def _sync_save_json(dir_path: str, file_path: str, data: dict) -> None:
 
 
 # =============================================================================
+# MCP Payload Sanitization
+# =============================================================================
+# Defense-in-depth for strings that cross the BioMCP boundary. Disease, gene,
+# pathway, and keyword inputs originate from analysis files (lr_candidates.json,
+# analysis results) that may be attacker-controlled in a supply-chain compromise.
+# These strings are interpolated into payloads sent to a BioMCP-side LLM via
+# `article_searcher` / `gene_getter` — we block the simplest prompt-injection
+# vectors (embedded control characters, sentinel substrings) and cap length so
+# the payload stays bounded.
+_MAX_GENE_LEN = 30
+_MAX_KEYWORD_LEN = 100
+_MAX_DISEASE_LEN = 150
+_INJECTION_SENTINELS = (
+    "ignore previous",
+    "ignore all previous",
+    "system:",
+    "assistant:",
+    "<|im_start|>",
+    "<|im_end|>",
+)
+
+
+def _is_sane_payload_string(s: Any, max_len: int) -> bool:
+    """Return True if `s` is a string safe to interpolate into a BioMCP payload.
+
+    Rejects: non-strings, empty strings, over-length strings, strings with
+    control characters (except tab/LF/CR), and strings containing known
+    prompt-injection sentinel substrings.
+    """
+    if not isinstance(s, str) or not s:
+        return False
+    if len(s) > max_len:
+        return False
+    for ch in s:
+        cp = ord(ch)
+        if cp < 0x20 and ch not in "\t\n\r":
+            return False
+        if cp == 0x7f:
+            return False
+    s_lower = s.lower()
+    for sentinel in _INJECTION_SENTINELS:
+        if sentinel in s_lower:
+            return False
+    return True
+
+
+def _sanitize_payload_list(
+    items: list[str] | None, max_len: int, label: str
+) -> list[str]:
+    """Drop items that fail `_is_sane_payload_string`, logging rejects."""
+    if not items:
+        return []
+    out: list[str] = []
+    for item in items:
+        if _is_sane_payload_string(item, max_len):
+            out.append(item)
+        else:
+            logger.warning(f"Dropping unsafe {label} input: {item!r}")
+    return out
+
+
+# =============================================================================
 # Dynamic Gene Alias Cache (BioMCP gene_getter)
 # =============================================================================
-# Session-level cache for gene aliases fetched from BioMCP
-# This avoids repeated API calls for the same gene
+# Session-level cache for gene aliases fetched from BioMCP.
+# Confirmed results (success, including confirmed-empty) are cached indefinitely.
+# Transient failures (timeouts, connection errors, tool-not-found) go into a
+# separate failure map with a short TTL so they get retried after the timeout —
+# this prevents a one-off BioMCP outage from poisoning a gene's alias lookup
+# for the process lifetime (Codex adversarial finding #2).
 _GENE_ALIAS_CACHE: dict[str, list[str]] = {}
+_GENE_ALIAS_FAILURES: dict[str, float] = {}  # gene_symbol -> failure timestamp
 _GENE_ALIAS_CACHE_LOCK = threading.Lock()
+_ALIAS_FAILURE_TTL_SECONDS = 300.0  # 5-minute retry window after transient failure
 
 
 # SJR (Scimago Journal Rank) Composite Score Cache
@@ -325,13 +394,31 @@ async def _fetch_gene_aliases_from_biomcp(
         Results are cached at module level to avoid repeated API calls.
         Token cost: 0 (API call, not LLM)
     """
-    # Check cache first (thread-safe)
+    # Sanitize before hitting the BioMCP boundary (PR6). Bad symbols short-
+    # circuit without touching the network — they'd never have matched anyway.
+    if not _is_sane_payload_string(gene_symbol, _MAX_GENE_LEN):
+        logger.warning(f"Dropping unsafe gene symbol: {gene_symbol!r}")
+        return []
+
+    # Check cache first (thread-safe). Confirmed results (success or
+    # confirmed-empty) short-circuit immediately. Recent transient failures
+    # short-circuit until their TTL expires to avoid hammering a flaky BioMCP,
+    # but unlike the old behavior they do NOT become permanent — after the
+    # TTL window elapses the call re-fetches.
     cache_key = gene_symbol.upper()
+    now = time.time()
     with _GENE_ALIAS_CACHE_LOCK:
         if cache_key in _GENE_ALIAS_CACHE:
             return _GENE_ALIAS_CACHE[cache_key]
+        prev_failure_ts = _GENE_ALIAS_FAILURES.get(cache_key)
+        if prev_failure_ts is not None:
+            if now - prev_failure_ts < _ALIAS_FAILURE_TTL_SECONDS:
+                return []
+            # TTL expired — drop the failure marker and retry fetch below
+            _GENE_ALIAS_FAILURES.pop(cache_key, None)
 
-    aliases = []
+    aliases: list[str] = []
+    fetch_failed = False
     try:
         tools = await get_biomcp_tools(biomcp_url)
 
@@ -340,24 +427,48 @@ async def _fetch_gene_aliases_from_biomcp(
 
         if gene_getter is None:
             logger.debug(f"gene_getter tool not found, skipping alias fetch for {gene_symbol}")
-            with _GENE_ALIAS_CACHE_LOCK:
-                _GENE_ALIAS_CACHE[cache_key] = []
-            return []
+            fetch_failed = True
+        else:
+            # Fetch gene info
+            result = await gene_getter.ainvoke({"gene_id_or_symbol": gene_symbol})
+            aliases = _parse_gene_aliases(result)
+            logger.debug(f"Fetched aliases for {gene_symbol}: {aliases}")
 
-        # Fetch gene info
-        result = await gene_getter.ainvoke({"gene_id_or_symbol": gene_symbol})
-
-        # Parse aliases from result
-        aliases = _parse_gene_aliases(result)
-        logger.debug(f"Fetched aliases for {gene_symbol}: {aliases}")
-
-    except Exception as e:
-        logger.debug(f"Failed to fetch aliases for {gene_symbol}: {e}")
+    except asyncio.CancelledError:
+        raise
+    except asyncio.TimeoutError as e:
+        # Transient — do NOT invalidate the shared client cache. A slow call
+        # should not force every other caller into cold-start reconnect.
+        logger.debug(f"Timed out fetching aliases for {gene_symbol}: {e}")
+        fetch_failed = True
+    except (ConnectionError, OSError) as e:
+        # Connection-class — the client is likely stale, drop it.
+        logger.debug(
+            f"Connection error fetching aliases for {gene_symbol}: "
+            f"{type(e).__name__}: {e}"
+        )
         invalidate_client(f"biomcp_{biomcp_url}")
+        fetch_failed = True
+    except Exception as e:
+        # Unknown (e.g., schema mismatch, parse failure) — log type but do not
+        # invalidate the shared client.
+        logger.debug(
+            f"Failed to fetch aliases for {gene_symbol}: "
+            f"{type(e).__name__}: {e}"
+        )
+        fetch_failed = True
 
-    # Cache result (even empty list to avoid retries) - thread-safe
+    # Record result (thread-safe). Success path caches authoritatively and
+    # clears any stale failure marker. Failure path writes to the failures
+    # map so subsequent calls within the TTL window return [] without hitting
+    # BioMCP again, and after the TTL window the marker is dropped so recovery
+    # is automatic.
     with _GENE_ALIAS_CACHE_LOCK:
-        _GENE_ALIAS_CACHE[cache_key] = aliases
+        if fetch_failed:
+            _GENE_ALIAS_FAILURES[cache_key] = now
+        else:
+            _GENE_ALIAS_CACHE[cache_key] = aliases
+            _GENE_ALIAS_FAILURES.pop(cache_key, None)
     return aliases
 
 
@@ -507,6 +618,32 @@ async def _search_with_biomcp(
         As of langchain-mcp-adapters 0.1.0, MultiServerMCPClient cannot be
         used as a context manager. Use client.get_tools() directly instead.
     """
+    # Sanitize caller-supplied lists before they cross the BioMCP boundary
+    # (PR6 — defense-in-depth against adversarial input files). Track whether
+    # the caller supplied anything so we can distinguish "no inputs" from "all
+    # inputs rejected" and log the latter at the call site, where the retrieval
+    # loop can surface it instead of silently returning [].
+    _orig_input_counts = {
+        "genes": len(genes) if genes else 0,
+        "diseases": len(diseases) if diseases else 0,
+        "keywords": len(keywords) if keywords else 0,
+        "chemicals": len(chemicals) if chemicals else 0,
+    }
+    genes = _sanitize_payload_list(genes, _MAX_GENE_LEN, "gene")
+    keywords = _sanitize_payload_list(keywords, _MAX_KEYWORD_LEN, "keyword")
+    diseases = _sanitize_payload_list(diseases, _MAX_DISEASE_LEN, "disease")
+    chemicals = _sanitize_payload_list(chemicals, _MAX_KEYWORD_LEN, "chemical")
+    if (
+        sum(_orig_input_counts.values()) > 0
+        and not any([genes, diseases, keywords, chemicals])
+    ):
+        logger.warning(
+            "_search_with_biomcp: sanitizer dropped ALL inputs "
+            f"(originals={_orig_input_counts}) — returning empty result. "
+            "Check upstream for adversarial or malformed input strings."
+        )
+        return []
+
     articles = []
 
     # F2: Evidence manifest stamp. Every article returned by this call carries
@@ -599,10 +736,22 @@ async def _search_with_biomcp(
                 }
                 articles.append(fallback_article)
 
-    except Exception as e:
-        # Return empty list on connection failure
-        logger.error(f"BioMCP connection failed: {e}")
+    except asyncio.CancelledError:
+        raise
+    except asyncio.TimeoutError as e:
+        # Transient: do NOT invalidate the shared client cache — a slow call
+        # should not force every other caller into cold-start reconnect.
+        logger.warning(f"BioMCP search timed out: {e}")
+    except (ConnectionError, OSError) as e:
+        # Connection-class: cache is likely stale, drop it so the next caller
+        # gets a fresh client.
+        logger.error(f"BioMCP connection failed: {type(e).__name__}: {e}")
         invalidate_client(f"biomcp_{biomcp_url}")
+    except Exception as e:
+        # Unknown error (e.g., tool schema mismatch, parse failure). Log with
+        # the exception type for diagnosis but do NOT invalidate — the tool
+        # itself is probably fine.
+        logger.error(f"BioMCP search failed: {type(e).__name__}: {e}")
 
     # Post-filter to reduce cross-disease retrieval noise
     if enforce_disease_match and diseases:
@@ -2132,144 +2281,6 @@ def _greedy_coverage_sort(
     return selected
 
 
-
-async def _think_with_biomcp_for_planner(
-    celltypes: list[str],
-    pathways: list[str],
-    available_analyses: str,
-    disease: str,
-    biomcp_url: str = DEFAULT_BIOMCP_URL,
-) -> dict:
-    """Execute 3-step strategic thinking via BioMCP think tool for PLANNER.
-
-    PLANNER-specific chain for interpretation planning context:
-    - Step 1: Disease Biology Analysis — analyze celltypes + pathways + tissue context
-    - Step 2: Interpretation Directions — suggest promising CCI interpretation focus areas
-    - Step 3: Expected Mechanisms — predict key L-R pairs, pathway crosstalk, spatial patterns
-
-    Args:
-        celltypes: List of cell types from analysis data
-        pathways: List of pathways from analysis data
-        available_analyses: Summary of available Part 1/2/3 analyses
-        disease: Disease context (inferred from cell types)
-        biomcp_url: BioMCP server URL
-
-    Returns:
-        Dictionary with strategic_context string and success flag
-    """
-    try:
-        tools = await get_biomcp_tools(biomcp_url)
-
-        think_tool = find_tool_by_name(tools, "think")
-
-        if think_tool is None:
-            logger.warning("BioMCP think tool not found for PLANNER")
-            return {"strategic_context": "", "success": False}
-
-        # Build context summary (no genes — PLANNER doesn't have gene-level data)
-        context = f"""
-Cell types: {', '.join(celltypes) if celltypes else 'None'}
-Pathways: {', '.join(pathways[:10]) if pathways else 'None'}
-Available analyses: {available_analyses}
-Disease: {disease or 'Not specified'}
-Analysis type: CCI (Cell-Cell Interaction) from spatial transcriptomics
-"""
-
-        results = []
-
-        # Step 1: Disease Biology Analysis
-        celltypes_str = ', '.join(celltypes) if celltypes else 'unknown'
-        pathways_str = ', '.join(pathways[:10]) if pathways else 'unknown'
-        step1 = await think_tool.ainvoke({
-            "thought": (
-                f"Disease biology analysis for {disease}: Given cell types "
-                f"[{celltypes_str}] and pathways [{pathways_str}], what are "
-                f"the key biological processes and known cell-cell interactions "
-                f"in this tissue context?"
-            ),
-            "thoughtNumber": 1,
-            "totalThoughts": 3,
-            "nextThoughtNeeded": True,
-        })
-        results.append(f"Disease Biology: {step1}")
-
-        # Step 2: Interpretation Directions
-        step2 = await think_tool.ainvoke({
-            "thought": (
-                f"Interpretation directions for CCI analysis: Given the disease "
-                f"biology and available analyses [{available_analyses}], what "
-                f"are the most promising focus areas for cell-cell "
-                f"interaction interpretation?"
-            ),
-            "thoughtNumber": 2,
-            "totalThoughts": 3,
-            "nextThoughtNeeded": True,
-        })
-        results.append(f"Interpretation Directions: {step2}")
-
-        # Step 3: Expected Mechanisms
-        step3 = await think_tool.ainvoke({
-            "thought": (
-                "Expected mechanisms: For the identified interpretation directions, "
-                "predict key ligand-receptor pairs, pathway crosstalk patterns, "
-                "and spatial organization features expected in this tissue."
-            ),
-            "thoughtNumber": 3,
-            "totalThoughts": 3,
-            "nextThoughtNeeded": False,
-        })
-        results.append(f"Expected Mechanisms: {step3}")
-
-        strategic_context = "\n".join(results)
-        logger.info("BioMCP think for PLANNER completed successfully (3 steps)")
-
-        return {
-            "strategic_context": strategic_context,
-            "success": True,
-        }
-
-    except Exception as e:
-        logger.warning(f"BioMCP think for PLANNER failed: {e}")
-        invalidate_client(f"biomcp_{biomcp_url}")
-        return {"strategic_context": "", "success": False}
-
-
-@tool
-def generate_biomedical_context(
-    celltypes: list[str],
-    pathways: list[str],
-    available_analyses: str,
-    disease: str,
-) -> dict:
-    """Generate biomedical context for interpretation planning using BioMCP's strategic reasoning.
-
-    Uses BioMCP's think tool to analyze disease biology, suggest interpretation directions,
-    and predict expected mechanisms BEFORE literature search. This enriches PLANNER's
-    interpretation guide with structured biomedical reasoning.
-
-    Args:
-        celltypes: List of cell types from analysis data (e.g., ["Tumor", "Fibroblast", "Macrophage"])
-        pathways: List of pathways from analysis data (e.g., ["EMT", "TGFB", "WNT"])
-        available_analyses: Summary of available analyses (e.g., "Part 1: spatial, celltype, neighborhood; Part 2: LIANA, NMF")
-        disease: Disease context inferred from cell types (e.g., "breast cancer")
-
-    Returns:
-        Dictionary with:
-        - strategic_context: BioMCP's biomedical reasoning output
-        - success: Whether the analysis completed successfully
-    """
-    try:
-        return run_async(
-            _think_with_biomcp_for_planner(
-                celltypes, pathways, available_analyses, disease
-            ),
-            timeout=45,
-        )
-    except Exception as e:
-        logger.warning(f"generate_biomedical_context failed: {e}")
-        return {"strategic_context": "", "success": False}
-
-
 def _format_lr_pairs_for_prompt(pairs: list[dict] | None) -> str:
     """Format L-R pairs for the query generation prompt."""
     if not pairs:
@@ -2278,83 +2289,6 @@ def _format_lr_pairs_for_prompt(pairs: list[dict] | None) -> str:
         f"{p.get('ligand', '')}-{p.get('receptor', '')}" + (f" (score: {p['score']:.2f})" if 'score' in p else "")
         for p in pairs[:10]  # Limit to 10 in prompt for token control
     )
-
-
-async def _think_search_strategy(
-    genes: list[str],
-    pathways: list[str],
-    celltypes: list[str],
-    disease: str,
-    lr_pairs: list[dict] | None = None,
-    biomcp_url: str = DEFAULT_BIOMCP_URL,
-) -> str:
-    """Execute a single BioMCP think call to plan search strategy for SEARCHER.
-
-    Unlike _think_with_biomcp_for_planner (3-step chain for PLANNER interpretation),
-    this is a 1-step strategic call focused on literature search optimization:
-    which gene combinations yield the best results, which keywords disambiguate
-    common gene names, and which biological contexts narrow the search.
-
-    Called ONCE per search_literature_dynamic_async invocation, BEFORE the
-    iteration loop. Output is injected into the LLM query generation prompt.
-
-    Args:
-        genes: Gene list from analysis
-        pathways: Pathway list from analysis
-        celltypes: Cell type list from analysis
-        disease: Disease context
-        lr_pairs: L-R pairs (if available from file)
-        biomcp_url: BioMCP server URL
-
-    Returns:
-        Search strategy text wrapped in section header (empty string on failure)
-    """
-    try:
-        tools = await get_biomcp_tools(biomcp_url)
-        think_tool_biomcp = find_tool_by_name(tools, "think")
-
-        if think_tool_biomcp is None:
-            logger.debug("BioMCP think tool not found for search strategy")
-            return ""
-
-        # Build compact context for the think call
-        genes_str = ", ".join(genes[:15]) if genes else "none"
-        pathways_str = ", ".join(pathways[:8]) if pathways else "none"
-        celltypes_str = ", ".join(celltypes[:8]) if celltypes else "none"
-        pairs_str = ", ".join(
-            f"{p['ligand']}-{p['receptor']}" for p in (lr_pairs or [])[:8]
-        ) or "none"
-
-        result = await asyncio.wait_for(
-            think_tool_biomcp.ainvoke({
-                "thought": (
-                    f"Search strategy for {disease or 'unspecified disease'}: "
-                    f"I need to find literature covering genes [{genes_str}], "
-                    f"pathways [{pathways_str}], cell types [{celltypes_str}], "
-                    f"and L-R pairs [{pairs_str}]. "
-                    f"What are the best PubMed search strategies? Consider: "
-                    f"(1) which gene combinations co-occur in papers, "
-                    f"(2) alternative gene names or symbols that improve recall, "
-                    f"(3) which pathway-disease keyword combinations are most specific, "
-                    f"(4) whether any L-R pairs are well-studied vs. novel."
-                ),
-                "thoughtNumber": 1,
-                "totalThoughts": 1,
-                "nextThoughtNeeded": False,
-            }),
-            timeout=15,
-        )
-
-        strategy = str(result).strip()
-        if strategy:
-            logger.info(f"BioMCP search strategy think completed ({len(strategy)} chars)")
-            return f"\n## Search Strategy Context\n{strategy}\n"
-        return ""
-
-    except Exception as e:
-        logger.warning(f"BioMCP search strategy think failed (non-critical): {e}")
-        invalidate_client(f"biomcp_{biomcp_url}")
-        return ""
 
 
 @tool
@@ -2418,7 +2352,7 @@ def search_literature_dynamic(
 
     Returns:
         If output_path is empty: Dictionary with papers, generated_queries, coverage,
-        think_success, iterations, coverage_history.
+        iterations, coverage_history.
         If output_path is provided: Compact summary with saved_to, total_papers,
         coverage, paper_titles (first 10), and a message.
     """
@@ -2528,11 +2462,6 @@ async def search_literature_dynamic_async(
     normalized_rerank_mode = _normalize_rerank_mode(rerank_mode)
     rerank_totals = {"applied_count": 0, "dropped_count": 0}
 
-    # think_success reflects actual BioMCP think tool outcome.
-    # Initialized to False; set to True only when _think_search_strategy returns content.
-    # (Fixes Codex adversarial review finding #3 — observability gap.)
-    think_success = False
-
     # SEARCHER-mode auto-enable: enable_lr_pair_queries is set ONLY by SEARCHER
     # (verified at subagents/prompts.py:261, 282 — PLANNER and REPORTER never
     # pass it). Coupling the two flags guarantees SEARCHER gets hub-coverage
@@ -2548,6 +2477,13 @@ async def search_literature_dynamic_async(
     # break fires. _greedy_coverage_sort then truncates the candidate pool back
     # down to _final_paper_cap.
     _final_paper_cap = max_results
+    # Internal candidate pool size for the retrieval loop. In non-SEARCHER mode
+    # this equals the caller-facing cap. In SEARCHER mode it is inflated below
+    # to absorb deterministic fan-out. Kept as a SEPARATE variable from
+    # max_results so fallback paths (_execute_fixed_strategy_search_async) that
+    # receive max_results still see the caller-facing cap rather than the
+    # internal pool — fixes the 300-paper-pool leak on LLM-exception fallback.
+    _internal_pool_size = max_results
     if enable_lr_pair_queries and not coverage_weighted_sort:
         logger.info(
             "SEARCHER mode detected (enable_lr_pair_queries=True); "
@@ -2562,10 +2498,10 @@ async def search_literature_dynamic_async(
         # material to maximize per-gene + per-pathway coverage in the final
         # truncation. Math: 13 pathway × 6 + 30 gene singleton × 5 + 8 LLM × 5
         # ≈ 268 papers; 300 leaves 32-paper headroom before final cap.
-        max_results = max(max_results * 5, 300)
+        _internal_pool_size = max(max_results * 5, 300)
         logger.info(
-            f"SEARCHER mode candidate pool: max_results internally bumped to "
-            f"{max_results} (final cap kept at {_final_paper_cap})"
+            f"SEARCHER mode candidate pool: internal pool size "
+            f"{_internal_pool_size} (final cap kept at {_final_paper_cap})"
         )
 
     # F2: REV-1 — single local governs both `_calculate_coverage` call sites
@@ -2594,43 +2530,40 @@ async def search_literature_dynamic_async(
                         _fetch_gene_aliases_from_biomcp(g, biomcp_url=biomcp_url),
                         timeout=10.0,
                     )
+                except asyncio.CancelledError:
+                    raise
+                except asyncio.TimeoutError:
+                    # Outer wait_for fired before inner function could record;
+                    # register transient failure so the TTL retry kicks in on
+                    # the next call for this gene (not permanently cached as
+                    # "no aliases" — that was the Codex-2 regression).
+                    with _GENE_ALIAS_CACHE_LOCK:
+                        _GENE_ALIAS_FAILURES[g.upper()] = time.time()
+                    return []
                 except Exception:
+                    # _fetch_gene_aliases_from_biomcp already records its own
+                    # transient failures via _GENE_ALIAS_FAILURES; nothing more
+                    # to record here.
                     return []
 
-            warm_results = await asyncio.gather(
+            await asyncio.gather(
                 *[_bounded_fetch(g) for g in genes_to_warm],
                 return_exceptions=True,
             )
-            warmed = 0
             with _GENE_ALIAS_CACHE_LOCK:
-                for gene, result in zip(genes_to_warm, warm_results):
-                    if isinstance(result, Exception) or not result:
-                        _GENE_ALIAS_CACHE.setdefault(gene.upper(), [])
-                        continue
-                    _GENE_ALIAS_CACHE[gene.upper()] = list(result)
-                    warmed += 1
+                warmed = sum(
+                    1 for g in genes_to_warm if g.upper() in _GENE_ALIAS_CACHE
+                )
             logger.info(
                 f"Pre-warmed gene alias cache: {warmed}/{len(genes_to_warm)} genes"
             )
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
-            logger.debug(f"Alias pre-warm skipped: {e}")
+            logger.warning(f"Alias pre-warm skipped: {e}")
 
     llm = create_llm(provider=llm_provider) if llm_provider else create_llm()
     recorded_iter0_queries: list[dict] = []
-
-    # v2: BioMCP think for search strategy (single call, pre-loop)
-    search_strategy_context = ""
-    if query_cache is None:  # Skip think when replaying cached queries
-        search_strategy_context = await _think_search_strategy(
-            genes=genes,
-            pathways=pathways,
-            celltypes=celltypes,
-            disease=disease,
-            lr_pairs=lr_pairs,
-            biomcp_url=biomcp_url,
-        )
-        if search_strategy_context:
-            think_success = True
 
     for iteration in range(max_iterations):
         logger.info(f"=== Async Iteration {iteration + 1}/{max_iterations} ===")
@@ -2658,7 +2591,7 @@ async def search_literature_dynamic_async(
             if gene_coverage_pct >= target_gene_coverage and pathway_coverage_pct >= target_pathway_coverage:
                 logger.info(f"Coverage targets met: genes={gene_coverage_pct:.1%}, pathways={pathway_coverage_pct:.1%}")
                 break
-            if len(all_papers) >= max_results:
+            if len(all_papers) >= _internal_pool_size:
                 logger.info(f"Max results reached: {len(all_papers)}")
                 break
 
@@ -2679,7 +2612,6 @@ async def search_literature_dynamic_async(
                     disease=disease or "Not specified",
                     gene_aliases="",  # BioMCP article_searcher handles aliases internally
                     lr_pairs=_format_lr_pairs_for_prompt(lr_pairs),
-                    search_strategy=search_strategy_context,
                 )
         else:
             # Gap-filling search for missing genes/pathways
@@ -2833,7 +2765,7 @@ async def search_literature_dynamic_async(
 
         logger.info(f"Query distribution: {len(gene_queries)} gene + {len(pathway_queries)} pathway queries")
 
-        remaining_slots = max_results - len(all_papers)
+        remaining_slots = _internal_pool_size - len(all_papers)
 
         # Allocate 60% to gene queries, 40% to pathway queries (minimum 3 per query)
         gene_slots = int(remaining_slots * 0.6) if gene_queries else 0
@@ -2846,7 +2778,7 @@ async def search_literature_dynamic_async(
 
         # Process gene queries first with higher allocation
         for i, query in enumerate(gene_queries):
-            if len(all_papers) >= max_results:
+            if len(all_papers) >= _internal_pool_size:
                 break
 
             try:
@@ -2888,8 +2820,8 @@ async def search_literature_dynamic_async(
                         new_papers += 1
 
                 # Backfill from fallback if slots remain
-                if fallback_papers and len(all_papers) < max_results:
-                    slots = max_results - len(all_papers)
+                if fallback_papers and len(all_papers) < _internal_pool_size:
+                    slots = _internal_pool_size - len(all_papers)
                     all_papers.extend(fallback_papers[:slots])
                     new_papers += min(slots, len(fallback_papers))
 
@@ -2901,7 +2833,7 @@ async def search_literature_dynamic_async(
 
         # Process pathway queries with remaining slots
         for i, query in enumerate(pathway_queries):
-            if len(all_papers) >= max_results:
+            if len(all_papers) >= _internal_pool_size:
                 break
 
             try:
@@ -2943,8 +2875,8 @@ async def search_literature_dynamic_async(
                         new_papers += 1
 
                 # Backfill from fallback if slots remain
-                if fallback_papers and len(all_papers) < max_results:
-                    slots = max_results - len(all_papers)
+                if fallback_papers and len(all_papers) < _internal_pool_size:
+                    slots = _internal_pool_size - len(all_papers)
                     all_papers.extend(fallback_papers[:slots])
                     new_papers += min(slots, len(fallback_papers))
 
@@ -2956,9 +2888,10 @@ async def search_literature_dynamic_async(
 
     # Truncation: coverage-weighted greedy sort or pure SJR sort.
     # _final_paper_cap is the user-facing output cap. In SEARCHER mode, the
-    # internal max_results was bumped earlier so the candidate pool (`all_papers`)
-    # is much larger than the cap; the final selection happens here. In non-
-    # SEARCHER mode, _final_paper_cap == max_results (no-op).
+    # retrieval loop used _internal_pool_size so the candidate pool
+    # (`all_papers`) is much larger than the cap; the final selection happens
+    # here. In non-SEARCHER mode, _final_paper_cap == _internal_pool_size
+    # (no-op).
     if sort_by_journal_quality:
         await _ensure_sjr_cache_loaded()
         if coverage_weighted_sort:
@@ -3035,7 +2968,6 @@ async def search_literature_dynamic_async(
         "generated_queries": all_queries,
         "coverage": final_coverage,
         "search_method": "search_literature_dynamic",
-        "think_success": think_success,
         "iterations": len(coverage_history) - 1,
         "coverage_history": coverage_history,
         "coverage_sufficient": coverage_sufficient,
@@ -3068,7 +3000,6 @@ async def search_literature_dynamic_async(
                         p.get("title", "")[:100] for p in final_papers[:10]
                     ],
                     "search_method": "search_literature_dynamic",
-                    "think_success": think_success,
                     "iterations": len(coverage_history) - 1,
                     "coverage_sufficient": coverage_sufficient,
                     "recommended_actions": recommended_actions,

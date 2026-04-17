@@ -52,7 +52,6 @@ search_literature_dynamic(
 - `papers`: List of found papers with PMIDs, abstracts, search_type, relevance_to_context
 - `generated_queries`: LLM-generated query structures (for debugging)
 - `coverage`: Full metrics
-- `think_success`: `True` if LLM query generation succeeded, `False` if internal fallback used
 
 **Fallback behavior**: If LLM query generation fails, automatically switches to a fixed 4-strategy internal search. No separate tool call needed.
 
@@ -449,7 +448,7 @@ python scripts/search_literature_dynamic.py \
 think_tool(
     reflection="Coverage: 28 papers found. Genes: APOE, TREM2 (100%). "
                "Pathways: TREM2 signaling (50%). All thresholds met. "
-               "think_success: True. No follow-up needed.",
+               "No follow-up needed.",
     iteration=1,
     max_iterations=1
 )
@@ -457,7 +456,6 @@ think_tool(
 - Papers found: 28 (pass >= 25)
 - Genes covered: ["APOE", "TREM2"] (100% pass)
 - Pathways covered: ["TREM2 signaling"] (50% pass)
-- think_success: True (no fallback needed)
 
 ### Phase 4: Output (Auto-Saved)
 Papers already auto-saved via `output_path` in Phase 2 — no `write_file` needed.

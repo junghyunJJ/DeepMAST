@@ -68,7 +68,6 @@ Use the **planner** subagent to:
 - Parse the embedded target configuration from initial message
 - Read /targets.json from virtual filesystem (already pre-written)
 - Load analysis data (data_path.txt is pre-written)
-- Generate biomedical context via BioMCP think (optional enrichment)
 - Search literature for grounding (search_literature_dynamic, 20 papers)
 - Assess data availability and create interpretation focus areas
 - Output: /interpretation_guide.md
@@ -297,7 +296,6 @@ Given the analysis context below, generate optimal PubMed search queries that ca
 - **Disease**: {disease}
 - **L-R Pairs**: {lr_pairs}
 {gene_aliases}
-{search_strategy}
 
 ## Query Generation Guidelines
 

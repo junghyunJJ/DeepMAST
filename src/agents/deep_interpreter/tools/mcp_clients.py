@@ -155,9 +155,18 @@ async def _get_cached_tools(
         return cached[1]
 
     # Slow path: create client OUTSIDE the lock (await-safe)
+    # Tool discovery is a one-time handshake; bound it so a hung MCP server
+    # cannot stall every caller for the full HTTP default (~30s). Fail-closed.
     try:
         client = MultiServerMCPClient({server_key: server_config})
-        tools = await client.get_tools()
+        tools = await asyncio.wait_for(client.get_tools(), timeout=10.0)
+    except asyncio.TimeoutError:
+        with _CLIENT_LOCK:
+            _CLIENT_CACHE.pop(server_key, None)
+        logger.warning(
+            f"MCP tool discovery timed out after 10s for '{server_key}'"
+        )
+        raise
     except Exception:
         # Clear any partial cache entry
         with _CLIENT_LOCK:
