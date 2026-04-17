@@ -221,6 +221,21 @@ def test_body_over_5000_words(skill_factory):
     assert find(report, "BD-002").passed is False
 
 
+def test_body_xml_in_inline_code_passes(skill_factory):
+    body = textwrap.dedent("""\
+    # T
+    ## Instructions
+    Use `<path>` as a placeholder and `<skill-name>` for the skill folder.
+    ## Examples
+    ok
+    ## Common Issues
+    ok
+    """)
+    skill = skill_factory(body=body)
+    report = validate_all(skill)
+    assert find(report, "BD-003").passed is True
+
+
 def test_body_xml_in_fenced_block_passes(skill_factory):
     body = textwrap.dedent("""\
     # T

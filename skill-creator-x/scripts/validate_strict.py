@@ -47,6 +47,8 @@ SOFT_ERROR_DISCLAIMER = (
 )
 KEBAB_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 FENCED_BLOCK_RE = re.compile(r"```.*?```", re.DOTALL)
+INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
+BLOCKQUOTE_MARKER_RE = re.compile(r"^>\s?", re.MULTILINE)
 VERB_HINT_RE = re.compile(r"\b(use|analyze|create|generate|fix|check|build|run|process|extract|convert|write|find|search|review|validate)\b", re.IGNORECASE)
 WHEN_HINT_RE = re.compile(r"\b(use when|use for|use if|when user|when the user|use to|for when)\b", re.IGNORECASE)
 
@@ -86,6 +88,19 @@ def _fail(rule_id: str, name: str, severity: Severity, verb: str, ref: str, msg:
 
 def _strip_fenced_blocks(body: str) -> str:
     return FENCED_BLOCK_RE.sub("", body)
+
+
+def _strip_code_blocks(body: str) -> str:
+    """Strip fenced blocks, inline code spans, and blockquote markers.
+
+    BD-003 applies only to prose — inline code is an explicit code expression
+    (e.g., `<path>`, `<skill-name>`) and markdown blockquotes begin with `> `
+    which is syntax, not XML. Extends the OQ 1 decision.
+    """
+    body = FENCED_BLOCK_RE.sub("", body)
+    body = INLINE_CODE_RE.sub("", body)
+    body = BLOCKQUOTE_MARKER_RE.sub("", body)
+    return body
 
 
 def _split_frontmatter(content: str) -> tuple[str, str] | None:
@@ -373,12 +388,12 @@ def validate_body(path: Path) -> list[ValidationResult]:
                              '"Keep SKILL.md under 5,000 words" (recommended)', "p.27",
                              f"body is {word_count} words (target <= {MAX_BODY_WORDS})"))
 
-    # BD-003: XML brackets outside fenced blocks (OQ 1 decision)
-    body_stripped = _strip_fenced_blocks(body)
+    # BD-003: XML brackets outside fenced blocks AND outside inline code (OQ 1 decision)
+    body_stripped = _strip_code_blocks(body)
     if "<" in body_stripped or ">" in body_stripped:
         results.append(_fail("BD-003", "body-no-xml-outside-fences", Severity.SOFT_ERROR,
                              '"No XML tags (< >)"', "p.11, p.30, p.31",
-                             "body contains `<` or `>` outside fenced code blocks"))
+                             "body contains `<` or `>` outside fenced code blocks or inline code"))
     else:
         results.append(_ok("BD-003", "body-no-xml-outside-fences", Severity.SOFT_ERROR,
                            '"No XML tags (< >)"', "p.11, p.30, p.31"))

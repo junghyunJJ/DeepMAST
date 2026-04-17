@@ -15,9 +15,22 @@ import argparse
 import sys
 from pathlib import Path
 
+from scripts import package_skill as _package_skill_mod
 from scripts.models import Severity, ValidationReport
 from scripts.package_skill import package_skill
 from scripts.validate_strict import validate_all
+
+# ADR-006 extension: wrapper excludes OMC/test artefacts that polluted the folder
+# during execution but are not part of the shippable skill.
+_package_skill_mod.EXCLUDE_DIRS = _package_skill_mod.EXCLUDE_DIRS | {
+    ".omc",
+    ".git",
+    ".pytest_cache",
+    ".coverage",
+    "backups",
+}
+_package_skill_mod.EXCLUDE_FILES = _package_skill_mod.EXCLUDE_FILES | {".coverage"}
+_package_skill_mod.ROOT_EXCLUDE_DIRS = _package_skill_mod.ROOT_EXCLUDE_DIRS | {"tests"}
 
 
 def _blocking_results(report: ValidationReport, strict: bool) -> list:

@@ -1,6 +1,12 @@
 ---
 name: biomedical-literature-search
-description: Complete 4-phase PubMed literature search workflow for cell-cell interaction (CCI) and spatial transcriptomics interpretation. Use when the SEARCHER subagent needs to find papers supporting ligand-receptor interactions, pathway enrichment, gene/marker expression, or disease-context evidence with coverage checks (>=25 papers, >=60% gene coverage, >=50% pathway coverage). Orchestrates `search_literature_dynamic` (primary, LLM-powered, auto-fallback to fixed-strategy) and `search_literature` for targeted follow-up, auto-saving results to `/papers.json`.
+description: Complete 4-phase PubMed literature search workflow for cell-cell interaction
+  (CCI) and spatial transcriptomics interpretation. Use when the SEARCHER subagent
+  needs to find papers supporting ligand-receptor interactions, pathway enrichment,
+  gene/marker expression, or disease-context evidence with coverage checks (GTE 25
+  papers, GTE 60% gene coverage, GTE 50% pathway coverage). Orchestrates `search_literature_dynamic`
+  (primary, LLM-powered, auto-fallback to fixed-strategy) and `search_literature`
+  for targeted follow-up, auto-saving results to `/papers.json`.
 metadata:
   author: DeepMAST Deep Interpreter
   version: 1.1.0
