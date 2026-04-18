@@ -9,7 +9,8 @@ Score = 0.30 x Evidence_Coverage + 0.30 x Specificity + 0.20 x Novelty + 0.20 x 
 ```
 
 **Threshold**: Hypotheses scoring below **0.4** are removed.
-**Fallback**: If fewer than 3 hypotheses survive, lower threshold to **0.35**.
+**Retention floor**: After filtering and FEATURED-gene coverage checks, retain at least `max(4, len(FEATURED))` hypotheses.
+**Fallback**: If fewer than `max(4, len(FEATURED))` viable hypotheses remain, generate targeted `[FEATURED-GAP]` or other evidence-backed additions before rescoring.
 
 ---
 
@@ -101,7 +102,7 @@ Measures drug development feasibility and experimental testability.
 | Exceptional | 0.70 - 1.00 | High-confidence hypothesis with strong evidence, specific prediction, novel insight, and clear drug development path |
 | Strong | 0.50 - 0.69 | Well-supported hypothesis suitable for immediate experimental planning |
 | Moderate | 0.40 - 0.49 | Acceptable hypothesis that may benefit from additional evidence or refinement |
-| Weak | 0.30 - 0.39 | Below threshold — remove unless < 3 hypotheses survive (then use 0.35 cutoff) |
+| Weak | 0.30 - 0.39 | Below threshold under the active runtime contract; replace with additional FEATURED-coverage hypotheses instead of relaxing the threshold |
 | Insufficient | 0.00 - 0.29 | Always remove |
 
 ---
