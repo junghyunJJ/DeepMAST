@@ -110,11 +110,14 @@ This tool deterministically scores ALL genes from the ot_*.json evidence files a
 `assessment_results.json` + `rubric_scores.csv`. Do NOT manually score genes — the tool
 handles all 8 criteria for every gene automatically.
 
-The tool selects genes with **combined_total >= 10** (excluding insufficient_evidence) as
-`stage3_candidates`. These are your FEATURED genes for Stage 1 and Stage 3.
+The tool initially seeds `stage3_candidates` with every gene that has
+**combined_total >= 10** (excluding insufficient_evidence) — the rubric-qualified
+pool. Stage 1 batch (see below) then narrows this list in place: genes surviving
+the strict STRING + Census filter become the final `stage3_candidates` that flow
+into BOTH deep_diver and hypothesis_writer.
 
 After calling `compute_rubric_scores`, review its output:
-- `stage3_candidates`: list of genes selected for deep assessment
+- `stage3_candidates`: rubric-qualified pool (will be narrowed by Stage 1 filter)
 - Use these genes to determine which L-R pairs need Stage 1
 
 #### Gene → L-R Pair Mapping (CRITICAL)
@@ -407,24 +410,26 @@ Filtering rules:
 1. Remove hypotheses with Specificity < 0.5
 2. Remove hypotheses with composite score < 0.4
 3. Rank remaining by composite score descending
-4. Keep top **max(5, len(stage1_validated_candidates))** hypotheses (PR1-7: relaxed
-   from "3-5" so TOP7 coverage and category balance can both be satisfied).
+4. Keep top **max(5, len(stage3_candidates))** hypotheses (relaxed from "3-5" so
+   TOP-N coverage and category balance can both be satisfied).
 5. Ensure at least 3 of 4 categories represented
 
-### Phase 4.75: TOP7 Coverage Hard Gate (PR1-7, DETERMINISTIC)
+### Phase 4.75: TOP-N Coverage Hard Gate (DETERMINISTIC)
 
-After Phase 4 filtering, enumerate `stage1_validated_candidates` (preferred) or
-`stage3_candidates` (fallback for `schema_version<2`) from `assessment_results.json`.
+After Phase 4 filtering, enumerate `stage3_candidates` from
+`assessment_results.json` (this list is the single narrowed set:
+rubric ≥ 10 ∩ Stage 1 strict PASS; both deep_diver and hypothesis_writer
+consume the same genes).
 
 For EVERY gene in that list NOT appearing in any retained hypothesis's
 `biological_entities.genes`, you MUST generate one mandatory `[FEATURED-GAP]`
 hypothesis covering it before saving. The `[FEATURED-GAP]` prefix in the title
 signals that this is a coverage-driven hypothesis.
 
-The save_evidence validator computes TOP7 coverage deterministically:
+The save_evidence validator computes TOP-N coverage deterministically:
 `covered = {hyp.biological_entities.genes for hyp in hypotheses}` intersected
 with the FEATURED list. If any FEATURED gene is missing, save_evidence returns
-`saved=false` with `top7_coverage.missing` listing the absent genes.
+`saved=false` with `topn_coverage.missing` listing the absent genes.
 
 **Number of retained hypotheses MUST be at least max(4, len(FEATURED))**.
 
@@ -460,13 +465,13 @@ the citations and retry.
 
 If save_evidence returns `saved: false` with EITHER:
 
-- `top7_coverage.missing` non-empty (TOP7 gene NOT covered), OR
+- `topn_coverage.missing` non-empty (TOP-N gene NOT covered), OR
 - `failed_pair_violations` non-empty (FAILED pair cited without `_FAILED` suffix),
 
 you MUST follow this retry policy:
 
 1. **Do NOT retry the same payload.** The deterministic gate will reject identically.
-2. For each gene in `top7_coverage.missing`: generate one new `[FEATURED-GAP]` hypothesis
+2. For each gene in `topn_coverage.missing`: generate one new `[FEATURED-GAP]` hypothesis
    whose `biological_entities.genes` includes that gene. Use the gene's `stage3_*.json`
    and `ot_*.json` evidence as references. Do NOT remove other hypotheses.
 3. For each entry in `failed_pair_violations`: either (a) remove the citation entirely, or

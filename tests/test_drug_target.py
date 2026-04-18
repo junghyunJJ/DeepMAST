@@ -507,6 +507,7 @@ class TestEvidenceLoader:
         assert any("not valid JSON" in e for e in result["errors"])
 
 
+
 # =========================================================================
 # 4. TestToolImports
 # =========================================================================
@@ -3140,35 +3141,27 @@ class TestStage1FilterCSVSync:
         assert result["success"] is True
         assert result["rubric_csv_updated"] is True
 
-        # 5. Verify CSV regenerated. PR1-1 changed contract: stage3_candidate is
-        # rubric-qualified (NOT narrowed by apply_stage1_filter); stage1_validated
-        # is the new per-row narrow flag.
+        # 5. Verify CSV regenerated. Schema v3 contract: stage3_candidate is narrowed
+        # in place to the intersection (rubric ∩ Stage 1 PASS).
         with open(rubric_csv) as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
-        # Per PR-1: stage3_candidate remains True for ALL rubric-qualified genes.
-        all_genes = {r["gene"] for r in rows}
         true_genes = {r["gene"] for r in rows if r["stage3_candidate"] == "True"}
-        assert true_genes == all_genes, (
-            "PR1-1: apply_stage1_filter must NOT overwrite stage3_candidate. "
-            "Use stage1_validated for the post-filter narrow set."
+        assert true_genes == {"TGFB1", "TGFBR2"}, (
+            "apply_stage1_filter must narrow per-row stage3_candidate to PASS-only genes."
         )
 
-        # New contract: stage1_validated reflects pass/fail. Read from the JSON
-        # since the rubric_scores.csv fieldnames don't include stage1_validated yet
-        # (intentionally — CSV is the rubric scoring snapshot, not the filter result).
         updated_assessment = json.loads(
             (evidence_dir / "assessment_results.json").read_text()
         )
-        validated_genes = {
-            r["gene"] for r in updated_assessment["rubric_assessment"]
-            if r.get("stage1_validated") is True
-        }
-        assert "TGFB1" in validated_genes
-        assert "TGFBR2" in validated_genes
-        assert "CD74" not in validated_genes
-        assert "MIF" not in validated_genes
+        assert updated_assessment["schema_version"] == 3
+        assert "stage1_validated_candidates" not in updated_assessment
+        assert all(
+            "stage1_validated" not in r for r in updated_assessment["rubric_assessment"]
+        )
+        stage3_genes = {c["gene"] for c in updated_assessment["stage3_candidates"]}
+        assert stage3_genes == {"TGFB1", "TGFBR2"}
 
         # Verify scores unchanged (only flags changed)
         for row in rows:
@@ -3260,22 +3253,24 @@ class TestC3C1Fixes:
 
 
 # ============================================================================
-# PR-1: TOP7 Gating + Validator Hardening
-# Plan: .omc/plans/drug-target-top7-gating-and-validator-hardening.md
+# TOP-N Gating + Validator Hardening (schema v3)
 # ============================================================================
 
 
-def _write_pr1_assessment(evidence_dir, *, schema_version=2):
-    """Helper: assessment_results.json with rubric-qualified > stage1-validated split.
-    7 rubric-qualified ({A,B,C,D,E,F,G}); 5 stage1-validated ({A,B,C,D,E}).
+def _write_pr1_assessment(evidence_dir, *, schema_version=3):
+    """Helper: assessment_results.json in post-narrowing (schema v3) state.
+
+    rubric_assessment has 7 rows ({A..G}); only A–E survive the Stage 1 filter
+    and therefore appear in `stage3_candidates` with per-row
+    `stage3_candidate=True`. F and G remain in rubric_assessment with
+    `stage3_candidate=False`.
     """
     rubric_assessment = []
     for g in "ABCDEFG":
         rubric_assessment.append({
             "gene": g, "combined_total": 12, "exploratory_total": 5,
             "classification": "validated_target", "priority": "high",
-            "stage3_candidate": True,
-            "stage1_validated": g in "ABCDE",
+            "stage3_candidate": g in "ABCDE",
         })
     payload = {
         "schema_version": schema_version,
@@ -3284,13 +3279,9 @@ def _write_pr1_assessment(evidence_dir, *, schema_version=2):
         "stage3_candidates": [{"gene": g, "combined_total": 12,
                                "classification": "validated_target", "priority": "high",
                                "exploratory_total": 5}
-                              for g in "ABCDEFG"],
-        "stage1_validated_candidates": [{"gene": g, "combined_total": 12,
-                                          "classification": "validated_target", "priority": "high",
-                                          "exploratory_total": 5}
-                                         for g in "ABCDE"],
+                              for g in "ABCDE"],
         "stage1_filter_applied": True,
-        "summary": {"total_genes": 7, "stage3_count": 7, "stage1_validated_count": 5},
+        "summary": {"total_genes": 7, "stage3_count": 5},
     }
     (evidence_dir / "assessment_results.json").write_text(json.dumps(payload, indent=2))
 
@@ -3327,7 +3318,7 @@ class TestPR1PathTraversal:
 
 
 class TestPR1Stage1Filter:
-    """PR1-1 / PR1-2: apply_stage1_filter splits stage3_candidate from stage1_validated;
+    """apply_stage1_filter narrows stage3_candidates in place (schema v3);
     writes stage1_filter_results.json sidecar; idempotent."""
 
     def _setup_stage1_inputs(self, data_dir):
@@ -3335,7 +3326,7 @@ class TestPR1Stage1Filter:
         evidence = _Path(data_dir) / "evidence"
         evidence.mkdir(parents=True, exist_ok=True)
         assessment = {
-            "schema_version": 2,
+            "schema_version": 3,
             "disease": "test",
             "rubric_assessment": [
                 {"gene": "PASSING_GENE", "combined_total": 12, "stage3_candidate": True,
@@ -3379,20 +3370,53 @@ class TestPR1Stage1Filter:
         (evidence / "stage1_evidence.json").write_text(json.dumps(s1, indent=2))
         return evidence
 
-    def test_apply_stage1_filter_adds_stage1_validated_field(self, tmp_path):
-        """PR1-1: stage1_validated added; stage3_candidate NOT overwritten."""
+    def test_apply_stage1_filter_narrows_stage3_candidates_in_place(self, tmp_path):
+        """Schema v3 contract: stage3_candidates is overwritten with the intersection
+        (rubric ∩ Stage 1 PASS); legacy stage1_validated_* fields are absent."""
         from src.agents.drug_target.tools.stage_logic import apply_stage1_filter
         evidence = self._setup_stage1_inputs(tmp_path)
         apply_stage1_filter.invoke({"data_dir": str(tmp_path)})
         a = json.loads((evidence / "assessment_results.json").read_text())
-        assert "stage1_validated_candidates" in a
+        assert a["schema_version"] == 3
+        assert "stage1_validated_candidates" not in a
+        assert "stage1_filter_passed_genes" not in a
+        assert {c["gene"] for c in a["stage3_candidates"]} == {"PASSING_GENE"}
         rows = {r["gene"]: r for r in a["rubric_assessment"]}
-        assert rows["PASSING_GENE"]["stage1_validated"] is True
-        assert rows["FAILING_GENE"]["stage1_validated"] is False
         assert rows["PASSING_GENE"]["stage3_candidate"] is True
-        assert rows["FAILING_GENE"]["stage3_candidate"] is True
-        assert {c["gene"] for c in a["stage3_candidates"]} == {"PASSING_GENE", "FAILING_GENE"}
-        assert {c["gene"] for c in a["stage1_validated_candidates"]} == {"PASSING_GENE"}
+        assert rows["FAILING_GENE"]["stage3_candidate"] is False
+        assert all("stage1_validated" not in r for r in a["rubric_assessment"])
+        summary = a.get("summary", {})
+        assert summary.get("stage3_count") == 1
+        assert "stage1_validated_count" not in summary
+
+    def test_compute_stage1_filter_no_record_is_strict_fail(self):
+        """STRING `no_record` must hard-fail — no PR2-1 relaxation (schema v3)."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_filter
+        evidence = {
+            "string_ppi": {
+                "max_combined_score": 0.0,
+                "string_record_found": False,
+                "interaction_found": False,
+            },
+            "census_validation": {
+                "target_vs_rest": {
+                    "coexpression": {"p_value": 0.0},
+                    "gene_a": {"p_value": 0.0},
+                    "gene_b": {"p_value": 0.0},
+                },
+            },
+        }
+        result = compute_stage1_filter(evidence)
+        assert result["passed"] is False
+        assert result["string_status"] == "no_record"
+
+    def test_schema_version_is_3_after_full_pipeline(self, tmp_path):
+        """compute_rubric_scores + apply_stage1_filter → schema_version == 3."""
+        from src.agents.drug_target.tools.stage_logic import apply_stage1_filter
+        evidence = self._setup_stage1_inputs(tmp_path)
+        apply_stage1_filter.invoke({"data_dir": str(tmp_path)})
+        a = json.loads((evidence / "assessment_results.json").read_text())
+        assert a["schema_version"] == 3
 
     def test_apply_stage1_filter_idempotent(self, tmp_path):
         """PR1-1: running fn twice produces identical output (Architect AC-PR1-1b)."""
@@ -3417,7 +3441,7 @@ class TestPR1Stage1Filter:
 
 
 class TestPR1HypothesisReportValidator:
-    """PR1-4/5/6: TOP7 coverage + deterministic evidence_coverage_pct + FAILED-pair gate."""
+    """TOP-N coverage + deterministic evidence_coverage_pct + FAILED-pair gate."""
 
     def _setup(self, tmp_path):
         evidence = tmp_path / "evidence"
@@ -3436,8 +3460,8 @@ class TestPR1HypothesisReportValidator:
             (evidence / fname).write_text("{}")
         return evidence
 
-    def test_top7_coverage_gate_rejects_missing_genes(self, tmp_path):
-        """PR1-4: hypothesis_report missing TOP7 gene → reject with diagnostic."""
+    def test_topn_coverage_gate_rejects_missing_genes(self, tmp_path):
+        """hypothesis_report missing a stage3_candidate → reject with diagnostic."""
         from src.agents.drug_target.tools.evidence_loader import save_evidence
         self._setup(tmp_path)
         report = {
@@ -3453,11 +3477,11 @@ class TestPR1HypothesisReportValidator:
             "data": json.dumps(report),
         }))
         assert result["saved"] is False
-        assert "top7_coverage" in result
-        assert set(result["top7_coverage"]["missing"]) == {"C", "D", "E"}
+        assert "topn_coverage" in result
+        assert set(result["topn_coverage"]["missing"]) == {"C", "D", "E"}
 
-    def test_top7_coverage_gate_passes_full_coverage(self, tmp_path):
-        """PR1-4: when all stage1_validated genes covered, gate passes."""
+    def test_topn_coverage_gate_passes_full_coverage(self, tmp_path):
+        """When every stage3_candidate gene is covered, the gate passes."""
         from src.agents.drug_target.tools.evidence_loader import save_evidence
         evidence = self._setup(tmp_path)
         report = {
@@ -3474,8 +3498,8 @@ class TestPR1HypothesisReportValidator:
         }))
         assert result["saved"] is True
         saved = json.loads((evidence / "hypothesis_report.json").read_text())
-        assert saved["top7_coverage"]["coverage_pct"] == 100.0
-        assert saved["top7_coverage"]["missing"] == []
+        assert saved["topn_coverage"]["coverage_pct"] == 100.0
+        assert saved["topn_coverage"]["missing"] == []
         assert saved["evidence_coverage_pct"] == 50.0
 
     def test_deterministic_evidence_coverage_pct_overwrites_llm(self, tmp_path):
@@ -3540,10 +3564,11 @@ class TestPR1HypothesisReportValidator:
 
 
 class TestPR2Stage1Filter:
-    """PR2-1: STRING `string_record_found` distinct from `score=0`."""
+    """Stage 1 filter (schema v3, strict): STRING must have a record with combined > 0.8
+    AND all three Census p-values < 0.05 — no relaxation for missing STRING rows."""
 
-    def test_string_no_record_skips_string_criterion(self):
-        """STRING returned no row → skip STRING criterion, require strong Census."""
+    def test_string_no_record_fails_even_with_strong_census(self):
+        """Schema v3: no_record ALWAYS fails, regardless of Census strength."""
         from src.agents.drug_target.tools.stage_logic import compute_stage1_filter
         ev = {
             "string_ppi": {
@@ -3553,7 +3578,7 @@ class TestPR2Stage1Filter:
             },
             "census_validation": {
                 "target_vs_rest": {
-                    "coexpression": {"p_value": 1e-15},  # ultra strong
+                    "coexpression": {"p_value": 1e-15},
                     "gene_a": {"p_value": 0.01},
                     "gene_b": {"p_value": 0.01},
                 },
@@ -3561,10 +3586,10 @@ class TestPR2Stage1Filter:
         }
         out = compute_stage1_filter(ev)
         assert out["string_status"] == "no_record"
-        assert out["passed"] is True
+        assert out["passed"] is False
 
     def test_string_no_record_fails_on_weak_census(self):
-        """no_record + weak coexpression → fail (no compensation possible)."""
+        """no_record + weak coexpression → fail."""
         from src.agents.drug_target.tools.stage_logic import compute_stage1_filter
         ev = {
             "string_ppi": {"string_record_found": False, "max_combined_score": 0.0},
@@ -3803,18 +3828,16 @@ class TestP3SchemaValidation:
         assert "jsonschema.ValidationError" in src
 
 
-class TestPR1RegressionSplitDefinition:
-    """Tombstone integration test (Architect AC-PR1-1c): rubric_qualified differs from
-    stage1_validated. Verifies hypothesis-side validator + downstream consumers behave correctly.
-    """
+class TestSchemaV3UnifiedContract:
+    """Schema v3: stage3_candidates is the single narrowed set (rubric ∩ Stage 1 PASS);
+    deep_diver and hypothesis_writer consume the same list."""
 
-    def test_rubric_vs_stage1_validated_split(self, tmp_path):
-        """7 rubric-qualified + 5 stage1-validated. TOP7 coverage gate enforces 5 (narrow)."""
+    def test_topn_gate_uses_stage3_candidates_only(self, tmp_path):
+        """TOP-N coverage gate enforces every gene in `stage3_candidates`."""
         from src.agents.drug_target.tools.evidence_loader import save_evidence
         evidence = tmp_path / "evidence"
         evidence.mkdir(parents=True, exist_ok=True)
-        _write_pr1_assessment(evidence)
-        # Cover all 5 validated; F, G are rubric-qualified-only and NOT required by gate.
+        _write_pr1_assessment(evidence)  # 5 stage3_candidates: {A,B,C,D,E}
         report = {
             "evidence_coverage_pct": 50,
             "hypotheses": [
@@ -3828,6 +3851,5 @@ class TestPR1RegressionSplitDefinition:
             "data": json.dumps(report),
         }))
         assert result["saved"] is True, (
-            f"TOP7 gate must use stage1_validated_candidates (5 genes), "
-            f"NOT stage3_candidates (7 genes). Got: {result}"
+            f"TOP-N gate must pass when every stage3_candidate is covered. Got: {result}"
         )
