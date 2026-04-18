@@ -42,4 +42,10 @@
 ## Warning
 
 These paths are observation-based de facto conventions and may change with platform updates.
-`install_multiplatform.py` verifies path existence before installation.
+`install_multiplatform.py` refuses to overwrite existing non-symlink targets unless both
+`--no-dry-run` and `--force` are given, in which case the prior target is renamed to
+`<target>.bak-<UTC-timestamp>` (never rmtree'd). Relative-path platforms (cursor, copilot)
+additionally require `--project-root /path/to/repo`; the installer never silently joins
+against `Path.cwd()`. Post-install, `verify_installation` parses the target's frontmatter
+and asserts that its `name` matches the target directory — a bare `SKILL.md` is not
+sufficient evidence that the skill landed in the intended slot.

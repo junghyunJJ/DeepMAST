@@ -62,7 +62,9 @@ Validate your skill at any time:
 python -m scripts.validate_strict <skill-dir>              # Full PDF compliance check
 python -m scripts.validate_strict <skill-dir> --strict      # Promote SOFT-ERROR to ERROR
 python -m scripts.check_cross_platform <skill-dir>          # Cross-platform compatibility
-python -m scripts.install_multiplatform <skill-dir> --dry-run  # Preview multi-platform install
+python -m scripts.install_multiplatform <skill-dir> --dry-run                  # Preview (default)
+python -m scripts.install_multiplatform <skill-dir> --no-dry-run --force \
+    [--project-root /path/to/repo]                                             # Apply (required to overwrite)
 ```
 
 ### Reserved Words Warning
