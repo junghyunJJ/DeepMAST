@@ -155,17 +155,96 @@ class TestFixNaming:
         assert any("SKILL.md" in c for c in changes)
         assert (sd / "SKILL.md").exists()
 
-    def test_renames_folder_kebab(self, tmp_path):
+    def test_reports_folder_rename_as_manual(self, tmp_path):
+        """P1-3: fix_naming must emit a MANUAL instruction, not rename the folder.
+
+        The prior behavior renamed the skill directory mid-run; subsequent
+        operations (backup, frontmatter write, autofix) then wrote to a stale
+        path, silently losing the backup. Option alpha defers the rename to
+        the human who owns the git/IDE/CI paths.
+        """
         sd = tmp_path / "My_Skill"
         sd.mkdir()
         (sd / "SKILL.md").write_text("# test\n")
-        changes = fix_naming(sd, dry_run=True)
-        assert any("my-skill" in c for c in changes)
+        # Call WITH dry_run=False — this used to rename the folder; now it
+        # must still emit a MANUAL instruction and leave the directory in place.
+        changes = fix_naming(sd, dry_run=False)
+
+        # A MANUAL rename instruction is present and references the kebab name.
+        manual_entries = [c for c in changes if c.startswith("MANUAL:")]
+        assert manual_entries, f"expected a MANUAL: entry in {changes!r}"
+        assert any("My_Skill" in c and "my-skill" in c for c in manual_entries)
+        # The message must point the user at the backup location post-rename.
+        assert any("backups/" in c for c in manual_entries), (
+            "MANUAL instruction must tell the user where the backup lives "
+            "after the rename; look for the literal substring 'backups/'"
+        )
+
+        # The folder was NOT renamed.
+        assert (tmp_path / "My_Skill").exists()
+        assert not (tmp_path / "my-skill").exists()
 
     def test_no_changes_if_correct(self, tmp_path):
         sd = make_skill(tmp_path, folder="good-name", name="good-name")
         changes = fix_naming(sd, dry_run=True)
         assert len(changes) == 0
+
+
+# ---------------------------------------------------------------------------
+# P1-3 end-to-end: migrate_skill must not write to a ghost path
+# ---------------------------------------------------------------------------
+
+
+class TestP1_3PreservesSkillDir:
+    def test_apply_preserves_skill_dir(self, tmp_path):
+        """After --apply --yes, the original directory is intact and backup is real."""
+        sd = tmp_path / "My_Skill"
+        sd.mkdir()
+        (sd / "skill.md").write_text(
+            "---\nname: My_Skill\ndescription: A legacy skill. Use when testing.\n---\n\n"
+            "# My Skill\n\n## Instructions\n1. Do it.\n\n"
+            "## Examples\nEx 1.\n\n"
+            "## Common Issues\n### Err\nFix.\n",
+            encoding="utf-8",
+        )
+        result = migrate_skill(sd, apply=True, yes=True, use_git=False)
+
+        # SKILL.md case-fix (intra-dir) did land.
+        assert (sd / "SKILL.md").exists()
+
+        # The backup landed inside the ORIGINAL directory (My_Skill/backups/<ts>/),
+        # not at a ghost kebab path.
+        assert result.backup_path is not None
+        assert result.backup_path.exists(), (
+            f"backup_path {result.backup_path} must actually exist — "
+            "bug would write it to a ghost 'my-skill/' path"
+        )
+        # The backup path must be under the original, still-un-renamed skill dir.
+        assert str(result.backup_path).startswith(str(sd)), (
+            f"backup_path {result.backup_path} must be inside the original "
+            f"skill dir {sd}, not a sibling"
+        )
+
+        # The MANUAL rename instruction is surfaced to the user.
+        assert any(c.startswith("MANUAL:") for c in result.changes_made)
+
+    def test_no_ghost_backup_dir(self, tmp_path):
+        """No sibling 'my-skill/' directory should be created anywhere."""
+        sd = tmp_path / "My_Skill"
+        sd.mkdir()
+        (sd / "SKILL.md").write_text(
+            "---\nname: My_Skill\ndescription: A legacy skill. Use when testing.\n---\n\n"
+            "# My Skill\n\n## Instructions\n1. Do.\n",
+            encoding="utf-8",
+        )
+        migrate_skill(sd, apply=True, yes=True, use_git=False)
+
+        # Walk everything under tmp_path — no 'my-skill' (kebab sibling) must exist.
+        ghosts = [p for p in tmp_path.rglob("my-skill") if p.is_dir()]
+        # Backup path can include the ORIGINAL skill dir name ("My_Skill"), but
+        # never a kebab sibling at the parent level.
+        assert not (tmp_path / "my-skill").exists()
+        assert not any(p.parent == tmp_path for p in ghosts)
 
 
 # ---------------------------------------------------------------------------

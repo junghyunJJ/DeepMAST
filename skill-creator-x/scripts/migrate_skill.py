@@ -205,7 +205,22 @@ def insert_missing_sections(content: str) -> str:
 
 
 def fix_naming(skill_dir: Path, *, dry_run: bool = True) -> list[str]:
-    """Fix SKILL.md case and folder kebab-case naming."""
+    """Fix SKILL.md case and report any required folder kebab-case rename.
+
+    The intra-directory case-fix (``skill.md`` -> ``SKILL.md``) is applied in
+    place: renaming a single file inside the skill folder is atomic, trivially
+    reversible, and never changes the directory itself.
+
+    The TOP-LEVEL folder rename is intentionally NOT applied here. Older
+    behavior renamed ``<skill_dir>`` to a kebab-case sibling mid-run, after
+    which the caller (``migrate_skill``) continued writing against the stale
+    path — including the backup — silently losing the backup to a ghost
+    location. Folder renames also touch the user's git history, IDE indexes,
+    and CI configuration, so the tool surfaces the requirement as a MANUAL
+    instruction and lets the human perform it after reviewing the diff. See
+    P1-3 in ``.omc/plans/skill-creator-x-p1-p2-fixes.md`` for the full
+    rationale (Option alpha: defer folder rename to manual step).
+    """
     changes: list[str] = []
     is_git = _detect_git(skill_dir)
 
@@ -226,14 +241,13 @@ def fix_naming(skill_dir: Path, *, dry_run: bool = True) -> list[str]:
     kebab_name = re.sub(r"-+", "-", kebab_name).strip("-")
 
     if kebab_name != folder_name:
-        new_dir = skill_dir.parent / kebab_name
-        if not dry_run and not new_dir.exists():
-            if is_git:
-                subprocess.run(["git", "mv", str(skill_dir), str(new_dir)],
-                               cwd=str(skill_dir.parent), capture_output=True, timeout=10)
-            else:
-                skill_dir.rename(new_dir)
-        changes.append(f"Rename folder {folder_name} -> {kebab_name}")
+        # MANUAL only. Do NOT rename the directory; the caller would then
+        # write backups and frontmatter to a ghost path.
+        changes.append(
+            f"MANUAL: rename folder {folder_name} -> {kebab_name} "
+            "(run after reviewing migration output). "
+            f"After renaming, your backup will live at {kebab_name}/backups/<ts>/."
+        )
 
     return changes
 
@@ -313,7 +327,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="migrate_skill", description="Migrate legacy skills to PDF-compliant format (ADR-010)")
     parser.add_argument("skill_dir", type=Path, help="Skill directory to migrate")
     parser.add_argument("--assess", action="store_true", help="Only assess migration need")
-    parser.add_argument("--apply", action="store_true", help="Apply migration")
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Apply migration. Note: --apply does NOT rename the skill directory "
+             "itself; any kebab-case folder rename is emitted as a MANUAL entry "
+             "in the output for the user to perform after reviewing the diff.",
+    )
     parser.add_argument("--yes", action="store_true", help="Skip confirmation")
     parser.add_argument("--json", action="store_true", help="Output JSON")
     parser.add_argument("--no-git", action="store_true", help="Disable git integration")

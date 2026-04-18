@@ -47,7 +47,7 @@ This will:
 3. Restructure frontmatter (add delimiters, required fields)
 4. Move unknown top-level keys under `metadata:`
 5. Insert missing sections (Common Issues, Examples)
-6. Fix naming (folder kebab-case, SKILL.md case)
+6. Fix naming — SKILL.md case-rename in place (intra-directory, atomic). If the top-level folder also needs kebab-casing, the tool emits a `MANUAL: rename folder <old> -> <new>` entry instead of renaming the directory mid-run; folder renames affect git history, IDE indexes, and CI paths and are left to the user. The manual instruction points at where the backup will live after the rename (`<new-dir>/backups/<ts>/`).
 7. Run all safe autofix rules
 8. Re-validate and report before/after comparison
 

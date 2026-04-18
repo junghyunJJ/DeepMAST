@@ -464,6 +464,8 @@ Structural migration for outdated formats — see `references/migration-guide.md
 - `python -m scripts.migrate_skill <skill> --assess` — Update vs Migrate (ADR-010)
 - `python -m scripts.migrate_skill <skill> --apply --yes` — reconstruct + insert + naming fix, git branch auto
 
+> Note: `migrate_skill --apply` intentionally does NOT rename the skill's top-level folder. If assessment surfaces a `MANUAL: rename folder <old> -> <new>` instruction, perform that rename yourself after reviewing the migration's diff — folder renames touch your git history, IDE indexes, and CI paths, so the tool leaves it to you. The message points at where your backup will live post-rename (`<new-dir>/backups/<ts>/`).
+
 ## Reference files
 
 The agents/ directory contains instructions for specialized subagents. Read them when you need to spawn the relevant subagent.
