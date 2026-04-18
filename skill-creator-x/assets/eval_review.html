@@ -59,8 +59,9 @@
 
   <p class="summary" id="summary"></p>
 
+  <script type="application/json" id="eval-data">__EVAL_DATA_PLACEHOLDER__</script>
   <script>
-    const EVAL_DATA = __EVAL_DATA_PLACEHOLDER__;
+    const EVAL_DATA = JSON.parse(document.getElementById('eval-data').textContent);
 
     let evalItems = [...EVAL_DATA];
 

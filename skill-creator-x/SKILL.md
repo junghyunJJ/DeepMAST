@@ -392,10 +392,10 @@ The key thing to avoid: don't make should-not-trigger queries obviously irreleva
 Present the eval set to the user for review using the HTML template:
 
 1. Read the template from `assets/eval_review.html`
-2. Replace the placeholders:
-   - `__EVAL_DATA_PLACEHOLDER__` → the JSON array of eval items (no quotes around it — it's a JS variable assignment)
-   - `__SKILL_NAME_PLACEHOLDER__` → the skill's name
-   - `__SKILL_DESCRIPTION_PLACEHOLDER__` → the skill's current description
+2. Replace the placeholders with **XSS-safe substitutions** (the template uses a `<script type="application/json">` tag + `JSON.parse(textContent)` so attacker-controlled query text cannot escape into JS context):
+   - `__EVAL_DATA_PLACEHOLDER__` → `json.dumps(eval_items).replace("</", "<\\/")` — the `</` escape prevents a `</script>` sequence inside any query string from prematurely terminating the JSON script tag.
+   - `__SKILL_NAME_PLACEHOLDER__` → `html.escape(skill_name, quote=True)`
+   - `__SKILL_DESCRIPTION_PLACEHOLDER__` → `html.escape(skill_description, quote=True)`
 3. Write to a temp file (e.g., `/tmp/eval_review_<skill-name>.html`) and open it: `open /tmp/eval_review_<skill-name>.html`
 4. The user can edit queries, toggle should-trigger, add/remove entries, then click "Export Eval Set"
 5. The file downloads to `~/Downloads/eval_set.json` — check the Downloads folder for the most recent version in case there are multiple (e.g., `eval_set (1).json`)
