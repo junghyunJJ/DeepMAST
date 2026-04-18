@@ -2,7 +2,20 @@
 
 Detailed search strategies, tool API, and examples for the `biomedical-literature-search` skill.
 
-> **Note**: This is the canonical reference for `SKILL.md`. See SKILL.md for the 4-phase workflow (Extract → Search → Reflect → Output). This file holds the tool API, advanced patterns, part-specific focus, quick reference card, and full worked examples.
+Note: this reference expands the SEARCHER-facing workflow in `SKILL.md`. The active SEARCHER contract is coverage-driven: extract context, run the primary search, inspect `coverage_sufficient` plus `recommended_actions`, and follow up only when the result says more work is needed.
+
+## Table of Contents
+
+- [Complete Tool API Reference](#complete-tool-api-reference)
+- [Advanced PubMed E-utilities Patterns](#advanced-pubmed-e-utilities-patterns)
+- [Part-Specific Search Focus](#part-specific-search-focus)
+- [L-R Interaction Search Strategy](#l-r-interaction-search-strategy)
+- [Pathway Search Strategy](#pathway-search-strategy)
+- [Gene/Marker Search Strategy](#genemarker-search-strategy)
+- [Search Result Optimization](#search-result-optimization)
+- [Quick Reference Card](#quick-reference-card)
+- [Interpretation Output Format](#interpretation-output-format)
+- [Full Example: Apoe-Trem2 in Alzheimer Disease](#full-example-apoe-trem2-in-alzheimer-disease)
 
 ---
 
@@ -10,9 +23,32 @@ Detailed search strategies, tool API, and examples for the `biomedical-literatur
 
 ### search_literature_dynamic (PRIMARY)
 
-LLM-powered dynamic search with context-aware query generation and internal fallback. This is the primary search tool for all phases.
+`search_literature_dynamic` is the primary SEARCHER tool. SEARCHER should use the direct tool call. The shell wrapper is useful for manual reruns and debugging, but it is not the authoritative SEARCHER entrypoint.
 
-**Preferred: CLI wrapper**
+**Preferred SEARCHER tool call**
+
+```python
+data_path = read_file("/data_path.txt").strip()
+
+result = search_literature_dynamic(
+    genes=search_context["genes"],
+    pathways=search_context["pathways"],
+    celltypes=search_context["celltypes"],
+    disease="breast cancer",
+    max_results=20,
+    output_path="papers.json",
+    data_dir=data_path,
+    enable_lr_pair_queries=True,
+)
+```
+
+Notes:
+- `genes` may already include candidate genes added by `load_analysis_data`.
+- `lr_pairs` support is activated through `enable_lr_pair_queries=True` for SEARCHER.
+- When `output_path` is set, always pass `data_dir`.
+
+**Manual shell wrapper**
+
 ```bash
 python scripts/search_literature_dynamic.py \
   --genes "CDH1,TGFB1,VIM,ERBB2,MMP2" \
@@ -20,188 +56,190 @@ python scripts/search_literature_dynamic.py \
   --celltypes "Tumor,Fibroblast,Macrophages" \
   --disease "breast cancer" \
   --max-results 20 \
-  --output-path "papers.json"
+  --output-path "papers.json" \
+  --data-dir "/path/to/results"
 ```
 
-**Equivalent direct tool call**:
-```python
-search_literature_dynamic(
-    genes=["CDH1", "TGFB1", "VIM"],       # Gene symbols (top 30 from hybrid score)
-    pathways=["EMT", "TGFB", "WNT"],       # Pathway names
-    celltypes=["Tumor", "Fibroblast"],     # Cell type names
-    disease="breast cancer",                # Disease context (string)
-    max_results=20,                         # Number of results
-    output_path="papers.json",              # Auto-save full results to DEEP_INTERPRETER_DATA_DIR/papers.json
-    target_gene_coverage=0.6,               # Gene coverage threshold
-    target_pathway_coverage=0.5,            # Pathway coverage threshold
-    max_iterations=3,                       # Internal refinement loop cap
-    enforce_disease_match=True,             # Post-filter by disease context
-    rerank_mode="off",                      # "off" or "llm" for optional rerank
-)
-```
+**Returns with `output_path`**
+- `saved_to`
+- `output_path`
+- `total_papers`
+- `coverage`
+- `paper_titles`
+- `search_method`
+- `iterations`
+- `coverage_sufficient`
+- `recommended_actions`
+- `filter_stage`
+- `rerank_applied_count`
+- `rerank_dropped_count`
+- `message`
 
-**Returns (with `output_path`)** — compact summary:
-- `saved_to`: Absolute path of saved JSON
-- `output_path`: Filename specified
-- `total_papers`: Number of papers saved (no truncation)
-- `coverage`: Full coverage metrics (`genes_covered`, `genes_missing`, `genes_coverage_pct`, `pathways_*`)
-- `paper_titles`: First 10 titles for quick preview
-- `message`: Confirmation
+`coverage_sufficient` and `recommended_actions` are the operational fields SEARCHER uses for follow-up.
 
-**Returns (without `output_path`)** — full result:
-- `papers`: List of found papers with PMIDs, abstracts, search_type, relevance_to_context
-- `generated_queries`: LLM-generated query structures (for debugging)
-- `coverage`: Full metrics
+**Returns without `output_path`**
+- `papers`
+- `generated_queries`
+- `coverage`
+- `iterations`
+- `coverage_history`
+- `coverage_sufficient`
+- `recommended_actions`
+- rerank metadata
 
-**Fallback behavior**: If LLM query generation fails, automatically switches to a fixed 4-strategy internal search. No separate tool call needed.
+**Fallback behavior**
+
+If LLM query generation fails, the tool automatically switches to a fixed internal strategy. No separate fallback call is needed.
 
 ### search_literature (Targeted Follow-up)
 
-Single-query PubMed search for targeted gap filling.
+Use `search_literature` for structured follow-up when the primary search leaves missing genes, pathway context, or too little disease-specific evidence.
 
 ```python
 search_literature(
     genes=["APOE", "TREM2"],
-    disease="Alzheimer",
+    disease="Alzheimer disease",
     keywords=["microglia", "neuroinflammation"],
     max_results=15,
-    include_preprints=True
 )
 ```
 
-Or with freeform query:
 ```python
 search_literature(
-    query="SNAI1 EMT breast cancer spatial",
+    genes=[],
+    disease="breast cancer",
+    keywords=["TGF-beta signaling", "fibroblast", "stromal"],
     max_results=10,
-    include_preprints=True
 )
 ```
 
-**Use when**: Phase 3 coverage gaps remain (missing genes/pathways), or specific topic follow-up after `search_literature_dynamic`.
+Use it when:
+- `recommended_actions` identifies missing genes
+- pathway coverage is weak and you need a focused keyword search
+- the paper count is low and a broader disease-context follow-up is enough
 
-### think_tool (Phase 3 Reflection)
+### think_tool (Manual Reflection Aid)
 
-Structured sequential thinking for quality validation.
+`think_tool` is not part of the active SEARCHER toolset. SEARCHER should follow `coverage_sufficient` and `recommended_actions` directly.
+
+The runtime payload may still include a legacy recommendation string mentioning `think_tool`. Treat that string as manual-only guidance rather than a SEARCHER step.
+
+Use `think_tool` only when:
+- you are manually reviewing the saved result outside SEARCHER
+- the surrounding tool environment explicitly exposes `think_tool`
+- you want an extra reflection pass before handing results to another stage
 
 ```python
 think_tool(
-    reflection="Coverage analysis for Part N: ...",   # Your reasoning content
-    iteration=1,                                       # Current thought number
-    max_iterations=2,                                  # Total thoughts planned
-    score_threshold=0.7                                # Optional quality threshold
+    reflection="Coverage summary: gene coverage below target for SNAI1. "
+               "Recommended follow-up is a focused gene search with EMT context.",
+    iteration=1,
+    max_iterations=1,
+    score_threshold=0.7,
 )
 ```
-
-**Use when**: Phase 3 reflection — validating coverage and planning follow-up searches (1-2 thoughts per iteration).
 
 ---
 
 ## Advanced PubMed E-utilities Patterns
 
-Use `search_pubmed_advanced` for targeted precision searches after `search_literature_dynamic` when coverage gaps remain in specific areas.
+Use `search_pubmed_advanced` when coverage gaps remain after direct follow-up or when you need exact PubMed syntax.
 
-**When to use**:
-- Gene coverage < 60% after Phase 3.1: Search missing genes with MeSH terms
-- Need recent papers (last 2 years): Use date filter
-- Need specific study types: Use publication type filter
-- Need pathway-specific papers: Use MeSH subheadings
-- Full control over PubMed query syntax (field tags, proximity operators, etc.)
+Typical reasons to use it:
+- recent papers only
+- publication-type filters
+- MeSH terms
+- field-specific query control
+- proximity operators
 
-**Example queries**:
+Examples:
+
 ```python
-# MeSH subheading for pathway mechanisms
 search_pubmed_advanced(
-    query="TGF-beta signaling/physiology[mh] AND spatial transcriptomics[tiab]"
-)
-
-# Recent systematic reviews
-search_pubmed_advanced(
-    query="cell-cell interaction[tiab] AND systematic review[pt]",
-    min_date="2023/01/01"
-)
-
-# Specific L-R interaction with date range and MeSH terms
-search_pubmed_advanced(
-    query="CDH1[tiab] AND E-cadherin[tiab] AND epithelial mesenchymal[mh]",
-    min_date="2020/01/01"
-)
-
-# Proximity search for co-occurring terms
-search_pubmed_advanced(
-    query='"spatial transcriptomics cell interaction"[TIAB:~5]'
-)
-
-# Multiple genes with publication type filter
-search_pubmed_advanced(
-    query="(VEGFA[tiab] OR TGFB1[tiab]) AND neoplasms[mh] AND review[pt]",
-    min_date="2022/01/01",
-    max_results=10
+    query="TGF-beta signaling[tiab] AND spatial transcriptomics[tiab]",
+    max_results=10,
 )
 ```
 
-**Key advantage over BioMCP**: Full control over PubMed query syntax including MeSH subheadings, field tags, date ranges, proximity operators, and publication type filters. Use this when you know exactly what you're looking for.
+```python
+search_pubmed_advanced(
+    query="cell-cell interaction[tiab] AND systematic review[pt]",
+    min_date="2023/01/01",
+    max_results=10,
+)
+```
 
-**Full E-utilities syntax reference**: See `skills/pubmed-eutils-search/SKILL.md`.
+```python
+search_pubmed_advanced(
+    query="CDH1[tiab] AND E-cadherin[tiab] AND epithelial mesenchymal[mh]",
+    min_date="2020/01/01",
+    max_results=10,
+)
+```
+
+```python
+search_pubmed_advanced(
+    query="(VEGFA[tiab] OR TGFB1[tiab]) AND neoplasms[mh] AND review[pt]",
+    min_date="2022/01/01",
+    max_results=10,
+)
+```
+
+See `skills/pubmed-eutils-search/SKILL.md` for the broader E-utilities syntax reference.
 
 ---
 
 ## Part-Specific Search Focus
 
-| Part | Primary Focus | think_tool Priority | Key Analyses |
-|------|--------------|---------------------|--------------|
-| **Part 1** (Spatial/Pathway) | Spatial patterns, pathway biology | Genes driving spatial organization | 1-1 Spatial, 1-3 Neighborhood, 1-4 Decoupler, 1-5 MISTy |
-| **Part 2** (CCI/NMF) | Cell-cell interaction, NMF patterns | L-R pairs, factor composition | 2-6 LIANA Moran's R, 2-7 NMF, 2-8 Pathway-Factor, 2-9 ctSVG |
-| **Part 3** (L-R Details) | Ligand-receptor biology | Specific L-R mechanisms | 3-10 L-R Visualization, 3-11 L-R Summary |
+| Part | Primary Focus | Follow-up emphasis | Key Analyses |
+|------|---------------|-------------------|--------------|
+| Part 1 | Spatial organization and pathway context | Missing pathway or tissue-specific context | Spatial, neighborhood, decoupler, MISTy |
+| Part 2 | Cell-cell interaction and NMF context | Ligand-receptor gaps and factor composition | LIANA Moran's R, NMF, pathway-factor, ctSVG |
+| Part 3 | Detailed ligand-receptor mechanisms | Receptor-specific mechanism and disease anchoring | L-R visualization and summary |
 
 ---
 
 ## L-R Interaction Search Strategy
 
 ### Required Parameters
-- `genes`: Include both ligand and receptor gene symbols
-- `disease`: Disease context as string
+- `genes`: include both ligand and receptor when they are known
+- `disease`: include disease context
 
 ### Recommended Keyword Combinations
 
-| Analysis Tool | Additional Keywords for query |
-|---------------|-------------------------------|
-| LIANA+ | "LIANA", "ligand receptor inference" |
-| CellChat | "CellChat", "cell communication" |
-| CellPhoneDB | "CellPhoneDB", "receptor ligand" |
-| NicheNet | "NicheNet", "ligand target" |
+| Analysis Tool | Additional Keywords |
+|---------------|---------------------|
+| LIANA+ | `LIANA`, `ligand receptor inference` |
+| CellChat | `CellChat`, `cell communication` |
+| CellPhoneDB | `CellPhoneDB`, `receptor ligand` |
+| NicheNet | `NicheNet`, `ligand target` |
 
-### Disease-specific MeSH Term Examples
-- Alzheimer: "Alzheimer disease", "neurodegeneration", "dementia"
-- Cancer: "neoplasms", "tumor microenvironment", "cancer"
-- Inflammation: "inflammation", "immune response"
+### Disease-Specific Keywords
+- Alzheimer: `Alzheimer disease`, `neurodegeneration`, `dementia`
+- Cancer: `neoplasms`, `tumor microenvironment`, `cancer`
+- Inflammation: `inflammation`, `immune response`
 
 ### Search Examples
+
 ```python
-# Apoe-Trem2 in AD
 search_literature_dynamic(
     genes=["APOE", "TREM2"],
     pathways=["TREM2 signaling", "microglial activation"],
     celltypes=["Microglia"],
     disease="Alzheimer disease",
     max_results=20,
-    output_path="papers.json"
+    output_path="papers.json",
+    data_dir=data_path,
+    enable_lr_pair_queries=True,
 )
+```
 
-# SPP1-CD44 in tumor
-search_literature_dynamic(
-    genes=["SPP1", "CD44"],
-    pathways=["integrin signaling", "ECM remodeling"],
-    celltypes=["Macrophages", "Tumor"],
-    disease="breast cancer",
-    max_results=20,
-    output_path="papers.json"
-)
-
-# Targeted follow-up search
+```python
 search_literature(
-    query="SPP1 CD44 tumor microenvironment macrophage",
-    max_results=10
+    genes=["SPP1", "CD44"],
+    disease="breast cancer",
+    keywords=["tumor microenvironment", "macrophage", "ECM remodeling"],
+    max_results=10,
 )
 ```
 
@@ -210,52 +248,45 @@ search_literature(
 ## Pathway Search Strategy
 
 ### Required Parameters
-- `pathways`: Pathway names from analysis (PROGENy, decoupler)
-- `disease`: Disease context
+- `pathways`: pathway names from analysis
+- `disease`: disease context
 
 ### Major Pathway Keywords
 
 | Pathway | Recommended Search Terms |
 |---------|--------------------------|
-| WNT | "WNT pathway", "WNT signaling", "beta-catenin" |
-| NFkB | "NFkB pathway", "NF-kappa B", "inflammatory signaling" |
-| TNFa | "TNF signaling", "TNF-alpha", "TNFR" |
-| TGFb | "TGF-beta signaling", "SMAD", "fibrosis" |
-| JAK-STAT | "JAK STAT pathway", "cytokine signaling" |
-| PI3K-AKT | "PI3K AKT", "mTOR signaling" |
-| MAPK | "MAPK pathway", "ERK signaling" |
-| Hypoxia | "hypoxia", "HIF-1", "oxygen sensing" |
-| Estrogen | "estrogen receptor", "ER signaling" |
-| Androgen | "androgen receptor", "AR signaling" |
-| EGFR | "EGFR signaling", "ErbB", "receptor tyrosine kinase" |
-| VEGF | "VEGF signaling", "angiogenesis", "vascular" |
-| p53 | "p53 pathway", "tumor suppressor", "apoptosis" |
-
-### Analysis Tool-specific Keywords
-- PROGENy: "pathway activity", "footprint"
-- decoupler: "pathway enrichment", "functional analysis"
-- GSEA: "gene set enrichment"
+| WNT | `WNT pathway`, `WNT signaling`, `beta-catenin` |
+| NFkB | `NFkB pathway`, `NF-kappa B`, `inflammatory signaling` |
+| TNFa | `TNF signaling`, `TNF-alpha`, `TNFR` |
+| TGFb | `TGF-beta signaling`, `SMAD`, `fibrosis` |
+| JAK-STAT | `JAK STAT pathway`, `cytokine signaling` |
+| PI3K-AKT | `PI3K AKT`, `mTOR signaling` |
+| MAPK | `MAPK pathway`, `ERK signaling` |
+| Hypoxia | `hypoxia`, `HIF-1`, `oxygen sensing` |
+| EGFR | `EGFR signaling`, `ErbB`, `receptor tyrosine kinase` |
+| VEGF | `VEGF signaling`, `angiogenesis`, `vascular` |
 
 ### Search Examples
+
 ```python
-# Pathway-focused search (no specific genes)
 search_literature_dynamic(
     genes=[],
     pathways=["WNT", "TGFb", "Hypoxia"],
     celltypes=["Fibroblast", "Tumor"],
     disease="breast cancer",
     max_results=20,
-    output_path="papers.json"
+    output_path="papers.json",
+    data_dir=data_path,
+    enable_lr_pair_queries=True,
 )
+```
 
-# With pathway-associated genes
-search_literature_dynamic(
-    genes=["CTNNB1", "WNT5A", "AXIN2"],
-    pathways=["WNT"],
-    celltypes=["Epithelial"],
-    disease="colorectal cancer",
-    max_results=20,
-    output_path="papers.json"
+```python
+search_literature(
+    genes=[],
+    disease="breast cancer",
+    keywords=["TGF-beta signaling", "fibroblast", "stroma"],
+    max_results=10,
 )
 ```
 
@@ -264,39 +295,40 @@ search_literature_dynamic(
 ## Gene/Marker Search Strategy
 
 ### Required Parameters
-- `genes`: List of target gene symbols (top 30 from search_context pre-filter)
-- `celltypes`: Associated cell types
+- `genes`: SEARCHER-ready gene symbols from `search_context["genes"]`
+- `celltypes`: associated cell types when available
 
-### Context-specific Search Terms
+### Context-Specific Keywords
 
-| Context | Recommended Keywords for query |
-|---------|--------------------------------|
-| Spatial marker | "spatial transcriptomics", "spatial distribution" |
-| Cell type marker | "cell type", "marker gene", "single cell" |
-| DEG | "differential expression", "upregulated", "downregulated" |
-| Cluster marker | "cluster", "subpopulation", "heterogeneity" |
-| EMT markers | "epithelial mesenchymal transition", "E-cadherin", "vimentin" |
+| Context | Recommended Keywords |
+|---------|----------------------|
+| Spatial marker | `spatial transcriptomics`, `spatial distribution` |
+| Cell type marker | `cell type`, `marker gene`, `single cell` |
+| DEG | `differential expression`, `upregulated`, `downregulated` |
+| Cluster marker | `cluster`, `subpopulation`, `heterogeneity` |
+| EMT marker | `epithelial mesenchymal transition`, `E-cadherin`, `vimentin` |
 
 ### Search Examples
+
 ```python
-# Spatial marker genes
 search_literature_dynamic(
     genes=["GFAP", "AQP4", "SLC1A2"],
     pathways=[],
     celltypes=["Astrocyte"],
     disease="Alzheimer disease",
     max_results=20,
-    output_path="papers.json"
+    output_path="papers.json",
+    data_dir=data_path,
+    enable_lr_pair_queries=True,
 )
+```
 
-# EMT-related markers
-search_literature_dynamic(
-    genes=["CDH1", "VIM", "SNAI1", "ZEB1"],
-    pathways=["EMT", "TGFb"],
-    celltypes=["Tumor", "Epithelial"],
+```python
+search_literature(
+    genes=["CDH1"],
     disease="breast cancer",
-    max_results=20,
-    output_path="papers.json"
+    keywords=["E-cadherin", "EMT", "epithelial"],
+    max_results=10,
 )
 ```
 
@@ -304,29 +336,33 @@ search_literature_dynamic(
 
 ## Search Result Optimization
 
-### `max_results` Setting
-- 25-30: Standard search (meets quality threshold)
-- 10: Targeted follow-up search
-- 30-40: Comprehensive literature review
+### `max_results` Settings
+- 15 to 30: standard primary search
+- 10: targeted follow-up search
+- 30 to 40: broader literature sweep when paper count stays low
 
 ### When Results Are Scarce
-1. Use `search_literature` with broader query terms
-2. Remove specific cell types to expand scope
-3. Search with genes only: `search_literature(query="GENE1 GENE2 disease")`
-4. Add synonyms: "E-cadherin" for CDH1, "TGF-beta" for TGFB1
+1. Broaden the disease phrasing.
+2. Remove overly specific cell types from the follow-up query.
+3. Use `search_literature` with broader structured keywords.
+4. Use `search_pubmed_advanced` when you know the exact PubMed phrasing you want.
 
-### Coverage Optimization (per SKILL.md quality criteria)
-- Gene coverage >= 60%
-- Pathway coverage >= 50%
-- Total papers >= 25
+### Coverage Targets
+- At least 15 papers
+- At least 60 percent gene coverage
+- At least 50 percent pathway coverage
+- Up to 2 SEARCHER follow-up rounds after the primary call
 
-If coverage is insufficient after initial search:
+### Example Follow-Up Pattern
+
 ```python
-# Follow-up for missing genes
-search_literature(
-    query="MISSING_GENE disease_context spatial",
-    max_results=10
-)
+if not result["coverage_sufficient"]:
+    search_literature(
+        genes=["MISSING_GENE"],
+        disease="disease context",
+        keywords=["pathway keyword", "cell type keyword"],
+        max_results=10,
+    )
 ```
 
 ---
@@ -336,80 +372,78 @@ search_literature(
 ### Tool Selection by Analysis Type
 
 | Analysis Type | Primary Tool | Follow-up Tool | Key Parameters |
-|--------------|--------------|----------------|----------------|
-| L-R Interaction | `search_literature_dynamic` | `search_literature` | genes=[ligand, receptor], disease |
-| Pathway | `search_literature_dynamic` | `search_literature` | pathways=[...], disease |
-| Gene Markers | `search_literature_dynamic` | `search_literature` | genes=[...], celltypes |
-| Specific Query | `search_literature` | — | query=specific_terms |
-| Advanced MeSH | `search_pubmed_advanced` | — | MeSH field tags, date filter |
+|---------------|--------------|----------------|----------------|
+| L-R interaction | `search_literature_dynamic` | `search_literature` | `genes=[ligand, receptor]`, `disease`, `enable_lr_pair_queries=True` |
+| Pathway | `search_literature_dynamic` | `search_literature` | `pathways=[...]`, `disease` |
+| Gene markers | `search_literature_dynamic` | `search_literature` | `genes=[...]`, `celltypes=[...]` |
+| Precision PubMed syntax | `search_pubmed_advanced` | none | `query=...`, date filters, MeSH filters |
 
-### Tool Selection Flow
-```
-search_literature_dynamic (primary — handles fallback internally)
-        │
-        ├─ Success → Use results
-        │
-        └─ Insufficient coverage (Phase 3 reflect)
-                │
-                ├─ search_literature (targeted follow-up for gaps)
-                │
-                └─ search_pubmed_advanced (precision MeSH queries)
-```
+### Follow-Up Flow
 
-### Quality Check Thresholds
+1. Run `search_literature_dynamic`.
+2. Inspect `coverage_sufficient`.
+3. If it is false, inspect `recommended_actions`.
+4. Choose the smallest direct follow-up:
+   - `search_literature` for structured gap filling
+   - `search_pubmed_advanced` for exact PubMed syntax
+5. Stop after the result is good enough or the follow-up limit is reached.
 
-| Quality Check | Threshold | Action if Failed |
-|--------------|-----------|------------------|
-| Total Papers | >= 25 | Broaden search terms |
-| Gene coverage | >= 60% | Add synonyms, search individually |
-| Pathway coverage | >= 50% | Add "signaling", disease context |
-| Max iterations | 3 | Proceed with warning |
+### Quality Thresholds
+
+| Check | Target | Typical response if below target |
+|-------|--------|----------------------------------|
+| Total papers | At least 15 | Broaden disease scope or add supporting keywords |
+| Gene coverage | At least 60 percent | Add gene aliases or targeted gene follow-up |
+| Pathway coverage | At least 50 percent | Add pathway-specific keywords such as `signaling` |
+| SEARCHER follow-up rounds | 2 | Proceed with warning if critical gaps remain |
 
 ### Phase-to-Tool Mapping
 
-| Phase | Tool | Thoughts | Purpose | Output |
-|-------|------|----------|---------|--------|
-| Phase 1 (Extract) | `load_analysis_data` | — | Load `search_context` | `/search_context.json` |
-| Phase 2 (Search) | `search_literature_dynamic` | — | Primary search | `/papers.json` (auto) |
-| Phase 3 (Reflect) | `think_tool` | 1-2 | Validate coverage | (internal) |
-| Phase 3 follow-up | `search_literature` | — | Gap filling | append to `/papers.json` |
-| Phase 4 (Output) | (auto-saved) | — | — | `/papers.json` |
+| Phase | Tool | Purpose | Output |
+|-------|------|---------|--------|
+| Phase 1 | `load_analysis_data` | Load SEARCHER-ready `search_context` | `/search_context.json` |
+| Phase 2 | `search_literature_dynamic` | Run the primary search | `/papers.json` plus compact summary |
+| Phase 3 | `search_literature` or `search_pubmed_advanced` | Targeted follow-up from `recommended_actions` | Updated evidence base |
+| Phase 4 | auto-save via `output_path` | Persist full result for downstream stages | `/papers.json` |
 
-### Thought Types for think_tool
+### Common `recommended_actions` Patterns
 
-| Thought Type | Key Content | should_continue |
-|--------------|-------------|-------------------|
-| Coverage Reflection | Coverage %, gaps | True if gaps |
-| Follow-up Strategy | Targeted queries | False |
+| Pattern | Meaning | Typical follow-up |
+|---------|---------|------------------|
+| Missing genes listed | Symbol coverage is weak | `search_literature` with gene aliases and disease keywords |
+| Missing pathways listed | Pathway context is weak | `search_literature` with pathway-specific keywords or `search_pubmed_advanced` |
+| Too few papers | Breadth is weak | Broaden disease phrasing or increase `max_results` |
 
 ---
 
 ## Interpretation Output Format
 
-> **Note**: The SEARCHER subagent's responsibility ends at `/papers.json`. The interpretation paragraph and reference list formatting below are consumed by the INTERPRETER subagent, documented here for end-to-end traceability.
+Note: SEARCHER ends at `/papers.json`. The paragraph and reference formatting below are consumed by INTERPRETER and are kept here for end-to-end traceability.
 
 ### Interpretation Paragraph Template
-```
+
+```text
 Our finding of [analysis result] is consistent with previous reports
 demonstrating that [paper's key finding] (Author et al., Year; PMID: xxxxx).
 Furthermore, [expand context] (Author2 et al., Year; PMID: xxxxx).
 ```
 
-**Writing Principles**:
-- State analysis result first
-- Use connecting phrases: "consistent with", "in line with", "supports"
-- Cite 2-3 papers per paragraph with PMIDs
-- Include specific statistics from analysis (Moran's R, p-values, FDR)
+Writing principles:
+- state the analysis result first
+- connect it to supporting literature
+- cite PMIDs from `/papers.json`
+- include specific statistics from the analysis
 
 ### Reference List Format
+
 ```markdown
 ## References
 
 1. Author et al. (Year) Title. Journal. PMID: xxxxx
-   -> Relevance: [How this paper supports the finding]
+   Relevance: [How this paper supports the finding]
 
 2. Author et al. (Year) Title. Journal. PMID: xxxxx
-   -> Relevance: [How this paper supports the finding]
+   Relevance: [How this paper supports the finding]
 ```
 
 ---
@@ -417,52 +451,50 @@ Furthermore, [expand context] (Author2 et al., Year; PMID: xxxxx).
 ## Full Example: Apoe-Trem2 in Alzheimer Disease
 
 ### Input
-> Found enriched Apoe-Trem2 interaction (LIANA score: 2.3, p=0.001) in microglia surrounding amyloid plaques in AD mouse brain.
+Found enriched Apoe-Trem2 interaction (LIANA score: 2.3, p=0.001) in microglia surrounding amyloid plaques in an Alzheimer disease mouse brain dataset.
 
 ### Phase 1: Extract Context
-- Analysis type: L-R Interaction
+- Analysis type: L-R interaction
 - Key genes: APOE, TREM2
 - Cell types: Microglia
-- Disease: Alzheimer's disease
+- Disease: Alzheimer disease
 
-### Phase 2: Execute Dynamic Search
-```bash
-python scripts/search_literature_dynamic.py \
-  --genes "APOE,TREM2" \
-  --pathways "TREM2 signaling,microglial activation" \
-  --celltypes "Microglia" \
-  --disease "Alzheimer disease" \
-  --max-results 20 \
-  --output-path "papers.json"
-# Fallback handled internally — result contains compact summary with total_papers, coverage
-```
+### Phase 2: Run Primary Search
 
-**Dynamic search benefits in this example**:
-- LLM understands APOE-TREM2 is a well-known AD pathway
-- Generates optimized queries like "TREM2 APOE microglia neurodegeneration"
-- Better coverage of mechanistic papers
-- Automatic internal fallback if LLM fails
-
-### Phase 3: Reflect on Coverage (think_tool)
 ```python
-think_tool(
-    reflection="Coverage: 28 papers found. Genes: APOE, TREM2 (100%). "
-               "Pathways: TREM2 signaling (50%). All thresholds met. "
-               "No follow-up needed.",
-    iteration=1,
-    max_iterations=1
+result = search_literature_dynamic(
+    genes=["APOE", "TREM2"],
+    pathways=["TREM2 signaling", "microglial activation"],
+    celltypes=["Microglia"],
+    disease="Alzheimer disease",
+    max_results=20,
+    output_path="papers.json",
+    data_dir=data_path,
+    enable_lr_pair_queries=True,
 )
 ```
-- Papers found: 28 (pass >= 25)
-- Genes covered: ["APOE", "TREM2"] (100% pass)
-- Pathways covered: ["TREM2 signaling"] (50% pass)
 
-### Phase 4: Output (Auto-Saved)
-Papers already auto-saved via `output_path` in Phase 2 — no `write_file` needed.
+Expected compact summary shape:
+
 ```python
-# result = {"saved_to": "/path/to/papers.json", "total_papers": 28, "coverage": {...}}
-# Use read_file("/papers.json") if you need to inspect the saved data
+{
+    "saved_to": "/path/to/papers.json",
+    "total_papers": 28,
+    "coverage_sufficient": True,
+    "recommended_actions": [],
+}
 ```
 
-### Generated Interpretation (by INTERPRETER)
-> Our finding of enriched Apoe-Trem2 interaction (LIANA score: 2.3, p=0.001) in plaque-associated microglia is consistent with previous reports demonstrating that the TREM2-APOE pathway drives the transcriptional phenotype of disease-associated microglia (Krasemann et al., 2017; PMID: 28930663). This interaction has been shown to be critical for microglial response to amyloid pathology (Zhou et al., 2020; PMID: 31932797).
+### Phase 3: Inspect Coverage and Decide
+- Papers found: 28
+- Genes covered: APOE and TREM2
+- Pathway coverage reached the threshold
+- `coverage_sufficient` is `True`, so no direct SEARCHER follow-up is needed
+
+### Phase 4: Use Saved Output
+
+The full result is already saved to `/papers.json`. Downstream stages can read that file directly without asking SEARCHER to rewrite it.
+
+### Generated Interpretation by INTERPRETER
+
+Our finding of enriched Apoe-Trem2 interaction (LIANA score: 2.3, p=0.001) in plaque-associated microglia is consistent with reports that the TREM2-APOE pathway drives the transcriptional phenotype of disease-associated microglia (Krasemann et al., 2017; PMID: 28930663). This interaction has also been linked to microglial response to amyloid pathology (Zhou et al., 2020; PMID: 31932797).

@@ -1,8 +1,25 @@
 #!/usr/bin/env python3
 """CLI wrapper for Deep Interpreter's search_literature_dynamic tool.
 
-Run from the skill directory:
-    python scripts/search_literature_dynamic.py --help
+Use this script for manual shell reruns, smoke tests, or debugging coverage
+gaps outside the SEARCHER subagent. The authoritative SEARCHER workflow lives
+in the skill docs and active subagent prompt; this wrapper is a convenience
+entrypoint for humans.
+
+The script walks upward until it finds
+`src/agents/deep_interpreter/tools/literature.py`, then invokes
+`search_literature_dynamic` with CLI-provided arguments. Required argument:
+`--disease`. Common optional arguments include `--genes`, `--pathways`,
+`--celltypes`, `--max-results`, `--output-path`, `--data-dir`, and
+`--rerank-mode`.
+
+Example:
+    python scripts/search_literature_dynamic.py \
+        --genes "CDH1,TGFB1,VIM" \
+        --disease "breast cancer" \
+        --max-results 20 \
+        --output-path papers.json \
+        --data-dir /tmp/literature-smoke
 """
 
 from __future__ import annotations

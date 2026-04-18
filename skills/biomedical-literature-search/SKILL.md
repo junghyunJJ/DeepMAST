@@ -1,34 +1,35 @@
 ---
 name: biomedical-literature-search
-description: Complete 4-phase PubMed literature search workflow for cell-cell interaction
-  (CCI) and spatial transcriptomics interpretation. Use when the SEARCHER subagent
-  needs to find papers supporting ligand-receptor interactions, pathway enrichment,
-  gene/marker expression, or disease-context evidence with coverage checks (GTE 25
-  papers, GTE 60% gene coverage, GTE 50% pathway coverage). Orchestrates `search_literature_dynamic`
-  (primary, LLM-powered, auto-fallback to fixed-strategy) and `search_literature`
-  for targeted follow-up, auto-saving results to `/papers.json`.
+description: SEARCHER-facing PubMed literature search workflow for Deep Interpreter
+  CCI and spatial transcriptomics analysis. Use when the SEARCHER subagent
+  needs ligand-receptor, pathway, marker, or disease-context evidence, must
+  save unified results to `/papers.json`, and must drive follow-up from
+  `coverage_sufficient` plus `recommended_actions` using thresholds of at least
+  15 papers, 60 percent gene coverage, and 50 percent pathway coverage.
+  Treat `search_literature_dynamic` as the primary tool, `search_literature`
+  as targeted follow-up, and `search_pubmed_advanced` as precision fallback.
 metadata:
-  author: DeepMAST Deep Interpreter
-  version: 1.1.0
+  author: Junghyun Jung
+  version: 1.2.0
 ---
 
 # Biomedical Literature Search Strategy
 
-Complete 4-phase literature search workflow for interpreting ST/CCI analysis results and generating publication-style output with supporting references.
+SEARCHER-facing literature search workflow for interpreting ST and CCI analysis results and producing a single grounded paper set for downstream interpretation.
 
 ## Purpose
 
 This skill defines the SEARCHER subagent's core workflow:
-- **WHEN** to search (timing by interpretation phase)
-- **WHAT** to search (priority by analysis type)
-- **HOW** to validate (quality criteria)
-- **WHERE** to write outputs (virtual filesystem)
+- **WHEN** to search: before interpretation, after `load_analysis_data` prepares context
+- **WHAT** to search: ligand-receptor biology, pathway context, marker evidence, and disease anchoring
+- **HOW** to follow up: inspect `coverage_sufficient` and `recommended_actions`, then run direct follow-up searches only when needed
+- **WHERE** to write outputs: unified `/papers.json` shared by downstream readers
 
-> **Progressive disclosure**: This file contains only the core 4-phase workflow and critical rules. Detailed tool API, advanced E-utilities patterns, part-specific focus, quick reference card, interpretation output format, and a full worked example all live in `references/search_strategies.md`. Read that file on demand.
+Progressive disclosure: this file keeps the SEARCHER workflow compact. Detailed tool API, E-utilities patterns, part-specific search focus, quick reference cards, interpretation output format, and a worked example live in `references/search_strategies.md`.
 
-## Script Entry Point
+## Manual Script Entry Point
 
-Run the primary wrapper from the skill directory:
+The shell wrapper is for manual reruns, smoke tests, and debugging outside the SEARCHER subagent. It is not the authoritative SEARCHER workflow.
 
 ```bash
 python scripts/search_literature_dynamic.py \
@@ -37,148 +38,165 @@ python scripts/search_literature_dynamic.py \
   --celltypes "Tumor,Fibroblast,Macrophages" \
   --disease "breast cancer" \
   --max-results 30 \
-  --output-path "papers.json"
+  --output-path "papers.json" \
+  --data-dir "/path/to/results"
 ```
 
-The wrapper calls `src/agents/deep_interpreter/tools/literature.py::search_literature_dynamic` and prints JSON output.
+The wrapper calls `src/agents/deep_interpreter/tools/literature.py::search_literature_dynamic` and prints JSON output. SEARCHER-specific options such as `enable_lr_pair_queries` are available through the tool call, not this wrapper.
 
 ## Virtual Filesystem Contract
 
 | File | Phase | Content |
 |------|-------|---------|
-| `/data_path.txt` | Read | Real data directory path (pre-written by orchestrator) |
-| `/search_context.json` | Phase 1 | Unified search context (genes, pathways, celltypes) |
-| `/papers.json` | Phase 2/4 | Auto-saved search results (all parts) |
+| `/data_path.txt` | Read | Real data directory path, pre-written by the orchestrator |
+| `/search_context.json` | Phase 1 | Unified search context saved for traceability |
+| `/papers.json` | Phase 2 and Phase 4 | Auto-saved literature results shared across parts |
 
 ---
 
 ## Phase 1: Extract Context
 
 ### Step 1.1: Load Data Path
-Read **`/data_path.txt`** to get the real data directory path.
+Read `read_file("/data_path.txt")` and keep the stripped path for every later call that uses `output_path`.
 
 ### Step 1.2: Load Analysis Data
-Call **`load_analysis_data`** with the exact path from `/data_path.txt`. The tool returns pre-extracted `search_context` fields — do NOT parse raw CSVs manually.
+Call `load_analysis_data` with the exact path from `/data_path.txt`. Do not parse raw CSV files manually.
 
-### Step 1.3: Use `search_context` (MANDATORY)
+### Step 1.3: Use `search_context` Directly
 
-The `load_analysis_data` tool returns a unified context:
+`load_analysis_data` returns a SEARCHER-ready `search_context` payload. Key fields include:
 
 | Field | Contains |
 |-------|----------|
-| `genes` | Top 30 by hybrid score (0.7×max_combinedscore + 0.3×freq) — **use directly** |
-| `all_genes` | Full unique gene set (reference only, do NOT use for search) |
-| `pathways` | Pathway names (e.g., EGFR, Hypoxia, TGFb, MAPK, PI3K) |
-| `celltypes` | Cell type names (e.g., B cells, Endothelial, Tumor, Stromal) |
-| `context_type` | `lr_interaction` / `pathway` / `marker` |
-| `applicable_parts` | List of Part numbers (1, 2, 3) |
-| `stats` | `{total_genes, search_genes, total_pathways, total_celltypes}` |
+| `genes` | Search-ready genes. This list may already include novel candidate genes and should be used as-is. |
+| `all_genes` | Full unique gene set for reference only. Do not substitute this for `genes`. |
+| `candidate_genes` | Optional novel genes added from prioritized pair context. |
+| `lr_pairs` | Optional top ligand-receptor pairs for SEARCHER-only pair query injection. |
+| `pathways` | Pathway names from upstream analysis. |
+| `celltypes` | Cell type names from upstream analysis. |
+| `context_type` | Context classification such as `lr_interaction`, `pathway`, or `marker`. |
+| `applicable_parts` | Parts that this context supports. |
+| `stats` | Summary counts including search genes, pathways, cell types, and optional search pairs. |
 
 ### Step 1.4: Write Context File
-Write the extracted context to **`/search_context.json`** for downstream use.
+Write the extracted context to `/search_context.json` for downstream inspection.
 
 ---
 
 ## Phase 2: Search Literature
 
-### Step 2.1: Execute LLM-Powered Dynamic Search (Primary)
+### Step 2.1: Run the Primary SEARCHER Tool
 
-Use **`scripts/search_literature_dynamic.py`** — the CLI wrapper for the primary tool:
+SEARCHER should use the direct tool call, not the shell wrapper, as its primary path:
 
-```bash
-python scripts/search_literature_dynamic.py \
-  --genes "CDH1,TGFB1,VIM,ERBB2,MMP2" \
-  --pathways "EMT,TGFB,WNT,Hypoxia" \
-  --celltypes "Tumor,Fibroblast,Macrophages" \
-  --disease "breast cancer" \
-  --max-results 20 \
-  --output-path "papers.json"
+```python
+data_path = read_file("/data_path.txt").strip()
+
+result = search_literature_dynamic(
+    genes=search_context["genes"],
+    pathways=search_context["pathways"],
+    celltypes=search_context["celltypes"],
+    disease="breast cancer",
+    output_path="papers.json",
+    data_dir=data_path,
+    enable_lr_pair_queries=True,
+)
 ```
 
-**Why dynamic search first?**
-- LLM understands biological context and generates optimized queries
-- Adapts to Part-specific analysis types (L-R, pathway, spatial)
-- Better relevance for specialized disease/tissue contexts
+Important SEARCHER rules:
+- Always pass `output_path="papers.json"` so the full result is saved without truncation.
+- Always pass `data_dir` from `/data_path.txt` when using `output_path`.
+- `enable_lr_pair_queries=True` is SEARCHER-only. It allows the tool to use saved pair context when available.
+- SEARCHER does not need to set `coverage_weighted_sort` manually. The tool handles the SEARCHER-specific behavior internally when pair queries are enabled.
 
 ### Step 2.2: Automatic Internal Fallback
-`search_literature_dynamic` handles fallback internally. If LLM query generation fails, it automatically switches to a fixed 4-strategy search.
+`search_literature_dynamic` handles fallback internally. If LLM query generation fails, it automatically switches to a fixed search strategy. Do not call a separate fallback tool.
 
-**You do NOT call a separate fallback tool.**
-
-### Step 2.3: Advanced E-utilities (Optional, Gap-Filling)
-
-If coverage gaps remain after Phase 3 reflection, use `search_pubmed_advanced` for precision MeSH / date / publication-type filters.
-
-→ See `references/search_strategies.md` § "Advanced PubMed E-utilities Patterns" for full syntax. Also cross-references `skills/pubmed-eutils-search/SKILL.md`.
+### Step 2.3: Precision Gap Filling
+If follow-up gaps remain after reviewing `recommended_actions`, use:
+- `search_literature` for targeted gene or pathway follow-up with the real structured signature
+- `search_pubmed_advanced` when you need exact PubMed syntax, MeSH filters, date filters, or publication-type filters
 
 ### Step 2.4: Tool Returns
-Compact summary (when `output_path` provided): `saved_to`, `total_papers`, `coverage`, `paper_titles`, `message`.
+When `output_path` is set, the compact summary includes:
+- `saved_to`
+- `output_path`
+- `total_papers`
+- `coverage`
+- `paper_titles`
+- `search_method`
+- `iterations`
+- `coverage_sufficient`
+- `recommended_actions`
+- `filter_stage`
+- rerank counters
+- `message`
 
-→ Full API parameters and return fields: `references/search_strategies.md` § "Complete Tool API Reference".
+`coverage_sufficient` and `recommended_actions` are the fields SEARCHER uses to decide whether follow-up is needed.
 
 ---
 
-## Phase 3: Reflect (Quality Loop)
+## Phase 3: Coverage-Driven Follow-Up
 
-**MANDATORY**: Use **`think_tool`** for quality validation and gap analysis.
+For SEARCHER, `coverage_sufficient` and `recommended_actions` are authoritative. Follow-up is coverage-driven, not a separate mandatory reflection phase.
 
-### Quality Criteria
+### Coverage Targets
 
-| Criterion | Threshold | Action if Failed |
-|-----------|-----------|------------------|
-| **Total Papers** | >= 25 unique papers | Broaden search terms |
-| **Gene Coverage** | >= 60% of priority genes | Add synonyms, search individually |
-| **Pathway Coverage** | >= 50% of priority pathways | Add "signaling", disease context |
-| **Max Iterations** | 3 | Proceed with warning |
+| Criterion | Target | Typical response if below target |
+|-----------|--------|----------------------------------|
+| Total papers | At least 15 unique papers | Broaden disease context or add broader supporting keywords |
+| Gene coverage | At least 60 percent of priority genes | Run targeted gene follow-up with synonyms or related context keywords |
+| Pathway coverage | At least 50 percent of priority pathways | Add pathway-specific keywords such as `signaling` plus disease context |
+| SEARCHER follow-up rounds | Up to 2 direct follow-up rounds | Proceed with a warning if important gaps remain after the limit |
 
-### Reflection Workflow
+### Follow-up Logic
 
-**Thought 1 — Coverage Analysis**:
-```python
-think_tool(
-    reflection="Coverage analysis for Part {N}: "
-               "{GENES_COVERED}/{TOTAL_GENES} priority genes covered ({X}%), "
-               "{PATHWAYS_COVERED}/{TOTAL_PATHWAYS} pathways covered ({Y}%). "
-               "Gaps identified: {MISSING_ITEMS}. "
-               "Follow-up search needed: {YES/NO}",
-    iteration=1,
-    max_iterations=2
-)
-```
+1. Inspect `coverage_sufficient`.
+2. If it is `True`, proceed without additional SEARCHER follow-up.
+3. If it is `False`, inspect `recommended_actions` and execute the smallest targeted follow-up needed.
+4. Re-run or supplement the search only until the missing coverage is reasonably addressed.
 
-**Thought 2 — Gap-Targeted Strategy** (only if coverage below threshold):
-```python
-think_tool(
-    reflection="Targeted follow-up: Searching {MISSING_GENES} with synonyms. "
-               "Broader terms for {PATHWAY}: '{PATHWAY} signaling {DISEASE}'.",
-    iteration=2,
-    max_iterations=2
-)
-```
+### Targeted Follow-up Examples
 
-### Follow-up Search (only if needed)
+Use `search_literature` for structured gap filling:
 
-Use `search_literature` for targeted single-query searches:
 ```python
 search_literature(
-    query="SNAI1 EMT breast cancer spatial",
+    genes=["SNAI1"],
+    disease="breast cancer",
+    keywords=["EMT", "spatial transcriptomics", "E-cadherin"],
     max_results=10,
-    include_preprints=True
 )
 ```
 
-→ Full reflection workflow, coverage-check logic, and part-specific priorities: `references/search_strategies.md`.
+Use `search_pubmed_advanced` when you need precise PubMed syntax:
+
+```python
+search_pubmed_advanced(
+    query="TGF-beta signaling[tiab] AND breast cancer[tiab] AND review[pt]",
+    max_results=10,
+)
+```
+
+### `think_tool` Clarification
+
+The runtime payload may still include a legacy recommendation string mentioning `think_tool`. SEARCHER should treat that string as manual-only guidance, not as a required SEARCHER step, because the active SEARCHER toolset does not include `think_tool`.
+
+If you are working outside SEARCHER and explicitly have access to `think_tool`, you may use it as an optional reflection aid while reviewing unresolved gaps. Do not model Phase 3 as a mandatory `think_tool` loop.
 
 ---
 
-## Phase 4: Output (Auto-Saved via `output_path`)
+## Phase 4: Output
 
-### Papers Are Auto-Saved
-When you call `search_literature_dynamic` with `output_path`, the tool saves complete results (all papers with full abstracts) directly to file. **You do NOT call `write_file` for papers.**
+### Auto-Saved Papers
+When `search_literature_dynamic` runs with `output_path`, the tool writes the full result to `data_dir/output_path`. Do not call `write_file` for papers.
 
-The saved file is guaranteed to have `total_papers == len(papers)` (no truncation). Use `read_file('/papers.json')` if you need to inspect the saved data.
+Use `read_file("/papers.json")` only if you need to inspect the saved result after the primary call.
 
-### Saved File Format
+### Saved File Shape
+
+The saved file contains the full result, not the compact summary. Expect fields such as:
+
 ```json
 {
   "papers": [
@@ -190,6 +208,12 @@ The saved file is guaranteed to have `total_papers == len(papers)` (no truncatio
       "relevance_to_context": "Directly discusses CDH1 role in EMT"
     }
   ],
+  "generated_queries": [
+    {
+      "query": "CDH1 EMT breast cancer",
+      "source": "llm"
+    }
+  ],
   "coverage": {
     "genes_covered": ["CDH1", "TGFB1", "VIM"],
     "genes_missing": ["SNAI1"],
@@ -198,8 +222,15 @@ The saved file is guaranteed to have `total_papers == len(papers)` (no truncatio
     "pathways_coverage_pct": 100,
     "total_papers": 28
   },
-  "search_iterations": 2,
-  "search_queries": ["\"CDH1\"[Gene] AND \"breast cancer\"[Title/Abstract]"]
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 20
+    }
+  ],
+  "coverage_sufficient": true,
+  "recommended_actions": []
 }
 ```
 
@@ -207,56 +238,98 @@ The saved file is guaranteed to have `total_papers == len(papers)` (no truncatio
 
 ## Common Mistakes to Avoid
 
-### ❌ FORBIDDEN
-- **DO NOT** use `read_file` on raw `.csv` files — causes context overflow
-- **DO NOT** parse raw CSV data manually
-- **DO NOT** extract genes from pathway enrichment `name` column — those are pathways, not genes
-- **DO NOT** override `search_context["genes"]` with `all_genes` — top 30 is pre-filtered
-- **DO NOT** call `write_file` for papers when using `output_path` — auto-save handles it
-- **DO NOT** proceed with < 60% gene coverage without follow-up searches
-- **DO NOT** skip Phase 3 reflection after search
+### Avoid
+- Do not read raw `.csv` files with `read_file`.
+- Do not replace `search_context["genes"]` with `all_genes`.
+- Do not treat the shell wrapper as the authoritative SEARCHER path.
+- Do not omit `data_dir` when using `output_path`.
+- Do not call `write_file` for papers after the dynamic search already auto-saved them.
+- Do not treat the legacy `think_tool` recommendation string as a required SEARCHER action.
 
-### ✅ CORRECT
-- **USE** `search_context` field from `load_analysis_data` — all terms pre-extracted
-- **USE** `search_literature_dynamic` as PRIMARY search tool (handles fallback internally)
-- **USE** `think_tool` for quality validation in Phase 3 (1-2 thoughts)
-- **USE** `search_literature` for targeted follow-up on specific gaps
-- **ALWAYS** pass `output_path="papers.json"` to auto-save
-- **WRITE** unified `/papers.json` (all parts)
+### Do Instead
+- Use `search_context` directly from `load_analysis_data`.
+- Treat `search_context["genes"]` as the SEARCHER-ready gene list, even when it already includes candidate genes.
+- Use `search_literature_dynamic` first, then inspect `coverage_sufficient` and `recommended_actions`.
+- Use `search_literature` for structured targeted follow-up.
+- Use `search_pubmed_advanced` for precise PubMed syntax and filters.
+- Keep a single unified `/papers.json` for the SEARCHER output set.
+
+---
+
+## Examples
+
+### Example 1: SEARCHER Follow-Up Using `recommended_actions`
+
+```python
+data_path = read_file("/data_path.txt").strip()
+
+result = search_literature_dynamic(
+    genes=search_context["genes"],
+    pathways=search_context["pathways"],
+    celltypes=search_context["celltypes"],
+    disease="breast cancer",
+    output_path="papers.json",
+    data_dir=data_path,
+    enable_lr_pair_queries=True,
+)
+
+if not result["coverage_sufficient"]:
+    search_literature(
+        genes=["SNAI1"],
+        disease="breast cancer",
+        keywords=["EMT", "E-cadherin"],
+        max_results=10,
+    )
+```
+
+### Example 2: Manual Shell Rerun
+
+```bash
+python scripts/search_literature_dynamic.py \
+  --genes "APOE,TREM2" \
+  --pathways "TREM2 signaling,microglial activation" \
+  --celltypes "Microglia" \
+  --disease "Alzheimer disease" \
+  --max-results 10 \
+  --output-path "papers.json" \
+  --data-dir "/tmp/literature-smoke"
+```
 
 ---
 
 ## Troubleshooting
 
 ### Error: 0 papers returned after disease filter
-**Cause**: `enforce_disease_match=True` filtered out all results because no paper matched the disease context string exactly.
-**Solution**: Retry with `--no-enforce-disease-match` (CLI) or `enforce_disease_match=False` (tool call). Alternatively, use a broader disease term (e.g., "cancer" instead of "triple-negative breast cancer").
+**Cause**: `enforce_disease_match=True` filtered out everything because the disease string was too specific.
+**Solution**: Retry with `--no-enforce-disease-match` in the wrapper or `enforce_disease_match=False` in the tool call. You can also broaden the disease term.
 
-### Error: Gene coverage < 60% after 3 iterations
-**Cause**: Search terms too specific, or gene symbols missing from the PubMed abstracts.
-**Solution**: Use `search_literature(query="GENE synonym disease")` for individual missing genes with known synonyms (e.g., `CDH1` → `"E-cadherin"`, `TGFB1` → `"TGF-beta"`). Accept residual gaps after iteration cap and note them in Phase 3 reflection.
+### Error: Gene coverage remains low after SEARCHER follow-up
+**Cause**: The initial search was too narrow, or the missing gene is usually described with aliases rather than the symbol.
+**Solution**: Run `search_literature` with structured `genes`, `disease`, and `keywords` arguments. For example, search `genes=["CDH1"]` with keywords such as `"E-cadherin"` and `"EMT"`. Limit SEARCHER to two direct follow-up rounds, then proceed with a warning if the gap remains.
 
 ### Error: `load_analysis_data` returned empty `search_context`
-**Cause**: `/data_path.txt` points to a wrong directory, or the analysis result files are missing.
-**Solution**: `read_file('/data_path.txt')` to verify. Check that `interest_sig_liana.csv` (or decoupler results) exists at that path. If missing, the PLANNER subagent must rerun data assessment first.
+**Cause**: `/data_path.txt` points at the wrong directory, or required result files are missing.
+**Solution**: Verify `/data_path.txt`, then confirm the expected analysis files exist in that directory before rerunning SEARCHER.
 
-### Error: `write_file` refused by `WriteFileArgGuardMiddleware`
-**Cause**: Attempted to manually write papers after calling `search_literature_dynamic` without `output_path`.
-**Solution**: Always pass `output_path="papers.json"` to `search_literature_dynamic`. The tool auto-saves; manual `write_file` for papers is blocked by guard middleware. See "Common Mistakes" above.
+### Error: Auto-save was skipped
+**Cause**: `output_path` was set but `data_dir` was missing, so the tool could not resolve the real save path.
+**Solution**: Always pass `data_dir=read_file("/data_path.txt").strip()` when using `output_path`.
 
-### Error: Results look irrelevant to the disease context
-**Cause**: LLM generated generic queries without disease anchoring, or `rerank_mode="off"`.
-**Solution**: Enable LLM rerank with `--rerank-mode llm --rerank-top-n 12 --rerank-min-confidence 0.70`. Or supply more specific pathway/celltype context in the arguments.
+### Error: Results look weakly anchored to the disease context
+**Cause**: The query mix stayed too generic, or reranking was left off for a noisy context.
+**Solution**: Supply more specific pathway or cell type context, or enable LLM reranking with `rerank_mode="llm"` and the matching rerank thresholds.
 
 ---
 
 ## Where to Find More
 
-- **Full tool API (parameters, returns, rerank options)** → `references/search_strategies.md` § "Complete Tool API Reference"
-- **Advanced PubMed E-utilities patterns** → `references/search_strategies.md` § "Advanced PubMed E-utilities Patterns"
-- **Part 1/2/3 specific search focus** → `references/search_strategies.md` § "Part-Specific Search Focus"
-- **Analysis-type → tool mapping, phase mapping, quality thresholds** → `references/search_strategies.md` § "Quick Reference Card"
-- **Interpretation paragraph + reference list format (consumed by INTERPRETER)** → `references/search_strategies.md` § "Interpretation Output Format"
-- **Full worked example (Apoe-Trem2 in Alzheimer disease)** → `references/search_strategies.md` § "Full Example"
-- **Gene/pathway/L-R keyword combinations** → `references/search_strategies.md` § "L-R / Pathway / Gene-Marker Search Strategy"
-- **PubMed E-utilities full syntax** → `skills/pubmed-eutils-search/SKILL.md`
+- **Full tool API, return fields, and rerank options**: `references/search_strategies.md` section `Complete Tool API Reference`
+- **Advanced PubMed E-utilities patterns**: `references/search_strategies.md` section `Advanced PubMed E-utilities Patterns`
+- **Part 1, Part 2, and Part 3 search focus**: `references/search_strategies.md` section `Part-Specific Search Focus`
+- **Analysis-type mapping, follow-up flow, and quality thresholds**: `references/search_strategies.md` section `Quick Reference Card`
+- **Interpretation paragraph and reference list format used downstream**: `references/search_strategies.md` section `Interpretation Output Format`
+- **Full worked example**: `references/search_strategies.md` section `Full Example: Apoe-Trem2 in Alzheimer Disease`
+- **L-R interaction keyword combinations**: `references/search_strategies.md` section `L-R Interaction Search Strategy`
+- **Pathway keyword combinations**: `references/search_strategies.md` section `Pathway Search Strategy`
+- **Gene and marker keyword combinations**: `references/search_strategies.md` section `Gene/Marker Search Strategy`
+- **PubMed E-utilities full syntax**: `skills/pubmed-eutils-search/SKILL.md`

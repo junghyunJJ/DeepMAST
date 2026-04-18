@@ -1,10 +1,9 @@
-"""Literature Searcher SubAgent - CompiledSubAgent with BioMCP workflow.
+"""Legacy literature-searcher package exports.
 
-This subagent performs proactive literature search using the BioMCP workflow:
-think → article_searcher → quality validation loop
-
-It is designed to be called BEFORE interpretation to provide a reference
-foundation for literature-grounded interpretations.
+This package is retained for backward compatibility. It is not the
+authoritative SEARCHER workflow. Use
+`src.agents.deep_interpreter.subagents.prompts.SUBAGENT_PROMPTS["searcher"]`
+and the matching config entry for the active SEARCHER contract.
 """
 
 from src.agents.deep_interpreter.subagents.literature_searcher.agent import (

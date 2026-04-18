@@ -1,15 +1,14 @@
-"""Literature Searcher SubAgent implementation.
+"""Legacy literature-searcher SubAgent implementation.
 
-This module provides the CompiledSubAgent for literature search using
-the BioMCP workflow pattern: think-assisted search → coverage-driven follow-up.
+This module is retained for backward compatibility, but it is not the
+authoritative SEARCHER contract. The active SEARCHER workflow lives in
+`src/agents/deep_interpreter/subagents/prompts.py` via
+`SUBAGENT_PROMPTS["searcher"]` and the matching entry in `subagents/configs.py`.
 
-The agent performs proactive literature search BEFORE interpretation
-to provide a reference foundation for literature-grounded interpretations.
-
-Backend Integration:
-- Accepts backend_factory parameter for shared FilesystemBackend
-- Virtual mode enabled: files stored in-memory, flushed on completion
-- Shares filesystem with main orchestrator for seamless file access
+Backend integration:
+- accepts `backend_factory` for shared FilesystemBackend
+- virtual mode stores files in memory and flushes on completion
+- shares filesystem with the main orchestrator for seamless file access
 """
 
 from typing import Callable, Optional
@@ -25,7 +24,10 @@ from src.agents.deep_interpreter.tools import (
     search_literature_dynamic,
 )
 
-
+# Legacy prompt note: retained for compatibility only.
+# Do not treat this prompt as the authoritative SEARCHER workflow.
+# Use `src/agents/deep_interpreter/subagents/prompts.py` and
+# `SUBAGENT_PROMPTS["searcher"]` for the active contract.
 LITERATURE_SEARCHER_SYSTEM_PROMPT = """You are an autonomous biomedical literature search agent.
 
 Your role is to PROACTIVELY find PubMed references BEFORE interpretation generation
