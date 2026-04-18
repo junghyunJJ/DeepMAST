@@ -293,7 +293,17 @@ def autofix(
     applied_count = 0
     skipped_count = 0
 
-    seen_handlers: set[int] = set()
+    # Cache handler outputs by handler.__name__ (P2-B).
+    #
+    # Several rules (notably FM-007 and FM-008) share the same handler
+    # function ``fix_fm007_008_name_kebab``. Previously we deduped by
+    # ``id(handler)`` and silently *dropped* the second rule_id from the
+    # report, so users saw "FM-008 not handled" when in fact FM-007's
+    # handler had already applied the fix for both. Keying the cache by
+    # ``handler.__name__`` is stable across re-imports, inspectable in
+    # logs, and lets us emit one FixResult per rule_id with the SAME
+    # diff/content rather than suppressing duplicates.
+    handler_cache: dict[str, tuple[str, str]] = {}
 
     for rule_id in applicable:
         if rule_id == "FM-004":
@@ -319,12 +329,18 @@ def autofix(
             skipped_count += 1
             continue
 
-        handler_id = id(handler)
-        if handler_id in seen_handlers:
-            continue
-        seen_handlers.add(handler_id)
+        cache_key = handler.__name__
+        if cache_key in handler_cache:
+            # Another rule_id already fired this handler. Reuse the cached
+            # (new_content, diff) so both rules carry an identical diff in
+            # their FixResult entries.
+            new_content, diff = handler_cache[cache_key]
+            reused = True
+        else:
+            new_content, diff = handler(content)
+            handler_cache[cache_key] = (new_content, diff)
+            reused = False
 
-        new_content, diff = handler(content)
         if not diff:
             report.fixes.append(FixResult(
                 rule_id=rule_id, applied=False, dry_run=dry_run,
@@ -336,14 +352,26 @@ def autofix(
         if dry_run or not yes:
             report.fixes.append(FixResult(
                 rule_id=rule_id, applied=False, dry_run=True,
-                diff=diff, message="dry-run: diff shown above",
+                diff=diff,
+                message=(
+                    f"dry-run: diff shown above (shared handler "
+                    f"'{cache_key}' — fixed via another rule)"
+                    if reused else "dry-run: diff shown above"
+                ),
             ))
             skipped_count += 1
         else:
-            content = new_content
+            if not reused:
+                # Only update content once per unique handler output.
+                content = new_content
             report.fixes.append(FixResult(
                 rule_id=rule_id, applied=True, dry_run=False,
-                diff=diff, message="applied", backup_path=backup_dir,
+                diff=diff,
+                message=(
+                    f"applied (shared handler '{cache_key}' — fixed via another rule)"
+                    if reused else "applied"
+                ),
+                backup_path=backup_dir,
             ))
             applied_count += 1
 
@@ -370,13 +398,42 @@ def autofix(
     return report
 
 
+class _AutofixArgParser(argparse.ArgumentParser):
+    """ArgumentParser that prints a deprecation notice on --dry-run.
+
+    P2-B (OQ-1 resolved): --dry-run was a no-op under the old inversion
+    (``actual_dry_run = not args.yes``), so adding or omitting the flag
+    never changed behavior. We removed it, but users who had it in scripts
+    deserve a clear one-release deprecation message instead of argparse's
+    default "unrecognized arguments" error.
+    """
+
+    def error(self, message: str) -> None:  # type: ignore[override]
+        if "--dry-run" in message:
+            self.exit(
+                2,
+                (
+                    "--dry-run was removed in skill-creator-x (P2-B): it is now the "
+                    "implicit default for autofix. Pass --yes to apply. This "
+                    "deprecation notice will be removed in the next release.\n"
+                ),
+            )
+        super().error(message)
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="autofix", description="Auto-fix common SKILL.md issues (ADR-011)")
+    parser = _AutofixArgParser(
+        prog="autofix",
+        description=(
+            "Auto-fix common SKILL.md issues (ADR-011). Dry-run by default — "
+            "pass --yes to apply. 9 rules are auto-fixable; --fix is repeatable "
+            "and may be combined with --fix-all-safe (union)."
+        ),
+    )
     parser.add_argument("skill_dir", type=Path, help="Skill directory containing SKILL.md")
-    parser.add_argument("--fix", action="append", dest="rules", metavar="RULE_ID", help="Fix specific rule (repeatable)")
+    parser.add_argument("--fix", action="append", dest="rules", metavar="RULE_ID", help="Fix specific rule (repeatable; may be combined with --fix-all-safe)")
     parser.add_argument("--fix-all-safe", action="store_true", help="Apply all safe auto-fix rules")
-    parser.add_argument("--dry-run", action="store_true", default=True, help="Show diffs without modifying (default)")
-    parser.add_argument("--yes", action="store_true", help="Apply fixes without confirmation")
+    parser.add_argument("--yes", action="store_true", help="Apply fixes without confirmation (without --yes, autofix runs in dry-run mode)")
     parser.add_argument("--json", action="store_true", help="Output JSON report")
     args = parser.parse_args(argv)
 

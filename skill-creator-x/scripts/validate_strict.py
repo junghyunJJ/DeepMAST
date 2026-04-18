@@ -103,14 +103,28 @@ def _strip_code_blocks(body: str) -> str:
     return body
 
 
-def _split_frontmatter(content: str) -> tuple[str, str] | None:
-    """Return (frontmatter_text, body) or None if missing delimiters."""
+def split_frontmatter(content: str) -> tuple[str, str] | None:
+    """Return ``(frontmatter_text, body)`` or ``None`` if missing delimiters.
+
+    Public contract since P2-B. Callers in ``scripts.utils`` and downstream
+    modules should import this directly rather than reaching through the
+    ``_split_frontmatter`` alias (kept for one release for backward-compat).
+    """
     if not content.startswith("---"):
         return None
     m = re.match(r"^---\n(.*?)\n---\n?(.*)$", content, re.DOTALL)
     if not m:
         return None
     return m.group(1), m.group(2)
+
+
+def _split_frontmatter(content: str) -> tuple[str, str] | None:
+    """DEPRECATED alias for :func:`split_frontmatter`.
+
+    Scheduled for removal one release after P2-B. Existing imports keep
+    working during the deprecation window.
+    """
+    return split_frontmatter(content)
 
 
 def _list_entries(skill_dir: Path) -> list[str]:

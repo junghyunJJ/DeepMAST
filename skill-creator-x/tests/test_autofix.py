@@ -403,3 +403,67 @@ class TestCLI:
             rc = main([str(sd), "--json"])
         assert rc == 0
         assert _read_skill(sd) == original
+
+
+# ---------------------------------------------------------------------------
+# P2-B: FM-008 FixResult preservation + CLI drift fixes
+# ---------------------------------------------------------------------------
+
+
+class TestP2B_FM008FixResult:
+    """FM-007 and FM-008 share fix_fm007_008_name_kebab. The old dedupe used
+    a ``set[int]`` of ``id(handler)`` values and silently dropped the second
+    rule_id from the report. After P2-B the cache is keyed on
+    ``handler.__name__`` and every rule_id still gets its own FixResult entry
+    sharing the computed diff.
+    """
+
+    def test_fm008_reported_when_fm007_handles_it(self, tmp_path):
+        from scripts.autofix import autofix
+
+        sd = make_skill(tmp_path, folder="Fm_Bad", name="Fm_Bad")
+        # Both FM-007 and FM-008 should be failing for this name.
+        report = autofix(
+            sd, rules=["FM-007", "FM-008"], dry_run=False, yes=True
+        )
+        rule_ids_applied = {
+            f.rule_id for f in report.fixes if f.applied and f.rule_id != "REGRESSION"
+        }
+        assert "FM-007" in rule_ids_applied, rule_ids_applied
+        assert "FM-008" in rule_ids_applied, (
+            "FM-008 must appear as its own FixResult even though it shares a handler "
+            f"with FM-007. Got applied rule_ids: {rule_ids_applied}"
+        )
+        # Both entries should carry the same diff (same handler output).
+        fm7 = next(f for f in report.fixes if f.rule_id == "FM-007" and f.applied)
+        fm8 = next(f for f in report.fixes if f.rule_id == "FM-008" and f.applied)
+        assert fm7.diff == fm8.diff
+
+
+class TestP2B_CLI:
+    def test_cli_no_dry_run_flag_rejected_with_deprecation_notice(self, tmp_path, capsys):
+        """OQ-1 resolved: --dry-run is removed; an explicit deprecation
+        message is printed on stderr before argparse exits non-zero.
+        """
+        sd = make_skill(tmp_path, folder="dep-dry", name="dep-dry")
+        with pytest.raises(SystemExit) as exc_info:
+            main([str(sd), "--dry-run"])
+        assert exc_info.value.code != 0
+        captured = capsys.readouterr()
+        # The deprecation notice is visible on stderr (not just argparse's default error).
+        assert "--dry-run" in captured.err
+        assert "deprecated" in captured.err.lower() or "removed" in captured.err.lower()
+
+    def test_cli_fix_repeatable(self, tmp_path):
+        sd = make_skill(
+            tmp_path, folder="fix-repeat", name="Fix_Repeat",
+            description="<xml>bad</xml>",
+        )
+        buf = StringIO()
+        with redirect_stdout(buf):
+            rc = main([str(sd), "--fix", "FM-007", "--fix", "FM-014", "--yes", "--json"])
+        assert rc == 0
+        data = json.loads(buf.getvalue())
+        applied_rule_ids = {f["rule_id"] for f in data["fixes"] if f["applied"]}
+        assert "FM-007" in applied_rule_ids
+        assert "FM-014" in applied_rule_ids
