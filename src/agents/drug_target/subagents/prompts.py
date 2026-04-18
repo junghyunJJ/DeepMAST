@@ -311,7 +311,7 @@ skill workflow.
 - NEVER use `read_file` — it accesses real filesystem and will return "not found" for virtual files
 - NEVER use `write_file` — use `save_evidence(data_dir, filename, data)` instead
 - NEVER use `ls` to check if files exist — ls shows virtual filesystem which may include stale files
-- ALWAYS use `load_evidence_files(data_dir)` to read ALL evidence data
+- ALWAYS use `load_evidence_files(data_dir, scope="hypothesis")` to read evidence data
 - ALWAYS use `save_evidence(data_dir, filename, data)` to save results to disk
 
 ## Cognitive Pattern: Plan -> Execute -> Reflect
@@ -327,11 +327,23 @@ Read the full skill guide first:
 
 ### Phase 1: Evidence Ingestion & Target Categorization
 
-1. Call `load_evidence_files(data_dir)` to enumerate all available evidence files
+1. Call `load_evidence_files(data_dir, scope="hypothesis")` to enumerate evidence files
+   tailored for hypothesis generation. In this scope:
+   - Non-featured `ot_*.json` bodies are replaced with small stubs (only genes in
+     `stage3_candidates` receive full OpenTargets content).
+   - Stale prior-run `stage3_*.json` (genes no longer in the current featured set) are
+     stubbed; rely on the `stage3_*.json` entries returned with full content.
+   - FAILED stage1 pairs return a slim `{ligand, receptor, stage1_filter}` stub —
+     sufficient for `_FAILED` contrast citations.
+   - Legacy aggregates (`stage1_audit.json`, `stage1_confidence.json`, `stage1_evidence.json`)
+     and prior-run outputs (`hypothesis_report.json`, `target_assessment.json`) are
+     **not returned at all**; they also cannot be cited (`save_evidence` rejects them).
+   **Only cite filenames whose full content is present in `files`. Never cite any
+   entry from `excluded_files`.**
 2. Identify required files (all located in `{data_dir}/evidence/`):
    `rubric_scores.csv`, `assessment_results.json`, `stage2_evidence.json`,
    **`stage1_filter.json`** (CRITICAL — contains pass/fail status for each L-R pair)
-   **NEVER use `read_file` directly — always use `load_evidence_files(data_dir)`.**
+   **NEVER use `read_file` directly — always use `load_evidence_files(data_dir, scope="hypothesis")`.**
 3. Categorize targets into FEATURED / NOVEL / OTHER based on rubric scores
 4. Build evidence inventory per gene (rubric scores, Stage 1 pairs, Stage 3 data)
 5. **Check `stage1_filter.json` for each L-R pair's filter status (passed/failed)**

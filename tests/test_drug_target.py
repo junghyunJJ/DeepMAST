@@ -507,6 +507,280 @@ class TestEvidenceLoader:
         assert any("not valid JSON" in e for e in result["errors"])
 
 
+# =========================================================================
+# 3.5. TestHypothesisScopeLoader  (scope-aware load_evidence_files)
+# =========================================================================
+
+class TestHypothesisScopeLoader:
+    """Scope-aware `load_evidence_files` (Codex F1/F2/F3 hardening)."""
+
+    @staticmethod
+    def _seed_assessment(ev_dir, featured_genes):
+        payload = {
+            "schema_version": 3,
+            "stage3_candidates": [{"gene": g} for g in featured_genes],
+        }
+        (ev_dir / "assessment_results.json").write_text(json.dumps(payload))
+
+    @staticmethod
+    def _seed_filter_json(ev_dir, pairs):
+        """pairs: list[tuple[ligand, receptor, passed_bool]]"""
+        rows = [
+            {"ligand": L, "receptor": R, "passed": p} for (L, R, p) in pairs
+        ]
+        (ev_dir / "stage1_filter_results.json").write_text(json.dumps(rows))
+
+    @staticmethod
+    def _seed_pair_file(ev_dir, ligand, receptor, passed):
+        payload = {
+            "ligand": ligand,
+            "receptor": receptor,
+            "string_ppi": {
+                "string_record_found": True,
+                "max_combined_score": 0.99 if passed else 0.5,
+            },
+            "census_validation": {
+                "target_vs_rest": {
+                    "coexpression": {"p_value": 0.0 if passed else 1.0},
+                    "gene_a": {"p_value": 0.0},
+                    "gene_b": {"p_value": 0.0},
+                },
+            },
+            "stage1_filter": {
+                "passed": passed,
+                "string_combined": 0.99 if passed else 0.5,
+                "string_status": "in_db",
+                "census_coexpr_pvalue": 0.0 if passed else 1.0,
+                "census_gene_a_pvalue": 0.0,
+                "census_gene_b_pvalue": 0.0,
+            },
+        }
+        (ev_dir / f"stage1_{ligand}--{receptor}.json").write_text(json.dumps(payload))
+
+    def _make_dir(self, tmp_path):
+        ev = tmp_path / "evidence"
+        ev.mkdir()
+        return ev
+
+    def test_default_scope_is_all(self, tmp_path):
+        """Regression guard: scope='all' (default) preserves legacy behavior."""
+        from src.agents.drug_target.tools.evidence_loader import load_evidence_files
+        ev = self._make_dir(tmp_path)
+        (ev / "ot_CD4.json").write_text(json.dumps({"gene": "CD4", "associations": [1, 2]}))
+        (ev / "ot_IRRELEVANT.json").write_text(json.dumps({"gene": "IRRELEVANT", "associations": []}))
+        raw = load_evidence_files.invoke({"data_dir": str(tmp_path)})
+        result = json.loads(raw)
+        # Legacy: both files returned full content regardless of featured set
+        assert "ot_CD4.json" in result["files"]
+        assert "ot_IRRELEVANT.json" in result["files"]
+        assert result["files"]["ot_IRRELEVANT.json"].get("gene") == "IRRELEVANT"
+        # excluded_files is always present but empty in scope=all
+        assert result["excluded_files"] == []
+
+    def test_hypothesis_scope_drops_non_featured_ot(self, tmp_path):
+        from src.agents.drug_target.tools.evidence_loader import load_evidence_files
+        ev = self._make_dir(tmp_path)
+        self._seed_assessment(ev, ["CD4", "FN1"])
+        (ev / "ot_CD4.json").write_text(json.dumps({"gene": "CD4", "data": {"x": 1}}))
+        (ev / "ot_FN1.json").write_text(json.dumps({"gene": "FN1", "data": {"x": 2}}))
+        (ev / "ot_IRRELEVANT.json").write_text(json.dumps({"gene": "IRRELEVANT", "data": {"x": 3}}))
+        raw = load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "hypothesis"})
+        result = json.loads(raw)
+        # Featured: full content
+        assert result["files"]["ot_CD4.json"].get("gene") == "CD4"
+        assert result["files"]["ot_FN1.json"].get("gene") == "FN1"
+        # Non-featured: stub with _note
+        stub = result["files"]["ot_IRRELEVANT.json"]
+        assert "skipped: non-featured" in stub.get("_note", "")
+        assert "gene" not in stub  # full body not present
+
+    def test_hypothesis_scope_stubs_stale_stage3(self, tmp_path):
+        """Codex F2: stage3_<GENE>.json not in current featured set is stubbed."""
+        from src.agents.drug_target.tools.evidence_loader import load_evidence_files
+        ev = self._make_dir(tmp_path)
+        self._seed_assessment(ev, ["CD4"])
+        (ev / "stage3_CD4.json").write_text(json.dumps({"gene": "CD4", "targets": ["drug1"]}))
+        (ev / "stage3_OLD.json").write_text(json.dumps({"gene": "OLD", "targets": ["stale_drug"]}))
+        raw = load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "hypothesis"})
+        result = json.loads(raw)
+        assert result["files"]["stage3_CD4.json"].get("gene") == "CD4"
+        stub = result["files"]["stage3_OLD.json"]
+        assert stub.get("_note", "").startswith("stale prior-run stage3 file")
+        assert "targets" not in stub
+
+    def test_hypothesis_scope_slims_failed_pair_stage1(self, tmp_path):
+        from src.agents.drug_target.tools.evidence_loader import load_evidence_files
+        ev = self._make_dir(tmp_path)
+        self._seed_assessment(ev, ["CD4"])
+        self._seed_filter_json(
+            ev,
+            [("FN1", "ITGB2", True), ("TGFB1", "P4HB", False)],
+        )
+        self._seed_pair_file(ev, "FN1", "ITGB2", passed=True)
+        self._seed_pair_file(ev, "TGFB1", "P4HB", passed=False)
+        raw = load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "hypothesis"})
+        result = json.loads(raw)
+        # PASSED: full content (has string_ppi + census_validation)
+        passed_payload = result["files"]["stage1_FN1--ITGB2.json"]
+        assert "string_ppi" in passed_payload
+        assert "census_validation" in passed_payload
+        # FAILED: slim stub — only ligand/receptor/stage1_filter
+        failed_stub = result["files"]["stage1_TGFB1--P4HB.json"]
+        assert failed_stub["ligand"] == "TGFB1"
+        assert failed_stub["receptor"] == "P4HB"
+        assert failed_stub["stage1_filter"]["passed"] is False
+        assert "string_ppi" not in failed_stub
+        assert "census_validation" not in failed_stub
+
+    def test_hypothesis_scope_falls_back_to_csv(self, tmp_path):
+        """Codex F1: JSON missing → CSV fallback."""
+        import csv as _csv
+        from src.agents.drug_target.tools.evidence_loader import load_evidence_files
+        ev = self._make_dir(tmp_path)
+        self._seed_assessment(ev, ["CD4"])
+        # Only CSV (no JSON sidecar)
+        csv_path = ev / "stage1_filter_results.csv"
+        with open(csv_path, "w", newline="") as f:
+            writer = _csv.DictWriter(f, fieldnames=["ligand", "receptor", "passed"])
+            writer.writeheader()
+            writer.writerow({"ligand": "FN1", "receptor": "ITGB2", "passed": "true"})
+            writer.writerow({"ligand": "TGFB1", "receptor": "P4HB", "passed": "false"})
+        self._seed_pair_file(ev, "FN1", "ITGB2", passed=True)
+        self._seed_pair_file(ev, "TGFB1", "P4HB", passed=False)
+        raw = load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "hypothesis"})
+        result = json.loads(raw)
+        # CSV-driven classification still applies
+        passed_payload = result["files"]["stage1_FN1--ITGB2.json"]
+        assert "string_ppi" in passed_payload  # full content
+        failed_stub = result["files"]["stage1_TGFB1--P4HB.json"]
+        assert "string_ppi" not in failed_stub  # stub
+
+    def test_hypothesis_scope_fails_open_when_filter_missing(self, tmp_path):
+        """Codex F1: no JSON AND no CSV → fail-open to full content, log warning."""
+        from src.agents.drug_target.tools.evidence_loader import load_evidence_files
+        ev = self._make_dir(tmp_path)
+        self._seed_assessment(ev, ["CD4"])
+        # NO filter JSON, NO filter CSV — only per-pair files
+        self._seed_pair_file(ev, "FN1", "ITGB2", passed=True)
+        self._seed_pair_file(ev, "TGFB1", "P4HB", passed=False)
+        raw = load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "hypothesis"})
+        result = json.loads(raw)
+        # Both pairs get FULL content (never silent-strip)
+        assert "string_ppi" in result["files"]["stage1_FN1--ITGB2.json"]
+        assert "string_ppi" in result["files"]["stage1_TGFB1--P4HB.json"]
+        # Warning surfaced in errors
+        assert any("filter results missing" in e for e in result["errors"])
+
+    def test_hypothesis_scope_excludes_legacy_and_prior_output(self, tmp_path):
+        """Codex F3: legacy aggregates + prior-run outputs excluded from files dict."""
+        from src.agents.drug_target.tools.evidence_loader import load_evidence_files
+        ev = self._make_dir(tmp_path)
+        self._seed_assessment(ev, ["CD4"])
+        for name in (
+            "stage1_audit.json",
+            "stage1_confidence.json",
+            "stage1_evidence.json",
+            "hypothesis_report.json",
+            "target_assessment.json",
+        ):
+            (ev / name).write_text(json.dumps({"name": name, "body": "x" * 10}))
+        raw = load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "hypothesis"})
+        result = json.loads(raw)
+        # (a) none appear in files dict
+        for name in (
+            "stage1_audit.json",
+            "stage1_confidence.json",
+            "stage1_evidence.json",
+            "hypothesis_report.json",
+            "target_assessment.json",
+        ):
+            assert name not in result["files"], f"{name} leaked into files dict"
+        # (b) all appear in excluded_files with reason
+        excluded_names = {e["name"] for e in result["excluded_files"]}
+        assert excluded_names == {
+            "stage1_audit.json",
+            "stage1_confidence.json",
+            "stage1_evidence.json",
+            "hypothesis_report.json",
+            "target_assessment.json",
+        }
+        for entry in result["excluded_files"]:
+            assert entry.get("reason")
+
+    def test_hypothesis_scope_aborts_when_assessment_missing(self, tmp_path):
+        """Hypothesis scope without assessment_results.json is a hard error."""
+        from src.agents.drug_target.tools.evidence_loader import load_evidence_files
+        ev = self._make_dir(tmp_path)
+        # No assessment_results.json
+        (ev / "ot_CD4.json").write_text(json.dumps({"gene": "CD4"}))
+        raw = load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "hypothesis"})
+        result = json.loads(raw)
+        assert result["files"] == {}
+        assert any("hypothesis scope aborted" in e for e in result["errors"])
+
+    def test_validate_hypothesis_report_blocks_denied_citations(self, tmp_path):
+        """Codex F3: save_evidence rejects hypothesis_report.json citing denied files."""
+        from src.agents.drug_target.tools.evidence_loader import save_evidence
+        ev = tmp_path / "evidence"
+        ev.mkdir()
+        # Pre-create the denied files + a legitimate stage1 file so only the
+        # denial rule triggers the rejection (not the "file missing" rule).
+        for name in ("hypothesis_report.json", "stage1_audit.json"):
+            (ev / name).write_text("{}")
+        (ev / "stage1_FN1--ITGB2.json").write_text("{}")
+        # assessment_results to satisfy downstream validators
+        (ev / "assessment_results.json").write_text(json.dumps({
+            "schema_version": 3,
+            "stage3_candidates": [{"gene": "FN1"}],
+        }))
+        (ev / "stage1_filter_results.json").write_text(json.dumps([
+            {"ligand": "FN1", "receptor": "ITGB2", "passed": True}
+        ]))
+
+        payload = {
+            "disease": "test",
+            "evidence_coverage_pct": 100.0,
+            "hypotheses": [{
+                "title": "Test",
+                "biological_entities": {"genes": ["FN1"]},
+                "evidence_references": [
+                    "hypothesis_report.json",
+                    "stage1_audit.json",
+                    "stage1_FN1--ITGB2.json",
+                ],
+            }],
+        }
+        raw = save_evidence.invoke({
+            "data_dir": str(tmp_path),
+            "filename": "hypothesis_report.json",
+            "data": json.dumps(payload),
+        })
+        result = json.loads(raw)
+        assert result["saved"] is False
+        error_text = " ".join(result.get("errors", [])) + " " + " ".join(
+            result.get("invalid_references", []) or []
+        )
+        assert "hypothesis_report.json" in error_text
+        assert "stage1_audit.json" in error_text
+
+    def test_validate_evidence_references_surfaces_denied(self, tmp_path):
+        """validate_evidence_references surfaces denied_citations with reason."""
+        from src.agents.drug_target.tools.evidence_loader import validate_evidence_references
+        ev = tmp_path / "evidence"
+        ev.mkdir()
+        (ev / "hypothesis_report.json").write_text("{}")
+        (ev / "stage1_FN1--ITGB2.json").write_text("{}")
+        raw = validate_evidence_references.invoke({
+            "data_dir": str(tmp_path),
+            "references": ["hypothesis_report.json", "stage1_FN1--ITGB2.json"],
+        })
+        result = json.loads(raw)
+        assert result["valid"] is False
+        tokens = {d["token"] for d in result.get("denied_citations", [])}
+        assert "hypothesis_report.json" in tokens
+        # The legit reference must NOT be denied
+        assert "stage1_FN1--ITGB2.json" not in tokens
+
 
 # =========================================================================
 # 4. TestToolImports
