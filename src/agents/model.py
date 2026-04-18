@@ -117,7 +117,7 @@ def create_ollama_llm(**kwargs) -> ChatOllama:
     base_url = kwargs.get("base_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:6000"))
     temperature = kwargs.get("temperature", 0)
     
-    num_ctx = kwargs.get("num_ctx", 65536)
+    num_ctx = kwargs.get("num_ctx", 262144) # 256K in H100 x2
     num_predict = kwargs.get("num_predict", -1)  # unlimited; prevents truncated tool call JSON (#14570)
 
     llm = ChatOllama(
@@ -186,7 +186,7 @@ def load_subagent_models_from_env(
         SUBAGENT_PLANNER_MODEL=gpt-4.1-mini
         SUBAGENT_INTERPRETER_PROVIDER=ollama
         SUBAGENT_INTERPRETER_MODEL=qwen3.5:122b
-        SUBAGENT_INTERPRETER_NUM_CTX=65536
+        SUBAGENT_INTERPRETER_NUM_CTX=262144 # 256K in H100 x2
 
     Args:
         subagent_names: List of subagent names to check (e.g. ["planner", "searcher"])

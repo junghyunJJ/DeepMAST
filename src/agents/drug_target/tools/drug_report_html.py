@@ -720,11 +720,9 @@ def render_drug_md(
     )
     tmpl = env.from_string(template_str)
 
-    # PR1-1a: drug.md FEATURED rows = post-stage1-filter narrow set.
-    # all_genes_matrix now includes stage1_validated (added by build_evidence_summary).
-    # Fall back to stage3_candidate for old data (schema_version<2).
+    # drug.md FEATURED rows = stage3_candidates (rubric ∩ Stage 1 PASS, single narrowed set).
     def _is_validated(r):
-        return r.get("stage1_validated", r.get("stage3_candidate", False))
+        return r.get("stage3_candidate", False)
 
     featured_rows = sorted(
         [r for r in all_genes_matrix if _is_validated(r)],

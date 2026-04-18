@@ -104,19 +104,18 @@ def normalize_st_colocalization_score(value: Any) -> float:
 def compute_stage1_filter(stage1_evidence: dict[str, Any]) -> dict[str, Any]:
     """Pass/fail filter for Stage 1 L-R pairs.
 
-    Criteria (all must be met):
+    Criteria (ALL must be met — strict, no relaxation for missing STRING records):
       - STRING combined score > 0.8
       - Census coexpression p-value < 0.05
       - Census gene_a (ligand) p-value < 0.05
       - Census gene_b (receptor) p-value < 0.05
+
+    ``string_status`` is informational only — it records whether the pair was
+    found in the STRING TSV but never changes the pass/fail decision.
     """
     string_data = stage1_evidence.get("string_ppi", {})
     raw_string = float(string_data.get("max_combined_score", 0))
     string_combined = min(raw_string, 1.0) if raw_string <= 1.0 else min(raw_string / 1000.0, 1.0)
-    # PR2-1: distinguish "STRING returned no record" from "low score". Pre-PR2-1
-    # both presented as max_combined_score=0.0 → treated as hard fail. Now: when the
-    # TSV had no row matching the pair, skip the STRING criterion AND require a
-    # stronger Census signal (coexpr_p < 1e-10) as compensation.
     string_record_found = bool(
         string_data.get("string_record_found",
                          string_data.get("interaction_found", True))
@@ -128,23 +127,13 @@ def compute_stage1_filter(stage1_evidence: dict[str, Any]) -> dict[str, Any]:
     gene_a_p = float(tvr.get("gene_a", {}).get("p_value", 1.0))
     gene_b_p = float(tvr.get("gene_b", {}).get("p_value", 1.0))
 
-    if not string_record_found and string_combined == 0.0:
-        # No STRING record at the configured threshold — skip STRING criterion,
-        # require strong Census signal (1e-10 vs default 0.05).
-        string_status = "no_record"
-        passed = (
-            coexpr_p < 1e-10
-            and gene_a_p < 0.05
-            and gene_b_p < 0.05
-        )
-    else:
-        string_status = "in_db"
-        passed = (
-            string_combined > 0.8
-            and coexpr_p < 0.05
-            and gene_a_p < 0.05
-            and gene_b_p < 0.05
-        )
+    string_status = "in_db" if string_record_found else "no_record"
+    passed = (
+        string_combined > 0.8
+        and coexpr_p < 0.05
+        and gene_a_p < 0.05
+        and gene_b_p < 0.05
+    )
 
     return {
         "passed": passed,
@@ -578,36 +567,35 @@ def apply_stage1_filter(data_dir: str) -> str:
         encoding="utf-8",
     )
 
-    # 4. Update assessment_results.json (schema_version=2, PR1-9):
-    # PR1-1: SPLIT stage3_candidate (rubric-qualified, NOT overwritten) from
-    # stage1_validated (post-filter narrow). Downstream consumers must read the
-    # field that matches their semantic intent — see Consumer Inventory in plan.
+    # 4. Update assessment_results.json (schema_version=3):
+    # Single-field contract: `stage3_candidates` is overwritten IN PLACE with the
+    # intersection of (rubric >=10) AND (Stage 1 strict PASS). Both deep_diver and
+    # hypothesis_writer consume the same narrowed list.
     assessment_path = evidence_dir / "assessment_results.json"
     updated_assessment = False
     if assessment_path.exists():
         assessment = json.loads(assessment_path.read_text(encoding="utf-8"))
-        # Schema version bump (PR1-9)
-        assessment["schema_version"] = 2
+        assessment["schema_version"] = 3
 
-        # PR1-1: keep stage3_candidates as the rubric-qualified set (do NOT narrow).
-        # Add stage1_validated_candidates as the post-stage1-filter narrow set.
         rubric_candidates = assessment.get("stage3_candidates", [])
         passed_upper = {g.upper() for g in passed_genes}
-        validated_candidates = [
+        narrowed = [
             c for c in rubric_candidates
             if (c.get("gene") or c.get("gene_symbol", "")).upper() in passed_upper
         ]
-        assessment["stage1_validated_candidates"] = validated_candidates
+        assessment["stage3_candidates"] = narrowed
         assessment["stage1_filter_applied"] = True
-        assessment["stage1_filter_passed_genes"] = sorted(passed_genes)  # deprecated, kept for back-compat
-        assessment.setdefault("summary", {})["stage3_count"] = len(rubric_candidates)
-        assessment["summary"]["stage1_validated_count"] = len(validated_candidates)
+        assessment.setdefault("summary", {})["stage3_count"] = len(narrowed)
 
-        # PR1-1: ADD per-row stage1_validated; DO NOT overwrite per-row stage3_candidate.
+        # Update per-row stage3_candidate to reflect the post-filter narrow set.
         for row in assessment.get("rubric_assessment", []):
             gene = (row.get("gene") or "").upper()
-            row["stage1_validated"] = bool(gene and gene in passed_upper)
-        # P2-8: atomic temp+rename instead of write_text (which is non-atomic).
+            row["stage3_candidate"] = bool(
+                gene
+                and gene in passed_upper
+                and row.get("classification") != "insufficient_evidence"
+                and row.get("combined_total", 0) >= 10
+            )
         _atomic_write_text(assessment_path, json.dumps(assessment, indent=2))
         updated_assessment = True
 
@@ -1308,11 +1296,12 @@ def compute_rubric_scores(data_dir: str) -> str:
     for r in results:
         r["stage3_candidate"] = r["gene"] in stage3_genes
 
-    # Save assessment_results.json (schema_version=2 since PR-1, see plan PR1-9).
-    # stage3_candidates here is the RUBRIC-QUALIFIED set; apply_stage1_filter later
-    # adds stage1_validated_candidates without narrowing this list.
+    # Save assessment_results.json (schema_version=3).
+    # stage3_candidates is written here as the RUBRIC-QUALIFIED pool; apply_stage1_filter
+    # later overwrites it in place with the (rubric ∩ Stage 1 PASS) intersection so both
+    # deep_diver and hypothesis_writer consume the same narrowed list.
     assessment = {
-        "schema_version": 2,
+        "schema_version": 3,
         "assessment_date": datetime.now().isoformat(),
         "disease": stage2.get("_disease", "unknown") if isinstance(stage2, dict) else "unknown",
         "rubric_assessment": results,
@@ -1411,7 +1400,7 @@ def validate_stage1_gate(data_dir: str) -> str:
     data_dir_path = _resolve_data_dir(data_dir)
     evidence_dir = data_dir_path / "evidence"
 
-    # 1. Load stage3_candidates
+    # 1. Load stage3_candidates (narrowed: rubric ∩ Stage 1 PASS).
     assessment_path = evidence_dir / "assessment_results.json"
     if not assessment_path.exists():
         return json.dumps({
@@ -1419,8 +1408,6 @@ def validate_stage1_gate(data_dir: str) -> str:
             "error": "assessment_results.json not found — run compute_rubric_scores first.",
         })
     assessment = json.loads(assessment_path.read_text())
-    # PR1-1a: validate_stage1_gate audits ALL rubric-qualified pairs (including those that
-    # ended up failing). Use stage3_candidates (rubric-qualified) — broader/more conservative.
     stage3_genes = [c["gene"] for c in assessment.get("stage3_candidates", [])]
     if not stage3_genes:
         return json.dumps({
@@ -1501,9 +1488,8 @@ def validate_stage3_gate(data_dir: str) -> str:
     data_dir_path = _resolve_data_dir(data_dir)
     evidence_dir = data_dir_path / "evidence"
 
-    # 1. Load validated candidates (post-stage1-filter narrow set; deep_diver runs on this)
-    # PR1-1a: validate_stage3_gate audits deep_diver's actual scope (narrow set).
-    # Fallback to stage3_candidates for schema_version<2.
+    # 1. Load stage3_candidates (single narrowed set — rubric ∩ Stage 1 PASS).
+    # Both deep_diver and hypothesis_writer run on this list.
     assessment_path = evidence_dir / "assessment_results.json"
     if not assessment_path.exists():
         return json.dumps({
@@ -1511,14 +1497,11 @@ def validate_stage3_gate(data_dir: str) -> str:
             "error": "assessment_results.json not found — run compute_rubric_scores first.",
         })
     assessment = json.loads(assessment_path.read_text())
-    _validated = assessment.get("stage1_validated_candidates")
-    if _validated is None:
-        _validated = assessment.get("stage3_candidates", [])
-    stage3_genes = [c["gene"] for c in _validated]
+    stage3_genes = [c["gene"] for c in assessment.get("stage3_candidates", [])]
     if not stage3_genes:
         return json.dumps({
             "success": False,
-            "error": "No stage1_validated_candidates / stage3_candidates in assessment_results.json.",
+            "error": "No stage3_candidates in assessment_results.json.",
         })
 
     # 2. Check stage3 files — both existence AND data quality
@@ -1802,12 +1785,9 @@ def build_evidence_summary(data_dir: str) -> str:
             "stage3_candidate": row.get("stage3_candidate", False),
         }
 
-    # PR1-1a (Consumer Inventory): build_evidence_summary feeds into Reference Card
-    # for report_writer. drug.md FEATURED Deep Dive section is the post-filter narrow set.
-    # Use stage1_validated_candidates with fallback to stage3_candidates for schema_version<2.
-    _validated = assessment.get("stage1_validated_candidates")
-    if _validated is None:
-        _validated = assessment.get("stage3_candidates", [])
+    # build_evidence_summary feeds the report_writer Reference Card.
+    # stage3_candidates is the single source of truth (post Stage 1 narrowing).
+    _validated = assessment.get("stage3_candidates", [])
     stage3_genes = [g for c in _validated if (g := c.get("gene"))]
 
     # 2. Load stage3_*.json → drugs + PMIDs per gene
@@ -1968,9 +1948,9 @@ def build_evidence_summary(data_dir: str) -> str:
         elif isinstance(kd, list):
             known_drugs = kd
 
-    # 5. Build all-genes druggability summary from rubric (full 14 columns + stage1_validated)
-    # PR1-1a: emit BOTH stage3_candidate (rubric-qualified) AND stage1_validated (post-filter narrow).
-    # drug_report_html splits FEATURED rows on stage1_validated (post-filter).
+    # 5. Build all-genes druggability summary from rubric.
+    # Single per-row flag: stage3_candidate reflects the post-filter narrow set
+    # (rubric ∩ Stage 1 PASS). drug_report_html splits FEATURED rows on this flag.
     all_genes_matrix = []
     for row in assessment.get("rubric_assessment", []):
         all_genes_matrix.append({
@@ -1988,7 +1968,6 @@ def build_evidence_summary(data_dir: str) -> str:
             "classification": row.get("classification", "unknown"),
             "priority": row.get("priority", "unranked"),
             "stage3_candidate": row.get("stage3_candidate", False),
-            "stage1_validated": row.get("stage1_validated", row.get("stage3_candidate", False)),
         })
 
     # 6. Load stage1_filter_results.csv for Biological Interaction Filter table
@@ -2195,14 +2174,11 @@ def validate_drug_md(data_dir: str) -> str:
         })
 
     # 2. Classification/Priority validation
-    # PR1-1a: drug.md FEATURED Deep Dive section is post-filter narrow.
-    # Use stage1_validated_candidates with fallback to stage3_candidates for schema_version<2.
+    # drug.md FEATURED Deep Dive section is keyed on stage3_candidates (post Stage 1 narrowing).
     assessment_path = evidence_dir / "assessment_results.json"
     if assessment_path.exists():
         assessment = json.loads(assessment_path.read_text())
-        _validated = assessment.get("stage1_validated_candidates")
-        if _validated is None:
-            _validated = assessment.get("stage3_candidates", [])
+        _validated = assessment.get("stage3_candidates", [])
         stage3_genes = {c.get("gene") for c in _validated}
 
         for row in assessment.get("rubric_assessment", []):
