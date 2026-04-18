@@ -43,9 +43,9 @@ Before writing any skill, define 2-3 concrete use cases. Each use case should sp
 
 Select the right pattern for your skill's complexity. The five patterns range from simple tool wrappers to full domain-specific intelligence. Read `references/design-patterns.md` to pick the best fit.
 
-### Error Handling
+### Error Handling Guidance for Authored Skills
 
-Every skill should include a "Common Issues" section with diagnostic steps and resolutions for predictable failures. See `references/error-handling-template.md` for the required format.
+Every skill you author with `skill-creator-x` should include a "Common Issues" section with diagnostic steps and resolutions for predictable failures. See `references/error-handling-template.md` for the required format. (The separate top-level `## Common Issues` later in this file is for debugging `skill-creator-x` itself, not for authored skills.)
 
 ### Cross-platform Awareness
 
@@ -70,6 +70,138 @@ python -m scripts.install_multiplatform <skill-dir> --no-dry-run --force \
 ### Reserved Words Warning
 
 The `name` field must not contain `claude` or `anthropic` (reserved by Anthropic, p.11/p.31). Violations are hard ERRORs that block publishing.
+
+---
+
+## Examples
+
+Two end-to-end walkthroughs showing the core loops this skill enables. Each walkthrough covers a complete success invocation, one realistic failure, and the recovery path.
+
+### Walkthrough 1: Creating a new skill from a trigger phrase
+
+**Goal:** the user says "I want a skill that reviews Python PRs for security issues." Draft it, test it, and iterate.
+
+**Success path:**
+
+```bash
+# 1. Interview the user, capture 2-3 use cases (see references/use-case-template.md).
+#    Assume you land on skill name 'python-pr-security-reviewer'.
+mkdir -p ~/skills/python-pr-security-reviewer
+
+# 2. Draft SKILL.md with kebab-case name, a WHAT+WHEN description, and instructions.
+$EDITOR ~/skills/python-pr-security-reviewer/SKILL.md
+
+# 3. Sanity-check the draft against PDF compliance BEFORE writing test cases.
+python -m scripts.validate_strict ~/skills/python-pr-security-reviewer/ --strict
+# Expected stdout (head):
+#   Skill: .../python-pr-security-reviewer
+#   Tool: skill-creator-x 0.1.x | PDF: 2026-01 | ...
+#   ✅ [ERROR]   FM-001 skill-md-filename: OK
+#   ✅ [ERROR]   FM-005 frontmatter-delimiters: OK
+# Expected tail:
+#   Summary: error=0 soft_error=0 warning=1 strict=True passed=True
+```
+
+**Realistic failure:** your first draft uses `name: python_pr_reviewer` (underscore, not kebab). The validator refuses:
+
+```text
+❌ [ERROR] FM-007 name-kebab-charset (PDF p.10):
+          name 'python_pr_reviewer' contains disallowed character '_'
+Summary: error=1 ... strict=True passed=False
+```
+
+**Recovery:**
+
+```bash
+# Fix with autofix (dry-run first, then apply).
+python -m scripts.autofix ~/skills/python-pr-security-reviewer/ --fix FM-007
+# Review diff, then apply:
+python -m scripts.autofix ~/skills/python-pr-security-reviewer/ --fix FM-007 --yes
+# Re-validate:
+python -m scripts.validate_strict ~/skills/python-pr-security-reviewer/ --strict
+# -> Summary: error=0 soft_error=0 ... passed=True
+# Now proceed to Test Cases (see 'Creating a skill' below).
+```
+
+### Walkthrough 2: Updating an existing skill via `migrate_skill`
+
+**Goal:** the user has a legacy skill called `My_Skill/` (underscore folder, `skill.md` lowercase, no frontmatter). Bring it into PDF compliance without losing the workflow text.
+
+**Success path:**
+
+```bash
+# 1. Assess first — decide Update vs Migrate (ADR-010).
+python -m scripts.migrate_skill ./My_Skill --assess
+# Expected stdout:
+#   Status: NEEDS MIGRATION
+#   Risk: high
+#   Changes required:
+#     - Missing frontmatter delimiters (FM-005)
+#     - FM-001: filename 'skill.md' must be SKILL.md
+#     - ...
+
+# 2. Apply the migration. Backup goes to My_Skill/backups/<timestamp>/.
+python -m scripts.migrate_skill ./My_Skill --apply --yes --no-git
+# Expected tail:
+#   Migration: .../My_Skill
+#   Applied: True
+#   Backup:  .../My_Skill/backups/2026.../
+#   Changes:
+#     - Restructured frontmatter
+#     - Inserted missing sections
+#     - Rename skill.md -> SKILL.md
+#     - MANUAL: rename folder My_Skill -> my-skill (run after reviewing migration output).
+#       After renaming, your backup will live at my-skill/backups/<ts>/.
+```
+
+**Realistic failure + recovery:** the migrate output surfaces `MANUAL: rename folder My_Skill -> my-skill`. The tool intentionally did NOT rename the folder itself because that touches git history, IDE indexes, and CI configuration. If you skip the manual step and try to install on Cursor/Copilot, `check_cross_platform` will flag the folder/name mismatch.
+
+```bash
+# Resolve by doing the rename yourself after reviewing the diff.
+git diff My_Skill/   # sanity-check the applied edits
+mv My_Skill my-skill
+# Verify — folder and frontmatter name now match.
+python -m scripts.validate_strict ./my-skill/ --strict
+# -> Summary: error=0 ... passed=True
+# Your backup now lives at ./my-skill/backups/<ts>/ as the MANUAL hint said.
+```
+
+---
+
+## Common Issues
+
+Troubleshooting for `skill-creator-x` itself (not for the skills you author with it — for those, see `### Error Handling Guidance for Authored Skills` above).
+
+### Validator rejects my skill but `--fix-all-safe` didn't help
+
+Some rules are intentionally NOT autofix-safe (most notably `FM-009` reserved-word removal — renaming the skill changes its identity). Run:
+
+```bash
+python -m scripts.validate_strict <skill-dir> --json | jq '.results[] | select(.passed == false)'
+```
+
+The JSON result distinguishes autofixable rules (see `references/autofix-rules.md`) from manual-only ones. Fix the manual-only rules by editing `SKILL.md` yourself, then re-run `validate_strict`.
+
+### `install_multiplatform --no-dry-run` refuses with "--force required"
+
+The installer refuses to overwrite an existing non-symlink target without `--force`. This is intentional. Add the flag and the old target is renamed to `<target>.bak-<UTC-timestamp>` (recoverable) rather than rmtree'd:
+
+```bash
+python -m scripts.install_multiplatform <skill-dir> --target claude --no-dry-run --force
+# In a TTY you'll also be asked to echo the absolute target path back before the
+# overwrite proceeds. Piped/CI invocations (yes | ..., subprocess without a TTY)
+# skip the echo-back.
+```
+
+To recover from a forced overwrite, the prior target is at `<target>.bak-<UTC-timestamp>`; rename it back or `rsync` selected files.
+
+### `migrate_skill` prints `MANUAL: rename folder …`
+
+This is not an error. `migrate_skill --apply` intentionally does not rename the skill's top-level folder (that touches git, CI, and IDE paths). Perform the rename yourself after reviewing the diff. Your backup still lives under the ORIGINAL folder name — the manual message points you at the post-rename location.
+
+### `eval_review.html` shows garbled text or doesn't load
+
+The eval viewer embeds data via `<script type="application/json" id="eval-data">` + `JSON.parse(document.getElementById('eval-data').textContent)`. Your substitution step for `__EVAL_DATA_PLACEHOLDER__` must use `json.dumps(eval_items).replace("</", "<\\/")` — the `</` escape prevents a `</script>` sequence inside any query from breaking the tag. `__SKILL_NAME_PLACEHOLDER__` and `__SKILL_DESCRIPTION_PLACEHOLDER__` must each be wrapped with `html.escape(..., quote=True)`. Substitute raw strings and you will either render garbled HTML or (worse) introduce a JS-injection sink; re-generate using the escape forms and the viewer loads cleanly.
 
 ---
 
@@ -168,6 +300,10 @@ Output: feat(auth): implement JWT-based authentication
 ### Writing Style
 
 Try to explain to the model why things are important in lieu of heavy-handed musty MUSTs. Use theory of mind and try to make the skill general and not super-narrow to specific examples. Start by writing a draft and then look at it with fresh eyes and improve it.
+
+### Validate
+
+Before writing test cases, run `python -m scripts.validate_strict <skill-dir> --strict` to fail-fast on PDF compliance issues while the draft is still fresh. Fix any ERROR or SOFT-ERROR before proceeding — they are cheap to fix now and expensive to fix after test infrastructure is built on top of them. Autofixable rules (`references/autofix-rules.md`) can be resolved with `python -m scripts.autofix <skill> --fix-all-safe [--yes]`.
 
 ### Test Cases
 
@@ -325,7 +461,7 @@ kill $VIEWER_PID 2>/dev/null
 Audit/autofix existing skills without re-authoring — see `references/update-existing-skill.md`.
 
 - `python -m scripts.audit_all <dir>` — batch severity report (`--json` for CI)
-- `python -m scripts.autofix <skill> --fix <RULE_ID> [--yes]` — dry-run default; 9 rules auto-fixable
+- `python -m scripts.autofix <skill> [--fix RULE_ID [--fix RULE_ID ...]] [--fix-all-safe] [--yes] [--json]` — dry-run by default; `--yes` applies. 9 rules auto-fixable. `--fix` is repeatable; `--fix-all-safe` may be combined with `--fix` (union semantics) or used alone
 
 ## Improving the skill
 
