@@ -70,6 +70,8 @@ class SearchTrialResult:
 
 No tag-provenance fields, no LLM-attribution split, no `candidate_pool_size`, no `alias_prewarm_latency_ms`. The production coverage IS the measurement.
 
+**Primary endpoint**: production-reported coverage (tag-on, matches `enable_lr_pair_queries=True` semantics that the production SEARCHER uses unconditionally per `literature.py:2577`; the `BENCHMARK_APPENDIX` in the harness pins the same parameter in both arms). **Secondary sensitivity endpoint**: `_calculate_coverage(use_retrieval_tags=False)` recomputed in-process from the same retrieved papers. The sensitivity endpoint exists to demonstrate that the skill effect is robust to the provenance-gate criticized in §1; both endpoints are reported in parallel (new `coverage_pass_tagoff`, `genes_coverage_pct_tagoff`, `pathways_coverage_pct_tagoff` fields in §4 data model) and both feed the GLMM specified in §5 — `coverage_pass` as primary, `coverage_pass_tagoff` as sensitivity.
+
 ## 5. Statistical Analysis
 
 - **Primary**: `glmer(coverage_pass ~ skill_on * model_strength + (1|case_id), family=binomial)` via `lme4`. LRT vs `~ skill_on + model_strength` for the interaction.
@@ -110,11 +112,11 @@ If all four gates pass, proceed to the 360-trial full run. Otherwise, apply the 
 ## 9. Implementation Sequence
 
 1. Read `docs/benchmarks/skills/benchmark_skill_harness.py:739-800` to understand `_run_tool_loop`'s pattern; **do not extend it** — write a new `build_searcher_for_trial()` using `create_react_agent` instead (per §3).
-2. Write `scripts/benchmarks/harness_x_model/run_trial.py` — single-trial async runner that builds the searcher, invokes, captures `/papers.json` + `/search_context.json` + BioMCP telemetry from the virtual FS, and emits one `SearchTrialResult`.
+2. Write `docs/benchmarks/harness_x_model/run_trial.py` — single-trial async runner that builds the searcher, invokes, captures `/papers.json` + `/search_context.json` + BioMCP telemetry from the virtual FS, and emits one `SearchTrialResult`.
 3. Reuse `build_trial_schedule` from PLAN.md §3.5 verbatim. Add a seeded JSONL checkpoint pattern from `scripts/benchmarks/benchmark_cci_core.py:986-999`.
-4. Write `scripts/benchmarks/harness_x_model/run_pilot.py` — 48 trials, one JSONL per trial under `results/pilot/`, aggregate into `pilot_summary.json`.
+4. Write `docs/benchmarks/harness_x_model/run_pilot.py` — 48 trials, one JSONL per trial under `results/pilot/`, aggregate into `pilot_summary.json`.
 5. Run pilot. Verify the four gates in §8. Record the power-analysis `N_required`.
-6. Write `scripts/benchmarks/harness_x_model/run_full.py` (thin wrapper around the pilot script with `repeats=3`, `cases=30`). Run full. Expected ~18-30h.
-7. Write `analysis/harness_x_model_glmm.R` implementing §5 (primary GLMM + LRT, secondary LMM, bootstrap CI, simple-effects if interaction significant).
+6. Write `docs/benchmarks/harness_x_model/run_full.py` (thin wrapper around the pilot script with `repeats=3`, `cases=30`). Run full. Expected ~18-30h.
+7. Write `docs/benchmarks/harness_x_model/harness_x_model_glmm.R` implementing §5 (primary GLMM + LRT, secondary LMM, bootstrap CI, simple-effects if interaction significant).
 8. Generate 2-panel figure: (A) interaction plot (model strength × skill_on, coverage_pass rate with SE), (B) violin+jitter of `genes_coverage_pct` per condition. Style from `s_figure_table3_results.R` (firebrick3 for ON, gray60 for OFF, theme_bw, patchwork).
 9. Run `python -m pytest tests/evaluation` and the existing CCI ablation regression suite to confirm no measurement drift in shared helpers.
