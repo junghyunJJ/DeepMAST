@@ -58,7 +58,7 @@
 
 ---
 
-{Repeat for Hypotheses 4-5 if applicable}
+{Repeat for any additional retained hypotheses as needed}
 
 ---
 

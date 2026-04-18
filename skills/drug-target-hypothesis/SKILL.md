@@ -1,6 +1,6 @@
 ---
 name: drug-target-hypothesis
-description: Generate biological mechanism hypotheses from drug target assessment evidence. Use when you have completed Stage 1-3 evidence collection and rubric scoring and need to formulate testable mechanistic hypotheses about drug targets, therapeutic strategies, cross-target interactions, and novel pathways. Data-driven — focuses on evidence insights not literature search. For general scientific hypothesis generation use hypothesis-generation; for automated LLM-driven hypothesis testing on datasets use hypogenic. For iterative quality improvement of generated hypotheses use evolution-reasoning.
+description: Generate evidence-backed biological mechanism hypotheses from completed drug target assessment evidence. Use when Stage 1-3 evidence is present, `assessment_results.json.stage3_candidates` is non-empty, and the hypothesis writer needs to produce `evidence/hypothesis_report.json` for downstream reporting. Do not use for general literature-driven hypothesis ideation or dataset classification.
 metadata:
     skill-author: K-Dense Inc.
 ---
@@ -9,271 +9,347 @@ metadata:
 
 ## Overview
 
-Generate testable biological mechanism hypotheses from multi-stage drug target assessment evidence. This skill applies a data-driven approach adapted from HypoGeniC (Zhou et al., 2024), using evidence from Stage 1-3 assessments to formulate ranked hypotheses with UCB-based quality scoring.
+Generate testable biological mechanism hypotheses from multi-stage drug target assessment evidence. This skill is specialized for the Drug Target Agent's hypothesis-writer runtime: it reads hypothesis-scope evidence, generates mechanism hypotheses across four thematic categories, validates every cited filename, and persists a structured `hypothesis_report.json` artifact for downstream report writing.
 
-Unlike the general `hypothesis-generation` skill (literature-driven, LaTeX output, broad science) or `hypogenic` (dataset classification), this skill is specialized for drug target assessment — it reads structured evidence files, generates mechanism hypotheses across four thematic categories, applies gap analysis to ensure comprehensive evidence coverage, and scores hypotheses on Evidence Coverage, Specificity, Novelty, and Actionability.
+Unlike the general `hypothesis-generation` skill or `hypogenic`, this skill is not a free-form ideation workflow. It is a runtime-aligned contract for evidence-backed hypothesis generation with deterministic save gates.
 
 ## When to Use This Skill
 
 Use this skill when:
-- Drug target assessment with Stage 1-3 evidence has been completed
-- `rubric_scores.csv`, `assessment_results.json`, and `stage2_evidence.json` exist in the evidence directory
-- You need testable hypotheses about mechanisms, therapeutic strategies, cross-target synergies, or novel pathways
-- The drug report markdown (e.g., `drug.md`) has been generated with FEATURED and NOVEL candidates
+- Stage 1-3 evidence has already been generated in `{data_dir}/evidence/`
+- `assessment_results.json.stage3_candidates` is present and non-empty
+- The goal is to produce mechanistic drug-target hypotheses for downstream reporting
+- The runtime can call `load_evidence_files(data_dir, scope="hypothesis")`, `validate_evidence_references(...)`, and `save_evidence(...)`
 
-Do NOT use for:
-- General biology questions without drug target evidence data
-- Literature-only hypothesis generation (use `hypothesis-generation` skill)
-- Classification tasks on tabular datasets (use `hypogenic` skill)
-- Generating hypotheses before evidence collection is complete
+Do not use this skill when:
+- You need general scientific hypothesis ideation without drug-target evidence
+- You need literature-driven hypothesis generation from scratch
+- You are classifying tabular datasets
+- `stage3_candidates` is empty; in that case hypothesis generation is skipped and the downstream report proceeds without a hypothesis section
+
+## Runtime Contract
+
+The active runtime contract is:
+- Load evidence only through `load_evidence_files(data_dir, scope="hypothesis")`
+- Do not use `read_file`, `write_file`, or `ls` as the persistence path for hypothesis output
+- Validate all cited filenames with `validate_evidence_references(data_dir, [...])`
+- Persist only through `save_evidence(data_dir, "hypothesis_report.json", hypothesis_data)`
+
+Treat `src/agents/drug_target/subagents/prompts.py` and `src/agents/drug_target/tools/evidence_loader.py` as the source of truth when this skill and repo docs disagree.
 
 ---
 
 ## Workflow
 
-Follow these five phases sequentially. Each phase builds on the previous.
+Follow these phases sequentially.
 
-### Phase 1: Evidence Ingestion & Target Categorization
+### Phase 1: Evidence Ingestion and Target Categorization
 
-**Step 1.1: Enumerate evidence files**
+**Step 1.1: Load hypothesis-scope evidence**
 
-Read the evidence directory and list all available files:
+Start with:
+
+```python
+load_evidence_files(data_dir, scope="hypothesis")
+```
+
+Use the returned `files` payload as the usable evidence set for hypothesis generation.
+
+Required files for normal hypothesis execution:
 
 | File Pattern | Required? | Description |
 |-------------|-----------|-------------|
-| `rubric_scores.csv` | **YES** | Gene-level rubric scores |
-| `assessment_results.json` | **YES** | Full rubric assessment with metadata |
-| `stage2_evidence.json` | **YES** | OpenTargets data per gene |
-| `stage1_{LIGAND}--{RECEPTOR}.json` | No | Per L-R pair biological context |
-| `stage3_{GENE}.json` | No | Per gene deep-dive (FEATURED) |
-| `ot_{GENE}.json` | No | OpenTargets detailed per gene |
-| `known_drugs.json` | No | Disease-level drug landscape |
-| `gene_manifest.json` | No | Gene list with selection flags |
+| `assessment_results.json` | Yes | Canonical disease context and `stage3_candidates` list |
+| `stage2_evidence.json` | Yes | OpenTargets evidence summary |
+| `stage1_filter_results.json` | Yes | Binary pass/fail data for Stage 1 pair validation |
+| `stage1_{LIGAND}--{RECEPTOR}.json` | Usually | Per-pair biological context; PASSED pairs load fully, FAILED pairs may be slim stubs |
+| `stage3_{GENE}.json` | Usually | Per-featured-gene deep dives |
+| `ot_{GENE}.json` | Optional | Additional OpenTargets detail for featured genes |
+| `known_drugs.json` | Optional | Disease-level drug landscape |
+| `gene_manifest.json` | Optional | Gene list and selection flags |
 
-Also check the parent directory for a drug report markdown (e.g., `drug.md`, `tmp_drug.md`).
+Do not treat prior-run outputs or legacy aggregates as valid citation targets. In hypothesis scope, `excluded_files` and denied citations include:
+- `hypothesis_report.json`
+- `target_assessment.json`
+- `stage1_audit.json`
+- `stage1_confidence.json`
+- `stage1_evidence.json`
 
-If any REQUIRED file is missing, stop and report the gap. Do not generate hypotheses with incomplete core evidence.
+If `stage3_candidates` is empty, stop hypothesis generation and let the downstream report writer continue without a hypothesis section.
 
-See `references/evidence_format_spec.md` for complete schema documentation of all file types.
+See `references/evidence_format_spec.md` for schema details.
 
 **Step 1.2: Categorize targets**
 
-Parse `rubric_scores.csv` and categorize ALL genes into three tiers:
+Derive tiers from runtime evidence, not from a parent markdown report:
+- **FEATURED**: genes listed in `assessment_results.json.stage3_candidates`
+- **NOVEL**: non-featured genes that still show distinctive exploratory signal in the available assessment and OpenTargets evidence
+- **OTHER**: all remaining genes used as supporting context only
 
-- **FEATURED**: genes where `stage3_candidate` = True. These have full Stage 1-3 evidence and are the primary hypothesis targets.
-- **NOVEL**: genes identified in the drug report's `[NOVEL]` section, OR genes with `priority` >= medium AND `exploratory_total` >= 6 AND no existing drug evidence but distinctive pathway profiles. Cross-reference with the drug report markdown if available.
-- **OTHER**: all remaining genes. These provide supporting context but are not primary hypothesis targets.
+**Step 1.3: Build the evidence inventory**
 
-**Step 1.3: Build Evidence Inventory**
+For each FEATURED gene, collect:
+- classification, priority, and evidence available in `assessment_results.json`
+- related `stage1_*.json` pairs
+- Stage 3 drug and publication evidence from `stage3_{GENE}.json`
+- tractability and function summaries from `stage2_evidence.json` or `ot_{GENE}.json`
 
-For each tier, extract and record:
-
-**Per FEATURED gene:**
-- All 11 rubric scores, classification, priority
-- Which `stage1_*.json` pairs involve this gene (as ligand or receptor)
-- Stage 3 data: ChEMBL drugs (drug names, mechanisms, max phases), PubMed papers (PMIDs, titles)
-- OT tractability modalities (SM, AB, PR, OC)
-- OT function descriptions (first 2-3 sentences)
-- Safety liabilities from OT or rubric safety_profile score
-
-**Per NOVEL gene:**
-- Rubric scores, classification, priority
-- Which L-R pairs involve this gene
-- OT data (tractability, function, disease association score)
-
-**Disease context:**
-- Disease name from `assessment_results.json`
-- Known disease drugs from `known_drugs.json` (if exists)
-- Total unique drugs and targets in the disease landscape
+For NOVEL genes, record:
+- why they remain biologically interesting
+- which Stage 1 pairs and pathway contexts they appear in
+- any tractability or disease-association signals
 
 **Step 1.4: Extract key biological entities**
 
-Identify patterns across the evidence:
-- **Convergent pathways**: pathways appearing in 2+ stage1 pairs (suggest shared biology)
-- **High-plausibility genes**: biological_plausibility score >= 3 in rubric
-- **Strong PPI pairs**: STRING `max_combined_score` > 0.9 in stage1 data
-- **Strong coexpression**: Census `coexpression_p_value` < 1e-10 AND `coexpression_risk_ratio` > 5.0
-- **Hub genes**: genes appearing in 3+ L-R pairs (suggest central role)
-- **Tractable targets**: genes with OT tractability in 2+ modalities
+Look for:
+- convergent pathways across multiple Stage 1 pairs
+- high-plausibility genes
+- strong PPI links
+- strong coexpression signals
+- hub genes appearing in several pairs
+- tractable targets supported by multiple modalities
 
-Record these entities — they are the building blocks for hypothesis generation.
+Record these entities because they become the building blocks of the final hypotheses.
+
+### Phase 1.5: FAILED-pair Citation Gate (DETERMINISTIC)
+
+Before using any Stage 1 pair as evidence, check its pass/fail status in `stage1_filter_results.json`.
+
+The strict Stage 1 pass condition uses all of the following:
+- STRING combined score above 0.8
+- coexpression p-value below 0.05
+- gene A p-value below 0.05
+- gene B p-value below 0.05
+
+Rules:
+- A FAILED pair cannot support the core mechanism claim of a hypothesis.
+- A FAILED pair may be cited only as contrast evidence.
+- Contrast citations must append the literal `_FAILED` suffix, for example `stage1_TGFB1--P4HB.json_FAILED`.
+- If a FAILED pair is cited without `_FAILED`, `save_evidence` rejects the payload with `failed_pair_violations`.
+
+When a pair is cited with `_FAILED`, do not describe it as validated support.
 
 ---
 
 ### Phase 2: Hypothesis Generation
 
-Generate **4-6 initial hypotheses** distributed across four mandatory thematic categories. At minimum, one hypothesis per category.
+Generate an initial set of 4-6 hypotheses across four mandatory thematic categories.
 
-See `references/hypothesis_thematic_categories.md` for detailed category definitions and examples.
-
-| Category | Focus | Min Count |
-|----------|-------|:---------:|
-| **Mechanism of Action (MoA)** | How a target mechanistically drives the disease | 1 |
-| **Therapeutic Strategy** | How to intervene (drug, modality, safety) | 1 |
+| Category | Focus | Minimum Count |
+|----------|-------|:-------------:|
+| **Mechanism of Action** | How a target mechanistically drives disease biology | 1 |
+| **Therapeutic Strategy** | How to intervene with a target or modality | 1 |
 | **Cross-Target Interaction** | Multi-target synergies or pathway convergence | 1 |
-| **Novel Pathway** | Unexpected connections from the evidence data | 1 |
+| **Novel Pathway** | Unexpected biology revealed by the evidence | 1 |
 
-**For each hypothesis, you MUST include all 7 elements:**
+Each hypothesis must include all seven elements:
+1. Title
+2. Thematic category
+3. Core claim
+4. Supporting evidence references
+5. Key biological entities
+6. Falsifiable prediction
+7. Proposed validation approach
 
-1. **Title**: Descriptive and specific. Include gene names, cell types, and mechanism.
-   - Good: "ICAM1-EZR Axis Drives Inflammatory Leukocyte Recruitment to Fibrotic Alveoli via NF-kB-Mediated Cytoskeletal Remodeling"
-   - Bad: "ICAM1 is important in IPF"
-
-2. **Thematic category**: One of MoA / Therapeutic Strategy / Cross-Target Interaction / Novel Pathway
-
-3. **Core claim**: 2-3 sentences stating the mechanistic hypothesis. Must explain HOW and WHY, not just WHAT.
-
-4. **Supporting evidence references**: Explicit list citing specific evidence files and fields.
-   - Format: `{file_id}: {specific finding}`
-   - Example: `stage1_ICAM1--MUC1.json: STRING PPI score 0.993, Census risk ratio 17.86 in AT2 cells`
-
-5. **Key biological entities**: Lists of genes, pathways, cell types, and drugs involved.
-
-6. **Falsifiable prediction**: One specific, testable prediction with:
-   - Named intervention or condition
-   - Measurable outcome with directionality
-   - Model system or context
-   - Failure criterion (what would disprove it)
-
-7. **Proposed validation approach**: Experimental method, model system, key readouts, and controls.
-
-**Generation strategy:**
-- Start with FEATURED genes (highest evidence)
-- Use hub genes and convergent pathways for Cross-Target hypotheses
-- Use NOVEL genes for Novel Pathway hypotheses
-- Prioritize hypotheses that integrate multiple evidence types (Census + PPI + pathways + drugs)
+Generation guidance:
+- Start with FEATURED genes first
+- Use hub genes and convergent pathways for cross-target hypotheses
+- Use distinctive non-featured genes for novel pathway hypotheses
+- Prefer hypotheses that integrate multiple evidence types
 
 ---
 
 ### Phase 3: Gap Detection
 
-Ensure comprehensive evidence utilization.
+Build a coverage matrix over the real Stage 1 and Stage 3 evidence files.
 
-**Step 3.1: Build coverage matrix**
-
-For each evidence file in the inventory, mark whether it was referenced by at least one hypothesis:
-
-```
-stage1_ICAM1--MUC1.json    → Referenced by Hypothesis 1 ✓
-stage1_ICAM1--EZR.json      → Referenced by Hypothesis 3 ✓
-stage1_TGFB1--P4HB.json    → NOT REFERENCED ✗
-stage3_TGFB1.json          → Referenced by Hypothesis 2 ✓
-...
-```
+**Step 3.1: Mark referenced evidence**
+- Map each evidence file to the hypotheses that cite it
 
 **Step 3.2: Identify orphan evidence**
+- Stage 1 pairs not cited anywhere
+- FEATURED genes whose Stage 3 evidence is absent from retained hypotheses
+- pathway clusters never mentioned
 
-List all unreferenced evidence:
-- Stage 1 pairs with no hypothesis referencing them
-- FEATURED genes whose Stage 3 data was not referenced
-- Pathways appearing in evidence but not in any hypothesis
-- NOVEL genes not mentioned in any hypothesis
+**Step 3.3: Generate supplementary hypotheses**
+- Use `[GAP]` for orphan-evidence hypotheses
+- Reserve `[FEATURED-GAP]` for the mandatory FEATURED-gene coverage rule in Phase 4.75
 
-**Step 3.3: Generate gap-filling hypotheses**
-
-For each significant cluster of orphan evidence, generate 1-2 supplementary hypotheses:
-- Tag with `[GAP]` prefix in the title
-- Follow the same 7-element structure as Phase 2 hypotheses
-- May span thematic categories
-
-**Step 3.4: Coverage check**
-
-Calculate: `files_referenced / total_evidence_files * 100`
-
-Target: **>= 80%** of stage1_*.json and stage3_*.json files referenced.
-
-If below 80% after gap-filling, generate one more hypothesis targeting the largest cluster of orphan evidence.
+**Step 3.4: Coverage target**
+- Aim to cover at least 80 percent of the real Stage 1 and Stage 3 evidence files
+- The runtime recomputes `evidence_coverage_pct` during save; do not rely on manual percentages as the source of truth
 
 ---
 
-### Phase 4: UCB Scoring & Filtering
+### Phase 4: UCB Scoring and Filtering
 
-Score ALL hypotheses (Phase 2 + Phase 3 gap-fillers) on four dimensions.
+Score every hypothesis on four dimensions:
 
-See `references/ucb_scoring_criteria.md` for the full scoring rubric with examples.
-
-**Composite score formula:**
-```
-Score = 0.30 × Evidence_Coverage + 0.30 × Specificity + 0.20 × Novelty + 0.20 × Actionability
+```text
+Score = 0.30 x Evidence_Coverage + 0.30 x Specificity + 0.20 x Novelty + 0.20 x Actionability
 ```
 
-**Scoring procedure for each hypothesis:**
+For each hypothesis, provide:
+- four dimension scores
+- one short justification per dimension
 
-1. **Evidence_Coverage** (0.30): Count distinct evidence files referenced. Score = min(count / 4, 1.0)
+Filtering rules:
+1. Remove any hypothesis with Specificity below 0.5
+2. Remove any hypothesis with composite score below 0.4
+3. Rank surviving hypotheses by composite score
+4. Keep the top `max(5, len(stage3_candidates))` hypotheses after initial ranking
+5. Maintain at least three thematic categories in the retained set
 
-2. **Specificity** (0.30): Rate the falsifiable prediction on the 0.0-1.0 scale.
-   - **Hard rule**: Hypotheses scoring < 0.5 on Specificity are automatically removed regardless of composite score.
+If too few retained hypotheses remain to satisfy FEATURED coverage, generate additional hypotheses before rescoring rather than forcing the same underspecified set through save.
 
-3. **Novelty** (0.20): Rate discovery potential on the 0.0-1.0 scale. Category 4 (Novel Pathway) hypotheses should target >= 0.5.
+See `references/ucb_scoring_criteria.md` for scoring calibration.
 
-4. **Actionability** (0.20): Rate drug development feasibility on the 0.0-1.0 scale. Use OT tractability, ChEMBL drugs, and clinical phase data.
+### Phase 4.5: Validate Evidence References (MANDATORY)
 
-**For each dimension, provide a brief justification** (1 sentence explaining the score).
+Before any save attempt, call:
 
-**Filtering:**
-1. Remove hypotheses with Specificity < 0.5
-2. Remove hypotheses with composite score < 0.4
-3. If fewer than 3 survive, lower composite threshold to 0.35 and re-filter
-4. Rank remaining by composite score descending
-5. Keep top **3-5** hypotheses
+```python
+validate_evidence_references(data_dir, all_cited_filenames)
+```
 
-**Category balance check:** If scoring eliminates an entire thematic category, generate one additional hypothesis for that category and re-score before finalizing.
+Rules:
+- Pass one flat combined list containing every filename cited across all hypotheses
+- If validation returns invalid references, replace or remove them
+- Never invent filenames
+- Stage 1 filenames use the `stage1_<LIGAND>--<RECEPTOR>.json` pattern with two hyphens between the gene symbols
+- Re-run validation until it returns `valid: true`
+
+Do not proceed to `save_evidence` until filename validation is clean.
+
+### Phase 4.75: TOP-N Coverage Gate (DETERMINISTIC)
+
+After ranking and filtering, ensure every gene in `assessment_results.json.stage3_candidates` appears in the retained hypothesis set through `biological_entities.genes`.
+
+Rules:
+- For every uncovered FEATURED gene, add one `[FEATURED-GAP]` hypothesis that explicitly includes that gene
+- The final retained set must contain at least `max(4, len(FEATURED))` hypotheses
+- `save_evidence` computes `topn_coverage` deterministically and rejects the payload if `topn_coverage.missing` is non-empty
+
+This gate is independent from the general orphan-evidence `[GAP]` logic.
 
 ---
 
-### Phase 4.5: Evolutionary Refinement (Conditional)
+### Phase 5: Save the Hypothesis Artifact
 
-**Trigger conditions** — apply this phase if ANY of the following are true:
-- Best composite score < 0.7
-- Fewer than 3 hypotheses survived Phase 4 filtering
-- An entire thematic category was eliminated after the balance check
+Persist the output only as structured JSON:
 
-If triggered, use the `evolution-reasoning` skill:
-1. Call `read_skill_file(skill_path="skills/evolution-reasoning")` to load the refinement protocol
-2. Pass surviving hypotheses as items with their UCB scores as dimensions:
-   - dimensions: `{Evidence_Coverage: 0.30, Specificity: 0.30, Novelty: 0.20, Actionability: 0.20}`
-   - threshold: 0.7
-   - generation_limit: 2
-3. Follow the skill's 4-phase protocol (Initialize, Critique & Score, Select & Mutate, Termination)
-4. Replace Phase 4 output with the refined hypotheses
+```python
+save_evidence(data_dir, "hypothesis_report.json", hypothesis_data)
+```
 
-If NOT triggered (best composite >= 0.7 AND >= 3 hypotheses AND all categories represented), skip directly to Phase 5.
+Do not use `write_file`.
+
+`assets/hypothesis_report_template.md` and `assets/example_hypothesis_ipf.md` are reference assets for downstream human-readable presentation. They are not the runtime persistence contract.
+
+Required top-level payload fields include:
+- `disease`
+- `evidence_coverage_pct`
+- `hypotheses_generated`
+- `hypotheses_retained`
+- `hypotheses`
+- `gap_analysis`
+
+### Phase 5.5: Retry Policy on Deterministic Rejection
+
+If `save_evidence` returns `saved: false`:
+- For `invalid_references`, remove or replace invalid filenames and validate again
+- For `topn_coverage.missing`, add one `[FEATURED-GAP]` hypothesis per missing FEATURED gene
+- For `failed_pair_violations`, remove the citation or append `_FAILED` if it is truly contrast evidence
+
+Do not retry the same payload after a deterministic rejection. Change the payload first, then retry.
 
 ---
 
-### Phase 5: Markdown Report Output
+## Examples
 
-Generate the hypothesis report using the template from `assets/hypothesis_report_template.md`.
+### Example 1: Happy-path save flow
 
-**Report sections:**
+```python
+evidence = load_evidence_files(data_dir, scope="hypothesis")
+# Build hypotheses only from evidence["files"]
 
-1. **Header**: Disease name, date, evidence directory, file counts, hypothesis counts (generated vs. retained)
+validate_evidence_references(data_dir, [
+    "stage1_ICAM1--ITGB2.json",
+    "stage3_ICAM1.json",
+    "ot_ICAM1.json",
+])
 
-2. **Executive Summary**: 2-3 paragraphs naming the top hypothesis, key predictions, cross-target insights, and novel discoveries. State evidence coverage percentage.
+save_evidence(data_dir, "hypothesis_report.json", {
+    "disease": "Idiopathic Pulmonary Fibrosis",
+    "evidence_coverage_pct": 0,
+    "hypotheses_generated": 6,
+    "hypotheses_retained": 5,
+    "hypotheses": [...],
+    "gap_analysis": {...}
+})
+```
 
-3. **Ranked Hypotheses**: Full detail for each retained hypothesis (all 7 elements + 4 dimension scores with justifications)
+Why this works:
+- citations come from real hypothesis-scope files
+- the artifact is JSON, not markdown
+- runtime fills the final deterministic coverage metadata during save
 
-4. **Scoring Summary**: Table comparing all retained hypotheses across dimensions
+### Example 2: FAILED-pair rejection and recovery
 
-5. **Gap Analysis**: Evidence coverage stats, list of orphan evidence, gap-filling hypothesis outcomes
+```python
+validate_evidence_references(data_dir, [
+    "stage1_TGFB1--P4HB.json",
+    "stage3_TGFB1.json",
+])
 
-6. **Appendix**: Evidence Inventory tables (FEATURED targets, NOVEL targets, Stage 1 L-R pairs)
+save_evidence(...)
+# returns saved: false with failed_pair_violations
+```
 
-**Output location**: Save as `hypothesis_report.md` in the same directory as the drug report.
+Correct recovery:
+- if `stage1_TGFB1--P4HB.json` is contrast evidence only, change the citation to `stage1_TGFB1--P4HB.json_FAILED`
+- if it was being used as primary support, rebuild the hypothesis around a PASSED pair instead
+- then validate again and retry with a changed payload
 
 ---
 
 ## Quality Standards
 
-Every generated report must meet these standards:
+Every generated hypothesis report must meet these standards:
+- Every claim traces to a specific evidence file and field
+- Every hypothesis includes a falsifiable prediction
+- The retained set covers the required FEATURED genes
+- All dimension scores have short justifications
+- No fabricated literature, drug names, or filenames
+- FAILED pairs are never presented as validated primary evidence
 
-- **Evidence integrity**: Every claim traces to a specific evidence file and field. No hallucinated data points. If a value is referenced, it must exist in the evidence files.
-- **Falsifiability**: Every hypothesis includes a prediction that can be disproven by a specific experiment.
-- **Coverage**: At least 80% of stage1/stage3 evidence files referenced by at least one hypothesis.
-- **Category balance**: At least 3 of 4 thematic categories represented in final hypotheses.
-- **Scoring transparency**: All 4 dimension scores justified with explicit rationale per hypothesis.
-- **No fabricated literature**: Do not cite PubMed papers not present in the evidence data. Only use PMIDs from `stage3_*.json` files.
-- **No fabricated drug data**: Only reference drugs found in `stage3_*.json` or `known_drugs.json`.
+---
+
+## Common Issues
+
+### `stage3_candidates` is empty
+
+Hypothesis generation should stop. This is a zero-featured bypass case, not a reason to invent placeholder hypotheses.
+
+### `validate_evidence_references` returns invalid filenames
+
+Remove or replace the bad filenames. Do not invent new ones. Stage 1 pair filenames always use two hyphens between ligand and receptor.
+
+### `save_evidence` returns `topn_coverage.missing`
+
+One or more FEATURED genes are uncovered. Add a `[FEATURED-GAP]` hypothesis for each missing gene before retrying.
+
+### `save_evidence` returns `failed_pair_violations`
+
+You cited a FAILED Stage 1 pair without `_FAILED`, or used it as primary support. Fix the citation or rebuild the hypothesis.
+
+### `load_evidence_files` did not return a pair as full content
+
+In hypothesis scope, some files are intentionally stubbed or excluded. Only cite files returned with usable content in `files`, and never cite entries from `excluded_files`.
+
+### Validator flags raw comparator text
+
+Avoid prose like bare angle-bracket comparisons outside inline code or fenced blocks. Use words such as "at least", "below", or "above" in narrative text.
 
 ---
 
@@ -281,19 +357,18 @@ Every generated report must meet these standards:
 
 ### references/
 
-- `evidence_format_spec.md` — Complete schema documentation for all evidence file types (rubric CSV, stage1-3 JSON, OT JSON, known_drugs, gene_manifest)
-- `ucb_scoring_criteria.md` — Detailed 4-dimension scoring rubric with 0.0-1.0 scale definitions, drug-target-specific examples, edge cases, and score interpretation bands
-- `hypothesis_thematic_categories.md` — Definitions for 4 thematic categories (MoA, Therapeutic Strategy, Cross-Target Interaction, Novel Pathway) with IPF examples and multi-category assignment guidelines
+- `evidence_format_spec.md` - schema documentation for evidence files and citation constraints
+- `ucb_scoring_criteria.md` - detailed scoring rubric and calibration guidance
+- `hypothesis_thematic_categories.md` - category definitions and examples
 
 ### assets/
 
-- `hypothesis_report_template.md` — Markdown template with placeholder variables for the output report
-- `example_hypothesis_ipf.md` — Worked example using IPF evidence data demonstrating the expected quality level
+- `hypothesis_report_template.md` - reference markdown presentation for downstream human-readable reports
+- `example_hypothesis_ipf.md` - worked IPF example showing target quality level
 
 ### Related Skills
 
-- `hypothesis-generation` — General scientific hypothesis generation with LaTeX PDF output and 8-step manual workflow
-- `hypogenic` — Automated LLM-driven hypothesis generation and testing on tabular datasets (HypoGeniC/HypoRefine)
-- `pubmed-eutils-search` — PubMed literature search (can supplement hypotheses with additional literature if needed)
-- `evolution-reasoning` — Iterative quality improvement via evolutionary critique-and-refine cycles. Use after UCB scoring when hypothesis quality is below threshold.
-- `html-report-generator` — Can integrate hypothesis report as a tab in the HTML drug target report
+- `hypothesis-generation` - general scientific hypothesis generation
+- `hypogenic` - automated LLM-driven hypothesis generation on tabular data
+- `pubmed-eutils-search` - PubMed search support when extra literature context is needed
+- `html-report-generator` - downstream HTML presentation once structured outputs already exist

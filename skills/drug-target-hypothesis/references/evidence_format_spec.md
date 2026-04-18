@@ -4,11 +4,12 @@ This document defines the schema for all evidence files consumed by the drug-tar
 
 ## Directory Structure
 
-```
+```text
 {data_dir}/evidence/
 ├── rubric_scores.csv           # Gene-level rubric scores (REQUIRED)
 ├── assessment_results.json     # Full rubric assessment with metadata (REQUIRED)
 ├── stage2_evidence.json        # OpenTargets data per gene (REQUIRED)
+├── stage1_filter_results.json  # Stage 1 pass/fail sidecar for deterministic gates
 ├── stage1_{LIGAND}--{RECEPTOR}.json  # Per L-R pair evidence
 ├── stage3_{GENE}.json          # Per gene deep-dive (FEATURED only)
 ├── ot_{GENE}.json              # OpenTargets detailed per-gene data
@@ -20,25 +21,24 @@ This document defines the schema for all evidence files consumed by the drug-tar
 
 ### rubric_scores.csv
 
-Tabular scoring for all assessed genes. One row per gene.
+Tabular scoring for assessed genes. One row per gene. This CSV is a supporting artifact for humans and downstream tooling; the hypothesis writer itself operates on hypothesis-scope JSON evidence and should not treat this CSV as a citation source.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `gene` | string | Gene symbol (e.g., "TGFB1") |
-| `existing_drug_evidence` | int | Score for existing drugs targeting this gene (-3 to 3) |
-| `clinical_trial_activity` | int | Score for active clinical trials (-3 to 3) |
-| `mechanism_relevance` | int | Score for disease mechanism relevance (-3 to 3) |
-| `safety_profile` | int | Score for safety/toxicity concerns (-3 to 3, negative = concerns) |
+| `existing_drug_evidence` | int | Existing drug evidence score; may be negative when disease-level evidence outweighs target-level support |
+| `clinical_trial_activity` | int | Clinical activity score for the target |
+| `safety_profile` | int | Safety and toxicity score; negative values indicate concerns |
 | `validated_total` | int | Sum of validated track scores |
-| `gwas_support` | int | GWAS/genetic evidence score (0-3) |
-| `tractability` | int | Drug tractability score (0-3) |
-| `biological_plausibility` | int | Biological plausibility score (0-3) |
-| `novelty_opportunity` | int | Novelty/opportunity score (0-3) |
+| `gwas_support` | int | GWAS and genetic evidence score |
+| `tractability` | int | Drug tractability score |
+| `biological_plausibility` | int | Biological plausibility score |
+| `novelty_opportunity` | int | Novelty and opportunity score |
 | `exploratory_total` | int | Sum of exploratory track scores |
 | `combined_total` | int | validated_total + exploratory_total |
-| `classification` | string | One of: "exploratory_target", "validated_target", "insufficient_evidence" |
+| `classification` | string | One of: "validated_target", "exploratory_target", "novel_candidate", "insufficient_evidence" |
 | `priority` | string | One of: "high", "medium", "low", "unranked" |
-| `stage3_candidate` | bool | Whether gene advanced to Stage 3 deep-dive |
+| `stage3_candidate` | bool | Whether the gene remains in the post-filter Stage 3 candidate set |
 
 ### assessment_results.json
 
@@ -88,11 +88,46 @@ Per-gene OpenTargets data. Top-level keys are gene symbols. Each gene has:
 - `PR` = Protein replacement (e.g., recombinant protein)
 - `OC` = Other clinical (PROTAC, oligonucleotide, etc.)
 
+### stage1_filter_results.json
+
+Stage 1 deterministic pass/fail sidecar used by the hypothesis writer. This file is written as a JSON array of rows that mirrors the Stage 1 filter CSV.
+
+```json
+[
+  {
+    "ligand": "string",
+    "receptor": "string",
+    "passed": true,
+    "string_combined": 0.0,
+    "string_status": "in_db|no_record",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0,
+    "gene_a_target_pct": 0.0,
+    "gene_a_risk_ratio": 0.0,
+    "gene_b_target_pct": 0.0,
+    "gene_b_risk_ratio": 0.0,
+    "coexpr_target_pct": 0.0,
+    "coexpr_risk_ratio": 0.0
+  }
+]
+```
+
+Interpretation:
+- `passed = true` means the pair cleared the strict Stage 1 gate
+- `passed = false` means the pair may be cited only as contrast evidence with the `_FAILED` suffix
+
+The strict pass rule requires:
+- STRING combined score above 0.8
+- coexpression p-value below 0.05
+- gene A p-value below 0.05
+- gene B p-value below 0.05
+
 ## Optional Files
 
 ### stage1_{LIGAND}--{RECEPTOR}.json
 
-Per L-R pair biological context validation.
+Per L-R pair biological context validation. The exact file may contain additional metadata, but the active Stage 1 filter reads the fields below.
 
 ```json
 {
@@ -107,20 +142,29 @@ Per L-R pair biological context validation.
       {"cell_type": "string", "count": int}
     ]
   },
-  "census_cross_validation": {
-    "census_version": "string",
-    "coexpression_diff": float,
-    "coexpression_p_value": float,
-    "coexpression_risk_ratio": float,
-    "gene_a_diff": float,
-    "gene_a_p_value": float,
-    "gene_a_risk_ratio": float,
-    "gene_a_target_pct": float,
-    "gene_b_diff": float,
-    "gene_b_p_value": float,
-    "gene_b_risk_ratio": float,
-    "resolved_cell_type": "string",
-    "target_cell_type": "string"
+  "census_validation": {
+    "target_vs_rest": {
+      "coexpression": {
+        "p_value": float,
+        "risk_ratio": float,
+        "target_pct": float
+      },
+      "gene_a": {
+        "p_value": float,
+        "risk_ratio": float,
+        "target_pct": float
+      },
+      "gene_b": {
+        "p_value": float,
+        "risk_ratio": float,
+        "target_pct": float
+      }
+    }
+  },
+  "stage1_filter": {
+    "passed": true|false,
+    "string_combined": float,
+    "string_status": "in_db|no_record"
   },
   "string_ppi": {
     "interaction_found": true|false,
@@ -139,9 +183,9 @@ Per L-R pair biological context validation.
 ```
 
 **Key interpretation guidelines:**
-- `coexpression_risk_ratio` > 5.0 indicates strong disease-specific coexpression
-- `coexpression_p_value` < 1e-10 indicates statistically significant coexpression
-- `string_ppi.max_combined_score` > 0.9 indicates high-confidence physical interaction
+- `census_validation.target_vs_rest.coexpression.risk_ratio` above 5.0 indicates strong disease-specific coexpression
+- `census_validation.target_vs_rest.coexpression.p_value` below 1e-10 indicates statistically significant coexpression
+- `string_ppi.max_combined_score` above 0.9 indicates high-confidence physical interaction
 - Shared pathways between ligand and receptor suggest functional coupling
 
 ### stage3_{GENE}.json
@@ -215,6 +259,20 @@ Array of gene entries with selection flags.
   {"symbol": "string", "is_selected_top3": true|false}
 ]
 ```
+
+## Excluded From Citations
+
+The following files are not valid hypothesis citations in hypothesis scope:
+- `hypothesis_report.json`
+- `target_assessment.json`
+- `stage1_audit.json`
+- `stage1_confidence.json`
+- `stage1_evidence.json`
+
+`load_evidence_files(data_dir, scope="hypothesis")` may also stub or exclude:
+- stale prior-run `stage3_*.json`
+- non-featured `ot_*.json`
+- FAILED Stage 1 pair files, which may appear only as slim contrast stubs
 
 ## Drug Report Markdown
 
