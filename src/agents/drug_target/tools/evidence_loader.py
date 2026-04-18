@@ -24,6 +24,29 @@ from src.agents.drug_target.tools.stage2_service import extract_lr_pairs
 # Module-level constant for overwrite protection (used in save_evidence)
 _SAVE_PROTECTED_FILES = {"stage2_evidence.json", "known_drugs.json", "gene_manifest.json"}
 
+# Files that are INVALID as hypothesis_writer inputs / citations.
+# - Prior-run outputs (hypothesis_report, target_assessment) must not feed back
+#   into the next generation's context (self-reference / loop-leak).
+# - Legacy aggregates (stage1_audit/confidence/evidence) are superseded by
+#   stage1_filter_results.json + per-pair stage1_<L>--<R>.json files.
+_HYPOTHESIS_DENIED_CITATIONS: frozenset[str] = frozenset({
+    "hypothesis_report.json",
+    "target_assessment.json",
+    "stage1_audit.json",
+    "stage1_confidence.json",
+    "stage1_evidence.json",
+})
+
+# Files always loaded in full for hypothesis scope regardless of gene filter.
+_HYPOTHESIS_ALWAYS_FULL: frozenset[str] = frozenset({
+    "assessment_results.json",
+    "stage1_filter.json",
+    "stage1_filter_results.json",
+    "gene_manifest.json",
+    "known_drugs.json",
+    "rubric_scores.json",
+})
+
 logger = logging.getLogger(__name__)
 
 
@@ -168,8 +191,135 @@ def load_lr_candidates(data_dir: str, disease: str = "") -> str:
     return json.dumps(result, indent=2)
 
 
+def _size_metadata_summary(data, size_bytes: int, content_limit: int) -> dict:
+    """Return the generic oversized-file metadata summary used by scope=all."""
+    summary: dict = {
+        "size_bytes": size_bytes,
+        "_note": (
+            f"content omitted (> {content_limit} bytes); "
+            "inspect sub-fields via scope-specific tools"
+        ),
+    }
+    if isinstance(data, dict):
+        summary["top_keys"] = list(data.keys())[:20]
+        summary["record_count"] = len(data)
+    elif isinstance(data, list):
+        summary["record_count"] = len(data)
+        if data and isinstance(data[0], dict):
+            summary["item_keys"] = list(data[0].keys())[:10]
+    else:
+        summary["record_count"] = 1
+    return summary
+
+
+def _load_featured_set(evidence_dir: Path) -> tuple[set[str], str | None]:
+    """Return (uppercase featured-gene set, error_message_or_None).
+
+    Reads `stage3_candidates` from assessment_results.json. Missing or
+    malformed assessment is a hard error for hypothesis scope.
+    """
+    assessment_path = evidence_dir / "assessment_results.json"
+    if not assessment_path.exists():
+        return set(), f"assessment_results.json not found at {assessment_path}"
+    try:
+        assessment = json.loads(assessment_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        return set(), f"Failed to parse assessment_results.json: {e}"
+    candidates = assessment.get("stage3_candidates") if isinstance(assessment, dict) else None
+    if not isinstance(candidates, list):
+        return set(), "assessment_results.json has no stage3_candidates list"
+    featured: set[str] = set()
+    for c in candidates:
+        if isinstance(c, dict):
+            gene = (c.get("gene") or c.get("gene_symbol") or "").strip().upper()
+            if gene:
+                featured.add(gene)
+    return featured, None
+
+
+def _stage1_slim_stub(data: dict) -> dict:
+    """Extract the minimum fields a FAILED stage1 pair needs for contrast citation."""
+    stage1_filter = {}
+    raw_filter = data.get("stage1_filter", {}) if isinstance(data, dict) else {}
+    if isinstance(raw_filter, dict):
+        for k in (
+            "passed",
+            "string_combined",
+            "string_status",
+            "census_coexpr_pvalue",
+            "census_gene_a_pvalue",
+            "census_gene_b_pvalue",
+        ):
+            if k in raw_filter:
+                stage1_filter[k] = raw_filter[k]
+    return {
+        "ligand": data.get("ligand") if isinstance(data, dict) else None,
+        "receptor": data.get("receptor") if isinstance(data, dict) else None,
+        "stage1_filter": stage1_filter,
+        "_note": "slim stub: FAILED stage1 pair; cite with '_FAILED' suffix as contrast evidence.",
+    }
+
+
+_STAGE3_NAME_RE = re.compile(r"^stage3_([A-Za-z0-9-]+)\.json$")
+_OT_NAME_RE = re.compile(r"^ot_([A-Za-z0-9-]+)\.json$")
+_STAGE1_PAIR_NAME_RE = re.compile(r"^stage1_([A-Za-z0-9-]+)--([A-Za-z0-9-]+)\.json$")
+
+
+def _classify_hypothesis_scope_file(
+    name: str,
+    *,
+    featured: set[str],
+    filter_map: dict[str, bool],
+    filter_missing: bool,
+) -> tuple[str, str | None]:
+    """Return (action, reason) for a given filename under hypothesis scope.
+
+    Actions:
+      - "full"      : load full JSON content
+      - "stub_stale_stage3"
+      - "stub_nonfeatured_ot"
+      - "stub_failed_pair"
+      - "excluded"  : omit from files dict (record in excluded_files)
+      - "fallback"  : defer to scope=all size-based logic
+    """
+    if name in _HYPOTHESIS_DENIED_CITATIONS:
+        return "excluded", "legacy aggregate or prior-run output; not valid hypothesis input"
+    if name in _HYPOTHESIS_ALWAYS_FULL:
+        return "full", None
+
+    m3 = _STAGE3_NAME_RE.match(name)
+    if m3:
+        gene = m3.group(1).upper()
+        if gene in featured:
+            return "full", None
+        return "stub_stale_stage3", f"stale prior-run stage3 file; {gene} not in current stage3_candidates"
+
+    mo = _OT_NAME_RE.match(name)
+    if mo:
+        gene = mo.group(1).upper()
+        if gene in featured:
+            return "full", None
+        return "stub_nonfeatured_ot", "skipped: non-featured gene in hypothesis scope"
+
+    mp = _STAGE1_PAIR_NAME_RE.match(name)
+    if mp:
+        pair_key = f"{mp.group(1).upper()}--{mp.group(2).upper()}"
+        if filter_missing:
+            # Codex F1 fail-open: no filter source → full content, never silent strip.
+            return "full", None
+        passed = filter_map.get(pair_key)
+        if passed is True:
+            return "full", None
+        if passed is False:
+            return "stub_failed_pair", "FAILED stage1 pair; slimmed to filter summary only"
+        # Pair not in filter_map even though sources exist → fail-open per F1 rationale.
+        return "full", None
+
+    return "fallback", None
+
+
 @tool
-def load_evidence_files(data_dir: str) -> str:
+def load_evidence_files(data_dir: str, scope: str = "all") -> str:
     """Load evidence JSON files from the evidence/ subdirectory.
 
     For files up to ~200 KB (stage1_filter.json, assessment_results.json,
@@ -183,22 +333,39 @@ def load_evidence_files(data_dir: str) -> str:
 
     Args:
         data_dir: Directory containing evidence/ subdirectory
+        scope: "all" (default) preserves the legacy load-everything
+            behavior. "hypothesis" restricts the payload to what
+            hypothesis_writer actually needs:
+              * OpenTargets full content only for genes in stage3_candidates.
+              * stage3_<GENE>.json full content only for current featured set
+                (stale prior-run files are stubbed).
+              * stage1_<L>--<R>.json full content only for PASSED pairs;
+                FAILED pairs are slim-stubbed (ligand/receptor + filter summary
+                so the _FAILED contrast-citation suffix still works).
+              * Legacy aggregates (stage1_audit/confidence/evidence) and
+                prior-run outputs (hypothesis_report, target_assessment) are
+                excluded entirely (not in ``files``, listed under
+                ``excluded_files``). The ``save_evidence`` citation gate
+                additionally rejects them as references.
+              * Fail-open: if stage1_filter_results.{json,csv} is missing or
+                unparseable, every per-pair stage1 file returns full content
+                (never silently strip a PASSED pair).
 
     Returns:
-        JSON with filename -> full content (small files) or
-        metadata summary (large files). Inspect the ``_note`` key on
-        summary entries to distinguish the two.
+        JSON with ``files`` (filename -> full content or stub), ``excluded_files``
+        (hypothesis scope only), ``file_count``, ``total_size_bytes``, and
+        ``errors``. For stub entries, inspect the ``_note`` key.
     """
-    # Files at or below this size get full content; larger files stay
-    # as metadata summaries to protect context window budgets.
     CONTENT_SIZE_LIMIT = 200_000  # 200 KB
 
     base = _resolve_data_dir(data_dir)
     evidence_dir = base / "evidence"
-    result = {
+    result: dict = {
         "data_dir": str(base),
         "evidence_dir": str(evidence_dir),
+        "scope": scope,
         "files": {},
+        "excluded_files": [],
         "file_count": 0,
         "total_size_bytes": 0,
         "errors": [],
@@ -208,40 +375,81 @@ def load_evidence_files(data_dir: str) -> str:
         result["errors"].append(f"evidence/ directory not found at {evidence_dir}")
         return json.dumps(result, indent=2)
 
+    hypothesis_scope = (scope or "all").lower() == "hypothesis"
+    featured: set[str] = set()
+    filter_map: dict[str, bool] = {}
+    filter_missing = False
+
+    if hypothesis_scope:
+        featured, feat_err = _load_featured_set(evidence_dir)
+        if feat_err:
+            result["errors"].append(
+                f"hypothesis scope aborted: {feat_err}. "
+                "Fall back to scope='all' if the featured set cannot be resolved."
+            )
+            return json.dumps(result, indent=2)
+        filter_map = _load_stage1_filter_results(evidence_dir)
+        # Detect whether any stage1 per-pair file exists to decide fail-open behavior.
+        any_pair_file = any(
+            _STAGE1_PAIR_NAME_RE.match(p.name) for p in evidence_dir.glob("stage1_*.json")
+        )
+        if not filter_map and any_pair_file:
+            filter_missing = True
+            logger.warning(
+                "hypothesis scope: stage1_filter_results.{json,csv} missing or unparseable; "
+                "falling back to full content for every stage1 pair file."
+            )
+            result["errors"].append(
+                "filter results missing — falling back to full content for all stage1 pair files "
+                "(fail-open to avoid silently stripping PASSED pairs)."
+            )
+
     for path in sorted(evidence_dir.glob("*.json")):
+        name = path.name
         try:
             size_bytes = path.stat().st_size
+        except Exception as e:
+            result["errors"].append(f"Failed to stat {name}: {e}")
+            continue
+
+        if hypothesis_scope:
+            action, reason = _classify_hypothesis_scope_file(
+                name,
+                featured=featured,
+                filter_map=filter_map,
+                filter_missing=filter_missing,
+            )
+            if action == "excluded":
+                result["excluded_files"].append({"name": name, "reason": reason or ""})
+                continue
+        else:
+            action = "fallback"
+            reason = None
+
+        try:
             with open(path) as f:
                 data = json.load(f)
-
-            if size_bytes <= CONTENT_SIZE_LIMIT:
-                # Return full JSON content — subagents need actual values
-                # (filter pass/fail flags, rubric scores, drug names, etc.)
-                result["files"][path.name] = data
-            else:
-                # Large file: metadata summary only (protects context window)
-                summary = {
-                    "size_bytes": size_bytes,
-                    "_note": (
-                        f"content omitted (> {CONTENT_SIZE_LIMIT} bytes); "
-                        "inspect sub-fields via scope-specific tools"
-                    ),
-                }
-                if isinstance(data, dict):
-                    summary["top_keys"] = list(data.keys())[:20]
-                    summary["record_count"] = len(data)
-                elif isinstance(data, list):
-                    summary["record_count"] = len(data)
-                    if data and isinstance(data[0], dict):
-                        summary["item_keys"] = list(data[0].keys())[:10]
-                else:
-                    summary["record_count"] = 1
-                result["files"][path.name] = summary
-
-            result["file_count"] += 1
-            result["total_size_bytes"] += size_bytes
         except Exception as e:
-            result["errors"].append(f"Failed to load {path.name}: {e}")
+            result["errors"].append(f"Failed to load {name}: {e}")
+            continue
+
+        if action == "full":
+            result["files"][name] = data
+        elif action == "stub_stale_stage3" or action == "stub_nonfeatured_ot":
+            stub: dict = {"size_bytes": size_bytes, "_note": reason or ""}
+            if isinstance(data, dict):
+                stub["top_keys"] = list(data.keys())[:5]
+            result["files"][name] = stub
+        elif action == "stub_failed_pair":
+            result["files"][name] = _stage1_slim_stub(data if isinstance(data, dict) else {})
+        else:  # "fallback" — size-based behavior (preserves scope=all logic)
+            if size_bytes <= CONTENT_SIZE_LIMIT:
+                result["files"][name] = data
+            else:
+                result["files"][name] = _size_metadata_summary(data, size_bytes, CONTENT_SIZE_LIMIT)
+
+        result["file_count"] += 1
+        result["total_size_bytes"] += size_bytes
 
     return json.dumps(result, indent=2)
 
@@ -293,6 +501,13 @@ def _validate_hypothesis_report_references(
             if not token_match:
                 continue
             token = token_match.group(1)
+            if token in _HYPOTHESIS_DENIED_CITATIONS:
+                errors.append(
+                    f"hypotheses[{idx}].evidence_references cites '{token}' "
+                    "which is a legacy aggregate or prior-run output forbidden "
+                    "as hypothesis input."
+                )
+                continue
             if token not in real:
                 errors.append(
                     f"hypotheses[{idx}].evidence_references cites '{token}' "
@@ -302,7 +517,7 @@ def _validate_hypothesis_report_references(
 
 
 # ---------------------------------------------------------------------------
-# PR1-4/5/6: Deterministic TOP7 coverage + evidence_coverage_pct + FAILED-pair gate
+# Deterministic TOP-N coverage + evidence_coverage_pct + FAILED-pair gate
 # ---------------------------------------------------------------------------
 
 
@@ -338,36 +553,34 @@ def _load_stage1_filter_results(evidence_dir: Path) -> dict[str, bool]:
     return {}
 
 
-def _validate_hypothesis_report_top7_and_failed_pairs(
+def _validate_hypothesis_report_topn_and_failed_pairs(
     parsed: dict,
     evidence_dir: Path,
 ) -> dict:
-    """Deterministic gates for hypothesis_report.json (PR1-4/5/6).
+    """Deterministic gates for hypothesis_report.json.
 
     Returns a diagnostic dict with keys:
-      - top7_coverage: {covered, missing, coverage_pct}
+      - topn_coverage: {covered, missing, coverage_pct}
       - evidence_coverage_pct: deterministic float (0..100)
       - failed_pair_violations: [strings] -- hypotheses citing FAILED pairs without _FAILED suffix
       - reject_reason: str | None  (non-None means save_evidence MUST refuse)
     """
     diag: dict = {
-        "top7_coverage": {"covered": [], "missing": [], "coverage_pct": 100.0},
+        "topn_coverage": {"covered": [], "missing": [], "coverage_pct": 100.0},
         "evidence_coverage_pct": 0.0,
         "failed_pair_violations": [],
         "reject_reason": None,
     }
 
     # 1. Resolve the FEATURED gene list from assessment_results.json.
-    #    PR1-1a: hypothesis_writer should cover ALL stage1_validated_candidates
-    #    (post-filter narrow set). Fallback to stage3_candidates for schema_version<2.
+    #    stage3_candidates is the single narrowed set (rubric ∩ Stage 1 PASS);
+    #    hypothesis_writer must cover every gene in this list.
     assessment_path = evidence_dir / "assessment_results.json"
     featured_genes: list[str] = []
     if assessment_path.exists():
         try:
             assessment = json.loads(assessment_path.read_text(encoding="utf-8"))
-            validated = assessment.get("stage1_validated_candidates")
-            if validated is None:
-                validated = assessment.get("stage3_candidates", [])
+            validated = assessment.get("stage3_candidates", [])
             featured_genes = [
                 (c.get("gene") or "").strip()
                 for c in validated
@@ -376,7 +589,7 @@ def _validate_hypothesis_report_top7_and_failed_pairs(
         except Exception:
             featured_genes = []
 
-    # 2. Compute TOP7 coverage deterministically.
+    # 2. Compute TOP-N coverage deterministically.
     hypotheses = parsed.get("hypotheses", []) if isinstance(parsed, dict) else []
     cited_genes: set[str] = set()
     if isinstance(hypotheses, list):
@@ -392,14 +605,14 @@ def _validate_hypothesis_report_top7_and_failed_pairs(
         upper_featured = {g.upper(): g for g in featured_genes}
         covered = sorted(g for upper, g in upper_featured.items() if upper in cited_genes)
         missing = sorted(g for upper, g in upper_featured.items() if upper not in cited_genes)
-        diag["top7_coverage"] = {
+        diag["topn_coverage"] = {
             "covered": covered,
             "missing": missing,
             "coverage_pct": round(100.0 * len(covered) / len(featured_genes), 2),
         }
         if missing:
             diag["reject_reason"] = (
-                f"top7_missing={missing}. hypothesis_writer MUST generate one "
+                f"topn_missing={missing}. hypothesis_writer MUST generate one "
                 f"[FEATURED-GAP] hypothesis per missing gene before retrying. "
                 f"Do NOT retry the same payload."
             )
@@ -602,12 +815,12 @@ def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) ->
             result["available_files"] = real
             return json.dumps(result, indent=2)
 
-        # PR1-4/5/6: Deterministic TOP7 coverage + evidence_coverage_pct + FAILED-pair gate.
-        diag = _validate_hypothesis_report_top7_and_failed_pairs(parsed, evidence_dir)
+        # Deterministic TOP-N coverage + evidence_coverage_pct + FAILED-pair gate.
+        diag = _validate_hypothesis_report_topn_and_failed_pairs(parsed, evidence_dir)
         # Always overwrite LLM-supplied evidence_coverage_pct with deterministic value.
         llm_pct = parsed.get("evidence_coverage_pct")
         parsed["evidence_coverage_pct"] = diag["evidence_coverage_pct"]
-        parsed["top7_coverage"] = diag["top7_coverage"]
+        parsed["topn_coverage"] = diag["topn_coverage"]
         if llm_pct is not None and abs(float(llm_pct) - diag["evidence_coverage_pct"]) > 5.0:
             logger.warning(
                 "evidence_coverage_pct mismatch: LLM=%.2f, computed=%.2f (drift>5pp)",
@@ -615,18 +828,18 @@ def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) ->
             )
         if diag["reject_reason"]:
             logger.error(
-                "hypothesis_report rejected: top7_missing=%s, failed_pair_violations=%d",
-                diag["top7_coverage"]["missing"], len(diag["failed_pair_violations"]),
+                "hypothesis_report rejected: topn_missing=%s, failed_pair_violations=%d",
+                diag["topn_coverage"]["missing"], len(diag["failed_pair_violations"]),
             )
             result["saved"] = False
             result["errors"].append(
-                "hypothesis_report.json blocked by deterministic TOP7/FAILED-pair gate. "
+                "hypothesis_report.json blocked by deterministic TOP-N/FAILED-pair gate. "
                 + diag["reject_reason"]
             )
-            result["top7_coverage"] = diag["top7_coverage"]
+            result["topn_coverage"] = diag["topn_coverage"]
             result["failed_pair_violations"] = diag["failed_pair_violations"]
             result["recommendation"] = (
-                "1) For each missing TOP7 gene in top7_coverage.missing, generate one "
+                "1) For each missing TOP-N gene in topn_coverage.missing, generate one "
                 "[FEATURED-GAP] hypothesis with biological_entities.genes including that gene. "
                 "2) For each failed_pair_violations entry, either remove the citation OR "
                 "append the '_FAILED' suffix marker (e.g., 'stage1_TGFB1--P4HB.json_FAILED') "
@@ -675,16 +888,31 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
     real = _list_real_evidence_filenames(evidence_dir)
 
     invalid: list[str] = []
+    denied: list[dict] = []
     seen_tokens: list[str] = []
     for ref in references or []:
         if not isinstance(ref, str) or not ref:
             continue
-        token_match = re.search(r"([A-Za-z0-9_.\-]+\.json)", ref)
+        # Strip _FAILED suffix marker before comparison (suffix is a citation
+        # qualifier, not a different filename).
+        ref_stripped = ref.replace(".json_FAILED", ".json")
+        token_match = re.search(r"([A-Za-z0-9_.\-]+\.json)", ref_stripped)
         if not token_match:
             invalid.append(ref)
             continue
         token = token_match.group(1)
         seen_tokens.append(token)
+        if token in _HYPOTHESIS_DENIED_CITATIONS:
+            invalid.append(ref)
+            denied.append({
+                "reference": ref,
+                "token": token,
+                "reason": (
+                    "legacy aggregate or prior-run output forbidden as "
+                    "hypothesis_writer input; remove the citation."
+                ),
+            })
+            continue
         if token not in real:
             invalid.append(ref)
 
@@ -696,6 +924,7 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
         "valid": len(invalid) == 0,
         "checked_references_count": len(seen_tokens),
         "invalid_references": invalid,
+        "denied_citations": denied,
         "available_files": sorted(real),
         "stage1_pair_files": stage1_pair_files,
         "naming_convention": (
@@ -817,19 +1046,16 @@ def check_stage1_completion(data_dir: str) -> str:
         return json.dumps(result, indent=2)
 
     result["has_assessment_results"] = True
-    # PR1-1a: check_stage1_completion gates downstream stages (deep_diver, etc).
-    # The "do we have anything left for deep_diver?" check uses the post-filter narrow set.
-    # Fallback to stage3_candidates for schema_version<2.
-    stage3_candidates = assessment.get("stage1_validated_candidates")
-    if stage3_candidates is None:
-        stage3_candidates = assessment.get("stage3_candidates", [])
+    # check_stage1_completion gates downstream stages (deep_diver, hypothesis_writer).
+    # Single narrowed set = stage3_candidates (rubric ∩ Stage 1 PASS).
+    stage3_candidates = assessment.get("stage3_candidates", [])
     result["stage3_candidates_count"] = len(stage3_candidates)
 
     # 2. Zero candidates = valid state (no featured genes)
     if not stage3_candidates:
         result["stage1_complete"] = True
         result["recommendation"] = (
-            "No stage1_validated_candidates / stage3_candidates (zero featured genes). "
+            "No stage3_candidates (zero featured genes). "
             "Skip deep_diver and hypothesis_writer, proceed to report_writer."
         )
         return json.dumps(result, indent=2)
