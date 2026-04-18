@@ -2,7 +2,7 @@
 name: drug-target-hypothesis
 description: Generate evidence-backed biological mechanism hypotheses from completed drug target assessment evidence. Use when Stage 1-3 evidence is present, `assessment_results.json.stage3_candidates` is non-empty, and the hypothesis writer needs to produce `evidence/hypothesis_report.json` for downstream reporting. Do not use for general literature-driven hypothesis ideation or dataset classification.
 metadata:
-    skill-author: K-Dense Inc.
+    skill-author: Junghyun Jung
 ---
 
 # Drug Target Hypothesis Generation
