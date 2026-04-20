@@ -1748,9 +1748,42 @@ def _prebuild_target_assessment(
     # C. Rank candidates and inject OpenTargets scores
     ranked_matrix = rank_featured_candidates(pair_matrix)
 
+    # Stage 1 filter lookup ({ligand}^{receptor} → passed bool) for B5
+    # promotion logic. stage1_filter.json is authoritative; fall back to an
+    # empty map if the file is missing so the existing behaviour is preserved.
+    stage1_passed: dict[str, bool] = {}
+    filter_path = evidence_dir / "stage1_filter.json"
+    if filter_path.exists():
+        try:
+            _raw = json.loads(filter_path.read_text(encoding="utf-8"))
+            if isinstance(_raw, dict):
+                for key, entry in _raw.items():
+                    if not isinstance(entry, dict):
+                        continue
+                    stage1_passed[key.upper()] = bool(entry.get("passed", False))
+        except Exception:
+            stage1_passed = {}
+
+    def _pair_passed_stage1(row: dict) -> bool:
+        ligand_u = str(row.get("ligand", "")).strip().upper()
+        receptor_u = str(row.get("receptor", "")).strip().upper()
+        key1 = f"{ligand_u}^{receptor_u}"
+        key2 = f"{receptor_u}^{ligand_u}"
+        return stage1_passed.get(key1, stage1_passed.get(key2, False))
+
+    # Initialise promotion_reason for every row. The "organic_featured"
+    # label applies to pairs that were already marked featured by
+    # `rank_featured_candidates` (i.e., they earned it via combined_total).
+    for row in ranked_matrix:
+        if row.get("is_featured") or row.get("is_novel"):
+            row["promotion_reason"] = "organic_featured"
+        else:
+            row["promotion_reason"] = None
+
     # Reconcile pair-level featured/novel with gene-level stage3_candidates:
     # 1. Remove featured from pairs where NEITHER gene is a stage3_candidate
     # 2. Ensure EVERY stage3 gene has at least one pair marked is_featured
+    #    — 2-pass logic: prefer Stage 1 PASSED pairs, fall back to any pair.
     if stage3_genes:
         s3_set = {g.upper() for g in stage3_genes}
         # Step 1: Remove non-stage3 featured
@@ -1761,6 +1794,7 @@ def _prebuild_target_assessment(
                 row["is_featured"] = False
                 row["is_novel"] = False
                 row["rank"] = None
+                row["promotion_reason"] = None
         # Step 2: Ensure all stage3 genes covered
         covered = set()
         for row in ranked_matrix:
@@ -1771,17 +1805,36 @@ def _prebuild_target_assessment(
                 if g in s3_set:
                     covered.add(g)
         missing = s3_set - covered
-        if missing:
+
+        def _promote_for_missing(only_passed: bool, reason: str) -> None:
             for row in ranked_matrix:
                 if not missing:
                     break
+                if only_passed and not _pair_passed_stage1(row):
+                    continue
                 ligand = str(row.get("ligand", "")).strip().upper()
                 receptor = str(row.get("receptor", "")).strip().upper()
                 for g in (receptor, ligand):
                     if g in missing:
                         row["is_featured"] = True
+                        row["promotion_reason"] = reason
                         missing.discard(g)
                         break
+
+        # Pass 1: try Stage 1 PASSED pairs for missing genes
+        _promote_for_missing(
+            only_passed=True,
+            reason="stage3_coverage_fallback_passed",
+        )
+        # Pass 2: if still uncovered, fall back to any pair (including
+        # FAILED Stage 1). This preserves the previous behaviour so no
+        # gene disappears from deep_dive, but the `promotion_reason`
+        # field now tells downstream consumers that the evidence is
+        # weak.
+        _promote_for_missing(
+            only_passed=False,
+            reason="stage3_coverage_fallback_failed",
+        )
 
     for row in ranked_matrix:
         if "open_targets_score" in row:
