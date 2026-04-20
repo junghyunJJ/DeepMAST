@@ -344,7 +344,15 @@ def _parse_census_csv(csv_path: Path, target_cell_type: str) -> dict[str, Any] |
         p_target = pos_target / n_target
         p_rest = pos_rest / n_rest
 
-        risk_ratio = round(p_target / p_rest, 4) if p_rest > 0 else float("inf")
+        # 0/0 produces a non-RFC-8259 JSON value when serialized as float("inf").
+        # Emit None + an explicit `risk_ratio_capped` flag so downstream JSON
+        # parsers, reports, and schema validators see a well-formed value.
+        if p_rest > 0:
+            risk_ratio: float | None = round(p_target / p_rest, 4)
+            risk_ratio_capped = False
+        else:
+            risk_ratio = None
+            risk_ratio_capped = True
         pooled = (pos_target + pos_rest) / (n_target + n_rest)
         if 0 < pooled < 1:
             se = math.sqrt(pooled * (1 - pooled) * (1 / n_target + 1 / n_rest))
@@ -359,6 +367,7 @@ def _parse_census_csv(csv_path: Path, target_cell_type: str) -> dict[str, Any] |
             "rest_pct": round(p_rest, 6),
             "diff": round(p_target - p_rest, 6),
             "risk_ratio": risk_ratio,
+            "risk_ratio_capped": risk_ratio_capped,
             "z": z_score,
             "p_value": p_value,
         }
