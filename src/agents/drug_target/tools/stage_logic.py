@@ -1179,6 +1179,44 @@ def _score_novelty_opportunity(associations: list[dict],
     return score
 
 
+def _extract_ot_disease_score(ot_data: dict[str, Any]) -> float:
+    """Extract disease-specific OpenTargets association score from ot_*.json.
+
+    Prefers max(disease_evidence[*].score) because it is disease-filtered
+    (higher score = stronger target-disease link for the input disease).
+    Falls back to associations[0].score, then legacy flat keys.
+    Returns 0.0 if no signal is available.
+    """
+    if not isinstance(ot_data, dict):
+        return 0.0
+    de = ot_data.get("disease_evidence") or []
+    if isinstance(de, list) and de:
+        try:
+            best = max(
+                (float(e.get("score") or 0) for e in de if isinstance(e, dict)),
+                default=0.0,
+            )
+            if best:
+                return best
+        except Exception:
+            pass
+    assocs = ot_data.get("associations") or []
+    if isinstance(assocs, list) and assocs:
+        first = assocs[0]
+        if isinstance(first, dict):
+            try:
+                val = float(first.get("score") or 0)
+                if val:
+                    return val
+            except Exception:
+                pass
+    legacy = ot_data.get("association_score") or ot_data.get("overall_association_score") or 0
+    try:
+        return float(legacy or 0)
+    except Exception:
+        return 0.0
+
+
 @tool
 def compute_rubric_scores(data_dir: str) -> str:
     """Compute deterministic rubric scores for ALL genes from Stage 2 evidence.
@@ -1681,9 +1719,7 @@ def _prebuild_target_assessment(
             if ot_file.exists():
                 try:
                     ot_data = json.loads(ot_file.read_text(encoding="utf-8"))
-                    score = ot_data.get("association_score") or ot_data.get(
-                        "overall_association_score", 0
-                    )
+                    score = _extract_ot_disease_score(ot_data)
                     if score:
                         row["open_targets_score"] = float(score)
                         break

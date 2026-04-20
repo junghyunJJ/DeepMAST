@@ -9,7 +9,10 @@ from typing import Any
 from langchain_core.tools import tool
 
 from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir
-from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
+from src.agents.drug_target.tools.stage_logic import (
+    _extract_ot_disease_score,
+    rank_featured_candidates,
+)
 from src.agents.drug_target.tools.stage2_service import extract_lr_pairs
 
 
@@ -69,7 +72,7 @@ def _inject_open_targets_scores(matrix: list[dict], evidence_dir: Path) -> None:
             if ot_file.exists():
                 try:
                     data = json.loads(ot_file.read_text(encoding="utf-8"))
-                    score = data.get("association_score") or data.get("overall_association_score", 0)
+                    score = _extract_ot_disease_score(data)
                     if score:
                         row["open_targets_score"] = float(score)
                         break
