@@ -1735,6 +1735,15 @@ def _prebuild_target_assessment(
     seen_genes: set[str] = set()
     s3_set = {g.upper() for g in (stage3_genes or [])}
 
+    # Gene-level authoritative track map from rubric classification.
+    # Previously the track was derived from `row.get("is_featured")` on the
+    # last iterand of the `ranked_matrix` loop above — a stale-variable leak
+    # that tagged every gene the same way regardless of identity.
+    gene_track_map: dict[str, str] = {}
+    for g_name, g_rubric in (rubric_by_gene or {}).items():
+        cls = str((g_rubric or {}).get("classification", "")).strip()
+        gene_track_map[g_name.upper()] = "novel" if cls == "novel_candidate" else "featured"
+
     # Collect all stage3 genes that appear in any featured/novel pair
     candidate_genes: list[str] = []
     for row in ranked_matrix:
@@ -1768,7 +1777,7 @@ def _prebuild_target_assessment(
 
         featured_deep_dive.append({
             "target_gene": gene,
-            "track": "featured" if row.get("is_featured") else "novel",
+            "track": gene_track_map.get(gene.upper(), "featured"),
             "stage3_clinical_safety": {
                 "known_drugs_drugbank": [
                     d.get("drug_name", d.get("name", ""))
