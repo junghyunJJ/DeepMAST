@@ -425,22 +425,51 @@ Each hypothesis MUST include all 7 elements:
 
 ### CRITICAL: Quantitative Predictions (Anti-Hallucination)
 
-- Every `falsifiable_prediction` containing a numeric effect size (percentages
-  like `50%`, ratios like `2-fold`, or thresholds like `p < 0.05`) MUST cite
-  the specific evidence value it extrapolates from, using one of these cue
-  phrases: `"Based on ..."`, `"Evidence: ..."`, or `"from <filename>"` inline
-  in the same sentence.
-- FORBIDDEN: round-number fabrications (`10%`, `20%`, ..., `90%`, `N-fold`)
-  without grounding. The values `50%`, `2-fold`, `40%`, `30%` appear so often
-  in un-grounded LLM output that save_evidence will flag them as
-  `grounding: "unverified"` unless an evidence citation is adjacent.
-- If no numeric evidence exists for a prediction, use qualitative language
-  (e.g., "significant reduction", "measurable increase") and omit the
-  percentage entirely.
-- The save_evidence gate tags each hypothesis with
-  `prediction_grounding ∈ {"grounded", "qualitative", "unverified"}` based on
-  deterministic pattern matching. Aim for `grounded` or `qualitative`. An
-  `unverified` tag is visible in the final report and to reviewers.
+Every `falsifiable_prediction` containing a numeric effect size MUST anchor
+each number to a concrete evidence file. The save_evidence gate deterministically
+scans for the pattern `from <filename>` where `<filename>` is the literal name
+of a stage1 or ot evidence JSON file (e.g. `from stage1_ICAM1--MUC1.json`).
+Generic cue phrases like `"Based on the passed stage1 filter"` NO LONGER qualify
+as grounding — the sentence must explicitly name the evidence file.
+
+#### Grounding labels (post-save classification)
+- `grounded_verified`: number cited + file cited + number appears in that file
+  (1% relative tolerance). This is the target state.
+- `grounded`: number cited + file cited, but the number does NOT appear in the
+  file. Indicates correct file but fabricated magnitude — visible to reviewers.
+- `unverified`: number present without a `from <filename>` cue. Indicates
+  fabrication — visible to reviewers.
+- `qualitative`: no numeric token — always acceptable.
+
+#### Required grammar for numeric predictions
+Pattern: `<action> <effect> by <N>% from <filename>`, or
+         `from <filename>, <action> <effect> by <N>%`.
+
+GOOD (will earn `grounded_verified` or `grounded`):
+- "from stage1_ICAM1--MUC1.json, a risk_ratio of 17.86 predicts that dual ICAM1+MUC1
+  blockade reduces IL-8 secretion by 17-fold in IPF fibroblast co-cultures."
+- "SDC2 knockdown will reduce fibroblast migration by 0.23-fold per
+  stage1_FN1--SDC2.json coexpr_risk_ratio."
+- "Based on STRING PPI score 0.999 from stage1_ICAM1--ITGB2.json, anti-ICAM1
+  blockade should reduce integrin cluster density measurably."
+
+BAD (will earn `unverified`):
+- "Based on the passed stage1 filter for ICAM1--ITGB2, α-SMA will drop 50%."
+  ❌ Generic "passed stage1 filter" cue; no `from <filename>` anchor; 50% is a
+  round number without origin.
+- "Blocking FN1-SDC2 will reduce EMT markers by at least 40% in cultures."
+  ❌ No evidence reference at all.
+
+#### When no numeric evidence exists
+Use qualitative language: "significant reduction", "measurable increase",
+"dose-dependent response", "comparable to untreated control". DO NOT invent
+round percentages to sound rigorous.
+
+#### Rule of thumb
+If you cannot write `from stage1_<L>--<R>.json` or `from ot_<GENE>.json` with
+a number that ACTUALLY appears in that file, downgrade to qualitative. The
+deterministic gate sees through filler grounding; reviewers will see every
+`unverified` tag in the final report.
 
 ### Phase 3: Gap Detection
 
