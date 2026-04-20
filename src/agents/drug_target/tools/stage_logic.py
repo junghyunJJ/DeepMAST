@@ -1179,6 +1179,45 @@ def _score_novelty_opportunity(associations: list[dict],
     return score
 
 
+def _ot_safety_summary(evidence_dir: Path, gene: str) -> str | None:
+    """Summarize OpenTargets `target_info.safetyLiabilities` for a gene.
+
+    Stage 3 (ChEMBL) rarely populates `safety_summary`, but the OT JSON
+    already contains curated safety events (ToxCast, AOP-Wiki, clinical
+    safety). Surface them so `toxicity_admet` isn't a silent
+    "No safety data available" when evidence is available.
+    Returns None when no signal exists.
+    """
+    ot_file = evidence_dir / f"ot_{gene}.json"
+    if not ot_file.exists():
+        return None
+    try:
+        data = json.loads(ot_file.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    safety = ((data.get("target_info") or {}).get("safetyLiabilities") or [])
+    if not isinstance(safety, list) or not safety:
+        return None
+    parts: list[str] = []
+    for s in safety[:3]:
+        if not isinstance(s, dict):
+            continue
+        event = str(s.get("event") or "").strip()
+        ds = str(s.get("datasource") or "").strip()
+        effects = s.get("effects")
+        effect_str = ""
+        if isinstance(effects, list) and effects:
+            # Each effect entry has `direction` and `dosing` in OT schema.
+            first = effects[0]
+            if isinstance(first, dict):
+                d = first.get("direction") or ""
+                if d:
+                    effect_str = f", {d}"
+        if event:
+            parts.append(f"{event} ({ds}{effect_str})" if ds else event)
+    return "; ".join(parts) if parts else None
+
+
 def _extract_ot_disease_score(ot_data: dict[str, Any]) -> float:
     """Extract disease-specific OpenTargets association score from ot_*.json.
 
@@ -1783,7 +1822,11 @@ def _prebuild_target_assessment(
                     d.get("drug_name", d.get("name", ""))
                     for d in s3.get("drugs", [])
                 ],
-                "toxicity_admet": s3.get("safety_summary", "No safety data available"),
+                "toxicity_admet": (
+                    s3.get("safety_summary")
+                    or _ot_safety_summary(evidence_dir, gene)
+                    or "No safety data available"
+                ),
                 "latest_pubmed_insights": (
                     ", ".join(
                         str(p.get("pmid", "")) if isinstance(p, dict) else str(p)
