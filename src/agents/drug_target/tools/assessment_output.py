@@ -9,7 +9,10 @@ from typing import Any
 from langchain_core.tools import tool
 
 from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir
-from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
+from src.agents.drug_target.tools.stage_logic import (
+    _extract_ot_disease_score,
+    rank_featured_candidates,
+)
 from src.agents.drug_target.tools.stage2_service import extract_lr_pairs
 
 
@@ -69,7 +72,7 @@ def _inject_open_targets_scores(matrix: list[dict], evidence_dir: Path) -> None:
             if ot_file.exists():
                 try:
                     data = json.loads(ot_file.read_text(encoding="utf-8"))
-                    score = data.get("association_score") or data.get("overall_association_score", 0)
+                    score = _extract_ot_disease_score(data)
                     if score:
                         row["open_targets_score"] = float(score)
                         break
@@ -326,6 +329,49 @@ def save_target_assessment(
     )
 
 
+def _persist_pipeline_quality_flags(data_dir_path: Path) -> dict:
+    """Re-validate drug.md deterministically and persist the result into
+    ``target_assessment.json`` as ``pipeline_quality_flags``.
+
+    This runs regardless of whether the LLM surfaces warnings in its own
+    text, closing the "LLM self-dismisses validator output" loophole. The
+    field is backward-compatible (additive) and downstream readers can
+    surface it without re-parsing drug.md.
+    """
+    # Local import to avoid a circular at module-load time.
+    from src.agents.drug_target.tools.stage_logic import validate_drug_md
+
+    try:
+        # LangChain @tool wrappers expose the underlying function via `.func`.
+        impl = getattr(validate_drug_md, "func", None) or validate_drug_md
+        report_json = impl(str(data_dir_path))
+        report = json.loads(report_json) if isinstance(report_json, str) else report_json
+    except Exception as exc:
+        report = {"valid": False, "error": f"validator raised: {exc}"}
+
+    ta_path = data_dir_path / "target_assessment.json"
+    if not ta_path.exists():
+        return report
+    try:
+        ta = json.loads(ta_path.read_text(encoding="utf-8"))
+    except Exception:
+        return report
+
+    issues = report.get("issues") or []
+    ta["pipeline_quality_flags"] = {
+        "valid": bool(report.get("valid", False)),
+        "total_checks": int(report.get("total_checks") or 0),
+        "issues_count": len(issues),
+        "issues": issues,
+        "source": "validate_drug_md (deterministic, post-save)",
+    }
+    try:
+        ta_path.write_text(json.dumps(ta, indent=2, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+    return report
+
+
 @tool
 def save_drug_md(data_dir: str, content: str | dict | list) -> str:
     """Save drug.md report to disk.
@@ -347,4 +393,8 @@ def save_drug_md(data_dir: str, content: str | dict | list) -> str:
     resolved = _resolve_data_dir(data_dir)
     drug_md_path = resolved / "drug.md"
     drug_md_path.write_text(content, encoding="utf-8")
-    return f"Saved drug.md ({len(content)} chars) to {drug_md_path}"
+    # Deterministically persist validation output so the LLM cannot dismiss it.
+    quality = _persist_pipeline_quality_flags(resolved)
+    issue_count = len(quality.get("issues") or [])
+    suffix = "" if issue_count == 0 else f"; {issue_count} quality_flag issue(s) persisted"
+    return f"Saved drug.md ({len(content)} chars) to {drug_md_path}{suffix}"

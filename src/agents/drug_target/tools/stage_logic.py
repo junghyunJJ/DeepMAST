@@ -1147,7 +1147,8 @@ def _score_biological_plausibility(
 
 
 def _score_novelty_opportunity(associations: list[dict],
-                                associations_truncated: bool = False) -> int:
+                                associations_truncated: bool = False,
+                                associations_total_count: int | None = None) -> int:
     """Score novelty_opportunity (0-5) inverse of how well-established the target is.
 
     0: 30+ associations (truncated, well-established)
@@ -1157,10 +1158,16 @@ def _score_novelty_opportunity(associations: list[dict],
     4: 1-2 associations
     5: 0 associations (completely novel, e.g. ST-only discovery)
 
-    When truncated=True, actual count exceeds what's returned (20+).
-    Cap novelty at 1.
+    Prefers ``associations_total_count`` (persisted before truncation) over
+    ``len(associations)``, because the pipeline truncates to 20 entries
+    and a raw length count cannot distinguish TGFB1 (thousands of
+    associations) from CD99 (~20). When the total is unavailable and
+    ``associations_truncated=True``, cap novelty at 1 (20+ floor).
     """
-    count = len(associations) if associations else 0
+    if associations_total_count is not None:
+        count = int(associations_total_count)
+    else:
+        count = len(associations) if associations else 0
     if count == 0:
         score = 5
     elif count <= 2:
@@ -1173,10 +1180,89 @@ def _score_novelty_opportunity(associations: list[dict],
         score = 1
     else:
         score = 0
-    # If truncated, at least 20+ associations exist → cap novelty at 1
-    if associations_truncated and score > 1:
+    # When the true total is unknown and the list is truncated, at least 20+
+    # associations exist → cap novelty at 1. Skip this cap when the caller
+    # passed the authoritative `associations_total_count`.
+    if associations_total_count is None and associations_truncated and score > 1:
         score = 1
     return score
+
+
+def _ot_safety_summary(evidence_dir: Path, gene: str) -> str | None:
+    """Summarize OpenTargets `target_info.safetyLiabilities` for a gene.
+
+    Stage 3 (ChEMBL) rarely populates `safety_summary`, but the OT JSON
+    already contains curated safety events (ToxCast, AOP-Wiki, clinical
+    safety). Surface them so `toxicity_admet` isn't a silent
+    "No safety data available" when evidence is available.
+    Returns None when no signal exists.
+    """
+    ot_file = evidence_dir / f"ot_{gene}.json"
+    if not ot_file.exists():
+        return None
+    try:
+        data = json.loads(ot_file.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    safety = ((data.get("target_info") or {}).get("safetyLiabilities") or [])
+    if not isinstance(safety, list) or not safety:
+        return None
+    parts: list[str] = []
+    for s in safety[:3]:
+        if not isinstance(s, dict):
+            continue
+        event = str(s.get("event") or "").strip()
+        ds = str(s.get("datasource") or "").strip()
+        effects = s.get("effects")
+        effect_str = ""
+        if isinstance(effects, list) and effects:
+            # Each effect entry has `direction` and `dosing` in OT schema.
+            first = effects[0]
+            if isinstance(first, dict):
+                d = first.get("direction") or ""
+                if d:
+                    effect_str = f", {d}"
+        if event:
+            parts.append(f"{event} ({ds}{effect_str})" if ds else event)
+    return "; ".join(parts) if parts else None
+
+
+def _extract_ot_disease_score(ot_data: dict[str, Any]) -> float:
+    """Extract disease-specific OpenTargets association score from ot_*.json.
+
+    Prefers max(disease_evidence[*].score) because it is disease-filtered
+    (higher score = stronger target-disease link for the input disease).
+    Falls back to associations[0].score, then legacy flat keys.
+    Returns 0.0 if no signal is available.
+    """
+    if not isinstance(ot_data, dict):
+        return 0.0
+    de = ot_data.get("disease_evidence") or []
+    if isinstance(de, list) and de:
+        try:
+            best = max(
+                (float(e.get("score") or 0) for e in de if isinstance(e, dict)),
+                default=0.0,
+            )
+            if best:
+                return best
+        except Exception:
+            pass
+    assocs = ot_data.get("associations") or []
+    if isinstance(assocs, list) and assocs:
+        first = assocs[0]
+        if isinstance(first, dict):
+            try:
+                val = float(first.get("score") or 0)
+                if val:
+                    return val
+            except Exception:
+                pass
+    legacy = ot_data.get("association_score") or ot_data.get("overall_association_score") or 0
+    try:
+        return float(legacy or 0)
+    except Exception:
+        return 0.0
 
 
 @tool
@@ -1252,7 +1338,11 @@ def compute_rubric_scores(data_dir: str) -> str:
         gwas = _score_gwas_support(gwas_data)
         tract = _score_tractability(tractability_data)
         bio_plaus = _score_biological_plausibility(disease_evidence, vep_data)
-        novelty = _score_novelty_opportunity(associations, ot.get("associations_truncated", False))
+        novelty = _score_novelty_opportunity(
+            associations,
+            ot.get("associations_truncated", False),
+            ot.get("associations_total_count"),
+        )
 
         validated_total = existing_drug + clinical_trial + safety
         exploratory_total = gwas + tract + bio_plaus + novelty
@@ -1619,10 +1709,26 @@ def _prebuild_target_assessment(
     for pair in lr_pairs:
         ligand = pair.get("ligand", "")
         receptor = pair.get("receptor", "")
-        rubric = rubric_by_gene.get(receptor, rubric_by_gene.get(ligand, {}))
+        # Pair rubric inherits the scores of whichever gene has rubric data:
+        # receptor preferred, ligand as fallback. Record which gene provided
+        # the scores so downstream consumers can distinguish pair-intrinsic
+        # from gene-inherited signal (e.g. HLA-DQB1--CD4 inherits CD4, not
+        # HLA-DQB1, and without this annotation the HLA pair appeared as a
+        # top-ranked candidate despite HLA-DQB1 itself being
+        # insufficient_evidence at the gene level).
+        if receptor in rubric_by_gene:
+            rubric = rubric_by_gene[receptor]
+            score_source = receptor
+        elif ligand in rubric_by_gene:
+            rubric = rubric_by_gene[ligand]
+            score_source = ligand
+        else:
+            rubric = {}
+            score_source = ""
         pair_matrix.append({
             "ligand": ligand,
             "receptor": receptor,
+            "score_source": score_source,
             "existing_drug_evidence": rubric.get("existing_drug_evidence", 0),
             "clinical_trial_activity": rubric.get("clinical_trial_activity", 0),
             "safety_profile": rubric.get("safety_profile", 0),
@@ -1681,9 +1787,7 @@ def _prebuild_target_assessment(
             if ot_file.exists():
                 try:
                     ot_data = json.loads(ot_file.read_text(encoding="utf-8"))
-                    score = ot_data.get("association_score") or ot_data.get(
-                        "overall_association_score", 0
-                    )
+                    score = _extract_ot_disease_score(ot_data)
                     if score:
                         row["open_targets_score"] = float(score)
                         break
@@ -1698,6 +1802,15 @@ def _prebuild_target_assessment(
     featured_deep_dive: list[dict[str, Any]] = []
     seen_genes: set[str] = set()
     s3_set = {g.upper() for g in (stage3_genes or [])}
+
+    # Gene-level authoritative track map from rubric classification.
+    # Previously the track was derived from `row.get("is_featured")` on the
+    # last iterand of the `ranked_matrix` loop above — a stale-variable leak
+    # that tagged every gene the same way regardless of identity.
+    gene_track_map: dict[str, str] = {}
+    for g_name, g_rubric in (rubric_by_gene or {}).items():
+        cls = str((g_rubric or {}).get("classification", "")).strip()
+        gene_track_map[g_name.upper()] = "novel" if cls == "novel_candidate" else "featured"
 
     # Collect all stage3 genes that appear in any featured/novel pair
     candidate_genes: list[str] = []
@@ -1732,13 +1845,17 @@ def _prebuild_target_assessment(
 
         featured_deep_dive.append({
             "target_gene": gene,
-            "track": "featured" if row.get("is_featured") else "novel",
+            "track": gene_track_map.get(gene.upper(), "featured"),
             "stage3_clinical_safety": {
                 "known_drugs_drugbank": [
                     d.get("drug_name", d.get("name", ""))
                     for d in s3.get("drugs", [])
                 ],
-                "toxicity_admet": s3.get("safety_summary", "No safety data available"),
+                "toxicity_admet": (
+                    s3.get("safety_summary")
+                    or _ot_safety_summary(evidence_dir, gene)
+                    or "No safety data available"
+                ),
                 "latest_pubmed_insights": (
                     ", ".join(
                         str(p.get("pmid", "")) if isinstance(p, dict) else str(p)

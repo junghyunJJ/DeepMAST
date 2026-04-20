@@ -423,6 +423,25 @@ Each hypothesis MUST include all 7 elements:
 6. Falsifiable prediction (testable, with failure criterion)
 7. Proposed validation approach (experimental method, readouts, controls)
 
+### CRITICAL: Quantitative Predictions (Anti-Hallucination)
+
+- Every `falsifiable_prediction` containing a numeric effect size (percentages
+  like `50%`, ratios like `2-fold`, or thresholds like `p < 0.05`) MUST cite
+  the specific evidence value it extrapolates from, using one of these cue
+  phrases: `"Based on ..."`, `"Evidence: ..."`, or `"from <filename>"` inline
+  in the same sentence.
+- FORBIDDEN: round-number fabrications (`10%`, `20%`, ..., `90%`, `N-fold`)
+  without grounding. The values `50%`, `2-fold`, `40%`, `30%` appear so often
+  in un-grounded LLM output that save_evidence will flag them as
+  `grounding: "unverified"` unless an evidence citation is adjacent.
+- If no numeric evidence exists for a prediction, use qualitative language
+  (e.g., "significant reduction", "measurable increase") and omit the
+  percentage entirely.
+- The save_evidence gate tags each hypothesis with
+  `prediction_grounding ∈ {"grounded", "qualitative", "unverified"}` based on
+  deterministic pattern matching. Aim for `grounded` or `qualitative`. An
+  `unverified` tag is visible in the final report and to reviewers.
+
 ### Phase 3: Gap Detection
 
 1. Build coverage matrix: which evidence files are referenced by hypotheses

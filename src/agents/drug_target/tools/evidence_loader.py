@@ -671,6 +671,93 @@ def _validate_hypothesis_report_topn_and_failed_pairs(
 
 
 # ---------------------------------------------------------------------------
+# Hypothesis quantitative-prediction grounding check (soft flag, not reject)
+# ---------------------------------------------------------------------------
+
+_ROUND_PCT_RE = re.compile(r"\b(?:10|20|25|30|33|40|50|60|66|70|75|80|90)\s*%")
+_FOLD_RE = re.compile(r"\b\d+(?:\.\d+)?\s*-?\s*fold\b", re.IGNORECASE)
+_GROUND_CUE_RE = re.compile(
+    r"(based on|evidence[:\s]|from\s+(?:stage\d_|ot_|cited|the)|per\s+(?:stage\d_|ot_)|"
+    r"ref(?:erence)?\s*[:=]|as\s+reported|measured|observed|citing)",
+    re.IGNORECASE,
+)
+
+
+def _classify_prediction_grounding(prediction: str) -> tuple[str, list[str]]:
+    """Classify a falsifiable_prediction string.
+
+    Returns ``(label, matched_tokens)`` where label is one of:
+      - ``"qualitative"``: no numeric effect-size tokens present
+      - ``"grounded"``: numeric tokens exist AND a grounding cue is nearby
+      - ``"unverified"``: numeric tokens exist WITHOUT a grounding cue
+    """
+    if not isinstance(prediction, str) or not prediction.strip():
+        return "qualitative", []
+    tokens: list[str] = []
+    tokens.extend(m.group(0) for m in _ROUND_PCT_RE.finditer(prediction))
+    tokens.extend(m.group(0) for m in _FOLD_RE.finditer(prediction))
+    if not tokens:
+        return "qualitative", []
+    has_cue = bool(_GROUND_CUE_RE.search(prediction))
+    return ("grounded" if has_cue else "unverified", tokens)
+
+
+def _sanitize_gap_analysis(parsed: dict, evidence_dir: Path) -> int:
+    """Strip `_FAILED` suffix from ``gap_analysis.orphan_files`` entries when
+    the unsuffixed file actually exists on disk.
+
+    The ``_FAILED`` marker is a CITATION convention for
+    ``evidence_references`` (contrast-only evidence for FAILED stage1 pairs).
+    It does NOT belong on filesystem-grounded lists like ``orphan_files``,
+    where every entry must correspond to a real file. Returns the number
+    of entries sanitized.
+    """
+    if not isinstance(parsed, dict):
+        return 0
+    ga = parsed.get("gap_analysis")
+    if not isinstance(ga, dict):
+        return 0
+    orphans = ga.get("orphan_files")
+    if not isinstance(orphans, list):
+        return 0
+    real = _list_real_evidence_filenames(evidence_dir) if evidence_dir.exists() else set()
+    cleaned: list = []
+    n_stripped = 0
+    for entry in orphans:
+        if isinstance(entry, str) and entry.endswith("_FAILED"):
+            base = entry[: -len("_FAILED")]
+            if base in real:
+                cleaned.append(base)
+                n_stripped += 1
+                continue
+        cleaned.append(entry)
+    if n_stripped:
+        ga["orphan_files"] = cleaned
+    return n_stripped
+
+
+def _tag_hypothesis_prediction_grounding(parsed: dict) -> dict:
+    """Mutate each hypothesis in-place with ``prediction_grounding`` and
+    ``prediction_numeric_tokens`` fields, and return a summary dict.
+    """
+    summary = {"grounded": 0, "qualitative": 0, "unverified": 0, "unverified_indices": []}
+    hypotheses = parsed.get("hypotheses") if isinstance(parsed, dict) else None
+    if not isinstance(hypotheses, list):
+        return summary
+    for idx, hyp in enumerate(hypotheses):
+        if not isinstance(hyp, dict):
+            continue
+        label, tokens = _classify_prediction_grounding(hyp.get("falsifiable_prediction", ""))
+        hyp["prediction_grounding"] = label
+        if tokens:
+            hyp["prediction_numeric_tokens"] = tokens
+        summary[label] = summary.get(label, 0) + 1
+        if label == "unverified":
+            summary["unverified_indices"].append(idx)
+    return summary
+
+
+# ---------------------------------------------------------------------------
 # PR1-3: Path-traversal allow-list for save_evidence filename argument
 # ---------------------------------------------------------------------------
 
@@ -847,6 +934,32 @@ def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) ->
                 "3) DO NOT retry the same payload — the deterministic gate will reject identically."
             )
             return json.dumps(result, indent=2)
+
+        # Strip invalid `_FAILED` suffixes from gap_analysis.orphan_files.
+        # The suffix is a citation convention for evidence_references only;
+        # orphan_files must list filesystem-grounded names.
+        n_stripped = _sanitize_gap_analysis(parsed, evidence_dir)
+        if n_stripped:
+            logger.info(
+                "hypothesis_report: stripped %d orphan_files '_FAILED' suffix(es) "
+                "to match filesystem filenames",
+                n_stripped,
+            )
+
+        # Soft tag: annotate each hypothesis with prediction_grounding so the
+        # downstream report can surface ungrounded round-number effect sizes
+        # without blocking save. (Hard block lives in the topn/FAILED gate
+        # above.)
+        grounding_summary = _tag_hypothesis_prediction_grounding(parsed)
+        parsed["prediction_grounding_summary"] = grounding_summary
+        if grounding_summary.get("unverified", 0) > 0:
+            logger.warning(
+                "hypothesis_report: %d of %d predictions tagged 'unverified' "
+                "(ungrounded round-number effect sizes). Indices: %s",
+                grounding_summary["unverified"],
+                sum(grounding_summary.get(k, 0) for k in ("grounded", "qualitative", "unverified")),
+                grounding_summary.get("unverified_indices", []),
+            )
 
     try:
         with open(file_path, "w") as f:
