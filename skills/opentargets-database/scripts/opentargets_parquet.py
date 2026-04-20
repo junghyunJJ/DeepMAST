@@ -214,14 +214,31 @@ def _build_target_disease_records(
     return records
 
 
-def _build_target_associations(ev: pd.DataFrame, min_score: float) -> List[Dict[str, Any]]:
+def _build_target_associations(
+    ev: pd.DataFrame, min_score: float
+) -> Dict[str, Any]:
+    """Build disease associations from parquet evidence.
+
+    Returns dict with keys:
+      - associations: list of per-disease aggregated records (max top-500 by score)
+      - pre_head_len: count of diseases matching `min_score` BEFORE head cap
+        (the authoritative total for novelty scoring)
+    """
     if len(ev) == 0:
-        return []
+        return {"associations": [], "pre_head_len": 0}
 
     agg = ev.groupby("diseaseId")["score"].max().reset_index()
-    agg = agg[agg["score"] >= min_score].sort_values("score", ascending=False).head(100)
+    filtered = agg[agg["score"] >= min_score].sort_values(
+        "score", ascending=False
+    )
+    pre_head_len = len(filtered)
+    # Raise head cap 100 → 500 to match the GraphQL path (A0). The CCI
+    # L-R gene panel has 5+ receptors in the 100-299 range where a 100-cap
+    # silently drops 50-60% of disease evidence before `_score_biological_plausibility`
+    # ever sees it.
+    agg = filtered.head(500)
     if len(agg) == 0:
-        return []
+        return {"associations": [], "pre_head_len": pre_head_len}
 
     dtype_scores = ev.groupby(["diseaseId", "datatypeId"])["score"].max().reset_index()
     disease_names = _disease_id_to_name(list(agg["diseaseId"]))
@@ -239,7 +256,7 @@ def _build_target_associations(ev: pd.DataFrame, min_score: float) -> List[Dict[
             "score": round(float(row["score"]), 4),
             "datatypeScores": dt_scores,
         })
-    return results
+    return {"associations": results, "pre_head_len": pre_head_len}
 
 
 def get_target_bundle(
@@ -256,6 +273,7 @@ def get_target_bundle(
             "target_info": {},
             "disease_evidence": [],
             "associations": [],
+            "associations_api_total_count": 0,
         }
 
     row = row_df.iloc[0]
@@ -269,6 +287,7 @@ def get_target_bundle(
             "target_info": target_info,
             "disease_evidence": [],
             "associations": [],
+            "associations_api_total_count": 0,
         }
 
     target_info["associatedDiseases"] = _build_associated_diseases(ev)
@@ -277,11 +296,14 @@ def get_target_bundle(
         if efo_id
         else []
     )
-    associations = _build_target_associations(ev, min_score=min_score)
+    assoc_result = _build_target_associations(ev, min_score=min_score)
     return {
         "target_info": target_info,
         "disease_evidence": disease_evidence,
-        "associations": associations,
+        "associations": assoc_result["associations"],
+        # Key name mirrors the GraphQL async path in query_opentargets.py so
+        # stage2_service can read `associations_api_total_count` uniformly.
+        "associations_api_total_count": assoc_result["pre_head_len"],
     }
 
 
@@ -406,16 +428,24 @@ def get_target_disease_evidence(
 
 def get_target_associations(
     ensembl_id: str, min_score: float = 0.0
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """Get all disease associations for a target, derived from evidence parquet.
 
     Groups evidence by diseaseId and takes max(score) per disease.
+
+    Returns dict matching `query_opentargets.get_target_associations`:
+      - associations: list of filtered disease associations (max 500 by score)
+      - api_total_count: pre-head-cap count of diseases matching min_score
     """
     try:
-        return get_target_bundle(ensembl_id, min_score=min_score)["associations"]
+        bundle = get_target_bundle(ensembl_id, min_score=min_score)
+        return {
+            "associations": bundle.get("associations", []),
+            "api_total_count": bundle.get("associations_api_total_count"),
+        }
     except Exception as exc:
         logger.error("Associations derivation failed: %s", exc)
-        return []
+        return {"associations": [], "api_total_count": None}
 
 
 def get_known_drugs_for_disease(efo_id: str) -> Dict[str, Any]:

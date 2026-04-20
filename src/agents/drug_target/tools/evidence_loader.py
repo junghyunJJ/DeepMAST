@@ -6,6 +6,7 @@ selected_top3_lr.json is optional (legacy) — featured candidates
 are now determined by rubric scoring in stage_logic.py.
 """
 
+import functools
 import json
 import logging
 import os
@@ -673,33 +674,136 @@ def _validate_hypothesis_report_topn_and_failed_pairs(
 # ---------------------------------------------------------------------------
 # Hypothesis quantitative-prediction grounding check (soft flag, not reject)
 # ---------------------------------------------------------------------------
+#
+# Four-tier classification (B7a, tightened regex + structured cross-validate):
+#   qualitative       — no numeric effect-size token present
+#   grounded_verified — numeric token AND a specific evidence file citation
+#                       AND the number matches a value in that file (1% tol)
+#   grounded          — numeric token AND a specific evidence file citation,
+#                       but the cited number is not in the file (LLM cited
+#                       the right file but fabricated the magnitude)
+#   unverified        — numeric token present without any evidence-file cite
+#
+# The tightened regex requires `from stage\d_*.json` or `from ot_*.json`
+# anywhere in the prediction — generic cues like "based on the passed
+# filter" no longer qualify, fixing the false-positive storm from the
+# prior (loose) regex.
 
 _ROUND_PCT_RE = re.compile(r"\b(?:10|20|25|30|33|40|50|60|66|70|75|80|90)\s*%")
 _FOLD_RE = re.compile(r"\b\d+(?:\.\d+)?\s*-?\s*fold\b", re.IGNORECASE)
+_NUMERIC_TOKEN_RE = re.compile(r"\b\d+(?:\.\d+)?\b")
+
+# File-anchored grounding cue: must name a real evidence file path.
 _GROUND_CUE_RE = re.compile(
-    r"(based on|evidence[:\s]|from\s+(?:stage\d_|ot_|cited|the)|per\s+(?:stage\d_|ot_)|"
-    r"ref(?:erence)?\s*[:=]|as\s+reported|measured|observed|citing)",
+    r"from\s+(stage\d_[A-Za-z0-9\-]+(?:--[A-Za-z0-9\-]+)?\.json|ot_[A-Za-z0-9\-]+\.json)",
     re.IGNORECASE,
 )
 
 
-def _classify_prediction_grounding(prediction: str) -> tuple[str, list[str]]:
+@functools.lru_cache(maxsize=64)
+def _load_evidence_cached(path_str: str) -> dict | None:
+    """Cache parsed evidence JSON so a hypothesis_report with 6-8 hypotheses
+    each citing 4-6 files does not re-read the same stage1_*/ot_*.json a
+    dozen times. Bounded by 500 KB file size to avoid memory surprises.
+    """
+    try:
+        p = Path(path_str)
+        if not p.exists() or p.stat().st_size > 500 * 1024:
+            return None
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _evidence_has_value(
+    node: object, target: float, tolerance: float = 0.01
+) -> bool:
+    """Recursively search nested dict/list for a numeric value within
+    ``tolerance`` (relative, on magnitude). Matches floats and int-likes.
+    """
+    if isinstance(node, bool):
+        return False  # bools are ints in Python; avoid 1.0 ↔ True collisions
+    if isinstance(node, (int, float)):
+        try:
+            target_f = float(target)
+            scale = max(abs(target_f), 1.0)
+            return abs(float(node) - target_f) <= tolerance * scale
+        except (ValueError, TypeError):
+            return False
+    if isinstance(node, dict):
+        return any(_evidence_has_value(v, target, tolerance) for v in node.values())
+    if isinstance(node, list):
+        return any(_evidence_has_value(v, target, tolerance) for v in node)
+    return False
+
+
+def _classify_prediction_grounding(
+    prediction: str,
+    evidence_dir: Path | None = None,
+) -> tuple[str, list[str], list[str]]:
     """Classify a falsifiable_prediction string.
 
-    Returns ``(label, matched_tokens)`` where label is one of:
-      - ``"qualitative"``: no numeric effect-size tokens present
-      - ``"grounded"``: numeric tokens exist AND a grounding cue is nearby
-      - ``"unverified"``: numeric tokens exist WITHOUT a grounding cue
+    Returns ``(label, matched_tokens, cited_files)`` where label ∈
+    {qualitative, grounded_verified, grounded, unverified}. The
+    ``cited_files`` list is populated only when the tightened regex matched.
+
+    Percentage tokens like ``40%`` are compared against ``40`` and ``0.40``
+    (both common representations in evidence JSON). Fold tokens like
+    ``2-fold`` match on the integer ``2``.
     """
     if not isinstance(prediction, str) or not prediction.strip():
-        return "qualitative", []
+        return "qualitative", [], []
+
+    # Collect effect-size tokens (percentages + fold changes)
     tokens: list[str] = []
     tokens.extend(m.group(0) for m in _ROUND_PCT_RE.finditer(prediction))
     tokens.extend(m.group(0) for m in _FOLD_RE.finditer(prediction))
     if not tokens:
-        return "qualitative", []
-    has_cue = bool(_GROUND_CUE_RE.search(prediction))
-    return ("grounded" if has_cue else "unverified", tokens)
+        return "qualitative", [], []
+
+    # Tightened cue: must reference a concrete evidence file
+    cited_files = list({m.group(1) for m in _GROUND_CUE_RE.finditer(prediction)})
+    if not cited_files:
+        return "unverified", tokens, []
+
+    # If no evidence_dir provided, stop at "grounded" (cue-only, not verified)
+    if evidence_dir is None:
+        return "grounded", tokens, cited_files
+
+    # Extract numeric values adjacent to each token and cross-validate
+    # against the referenced evidence files.
+    def _token_as_float(tok: str) -> list[float]:
+        """Return plausible numeric representations of an effect-size token.
+
+        '40%' -> [40.0, 0.40]
+        '2-fold' -> [2.0]
+        '2.5-fold' -> [2.5]
+        """
+        t = tok.strip().lower()
+        if t.endswith("%"):
+            v = float(t.rstrip("%").strip())
+            return [v, v / 100.0]
+        m = re.match(r"(\d+(?:\.\d+)?)\s*-?\s*fold", t)
+        if m:
+            return [float(m.group(1))]
+        return []
+
+    verified = False
+    for tok in tokens:
+        candidate_values = _token_as_float(tok)
+        if not candidate_values:
+            continue
+        for fname in cited_files:
+            evidence = _load_evidence_cached(str(evidence_dir / fname))
+            if not isinstance(evidence, dict):
+                continue
+            if any(_evidence_has_value(evidence, v) for v in candidate_values):
+                verified = True
+                break
+        if verified:
+            break
+
+    return ("grounded_verified" if verified else "grounded", tokens, cited_files)
 
 
 def _sanitize_gap_analysis(parsed: dict, evidence_dir: Path) -> int:
@@ -736,21 +840,41 @@ def _sanitize_gap_analysis(parsed: dict, evidence_dir: Path) -> int:
     return n_stripped
 
 
-def _tag_hypothesis_prediction_grounding(parsed: dict) -> dict:
-    """Mutate each hypothesis in-place with ``prediction_grounding`` and
-    ``prediction_numeric_tokens`` fields, and return a summary dict.
+def _tag_hypothesis_prediction_grounding(
+    parsed: dict, evidence_dir: Path | None = None
+) -> dict:
+    """Mutate each hypothesis in-place with ``prediction_grounding``,
+    ``prediction_numeric_tokens``, and ``prediction_cited_files`` fields,
+    and return a summary dict.
+
+    When ``evidence_dir`` is passed, numeric tokens are cross-validated
+    against the referenced evidence files — successful matches earn the
+    ``grounded_verified`` label; a cue without a matching value stays
+    ``grounded``. When no ``evidence_dir`` is provided, the classifier
+    tops out at ``grounded`` (cue-only).
     """
-    summary = {"grounded": 0, "qualitative": 0, "unverified": 0, "unverified_indices": []}
+    summary = {
+        "grounded_verified": 0,
+        "grounded": 0,
+        "qualitative": 0,
+        "unverified": 0,
+        "unverified_indices": [],
+    }
     hypotheses = parsed.get("hypotheses") if isinstance(parsed, dict) else None
     if not isinstance(hypotheses, list):
         return summary
     for idx, hyp in enumerate(hypotheses):
         if not isinstance(hyp, dict):
             continue
-        label, tokens = _classify_prediction_grounding(hyp.get("falsifiable_prediction", ""))
+        label, tokens, cited = _classify_prediction_grounding(
+            hyp.get("falsifiable_prediction", ""),
+            evidence_dir=evidence_dir,
+        )
         hyp["prediction_grounding"] = label
         if tokens:
             hyp["prediction_numeric_tokens"] = tokens
+        if cited:
+            hyp["prediction_cited_files"] = cited
         summary[label] = summary.get(label, 0) + 1
         if label == "unverified":
             summary["unverified_indices"].append(idx)
@@ -950,14 +1074,19 @@ def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) ->
         # downstream report can surface ungrounded round-number effect sizes
         # without blocking save. (Hard block lives in the topn/FAILED gate
         # above.)
-        grounding_summary = _tag_hypothesis_prediction_grounding(parsed)
+        grounding_summary = _tag_hypothesis_prediction_grounding(
+            parsed, evidence_dir=evidence_dir
+        )
         parsed["prediction_grounding_summary"] = grounding_summary
         if grounding_summary.get("unverified", 0) > 0:
             logger.warning(
                 "hypothesis_report: %d of %d predictions tagged 'unverified' "
                 "(ungrounded round-number effect sizes). Indices: %s",
                 grounding_summary["unverified"],
-                sum(grounding_summary.get(k, 0) for k in ("grounded", "qualitative", "unverified")),
+                sum(
+                    grounding_summary.get(k, 0)
+                    for k in ("grounded_verified", "grounded", "qualitative", "unverified")
+                ),
                 grounding_summary.get("unverified_indices", []),
             )
 

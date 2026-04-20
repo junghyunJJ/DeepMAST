@@ -61,6 +61,9 @@ docs/benchmarks/*
 !docs/benchmarks/drugtarget_skill_ablation/**
 !docs/benchmarks/harness_x_model/
 !docs/benchmarks/harness_x_model/**
+# drug_target output contract — loaded at runtime by assessment_output.py
+!docs/drugtarget/
+!docs/drugtarget/**
 large_tool_results/
 conversation_history/
 workspace/

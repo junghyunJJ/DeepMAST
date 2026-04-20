@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DeepMAST_Target_Assessment",
+  "type": "object",
+  "properties": {
+    "project_meta": {
+      "type": "object",
+      "properties": {
+        "disease_focus": { "type": "string" },
+        "total_input_pairs": { "type": "integer" }
+      }
+    },
+    "druggability_matrix": {
+      "type": "array",
+      "description": "Stage 1 & 2 results for all evaluated pairs",
+      "items": {
+        "type": "object",
+        "properties": {
+          "rank": { "type": ["integer", "null"], "description": "Null for non-featured or promotion-fallback rows" },
+          "ligand": { "type": "string" },
+          "receptor": { "type": "string" },
+          "is_featured": { "type": "boolean" },
+          "is_novel": { "type": "boolean" },
+          "open_targets_score": { "type": "number" },
+          "promotion_reason": {
+            "type": ["string", "null"],
+            "enum": [null, "organic_featured", "stage3_coverage_fallback_passed", "stage3_coverage_fallback_failed"],
+            "description": "Why this row is is_featured (null for non-featured rows)"
+          },
+          "max_clinical_phase": { "type": "string" },
+          "st_colocalization_score": { "type": "string" },
+          "genetic_flag": { "type": "string", "description": "e.g., VEP Pathogenic, eQTL confirmed" },
+          "tractability": { "type": "string" }
+        },
+        "required": ["ligand", "receptor", "is_featured", "is_novel", "open_targets_score"]
+      }
+    },
+    "featured_candidates_deep_dive": {
+      "type": "array",
+      "description": "Stage 3 results for featured and novel candidates",
+      "items": {
+        "type": "object",
+        "properties": {
+          "target_gene": { "type": "string" },
+          "track": { "type": "string", "enum": ["featured", "novel"] },
+          "stage3_clinical_safety": {
+            "type": "object",
+            "properties": {
+              "known_drugs_drugbank": { "type": "array", "items": { "type": "string" } },
+              "toxicity_admet": { "type": "string" },
+              "latest_pubmed_insights": { "type": ["string", "null"], "description": "Null if Phase < 2" }
+            }
+          },
+          "stage1_biological_context": {
+            "type": "object",
+            "properties": {
+              "string_ppi_score": { "type": "number" },
+              "primary_kegg_pathway": { "type": "string" }
+            }
+          }
+        },
+        "required": ["target_gene"]
+      }
+    }
+  }
+}

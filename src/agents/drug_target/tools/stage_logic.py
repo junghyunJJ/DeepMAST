@@ -1151,38 +1151,45 @@ def _score_novelty_opportunity(associations: list[dict],
                                 associations_total_count: int | None = None) -> int:
     """Score novelty_opportunity (0-5) inverse of how well-established the target is.
 
-    0: 30+ associations (truncated, well-established)
-    1: 16-30 associations
-    2: 6-15 associations
-    3: 3-5 associations
-    4: 1-2 associations
-    5: 0 associations (completely novel, e.g. ST-only discovery)
+    Bracket schema tuned for well-studied gene panels (CCI-derived L-R
+    receptors routinely have 300-3000 OpenTargets disease associations).
+    A live probe against res_ipf_qwen2's 41 genes on 2026-04-20 measured
+    the true API count for each — the new brackets produce
+    14 / 22 / 5 / 0 / 0 / 0 distribution across 0..5, whereas the legacy
+    0-30 schema collapsed every gene into bucket 0 once the true count
+    was wired through.
+
+    0: 1000+ associations (well-studied, e.g. TGFB1=3124, CD4=2905)
+    1: 300-999  associations (moderately studied, e.g. LRP1=781, CD74=967)
+    2: 100-299  associations (emerging, e.g. ITGA3=262, HLA-DMA=232)
+    3: 30-99    associations
+    4: 10-29    associations
+    5: 0-9      associations (ST-only discovery or brand-new target)
 
     Prefers ``associations_total_count`` (persisted before truncation) over
-    ``len(associations)``, because the pipeline truncates to 20 entries
-    and a raw length count cannot distinguish TGFB1 (thousands of
-    associations) from CD99 (~20). When the total is unavailable and
-    ``associations_truncated=True``, cap novelty at 1 (20+ floor).
+    ``len(associations)``. When the total is unavailable and
+    ``associations_truncated=True``, cap novelty at 1 (500+ floor via page-size).
     """
     if associations_total_count is not None:
         count = int(associations_total_count)
     else:
         count = len(associations) if associations else 0
-    if count == 0:
-        score = 5
-    elif count <= 2:
-        score = 4
-    elif count <= 5:
-        score = 3
-    elif count <= 15:
-        score = 2
-    elif count <= 30:
-        score = 1
-    else:
+    if count >= 1000:
         score = 0
-    # When the true total is unknown and the list is truncated, at least 20+
-    # associations exist → cap novelty at 1. Skip this cap when the caller
-    # passed the authoritative `associations_total_count`.
+    elif count >= 300:
+        score = 1
+    elif count >= 100:
+        score = 2
+    elif count >= 30:
+        score = 3
+    elif count >= 10:
+        score = 4
+    else:
+        score = 5
+    # When the true total is unknown and the list is truncated, at least
+    # page_size (500 post-A0) associations exist → floor novelty at 1.
+    # Skip this cap when the caller passed the authoritative
+    # ``associations_total_count``.
     if associations_total_count is None and associations_truncated and score > 1:
         score = 1
     return score
@@ -1741,9 +1748,42 @@ def _prebuild_target_assessment(
     # C. Rank candidates and inject OpenTargets scores
     ranked_matrix = rank_featured_candidates(pair_matrix)
 
+    # Stage 1 filter lookup ({ligand}^{receptor} → passed bool) for B5
+    # promotion logic. stage1_filter.json is authoritative; fall back to an
+    # empty map if the file is missing so the existing behaviour is preserved.
+    stage1_passed: dict[str, bool] = {}
+    filter_path = evidence_dir / "stage1_filter.json"
+    if filter_path.exists():
+        try:
+            _raw = json.loads(filter_path.read_text(encoding="utf-8"))
+            if isinstance(_raw, dict):
+                for key, entry in _raw.items():
+                    if not isinstance(entry, dict):
+                        continue
+                    stage1_passed[key.upper()] = bool(entry.get("passed", False))
+        except Exception:
+            stage1_passed = {}
+
+    def _pair_passed_stage1(row: dict) -> bool:
+        ligand_u = str(row.get("ligand", "")).strip().upper()
+        receptor_u = str(row.get("receptor", "")).strip().upper()
+        key1 = f"{ligand_u}^{receptor_u}"
+        key2 = f"{receptor_u}^{ligand_u}"
+        return stage1_passed.get(key1, stage1_passed.get(key2, False))
+
+    # Initialise promotion_reason for every row. The "organic_featured"
+    # label applies to pairs that were already marked featured by
+    # `rank_featured_candidates` (i.e., they earned it via combined_total).
+    for row in ranked_matrix:
+        if row.get("is_featured") or row.get("is_novel"):
+            row["promotion_reason"] = "organic_featured"
+        else:
+            row["promotion_reason"] = None
+
     # Reconcile pair-level featured/novel with gene-level stage3_candidates:
     # 1. Remove featured from pairs where NEITHER gene is a stage3_candidate
     # 2. Ensure EVERY stage3 gene has at least one pair marked is_featured
+    #    — 2-pass logic: prefer Stage 1 PASSED pairs, fall back to any pair.
     if stage3_genes:
         s3_set = {g.upper() for g in stage3_genes}
         # Step 1: Remove non-stage3 featured
@@ -1754,6 +1794,7 @@ def _prebuild_target_assessment(
                 row["is_featured"] = False
                 row["is_novel"] = False
                 row["rank"] = None
+                row["promotion_reason"] = None
         # Step 2: Ensure all stage3 genes covered
         covered = set()
         for row in ranked_matrix:
@@ -1764,17 +1805,36 @@ def _prebuild_target_assessment(
                 if g in s3_set:
                     covered.add(g)
         missing = s3_set - covered
-        if missing:
+
+        def _promote_for_missing(only_passed: bool, reason: str) -> None:
             for row in ranked_matrix:
                 if not missing:
                     break
+                if only_passed and not _pair_passed_stage1(row):
+                    continue
                 ligand = str(row.get("ligand", "")).strip().upper()
                 receptor = str(row.get("receptor", "")).strip().upper()
                 for g in (receptor, ligand):
                     if g in missing:
                         row["is_featured"] = True
+                        row["promotion_reason"] = reason
                         missing.discard(g)
                         break
+
+        # Pass 1: try Stage 1 PASSED pairs for missing genes
+        _promote_for_missing(
+            only_passed=True,
+            reason="stage3_coverage_fallback_passed",
+        )
+        # Pass 2: if still uncovered, fall back to any pair (including
+        # FAILED Stage 1). This preserves the previous behaviour so no
+        # gene disappears from deep_dive, but the `promotion_reason`
+        # field now tells downstream consumers that the evidence is
+        # weak.
+        _promote_for_missing(
+            only_passed=False,
+            reason="stage3_coverage_fallback_failed",
+        )
 
     for row in ranked_matrix:
         if "open_targets_score" in row:

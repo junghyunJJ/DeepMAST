@@ -384,7 +384,7 @@ def get_drug_info(chembl_id: str) -> Dict[str, Any]:
     return result.get("drug", {})
 
 
-def get_target_associations(ensembl_id: str, min_score: float = 0.0) -> List[Dict[str, Any]]:
+def get_target_associations(ensembl_id: str, min_score: float = 0.0) -> Dict[str, Any]:
     """
     Get all disease associations for a target, filtered by minimum score.
 
@@ -393,12 +393,19 @@ def get_target_associations(ensembl_id: str, min_score: float = 0.0) -> List[Dic
         min_score: Minimum association score (0-1) to include
 
     Returns:
-        List of disease associations with scores
+        Dict with keys:
+          - associations: List of filtered disease associations with scores
+          - api_total_count: OpenTargets' reported total count (pre-page-size,
+            pre-filter). None when the response omits the field.
+
+        Returning a dict (rather than a bare list as the legacy contract did)
+        lets downstream scoring functions distinguish "well-studied gene
+        truncated at page_size" from "truly short association list".
     """
     query = """
       query targetAssociations($ensemblId: String!) {
         target(ensemblId: $ensemblId) {
-          associatedDiseases(page: {index: 0, size: 100}) {
+          associatedDiseases(page: {index: 0, size: 500}) {
             count
             rows {
               disease {
@@ -417,10 +424,14 @@ def get_target_associations(ensembl_id: str, min_score: float = 0.0) -> List[Dic
     """
 
     result = execute_query(query, {"ensemblId": ensembl_id})
-    associations = result.get("target", {}).get("associatedDiseases", {}).get("rows", [])
+    assoc_data = result.get("target", {}).get("associatedDiseases", {}) or {}
+    api_total_count = assoc_data.get("count")
+    rows = assoc_data.get("rows", []) or []
 
-    # Filter by minimum score
-    return [assoc for assoc in associations if assoc.get("score", 0) >= min_score]
+    return {
+        "associations": [a for a in rows if a.get("score", 0) >= min_score],
+        "api_total_count": api_total_count,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -561,7 +572,7 @@ async def async_query_full_target(
         assoc_query = """
           query targetAssociations($ensemblId: String!) {
             target(ensemblId: $ensemblId) {
-              associatedDiseases(page: {index: 0, size: 100}) {
+              associatedDiseases(page: {index: 0, size: 500}) {
                 count
                 rows {
                   disease { id name }
@@ -575,9 +586,15 @@ async def async_query_full_target(
         assoc_result = await async_execute_query(
             assoc_query, {"ensemblId": ensembl_id}, session
         )
-        associations = (
-            assoc_result.get("target", {}).get("associatedDiseases", {}).get("rows", [])
+        assoc_data = (
+            assoc_result.get("target", {}).get("associatedDiseases", {}) or {}
         )
+        # `count` is the OT-reported total number of associated diseases BEFORE
+        # page-size/score filters — use this as the authoritative source for
+        # novelty scoring downstream instead of `len(associations)`, which is
+        # capped at the page size.
+        result["associations_api_total_count"] = assoc_data.get("count")
+        associations = assoc_data.get("rows", []) or []
         result["associations"] = [a for a in associations if a.get("score", 0) >= 0.1]
         result["executed"] = True
 

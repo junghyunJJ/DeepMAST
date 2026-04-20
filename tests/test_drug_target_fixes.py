@@ -153,18 +153,30 @@ def test_stage1_ztest_no_infinity(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_hypothesis_grounding_classifier() -> None:
-    label, tokens = _classify_prediction_grounding(
+    # Tightened regex (followup B7a) requires `from stage\d_*.json` or
+    # `from ot_*.json`. Return tuple is now 3-element.
+    label, tokens, cited = _classify_prediction_grounding(
         "Blocking ICAM1-ITGB2 interaction will reduce markers by at least 50% in explants."
     )
     assert label == "unverified"
     assert tokens == ["50%"]
+    assert cited == []
 
-    label, _ = _classify_prediction_grounding(
-        "Based on stage1_ICAM1--MUC1.json risk_ratio=17.86, dual blockade reduces IL-8 by 50%."
+    # "from stage1_..." + numeric token → grounded (cue-only, no evidence_dir)
+    label, tokens, cited = _classify_prediction_grounding(
+        "from stage1_ICAM1--MUC1.json risk_ratio=17.86, dual blockade reduces IL-8 by 50%."
     )
     assert label == "grounded"
+    assert cited == ["stage1_ICAM1--MUC1.json"]
 
-    label, tokens = _classify_prediction_grounding(
+    # Loose "Based on" cue without "from <file>" → no longer counts as grounded
+    label, tokens, cited = _classify_prediction_grounding(
+        "Based on the passed stage1 filter, reduce markers by 40%"
+    )
+    assert label == "unverified"
+    assert cited == []
+
+    label, tokens, cited = _classify_prediction_grounding(
         "Significant reduction in fibroblast migration compared to controls."
     )
     assert label == "qualitative"
@@ -175,24 +187,39 @@ def test_hypothesis_grounding_tag_summary() -> None:
     parsed = {
         "hypotheses": [
             {"falsifiable_prediction": "Reduce COL1A1 by 50% in cultures"},
-            {"falsifiable_prediction": "Based on stage3_CD47.json index 0.3 → 2-fold increase"},
+            {"falsifiable_prediction": "from stage3_CD47.json index 0.3 → 2-fold increase"},
             {"falsifiable_prediction": "Significant reduction observed"},
+            # Loose cue (old regex would match, new regex does not)
+            {"falsifiable_prediction": "Based on the stage1 filter pass, 30% reduction"},
         ]
     }
     s = _tag_hypothesis_prediction_grounding(parsed)
-    assert s["unverified"] == 1
-    assert s["grounded"] == 1
-    assert s["qualitative"] == 1
+    assert s["unverified"] == 2, s
+    assert s["grounded"] == 1, s          # (stage3_CD47.json cited, no evidence_dir for verify)
+    assert s["grounded_verified"] == 0, s
+    assert s["qualitative"] == 1, s
     assert parsed["hypotheses"][0]["prediction_grounding"] == "unverified"
     assert parsed["hypotheses"][1]["prediction_grounding"] == "grounded"
     assert parsed["hypotheses"][2]["prediction_grounding"] == "qualitative"
+    assert parsed["hypotheses"][3]["prediction_grounding"] == "unverified"
 
 
 def test_hypothesis_prompt_has_quantitative_constraint() -> None:
+    """Followup B7b rewrote the Quantitative Predictions block with explicit
+    `from <filename>` grammar and 4-tier grounding labels. Validate the
+    prompt still carries those contract anchors."""
     from src.agents.drug_target.subagents import prompts as pmts
 
-    assert "round-number fabrications" in pmts.HYPOTHESIS_WRITER_PROMPT.lower()
-    assert "prediction_grounding" in pmts.HYPOTHESIS_WRITER_PROMPT
+    p = pmts.HYPOTHESIS_WRITER_PROMPT
+    # Anti-hallucination header + 4-tier labels
+    assert "Quantitative Predictions" in p
+    assert "grounded_verified" in p
+    assert "unverified" in p
+    assert "qualitative" in p
+    # New file-anchored grammar requirement
+    assert "from <filename>" in p or "from stage1_" in p
+    # Concrete good/bad examples to teach Qwen2 the pattern
+    assert "GOOD" in p and "BAD" in p
 
 
 # ---------------------------------------------------------------------------
@@ -260,11 +287,20 @@ def test_score_source_selection_rule() -> None:
 # ---------------------------------------------------------------------------
 
 def test_novelty_uses_associations_total_count() -> None:
-    # Truncated list, but total_count known
-    score = _score_novelty_opportunity([{}] * 20, True, 500)
-    assert score == 0  # 500 associations -> well-studied
-    score = _score_novelty_opportunity([{}] * 20, True, 3)
-    assert score == 3  # only 3 associations despite list-length=20
+    # Brackets updated by followup A4 (0:1000+, 1:300-999, 2:100-299,
+    # 3:30-99, 4:10-29, 5:0-9). Values here are chosen to match the
+    # live-probed IPF gene counts (TGFB1=3124, LRP1=781, ITGA3=262).
+    #
+    # Truncated list, but total_count known.
+    # TGFB1-like (3124): well-studied -> 0
+    assert _score_novelty_opportunity([{}] * 20, True, 3124) == 0
+    # LRP1-like (781): moderate -> 1
+    assert _score_novelty_opportunity([{}] * 20, True, 781) == 1
+    # ITGA3-like (262): emerging -> 2
+    assert _score_novelty_opportunity([{}] * 20, True, 262) == 2
+    # Boundary cases
+    assert _score_novelty_opportunity([], False, 0) == 5
+    assert _score_novelty_opportunity([], False, 29) == 4
     # Legacy: when total_count is None and truncated=True, cap at 1
     assert _score_novelty_opportunity([{}] * 20, True) == 1
 
