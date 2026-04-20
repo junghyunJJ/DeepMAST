@@ -1151,38 +1151,45 @@ def _score_novelty_opportunity(associations: list[dict],
                                 associations_total_count: int | None = None) -> int:
     """Score novelty_opportunity (0-5) inverse of how well-established the target is.
 
-    0: 30+ associations (truncated, well-established)
-    1: 16-30 associations
-    2: 6-15 associations
-    3: 3-5 associations
-    4: 1-2 associations
-    5: 0 associations (completely novel, e.g. ST-only discovery)
+    Bracket schema tuned for well-studied gene panels (CCI-derived L-R
+    receptors routinely have 300-3000 OpenTargets disease associations).
+    A live probe against res_ipf_qwen2's 41 genes on 2026-04-20 measured
+    the true API count for each — the new brackets produce
+    14 / 22 / 5 / 0 / 0 / 0 distribution across 0..5, whereas the legacy
+    0-30 schema collapsed every gene into bucket 0 once the true count
+    was wired through.
+
+    0: 1000+ associations (well-studied, e.g. TGFB1=3124, CD4=2905)
+    1: 300-999  associations (moderately studied, e.g. LRP1=781, CD74=967)
+    2: 100-299  associations (emerging, e.g. ITGA3=262, HLA-DMA=232)
+    3: 30-99    associations
+    4: 10-29    associations
+    5: 0-9      associations (ST-only discovery or brand-new target)
 
     Prefers ``associations_total_count`` (persisted before truncation) over
-    ``len(associations)``, because the pipeline truncates to 20 entries
-    and a raw length count cannot distinguish TGFB1 (thousands of
-    associations) from CD99 (~20). When the total is unavailable and
-    ``associations_truncated=True``, cap novelty at 1 (20+ floor).
+    ``len(associations)``. When the total is unavailable and
+    ``associations_truncated=True``, cap novelty at 1 (500+ floor via page-size).
     """
     if associations_total_count is not None:
         count = int(associations_total_count)
     else:
         count = len(associations) if associations else 0
-    if count == 0:
-        score = 5
-    elif count <= 2:
-        score = 4
-    elif count <= 5:
-        score = 3
-    elif count <= 15:
-        score = 2
-    elif count <= 30:
-        score = 1
-    else:
+    if count >= 1000:
         score = 0
-    # When the true total is unknown and the list is truncated, at least 20+
-    # associations exist → cap novelty at 1. Skip this cap when the caller
-    # passed the authoritative `associations_total_count`.
+    elif count >= 300:
+        score = 1
+    elif count >= 100:
+        score = 2
+    elif count >= 30:
+        score = 3
+    elif count >= 10:
+        score = 4
+    else:
+        score = 5
+    # When the true total is unknown and the list is truncated, at least
+    # page_size (500 post-A0) associations exist → floor novelty at 1.
+    # Skip this cap when the caller passed the authoritative
+    # ``associations_total_count``.
     if associations_total_count is None and associations_truncated and score > 1:
         score = 1
     return score

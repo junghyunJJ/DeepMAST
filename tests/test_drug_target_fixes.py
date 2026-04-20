@@ -260,11 +260,20 @@ def test_score_source_selection_rule() -> None:
 # ---------------------------------------------------------------------------
 
 def test_novelty_uses_associations_total_count() -> None:
-    # Truncated list, but total_count known
-    score = _score_novelty_opportunity([{}] * 20, True, 500)
-    assert score == 0  # 500 associations -> well-studied
-    score = _score_novelty_opportunity([{}] * 20, True, 3)
-    assert score == 3  # only 3 associations despite list-length=20
+    # Brackets updated by followup A4 (0:1000+, 1:300-999, 2:100-299,
+    # 3:30-99, 4:10-29, 5:0-9). Values here are chosen to match the
+    # live-probed IPF gene counts (TGFB1=3124, LRP1=781, ITGA3=262).
+    #
+    # Truncated list, but total_count known.
+    # TGFB1-like (3124): well-studied -> 0
+    assert _score_novelty_opportunity([{}] * 20, True, 3124) == 0
+    # LRP1-like (781): moderate -> 1
+    assert _score_novelty_opportunity([{}] * 20, True, 781) == 1
+    # ITGA3-like (262): emerging -> 2
+    assert _score_novelty_opportunity([{}] * 20, True, 262) == 2
+    # Boundary cases
+    assert _score_novelty_opportunity([], False, 0) == 5
+    assert _score_novelty_opportunity([], False, 29) == 4
     # Legacy: when total_count is None and truncated=True, cap at 1
     assert _score_novelty_opportunity([{}] * 20, True) == 1
 
