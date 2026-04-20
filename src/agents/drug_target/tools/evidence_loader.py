@@ -702,6 +702,40 @@ def _classify_prediction_grounding(prediction: str) -> tuple[str, list[str]]:
     return ("grounded" if has_cue else "unverified", tokens)
 
 
+def _sanitize_gap_analysis(parsed: dict, evidence_dir: Path) -> int:
+    """Strip `_FAILED` suffix from ``gap_analysis.orphan_files`` entries when
+    the unsuffixed file actually exists on disk.
+
+    The ``_FAILED`` marker is a CITATION convention for
+    ``evidence_references`` (contrast-only evidence for FAILED stage1 pairs).
+    It does NOT belong on filesystem-grounded lists like ``orphan_files``,
+    where every entry must correspond to a real file. Returns the number
+    of entries sanitized.
+    """
+    if not isinstance(parsed, dict):
+        return 0
+    ga = parsed.get("gap_analysis")
+    if not isinstance(ga, dict):
+        return 0
+    orphans = ga.get("orphan_files")
+    if not isinstance(orphans, list):
+        return 0
+    real = _list_real_evidence_filenames(evidence_dir) if evidence_dir.exists() else set()
+    cleaned: list = []
+    n_stripped = 0
+    for entry in orphans:
+        if isinstance(entry, str) and entry.endswith("_FAILED"):
+            base = entry[: -len("_FAILED")]
+            if base in real:
+                cleaned.append(base)
+                n_stripped += 1
+                continue
+        cleaned.append(entry)
+    if n_stripped:
+        ga["orphan_files"] = cleaned
+    return n_stripped
+
+
 def _tag_hypothesis_prediction_grounding(parsed: dict) -> dict:
     """Mutate each hypothesis in-place with ``prediction_grounding`` and
     ``prediction_numeric_tokens`` fields, and return a summary dict.
@@ -900,6 +934,17 @@ def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) ->
                 "3) DO NOT retry the same payload — the deterministic gate will reject identically."
             )
             return json.dumps(result, indent=2)
+
+        # Strip invalid `_FAILED` suffixes from gap_analysis.orphan_files.
+        # The suffix is a citation convention for evidence_references only;
+        # orphan_files must list filesystem-grounded names.
+        n_stripped = _sanitize_gap_analysis(parsed, evidence_dir)
+        if n_stripped:
+            logger.info(
+                "hypothesis_report: stripped %d orphan_files '_FAILED' suffix(es) "
+                "to match filesystem filenames",
+                n_stripped,
+            )
 
         # Soft tag: annotate each hypothesis with prediction_grounding so the
         # downstream report can surface ungrounded round-number effect sizes
