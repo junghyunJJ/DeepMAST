@@ -551,6 +551,31 @@ def query_gwas_gene_trait_data(
                 disease,
                 disease_context=disease_context,
             )
+            # Parquet-path enrichment: `query_gene_trait_with_context` does NOT
+            # compute proximity overlap between disease trait rsIds and the
+            # gene's own cis-SNPs. Without this, `disease_specific_hits` only
+            # reports `n_gene_in_trait` / `n_gene_snps_in_disease`, both of
+            # which depend on the trait_associations[*].genes array — which
+            # OT Genetics populates sparsely for most GWAS loci. The legacy
+            # else-branch below already runs `_proximity_match`, so we mirror
+            # that behaviour here.
+            dsh = result.get("disease_specific_hits") or {}
+            if "n_proximity_hits" not in dsh:
+                _trait_assocs = result.get("trait_associations", []) or []
+                _gene_assocs = result.get("gene_associations", []) or []
+                _trait_rsids = {
+                    a.get("rsId") for a in _trait_assocs if a.get("rsId")
+                }
+                if "gene_snps_in_disease" not in dsh:
+                    _gene_snps = [
+                        a for a in _gene_assocs if a.get("rsId") in _trait_rsids
+                    ]
+                    dsh["gene_snps_in_disease"] = _gene_snps
+                    dsh["n_gene_snps_in_disease"] = len(_gene_snps)
+                _proximity = _proximity_match(_gene_assocs, _trait_assocs)
+                dsh["proximity_hits"] = _proximity
+                dsh["n_proximity_hits"] = len(_proximity)
+                result["disease_specific_hits"] = dsh
         else:
             result["efo_traits"] = disease_context.get("efo_traits", [])[:5]
             result["trait_associations"] = disease_context.get("trait_associations", [])
