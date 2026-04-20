@@ -1,0 +1,73 @@
+{
+  "search_metadata": {
+    "search_method": "search_literature_dynamic",
+    "iterations": 2,
+    "think_success": true,
+    "total_papers": 40,
+    "coverage": {
+      "genes_covered": [
+        "CD4",
+        "CXCL12"
+      ],
+      "genes_matched_by": {
+        "CD4": "t",
+        "CXCL12": "cxcl"
+      },
+      "pathways_covered": [],
+      "pathways_matched_by": {},
+      "celltypes_covered": [
+        "Stromal",
+        "Macrophages 1",
+        "Macrophages 2",
+        "Endothelial"
+      ],
+      "total_papers": 40,
+      "genes_coverage_pct": 100.0,
+      "pathways_coverage_pct": 0.0,
+      "celltypes_coverage_pct": 80.0,
+      "genes_missing": [],
+      "pathways_missing": [],
+      "celltypes_missing": [
+        "Stromal & T Cell Hybrid"
+      ]
+    },
+    "filter_stage": "deterministic_only",
+    "rerank_applied_count": 0,
+    "rerank_dropped_count": 0
+  },
+  "papers": [
+    {
+      "pmid": "41902967",
+      "title": "CXCL12-mediated T cell infiltration drives breast cancer metastasis",
+      "abstract": "Breast cancer (BC) is a malignant tumor with the highest incidence rate in women. This work explored the function of CXCL12 in tumor metastasis. CXCL12 protein expression levels were assessed by IHC in breast cancer tissues. Protein-protein interaction analysis (STRING) indicated that CXCL12 interacts with CXCL10 protein molecules. Correlation analysis in GEPIA2 showed that CXCL12 was negatively correlated with CXCL10. The effects of CXCL12 on invasion and migration were detected by scratch and transwell experiments in breast cancer cells. CD4 + T and CD8 + T cells in the inflammatory microenvironment of breast cancer patients were evaluated with the NGDC database and verified by IF. CXCL12 knockdown efficiency was 55.4% (P < 0.05). the migration inhibition percentage is 7.7% in CXCL12 knockdown group (P < 0.05). CXCL12 knockdown enhanced the expression and secretion of CXCL10 in BC. CXCL10 is responsible for the recruitment of CD4 + and CD8 + T lymphocytes into tumors and enhances antitumor effects. The IF data showed that the patients in the CXCL10 + CD4+/CD8 + T-cell group and the CXCL12-CD4+/CD8 + T-cell group had better prognoses. CXCL12 promoted BC migration and invasion. On the other hand, CXCL12 inhibited the expression and secretion of CXCL10, further inhibiting T lymphocyte infiltration and promoting breast cancer metastasis in the TME.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Liu X",
+        "Chen C",
+        "Liu L",
+        "Tang J",
+        "Zhang H",
+        "Jin G",
+        "Chen Y"
+      ],
+      "journal": "Clin Exp Med",
+      "date": "2026-03-28T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12",
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "CXCL12 signaling",
+          "CD4 signaling",
+          "chemokine signaling",
+          "CXCR4 signaling",
+          "immune signaling"
+        ]
+      }
+    }
+  ]
+}

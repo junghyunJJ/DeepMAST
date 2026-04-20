@@ -3,6 +3,7 @@ name: drug-target-hypothesis
 description: Generate evidence-backed biological mechanism hypotheses from completed drug target assessment evidence. Use when Stage 1-3 evidence is present, `assessment_results.json.stage3_candidates` is non-empty, and the hypothesis writer needs to produce `evidence/hypothesis_report.json` for downstream reporting. Do not use for general literature-driven hypothesis ideation or dataset classification.
 metadata:
     skill-author: Junghyun Jung
+    version: 1.0.0
 ---
 
 # Drug Target Hypothesis Generation
@@ -26,6 +27,32 @@ Do not use this skill when:
 - You need literature-driven hypothesis generation from scratch
 - You are classifying tabular datasets
 - `stage3_candidates` is empty; in that case hypothesis generation is skipped and the downstream report proceeds without a hypothesis section
+
+## Concrete Use Cases
+
+Use Case: Runtime hypothesis writer on a completed evidence bundle
+Trigger: "Generate `evidence/hypothesis_report.json` from the saved Stage 1-3 evidence" or "Run the hypothesis-writer step for this completed drug-target assessment"
+Steps:
+1. Load hypothesis-scope evidence with `load_evidence_files(data_dir, scope="hypothesis")`
+2. Build retained hypotheses from the returned files and validate all cited filenames
+3. Persist the structured result through `save_evidence(data_dir, "hypothesis_report.json", hypothesis_data)`
+Result: A runtime-aligned JSON hypothesis artifact is saved for downstream reporting
+
+Use Case: Deterministic retry after citation rejection
+Trigger: "Retry the hypothesis report after `invalid_references`" or "Recover from `failed_pair_violations` in the hypothesis payload"
+Steps:
+1. Inspect the deterministic rejection returned by `save_evidence`
+2. Remove or repair invalid citations, including `_FAILED` suffix handling for contrast-only failed pairs
+3. Re-run validation and save only after the payload changes
+Result: The hypothesis artifact is retried through the runtime contract instead of repeating the same rejected payload
+
+Use Case: Zero-featured bypass
+Trigger: "Check whether hypothesis generation should be skipped for this data_dir" or "Handle the case where `stage3_candidates` is empty"
+Steps:
+1. Read `assessment_results.json.stage3_candidates` from the hypothesis-scope evidence
+2. Detect that no FEATURED genes are available for retained hypotheses
+3. Stop hypothesis generation and let the downstream report continue without a hypothesis section
+Result: The runtime bypasses hypothesis generation cleanly instead of inventing placeholder biology
 
 ## Runtime Contract
 
@@ -372,3 +399,7 @@ Avoid prose like bare angle-bracket comparisons outside inline code or fenced bl
 - `hypogenic` - automated LLM-driven hypothesis generation on tabular data
 - `pubmed-eutils-search` - PubMed search support when extra literature context is needed
 - `html-report-generator` - downstream HTML presentation once structured outputs already exist
+
+### evals/
+
+- `evals/evals.json` - trigger, paraphrase, and non-trigger prompt set for PDF-first skill maintenance checks

@@ -34,12 +34,19 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Subagent names expected in the Drug Target pipeline trace.
+# Subagent names expected in the Drug Target pipeline trace (happy path).
 SUBAGENTS = [
     "evidence_assessor",
-    "deep_diver",
     "hypothesis_writer",
     "report_writer",
+]
+
+# Subagents that may appear in traces but are not required — absence is logged
+# as INFO, not ERROR. `deep_diver` is preserved in SUBAGENT_CONFIGS for manual
+# re-runs but is not part of the default 3-agent workflow; Stage 3 ChEMBL now
+# runs inline inside evidence_assessor.
+OPTIONAL_SUBAGENTS = [
+    "deep_diver",
 ]
 
 # Mandatory evidence artifacts whose absence means the pipeline failed.

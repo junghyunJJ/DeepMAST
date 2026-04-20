@@ -117,7 +117,7 @@ def create_ollama_llm(**kwargs) -> ChatOllama:
     base_url = kwargs.get("base_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:6000"))
     temperature = kwargs.get("temperature", 0)
     
-    num_ctx = kwargs.get("num_ctx", 262144) # 256K in H100 x2
+    num_ctx = kwargs.get("num_ctx", 98304) # default to 98K
     num_predict = kwargs.get("num_predict", -1)  # unlimited; prevents truncated tool call JSON (#14570)
 
     llm = ChatOllama(

@@ -1,0 +1,54 @@
+{
+  "saved_to": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/docs/benchmarks/harness_x_model/workspaces/pilot_post_update_b_prime/trial_0030_cci_full_07_LAMA2_ITGA6_weak_on/papers.json",
+  "output_path": "papers.json",
+  "total_papers": 30,
+  "coverage": {
+    "genes_covered": [
+      "LAMA2",
+      "ITGA6"
+    ],
+    "genes_matched_by": {
+      "LAMA2": "lama2",
+      "ITGA6": "itga6"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Endothelial",
+      "Macrophages 2",
+      "Stromal"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 75.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Stromal & T Cell Hybrid"
+    ]
+  },
+  "paper_titles": [
+    "Integrin alpha6 and EGFR signaling converge at mechanosensitive calpain 2.",
+    "Structural and functional consequences of non-synonymous SNPs within the LAMA2 protein: a molecular ",
+    "Correction to: Epigenetic regulation of LINC01270 in breast cancer progression by mediating LAMA2 pr",
+    "Epigenetic regulation of LINC01270 in breast cancer progression by mediating LAMA2 promoter methylat",
+    "Abnormal promoter DNA hypermethylation of the integrin, nidogen, and dystroglycan genes in breast ca",
+    "Molecular profiling of hormone receptor-positive, HER2-negative breast cancers from patients treated",
+    "Whole-exome sequencing of breast cancer, malignant peripheral nerve sheath tumor and neurofibroma fr",
+    "[DNA methylation in the promoter regions of the laminin family genes in normal and breast carcinoma ",
+    "Laminin alpha2 chain-positive vessels and epidermal growth factor in lung neuroendocrine carcinoma: ",
+    "First-in-human pilot study of an integrin alpha6-targeted radiotracer for SPECT imaging of breast ca"
+  ],
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with 'signaling' + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0,
+  "message": "Full results (30 papers) saved to papers.json. Use read_file('/papers.json') to access complete data."
+}

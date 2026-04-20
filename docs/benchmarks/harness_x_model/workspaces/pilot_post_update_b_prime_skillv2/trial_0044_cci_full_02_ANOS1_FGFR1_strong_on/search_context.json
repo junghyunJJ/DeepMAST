@@ -1,0 +1,18 @@
+{
+  "genes": [
+    "ANOS1",
+    "FGFR1"
+  ],
+  "pathways": [
+    "Hypoxia"
+  ],
+  "celltypes": [
+    "Endothelial",
+    "Macrophages 2",
+    "Myoepi ACTA2+",
+    "Stromal"
+  ],
+  "disease": "breast cancer",
+  "lr_pair": "ANOS1-FGFR1",
+  "category": "low_morans_known"
+}

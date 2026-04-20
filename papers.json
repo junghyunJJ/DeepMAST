@@ -1,0 +1,559 @@
+{
+  "search_context": {
+    "disease": "breast cancer",
+    "analysis_source": "res_bc_ollama",
+    "analysis_target": {
+      "interest_clusters": [
+        "4",
+        "14",
+        "17"
+      ],
+      "interest_celltypes_raw": [
+        "Prolif Invasive Tumor",
+        "Invasive Tumor",
+        "Stromal",
+        "Endothelial",
+        "Macrophages 1",
+        "Macrophages 2",
+        "CD4+ T Cells",
+        "CD8+ T Cells",
+        "DCIS 1",
+        "DCIS 2"
+      ],
+      "celltypes_canonical": [
+        "tumor epithelial compartment",
+        "DCIS",
+        "stromal/CAF",
+        "endothelial",
+        "macrophage/TAM",
+        "CD4+ T cells",
+        "CD8+ T cells"
+      ],
+      "canonicalization_notes": [
+        "'Prolif Invasive Tumor' and 'Invasive Tumor' were grounded against tumor epithelial / proliferative tumor compartment literature.",
+        "'Macrophages 1' and 'Macrophages 2' were collapsed to a macrophage/TAM compartment.",
+        "'DCIS 1' and 'DCIS 2' were collapsed to DCIS literature terms."
+      ]
+    },
+    "lr_pairs": [
+      "SPP1-CD44",
+      "VEGFA-FLT1",
+      "TGFB1-TGFBR2"
+    ],
+    "pathways": [
+      "Estrogen",
+      "EGFR/HER2",
+      "NFkB",
+      "TGFb",
+      "Hypoxia",
+      "VEGF",
+      "PI3K/Akt",
+      "MAPK"
+    ],
+    "query_log": [
+      "breast cancer spatial transcriptomics cell-cell interaction tumor microenvironment",
+      "breast cancer SPP1 CD44 macrophage tumor microenvironment",
+      "breast cancer VEGFA FLT1 endothelial angiogenesis",
+      "breast cancer TGFBR2 fibroblast immune exclusion",
+      "breast cancer estrogen receptor signaling review",
+      "breast cancer EGFR HER2 signaling review",
+      "breast cancer NF-kB signaling tumor microenvironment",
+      "breast cancer hypoxia VEGF angiogenesis",
+      "breast cancer CD4 T cells",
+      "breast cancer CD8 tumor-infiltrating T cells",
+      "breast cancer DCIS invasive transition single-cell"
+    ],
+    "retrieved_on": "2026-04-19"
+  },
+  "coverage": {
+    "papers_total": 18,
+    "lr_pairs_directly_supported": [
+      "SPP1-CD44",
+      "VEGFA-FLT1"
+    ],
+    "lr_pairs_direct_support_pct": 66.7,
+    "lr_pairs_supported_at_axis_or_direct_level": [
+      "SPP1-CD44",
+      "TGFB1-TGFBR2",
+      "VEGFA-FLT1"
+    ],
+    "lr_pairs_axis_or_direct_support_pct": 100.0,
+    "pathways_covered": [
+      "EGFR/HER2",
+      "Estrogen",
+      "Hypoxia",
+      "MAPK",
+      "NFkB",
+      "PI3K/Akt",
+      "TGFb",
+      "VEGF"
+    ],
+    "pathways_coverage_pct": 100.0,
+    "celltypes_covered": [
+      "CD4+ T cells",
+      "CD8+ T cells",
+      "DCIS",
+      "endothelial",
+      "macrophage/TAM",
+      "stromal/CAF",
+      "tumor epithelial compartment"
+    ],
+    "celltypes_coverage_pct": 100.0,
+    "pathways_missing": [],
+    "celltypes_missing": [],
+    "coverage_notes": [
+      "Exact PubMed pair-level support is strongest for SPP1-CD44 and VEGFA-FLT1.",
+      "TGFB1-TGFBR2 is supported through breast-cancer TGFβ/TGFBR2 stromal-axis papers rather than many exact same-title pair hits.",
+      "Canonical cell-type coverage is complete after collapsing the repo's custom labels to PubMed-standard terms."
+    ]
+  },
+  "papers": [
+    {
+      "pmid": "39703753",
+      "title": "Spatial transcriptomics in breast cancer reveals tumour microenvironment-driven drug responses and clonal therapeutic heterogeneity",
+      "journal": "NAR Cancer",
+      "year": 2024,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/39703753/",
+      "study_type": "original spatial transcriptomics",
+      "evidence_types": [
+        "spatial_context",
+        "ligand_receptor"
+      ],
+      "matched_pathways": [],
+      "matched_celltypes": [
+        "tumor epithelial compartment",
+        "stromal/CAF"
+      ],
+      "lr_support": [],
+      "evidence_summary": "Breast cancer spatial transcriptomics identified tumor, interphase, and microenvironment regions with distinct drug-response states and unique ligand-receptor programs, directly supporting a spatial CCI framing for the current analysis.",
+      "relevance_to_analysis": "Grounds the use of spatially resolved ligand-receptor programs to interpret proliferative tumor regions and their surrounding microenvironment."
+    },
+    {
+      "pmid": "30514914",
+      "title": "Spatially and functionally distinct subclasses of breast cancer-associated fibroblasts revealed by single cell RNA sequencing",
+      "journal": "Nat Commun",
+      "year": 2018,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/30514914/",
+      "study_type": "original single-cell RNA-seq",
+      "evidence_types": [
+        "celltype"
+      ],
+      "matched_pathways": [],
+      "matched_celltypes": [
+        "stromal/CAF"
+      ],
+      "lr_support": [],
+      "evidence_summary": "Single-cell profiling resolved multiple spatially separated breast cancer-associated fibroblast states with distinct origins and functions.",
+      "relevance_to_analysis": "Supports collapsing the repo's stromal labels into a CAF/stromal compartment with heterogeneous functions in breast cancer."
+    },
+    {
+      "pmid": "38824268",
+      "title": "Study on the mechanism of heterogeneous tumor-associated macrophages in three subtypes of breast cancer through the integration of single-cell RNA sequencing and in vitro experiments",
+      "journal": "Mol Biol Rep",
+      "year": 2024,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/38824268/",
+      "study_type": "original single-cell plus experimental",
+      "evidence_types": [
+        "ligand_receptor",
+        "celltype",
+        "pathway"
+      ],
+      "matched_pathways": [
+        "VEGF"
+      ],
+      "matched_celltypes": [
+        "macrophage/TAM"
+      ],
+      "lr_support": [
+        {
+          "pair": "SPP1-CD44",
+          "support": "direct",
+          "note": "Paper explicitly reports SPP1-CD44 among TAM-associated L-R pairs in breast cancer."
+        },
+        {
+          "pair": "VEGFA-FLT1",
+          "support": "direct",
+          "note": "Paper explicitly reports VEGFA-VEGFR1/Flt1 communication in breast cancer TAM programs."
+        }
+      ],
+      "evidence_summary": "Across luminal, HER2, and triple-negative breast cancer, heterogeneous TAM states showed subtype-specific communication, including VEGFA-VEGFR1, SPP1-CD44, and SPP1-ITGB1 interactions.",
+      "relevance_to_analysis": "This is the cleanest direct PubMed support for two of the target L-R pairs in a breast-cancer immune-microenvironment setting."
+    },
+    {
+      "pmid": "31969374",
+      "title": "Breast Cancer Cell-Derived Soluble CD44 Promotes Tumor Progression by Triggering Macrophage IL1β Production",
+      "journal": "Cancer Res",
+      "year": 2020,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/31969374/",
+      "study_type": "original experimental",
+      "evidence_types": [
+        "ligand_receptor",
+        "celltype",
+        "pathway"
+      ],
+      "matched_pathways": [
+        "NFkB"
+      ],
+      "matched_celltypes": [
+        "macrophage/TAM",
+        "tumor epithelial compartment"
+      ],
+      "lr_support": [
+        {
+          "pair": "SPP1-CD44",
+          "support": "axis_level",
+          "note": "Supports the CD44 side of an SPP1-CD44 macrophage-tumor communication axis through breast-cancer CD44-driven macrophage activation."
+        }
+      ],
+      "evidence_summary": "Breast-cancer-derived soluble CD44 activated macrophages to produce IL1β and promoted tumor progression, showing a concrete tumor-to-macrophage communication mechanism centered on CD44.",
+      "relevance_to_analysis": "Provides mechanistic support for CD44-centered tumor-macrophage crosstalk in the breast tumor microenvironment."
+    },
+    {
+      "pmid": "39349495",
+      "title": "SPP1+ macrophages in HR+ breast cancer are associated with tumor-infiltrating lymphocytes",
+      "journal": "NPJ Breast Cancer",
+      "year": 2024,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/39349495/",
+      "study_type": "original translational",
+      "evidence_types": [
+        "ligand_receptor",
+        "celltype"
+      ],
+      "matched_pathways": [],
+      "matched_celltypes": [
+        "macrophage/TAM",
+        "CD8+ T cells"
+      ],
+      "lr_support": [
+        {
+          "pair": "SPP1-CD44",
+          "support": "axis_level",
+          "note": "Supports the SPP1-producing macrophage state that commonly mediates SPP1-CD44 signaling in tumors."
+        }
+      ],
+      "evidence_summary": "HR-positive breast tumors contained SPP1-positive macrophages associated with tumor-infiltrating lymphocyte patterns, strengthening the relevance of SPP1 macrophage states in breast-cancer CCI.",
+      "relevance_to_analysis": "Grounds an SPP1-high macrophage compartment adjacent to tumor and lymphocyte programs."
+    },
+    {
+      "pmid": "18630531",
+      "title": "Expression of VEGFR-1 (Flt-1) in breast cancer is associated with VEGF expression and with node-negative tumour stage",
+      "journal": "Anticancer Res",
+      "year": 2008,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/18630531/",
+      "study_type": "original translational",
+      "evidence_types": [
+        "ligand_receptor",
+        "pathway",
+        "celltype"
+      ],
+      "matched_pathways": [
+        "VEGF",
+        "Hypoxia"
+      ],
+      "matched_celltypes": [
+        "endothelial",
+        "tumor epithelial compartment"
+      ],
+      "lr_support": [
+        {
+          "pair": "VEGFA-FLT1",
+          "support": "direct",
+          "note": "Directly links VEGF and VEGFR1/Flt1 expression in breast cancer."
+        }
+      ],
+      "evidence_summary": "Breast tumors expressing VEGFR1/Flt1 were associated with VEGF expression, supporting a VEGFA-FLT1 signaling axis relevant to angiogenesis and tumor-endothelial communication.",
+      "relevance_to_analysis": "Provides direct pair-level support for the VEGFA-FLT1 axis in breast cancer."
+    },
+    {
+      "pmid": "24336330",
+      "title": "TGF-beta receptor type-2 expression in cancer-associated fibroblasts regulates breast cancer cell growth and survival and is a prognostic marker in pre-menopausal breast cancer",
+      "journal": "Oncogene",
+      "year": 2014,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/24336330/",
+      "study_type": "original translational",
+      "evidence_types": [
+        "ligand_receptor",
+        "pathway",
+        "celltype"
+      ],
+      "matched_pathways": [
+        "TGFb"
+      ],
+      "matched_celltypes": [
+        "stromal/CAF",
+        "tumor epithelial compartment"
+      ],
+      "lr_support": [
+        {
+          "pair": "TGFB1-TGFBR2",
+          "support": "axis_level",
+          "note": "Supports the receptor arm of the TGFβ1-TGFBR2 axis in breast-cancer CAFs."
+        }
+      ],
+      "evidence_summary": "CAF-specific TGFBR2 expression was tied to breast cancer cell growth, survival, and prognosis, demonstrating that stromal TGFβ receptor signaling shapes tumor behavior.",
+      "relevance_to_analysis": "Grounds a stromal/CAF-centered TGFβ signaling program around the proliferative tumor compartment."
+    },
+    {
+      "pmid": "38505604",
+      "title": "Cancer-associated fibroblast spatial heterogeneity and EMILIN1 expression in the tumor microenvironment modulate TGF-β activity and CD8+ T-cell infiltration in breast cancer",
+      "journal": "Theranostics",
+      "year": 2024,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/38505604/",
+      "study_type": "original single-cell plus spatial transcriptomics",
+      "evidence_types": [
+        "celltype",
+        "pathway"
+      ],
+      "matched_pathways": [
+        "TGFb"
+      ],
+      "matched_celltypes": [
+        "stromal/CAF",
+        "CD8+ T cells"
+      ],
+      "lr_support": [
+        {
+          "pair": "TGFB1-TGFBR2",
+          "support": "axis_level",
+          "note": "Supports TGFβ activity in spatially organized CAF niches linked to immune exclusion."
+        }
+      ],
+      "evidence_summary": "Integrated single-cell and spatial data showed that spatially organized CAF populations modulate TGFβ activity and CD8 T-cell infiltration in breast tumors.",
+      "relevance_to_analysis": "Directly links stromal spatial structure, TGFβ signaling, and T-cell exclusion in a breast-cancer setting."
+    },
+    {
+      "pmid": "36465358",
+      "title": "TGF-β1 promotes human breast cancer angiogenesis and malignant behavior by regulating endothelial-mesenchymal transition",
+      "journal": "Front Oncol",
+      "year": 2022,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/36465358/",
+      "study_type": "original experimental",
+      "evidence_types": [
+        "ligand_receptor",
+        "pathway",
+        "celltype"
+      ],
+      "matched_pathways": [
+        "TGFb",
+        "VEGF"
+      ],
+      "matched_celltypes": [
+        "endothelial",
+        "tumor epithelial compartment",
+        "macrophage/TAM"
+      ],
+      "lr_support": [
+        {
+          "pair": "TGFB1-TGFBR2",
+          "support": "axis_level",
+          "note": "Supports ligand-driven TGFβ1 signaling in a breast-cancer angiogenesis program involving endothelial transition."
+        }
+      ],
+      "evidence_summary": "TGFβ1 promoted breast cancer angiogenesis and malignant behavior by inducing endothelial-mesenchymal transition; the study also connects TAM-derived cues with TGFβ and Notch signaling in endothelial cells.",
+      "relevance_to_analysis": "Supports a TGFβ-driven tumor-endothelial crosstalk program around angiogenesis and invasion."
+    },
+    {
+      "pmid": "35964426",
+      "title": "An overview on Estrogen receptors signaling and its ligands in breast cancer",
+      "journal": "Eur J Med Chem",
+      "year": 2022,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/35964426/",
+      "study_type": "review",
+      "evidence_types": [
+        "pathway"
+      ],
+      "matched_pathways": [
+        "Estrogen"
+      ],
+      "matched_celltypes": [
+        "tumor epithelial compartment"
+      ],
+      "lr_support": [],
+      "evidence_summary": "This review summarizes ERα, ERβ, and GPER signaling, including genomic and non-genomic estrogen pathways that drive breast cancer growth and therapy resistance.",
+      "relevance_to_analysis": "Grounds the Estrogen pathway enrichment detected in the Factor3-associated breast cancer program."
+    },
+    {
+      "pmid": "34572912",
+      "title": "Crosstalk between PRLR and EGFR/HER2 Signaling Pathways in Breast Cancer",
+      "journal": "Cancers (Basel)",
+      "year": 2021,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/34572912/",
+      "study_type": "review",
+      "evidence_types": [
+        "pathway"
+      ],
+      "matched_pathways": [
+        "EGFR/HER2",
+        "MAPK",
+        "PI3K/Akt"
+      ],
+      "matched_celltypes": [
+        "tumor epithelial compartment"
+      ],
+      "lr_support": [],
+      "evidence_summary": "The review synthesizes PRLR crosstalk with EGFR/HER2 signaling in breast cancer and highlights downstream MAPK and PI3K/Akt signaling relevant to tumor growth and therapy response.",
+      "relevance_to_analysis": "Provides pathway-level support for the EGFR/HER2 and downstream MAPK/PI3K signals highlighted in the analysis context."
+    },
+    {
+      "pmid": "39858015",
+      "title": "Molecular Insights on Signaling Cascades in Breast Cancer: A Comprehensive Review",
+      "journal": "Cancers (Basel)",
+      "year": 2025,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/39858015/",
+      "study_type": "review",
+      "evidence_types": [
+        "pathway",
+        "celltype"
+      ],
+      "matched_pathways": [
+        "Estrogen",
+        "EGFR/HER2",
+        "MAPK",
+        "PI3K/Akt"
+      ],
+      "matched_celltypes": [
+        "tumor epithelial compartment",
+        "stromal/CAF",
+        "macrophage/TAM",
+        "CD8+ T cells"
+      ],
+      "lr_support": [],
+      "evidence_summary": "This review places EGFR, ER, MAPK, and PI3K/Akt signaling inside the broader breast tumor microenvironment and explicitly links these cascades to stromal, immune, and tumor-cell interplay.",
+      "relevance_to_analysis": "Useful umbrella citation for pathway-factor results that intersect tumor, stromal, and immune compartments."
+    },
+    {
+      "pmid": "39493763",
+      "title": "NF-κB signaling pathway in tumor microenvironment",
+      "journal": "Front Immunol",
+      "year": 2024,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/39493763/",
+      "study_type": "review",
+      "evidence_types": [
+        "pathway"
+      ],
+      "matched_pathways": [
+        "NFkB"
+      ],
+      "matched_celltypes": [
+        "macrophage/TAM",
+        "CD4+ T cells",
+        "CD8+ T cells",
+        "endothelial"
+      ],
+      "lr_support": [],
+      "evidence_summary": "The review describes NF-κB as a core microenvironmental signaling hub that shapes inflammatory signaling, immune-cell behavior, and stromal-tumor interactions.",
+      "relevance_to_analysis": "Grounds the NFkB pathway enrichment even when the supporting breast-cancer paper is pathway-level rather than pair-specific."
+    },
+    {
+      "pmid": "40851994",
+      "title": "Hypoxia-driven angiogenesis in breast cancer mechanisms and therapeutic targets: a narrative review",
+      "journal": "Ann Med Surg (Lond)",
+      "year": 2025,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/40851994/",
+      "study_type": "review",
+      "evidence_types": [
+        "pathway",
+        "celltype"
+      ],
+      "matched_pathways": [
+        "Hypoxia",
+        "VEGF"
+      ],
+      "matched_celltypes": [
+        "endothelial",
+        "tumor epithelial compartment"
+      ],
+      "lr_support": [],
+      "evidence_summary": "This review centers breast-cancer hypoxia as a driver of angiogenesis and explains how hypoxic signaling reshapes the tumor microenvironment through VEGF-centered vascular programs.",
+      "relevance_to_analysis": "Grounds the Hypoxia and VEGF pathway hits in spatial tumor regions likely under vascular and oxygen stress."
+    },
+    {
+      "pmid": "35192807",
+      "title": "Breast cancer cells-derived Von Willebrand Factor promotes VEGF-A-related angiogenesis through PI3K/Akt-miR-205-5p signaling pathway",
+      "journal": "Toxicol Appl Pharmacol",
+      "year": 2022,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/35192807/",
+      "study_type": "original experimental",
+      "evidence_types": [
+        "pathway",
+        "celltype"
+      ],
+      "matched_pathways": [
+        "VEGF",
+        "PI3K/Akt"
+      ],
+      "matched_celltypes": [
+        "endothelial",
+        "tumor epithelial compartment"
+      ],
+      "lr_support": [],
+      "evidence_summary": "Breast-cancer-cell-derived vWF increased VEGF-A production and vascular proliferation through PI3K/Akt signaling, providing direct experimental support for VEGF and PI3K/Akt coupling in angiogenesis.",
+      "relevance_to_analysis": "Helps explain pathway-factor enrichment around VEGF and PI3K/Akt in tumor-endothelial communication."
+    },
+    {
+      "pmid": "35197632",
+      "title": "A trispecific antibody targeting HER2 and T cells inhibits breast cancer growth via CD4 cells",
+      "journal": "Nature",
+      "year": 2022,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/35197632/",
+      "study_type": "original experimental",
+      "evidence_types": [
+        "celltype",
+        "pathway"
+      ],
+      "matched_pathways": [
+        "EGFR/HER2"
+      ],
+      "matched_celltypes": [
+        "CD4+ T cells",
+        "tumor epithelial compartment"
+      ],
+      "lr_support": [],
+      "evidence_summary": "In HER2-positive breast cancer, CD4 T cells were shown to mediate antitumor effects and induce pro-inflammatory signaling, demonstrating that CD4 T cells can be functional effectors in breast tumor control.",
+      "relevance_to_analysis": "Provides breast-cancer-specific support for a CD4 T-cell compartment interacting with HER2-positive tumor programs."
+    },
+    {
+      "pmid": "36589661",
+      "title": "Prognostic value of CD8+ tumor-infiltrating T cells in patients with breast cancer: A systematic review and meta-analysis",
+      "journal": "Oncol Lett",
+      "year": 2023,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/36589661/",
+      "study_type": "systematic review and meta-analysis",
+      "evidence_types": [
+        "celltype"
+      ],
+      "matched_pathways": [],
+      "matched_celltypes": [
+        "CD8+ T cells"
+      ],
+      "lr_support": [],
+      "evidence_summary": "Across 14 studies, high CD8 T-cell infiltration was associated with better survival in breast cancer, confirming the clinical relevance of CD8-rich tumor microenvironments.",
+      "relevance_to_analysis": "Grounds the CD8 T-cell compartment as a meaningful cell-type feature when interpreting spatial immune neighborhoods."
+    },
+    {
+      "pmid": "39363164",
+      "title": "Single-cell transcriptome analysis reveals immune microenvironment changes and insights into the transition from DCIS to IDC with associated prognostic genes",
+      "journal": "BMC Cancer",
+      "year": 2024,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/39363164/",
+      "study_type": "original single-cell transcriptomics",
+      "evidence_types": [
+        "celltype"
+      ],
+      "matched_pathways": [],
+      "matched_celltypes": [
+        "DCIS",
+        "tumor epithelial compartment",
+        "CD8+ T cells"
+      ],
+      "lr_support": [],
+      "evidence_summary": "Single-cell analysis of the DCIS-to-IDC transition identified immune-microenvironment remodeling, including T-cell proportion changes, across pre-invasive and invasive breast disease.",
+      "relevance_to_analysis": "Supports mapping the repo's DCIS and invasive-tumor labels onto a literature-backed progression axis."
+    }
+  ],
+  "provenance": {
+    "source": "PubMed",
+    "curation_method": "manual PubMed search and abstract-level relevance screening",
+    "schema_version": 1
+  }
+}

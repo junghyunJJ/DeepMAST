@@ -1,0 +1,13 @@
+{
+  "genes": [
+    "IL16",
+    "CD4"
+  ],
+  "pathways": [],
+  "celltypes": [
+    "Endothelial",
+    "Macrophages 2",
+    "Stromal"
+  ],
+  "disease": "breast cancer"
+}

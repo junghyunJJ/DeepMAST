@@ -1,0 +1,75 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Helvetica, Arial",
+    "primaryColor": "#f5f7fa",
+    "primaryBorderColor": "#c9d1d9",
+    "lineColor": "#9aa4b2",
+    "secondaryColor": "#eef2f7",
+    "tertiaryColor": "#ffffff",
+    "fontSize": "14px"
+  }
+}}%%
+flowchart TD
+    %% ── Title ──
+    TITLE["<b>SkillLoadHarness Evaluation Protocol</b><br/><i>Middleware -- injected into system prompt</i>"]:::titleNode
+
+    TITLE --> TASK
+
+    %% ── Entry ──
+    TASK(["User Task"]):::terminal
+
+    TASK --> P1
+
+    %% ── Phase 1 ──
+    subgraph PH1 [" "]
+        direction TB
+        P1{"<b>PHASE 1 -- QUICK SCREEN</b><br/><br/>Does this task require reading a<br/>skill guide for interpreting results<br/>or planning a query strategy?<br/><br/><i>Default answer: NO</i>"}:::decision
+    end
+
+    P1 -->|"YES"| P2
+    P1 -->|"NO"| SKIP
+
+    %% ── NO branch ──
+    SKIP["NO_SKILLS_NEEDED<br/><i>Skip directly to Phase 3</i>"]:::tool
+
+    %% ── Phase 2 ──
+    subgraph PH2 ["PHASE 2 -- EVALUATE"]
+        direction TB
+        P2["For each registered skill:"]:::agent
+
+        P2 --> S1
+        S1["Skill 1: <i>desc</i><br/>--> YES / NO + reason"]:::module
+        S1 --> S2
+        S2["Skill 2: <i>desc</i><br/>--> YES / NO + reason"]:::module
+        S2 --> SN
+        SN["...<br/>Skill N: <i>desc</i><br/>--> YES / NO + reason"]:::module
+
+        SN --> RULES
+        RULES["<b>Decision Rules</b><br/>1. Context match --> YES<br/>2. When in doubt --> NO"]:::decision
+    end
+
+    %% ── Load skills ──
+    RULES -->|"YES skills only"| LOAD
+    LOAD["<b>read_skill_file</b>(path)<br/>Load selected SKILL.md<br/>guides into context"]:::tool
+
+    %% ── Phase 3 ──
+    LOAD --> P3
+    SKIP --> P3
+
+    subgraph PH3 [" "]
+        direction TB
+        P3["<b>PHASE 3 -- IMPLEMENT</b><br/><br/>Execute the task.<br/>Reference activated skill guidance<br/>where applicable."]:::agent
+    end
+
+    %% ── Style Classes ──
+    classDef module fill:#ffffff,stroke:#c9d1d9,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+    classDef decision fill:#e3f2fd,stroke:#90caf9,stroke-width:1.5px,rx:12,ry:12,color:#1a1a1a
+    classDef agent fill:#f4f6f8,stroke:#9aa4b2,stroke-width:2px,rx:18,ry:18,color:#1f2933
+    classDef tool fill:#eceff1,stroke:#b0bec5,stroke-width:1.2px,rx:10,ry:10,color:#1a1a1a
+    classDef terminal fill:#263238,color:#ffffff,stroke:#263238,stroke-width:2px,rx:15,ry:15
+    classDef titleNode fill:#f5f7fa,stroke:#c9d1d9,stroke-width:2px,color:#1f2933
+
+    style PH1 fill:none,stroke:#90caf9,stroke-width:1.5px,stroke-dasharray:5 5
+    style PH2 fill:#f5f7fa,stroke:#9aa4b2,stroke-width:1.5px
+    style PH3 fill:none,stroke:#9aa4b2,stroke-width:1.5px,stroke-dasharray:5 5

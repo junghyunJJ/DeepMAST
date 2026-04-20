@@ -1,0 +1,765 @@
+{
+  "papers": [
+    {
+      "pmid": "36835413",
+      "title": "Crosstalk of Inflammatory Cytokines within the Breast Tumor Microenvironment",
+      "abstract": "Several immune and immunocompetent cells, including dendritic cells, macrophages, adipocytes, natural killer cells, T cells, and B cells, are significantly correlated with the complex discipline of oncology. Cytotoxic innate and adaptive immune cells can block tumor proliferation, and others can prevent the immune system from rejecting malignant cells and provide a favorable environment for tumor progression. These cells communicate with the microenvironment through cytokines, a chemical messenger, in an endocrine, paracrine, or autocrine manner. These cytokines play an important role in health and disease, particularly in host immune responses to infection and inflammation. They include chemokines, interleukins (ILs), adipokines, interferons, colony-stimulating factors (CSFs), and tumor necrosis factor (TNF), which are produced by a wide range of cells, including immune cells, such as macrophages, B-cells, T-cells, and mast cells, as well as endothelial cells, fibroblasts, a variety of stromal cells, and some cancer cells. Cytokines play a crucial role in cancer and cancer-related inflammation, with direct and indirect effects on tumor antagonistic or tumor promoting functions. They have been extensively researched as immunostimulatory mediators to promote the generation, migration and recruitment of immune cells that contribute to an effective antitumor immune response or pro-tumor microenvironment. Thus, in many cancers such as breast cancer, cytokines including leptin, IL",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "endothelial cells",
+          "macrophage",
+          "stromal cells",
+          "tumor microenvironment",
+          "immune infiltration"
+        ]
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "pathway"
+    },
+    {
+      "pmid": "38173057",
+      "title": "2023 Canadian Surgery Forum ... 01. Evaluation of physicians' practices and knowledge regarding the treatment of acute uncomplicated diverticulitis ... 03. What is the effect of rurality on outcomes for parathyroidectomy in a large North American jurisdiction? ... 05. Characteristics of opioid providers for patients undergoing same-day breast surgery in Ontario, Canada ... 06. Improving the management and outcomes of complex non-pedunculated colorectal polyps at a regional hospital in British Columbia ... 10. Actinomycosis presenting as an anterior abdominal mass after laparoscopic cholecystectomy ... 12. Prioritizing melanoma surgeries to prevent wait time delays and upstaging of melanoma during the COVID-19 pandemic ... 13. Trust me, I know them: assessing interpersonal bias in general surgery residency interviews ... 14. Current state of female and BIPOC representation in Canadian academic surgical societies ... 15. Harnessing a province-wide network of surgical excellence and diverse talents for the continuous improvement of surgical care in BC ... 16. Massive stone or is it glass: a curious case of porcelain gallbladder ... 17. Choosing your endoscopist: a retrospective single-centre cohort study ... 18. The local experience with endoscopic ampullectomy for noninvasive ampullary lesions at a single tertiary care centre ... 19. Defining appropriate intraoperative patient blood management strategies in noncardiac surgery: the Ottawa Intraoperative Transfusion Consensus ... 20. Postoperative gastrointestinal dysfunction after neuromuscular blockade reversal with sugammadex versus cholinesterase inhibitors in patients undergoing gastrointestinal surgery: a systematic review and meta-analysis ... 21. Factors influencing recurrence in medial breast cancer after skin-sparing mastectomy and immediate breast reconstruction ... 22. What is the role of fit in medical education? A scoping review ... 23. The obesity paradox revisited: Is obesity still a protective factor for patients with severe comorbidities or in high-risk operations? ... 24. Planetary health education for residents : an integrative approach through quality improvement ... 25. A rare case of concurrent primary malignancies: adrenal cortical carcinoma and metastatic colon cancer ... 26. Effect of video-based self-assessment on intraoperative skills: a pilot randomized controlled trial ... 28. A cost-utility study of elective hemorrhoidectomies in Canada ... 30. Opioid-free hernia repair using local anesthetic: an assessment of postoperative pain and recovery ... 31. Mitigating the environmental burden of surgical and isolation gowns ... 33. The evolution and contributions of the Canadian Journal of Surgery: a bibliometric study ... 34. Clinical and oncologic outcomes of patients with rectal cancer and past radiotherapy for prostate cancer: a case-control study ... 35. Antibiotic prophylaxis and mechanical bowel preparation in elective colorectal surgery: a survey of Quebec general surgeons ... 36. Identifying core deficiencies and needs in the surgical knot-tying curriculum: a single-centre qualitative analysis ... 37. Spleen-preserving surgery for symptomatic benign splenic cyst: video case report ... 38. Learning to manage power differentials and navigate uncertainty: a qualitative interview study about decision-making in surgery ... 39. Surgical education checklist: a novel tool to improve uptake of Competence By Design in a residency program and surgical resident experience ... 40. A comparative evaluation of management strategies and patient outcomes for acute appendicitis in the post-COVID era ... 41. External benchmarking of colorectal resection outcomes using ACS-NSQIP: accurately categorizing procedures at risk of morbidity ... 42. Role of thymectomy in surgical treatment of secondary and tertiary hyperparathyroidism ... 43. Starting position during colonoscopy: a systematic review and meta-analysis of randomized controlled trials ... 44. Enhanced Recovery After Surgery protocols following emergency intra-abdominal surgery reduces length of stay and postoperative morbidity: a systematic review and meta-analysis ... 45. Competencies, privileging and geography: preparing general surgery residents for rural practice in British Columbia ... 46. Holographic surgical skills training: Can we use holograms to teach hand ties and is it comparable to in-person learning? ... 47. The association between gender and confidence in UBC general surgery residents ... 48. Quality improvement in timeliness of EPA completion in general surgery residency ... 49. Gastrointestinal system surgical outcomes in the highly active antiretroviral therapy (HAART)-era HIV-positive patient: a scoping review ... 50. Joint rounds as a method to partner surgical residency programs and enhance global surgical training ... 52. Preoperative frailty and mortality in medicare beneficiaries undergoing major and minor surgical procedures ... 53. What's going on out there? Evaluating the scope of rural general surgery in British Columbia ... 54. Short-stay compared with long-stay admissions for loop ileostomy reversals: a systematic review and meta-analysis ... 55. General surgeons' right hemicolectomy costs proficiency and preferences ... 56. Staple line with bioabsorbable reinforcement for gastropexy in hiatal hernia repair ... 57. Impact of enhanced recovery pathways on patient-reported outcomes after abdominal surgery: a systematic review ... 58. Evaluation of outcomes between rural, northern/remote, and urban surgical patients diagnosed with moderate to severe acute pancreatitis: a retrospective study ... 59. Outcome of preoperative percutaneous drainage of intraabdominal abscess versus initial surgery in patients with Crohn disease ... 60. Preliminary analysis: dexamethasone-supplemented TAP blocks may reduce opioid requirements after colorectal surgery: a multi-centre randomized controlled trial ... 61. Preoperative skin preparation with chlorhexidine alcohol versus povidone-iodine alcohol for the prevention of surgical site infections: a systematic review and meta-analysis of randomized controlled trials ... 62. \"Why didn't you call me?\" Factors junior learners consider when deciding whether to call their supervisor ... 63. Cost savings associated with general surgical consultation within remote Indigenous communities in Quebec: a costing evaluation ... 64. Right lateral decubitis patient position during colonoscopy increases endoscopist's risk of musculoskeletal injury ... 65. Reducing re-visit to hospital rates among pediatric post-appendectomy patients: a quality-improvement project ... 66. Exploring gender diversity in surgical residency leadership across Canada ... 67. Operating room sustainability project: quantifying the surgical environmental footprint for a laparoscopic cholecystectomy in 2 major surgical centres ... 68. ERCP under general anesthesia compared with conscious sedation (EUGACCS) study ... 69. Complications requiring intervention following gastrostomy/gastrojejunostomy tube insertion: a retrospective analysis ... 70. Equity, diversity and inclusion (EDI) in underrepresented in medicine (URiM) residents: Where are we and what now? ... 71. Association between complications and death within 30 days after general surgery procedures: a Vascular Events in Noncardiac Surgery Patients Cohort Evaluation (VISION) substudy ... 72. What is the long-term impact of gastrograffin on adhesive small bowel obstruction? A systematic narrative review ... 73. TRASH-CAN: Trainee-Led Research and Sudit for Sustainability in Healthcare Canada ... 74. Representation and reporting of sociodemographic variables in BREAST-Q studies: a systematic review ... 75. A scoping review: should tap water instead of sterile water be used for endoscopy of the colon and rectum? ... 76. Laparoscopic revision of Nissen fundoplication with EndoFLIP intraoperative assistance: a video presentation ... 77. Environmental sustainability in the operating room: perspectives and practice patterns of general surgeons in Canada ... 78. The impact of COVID-19 on medical students applying to general surgery in the CaRMS matching process ... 79. Novel approach to laparoscopic gastrostomy tube placement ... 80. Using prucalopride for prevention of postoperative ileus in gastrointestinal surgery: a systematic review and meta-analysis of randomized controlled trials ... 81. Assessment of environmental and economic sustainability of perioperative patient warming strategies ... 83. Development of a Canadian colorectal robotic surgery program: the first three years ... 84. Patient safety and quality improvement lessons from review of Canadian thyroid and parathyroid surgery malpractice litigation case law ... 01. Changes in sarcopenia status predict survival among patients with resectable esophageal cancer ... 02. The feasibility of near-infrared fluorescence-guided robotic-assisted minimally invasive esophagectomy using indocyanine green dye ... 03. Does patient experience with robotic thoracic surgery influence their willingness to pay for it? ... 04. Artificial intelligence-augmented endobronchial ultrasound-elastography is a useful adjunct for lymph node staging for lung cancer ... 05. Preoperative mediastinal staging in early-stage lung cancer: targeted nodal sampling is not inferior to systematic nodal sampling ... 06. The application of an artificial intelligence algorithm to predict lymph node malignancy in non-small cell lung cancer ... 07. Pneumonectomy for non-small cell lung cancer: long-term overall survival from a 15-year experience ... 09. Primary spontaneous pneumothorax occurred in pectus excavatum patients ... 10. Optimizing management for early-stage esophageal adenocarcinoma: longitudinal results from a multidisciplinary program ... 11. Needle decompressions in post-traumatic tension pneumothorax: boon or bane ... 12. 10-year follow-up of endoscopic mucosal resection versus esophagectomy for esophageal intramucosal adenocarcinoma in the setting of Barrett esophagus: a Canadian experience ... 13. Outcomes after thoracic surgery for malignancy in patients with severe and persistent mental illness ... 15. Stage II/III esophageal cancer patients with complete clinical response after neoadjuvant chemoradiotherapy: a Markov decision analysis ... 16. Development of a surgical stabilization of rib fractures program at a Level I trauma centre in Qatar: initial report ... 17. Screening Criteria Evaluation for Expansion in Pulmonary Neoplasias (SCREEN) II ... 18. Multi-centre study evaluating the risks and benefits of intraoperative steroids during pneumonectomy ... 19. Prediction of esophageal cancer short-term survival using a pretreatment health-related quality of life measure ... 20. Evaluating the impact of virtual care in thoracic surgery: patients' perspective ... 21. Virtual thoracic surgical outpatient encounters are non-inferior to in-person visits for overall patient care satisfaction in the post-COVID-19 era ... 22. Concurrent minimally invasive esophagectomy and laparoscopic right hemicolectomy ... 23. Assessing the impact of robotic-assisted thoracic surgery on direct carbon dioxide emissions : a retrospective analysis of a prospective cohort ... 24. Young's modulus of human lung parenchyma and tumours ... 25. Thoracic surgery trauma: nail gun v. SVC ... 26. Thymomatous myasthenia gravis after total thymectomy at a tertiary care surgical centre: a 15-year retrospective review ... 27. Effectiveness of 18F-FDG-PET/CT in the stage diagnosis of non-small cell lung cancer (NSCLC): a diagnostic test accuracy systematic review and meta-analysis ... 01. Emergency colon resection in the geriatric population: the modified frailty score as a risk factor of early mortality ... 02. Laparoscopic ovarian transposition prior to pelvic radiation in young female patients with anorectal malignancies: a systematic review and meta-analysis of prevalence ... 03. Using preoperative C-reactive protein levels to predict anastomotic leaks and other complications after elective colorectal surgery: a systematic review and meta-analysis ... 04. Perioperative intravenous dexamethasone for patients undergoing colorectal surgery: a systematic review and meta-analysis ... 05. Population-based study comparing time from presentation to diagnosis and treatment between younger and older adults with colorectal cancer ... 06. The role of warmed-humidified CO2 insufflation in colorectal surgery: a meta-analysis ... 07. Total abdominal colectomy versus diverting loop ileostomy and antegrade colonic lavage for fulminant Clostridioides colitis: analysis of the national inpatient sample 2016-2019 ... 08. Cutting seton for the treatment of cryptoglandular fistula-inano: a systematic review and meta-analysis ... 09. Prognostic value of routine stain versus elastic trichrome stain in identifying venous invasion in colon cancer ... 10. Anastomotic leak rate following the implementation of a powered circular stapler in elective colorectal surgeries ... 11. Surgical technique and recurrence of Crohn disease following ileocolic resection ... 12. Implementation of synoptic reporting for endoscopic localization of complex colorectal neoplasms: Can we reduce rates of repeat preoperative colonoscopy? ... 13. Effects of diet and antibiotics on anastomotic healing: a mouse model study with varied dietary fibre and fat, and preoperative antibiotics ... 14. Assessment of rectal surgery-related physical pain and conditioning: a national survey of Canadian rectal surgeons ... 15. Does specimen extraction incision and transversus abdominis plane block affect opioid requirements after laparoscopic colectomy? ... 16. Colorectal and therapeutic GI working together: What is the role for TAMIS for benign lesions? ... 17. Impact of the COVID-19 pandemic on readmission rates following colorectal surgery ... 18. More than the sum of its parts: the benefits of multidisciplinary conferences extend beyond patient care ... 19. Multidisciplinary conference for rectal cancer : measuring patient care impact ... 20. Patient outcomes in emergency colorectal cancer resections: a 15-year cohort analysis ... 21. Enhanced Recovery after Surgery (ERAS) protocols in colorectal cancer resection: a 15-year analysis of patient outcomes ... 22. Laparoscopic to open conversion in colorectal cancer resection: a 15-year analysis of postoperative outcomes ... 23. Management of postoperative ileus in colorectal cancer resections: a 15-year evaluation of patient outcomes ... 24. Timing of ostomy reversal and associated outcomes: a systematic review ... 25. Fragility of statistically significant outcomes in colonic diverticular disease randomized trials ... 26. Postoperative day 1 and 2 C-reactive protein values for predicting postoperative morbidity following colorectal surgery ... 27. Bariatric surgery before colorectal surgery reduces postoperative morbidity and health care resource utilization: a propensity score matched analysis ... 28. Ileocolic Crohn disease: a video vignette of the Kono-S anastomosis ... 29. Association between patient activation and postoperative outcomes in rectal cancer survivors ... 30. Understanding surgeon and nurse perspectives on the use of patient-generated data in the management of low anterior resection syndrome ... 31. Characteristics of interval colorectal cancer: a Canadian retrospective population-level analysis from Newfoundland and Labrador ... 32. Current rectal cancer survivorship care: unmet patient needs and fragmented specialist and family physician care ... 33. Local excision for T1 rectal cancer: a population-based study of practice patterns and oncological outcomes ... 34. Can nonoperative management of acute complicated diverticulitis be successfully treated with a future hospital at home program? A retrospective cohort study ... 35. Does patient activation impact remote digital health follow-up and same-day discharge after elective colorectal surgery ... 36. Parastomal hernia prevention, assessment and management: best practice guidelines ... 37. Anastomotic leak rates in circular powered staplers versus manual circular staplers in left sided colorectal anastomoses: a systematic review ... 38. The Gips procedure for pilonidal disease: a video presentation ... 39. Local recurrence-free survival after transanal total mesorectal excision: a Canadian institutional experience ... 40. The impact of operative approach for obese colorectal cancer patients: analysis of the national inpatient sample (2015-2019) ... 41. Safety and feasibility of discharge within 24 hours of colectomy: a systematic review and meta-analysis ... 42. Laparoscopic lateral lymph node dissection for an advanced rectal cancer: a video abstract ... 43. \"Dear diary\": challenges in adopting routine operative recording in surgical training ... 44. Rectal cancer in the very young (age < 40) : more treatment, worse survival: a population-based study ... 45. Surveillance following treatment for stage I-III rectal cancer in Ontario : a population-based descriptive study ... 46. A 15-year institutional experience of trananal endoscopic microsurgery for local excision of benign and malignant rectal neoplasia ... 47. Robotic approach to reoperative pelvic surgery ... 48. A mucosa-adherent bacterium impairs colorectal anastomotic healing by upregulating interleukin-17: the role of low-grade inflammation as a driver of anastomotic leak ... 49. High uptake of total neoadjuvant therapy for rectal cancer in Canada despite surgeon concerns for possible overtreatment and treatment-related toxicity ... 50. Safety and feasibility of discharge within 24 hours of ileostomy reversal: a systematic review and meta-analysis ... 51. Safety and efficacy of intravenous antifibrinolytic use in colorectal surgery: systematic review and meta-analysis ... 52. Impact of ileal pouch anal anastomosis on fertility in female patients with uulcerative colitis: a systemic review ... 53. Modulation of the gut microbiota with fermentable fibres and 5-aminosalicylate to prevent peri-anastomotic and metastatic recurrence of colorectal cancer ... 54. Patients with locally advanced rectal cancer and a non-threatened circumferential resection margin may go straight to surgery and avoid radiation toxicities: the QuickSilver Trial ... 55. Colonoscopies during the COVID-19 pandemic recovery period: Are we caught up on colorectal cancer detection and prevention? A single-institution experience ... 56. Interim results of a phase II study evaluating the safety of nonoperative management for locally advanced low rectal cancer ... 57. Assessing a tailored curriculum for endoscopic simulation for general surgery residency programs in Canada ... 58. Modified Frailty Index for patients undergoing surgery for colorectal cancer: analysis of the National Inpatient Sample (2015-2019) ... 59. Reducing postoperative bloodwork in elective colorectal surgery: a quality-improvement initiative ... 60. A Nationwide Readmission Database (NRD) analysis assessing timing of readmission for complications following emergency colectomy: why limiting follow-up to postoperative day 30 underserves patients ... 61. The same but different: clinical and Enhanced Recovery After Surgery outcomes in right hemicolectomy for colon cancer versus ileocecal resection in Crohn disease ... 01. How reliable are postmastectomy breast reconstruction videos on YouTube? ... 02. Knowledge, perceptions, attitudes, and barriers to genetic literacy among surgeons: a scoping review ... 03. Exploring neutrophil-to-lymphocyte ratio as a predictor of postoperative breast cancer overall survival ... 04. High beta integrin expression is differentially associated with worsened pancreatic ductal adenocarcinoma outcomes ... 05. Epidemiology of undifferentiated carcinomas ... 06. An evidence-based approach to the incorporation of total neoadjuvant therapy into a standardized rectal cancer treatment algorithm ... 07. Pushing the boundaries: right retroperitoneoscopic adrenalectomy after laparoscopic right nephrectomy ... 08. The role of caspase-1 in triple negative breast cancer, the immune tumour microenvironment and response to anti-PD1 immunotherapy ... 09. Perioperative neutrophil-to-lymphocyte ratio is associated with survival in patients undergoing colorectal cancer surgery ... 10. Achievement of quality metrics in older adults undergoing elective colorectal cancer surgery ... 11. Opportunities to improve the environmental sustainability of breast cancer surgical care ... 12. Does margin status after biopsy matter in melanoma? A cohort study of micro- and macroscopic margin status and their impact on residual disease and survival ... 13. Demonstration of D2 Lymph node stations during laparoscopic total gastrectomy ... 14. Incidence of metastatic tumours to the ovary (Krukenberg) versus primary ovarian neoplasms associated with colorectal cancer surgery ... 15. Spatial biomarkers in cancer ... 16. How informed is the consent process for complex cancer resections? ... 17. Adjuvant radiation therapy among immigrant and Canadian-born/long-term resident women with breast cancer ... 18. Human peritoneal explant model reveals genomic alterations that facilitate peritoneal implantation of gastric cancer cells ... 19. Preoperative breast satisfaction association with major complications following oncologic breast surgery ... 20. Impact of geography on receipt of medical oncology consultation and neoadjuvant chemotherapy for triple negative and HER2 positive breast cancer ... 21. Comparison of radiation, surgery or both in women with breast cancer and 3 or more positive lymph nodes ... 22. Impact of synoptic operative reporting as a quality indicator for thyroid surgery: a Canadian national study ... 01. The Toronto management of initially unresectable liver metastases from colorectal cancer in a living donor liver transplant program ... 02. Dissection of a replaced right hepatic artery arising from the superior mesenteric artery during a laparoscopic Whipple ... 03. Implementing the HIBA index: a low-cost method for assessing future liver remnant function ... 04. Oncologic outcomes after surgical resection versus thermoablation in early-stage hepatocellular carcinoma: a systematic review of randomized controlled trials with meta-analysis ... 05. Robotic pancreatic necrosectomy and internal drainage for walled-off pancreatic necrosis ... 06. Predicting diabetes mellitus after partial pancreatectomy: PRIMACY, a pilot study ... 07. Bleed and save: patient blood management in hepatectomy ... 08. Defining standards for hepatopancreatobiliary cancer surgery in Ontario, Canada: a population-based cohort study of clinical outcomes ... 09. Laparoscopic choledochoduodenostomy for recurrent choledocholithiasis ... 10. A comparison of daytime versus evening versus overnight liver transplant from a single Canadian centre ... 11. Pilot study validating the line of safety as a landmark for safe laparoscopic cholecystectomy using indocyanine green and near-infrared imagine ... 12. Effect of transversus abdominis plane catheters on postoperative opioid consumption in patients undergoing open liver resections : a single-centre retrospective review ... 13. Comparing the RETREAT score to the Milan criteria for predicting 5-year survival in post-liver transplant hepatocellular carcinoma patients: a retrospective analysis ... 14. Characterizing the effect of a heat shock protein-90 inhibitor on porcine liver for transplantation using ex-vivo machine perfusion ... 15. Modulation by PCSK9 of the immune recognition of colorectal cancer liver metastasis ... 17. Implementation of a preoperative ketogenic diet for reduction of hepatic steatosis before hepatectomy ... 19. Trends in the incidence and management of hepatocellular carcinoma in Ontario ... 20. Canadian coaching program leads to successful transition from open to laparoscopic hepatopancreatobiliary surgery ... 21. The impact of a positive pancreatic margin analyzed according to LEEPP on the recurrence and survival of patients with pancreatic head adenocarcinoma ... 22. Armed oncolytic virus VSV-LIGHT/TNFSF14 promotes survival and results in complete pathological and radiological response in an immunocompetent model of advanced pancreatic cancer ... 23. Comparing the efficacy of cefazolin/metronidazole, piperacillin-tazobactam, or cefoxitin as surgical antibiotic prophylaxis in patients undergoing pancreaticoduodenectomy: a retrospective cohort study ... 01. Not just jumping on the bandwagon: a cost-conscious establishment of a robotic abdominal wall reconstruction program in a publicly funded health care system ... 02. Shouldice method brief educational video ... 03. Laparoscopic recurrent hiatal hernia repair with mesh gastropexy ... 04. Robotic transabdominal preperitoneal Grynfeltt lumbar hernia repair with mesh ... 01. Substance abuse screening prior to bariatric surgery: an MBSAQIP cohort study evaluating frequency and factors associated with screening ... 02. MBSAQIP risk calculator use in elective bariatric surgery is uncommon, yet associated with reduced odds of serious complications: a retrospective cohort analysis of 210 710 patients ... 03. Short-term outcomes of concomitant versus delayed revisional bariatric surgery after adjustable gastric band removal ... 04. Safety and outcomes of bariatric surgery in patients with inflammatory bowel disease: a systematic review and meta-analysis ... 08. Prescription drug usage as measure of comorbidity resolution after bariatric surgery : a population-based cohort study ... 09. Experiences and outcomes of Indigenous patients undergoing bariatric surgery: a mixed-methods scoping review ... 10. Bariatric surgery reduces major adverse kidney events in patients with chronic kidney disease: a multiple-linked database analysis in Ontario ... 11. Inter-rater reliability of indocyanine green fluorescence angiography for blood flow visualization in laparoscopic Roux-en-Y gastric bypass ... 12. Characterization of small bowel obstructions following elective bariatric surgery ... 13. Revision of bariatric surgery for gastroesophageal reflux disease: characterizing patient and procedural factors and 30-day outcomes for a retrospective cohort of 4412 patients ... 14. Duodenal-jejunal bypass liners are superior to optimal medical management in ameliorating metabolic dysfunction: a systematic review and meta-analysis ... 15. Characteristics and outcomes for patients undergoing revisional bariatric surgery due to persistent obesity: a retrospective cohort study of 10 589 patients ... 01. Collateral damage: the impact of the COVID-19 pandemic on the severity of abdominal emergency surgery at a regional hospital ... 02. Pseudoaneurysms after high-grade penetrating solid organ injury and the utility of delayed CT angiography ... 03. Pseudoaneurysm screening after pediatric high-grade solid organ injury ... 04. Witnessed prehospital traumatic arrest: predictors of survival to hospital discharge ... 05. A tension controlled, noninvasive device for reapproximation of the abdominal wall fascia in open abdomens ... 08. Delayed vs. early laparoscopic appendectomy (DELAY) for adult patients with acute appendicitis: a randomized controlled trial ... 09. Days at home after malignant bowel obstructions: a patient-centred analysis of treatment decisions ... 10. Polytrauma and polyshock: prevailing puzzle ... 11. National emergency laparotomy audit: a 9-year evaluation of postoperative mortality in emergency laparotomy ... 13. A comparison of stress response in high-fidelity and low-fidelity trauma simulation ... 14. ASA versus heparin in the treatment of blunt cerebrovascular injury : a systematic review and meta-analysis ... 15. Comparison of complication reporting in trauma systems: a review of Canadian trauma registries ... 16. Benefits of the addition of a nurse practitioner to a high-volume acute care surgery service: a quantitative survey of nurses, residents and surgery attendings ... 17. Examining current evidence for trauma recurrence preventions systems ... 18. Disparities in access to trauma care in Canada: a geospatial analysis of Census data ... 19. Fast-track pathway to accelerated cholecystectomy versus standard of care for acute cholecystitis: the FAST pilot trial ... 20. Using the modified Frailty Index to predict postoperative outcomes in patients undergoing surgery for adhesive small bowel obstruction: analysis of the National Inpatient Sample, 2015-2019 ... 21. Adequacy of thromboprophylaxis in trauma patients receiving conventional versus higher dosing regimens of low-molecular-weight heparin: a prospective cohort study ... 22. The hidden epidemiology of trauma in Nunavik: a comparison of trauma registries as a call to action ... 23. Mapping surgical services in rural British Columbia: an environmental scan",
+      "abstract": "Article: 38173057",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12",
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell interaction",
+          "tumor microenvironment",
+          "cell communication"
+        ]
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30042416",
+      "title": "Adam12 and lnc015192 act as ceRNAs in breast cancer by regulating miR-34a.",
+      "abstract": "Long non-coding RNAs (lncRNAs) are reported to play vital roles in the progress of multiple cancers. However, the functions of lncRNAs in breast cancer remain to be discovered. We performed microarrays to identify the differentially expressed mRNAs and lncRNAs in breast tissues with or without miR-34a knockout. To explore the functions of the differentially expressed mRNA and lncRNA in breast cancer, we conducted a series of experiments. We found that Adam12 and lnc015192 were significantly upregulated in miR-34a knockout breast tissues. Knockdown of Adam12 and lnc015192 inhibited breast cancer cell migration, invasion, and epithelial-mesenchymal transition (EMT). Further experiments revealed that lnc015192 regulated Adam12 expression by functioning as a competing endogenous RNA (ceRNA) for miR-34a. In summary, our study demonstrate that Adam12 and lnc015192 promote breast cancer metastasis partly by sponging miR-34a through the ceRNA mechanism.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28765266",
+      "title": "ADAM12 Is a Novel Regulator of Tumor Angiogenesis via STAT3 Signaling.",
+      "abstract": "ADAM12, (ADisintegrin and metalloproteinase domain-containing protein 12), is upregulated in epithelial cancers and contributes to increased tumor proliferation, metastasis, and endocrine resistance. However, its role in tumor angiogenesis is unknown. Here, we report that ADAM12 is upregulated in the vessels of aggressive breast tumors and exerts key regulatory functions. ADAM12 significantly increases bFGF-mediated angiogenesis in vivo and ADAM12 levels are upregulated in tumors that have undergone a switch to the angiogenic phenotype. Importantly, ADAM12-overexpressing breast tumors display a higher microvessel density (MVD). Our goal was to identify the mechanisms by which tumor-associated ADAM12 promotes angiogenesis. ADAM12 expression in breast tumor cells correlated with a significant upregulation of proangiogenic factors such as VEGF and MMP-9 and downregulation of antiangiogenic factors such as Thrombospondin-1 (THBS1/TSP1) and Tissue Inhibitor of Metalloproteinases-2 (TIMP-2). Co-culture with ADAM12-expressing tumor cells promoted endothelial cell (EC) recruitment and capillary tube formation. Conversely, downregulation of endogenous ADAM12 in breast cancer cell lines resulted in reduction of pro-angiogenic factors and EC recruitment. These ADAM12-mediated effects are driven by the activation of EGFR, STAT3 and Akt signaling. Blockade of EGFR/STAT3 or silencing of ADAM12 reversed the proangiogenic tumor phenotype, significantly downregulated pro-angiogenic mitogens a",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28468988",
+      "title": "ADAM12 induction by Twist1 promotes tumor invasion and metastasis via regulation of invadopodia and focal adhesions.",
+      "abstract": "The Twist1 transcription factor promotes tumor invasion and metastasis by inducing epithelial-mesenchymal transition (EMT) and invadopodia-mediated extracellular matrix (ECM) degradation. The critical transcription targets of Twist1 for mediating these events remain to be uncovered. Here, we report that Twist1 strongly induces expression of a disintegrin and metalloproteinase 12 (ADAM12). We observed that the expression levels of Twist1 mRNA and ADAM12 mRNA are tightly correlated in human breast tumors. Knocking down ADAM12 blocked cell invasion in a 3D mammary organoid culture. Suppression of ADAM12 also inhibited Twist1-induced tumor invasion and metastasis in human breast tumor xenografts, without affecting primary tumor formation. Mechanistically, knockdown of ADAM12 in breast cancer cells significantly reduced invadopodia formation and matrix degradation, and simultaneously increased overall cell adhesion to the ECM. Live-imaging analysis showed that knockdown of ADAM12 significantly inhibited focal adhesion turnover. Mechanistically, both the disintegrin and metalloproteinase domains of ADAM12 are required for its function at invadopodia, whereas the metalloproteinase domain is dispensable for its function at focal adhesions. Taken together, these data suggest that ADAM12 plays a crucial role in tumor invasion and metastasis by regulating both invadopodia and focal adhesions.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26722530",
+      "title": "ADAM12 expression predicts clinical outcome in estrogen receptor-positive breast cancer.",
+      "abstract": "OBJECTIVES: Our study was aimed to make sure whether ADAM12 could serve as a prognostic biomarker of estrogen receptor (ER) -positive breast cancer. METHODS: 127 patients with ER-positive breast cancer were included in the present study. The level of ADAM12 was assayed through real-time quantitative PCR (RT-qPCR). Levels of ADAM12 in tumor tissues and adjacent normal tissues were compared with paired t-test. The association of ADAM12 expression with clinical characteristics was analyzed via chi(2) test. Kaplan-Meier survival curve was used to evaluate the role of ADAM12 expression in overall survival (OS) of patients. Cox-regression analysis was performed to judge if ADAM12 could serve as a prognostic marker in breast cancer. RESULTS: The level of ADAM12 was upregulated in tumor tissues of breast cancer compared to that of adjacent normal tissues (P < 0.05). The expression of ADAM12 was closely related to the Ki-67 and HER2 status (P < 0.05 for both). The results of Kaplan-Meier survival curve showed that patients with higher level of ADAM12 exhibited shorter survival time compared to that of low level of ADAM12 (P < 0.001). Cox regression analysis showed that ADAM12 might be a biomarker in predicting prognosis of patients with ER-positive breast cancer (HR = 7.116, 95% CI = 3.329-15.212). CONCLUSION: ADAM12 appears to be a prognostic marker in ER-positive breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "24690292",
+      "title": "Urinary concentrations of ADAM 12 from breast cancer patients pre- and post-surgery vs. cancer-free controls: a clinical study for biomarker validation",
+      "abstract": "Background\n\nThe ADAMs (A Disintegrin and Metalloproteinases) are a family of multi-domain, zinc-dependent metalloproteinase enzymes. ADAM 12 has been previously associated with the onset and progression of breast cancer, and elevated levels of ADAM 12 have been previously found in the urine of breast cancer patients. Aims of the current study are: 1) establish the viability of urinary ADAM 12 as a diagnostic marker for breast cancer, and 2) explore the effects of surgical tumor removal on the levels of urinary ADAM 12.\n\nMethods\n\nA total of 96 patients have been recruited for this study, including 50 patients diagnosed with cancer, and 46 age-matched controls. Commercially available ELISA kits for ADAM 12 were used to quantify the presence and concentration of this enzyme in the urine from cancer patients with ductal carcinoma in situ (DCIS) and invasive breast cancer (IBC) both prior to any treatment and approximately two weeks following surgery, as well as from controls.\n\nResults\n\nWe find no statistically significant differences between the concentrations of ADAM 12 in the urine of breast cancer patients prior to treatment and that of their age-matched controls; however the concentration of ADAM 12, both alone and as a function of urine total protein, are significantly elevated following surgery (p < 0.0001). Patients who underwent a mastectomy have significantly higher urinary ADAM 12 concentrations than those who underwent a lumpectomy (significant at p = 0.0271).\n\nConclus",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21387162",
+      "title": "ADAM12 induces estrogen-independence in breast cancer cells.",
+      "abstract": "Antiestrogen therapy has been used successfully to prolong disease-free and overall survival of ER positive breast cancer patients. However, 50% of patients with ER+ tumors fail to respond to such therapy or eventually acquire resistance to endocrine therapy, resulting in tumor progression and mortality. It is imperative, therefore, to understand the mechanisms that lead to hormone refractory breast cancer in order to develop therapeutics that can modulate the resistance to antiestrogen therapy. The protease, ADAM12, can be detected in the urine of breast cancer patients and its levels correlate with disease status, stage, and cancer risk. Within the context of this study, the authors have investigated the role of the two distinct isoforms of ADAM12 in breast tumor cell proliferation and as potential mediators of endocrine resistance. Using stable clones of ADAM12-overexpressing MCF-7 cells, the authors analyzed proliferation rates of these ER+ breast tumor cells both in estrogen-depleted medium and in the presence of the antiestrogens, tamoxifen, and ICI 182,780. Acquired estrogen resistance in these cells was analyzed using phospho-RTK analysis. Upregulation and phosphorylation of proteins were detected via immunoprecipitation and immunoblotting. EGFR and MAPK inhibitors were used to explore the mechanism of acquired estrogen resistance in breast tumor cells. It was observed that overexpression of the two isoforms, transmembrane ADAM12-L, and secreted ADAM12-S, in breast tu",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21875931",
+      "title": "ADAM12 produced by tumor cells rather than stromal cells accelerates breast tumor progression.",
+      "abstract": "Expression of ADAM12 is low in most normal tissues but is markedly increased in numerous human cancers, including breast carcinomas. We have previously shown that overexpression of ADAM12 accelerates tumor progression in a mouse model of breast cancer (PyMT). In this study, we found that ADAM12 deficiency reduces breast tumor progression in the PyMT model. However, the catalytic activity of ADAM12 seems to be dispensable for its tumor-promoting effect. Interestingly, we show that ADAM12 endogenously expressed in tumor-associated stroma in the PyMT model does not influence tumor progression, but that ADAM12 expression by tumor cells is necessary for tumor progression in these mice. This finding is consistent with our observation that in human breast carcinoma, ADAM12 is almost exclusively located in tumor cells and, only rarely, seen in the tumor-associated stroma. We hypothesized, however, that the tumor-associated stroma may stimulate ADAM12 expression in tumor cells, on the basis of the fact that TGF-beta1 stimulates ADAM12 expression and is a well-known growth factor released from tumor-associated stroma. TGF-beta1 stimulation of ADAM12-negative Lewis lung tumor cells induced ADAM12 synthesis, and growth of these cells in vivo induced more than 200-fold increase in ADAM12 expression. Our observation that ADAM12 expression is significantly higher in the terminal duct lobular units (TDLU) adjacent to human breast carcinoma compared with TDLUs found in normal breast tissue su",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21493715",
+      "title": "ADAM12 transmembrane and secreted isoforms promote breast tumor growth: a distinct role for ADAM12-S protein in tumor metastasis.",
+      "abstract": "Increased levels of ADAM12 have been reported in a variety of human cancers. We have previously reported that urinary ADAM12 is predictive of disease status in breast cancer patients and that ADAM12 protein levels in urine increase with progression of disease. On the basis of these findings, the goal of this study was to elucidate the contribution of ADAM12 in breast tumor growth and progression. Overexpression of both the ADAM12-L (transmembrane) and ADAM12-S (secreted) isoforms in human breast tumor cells resulted in a significantly higher rate of tumor take and increased tumor size. Cells expressing the enzymatically inactive form of the secreted isoform, ADAM12-S, had tumor take rates and tumor volumes similar to those of wild-type cells, suggesting that the tumor-promoting activity of ADAM12-S was a function of its proteolytic activity. Of the two isoforms, only the secreted isoform, ADAM12-S, enhanced the ability of tumor cells to migrate and invade in vitro and resulted in a higher incidence of local and distant metastasis in vivo. This stimulatory effect of ADAM12-S on migration and invasion was dependent on its catalytic activity. Expression of both ADAM12 isoforms was found to be significantly elevated in human malignant breast tissue. Taken together, our results suggest that ADAM12 overexpression results in increased tumor take, tumor size, and metastasis in vivo. These findings suggest that ADAM12 may represent a potential therapeutic target in breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21103624",
+      "title": "Molecular profiling of ADAM12 gene in breast cancers.",
+      "abstract": "ADAMs (a disintegrin and metalloproteinase) family have been associated with the process of proteolytic \"shedding\" of membrane-associated proteins ectodomain and hence the rapid modulation of key cell signaling pathways in tissues microenvironment. A variety of cytokines, chemokines and growth factors which are initially produced as transmembrane proforms are activated by these sheddase activities. ADAM12 is highly expressed in rapidly growing tissues such as placenta and malignant tumors and it was found as one of the Candidate Cancer Genes in a comprehensive mutational analysis of human breast cancers. Our aim was to determine the gene expression profile of ADAM12 in breast cancers in comparison with normal breast and to correlate their level of expression with the clinical and pathological characteristics of breast cancers. Gene expression of ADAM12 spliced variants (12L and 12S) was evaluated using quantitative reverse-transcription PCR in samples obtained by laser capture microdissection from 38 patients with breast cancers and compared with adjacent healthy breast tissues. Both ADAM12L and 12S expression were significantly up-regulated in breast cancers, while in the normal breast, we found a very low expression. ADAM12L expression was significantly correlated with the histopathological types and, although not statistically significant, ADAM12 both variants were up-regulated in high-grade, highly-proliferative and HER2/neu positive tumors. From these preliminary results",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "15930294",
+      "title": "A role for ADAM12 in breast tumor progression and stromal cell apoptosis.",
+      "abstract": "As in developmental and regenerative processes, cell survival is of fundamental importance in cancer. Thus, a tremendous effort has been devoted to dissecting the molecular mechanisms involved in understanding the resistance of tumor cells to programmed cell death. Recently, the importance of stromal fibroblasts in tumor initiation and progression has been elucidated. Here, we show that stromal cell apoptosis occurs in human breast carcinoma but is only rarely seen in nonmalignant breast lesions. Furthermore, we show that ADAM12, a disintegrin and metalloprotease up-regulated in human breast cancer, accelerates tumor progression in a mouse breast cancer model. ADAM12 does not influence tumor cell proliferation but rather confers both decreased tumor cell apoptosis and increased stromal cell apoptosis. This dual role of ADAM12 in governing cell survival is underscored by the finding that ADAM12 increases the apoptotic sensitivity of nonneoplastic cells in vitro while rendering tumor cells more resistant to apoptosis. Together, these results show that the ability of ADAM12 to influence apoptosis may contribute to tumor progression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39343856",
+      "title": "Integrin beta1 in breast cancer: mechanisms of progression and therapy.",
+      "abstract": "The therapy for breast cancer (BC), to date, still needs improvement. Apart from traditional therapy methods, biological therapy being explored opens up a novel avenue for BC patients. Integrin beta1 (ITGbeta1), one of the largest subgroups in integrin family, is a key player in cancer evolution and therapy. Recent researches progress in the relationship of ITGbeta1 level and BC, finding that ITGbeta1 expression evidently concerns BC progression. In this chapter, we outline diverse ITGbeta1-based mechanisms regarding to the promoted effect of ITGbeta1 on BC cell structure rearrangement and malignant phenotype behaviors, the unfavorable patient prognosis conferred by ITGbeta1, BC therapy tolerance induced by ITGbeta1, and lastly novel inhibitors targeting ITGbeta1 for BC therapy. As an effective biomarker, ITGbeta1 undoubtedly emerges one of targeted-therapy opportunities of BC patients in future. It is a necessity focusing on scientific and large-scale clinical trials on the validation of targeted-ITGbeta1 drugs for BC patients.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37044238",
+      "title": "A novel computational predictive biological approach distinguishes Integrin beta1 as a salient biomarker for breast cancer chemoresistance.",
+      "abstract": "Chemoresistance is a primary cause of breast cancer treatment failure, and protein-protein interactions significantly contribute to chemoresistance during different stages of breast cancer progression. In pursuit of novel biomarkers and relevant protein-protein interactions occurring during the emergence of breast cancer chemoresistance, we used a computational predictive biological (CPB) approach. CPB identified associations of adhesion molecules with proteins connected with different breast cancer proteins associated with chemoresistance. This approach identified an association of Integrin beta1 (ITGB1) with chemoresistance and breast cancer stem cell markers. ITGB1 activated the Focal Adhesion Kinase (FAK) pathway promoting invasion, migration, and chemoresistance in breast cancer by upregulating Erk phosphorylation. FAK also activated Wnt/Sox2 signaling, which enhanced self-renewal in breast cancer. Activation of the FAK pathway by ITGB1 represents a novel mechanism linked to breast cancer chemoresistance, which may lead to novel therapies capable of blocking breast cancer progression by intervening in ITGB1-regulated signaling pathways.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30719702",
+      "title": "beta1 Integrin is essential for fascin-mediated breast cancer stem cell function and disease progression",
+      "abstract": "Breast cancer remains the second cause of tumor-related mortality in women worldwide mainly due to chemoresistance and metastasis. The chemoresistance and metastasis are attributed to a rare subpopulation with enriched stem-like characteristics, thus called Cancer Stem Cells (CSCs). We have previously reported aberrant expression of the actin-bundling protein (fascin) in breast cancer cells, which enhances their chemoresistance, metastasis and enriches CSC population. The intracellular mechanisms that link fascin with its downstream effectors are not fully elucidated. Here, loss and gain of function approaches in two different breast cancer models were used to understand how fascin promotes disease progression. Importantly, findings were aligned with expression data from actual breast cancer patients. Expression profiling of a large breast cancer dataset (TCGA, 530 patients) showed statistically significant correlation between fascin expression and a key adherence molecule, beta1 integrin (ITGB1). In vitro manipulation of fascin expression in breast cancer cells exhibited its direct effect on ITGB1 expression. Fascin-mediated regulation of ITGB1 was critical for several breast cancer cell functions including adhesion to different extracellular matrix, self-renewability and chemoresistance. Importantly, there was a significant relationship between fascin and ITGB1 co-expression and short disease-free as well as overall survival in chemo-treated breast cancer patients. This nov",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28829502",
+      "title": "Expression of long non-coding RNA linc-ITGB1 in breast cancer and its influence on prognosis and survival.",
+      "abstract": "OBJECTIVE: Long noncoding RNA linc-ITGB1 (linc-ITGB1) was reported to serve as a tumor promoter in breast cancer (BC). However, the clinical significance of linc-ITGB1 has not been reported. The present study aimed to determine the relationship between linc-ITGB1 expression and clinicopathological features and survival. PATIENTS AND METHODS: qRT-PCR was used to quantify the expression levels of linc-ITGB1 in BC and adjacent non-cancerous breast tissues. The X2 test was performed to determine the associations between linc-ITGB expression and the clinicopathological characters. The overall survival time (OS) and disease-free survival (DFS) were collected by follow-up and analyzed by Kaplan-Meier analysis. Multivariate Cox regression analysis was used to identify the independent risk factors for BC. RESULTS: The results showed that linc-ITGB1 levels were lower in tumor tissues of BC patients in comparison to adjacent non-cancerous breast tissues (p < 0.001). Linc-ITGB1 expression was significantly associated with lymph node metastasis, pathological differentiation and TNM stage (all p < 0.05). Furthermore, Kaplan-Meier analysis demonstrated that high-linc-ITGB1 expression level was associated with poorer OS (p = 0.006) and DFS (p = 0.003). Cox proportional hazards risk analysis demonstrated that linc-ITGB1 was an independent predictor for both OS (p = 0.004) and DFS (p = 0.002) in BC. CONCLUSIONS: These results indicated, for the first time, that linc-ITGB1 be a potential biomar",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28160423",
+      "title": "Polymeric Delivery of siRNA against Integrin-beta1 (CD29) to Reduce Attachment and Migration of Breast Cancer Cells.",
+      "abstract": "Cell surface integrins, which play important roles in the survival, proliferation, migration, and invasion of cancer cells, are a viable target for treatment of metastatic breast cancer. This line of therapy still remains challenging due to the lack of proper identification and validation of effective targets as well as the lack of suitable therapeutic agents for treatment. The focus is on one such molecular target for this purpose, namely integrin-beta1, and effective lowering of integrin-beta1 levels on a breast cancer model (MDA-MB-231 cells) is achieved by delivering a dicer-substrate short interfering RNA (siRNA) targeting integrin-beta1 with lipid-modified low molecular weight polyethylenimine polymers. Reduction of integrin-beta1 levels leads to reduced adhesion of MDA-MB-231 cells to extracellular matrix component fibronectin as well as to human bone marrow cells. A reduced migration of the breast cancer cells is also observed after integrin-beta1 silencing in \"scratch\" and \"transwell\" migration assays. These results highlight the importance of integrin-beta1 for the migration of metastatic breast cancer cells by effectively silencing this target with a practical dose of siRNA.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25426561",
+      "title": "New mechanistic insights of integrin beta1 in breast cancer bone colonization",
+      "abstract": "Bone metastasis is a frequent and life-threatening complication of breast cancer. The molecular mechanisms supporting the establishment of breast cancer cells in the skeleton are still not fully understood, which may be attributed to the lack of suitable models that interrogate interactions between human breast cancer cells and the bone microenvironment. Although it is well-known that integrins mediate adhesion of malignant cells to bone extracellular matrix, their role during bone colonization remains unclear. Here, the role of beta1 integrins in bone colonization was investigated using tissue-engineered humanized in vitro and in vivo bone models. In vitro, bone-metastatic breast cancer cells with suppressed integrin beta1 expression showed reduced attachment, spreading, and migration within human bone matrix compared to control cells. Cell proliferation in vitro was not affected by beta1 integrin knockdown, yet tumor growth in vivo within humanized bone microenvironments was significantly inhibited upon beta1 integrin suppression, as revealed by quantitative in/ex vivo fluorescence imaging and histological analysis. Tumor cells invaded bone marrow spaces in the humanized bone and formed osteolytic lesions; osteoclastic bone resorption was, however, not reduced by beta1 integrin knockdown. Taken together, we demonstrate that beta1 integrins have a pivotal role in bone colonization using unique tissue-engineered humanized bone models.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21400218",
+      "title": "Expression of Toll-like receptor 4 and beta 1 integrin in breast cancer.",
+      "abstract": "Toll-like receptor (TLR) 4 signaling pathway has been shown to support tumor cell growth in vitro and in vivo. Its stimulation on breast cancer cell lines induces beta1 integrin and promotes tumor invasiveness. However, its role in predicting clinical behavior of tumor is not yet clarified. Therefore, we investigated TLR4 and beta1 integrin expression on 133 primary breast cancer samples by immunohistochemistry and correlated it with overall survival and disease-free survival of patients as well as with clinicopathological characteristics of the tumor. We found higher beta1 integrin expression in invasive lobular cancer in comparison with other tumor types. No significant association of TLR4 and beta1 integrin expression with overall survival or disease-free survival was seen. Therefore, we conclude that expression of these markers is of biological interest but appears to be of little additional use as predictive clinical marker.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "17234776",
+      "title": "Increased beta1 integrin is associated with decreased survival in invasive breast cancer.",
+      "abstract": "Aberrant microenvironments and loss of balance in cell-extracellular matrix signaling are associated with breast cancer invasion, metastasis, and resistance to therapy. We have recently shown that increased beta1 integrin signaling is involved in malignant progression and that inhibitory antibody to beta1 integrin leads to selective apoptosis and decreased proliferation in three-dimensional cultures and in xenograft models of breast cancer in vivo. To investigate the clinical importance of these findings, in the present study we examined the expression of beta1 integrin and extracellular beta1 integrin ligands fibronectin and laminin-1 in a cohort of 249 breast cancer patients who had a median follow-up of 8.4 years. Among the 149 scorable cases, the highest beta1 integrin intensity score (3+ versus 0-2+) was associated with significantly decreased 10-year overall survival of 48% versus 71% (P<0.03) and decreased disease-free survival of 50% versus 80% (P<0.05). Importantly, high fibronectin expression was associated with decreased overall and disease-free survival on univariate analysis (P<0.04) and beta1 integrin intensity score was significantly correlated with fibronectin expression (Kendall's tau-b=0.19; P=0.03). In a multivariate Cox proportional hazards model, beta1 integrin intensity score remained a significant independent predictor of overall survival [hazard ratio (HR), 1.69; 95% confidence interval (95% CI), 1.19-2.38; P<0.003] and disease-free survival (HR, 1.87;",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "11526484",
+      "title": "Integrin signaling inhibits paclitaxel-induced apoptosis in breast cancer cells.",
+      "abstract": "Inherent or acquired drug resistance is one of the major problems in chemotherapy. The mechanisms by which cancer cells survive and escape the cytotoxic effects of chemotherapeutic agents are essentially unknown. In the present study, we demonstrate that in the MDA-MB-231 and MDA-MB-435 breast cancer cells, ligation of beta1 integrins by their extracellular matrix ligands inhibits significantly apoptosis induced by paclitaxel and vincristine, two microtubule-directed chemotherapeutic agents that are widely used in the therapy of breast cancer. We show that beta1 integrin signaling inhibits drug-induced apoptosis by inhibiting the release of cytochrome c from the mitochondria in response to drug treatment. Further, integrin-mediated protection from drug-induced apoptosis and inhibition of cytochrome c release are dependent on the activation of the PI 3-kinase/Akt pathway. Our results identify beta1 integrin signaling as an important survival pathway in drug-induced apoptosis in breast cancer cells and suggest that activation of this pathway may contribute to the generation of drug resistance.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "11408736",
+      "title": "Potential role of beta 1 integrin and collagen biosynthesis in estrogen-dependent reduction of apoptosis in tamoxifen-treated breast cancer cells.",
+      "abstract": "It was found that 10 microM tamoxifen induced apoptosis and a significant (approximately 50%) depletion of beta 1 integrin levels in human breast cancer cells. Estradiol-treated MCF-7 cells exhibited exceptional viability and adherence, high levels of beta 1 integrin and increased (by 100%) collagen biosynthesis. Pretreatment of MCF-7 cells with 1 nM estradiol prevented tamoxifen-induced cell death, loss of cell adherence and decrease in beta 1 integrin level. Tamoxifen and estradiol had an opposite effect on the beta 1 integrin level and adherence in breast cancer cells, suggesting that the decrease in the beta 1 integrin level may be an early event during tamoxifen-induced apoptosis in breast cancer cells.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38317965",
+      "title": "New insight into the role of the ADAM protease family in breast carcinoma progression",
+      "abstract": "Protease and adhesion molecules play a very emphasized role in the occurrence or progression of metastasis in many types of cancers. In this context, a molecule that contains both protease and adhesion functions play a crucial role in metastasis. ADAMs (a disintegrin and metalloprotease) are molecules with this special characteristic. Recently, a lot of attention has been attracted to various ADAM molecules and researchers have tried to elucidate the role of ADAMs in breast cancer occurrence and progression. Disrupting ADAMs protease and adhesion capabilities can lead to the discovery of worthy therapeutic targets in breast cancer treatment. In this review, we intend to discuss the mechanism of action of various ADAM molecules, their relation to pathogenic processes of breast cancer, and their potential as possible targets for breast cancer treatment.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "extracellular matrix remodeling",
+          "protease",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "29765546",
+      "title": "Proteomic screening identifies the zonula occludens protein ZO-1 as a new partner for ADAM12 in invadopodia-like structures",
+      "abstract": "The epithelial mesenchymal transition (EMT) is a key process for cancer cell invasion and migration. This complex program whereby epithelial tumor cells loose polarity and acquire mesenchymal phenotype is driven by the regulation of cell-cell adhesion and cell-substrate interactions. We recently described the association of ADAM12 with EMT and we now use immunoprecipitation and proteomic approaches to identify interacting partners for ADAM12 during EMT. We identify twenty proteins that are involved in molecular mechanisms associated with adhesion/invasion processes. Integrative network analyses point out the zonula occludens protein ZO-1, as a new potential partner for ADAM12. In silico screening demonstrates that ZO-1 and ADAM12 are coexpressed in breast cancer cell lines sharing EMT signature. We validate the interaction between ZO-1 and ADAM12 in invasive breast cancer cell lines and show that ZO-1 and ADAM12 co-localize in actin- and cortactin-rich structures. Silencing either ADAM12 or ZO-1 inhibits gelatin degradation demonstrating that both proteins are required for matrix degradation. We further show that matrix metalloprotease 14, known to mediate degradation of collagen in invadopodia-like structures interacts with ZO-1. Depletion of PKCepsilon that regulates the recruitment of ADAM12 and ZO-1 to cell membranes induces a decrease in ADAM12 and ZO-1 at invadopodia-like structures and degradation activity. Together our data provide evidence for a new interaction betwe",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "extracellular matrix remodeling",
+          "protease",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "24375628",
+      "title": "ADAM8 expression in invasive breast cancer promotes tumor dissemination and metastasis",
+      "abstract": "The transmembrane metalloprotease-disintegrin ADAM8 mediates cell adhesion and shedding of ligands, receptors and extracellular matrix components. Here, we report that ADAM8 is abundantly expressed in breast tumors and derived metastases compared to normal tissue, especially in triple-negative breast cancers (TNBCs). Furthermore, high ADAM8 levels predicted poor patient outcome. Consistently, ADAM8 promoted an aggressive phenotype of TNBC cells in culture. In a mouse orthotopic model, tumors derived from TNBC cells with ADAM8 knockdown failed to grow beyond a palpable size and displayed poor vascularization. Circulating tumor cells and brain metastases were also significantly reduced. Mechanistically, ADAM8 stimulated both angiogenesis through release of VEGF-A and transendothelial cell migration via beta1-integrin activation. In vivo, treatment with an anti-ADAM8 antibody from the time of cell inoculation reduced primary tumor burden and metastases. Furthermore, antibody treatment of established tumors profoundly decreased metastases in a resection model. As a non-essential protein under physiological conditions, ADAM8 represents a promising novel target for treatment of TNBCs, which currently lack targeted therapies and frequently progress with fatal dissemination.\n\nSubject Category Cancer",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "extracellular matrix remodeling",
+          "protease",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "18394187",
+      "title": "Inflammation and breast cancer. Metalloproteinases as common effectors of inflammation and extracellular matrix breakdown in breast cancer",
+      "abstract": "Two rapidly evolving fields are converging to impact breast cancer: one has identified novel substrates of metalloproteinases that alter immune cell function, and the other has revealed a role for inflammation in human cancers. Evidence now shows that the mechanisms underlying these two fields interact in the context of breast cancer, providing new opportunities to understand this disease and uncover novel therapeutic strategies. The metalloproteinase class of enzymes is well studied in mammary gland development and physiology, but mostly in the context of extracellular matrix modification. Aberrant metalloproteinase expression has also been implicated in breast cancer progression, where these genes act as tumor modifiers. Here, we review how the metalloproteinase axis impacts mammary physiology and tumorigenesis and is associated with inflammatory cell influx in human breast cancer, and evaluate its potential as a regulator of inflammation in the mammary gland.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "extracellular matrix remodeling",
+          "protease",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39235446",
+      "title": "Serum cytokine profiles in children with IgA vasculitis with nephritis",
+      "abstract": "This study aimed to discover novel serum biomarkers for IgA vasculitis with nephritis (IgAVN). The serum of IgA vasculitis (IgAV) patients without nephritis and IgAVN patients not treated with glucocorticoids was analyzed for 440 proteins using a novel quantitative planar protein microarray. To verify the biomarkers, semiquantitative immunofluorescence analysis was performed on selected differential cytokines in a separate cohort of kidney tissue samples. A total of 41 proteins were differentially expressed between the IgAVN and IgAV groups out of the 440 proteins analyzed. Five differentially abundant proteins, including VEGF R3, ADAM12, TIM-3, IL-12p40, and CEACAM-5, were further validated by semiquantitative immunofluorescence analysis in kidney tissue from independent cohorts. ADAM12, TIM-3, IL-12p40, and CEACAM-5 were expressed in kidney tissue. A linear relationship was observed between the pathological grade of IgAVN and the expression levels of ADAM12 and CEACAM-5. Furthermore, while the prognosis of children with IgAVN may have a linear relationship with CEACAM-5, the results did not indicate a significant statistical difference, which may be related to the sample size. The expression of ADAM12 and CEACAM-5 were positively correlated with the pathological grade. More importantly, we found that CEACAM-5 may be related to the prognosis of IgAVN, which could serve as a significant biomarker for assessing disease severity and monitoring disease progression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "extracellular matrix remodeling",
+          "protease",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32386517",
+      "title": "Role of hypoxia-related proteins in adenoid cystic carcinoma invasion",
+      "abstract": "Background\n\nAmong cancers affecting the oral cavity, adenoid cystic carcinoma (ACC) is a relatively common malignant neoplasm. It has high rates of metastasis and recurrence and is associated with significant morbidity. During the progression of ACC, the oxygen concentration is reduced in specific areas of the tumour microenvironment, leading to intratumoural hypoxia. The expression of NOTCH1, a disintegrin and metalloproteinase 12 (ADAM-12), hypoxia-inducible factor 1 alpha (HIF-1alpha), and heparin-binding epidermal growth factor (HB-EGF) under hypoxic conditions has been implicated in invadopodia formation, tumour invasiveness, and metastasis. The aim of this study was to analyse the expression of these proteins to elucidate the mechanisms underlying ACC invasiveness.\n\nMethods\n\nFifteen ACC samples and 10 normal-looking salivary gland (SG) samples were used to investigate the expression of these proteins by immunohistochemistry. Primary antibodies against NOTCH1, ADAM-12, HIF-1alpha, and HB-EGF were used.\n\nResults\n\nThe immunoexpression of all proteins was higher in ACC samples than in SG samples (p < 0.05).\n\nConclusions\n\nThere was increased expression of proteins associated with hypoxia and tumour invasiveness in ACC samples, which indicates a possible role of these proteins in the biological behaviour of this tumour.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "extracellular matrix remodeling",
+          "protease",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25367033",
+      "title": "Pericellular proteolysis in cancer",
+      "abstract": "Pericellular proteases have long been associated with cancer invasion and metastasis due to their ability to degrade extracellular matrix components, but they can also modulate tumor progression and metastasis through highly regulated and complex processes. In this review, Sevenich and Joyce dissect the multitude of mechanisms by which pericellular proteases contribute to cancer progression and discuss how this knowledge can be integrated into therapeutic opportunities.\n\nPericellular proteases have long been associated with cancer invasion and metastasis due to their ability to degrade extracellular matrix components. Recent studies demonstrate that proteases also modulate tumor progression and metastasis through highly regulated and complex processes involving cleavage, processing, or shedding of cell adhesion molecules, growth factors, cytokines, and kinases. In this review, we address how cancer cells, together with their surrounding microenvironment, regulate pericellular proteolysis. We dissect the multitude of mechanisms by which pericellular proteases contribute to cancer progression and discuss how this knowledge can be integrated into therapeutic opportunities.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "extracellular matrix remodeling",
+          "protease",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23589494",
+      "title": "Notch increases the shedding of HB-EGF by ADAM12 to potentiate invadopodia formation in hypoxia",
+      "abstract": "Hypoxia increases the levels of ADAM12 in a Notch-dependent manner, leading to increased ectodomain shedding of HB-EGF and subsequent promotion of invadopodia formation.\n\nNotch regulates cell-cell contact-dependent signaling and is activated by hypoxia, a microenvironmental condition that promotes cellular invasion during both normal physiology and disease. The mechanisms by which hypoxia and Notch regulate cellular invasion are not fully elucidated. In this paper, we show that, in cancer cells, hypoxia increased the levels and activity of the ADAM12 metalloprotease in a Notch signaling-dependent manner, leading to increased ectodomain shedding of the epidermal growth factor (EGF) receptor (EGFR) ligand heparin-binding EGF-like growth factor. Released HB-EGF induced the formation of invadopodia, cellular structures that aid cancer cell invasion. Thus, we describe a signaling pathway that couples cell contact-dependent signaling with the paracrine activation of the EGFR, indicating cross talk between the Notch and EGFR pathways in promoting cancer cell invasion. This signaling pathway might regulate the coordinated acquisition of invasiveness by neighboring cells and mediate the communication between normoxic and hypoxic areas of tumors to facilitate cancer cell invasion.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "extracellular matrix remodeling",
+          "protease",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "ADAM12"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ITGB1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ADAM12"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "metalloprotease",
+        "extracellular matrix remodeling",
+        "protease",
+        "tumor progression"
+      ]
+    },
+    {
+      "genes": [
+        "ITGB1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "integrin receptor",
+        "cell adhesion",
+        "extracellular matrix",
+        "cell migration"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "androgen signaling",
+        "androgen receptor pathway",
+        "hormone signaling",
+        "tumor microenvironment"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "MAPK pathway",
+        "ERK signaling",
+        "tumor progression",
+        "cell proliferation"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "endothelial cells",
+        "macrophage",
+        "stromal cells",
+        "tumor microenvironment",
+        "immune infiltration"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "perivascular-like cells",
+        "stromal cells",
+        "T cell hybrid",
+        "tumor microenvironment",
+        "spatial transcriptomics"
+      ]
+    },
+    {
+      "genes": [
+        "ADAM12",
+        "ITGB1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "spatial transcriptomics",
+        "cell-cell interaction",
+        "tumor microenvironment",
+        "cell communication"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "ADAM12",
+      "ITGB1"
+    ],
+    "genes_matched_by": {
+      "ADAM12": "biomcp_tag_only",
+      "ITGB1": "biomcp_tag_only"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Endothelial",
+      "Macrophages 2",
+      "Stromal"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 60.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Perivascular-Like",
+      "Stromal & T Cell Hybrid"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "think_success": true,
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 78,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": "final",
+      "papers": 30,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    }
+  ],
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with 'signaling' + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

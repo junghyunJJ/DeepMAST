@@ -1,0 +1,21 @@
+{
+  "genes": [
+    "COL1A1",
+    "CD93"
+  ],
+  "pathways": [],
+  "celltypes": [
+    "DCIS 2",
+    "Endothelial",
+    "Invasive Tumor",
+    "Macrophages 2",
+    "Myoepi ACTA2+",
+    "Prolif Invasive Tumor",
+    "Stromal",
+    "Stromal & T Cell Hybrid",
+    "T Cell & Tumor Hybrid"
+  ],
+  "disease": "breast cancer",
+  "lr_pair": "COL1A1-CD93",
+  "category": "medium_morans_unknown"
+}

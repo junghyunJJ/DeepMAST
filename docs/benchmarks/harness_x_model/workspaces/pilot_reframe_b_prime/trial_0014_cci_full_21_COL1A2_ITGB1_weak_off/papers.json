@@ -1,0 +1,1140 @@
+{
+  "papers": [
+    {
+      "pmid": "41846871",
+      "title": "Patient-derived cell lines unveil COL1A2 as a predictor of docetaxel resistance in breast cancer.",
+      "abstract": "Introduction: Breast cancer is the most common malignant tumor among women worldwide and a major cause of cancer-related mortality. Chemoresistance presents a significant challenge in breast cancer therapy and is a primary driver of tumor recurrence and metastasis. However, effective predictive strategies for chemoresistance remain limited. This study aimed to investigate the mechanisms and predictive models underlying chemotherapy resistance in HR+/HER2- breast cancer. Methods: Patient-derived primary cancer cell lines (PCCLs) were successfully established from four patients with HR+/HER2- breast cancer (Luminal B, HER2 non-amplified) using primary cell culture techniques. The retention of the original tumors' pathological characteristics and drug response heterogeneity was confirmed. The sensitivities of PCCLs to taxanes, including docetaxel, were evaluated. RNA sequencing followed by protein-protein interaction (PPI) network analysis was performed to identify candidate genes associated with docetaxel resistance. The expression of COL1A2 was then correlated with pathological complete response (pCR) and recurrence-free survival (RFS) in patients who received neoadjuvant chemotherapy (AC-T regimen). Functional assays were conducted to assess the impact of COL1A2 expression on docetaxel sensitivity in HR+/HER2- breast cancer cells. Results: PCCLs derived from HR+/HER2- breast cancer exhibited heterogeneous sensitivity to taxanes, including docetaxel. RNA sequencing and PPI net",
+      "journal_quality": 0.5,
+      "authors": [
+        "Gao Y",
+        "Wang R",
+        "Dou X",
+        "Chen S",
+        "Chen W",
+        "Liu J",
+        "Zhu S",
+        "Huang J",
+        "Gao Q"
+      ],
+      "journal": "Front Oncol",
+      "date": "2026-03-02T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40652757",
+      "title": "Comparative machine learning analysis for predicting organ tropism in breast cancer and identifying key gene signatures.",
+      "abstract": "BACKGROUND: Breast cancer metastasis (BCM) metastasizes preferentially to certain organs. Important genetic markers can be used for early detection and treatment. Machine learning (ML) can efficiently handle gene expression data to enhance metastasis prediction. METHODS: This study employed the GSE14020 dataset of gene expression profiles of 65 breast cancer patients with liver, lung, bone, or brain metastasis, covering 22,474 genes. Feature selection by Gini reduction reduced the top 25 important genes to nine important genes. Three machine learning models-Random Forest (RF), Support Vector Machine (SVM), and Artificial Neural Networks (ANN)-were employed to predict metastatic sites from gene expression profiles. Model performance was assessed by accuracy, precision, recall, and F1-score measures. Radviz visualization investigated gene-metastasis correlations and validated the biological relevance of the identified gene markers. RESULTS: ANN had the best accuracy (>90 %), followed by RF and SVM. Nine significant genes, i.e., CCL19, FABP7, and COL1A2, were identified as potential biomarkers. Radviz visualization confirmed gene-metastasis relationships, in agreement with biological literature. RF was effective for brain and liver metastasis but was poor for bone and lung classification. CONCLUSION: This study is an example of the potential of ML in precision oncology through enhanced biomarker discovery and prediction of metastasis. The incorporation of ML models with biologic",
+      "journal_quality": 0.5,
+      "authors": [
+        "Chakraborty S",
+        "Shakhapur N",
+        "K S",
+        "Banerjee S"
+      ],
+      "journal": "Comput Biol Med",
+      "date": "2025-09-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40055751",
+      "title": "Integrating spatial and single-cell transcriptomes reveals the role of COL1A2(+) MMP1(+/-) cancer-associated fibroblasts in ER-positive breast cancer.",
+      "abstract": "Cancer-associated fibroblasts (CAFs) are highly heterogeneous cells and important components of the breast tumor microenvironment (TME). However, their role and clinical value in ER-positive breast cancer have not been fully clarified. Our study aims to comprehensively characterize the heterogeneity, potential biological functions, and molecular mechanisms of CAFs in ER-positive breast cancer within the tumor microenvironment using multi-omics data, to provide new strategies for the diagnosis and treatment of ER-positive breast cancer patients. In this study, we found that COL1A2(+) MMP1(+) and COL1A2(+) MMP1(-) CAFs were associated with unfavorable prognosis. The dynamic evolution and cell-cell communications of CAFs were analyzed, revealing that COL1A2(+) MMP1(+/-) CAFs show extensive crosstalk with tumor-associated macrophages (TAMs), contributing to an immunosuppressive TME. Moreover, the somatic mutation of TP53 may be a potential indicator for evaluating the infiltration of COL1A2(+) MMP1(+/-) CAFs. Finally, an MRI-based radiomic model was constructed to estimate the abundance of these CAFs. In conclusion, our findings provide a theoretical basis for targeting CAFs and offer a noninvasive approach to evaluate the infiltration level of COL1A2(+) MMP1(+/-) CAFs.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Yu ZH",
+        "Xu HL",
+        "Wang S",
+        "Li YX",
+        "Wang GX",
+        "Tian Y",
+        "Chen ZH",
+        "Song WB",
+        "He L",
+        "Wang X",
+        "Cao XC",
+        "Yu Y"
+      ],
+      "journal": "Cancer Cell Int",
+      "date": "2025-03-07T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35274048",
+      "title": "Radiation increases COL1A1, COL3A1, and COL1A2 expression in breast cancer",
+      "abstract": "Abstract\n\nBackground\n\nRadiotherapy-associated secondary cancer is an important issue for the treatment of breast cancer (BCa). This study aimed to investigate the molecular mechanism and genetic risk factors for radiation-associated secondary diseases in BCa.\n\nMethods\n\nThe differentially expressed genes (DEGs) between preradiation and postradiation BCa samples in the GSE65505 dataset were obtained. The pathways related to the radiation-associated DEGs in the protein-protein interaction (PPI) network modules were identified. miRNAs targeted to the key genes in the PPI network were identified, and their association with BCa prognosis was analyzed.\n\nResults\n\nA total of 136 radiation-associated DEGs preradiation and postradiation BCa samples were screened out. The PPI network consisted of a significant module that consisted of 21 upregulated DEGs that were associated with \"hsa04512: ECM-receptor interaction,\" \"hsa04151: PI3K-Akt signaling pathway,\" and \"hsa04115: p53 signaling pathway.\" Sixteen DEGs, including three collagen genes collagen type I alpha 1 chain (COL1A1), COL3A1, and COL1A2, were enriched in 17 radiation-associated pathways. The three genes were upregulated in BCa tissues compared with controls and were also elevated by radiation. They were targeted by hsa-miR-29a/c, and the expression levels of hsa-miR-29a/c were associated with a poor prognosis of BCa.\n\nConclusions\n\nThe upregulation of COL1A1, COL3A1, and COL1A2 might be genetic risk factors for radiation-associa",
+      "journal_quality": 0.5,
+      "authors": [
+        "Yao G",
+        "Zhao K",
+        "Bao K",
+        "Li J"
+      ],
+      "journal": "Open Med (Wars)",
+      "date": "2022-02-17T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "9407961",
+      "title": "Aggressive breast cancer leads to discrepant serum levels of the type I procollagen propeptides PINP and PICP.",
+      "abstract": "The propeptides PICP and PINP are derived from the synthesis of type I collagen, a major matrix protein of bone and soft tissues. The aim of this cross-sectional study was to investigate their value as indicators of the aggressivity of breast cancer. Serum PINP, PICP, and total alkaline phosphatase were determined from 89 breast cancer patients. Forty had major bone and/or soft tissue metastases with an aggressive disease course: the progressive disease (PD) group. Forty-nine had either none or minor bone and/or soft tissue metastases with a stable clinical course: the stable disease group (SD). The mean value of PINP in the PD group was 7.2 times higher than that in the SD group (276 +/- 79 microg/l versus 38 +/- 3 microg/l, respectively; P = 0.005), whereas PICP mean value was only 1.7 times higher in the PD group (174 +/- 20 microg/l versus 100 +/- 5 microg/l; P = 0.001). The ratio of PICP to PINP was 1.02 +/- 0.07 in the PD group and 3.07 +/- 0.18 in the SD group (P < 0.001). The correlation between PICP and PINP was linear in the SD group and nonlinear in the PD group. The results indicate that high serum PICP and PINP concentrations and a low PICP:PINP ratio are associated with a highly aggressive nature of breast cancer. Determination of PINP, in particular, may be valuable when evaluating the clinical status of a breast cancer patient.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Jukkola A",
+        "Tähtelä R",
+        "Thölix E",
+        "Vuorinen K",
+        "Blanco G",
+        "Risteli L",
+        "Risteli J"
+      ],
+      "journal": "Cancer Res",
+      "date": "1997-12-15T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "10797313",
+      "title": "Interaction of smad3 with a proximal smad-binding element of the human alpha2(I) procollagen gene promoter required for transcriptional activation by TGF-beta.",
+      "abstract": "Transcription of the alpha2(I) collagen gene (COL1A2) in fibroblasts is potently induced by transforming growth factor-beta (TGF-beta). Smad family proteins function as intracellular signal transducers for TGF-beta that convey information from the cell membrane to the nucleus. In the present study, we establish the functional requirement for endogenous Smad3 and Smad4 in TGF-beta-stimulated COL1A2 transcription in human skin fibroblasts in vitro. Furthermore, using transfections with a series of 5' deletions of the human COL1A2 promoter, we identify a proximal region between -353 and -148 bp, which is required for full stimulation of transcription by a constitutively active TGF-beta type I receptor. This region of the COL1A2 promoter contains a CAGA motif also found in the promoter of the plasminogen activator inhibitor-1. Substitutions disrupting this sequence decreased the binding of nuclear extracts or recombinant Smad3 to the CAGACA oligonucleotide, and markedly reduced the transcriptional response to TGF-beta or overexpressed Smad3 in transient transfection assays. The insertion of tandem repeats of CAGACA conferred TGF-beta stimulation to a heterologous minimal promoter-reporter construct. Inhibition of endogenous Smad expression in fibroblasts by antisense oligonucleotides or cDNA against Smad3 or Smad4, and transfection of COL1A2 promoter constructs into Smad4-deficient breast adenocarcinoma cells, indicated the critical role of Smads for the full TGF-beta response. T",
+      "journal_quality": 0.5,
+      "authors": [
+        "Chen SJ",
+        "Yuan W",
+        "Lo S",
+        "Trojanowska M",
+        "Varga J"
+      ],
+      "journal": "J Cell Physiol",
+      "date": "2000-06-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37044238",
+      "title": "A novel computational predictive biological approach distinguishes Integrin beta1 as a salient biomarker for breast cancer chemoresistance.",
+      "abstract": "Chemoresistance is a primary cause of breast cancer treatment failure, and protein-protein interactions significantly contribute to chemoresistance during different stages of breast cancer progression. In pursuit of novel biomarkers and relevant protein-protein interactions occurring during the emergence of breast cancer chemoresistance, we used a computational predictive biological (CPB) approach. CPB identified associations of adhesion molecules with proteins connected with different breast cancer proteins associated with chemoresistance. This approach identified an association of Integrin beta1 (ITGB1) with chemoresistance and breast cancer stem cell markers. ITGB1 activated the Focal Adhesion Kinase (FAK) pathway promoting invasion, migration, and chemoresistance in breast cancer by upregulating Erk phosphorylation. FAK also activated Wnt/Sox2 signaling, which enhanced self-renewal in breast cancer. Activation of the FAK pathway by ITGB1 represents a novel mechanism linked to breast cancer chemoresistance, which may lead to novel therapies capable of blocking breast cancer progression by intervening in ITGB1-regulated signaling pathways.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Das S",
+        "Kundu M",
+        "Hassan A",
+        "Parekh A",
+        "Jena BC",
+        "Mundre S",
+        "Banerjee I",
+        "Yetirajam R",
+        "Das CK",
+        "Pradhan AK",
+        "Das SK",
+        "Emdad L",
+        "Mitra P",
+        "Fisher PB",
+        "Mandal M"
+      ],
+      "journal": "Biochim Biophys Acta Mol Basis Dis",
+      "date": "2023-08-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30719702",
+      "title": "beta1 Integrin is essential for fascin-mediated breast cancer stem cell function and disease progression",
+      "abstract": "Breast cancer remains the second cause of tumor-related mortality in women worldwide mainly due to chemoresistance and metastasis. The chemoresistance and metastasis are attributed to a rare subpopulation with enriched stem-like characteristics, thus called Cancer Stem Cells (CSCs). We have previously reported aberrant expression of the actin-bundling protein (fascin) in breast cancer cells, which enhances their chemoresistance, metastasis and enriches CSC population. The intracellular mechanisms that link fascin with its downstream effectors are not fully elucidated. Here, loss and gain of function approaches in two different breast cancer models were used to understand how fascin promotes disease progression. Importantly, findings were aligned with expression data from actual breast cancer patients. Expression profiling of a large breast cancer dataset (TCGA, 530 patients) showed statistically significant correlation between fascin expression and a key adherence molecule, beta1 integrin (ITGB1). In vitro manipulation of fascin expression in breast cancer cells exhibited its direct effect on ITGB1 expression. Fascin-mediated regulation of ITGB1 was critical for several breast cancer cell functions including adhesion to different extracellular matrix, self-renewability and chemoresistance. Importantly, there was a significant relationship between fascin and ITGB1 co-expression and short disease-free as well as overall survival in chemo-treated breast cancer patients. This nov",
+      "journal_quality": 0.5,
+      "authors": [
+        "Barnawi R",
+        "Al-Khaldi S",
+        "Colak D",
+        "Tulbah A",
+        "Al-Tweigeri T",
+        "Fallatah M",
+        "Monies D",
+        "Ghebeh H",
+        "Al-Alwan M"
+      ],
+      "journal": "Int J Cancer",
+      "date": "2019-08-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28829502",
+      "title": "Expression of long non-coding RNA linc-ITGB1 in breast cancer and its influence on prognosis and survival.",
+      "abstract": "OBJECTIVE: Long noncoding RNA linc-ITGB1 (linc-ITGB1) was reported to serve as a tumor promoter in breast cancer (BC). However, the clinical significance of linc-ITGB1 has not been reported. The present study aimed to determine the relationship between linc-ITGB1 expression and clinicopathological features and survival. PATIENTS AND METHODS: qRT-PCR was used to quantify the expression levels of linc-ITGB1 in BC and adjacent non-cancerous breast tissues. The X2 test was performed to determine the associations between linc-ITGB expression and the clinicopathological characters. The overall survival time (OS) and disease-free survival (DFS) were collected by follow-up and analyzed by Kaplan-Meier analysis. Multivariate Cox regression analysis was used to identify the independent risk factors for BC. RESULTS: The results showed that linc-ITGB1 levels were lower in tumor tissues of BC patients in comparison to adjacent non-cancerous breast tissues (p < 0.001). Linc-ITGB1 expression was significantly associated with lymph node metastasis, pathological differentiation and TNM stage (all p < 0.05). Furthermore, Kaplan-Meier analysis demonstrated that high-linc-ITGB1 expression level was associated with poorer OS (p = 0.006) and DFS (p = 0.003). Cox proportional hazards risk analysis demonstrated that linc-ITGB1 was an independent predictor for both OS (p = 0.004) and DFS (p = 0.002) in BC. CONCLUSIONS: These results indicated, for the first time, that linc-ITGB1 be a potential biomar",
+      "journal_quality": 0.5,
+      "authors": [
+        "Li WX",
+        "Sha RL",
+        "Bao JQ",
+        "Luan W",
+        "Su RL",
+        "Sun SR"
+      ],
+      "journal": "Eur Rev Med Pharmacol Sci",
+      "date": "2017-08-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28160423",
+      "title": "Polymeric Delivery of siRNA against Integrin-beta1 (CD29) to Reduce Attachment and Migration of Breast Cancer Cells.",
+      "abstract": "Cell surface integrins, which play important roles in the survival, proliferation, migration, and invasion of cancer cells, are a viable target for treatment of metastatic breast cancer. This line of therapy still remains challenging due to the lack of proper identification and validation of effective targets as well as the lack of suitable therapeutic agents for treatment. The focus is on one such molecular target for this purpose, namely integrin-beta1, and effective lowering of integrin-beta1 levels on a breast cancer model (MDA-MB-231 cells) is achieved by delivering a dicer-substrate short interfering RNA (siRNA) targeting integrin-beta1 with lipid-modified low molecular weight polyethylenimine polymers. Reduction of integrin-beta1 levels leads to reduced adhesion of MDA-MB-231 cells to extracellular matrix component fibronectin as well as to human bone marrow cells. A reduced migration of the breast cancer cells is also observed after integrin-beta1 silencing in \"scratch\" and \"transwell\" migration assays. These results highlight the importance of integrin-beta1 for the migration of metastatic breast cancer cells by effectively silencing this target with a practical dose of siRNA.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Meenakshi Sundaram DN",
+        "Kucharski C",
+        "Parmar MB",
+        "Kc RB",
+        "Uludağ H"
+      ],
+      "journal": "Macromol Biosci",
+      "date": "2017-06-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21400218",
+      "title": "Expression of Toll-like receptor 4 and beta 1 integrin in breast cancer.",
+      "abstract": "Toll-like receptor (TLR) 4 signaling pathway has been shown to support tumor cell growth in vitro and in vivo. Its stimulation on breast cancer cell lines induces beta1 integrin and promotes tumor invasiveness. However, its role in predicting clinical behavior of tumor is not yet clarified. Therefore, we investigated TLR4 and beta1 integrin expression on 133 primary breast cancer samples by immunohistochemistry and correlated it with overall survival and disease-free survival of patients as well as with clinicopathological characteristics of the tumor. We found higher beta1 integrin expression in invasive lobular cancer in comparison with other tumor types. No significant association of TLR4 and beta1 integrin expression with overall survival or disease-free survival was seen. Therefore, we conclude that expression of these markers is of biological interest but appears to be of little additional use as predictive clinical marker.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Petricevic B",
+        "Vrbanec D",
+        "Jakic-Razumovic J",
+        "Brcic I",
+        "Rabic D",
+        "Badovinac T",
+        "Ozimec E",
+        "Bali V"
+      ],
+      "journal": "Med Oncol",
+      "date": "2012-06-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "17234776",
+      "title": "Increased beta1 integrin is associated with decreased survival in invasive breast cancer.",
+      "abstract": "Aberrant microenvironments and loss of balance in cell-extracellular matrix signaling are associated with breast cancer invasion, metastasis, and resistance to therapy. We have recently shown that increased beta1 integrin signaling is involved in malignant progression and that inhibitory antibody to beta1 integrin leads to selective apoptosis and decreased proliferation in three-dimensional cultures and in xenograft models of breast cancer in vivo. To investigate the clinical importance of these findings, in the present study we examined the expression of beta1 integrin and extracellular beta1 integrin ligands fibronectin and laminin-1 in a cohort of 249 breast cancer patients who had a median follow-up of 8.4 years. Among the 149 scorable cases, the highest beta1 integrin intensity score (3+ versus 0-2+) was associated with significantly decreased 10-year overall survival of 48% versus 71% (P<0.03) and decreased disease-free survival of 50% versus 80% (P<0.05). Importantly, high fibronectin expression was associated with decreased overall and disease-free survival on univariate analysis (P<0.04) and beta1 integrin intensity score was significantly correlated with fibronectin expression (Kendall's tau-b=0.19; P=0.03). In a multivariate Cox proportional hazards model, beta1 integrin intensity score remained a significant independent predictor of overall survival [hazard ratio (HR), 1.69; 95% confidence interval (95% CI), 1.19-2.38; P<0.003] and disease-free survival (HR, 1.87;",
+      "journal_quality": 0.5,
+      "authors": [
+        "Yao ES",
+        "Zhang H",
+        "Chen YY",
+        "Lee B",
+        "Chew K",
+        "Moore D",
+        "Park C"
+      ],
+      "journal": "Cancer Res",
+      "date": "2007-01-15T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "11408736",
+      "title": "Potential role of beta 1 integrin and collagen biosynthesis in estrogen-dependent reduction of apoptosis in tamoxifen-treated breast cancer cells.",
+      "abstract": "It was found that 10 microM tamoxifen induced apoptosis and a significant (approximately 50%) depletion of beta 1 integrin levels in human breast cancer cells. Estradiol-treated MCF-7 cells exhibited exceptional viability and adherence, high levels of beta 1 integrin and increased (by 100%) collagen biosynthesis. Pretreatment of MCF-7 cells with 1 nM estradiol prevented tamoxifen-induced cell death, loss of cell adherence and decrease in beta 1 integrin level. Tamoxifen and estradiol had an opposite effect on the beta 1 integrin level and adherence in breast cancer cells, suggesting that the decrease in the beta 1 integrin level may be an early event during tamoxifen-induced apoptosis in breast cancer cells.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Dabrowska M",
+        "Palka J",
+        "Wolczynski S",
+        "Pietruczuk M",
+        "Osada J"
+      ],
+      "journal": "Gynecol Obstet Invest",
+      "date": "2001-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39780487",
+      "title": "Deciphering progressive lesion areas in breast cancer spatial transcriptomics via TGR-NMF",
+      "abstract": "Abstract\n\nIdentifying spatial domains is critical for understanding breast cancer tissue heterogeneity and providing insights into tumor progression. However, dropout events introduces computational challenges and the lack of transparency in methods such as graph neural networks limits their interpretability. This study aimed to decipher disease progression-related spatial domains in breast cancer spatial transcriptomics by developing the three graph regularized non-negative matrix factorization (TGR-NMF). A unitization strategy was proposed to mitigate the impact of dropout events on the computational process, enabling utilization of the complete gene expression count data. By integrating one gene expression neighbor topology and two spatial position neighbor topologies, TGR-NMF was developed for constructing an interpretable low-dimensional representation of spatial transcriptomic data. The progressive lesion area that can reveal the progression of breast cancer was uncovered through heterogeneity analysis. Moreover, several related pathogenic genes and signal pathways on this area were identified by using gene enrichment and cell communication analysis.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Li J",
+        "Xiang S",
+        "Wei D"
+      ],
+      "journal": "Brief Bioinform",
+      "date": "2024-11-22T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen type I",
+          "extracellular matrix",
+          "ECM",
+          "stromal interaction"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37304544",
+      "title": "Identification of key genes in HER2-positive breast cancer with brain metastasis via bioinformatics methods",
+      "abstract": "Background\n\nBrain metastasis (BM) represents one of the most common advanced disease states in breast cancer (BC), especially in human epidermal growth factor receptor 2 (HER2)-positive BC, and is associated with poor survival outcomes.\n\nMethods\n\nIn this study, in-depth analysis of the microarray data from the GSE43837 dataset with 19 BM samples of HER2-positive BC patients and 19 HER2-positive nonmetastatic primary BC samples was conducted. The differentially expressed genes (DEGs) between BM and primary BC samples were identified and function enrichment analysis of the DEGs was conducted to identify potential biological functions. The hub genes were identified by constructing the protein-protein interaction (PPI) network using STRING and Cytoscape. UALCAN and Kaplan-Meier plotter online tools were used to verify the clinical roles of the hub DEGs in HER2-positive BC with BM (BCBM).\n\nResults\n\nA total of 1,056 DEGs including 767 downregulated and 289 upregulated genes were identified by comparing the microarray data of the HER2-positive BM and primary BC samples. Functional enrichment analysis demonstrated that the DEGs were mainly enriched in pathways related to extracellular matrix (ECM) organization, cell adhesion, and collagen fibril organization. PPI network analysis identified 14 hub genes. Among these, CD44, COL1A2, MMP14, POSTN, and SOX9 were associated with the survival outcomes of HER2-positive patients.\n\nConclusions\n\nIn summary, 5 BM-specific hub genes were identif",
+      "journal_quality": 0.5,
+      "authors": [
+        "Yang Z",
+        "Sun R",
+        "Qu G",
+        "Wang F",
+        "Yin Z",
+        "Zhang T",
+        "Wang P",
+        "Li S",
+        "Lin S"
+      ],
+      "journal": "Transl Cancer Res",
+      "date": "2023-05-31T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen type I",
+          "extracellular matrix",
+          "ECM",
+          "stromal interaction"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37361568",
+      "title": "Bioinformatics and pathway enrichment analysis identified hub genes and potential biomarker for gastric cancer prognosis",
+      "abstract": "Introduction\n\nGastric cancer is one of the most common cancers in the world. This study aimed to identify genes, biomarkers, and metabolic pathways affecting gastric cancer using bioinformatic analysis and meta-analysis. \n\nMethods\n\nDatasets containing gene expression profiles of tumor lesions and adjacent non-tumor mucosa samples were downloaded. Common differentially expressed genes between data sets were selected to identify hub genes and further analysis. Gene Expression Profiling and Interactive Analyses (GEPIA) and the Kaplan-Meier method were used to further validate the expression level of genes and plot the overall survivalcurve, respectively.\n\nResults and disscussion\n\nKEGG pathway analysis showed that the most important pathway was enriched in ECM-receptor interaction. Hub genes includingCOL1A2, FN1, BGN, THBS2, COL5A2, COL6A3, SPARC and COL12A1 wereidentified. The top interactive miRNAs including miR-29a-3p, miR-101-3p,miR-183-5p, and miR-15a-5p targeted the most hub genes. The survival chart showed an increase in mortality in patients with gastric cancer, which shows the importance of the role of these genes in the development of the disease and can be considered candidate genes in the prevention and early diagnosis of gastric cancer.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Darang E",
+        "Pezeshkian Z",
+        "Mirhoseini SZ",
+        "Ghovvati S"
+      ],
+      "journal": "Front Oncol",
+      "date": "2023-06-09T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen type I",
+          "extracellular matrix",
+          "ECM",
+          "stromal interaction"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36057263",
+      "title": "Comprehensive analysis of the differential expression and prognostic value of COL1A2 in colon adenocarcinoma",
+      "abstract": "Background: Colon adenocarcinoma (COAD) is a highly heterogeneous disease, which is the second most common cancer in females and third in males. Collagen type I alpha 2 (COL1A2) has been documented to be involved in the carcinogenesis of multiple tumors; however, the expression and prognostic significance of COL1A2 and its underlying mechanism in COAD remains unclarified.\n\nMaterials and Methods: The general profile of COL1A2, its expression pattern, and prognostic value were systematically assessed through various bioinformatics tools. The protein level of COL1A2 was verified in COAD patients using immunohistochemistry analysis. In addition, enrichment analyses were performed to explore the possible regulatory pathways of COL1A2 in COAD.\n\nResults: The mRNA and protein levels of COL1A2 were significantly increased in COAD than that in normal tissues (P < 0.05). The COL1A2 expression tended to increase along with cancer stages and nodal metastasis status in COAD, while the promoter methylation levels of COL1A2 might negatively related to its mRNA expression. Survival analysis showed that COL1A2 was a reliable predictor for distinguishing the status of disease-specific survival (DSS), overall survival (OS), and progression-free survival (PFS), and might serve as a robust independent prognostic biomarker for DSS and OS in COAD patients (P < 0.05). The enrichment analysis showed focal adhesion as the most possible regulatory pathway by COL1A2.\n\nConclusion: Collectively, COL1A2 fun",
+      "journal_quality": 0.5,
+      "authors": [
+        "Jin JJ",
+        "Zheng T",
+        "Xu XX",
+        "Zheng L",
+        "Li FY",
+        "Li XX",
+        "Zhou L"
+      ],
+      "journal": "Aging (Albany NY)",
+      "date": "2022-09-02T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen type I",
+          "extracellular matrix",
+          "ECM",
+          "stromal interaction"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33772505",
+      "title": "Three-dimensional collagen-based scaffold model to study the microenvironment and drug-resistance mechanisms of oropharyngeal squamous cell carcinomas",
+      "abstract": "Objective:\n\nSquamous cell carcinoma (SCC) represents the most common histotype of all head and neck malignancies and includes oropharyngeal squamous cell carcinoma (OSCC), a tumor associated with different clinical outcomes and linked to human papilloma virus (HPV) status. Translational research has few available in vitro models with which to study the different pathophysiological behavior of OSCCs. The present study proposes a 3-dimensional (3D) biomimetic collagen-based scaffold to mimic the tumor microenvironment and the crosstalk between the extracellular matrix (ECM) and cancer cells.\n\nMethods:\n\nWe compared the phenotypic and genetic features of HPV-positive and HPV-negative OSCC cell lines cultured on common monolayer supports and on scaffolds. We also explored cancer cell adaptation to the 3D microenvironment and its impact on the efficacy of drugs tested on cell lines and primary cultures.\n\nResults:\n\nHPV-positive and HPV-negative cell lines were successfully grown in the 3D model and displayed different collagen fiber organization. The 3D cultures induced an increased expression of markers related to epithelial-mesenchymal transition (EMT) and to matrix interactions and showed different migration behavior, as confirmed by zebrafish embryo xenografts. The expression of hypoxia-inducible factor 1alpha (1alpha) and glycolysis markers were indicative of the development of a hypoxic microenvironment inside the scaffold area. Furthermore, the 3D cultures activated drug-resi",
+      "journal_quality": 0.5,
+      "authors": [
+        "Miserocchi G",
+        "Cocchi C",
+        "De Vita A",
+        "Liverani C",
+        "Spadazzi C",
+        "Calpona S",
+        "Di Menna G",
+        "Bassi M",
+        "Meccariello G",
+        "De Luca G",
+        "Campobassi A",
+        "Maddalena Tumedei M",
+        "Bongiovanni A",
+        "Fausti V",
+        "Cotelli F",
+        "Ibrahim T",
+        "Mercatali L"
+      ],
+      "journal": "Cancer Biol Med",
+      "date": "2021-03-27T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen type I",
+          "extracellular matrix",
+          "ECM",
+          "stromal interaction"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32566007",
+      "title": "Clinical significance of COL1A1 and COL1A2 expression levels in hypopharyngeal squamous cell carcinoma",
+      "abstract": "Alterations in collagen type I alpha1 (COL1A1) and collagen type I alpha 2 (COL1A2) expression levels have been reported to predict prognosis in various types of cancer. However, the effect of these biomarkers on hypopharyngeal squamous cell carcinoma (HPSCC) is yet to be fully elucidated. The present study aimed to explore the prognostic significance of COL1A1 and COL1A2 expression levels in HPSCC. The expression levels of COL1A1 and COL1A2 in 67 patients with HPSCC were examined using an immunohistochemical assay in a tissue microarray. The associations between COL1A1/COL1A2 expression levels and patient clinicopathological features were analyzed using ANOVA, Pearson's chi2 or Fisher's exact test. The Cox proportional hazard models and Kaplan-Meier survival analysis with log-rank tests were used to analyze the significance of COL1A1/COL1A2 as prognostic markers for patients with HPSCC. As a result, immunohistochemical staining revealed that COL1A1 was positively expressed in all cases, among which 40.3% were strong positive, while COL1A2 was positively expressed in 76.1% of the HPSCC cases with 6.0% of the samples exhibiting strong staining. Further analysis revealed no significant association between the expression levels of COL1A1/COL1A2 and other clinicopathological features. Cox regression analysis revealed that a high COL1A2 expression level predicted a high locoregional recurrence and a less favorable disease-free survival rate (P=0.042 and 0.020, respectively). Overa",
+      "journal_quality": 0.5,
+      "authors": [
+        "Lin P",
+        "Tian P",
+        "Pang J",
+        "Lai L",
+        "He G",
+        "Song Y",
+        "Zheng Y"
+      ],
+      "journal": "Oncol Lett",
+      "date": "2020-07-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen type I",
+          "extracellular matrix",
+          "ECM",
+          "stromal interaction"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "11526484",
+      "title": "Integrin signaling inhibits paclitaxel-induced apoptosis in breast cancer cells.",
+      "abstract": "Inherent or acquired drug resistance is one of the major problems in chemotherapy. The mechanisms by which cancer cells survive and escape the cytotoxic effects of chemotherapeutic agents are essentially unknown. In the present study, we demonstrate that in the MDA-MB-231 and MDA-MB-435 breast cancer cells, ligation of beta1 integrins by their extracellular matrix ligands inhibits significantly apoptosis induced by paclitaxel and vincristine, two microtubule-directed chemotherapeutic agents that are widely used in the therapy of breast cancer. We show that beta1 integrin signaling inhibits drug-induced apoptosis by inhibiting the release of cytochrome c from the mitochondria in response to drug treatment. Further, integrin-mediated protection from drug-induced apoptosis and inhibition of cytochrome c release are dependent on the activation of the PI 3-kinase/Akt pathway. Our results identify beta1 integrin signaling as an important survival pathway in drug-induced apoptosis in breast cancer cells and suggest that activation of this pathway may contribute to the generation of drug resistance.",
+      "journal_quality": 0.463,
+      "authors": [
+        "Aoudjit F",
+        "Vuori K"
+      ],
+      "journal": "Oncogene",
+      "date": "2001-08-16T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35741056",
+      "title": "Delineation of Pathogenomic Insights of Breast Cancer in Young Women",
+      "abstract": "The prognosis of breast cancer (BC) in young women (BCYW) aged <=40 years tends to be poorer than that in older patients due to aggressive phenotypes, late diagnosis, distinct biologic, and poorly understood genomic features of BCYW. Considering the estimated predisposition of only approximately 15% of the BC population to BC-promoting genes, the underlying reasons for an increased occurrence of BCYW, at large, cannot be completely explained based on general risk factors for BC. This underscores the need for the development of next-generation of tissue- and body fluid-based prognostic and predictive biomarkers for BCYW. Here, we identified the genes associated with BCYW with a particular focus on the age, intrinsic BC subtypes, matched normal or normal breast tissues, and BC laterality. In young women with BC, we observed dysregulation of age-associated cancer-relevant gene sets in both cancer and normal breast tissues, sub-sets of which substantially affected the overall survival (OS) or relapse-free survival (RFS) of patients with BC and exhibited statically significant correlations with several gene modules associated with cellular processes such as the stroma, immune responses, mitotic progression, early response, and steroid responses. For example, high expression of COL1A2, COL5A2, COL5A1, NPY1R, and KIAA1644 mRNAs in the BC and normal breast tissues from young women correlated with a substantial reduction in the OS and RFS of BC patients with increased levels of these ",
+      "journal_quality": 0.3955,
+      "authors": [
+        "Paul AM",
+        "George B",
+        "Saini S",
+        "Pillai MR",
+        "Toi M",
+        "Costa L",
+        "Kumar R"
+      ],
+      "journal": "Cells",
+      "date": "2022-06-15T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "20525369",
+      "title": "Prediction of epigenetically regulated genes in breast cancer cell lines",
+      "abstract": "Background\n\nMethylation of CpG islands within the DNA promoter regions is one mechanism that leads to aberrant gene expression in cancer. In particular, the abnormal methylation of CpG islands may silence associated genes. Therefore, using high-throughput microarrays to measure CpG island methylation will lead to better understanding of tumor pathobiology and progression, while revealing potentially new biomarkers. We have examined a recently developed high-throughput technology for measuring genome-wide methylation patterns called mTACL. Here, we propose a computational pipeline for integrating gene expression and CpG island methylation profles to identify epigenetically regulated genes for a panel of 45 breast cancer cell lines, which is widely used in the Integrative Cancer Biology Program (ICBP). The pipeline (i) reduces the dimensionality of the methylation data, (ii) associates the reduced methylation data with gene expression data, and (iii) ranks methylation-expression associations according to their epigenetic regulation. Dimensionality reduction is performed in two steps: (i) methylation sites are grouped across the genome to identify regions of interest, and (ii) methylation profles are clustered within each region. Associations between the clustered methylation and the gene expression data sets generate candidate matches within a fxed neighborhood around each gene. Finally, the methylation-expression associations are ranked through a logistic regression, and their",
+      "journal_quality": 0.3841,
+      "authors": [
+        "Loss LA",
+        "Sadanandam A",
+        "Durinck S",
+        "Nautiyal S",
+        "Flaucher D",
+        "Carlton VE",
+        "Moorhead M",
+        "Lu Y",
+        "Gray JW",
+        "Faham M",
+        "Spellman P",
+        "Parvin B"
+      ],
+      "journal": "BMC Bioinformatics",
+      "date": "2010-06-04T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35045088",
+      "title": "Comparative analysis of protein-protein interaction networks in metastatic breast cancer",
+      "abstract": "Metastatic lesions leading causes of the majority of deaths in patients with the breast cancer. The present study aimed to provide a comprehensive analysis of the differentially expressed genes (DEGs) in the brain (MDA-MB-231 BrM2) and lung (MDA-MB-231 LM2) metastatic cell lines obtained from breast cancer patients compared with those who have primary breast cancer. We identified 981 and 662 DEGs for brain and lung metastasis, respectively. Protein-protein interaction (PPI) analysis revealed seven shared (PLCB1, FPR1, FPR2, CX3CL1, GABBR2, GPR37, and CXCR4) hub genes between brain and lung metastasis in breast cancer. Moreover, GNG2 and CXCL8, C3, and PTPN6 in the brain and SAA1 and CCR5 in lung metastasis were found as unique hub genes. Besides, five co-regulation of clusters via seven important co-expression genes (COL1A2, LUM, SPARC, THBS2, IL1B, CXCL8, THY1) were identified in the brain PPI network. Clusters screening followed by biological process (BP) function and pathway enrichment analysis for both metastatic cell lines showed that complement receptor signalling, acetylcholine receptor signalling, and gastric acid secretion pathways were common between these metastases, whereas other pathways were site-specific. According to our findings, there are a set of genes and functional pathways that mark and mediate breast cancer metastasis to the brain and lungs, which may enable us understand the molecular basis of breast cancer development in a deeper levele to the brain a",
+      "journal_quality": 0.3792,
+      "authors": [
+        "Hozhabri H",
+        "Ghasemi Dehkohneh RS",
+        "Razavi SM",
+        "Razavi SM",
+        "Salarian F",
+        "Rasouli A",
+        "Azami J",
+        "Ghasemi Shiran M",
+        "Kardan Z",
+        "Farrokhzad N",
+        "Mikaeili Namini A",
+        "Salari A"
+      ],
+      "journal": "PLoS One",
+      "date": "2022-01-19T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23441215",
+      "title": "Neoplastic and Stromal Cells Contribute to an Extracellular Matrix Gene Expression Profile Defining a Breast Cancer Subtype Likely to Progress",
+      "abstract": "We recently showed that differential expression of extracellular matrix (ECM) genes delineates four subgroups of breast carcinomas (ECM1, -2, -3- and -4) with different clinical outcome. To further investigate the characteristics of ECM signature and its impact on tumor progression, we conducted unsupervised clustering analyses in 6 additional independent datasets of invasive breast tumors from different platforms for a total of 643 samples. Use of four different clustering algorithms identified ECM3 tumors as an independent group in all datasets tested. ECM3 showed a homogeneous gene pattern, consisting of 58 genes encoding 43 structural ECM proteins. From 26 to 41% of the cases were ECM3-enriched, and analysis of datasets relevant to gene expression in neoplastic or corresponding stromal cells showed that both stromal and breast carcinoma cells can coordinately express ECM3 genes. In in vitro experiments, beta-estradiol induced ECM3 gene production in ER-positive breast carcinoma cell lines, whereas TGFbeta induced upregulation of the genes leading to ECM3 gene classification, especially in ER-negative breast carcinoma cells and in fibroblasts. Multivariate analysis of distant metastasis-free survival in untreated breast tumor patients revealed a significant interaction between ECM3 and histological grade (p = 0.001). Cox models, estimated separately in grade I-II and grade III tumors, indicated a highly significant association between ECM3 and worse survival probability on",
+      "journal_quality": 0.3792,
+      "authors": [
+        "Triulzi T",
+        "Casalini P",
+        "Sandri M",
+        "Ratti M",
+        "Carcangiu ML",
+        "Colombo MP",
+        "Balsari A",
+        "Ménard S",
+        "Orlandi R",
+        "Tagliabue E"
+      ],
+      "journal": "PLoS One",
+      "date": "2013-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen type I",
+          "extracellular matrix",
+          "ECM",
+          "stromal interaction"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39930421",
+      "title": "Proteomic profiling reveals biological processes and biomarkers involved in the pathogenesis of occult breast cancer",
+      "abstract": "Background\n\nOccult breast cancer (OBC) is defined as axillary lymph node metastasis without any evidence of a primary tumor in the breast. Because of the limited number of clinical cases, the clinicopathological features and treatment recommendations of OBC are still controversial. In addition, its natural history is poorly understood and its proteomic signature remains unknown.\n\nMaterials and Methods\n\nWe compared the clinicopathological features and prognosis of OBC patients and Non-OBC patients from the Surveillance, Epidemiology, and End Results (SEER) database and analyzed the effects of local treatment on the survival outcomes of OBC patients. Additionally, we performed a quantitative proteomic analysis for tissue samples of metastatic lymph nodes from OBC patients (OBC-LN), and paired tissue samples of metastatic lymph nodes (Non-OBC-LN) and primary tumors (Non-OBC-PT) from Non-OBC patients. We identified differentially expressed proteins in different comparable groups using Student's t test. Functional enrichment and protein-protein interaction network analyses were used to interpret the functions and interactions of the differentially expressed proteins in the comparison of OBC-LN vs Non-OBC-LN. Immunohistochemistry was used for the validation of the hub proteins.\n\nResults\n\nAnalysis of data from the SEER database demonstrated that OBC patients had a better prognosis than Non-OBC patients did and that either mastectomy or radiation therapy improved the outcomes of OBC ",
+      "journal_quality": 0.3621,
+      "authors": [
+        "Zhang J",
+        "Wang Y",
+        "Liu Y",
+        "Chen H",
+        "Chai N",
+        "Zhao Y",
+        "Li Y",
+        "Li X",
+        "He J",
+        "Zhang H"
+      ],
+      "journal": "BMC Cancer",
+      "date": "2025-02-10T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39816347",
+      "title": "Exploring the key genes associated with breast cancer radiotherapy sensitivity based on the stromal-immune score and analysis of the WGCNA and ceRNA network",
+      "abstract": "Background\n\nBreast cancer is a highly malignant disease worldwide, but there are currently no sufficient molecular biomarkers to predict patient prognosis and guide radiotherapy. The tumor microenvironment (TME) is an important factor affecting tumor biological function, and changes in its composition are equally relevant to tumor progression and prognosis during radiotherapy.\n\nMethods\n\nHere, we performed bioinformatic analyses using data obtained from The Cancer Genome Atlas (TCGA) and the Gene Expression Omnibus (GEO) databases to screen for molecular biomarkers related to the TME that may influence radiotherapy sensitivity. By combining immune scores and stromal scores and performing weighted coexpression network analysis (WGCNA), we identified key modules and hub genes to construct competing endogenous RNA (ceRNA) networks. Then, key pathways and genes were identified using Gene Ontology (GO) and Kyoto Encyclopedia of Genes and Genomes (KEGG) enrichment analyses. Furthermore, we explored the effect of THBS2 on the malignant phenotype of breast cancer through cellular experiments.\n\nResults\n\nGenes in the PI3K-AKT pathway in the blue module were significantly enriched. Among the hub genes in the blue module, COL1A1, COL1A2, COL6A3, THBS2 and PDGFRB were negatively associated with RT sensitivity. Cellular experiments confirmed that knockdown of THBS2 inhibited the proliferation and invasion of breast cancer cells.\n\nConclusion\n\nThese findings may provide new insights into the ",
+      "journal_quality": 0.3336,
+      "authors": [
+        "Sun X",
+        "Wu C",
+        "Lin Y",
+        "Zhang S",
+        "Zhao X",
+        "Wang X"
+      ],
+      "journal": "Heliyon",
+      "date": "2024-07-14T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen type I",
+          "extracellular matrix",
+          "ECM",
+          "stromal interaction"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36547361",
+      "title": "Identification of the Collagen Types Essential for Mammalian Breast Acinar Structures",
+      "abstract": "Modeling human breast tissue architecture is essential to study the pathophysiological conditions of the breast. We report that normal mammary epithelial cells grown in human breast extracellular matrix (ECM) hydrogel formed acini structurally similar to those of human and pig mammary tissues. Type I, II, III and V collagens were commonly identified in human, pig, and mouse breast ECM. Mammary epithelial cells formed acini on certain types or combinations of the four collagens at normal levels of breast tissue elasticity. Comparison of the collagen species in mouse normal breast and breast tumor ECM revealed common and distinct sets of collagens within the two types of tissues. Elevated expression of collagen type I alpha 1 chain (Col1a1) was found in mouse and human breast cancers. Collagen type XXV alpha 1 chain (Col25a1) was identified in mouse breast tumors but not in normal breast tissues. Our data provide strategies for modeling human breast pathophysiological structures and functions using native tissue-derived hydrogels and offer insight into the potential contributions of different collagen types in breast cancer development.",
+      "journal_quality": 0.3282,
+      "authors": [
+        "Keller CR",
+        "Ruud KF",
+        "Martinez SR",
+        "Li W"
+      ],
+      "journal": "Gels",
+      "date": "2022-12-18T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen type I",
+          "extracellular matrix",
+          "ECM",
+          "stromal interaction"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25426561",
+      "title": "New mechanistic insights of integrin beta1 in breast cancer bone colonization",
+      "abstract": "Bone metastasis is a frequent and life-threatening complication of breast cancer. The molecular mechanisms supporting the establishment of breast cancer cells in the skeleton are still not fully understood, which may be attributed to the lack of suitable models that interrogate interactions between human breast cancer cells and the bone microenvironment. Although it is well-known that integrins mediate adhesion of malignant cells to bone extracellular matrix, their role during bone colonization remains unclear. Here, the role of beta1 integrins in bone colonization was investigated using tissue-engineered humanized in vitro and in vivo bone models. In vitro, bone-metastatic breast cancer cells with suppressed integrin beta1 expression showed reduced attachment, spreading, and migration within human bone matrix compared to control cells. Cell proliferation in vitro was not affected by beta1 integrin knockdown, yet tumor growth in vivo within humanized bone microenvironments was significantly inhibited upon beta1 integrin suppression, as revealed by quantitative in/ex vivo fluorescence imaging and histological analysis. Tumor cells invaded bone marrow spaces in the humanized bone and formed osteolytic lesions; osteoclastic bone resorption was, however, not reduced by beta1 integrin knockdown. Taken together, we demonstrate that beta1 integrins have a pivotal role in bone colonization using unique tissue-engineered humanized bone models.",
+      "journal_quality": 0.3198,
+      "authors": [
+        "Thibaudeau L",
+        "Taubenberger AV",
+        "Theodoropoulos C",
+        "Holzapfel BM",
+        "Ramuz O",
+        "Straub M",
+        "Hutmacher DW"
+      ],
+      "journal": "Oncotarget",
+      "date": "2015-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36278695",
+      "title": "Proteomics-Based Identification of Dysregulated Proteins in Breast Cancer",
+      "abstract": "Immunohistochemistry (IHC) is still widely used as a morphology-based assay for in situ analysis of target proteins as specific tumor antigens. However, as a very heterogeneous collection of neoplastic diseases, breast cancer (BC) requires an accurate identification and characterization of larger panels of candidate biomarkers, beyond ER, PR, and HER2 proteins, for diagnosis and personalized treatment, without the limited availability of antibodies that are required to identify specific proteins. Top-down, middle-down, and bottom-up mass spectrometry (MS)-based proteomics approaches complement traditional histopathological tissue analysis to examine expression, modification, and interaction of hundreds to thousands of proteins simultaneously. In this review, we discuss the proteomics-based identification of dysregulated proteins in BC that are essential for the following issues: discovery and validation of new biomarkers by analysis of solid and liquid/non-invasive biopsies, cell lines, organoids and xenograft models; identification of panels of biomarkers for early detection and accurate discrimination between cancer, benign and normal tissues; identification of subtype-specific and stage-specific protein expression profiles in BC grading and measurement of disease progression; characterization of new subtypes of BC; characterization and quantitation of post-translational modifications (PTMs) and aberrant protein-protein interactions (PPI) involved in tumor development; char",
+      "journal_quality": 0.3073,
+      "authors": [
+        "Neagu AN",
+        "Jayathirtha M",
+        "Whitham D",
+        "Mutsengi P",
+        "Sullivan I",
+        "Petre BA",
+        "Darie CC"
+      ],
+      "journal": "Proteomes",
+      "date": "2022-10-21T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen type I",
+          "extracellular matrix",
+          "ECM",
+          "stromal interaction"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39343856",
+      "title": "Integrin beta1 in breast cancer: mechanisms of progression and therapy.",
+      "abstract": "The therapy for breast cancer (BC), to date, still needs improvement. Apart from traditional therapy methods, biological therapy being explored opens up a novel avenue for BC patients. Integrin beta1 (ITGbeta1), one of the largest subgroups in integrin family, is a key player in cancer evolution and therapy. Recent researches progress in the relationship of ITGbeta1 level and BC, finding that ITGbeta1 expression evidently concerns BC progression. In this chapter, we outline diverse ITGbeta1-based mechanisms regarding to the promoted effect of ITGbeta1 on BC cell structure rearrangement and malignant phenotype behaviors, the unfavorable patient prognosis conferred by ITGbeta1, BC therapy tolerance induced by ITGbeta1, and lastly novel inhibitors targeting ITGbeta1 for BC therapy. As an effective biomarker, ITGbeta1 undoubtedly emerges one of targeted-therapy opportunities of BC patients in future. It is a necessity focusing on scientific and large-scale clinical trials on the validation of targeted-ITGbeta1 drugs for BC patients.",
+      "journal_quality": 0.3042,
+      "authors": [
+        "Huang Q",
+        "Wang J",
+        "Ning H",
+        "Liu W",
+        "Han X"
+      ],
+      "journal": "Breast Cancer",
+      "date": "2024-09-30T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "COL1A2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ITGB1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "COL1A2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "collagen type I",
+        "extracellular matrix",
+        "ECM",
+        "stromal interaction"
+      ]
+    },
+    {
+      "genes": [
+        "ITGB1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "integrin beta 1",
+        "cell adhesion",
+        "ECM receptor",
+        "tumor progression"
+      ]
+    },
+    {
+      "genes": [
+        "COL1A2",
+        "ITGB1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "collagen-integrin signaling",
+        "ECM remodeling",
+        "tumor-stroma crosstalk"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "extracellular matrix pathway",
+        "ECM organization",
+        "collagen signaling",
+        "matrix remodeling"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "integrin signaling pathway",
+        "cell adhesion pathway",
+        "FAK signaling",
+        "tumor microenvironment"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "DCIS",
+        "ductal carcinoma in situ",
+        "preinvasive breast cancer",
+        "tumor progression"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "macrophage",
+        "endothelial",
+        "stromal cells",
+        "tumor microenvironment",
+        "cell composition"
+      ]
+    },
+    {
+      "genes": [
+        "COL1A2",
+        "ITGB1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "spatial transcriptomics",
+        "cell-cell interaction",
+        "perivascular",
+        "stromal cells",
+        "tumor microenvironment"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "spatial transcriptomics",
+        "cell-cell communication",
+        "tumor microenvironment",
+        "immune infiltration",
+        "spatial distribution"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "COL1A2",
+      "ITGB1"
+    ],
+    "genes_matched_by": {
+      "COL1A2": "col1a2",
+      "ITGB1": "itgb1"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Macrophages 2",
+      "Stromal"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 25.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "DCIS 1",
+      "DCIS 2",
+      "Endothelial",
+      "Myoepi ACTA2+",
+      "Perivascular-Like",
+      "Stromal & T Cell Hybrid"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "think_success": true,
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 30,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": "final",
+      "papers": 30,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    }
+  ],
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with 'signaling' + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

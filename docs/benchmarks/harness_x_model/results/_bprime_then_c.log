@@ -1,0 +1,107 @@
+=== P2.3 + P2.4 Sequential Pilot starting at 2026-04-18T06:31:20Z ===
+OLLAMA_HOST=http://localhost:7000
+
+####################################################
+#  P2.3 — B' pilot (48 trials, mode=B_prime)
+####################################################
+
+
+=== B' pilot finished at 2026-04-18T08:29:07Z with exit code 0 ===
+=== B' pilot_gates.json ===
+{
+  "gate_a": {
+    "passed": true,
+    "endpoint": "celltypes_coverage_pct",
+    "strong_on_median_pct": 61.25,
+    "strong_off_median_pct": 42.22,
+    "threshold_pct": 90.0
+  },
+  "gate_null": {
+    "passed": true,
+    "skipped": true,
+    "reason": "Gate Null only applies to mode=B; got mode=B_prime"
+  },
+  "gate_b": {
+    "passed": true,
+    "error_rate": 0.0208,
+    "latency_ms_median": 109980.0,
+    "error_rate_threshold": 0.05,
+    "latency_ms_threshold": 600000,
+    "n_rows": 48,
+    "n_errors": 1
+  },
+  "gate_c": {
+    "passed": true,
+    "unique_rounded_values_per_condition": {
+      "strong_on": 9,
+      "strong_off": 9,
+      "weak_on": 10,
+      "weak_off": 9
+    },
+    "minimum_observed": 9,
+    "threshold": 3
+  },
+  "variance": {
+    "passed": true,
+    "mean_per_case_stdev_pct": 13.363,
+    "threshold_pct": 2.0,
+    "n_cases_with_multi_rows": 12
+  },
+  "all_passed": true,
+  "messages": [],
+  "generated_at": "2026-04-18T08:29:06Z",
+  "benchmark_mode": "B_prime"
+}
+
+####################################################
+#  P2.4 — C pilot (48 trials, mode=C)
+####################################################
+
+
+=== C pilot finished at 2026-04-18T10:16:00Z with exit code 0 ===
+=== C pilot_gates.json ===
+{
+  "gate_a": {
+    "passed": true,
+    "endpoint": "celltypes_coverage_pct",
+    "strong_on_median_pct": 61.25,
+    "strong_off_median_pct": 44.44,
+    "threshold_pct": 90.0
+  },
+  "gate_null": {
+    "passed": true,
+    "skipped": true,
+    "reason": "Gate Null only applies to mode=B; got mode=C"
+  },
+  "gate_b": {
+    "passed": true,
+    "error_rate": 0.0,
+    "latency_ms_median": 109531.0,
+    "error_rate_threshold": 0.05,
+    "latency_ms_threshold": 600000,
+    "n_rows": 48,
+    "n_errors": 0
+  },
+  "gate_c": {
+    "passed": true,
+    "unique_rounded_values_per_condition": {
+      "strong_on": 9,
+      "strong_off": 9,
+      "weak_on": 9,
+      "weak_off": 10
+    },
+    "minimum_observed": 9,
+    "threshold": 3
+  },
+  "variance": {
+    "passed": true,
+    "mean_per_case_stdev_pct": 14.824,
+    "threshold_pct": 2.0,
+    "n_cases_with_multi_rows": 12
+  },
+  "all_passed": true,
+  "messages": [],
+  "generated_at": "2026-04-18T10:15:59Z",
+  "benchmark_mode": "C"
+}
+=== All 3 modes complete at 2026-04-18T10:16:00Z ===

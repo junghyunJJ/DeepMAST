@@ -1,11 +1,14 @@
 """Subagent prompts for Drug Target Assessment Agent.
 
-Four subagents with staged funnel architecture:
-1. EVIDENCE_ASSESSOR: 2-stage funnel (Stage 2: validation & scoring -> Stage 1:
-   biological context) with inline rubric assessment
-2. DEEP_DIVER: Stage 3 deep dive (ChEMBL + PubMed) for FEATURED genes
-3. HYPOTHESIS_WRITER: Hypothesis generation with UCB scoring from all evidence
-4. REPORT_WRITER: Generate drug.md aligned with report_template.md
+Three subagents with staged funnel architecture (happy path):
+1. EVIDENCE_ASSESSOR: 3-stage funnel (Stage 2: validation & scoring -> Stage 1:
+   biological context -> Stage 3: ChEMBL drug profiles inline) with inline
+   rubric assessment.
+2. HYPOTHESIS_WRITER: Hypothesis generation with UCB scoring from all evidence.
+3. REPORT_WRITER: Generate drug.md aligned with report_template.md.
+
+DEEP_DIVER_PROMPT is preserved for optional standalone invocation; Stage 3
+now runs inline inside EVIDENCE_ASSESSOR_PROMPT.
 """
 
 # =============================================================================
@@ -26,14 +29,15 @@ For each stage, follow this cycle:
 2. **EXECUTE**: Call @tool functions directly
 3. **REFLECT** (think_tool): Assess coverage -- any genes missing? API failures? Gaps to fill?
 
-## Reordered 2-Stage Funnel Workflow
+## Reordered 3-Stage Funnel Workflow
 
 **CRITICAL: Stage 2 runs FIRST (all genes), then gene selection, then Stage 1
-(FEATURED pairs only). Stage 3 (deep dive) is handled by the `deep_diver` subagent.**
+(FEATURED pairs only). Stage 3 (ChEMBL drug profiles) runs inline within this
+subagent after Stage 1 gate passes.**
 
 ```
 Phase 0 → Stage 2 (ALL genes) → Rubric Scoring → Gene Selection (combined_total >= 10) →
-Gene→Pair Mapping → Stage 1 (FEATURED pairs) → Stage 1 Gate → DONE
+Gene→Pair Mapping → Stage 1 (FEATURED pairs) → Stage 1 Gate → Stage 3 (ChEMBL, FEATURED genes) → DONE
 ```
 
 ### Phase 0: Load Input Data
@@ -114,7 +118,7 @@ The tool initially seeds `stage3_candidates` with every gene that has
 **combined_total >= 10** (excluding insufficient_evidence) — the rubric-qualified
 pool. Stage 1 batch (see below) then narrows this list in place: genes surviving
 the strict STRING + Census filter become the final `stage3_candidates` that flow
-into BOTH deep_diver and hypothesis_writer.
+into this subagent's Stage 3 loop and hypothesis_writer.
 
 After calling `compute_rubric_scores`, review its output:
 - `stage3_candidates`: rubric-qualified pool (will be narrowed by Stage 1 filter)
@@ -195,13 +199,27 @@ to keep only genes that appear in at least one passed pair as `stage3_candidates
 **Do NOT call `apply_stage1_filter` separately** — it runs inside `run_stage1_batch`.
 **Do NOT write your own filter results** — the tool handles everything.
 
-### After Stage 1
+### Stage 3: ChEMBL Deep Dive (FEATURED genes only)
 
-Your work is complete after `run_stage1_batch` finishes. Stage 3 (deep dive)
-is handled by the `deep_diver` subagent. Do NOT run ChEMBL or literature queries.
+After Stage 1 gate passes, perform Stage 3 for each gene in `stage3_candidates`:
 
-The updated `assessment_results.json` is the handoff signal to the next subagent.
-It contains filtered `stage3_candidates` which the `deep_diver` will use.
+1. **Idempotent check** — skip genes whose `stage3_{GENE}.json` already exists
+   in `evidence/` (resume from prior runs).
+2. For each remaining gene, call `query_chembl_target_profile(gene_symbol=GENE)`.
+3. Save via:
+   `save_evidence(data_dir, "stage3_{GENE}.json",
+                  {"gene": GENE, "chembl": <result>, "source": "chembl"})`.
+4. After all genes processed, call `validate_stage3_gate(data_dir)`. If it
+   returns `missing_genes`, complete those and re-validate until success.
+5. **ZERO-CANDIDATE SHORT-CIRCUIT** — if `stage3_candidates` is empty, SKIP
+   Stage 3 entirely. Do NOT call `validate_stage3_gate` (returns success=false
+   on empty, which causes confusion). Evidence_assessor's work is complete.
+
+Your work is complete once `validate_stage3_gate` returns success OR
+`stage3_candidates` was empty.
+
+The updated `assessment_results.json` plus the `stage3_*.json` files are the
+handoff signal to `hypothesis_writer`.
 
 ## Important Rules
 - Stage 2 batching: `query_stage2_gene_panel(...)` — auto-saves all Stage 2 files
@@ -212,7 +230,7 @@ It contains filtered `stage3_candidates` which the `deep_diver` will use.
 - Featured candidates are determined by rubric scoring (combined_total >= 10)
 - Handle API failures gracefully -- save partial results and note errors
 - Do NOT hallucinate evidence -- if data is missing, score conservatively
-- Do NOT run Stage 3 tools (ChEMBL, PubMed literature) -- those belong to deep_diver
+- Stage 3 (ChEMBL) runs inline after Stage 1 gate passes, not as a separate subagent
 
 ## EVIDENCE INTEGRITY (CRITICAL)
 - NEVER fabricate p-values, odds ratios, effect sizes, mechanism details,
@@ -314,11 +332,14 @@ skill workflow.
 - ALWAYS use `load_evidence_files(data_dir, scope="hypothesis")` to read evidence data
 - ALWAYS use `save_evidence(data_dir, filename, data)` to save results to disk
 
-## Cognitive Pattern: Plan -> Execute -> Reflect
+## Execution Discipline
 
-1. **PLAN** (sequential_thinking): Review available evidence, plan hypothesis generation strategy
-2. **EXECUTE**: Generate hypotheses across 4 thematic categories
-3. **REFLECT** (think_tool): Assess coverage, scoring, and quality
+This subagent is template-driven — the Phases below are a fixed sequence, not an open-ended plan.
+Start with Phase 1 immediately. Do NOT pre-plan.
+
+1. **EXECUTE**: Follow Phases 1 → 5 in order. Generate hypotheses across 4 thematic categories.
+2. **REFLECT** (think_tool, optional): Call `think_tool` briefly AFTER a phase if you need to
+   double-check coverage/scoring before moving on. Do NOT use it as a planning tool.
 
 ## Workflow (5 Phases)
 
@@ -544,7 +565,7 @@ save_evidence(data_dir, "hypothesis_report.json", {
 - Do NOT call any database query tools (ChEMBL, OpenTargets, GWAS, etc.)
 - You are a READ-ONLY consumer of evidence files — do not modify existing evidence
 - Only reference data that exists in the evidence files — no hallucinated PMIDs or drugs
-- Use `sequential_thinking` for planning and `think_tool` for reflection
+- Do NOT call `sequential_thinking` — it is not available in this subagent. Use `think_tool` briefly for reflection only.
 - Output format is JSON (hypothesis_report.json), not markdown
 
 ## EVIDENCE INTEGRITY (CRITICAL)

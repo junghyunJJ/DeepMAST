@@ -2,11 +2,12 @@
 
 Detailed search strategies, tool API, and examples for the `biomedical-literature-search` skill.
 
-Note: this reference expands the SEARCHER-facing workflow in `SKILL.md`. The active SEARCHER contract is coverage-driven: extract context, run the primary search, inspect `coverage_sufficient` plus `recommended_actions`, and follow up only when the result says more work is needed.
+Note: this reference expands the Rev6 SEARCHER workflow in `SKILL.md`. The active SEARCHER contract is multi-axis: extract context, run the primary search, inspect `coverage`, treat `coverage_sufficient` and `recommended_actions` as reference signals, then bundle pathway and celltype follow-up when the active drivers are still weak.
 
 ## Table of Contents
 
 - [Complete Tool API Reference](#complete-tool-api-reference)
+- [Rev6 Follow-Up Policy](#rev6-follow-up-policy)
 - [Advanced PubMed E-utilities Patterns](#advanced-pubmed-e-utilities-patterns)
 - [Part-Specific Search Focus](#part-specific-search-focus)
 - [L-R Interaction Search Strategy](#l-r-interaction-search-strategy)
@@ -46,6 +47,7 @@ Notes:
 - `genes` may already include candidate genes added by `load_analysis_data`.
 - `lr_pairs` support is activated through `enable_lr_pair_queries=True` for SEARCHER.
 - When `output_path` is set, always pass `data_dir`.
+- The compact summary is only the first layer. Rev6 follow-up must inspect the nested `coverage` object directly.
 
 **Manual shell wrapper**
 
@@ -75,7 +77,7 @@ python scripts/search_literature_dynamic.py \
 - `rerank_dropped_count`
 - `message`
 
-`coverage_sufficient` and `recommended_actions` are the operational fields SEARCHER uses for follow-up.
+`coverage_sufficient` and `recommended_actions` are operational hints, not the only follow-up gate.
 
 **Returns without `output_path`**
 - `papers`
@@ -91,9 +93,9 @@ python scripts/search_literature_dynamic.py \
 
 If LLM query generation fails, the tool automatically switches to a fixed internal strategy. No separate fallback call is needed.
 
-### search_literature (Targeted Follow-up)
+### search_literature (Bundled Follow-up)
 
-Use `search_literature` for structured follow-up when the primary search leaves missing genes, pathway context, or too little disease-specific evidence.
+Use `search_literature` for structured follow-up when the primary search leaves missing pathway or celltype context, weak disease anchoring, or low paper count.
 
 ```python
 search_literature(
@@ -106,21 +108,22 @@ search_literature(
 
 ```python
 search_literature(
-    genes=[],
+    genes=["COL1A2"],
     disease="breast cancer",
-    keywords=["TGF-beta signaling", "fibroblast", "stromal"],
+    keywords=["VEGF signaling", "endothelial cells", "tumor microenvironment"],
     max_results=10,
 )
 ```
 
 Use it when:
-- `recommended_actions` identifies missing genes
-- pathway coverage is weak and you need a focused keyword search
+- pathway coverage is weak and pathway context exists
+- celltype coverage is weak and celltype context exists
 - the paper count is low and a broader disease-context follow-up is enough
+- gene coverage is below the guardrail and gene aliases need one targeted pass
 
-### think_tool (Manual Reflection Aid)
+### think_tool (Manual-Only Legacy Aid)
 
-`think_tool` is not part of the active SEARCHER toolset. SEARCHER should follow `coverage_sufficient` and `recommended_actions` directly.
+`think_tool` is not part of the active SEARCHER toolset. SEARCHER should follow the Rev6 bundled follow-up rules rather than trying to add a reflection loop.
 
 The runtime payload may still include a legacy recommendation string mentioning `think_tool`. Treat that string as manual-only guidance rather than a SEARCHER step.
 
@@ -131,8 +134,8 @@ Use `think_tool` only when:
 
 ```python
 think_tool(
-    reflection="Coverage summary: gene coverage below target for SNAI1. "
-               "Recommended follow-up is a focused gene search with EMT context.",
+    reflection="Coverage summary: pathway context is still weak after bundle 1. "
+               "Manual reviewer wants an extra reflection pass before escalating.",
     iteration=1,
     max_iterations=1,
     score_threshold=0.7,
@@ -141,16 +144,74 @@ think_tool(
 
 ---
 
+## Rev6 Follow-Up Policy
+
+Rev6 SEARCHER completion is based on multiple axes, not only on `coverage_sufficient`.
+
+### Active Drivers
+
+| Axis | Target | Role | Applies When |
+|------|--------|------|--------------|
+| Papers | `>=15` | Active driver | Always |
+| Gene | `>=60%` | Guardrail | Always |
+| Pathway | `>=50%` | Active driver | Only when `search_context["pathways"]` is non-empty |
+| Celltype | `>=60%` | Active driver | Only when `search_context["celltypes"]` is non-empty |
+
+### Rev6 Decision Rules
+
+1. Run `search_literature_dynamic` first.
+2. Inspect `coverage`, `coverage_sufficient`, and `recommended_actions`.
+3. Determine which active axes exist for this case.
+4. If papers are low or any active axis is below target, run bundled follow-up round 1.
+5. Bundle pathway and celltype signals together in one follow-up pass. Add gene aliases only if gene coverage is below 60 percent.
+6. Re-run `search_literature_dynamic` at most once, and only when papers stay below 15 or both active drivers remain weak after bundle 1.
+7. Stop after two bundled follow-up rounds. Carry forward a warning if important gaps remain.
+
+### Rev6 Bundled Follow-Up Example
+
+```python
+coverage = result["coverage"]
+has_pathways = bool(search_context["pathways"])
+has_celltypes = bool(search_context["celltypes"])
+
+needs_bundle = (
+    coverage["total_papers"] < 15
+    or coverage["genes_coverage_pct"] < 60
+    or (has_pathways and coverage["pathways_coverage_pct"] < 50)
+    or (has_celltypes and coverage["celltypes_coverage_pct"] < 60)
+)
+
+if needs_bundle:
+    search_literature(
+        genes=coverage["genes_missing"][:3] or search_context["genes"][:2],
+        disease="breast cancer",
+        keywords=[
+            "VEGF signaling",
+            "angiogenesis",
+            "endothelial cells",
+            "stromal cells",
+            "tumor microenvironment",
+            "spatial transcriptomics",
+        ],
+        max_results=10,
+    )
+```
+
+Absent-pathway cases are not pathway failures. If the case has no pathway context, pathway is informational only.
+
+---
+
 ## Advanced PubMed E-utilities Patterns
 
-Use `search_pubmed_advanced` when coverage gaps remain after direct follow-up or when you need exact PubMed syntax.
+Use `search_pubmed_advanced` when bundled follow-up still leaves important gaps or when you need exact PubMed syntax.
 
 Typical reasons to use it:
 - recent papers only
 - publication-type filters
 - MeSH terms
 - field-specific query control
-- proximity operators
+- exact pathway wording
+- exact celltype wording
 
 Examples:
 
@@ -163,24 +224,15 @@ search_pubmed_advanced(
 
 ```python
 search_pubmed_advanced(
+    query="VEGF signaling[tiab] AND endothelial[tiab] AND breast cancer[tiab]",
+    max_results=10,
+)
+```
+
+```python
+search_pubmed_advanced(
     query="cell-cell interaction[tiab] AND systematic review[pt]",
     min_date="2023/01/01",
-    max_results=10,
-)
-```
-
-```python
-search_pubmed_advanced(
-    query="CDH1[tiab] AND E-cadherin[tiab] AND epithelial mesenchymal[mh]",
-    min_date="2020/01/01",
-    max_results=10,
-)
-```
-
-```python
-search_pubmed_advanced(
-    query="(VEGFA[tiab] OR TGFB1[tiab]) AND neoplasms[mh] AND review[pt]",
-    min_date="2022/01/01",
     max_results=10,
 )
 ```
@@ -238,7 +290,7 @@ search_literature_dynamic(
 search_literature(
     genes=["SPP1", "CD44"],
     disease="breast cancer",
-    keywords=["tumor microenvironment", "macrophage", "ECM remodeling"],
+    keywords=["cell-cell interaction", "tumor microenvironment", "stromal cells"],
     max_results=10,
 )
 ```
@@ -250,42 +302,30 @@ search_literature(
 ### Required Parameters
 - `pathways`: pathway names from analysis
 - `disease`: disease context
+- `celltypes`: associated cell types when available
 
-### Major Pathway Keywords
+### Common Pathway Rephrasings
 
-| Pathway | Recommended Search Terms |
-|---------|--------------------------|
+| Input | Useful Follow-up Terms |
+|------|-------------------------|
 | WNT | `WNT pathway`, `WNT signaling`, `beta-catenin` |
 | NFkB | `NFkB pathway`, `NF-kappa B`, `inflammatory signaling` |
-| TNFa | `TNF signaling`, `TNF-alpha`, `TNFR` |
-| TGFb | `TGF-beta signaling`, `SMAD`, `fibrosis` |
-| JAK-STAT | `JAK STAT pathway`, `cytokine signaling` |
-| PI3K-AKT | `PI3K AKT`, `mTOR signaling` |
+| TGFb | `TGF-beta signaling`, `SMAD`, `fibroblast activation` |
+| Hypoxia | `hypoxia signaling`, `HIF1A`, `tumor hypoxia` |
 | MAPK | `MAPK pathway`, `ERK signaling` |
-| Hypoxia | `hypoxia`, `HIF-1`, `oxygen sensing` |
-| EGFR | `EGFR signaling`, `ErbB`, `receptor tyrosine kinase` |
-| VEGF | `VEGF signaling`, `angiogenesis`, `vascular` |
 
-### Search Examples
+### Pattern
 
-```python
-search_literature_dynamic(
-    genes=[],
-    pathways=["WNT", "TGFb", "Hypoxia"],
-    celltypes=["Fibroblast", "Tumor"],
-    disease="breast cancer",
-    max_results=20,
-    output_path="papers.json",
-    data_dir=data_path,
-    enable_lr_pair_queries=True,
-)
-```
+When pathway context is weak, combine:
+- pathway-specific keywords
+- disease context
+- one or two missing celltypes
 
 ```python
 search_literature(
     genes=[],
     disease="breast cancer",
-    keywords=["TGF-beta signaling", "fibroblast", "stroma"],
+    keywords=["VEGF signaling", "angiogenesis", "endothelial cells", "stromal cells"],
     max_results=10,
 )
 ```
@@ -295,33 +335,13 @@ search_literature(
 ## Gene/Marker Search Strategy
 
 ### Required Parameters
-- `genes`: SEARCHER-ready gene symbols from `search_context["genes"]`
+- `genes`: search genes from `search_context`
 - `celltypes`: associated cell types when available
+- `disease`: disease context
 
-### Context-Specific Keywords
+### Pattern
 
-| Context | Recommended Keywords |
-|---------|----------------------|
-| Spatial marker | `spatial transcriptomics`, `spatial distribution` |
-| Cell type marker | `cell type`, `marker gene`, `single cell` |
-| DEG | `differential expression`, `upregulated`, `downregulated` |
-| Cluster marker | `cluster`, `subpopulation`, `heterogeneity` |
-| EMT marker | `epithelial mesenchymal transition`, `E-cadherin`, `vimentin` |
-
-### Search Examples
-
-```python
-search_literature_dynamic(
-    genes=["GFAP", "AQP4", "SLC1A2"],
-    pathways=[],
-    celltypes=["Astrocyte"],
-    disease="Alzheimer disease",
-    max_results=20,
-    output_path="papers.json",
-    data_dir=data_path,
-    enable_lr_pair_queries=True,
-)
-```
+Gene follow-up is a guardrail pass, not the main optimization target. Only do it when gene coverage is below 60 percent.
 
 ```python
 search_literature(
@@ -338,29 +358,34 @@ search_literature(
 
 ### `max_results` Settings
 - 15 to 30: standard primary search
-- 10: targeted follow-up search
+- 10: targeted bundled follow-up search
 - 30 to 40: broader literature sweep when paper count stays low
 
 ### When Results Are Scarce
 1. Broaden the disease phrasing.
-2. Remove overly specific cell types from the follow-up query.
+2. Remove overly specific terms from the bundled keyword list.
 3. Use `search_literature` with broader structured keywords.
-4. Use `search_pubmed_advanced` when you know the exact PubMed phrasing you want.
+4. Use `search_pubmed_advanced` when exact PubMed phrasing is known.
 
 ### Coverage Targets
 - At least 15 papers
 - At least 60 percent gene coverage
-- At least 50 percent pathway coverage
-- Up to 2 SEARCHER follow-up rounds after the primary call
+- At least 50 percent pathway coverage when pathway context exists
+- At least 60 percent celltype coverage when celltype context exists
+- Up to 2 bundled SEARCHER follow-up rounds
 
 ### Example Follow-Up Pattern
 
 ```python
-if not result["coverage_sufficient"]:
+if (
+    result["coverage"]["total_papers"] < 15
+    or result["coverage"]["genes_coverage_pct"] < 60
+    or result["coverage"]["celltypes_coverage_pct"] < 60
+):
     search_literature(
-        genes=["MISSING_GENE"],
+        genes=result["coverage"]["genes_missing"][:3],
         disease="disease context",
-        keywords=["pathway keyword", "cell type keyword"],
+        keywords=["pathway keyword", "celltype keyword", "microenvironment keyword"],
         max_results=10,
     )
 ```
@@ -374,45 +399,39 @@ if not result["coverage_sufficient"]:
 | Analysis Type | Primary Tool | Follow-up Tool | Key Parameters |
 |---------------|--------------|----------------|----------------|
 | L-R interaction | `search_literature_dynamic` | `search_literature` | `genes=[ligand, receptor]`, `disease`, `enable_lr_pair_queries=True` |
-| Pathway | `search_literature_dynamic` | `search_literature` | `pathways=[...]`, `disease` |
+| Pathway | `search_literature_dynamic` | `search_literature` or `search_pubmed_advanced` | `pathways=[...]`, `disease`, `celltypes=[...]` |
 | Gene markers | `search_literature_dynamic` | `search_literature` | `genes=[...]`, `celltypes=[...]` |
 | Precision PubMed syntax | `search_pubmed_advanced` | none | `query=...`, date filters, MeSH filters |
 
-### Follow-Up Flow
+### Rev6 Follow-Up Flow
 
 1. Run `search_literature_dynamic`.
-2. Inspect `coverage_sufficient`.
-3. If it is false, inspect `recommended_actions`.
-4. Choose the smallest direct follow-up:
+2. Inspect `coverage`, `coverage_sufficient`, and `recommended_actions`.
+3. Decide which active axes apply to this case.
+4. If papers are low or any active axis is weak, run bundled follow-up:
    - `search_literature` for structured gap filling
-   - `search_pubmed_advanced` for exact PubMed syntax
-5. Stop after the result is good enough or the follow-up limit is reached.
+   - `search_pubmed_advanced` for exact PubMed phrasing
+5. Re-run `search_literature_dynamic` only under the bounded Rev6 rerun rule.
+6. Stop after two bundled rounds or when the active targets are good enough.
 
 ### Quality Thresholds
 
-| Check | Target | Typical response if below target |
-|-------|--------|----------------------------------|
-| Total papers | At least 15 | Broaden disease scope or add supporting keywords |
-| Gene coverage | At least 60 percent | Add gene aliases or targeted gene follow-up |
-| Pathway coverage | At least 50 percent | Add pathway-specific keywords such as `signaling` |
-| SEARCHER follow-up rounds | 2 | Proceed with warning if critical gaps remain |
-
-### Phase-to-Tool Mapping
-
-| Phase | Tool | Purpose | Output |
-|-------|------|---------|--------|
-| Phase 1 | `load_analysis_data` | Load SEARCHER-ready `search_context` | `/search_context.json` |
-| Phase 2 | `search_literature_dynamic` | Run the primary search | `/papers.json` plus compact summary |
-| Phase 3 | `search_literature` or `search_pubmed_advanced` | Targeted follow-up from `recommended_actions` | Updated evidence base |
-| Phase 4 | auto-save via `output_path` | Persist full result for downstream stages | `/papers.json` |
+| Check | Target | Notes |
+|-------|--------|-------|
+| Total papers | At least 15 | Always active |
+| Gene coverage | At least 60 percent | Guardrail only |
+| Pathway coverage | At least 50 percent | Only when pathway context exists |
+| Celltype coverage | At least 60 percent | Only when celltype context exists |
+| SEARCHER follow-up rounds | 2 | Hard cap |
 
 ### Common `recommended_actions` Patterns
 
 | Pattern | Meaning | Typical follow-up |
 |---------|---------|------------------|
 | Missing genes listed | Symbol coverage is weak | `search_literature` with gene aliases and disease keywords |
-| Missing pathways listed | Pathway context is weak | `search_literature` with pathway-specific keywords or `search_pubmed_advanced` |
-| Too few papers | Breadth is weak | Broaden disease phrasing or increase `max_results` |
+| Missing pathways listed | Pathway context is weak | bundled `search_literature` with pathway and celltype keywords |
+| Celltype coverage is weak | Context-rich papers are missing | bundled `search_literature` with celltype and microenvironment keywords |
+| Too few papers | Breadth is weak | Broaden disease phrasing or bounded rerun |
 
 ---
 
@@ -428,38 +447,9 @@ demonstrating that [paper's key finding] (Author et al., Year; PMID: xxxxx).
 Furthermore, [expand context] (Author2 et al., Year; PMID: xxxxx).
 ```
 
-Writing principles:
-- state the analysis result first
-- connect it to supporting literature
-- cite PMIDs from `/papers.json`
-- include specific statistics from the analysis
-
-### Reference List Format
-
-```markdown
-## References
-
-1. Author et al. (Year) Title. Journal. PMID: xxxxx
-   Relevance: [How this paper supports the finding]
-
-2. Author et al. (Year) Title. Journal. PMID: xxxxx
-   Relevance: [How this paper supports the finding]
-```
-
 ---
 
 ## Full Example: Apoe-Trem2 in Alzheimer Disease
-
-### Input
-Found enriched Apoe-Trem2 interaction (LIANA score: 2.3, p=0.001) in microglia surrounding amyloid plaques in an Alzheimer disease mouse brain dataset.
-
-### Phase 1: Extract Context
-- Analysis type: L-R interaction
-- Key genes: APOE, TREM2
-- Cell types: Microglia
-- Disease: Alzheimer disease
-
-### Phase 2: Run Primary Search
 
 ```python
 result = search_literature_dynamic(
@@ -474,27 +464,27 @@ result = search_literature_dynamic(
 )
 ```
 
-Expected compact summary shape:
+Expected interpretation:
+- if pathway and celltype coverage are good, stop after the primary pass
+- if either is weak, run one bundled follow-up with microglia and pathway keywords
+- only escalate to exact PubMed syntax if the bundled pass still leaves important gaps
+
+Example summary:
 
 ```python
 {
-    "saved_to": "/path/to/papers.json",
-    "total_papers": 28,
-    "coverage_sufficient": True,
-    "recommended_actions": [],
+  "coverage_sufficient": True,
+  "recommended_actions": [],
+  "coverage": {
+    "genes_coverage_pct": 100,
+    "pathways_coverage_pct": 100,
+    "celltypes_coverage_pct": 100,
+    "total_papers": 20
+  }
 }
 ```
 
-### Phase 3: Inspect Coverage and Decide
-- Papers found: 28
-- Genes covered: APOE and TREM2
-- Pathway coverage reached the threshold
-- `coverage_sufficient` is `True`, so no direct SEARCHER follow-up is needed
-
-### Phase 4: Use Saved Output
-
-The full result is already saved to `/papers.json`. Downstream stages can read that file directly without asking SEARCHER to rewrite it.
-
-### Generated Interpretation by INTERPRETER
-
-Our finding of enriched Apoe-Trem2 interaction (LIANA score: 2.3, p=0.001) in plaque-associated microglia is consistent with reports that the TREM2-APOE pathway drives the transcriptional phenotype of disease-associated microglia (Krasemann et al., 2017; PMID: 28930663). This interaction has also been linked to microglial response to amyloid pathology (Zhou et al., 2020; PMID: 31932797).
+When this happens:
+- the active drivers are satisfied
+- no bundled follow-up is needed
+- `/papers.json` is ready for downstream interpretation

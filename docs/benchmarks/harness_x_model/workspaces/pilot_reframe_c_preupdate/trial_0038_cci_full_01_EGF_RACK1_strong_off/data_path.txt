@@ -1,0 +1,1 @@
+/common/jungj2/project/DeepMAST/docs/benchmarks/harness_x_model/workspaces/pilot/trial_0038_cci_full_01_EGF_RACK1_strong_off

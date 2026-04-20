@@ -1,0 +1,1052 @@
+[
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Evaluate target validation evidence and score druggability using genetic associations",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.034,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Evaluate target validation evidence and score druggability using genetic associations",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Evaluate target validation evidence and score druggability using genetic associations",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Evaluate target validation evidence and score druggability using genetic associations",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Evaluate target validation evidence and score druggability using genetic associations",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.012,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Query OpenTargets for target-disease association and GWAS gene-trait evidence",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.016,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Query OpenTargets for target-disease association and GWAS gene-trait evidence",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Query OpenTargets for target-disease association and GWAS gene-trait evidence",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Query OpenTargets for target-disease association and GWAS gene-trait evidence",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Query OpenTargets for target-disease association and GWAS gene-trait evidence",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Assess tractability and genetic support for the target gene panel",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.018,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Assess tractability and genetic support for the target gene panel",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Assess tractability and genetic support for the target gene panel",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Assess tractability and genetic support for the target gene panel",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage2_direct",
+    "prompt": "Assess tractability and genetic support for the target gene panel",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Perform deep dive: retrieve known drugs and clinical compound profiles via ChEMBL",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.018,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Perform deep dive: retrieve known drugs and clinical compound profiles via ChEMBL",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.015,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Perform deep dive: retrieve known drugs and clinical compound profiles via ChEMBL",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Perform deep dive: retrieve known drugs and clinical compound profiles via ChEMBL",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Perform deep dive: retrieve known drugs and clinical compound profiles via ChEMBL",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.012,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Query ChEMBL target profile for the featured candidate's drug landscape",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.017,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Query ChEMBL target profile for the featured candidate's drug landscape",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Query ChEMBL target profile for the featured candidate's drug landscape",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Query ChEMBL target profile for the featured candidate's drug landscape",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Query ChEMBL target profile for the featured candidate's drug landscape",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.012,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Investigate approved drugs and clinical trial compounds for this target",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.017,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Investigate approved drugs and clinical trial compounds for this target",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.015,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Investigate approved drugs and clinical trial compounds for this target",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.015,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Investigate approved drugs and clinical trial compounds for this target",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.017,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage3_direct",
+    "prompt": "Investigate approved drugs and clinical trial compounds for this target",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.012,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Run full Stage 2 validation then Stage 3 deep dive for featured candidates",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.018,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Run full Stage 2 validation then Stage 3 deep dive for featured candidates",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.017,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Run full Stage 2 validation then Stage 3 deep dive for featured candidates",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.016,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Run full Stage 2 validation then Stage 3 deep dive for featured candidates",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.015,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Run full Stage 2 validation then Stage 3 deep dive for featured candidates",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Comprehensive target assessment: genetic evidence, druggability, and known compounds",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.017,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Comprehensive target assessment: genetic evidence, druggability, and known compounds",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.015,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Comprehensive target assessment: genetic evidence, druggability, and known compounds",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Comprehensive target assessment: genetic evidence, druggability, and known compounds",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.015,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Comprehensive target assessment: genetic evidence, druggability, and known compounds",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Complete assessment pipeline from GWAS evidence through drug compound profiling",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.018,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Complete assessment pipeline from GWAS evidence through drug compound profiling",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Complete assessment pipeline from GWAS evidence through drug compound profiling",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.015,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Complete assessment pipeline from GWAS evidence through drug compound profiling",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "composite",
+    "prompt": "Complete assessment pipeline from GWAS evidence through drug compound profiling",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Query KEGG pathways for the ligand gene and STRING PPI score for this L-R pair",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.019,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Query KEGG pathways for the ligand gene and STRING PPI score for this L-R pair",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.019,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Query KEGG pathways for the ligand gene and STRING PPI score for this L-R pair",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.019,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Query KEGG pathways for the ligand gene and STRING PPI score for this L-R pair",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Query KEGG pathways for the ligand gene and STRING PPI score for this L-R pair",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Run CELLxGENE census validation and Reactome pathway queries for biological context",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.015,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Run CELLxGENE census validation and Reactome pathway queries for biological context",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Run CELLxGENE census validation and Reactome pathway queries for biological context",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Run CELLxGENE census validation and Reactome pathway queries for biological context",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Run CELLxGENE census validation and Reactome pathway queries for biological context",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Gather Stage 1 biological context: pathways, PPI, and cell type expression",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.015,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Gather Stage 1 biological context: pathways, PPI, and cell type expression",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Gather Stage 1 biological context: pathways, PPI, and cell type expression",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Gather Stage 1 biological context: pathways, PPI, and cell type expression",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "stage1_tools_only",
+    "prompt": "Gather Stage 1 biological context: pathways, PPI, and cell type expression",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Finalize Stage 1 artifacts and save all evidence files to the evidence directory",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.016,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Finalize Stage 1 artifacts and save all evidence files to the evidence directory",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Finalize Stage 1 artifacts and save all evidence files to the evidence directory",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Finalize Stage 1 artifacts and save all evidence files to the evidence directory",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Finalize Stage 1 artifacts and save all evidence files to the evidence directory",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.012,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Load LR candidates, organize collected data, and prepare for Stage 2",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.017,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Load LR candidates, organize collected data, and prepare for Stage 2",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.019,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Load LR candidates, organize collected data, and prepare for Stage 2",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Load LR candidates, organize collected data, and prepare for Stage 2",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.016,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Load LR candidates, organize collected data, and prepare for Stage 2",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Validate evidence completeness and generate the final drug.md report",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.016,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Validate evidence completeness and generate the final drug.md report",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Validate evidence completeness and generate the final drug.md report",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.012,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Validate evidence completeness and generate the final drug.md report",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "internal_pipeline",
+    "prompt": "Validate evidence completeness and generate the final drug.md report",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.012,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Explain the biological significance of the BRAF V600E mutation",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.016,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Explain the biological significance of the BRAF V600E mutation",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.015,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Explain the biological significance of the BRAF V600E mutation",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Explain the biological significance of the BRAF V600E mutation",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Explain the biological significance of the BRAF V600E mutation",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.012,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Describe the general function of tyrosine kinases in cell signaling",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.016,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Describe the general function of tyrosine kinases in cell signaling",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Describe the general function of tyrosine kinases in cell signaling",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Describe the general function of tyrosine kinases in cell signaling",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Describe the general function of tyrosine kinases in cell signaling",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Explain the role of ligand-receptor interactions in tumor microenvironment",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.015,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Explain the role of ligand-receptor interactions in tumor microenvironment",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Explain the role of ligand-receptor interactions in tumor microenvironment",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Explain the role of ligand-receptor interactions in tumor microenvironment",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.013,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "general_biology",
+    "prompt": "Explain the role of ligand-receptor interactions in tumor microenvironment",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Visualize the Stage 2 scoring results as a heatmap",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.017,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Visualize the Stage 2 scoring results as a heatmap",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.015,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Visualize the Stage 2 scoring results as a heatmap",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Visualize the Stage 2 scoring results as a heatmap",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Visualize the Stage 2 scoring results as a heatmap",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.012,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Create a bar chart comparing druggability scores across all targets",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.016,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Create a bar chart comparing druggability scores across all targets",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Create a bar chart comparing druggability scores across all targets",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.012,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Create a bar chart comparing druggability scores across all targets",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Create a bar chart comparing druggability scores across all targets",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.012,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Draw the L-R interaction network showing PPI confidence scores",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.016,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Draw the L-R interaction network showing PPI confidence scores",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Draw the L-R interaction network showing PPI confidence scores",
+    "variant": "B1_stage_gated",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Draw the L-R interaction network showing PPI confidence scores",
+    "variant": "B3_two_phase",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.014,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  },
+  {
+    "model": "qwen3:14b",
+    "category": "data_visualization",
+    "prompt": "Draw the L-R interaction network showing PPI confidence scores",
+    "variant": "B4_minimal_desc",
+    "activated_skills": [],
+    "tool_history": [],
+    "latency_s": 0.011,
+    "error": "model 'qwen3:14b' not found (status code: 404)"
+  }
+]

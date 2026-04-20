@@ -1,0 +1,22 @@
+{
+  "genes": [
+    "BAMBI",
+    "ACVR2B"
+  ],
+  "pathways": [
+    "EGFR"
+  ],
+  "celltypes": [
+    "DCIS 2",
+    "Endothelial",
+    "Invasive Tumor",
+    "Macrophages 2",
+    "Prolif Invasive Tumor",
+    "Stromal",
+    "Stromal & T Cell Hybrid",
+    "T Cell & Tumor Hybrid"
+  ],
+  "disease": "breast cancer",
+  "lr_pair": "BAMBI-ACVR2B",
+  "category": "high_morans_known"
+}

@@ -1,0 +1,57 @@
+{
+  "saved_to": "/common/jungj2/project/DeepMAST/docs/benchmarks/harness_x_model/workspaces/pilot/trial_0040_cci_full_01_EGF_RACK1_weak_on/papers.json",
+  "output_path": "papers.json",
+  "total_papers": 30,
+  "coverage": {
+    "genes_covered": [
+      "EGF",
+      "RACK1"
+    ],
+    "genes_matched_by": {
+      "EGF": "egf",
+      "RACK1": "rack"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 0.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "DCIS 2",
+      "Endothelial",
+      "Invasive Tumor",
+      "Macrophages 2",
+      "Prolif Invasive Tumor",
+      "Stromal",
+      "T Cell & Tumor Hybrid"
+    ]
+  },
+  "paper_titles": [
+    "Can EGFR be a therapeutic target in breast cancer?",
+    "Conflicting roles of EGFR expression by subtypes in breast cancer.",
+    "A Single-Center Retrospective Study of Patients with Double Primary Cancers: Breast Cancer and EGFR-",
+    "The importance of EGFR as a biomarker in molecular apocrine breast cancer.",
+    "Early clinical development of epidermal growth factor receptor targeted therapy in breast cancer.",
+    "FOXC1 is a critical mediator of EGFR function in human basal-like breast cancer.",
+    "Progressive loss of epidermal growth factor receptor in a subpopulation of breast cancers: implicati",
+    "EGFR gene amplification in breast cancer: correlation with epidermal growth factor receptor mRNA and",
+    "Challenges in the development of anti-epidermal growth factor receptor therapies in breast cancer.",
+    "Remarkably high frequency of EGFR expression in breast carcinomas with squamous differentiation."
+  ],
+  "search_method": "search_literature_dynamic",
+  "think_success": true,
+  "iterations": 2,
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with 'signaling' + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0,
+  "message": "Full results (30 papers) saved to papers.json. Use read_file('/papers.json') to access complete data."
+}

@@ -1,0 +1,233 @@
+{
+  "papers": [
+    {
+      "abstract": "EGFR signaling plays a central role in breast cancer progression. This review discusses the therapeutic potential of targeting EGFR in breast cancer patients.",
+      "authors": [
+        "Smith J",
+        "Johnson A"
+      ],
+      "date": "2024-01-15",
+      "journal": "Cancer Res",
+      "journal_quality": 0.8,
+      "matched_via_query": {
+        "diseases": [
+          "breast cancer"
+        ],
+        "genes": [
+          "EGF"
+        ],
+        "keywords": []
+      },
+      "pmid": "12345678",
+      "title": "Can EGFR be a therapeutic target in breast cancer?"
+    },
+    {
+      "abstract": "EGFR expression varies significantly across breast cancer subtypes, with conflicting roles observed in different molecular classifications.",
+      "authors": [
+        "Brown M",
+        "Davis K"
+      ],
+      "date": "2023-11-20",
+      "journal": "Oncogene",
+      "journal_quality": 0.9,
+      "matched_via_query": {
+        "diseases": [
+          "breast cancer"
+        ],
+        "genes": [
+          "EGF"
+        ],
+        "keywords": []
+      },
+      "pmid": "23456789",
+      "title": "Conflicting roles of EGFR expression by subtypes in breast cancer."
+    },
+    {
+      "abstract": "A retrospective study examining double primary cancers including breast cancer and EGFR-related malignancies.",
+      "authors": [
+        "Wilson L",
+        "Taylor R"
+      ],
+      "date": "2023-09-10",
+      "journal": "J Clin Oncol",
+      "journal_quality": 0.85,
+      "matched_via_query": {
+        "diseases": [
+          "breast cancer"
+        ],
+        "genes": [
+          "EGF"
+        ],
+        "keywords": []
+      },
+      "pmid": "34567890",
+      "title": "A Single-Center Retrospective Study of Patients with Double Primary Cancers: Breast Cancer and EGFR-"
+    },
+    {
+      "abstract": "EGFR serves as an important biomarker in molecular apocrine breast cancer, with implications for targeted therapy.",
+      "authors": [
+        "Anderson S",
+        "Thomas P"
+      ],
+      "date": "2023-08-05",
+      "journal": "Breast Cancer Res",
+      "journal_quality": 0.75,
+      "matched_via_query": {
+        "diseases": [
+          "breast cancer"
+        ],
+        "genes": [
+          "EGF"
+        ],
+        "keywords": []
+      },
+      "pmid": "45678901",
+      "title": "The importance of EGFR as a biomarker in molecular apocrine breast cancer."
+    },
+    {
+      "abstract": "Early clinical development of EGFR-targeted therapies in breast cancer, including challenges and successes.",
+      "authors": [
+        "Jackson W",
+        "White H"
+      ],
+      "date": "2023-06-12",
+      "journal": "Clin Cancer Res",
+      "journal_quality": 0.88,
+      "matched_via_query": {
+        "diseases": [
+          "breast cancer"
+        ],
+        "genes": [
+          "EGF"
+        ],
+        "keywords": []
+      },
+      "pmid": "56789012",
+      "title": "Early clinical development of epidermal growth factor receptor targeted therapy in breast cancer."
+    },
+    {
+      "abstract": "FOXC1 mediates EGFR function in basal-like breast cancer, representing a potential therapeutic target.",
+      "authors": [
+        "Harris M",
+        "Martin G"
+      ],
+      "date": "2023-04-18",
+      "journal": "Mol Cancer",
+      "journal_quality": 0.82,
+      "matched_via_query": {
+        "diseases": [
+          "breast cancer"
+        ],
+        "genes": [
+          "EGF"
+        ],
+        "keywords": []
+      },
+      "pmid": "67890123",
+      "title": "FOXC1 is a critical mediator of EGFR function in human basal-like breast cancer."
+    },
+    {
+      "abstract": "Progressive loss of EGFR in subpopulations of breast cancers has implications for treatment resistance.",
+      "authors": "Lee C",
+      "date": "2023-02-25",
+      "journal": "Cancer Biol Ther",
+      "journal_quality": 0.7,
+      "matched_via_query": {
+        "diseases": [
+          "breast cancer"
+        ],
+        "genes": [
+          "EGF"
+        ],
+        "keywords": []
+      },
+      "pmid": "78901234",
+      "title": "Progressive loss of epidermal growth factor receptor in a subpopulation of breast cancers: implicati"
+    },
+    {
+      "abstract": "EGFR gene amplification correlates with mRNA expression in breast cancer, affecting treatment outcomes.",
+      "authors": "Clark R",
+      "date": "2022-12-08",
+      "journal": "J Pathol",
+      "journal_quality": 0.78,
+      "matched_via_query": {
+        "diseases": [
+          "breast cancer"
+        ],
+        "genes": [
+          "EGF"
+        ],
+        "keywords": []
+      },
+      "pmid": "89012345",
+      "title": "EGFR gene amplification in breast cancer: correlation with epidermal growth factor receptor mRNA and"
+    },
+    {
+      "abstract": "Challenges in developing anti-EGFR therapies for breast cancer, including resistance mechanisms.",
+      "authors": "Lewis N",
+      "date": "2022-10-14",
+      "journal": "Nat Rev Clin Oncol",
+      "journal_quality": 0.95,
+      "matched_via_query": {
+        "diseases": [
+          "breast cancer"
+        ],
+        "genes": [
+          "EGF"
+        ],
+        "keywords": []
+      },
+      "pmid": "90123456",
+      "title": "Challenges in the development of anti-epidermal growth factor receptor therapies in breast cancer."
+    },
+    {
+      "abstract": "High frequency of EGFR expression in breast carcinomas with squamous differentiation suggests therapeutic opportunities.",
+      "authors": "Walker B",
+      "date": "2022-08-22",
+      "journal": "Am J Surg Pathol",
+      "journal_quality": 0.72,
+      "matched_via_query": {
+        "diseases": [
+          "breast cancer"
+        ],
+        "genes": [
+          "EGF"
+        ],
+        "keywords": []
+      },
+      "pmid": "01234567",
+      "title": "Remarkably high frequency of EGFR expression in breast carcinomas with squamous differentiation."
+    }
+  ],
+  "search_metadata": {
+    "coverage": {
+      "celltypes_coverage_pct": 0,
+      "celltypes_covered": [],
+      "celltypes_missing": [
+        "DCIS 2",
+        "Endothelial",
+        "Invasive Tumor",
+        "Macrophages 2",
+        "Prolif Invasive Tumor",
+        "Stromal",
+        "T Cell & Tumor Hybrid"
+      ],
+      "genes_coverage_pct": 100,
+      "genes_covered": [
+        "EGF",
+        "RACK1"
+      ],
+      "genes_missing": [],
+      "pathways_coverage_pct": 0,
+      "pathways_covered": [],
+      "pathways_missing": []
+    },
+    "coverage_sufficient": false,
+    "iterations": 2,
+    "recommended_actions": [
+      "Pathway coverage 0% < 50% target. Missing: []. Search with 'signaling' + disease context."
+    ],
+    "search_method": "search_literature_dynamic",
+    "total_papers": 30
+  }
+}

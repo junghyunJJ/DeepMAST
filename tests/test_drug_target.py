@@ -175,25 +175,26 @@ class TestSubagentConfigs:
             "validate_quality",
         }
         assert expected.issubset(names)
-        # Stage 3 tools must NOT be in evidence_assessor
-        assert "query_chembl_target_profile" not in names
+        # Stage 3 ChEMBL tools now run inline in evidence_assessor (was deep_diver).
+        assert "query_chembl_target_profile" in names
+        assert "validate_stage3_gate" in names
+        # PubMed literature search is NOT wired into evidence_assessor.
         assert "search_literature_dynamic" not in names
-        assert "validate_stage3_gate" not in names
 
     def test_workflow_order(self):
         from src.agents.drug_target.subagents.configs import WORKFLOW_ORDER
-        assert WORKFLOW_ORDER == ["evidence_assessor", "deep_diver", "hypothesis_writer", "report_writer"]
+        assert WORKFLOW_ORDER == ["evidence_assessor", "hypothesis_writer", "report_writer"]
 
-    def test_get_subagents_returns_4(self):
+    def test_get_subagents_returns_3(self):
         from src.agents.drug_target.subagents.configs import get_subagents
         subagents = get_subagents()
-        assert len(subagents) == 4
+        assert len(subagents) == 3
 
     def test_get_subagents_order(self):
         from src.agents.drug_target.subagents.configs import get_subagents
         subagents = get_subagents()
         names = [s["name"] for s in subagents]
-        assert names == ["evidence_assessor", "deep_diver", "hypothesis_writer", "report_writer"]
+        assert names == ["evidence_assessor", "hypothesis_writer", "report_writer"]
 
     def test_custom_tools_appended_to_all_subagents(self):
         from src.agents.drug_target.subagents.configs import get_subagents
@@ -207,7 +208,6 @@ class TestSubagentConfigs:
     def test_evidence_assessor_prompt_mentions_databases_and_rubric(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         prompt = SUBAGENT_CONFIGS["evidence_assessor"]["system_prompt"]
-        # Database references (ChEMBL moved to deep_diver)
         for keyword in ("OpenTargets", "GWAS"):
             assert keyword in prompt
         # Rubric references (merged from clinical_assessor)
@@ -215,21 +215,38 @@ class TestSubagentConfigs:
         assert "validated" in prompt.lower()
         assert "exploratory" in prompt.lower()
 
-    def test_evidence_assessor_prompt_mentions_2_stages(self):
+    def test_evidence_assessor_prompt_mentions_3_stages(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         prompt = SUBAGENT_CONFIGS["evidence_assessor"]["system_prompt"]
         assert "Stage 1" in prompt
         assert "Stage 2" in prompt
-        assert "2-Stage Funnel" in prompt
+        assert "Stage 3" in prompt
+        assert "3-Stage Funnel" in prompt
 
-    def test_workflow_description_mentions_4_agents(self):
+    def test_evidence_assessor_has_stage3_tools(self):
+        """Stage 3 ChEMBL tools now run inline inside evidence_assessor (v5 merge)."""
+        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
+        tools = SUBAGENT_CONFIGS["evidence_assessor"]["tools"]
+        names = {t.name for t in tools}
+        assert "query_chembl_target_profile" in names
+        assert "validate_stage3_gate" in names
+
+    def test_evidence_assessor_prompt_mentions_stage3(self):
+        """Evidence assessor prompt must describe Stage 3 ChEMBL deep dive inline."""
+        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
+        prompt = SUBAGENT_CONFIGS["evidence_assessor"]["system_prompt"]
+        assert "Stage 3" in prompt
+        assert "ChEMBL" in prompt
+
+    def test_workflow_description_mentions_3_agents(self):
         from src.agents.drug_target.subagents.configs import WORKFLOW_DESCRIPTION
 
-        assert "4-Agent Workflow" in WORKFLOW_DESCRIPTION
+        assert "3-Agent Workflow" in WORKFLOW_DESCRIPTION
         assert "EVIDENCE_ASSESSOR" in WORKFLOW_DESCRIPTION
-        assert "DEEP_DIVER" in WORKFLOW_DESCRIPTION
         assert "HYPOTHESIS_WRITER" in WORKFLOW_DESCRIPTION
         assert "REPORT_WRITER" in WORKFLOW_DESCRIPTION
+        # deep_diver preserved as optional/standalone
+        assert "DEEP_DIVER" in WORKFLOW_DESCRIPTION
 
     def test_evidence_assessor_prompt_mentions_census_and_gwas(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -298,11 +315,62 @@ class TestSubagentConfigs:
         assert "Specificity" in prompt
 
     def test_subagent_prompts_registry_has_4_entries(self):
+        """SUBAGENT_PROMPTS keeps 4 entries — deep_diver prompt preserved for optional use."""
         from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
         assert len(SUBAGENT_PROMPTS) == 4
         assert set(SUBAGENT_PROMPTS.keys()) == {
             "evidence_assessor", "deep_diver", "hypothesis_writer", "report_writer",
         }
+
+
+class TestStage1NullSafe:
+    """B.1: compute_stage1_filter must not crash on explicit None values."""
+
+    def test_compute_stage1_filter_handles_null_pvalues(self):
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_filter
+        evidence = {
+            "string_ppi": {"max_combined_score": 0.9},
+            "census_validation": {"target_vs_rest": {
+                "coexpression": {"p_value": None},
+                "gene_a": {"p_value": 0.01},
+                "gene_b": {"p_value": 0.02},
+            }},
+        }
+        result = compute_stage1_filter(evidence)
+        # Null coexpression p-value defaults to 1.0 (non-passing)
+        assert result["passed"] is False
+        assert result["census_coexpr_pvalue"] == 1.0
+
+    def test_compute_stage1_filter_handles_null_string_score(self):
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_filter
+        evidence = {
+            "string_ppi": {"max_combined_score": None},
+            "census_validation": {"target_vs_rest": {
+                "coexpression": {"p_value": 0.01},
+                "gene_a": {"p_value": 0.01},
+                "gene_b": {"p_value": 0.01},
+            }},
+        }
+        result = compute_stage1_filter(evidence)
+        # Null STRING score defaults to 0.0 (fails > 0.8 threshold)
+        assert result["passed"] is False
+        assert result["string_combined"] == 0.0
+
+    def test_compute_stage1_filter_passes_with_valid_data(self):
+        """Sanity regression: valid inputs still pass the filter."""
+        from src.agents.drug_target.tools.stage_logic import compute_stage1_filter
+        evidence = {
+            "string_ppi": {"max_combined_score": 0.9},
+            "census_validation": {"target_vs_rest": {
+                "coexpression": {"p_value": 0.01},
+                "gene_a": {"p_value": 0.01},
+                "gene_b": {"p_value": 0.01},
+            }},
+        }
+        result = compute_stage1_filter(evidence)
+        assert result["passed"] is True
+        assert result["string_combined"] == 0.9
+        assert result["census_coexpr_pvalue"] == 0.01
 
 
 # =========================================================================
@@ -2788,7 +2856,7 @@ class TestIntegration:
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
-    def test_create_agent_passes_subagents_with_4_entries(
+    def test_create_agent_passes_subagents_with_3_entries(
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
@@ -2801,7 +2869,7 @@ class TestIntegration:
 
         call_kwargs = mock_create_deep_agent.call_args
         subagents = call_kwargs.kwargs.get("subagents") or call_kwargs[1].get("subagents")
-        assert len(subagents) == 4
+        assert len(subagents) == 3
 
     def test_shared_skills_middleware_filters_allowed_skill_names(self, tmp_path):
         import asyncio
@@ -3712,6 +3780,120 @@ class TestPR1Stage1Filter:
         rows = json.loads(json_sidecar.read_text())
         assert any(r["passed"] is True for r in rows)
         assert any(r["passed"] is False for r in rows)
+
+
+class TestBuildEvidenceSummaryStage1Artifacts:
+    """Reference Card loading should ignore Stage 1 sidecars and invalid payloads."""
+
+    @staticmethod
+    def _setup_reference_card_inputs(tmp_path):
+        evidence = tmp_path / "evidence"
+        evidence.mkdir(parents=True, exist_ok=True)
+
+        (tmp_path / "lr_candidates.json").write_text(json.dumps({
+            "disease": "idiopathic pulmonary fibrosis",
+            "pairs": [
+                {"ligand": "TGFB1", "receptor": "TGFBR2", "score": 0.95},
+            ],
+        }))
+
+        (evidence / "assessment_results.json").write_text(json.dumps({
+            "disease": "idiopathic pulmonary fibrosis",
+            "stage3_candidates": [{"gene": "TGFBR2"}],
+            "rubric_assessment": [{
+                "gene": "TGFBR2",
+                "classification": "validated_target",
+                "priority": "high",
+                "combined_total": 12,
+                "validated_total": 7,
+                "exploratory_total": 5,
+                "stage3_candidate": True,
+            }],
+        }))
+
+        (evidence / "stage3_TGFBR2.json").write_text(json.dumps({
+            "executed": True,
+            "matched_drugs": [],
+            "errors": [],
+            "pubmed_papers": [],
+        }))
+
+        (evidence / "stage1_TGFB1--TGFBR2.json").write_text(json.dumps({
+            "ligand": "TGFB1",
+            "receptor": "TGFBR2",
+            "string_ppi": {
+                "interaction_found": True,
+                "max_combined_score": 0.97,
+            },
+            "kegg_pathways": {
+                "ligand_pathways": [{"name": "TGF-beta signaling pathway"}],
+                "receptor_pathways": [{"name": "Cell adhesion molecules"}],
+            },
+            "reactome_pathways": {
+                "ligand_pathways": [{"name": "Extracellular matrix organization"}],
+                "receptor_pathways": [{"name": "Signaling by TGF-beta receptor complex"}],
+            },
+            "census_validation": {
+                "target_vs_rest": {
+                    "coexpression": {"risk_ratio": 2.1, "p_value": 0.001},
+                },
+            },
+        }))
+
+        return evidence
+
+    def test_build_evidence_summary_ignores_list_sidecar_and_preserves_stage1_pair(
+        self,
+        tmp_path,
+    ):
+        from src.agents.drug_target.tools.stage_logic import build_evidence_summary
+
+        evidence = self._setup_reference_card_inputs(tmp_path)
+        (evidence / "stage1_filter_results.json").write_text(json.dumps([
+            {
+                "ligand": "TGFB1",
+                "receptor": "TGFBR2",
+                "passed": True,
+                "string_combined": 0.97,
+            }
+        ]))
+
+        with patch(
+            "src.agents.drug_target.tools.drug_report_html.render_drug_md",
+            return_value="# drug draft",
+        ):
+            raw = build_evidence_summary.invoke({"data_dir": str(tmp_path)})
+
+        result = json.loads(raw)
+        featured = result["featured_genes"][0]
+        assert featured["gene"] == "TGFBR2"
+        assert "TGFB1_TGFBR2" in featured["stage1_pairs"]
+        pair = featured["stage1_pairs"]["TGFB1_TGFBR2"]
+        assert pair["ligand"] == "TGFB1"
+        assert pair["receptor"] == "TGFBR2"
+        assert pair["string_ppi"]["max_combined_score"] == 0.97
+
+    def test_build_evidence_summary_skips_unexpected_non_dict_stage1_artifact(
+        self,
+        tmp_path,
+    ):
+        from src.agents.drug_target.tools.stage_logic import build_evidence_summary
+
+        evidence = self._setup_reference_card_inputs(tmp_path)
+        (evidence / "stage1_BAD--PAYLOAD.json").write_text(json.dumps([
+            {"artifact": "not a stage1 pair payload"}
+        ]))
+
+        with patch(
+            "src.agents.drug_target.tools.drug_report_html.render_drug_md",
+            return_value="# drug draft",
+        ):
+            raw = build_evidence_summary.invoke({"data_dir": str(tmp_path)})
+
+        result = json.loads(raw)
+        featured = result["featured_genes"][0]
+        assert "TGFB1_TGFBR2" in featured["stage1_pairs"]
+        assert featured["stage1_pairs"]["TGFB1_TGFBR2"]["ligand"] == "TGFB1"
 
 
 class TestPR1HypothesisReportValidator:

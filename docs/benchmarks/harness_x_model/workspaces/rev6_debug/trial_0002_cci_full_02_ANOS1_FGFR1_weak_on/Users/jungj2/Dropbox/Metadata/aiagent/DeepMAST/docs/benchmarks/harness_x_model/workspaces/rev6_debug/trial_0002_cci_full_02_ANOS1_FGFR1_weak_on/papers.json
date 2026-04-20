@@ -1,0 +1,55 @@
+{
+  "saved_to": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/docs/benchmarks/harness_x_model/workspaces/rev6_debug/trial_0002_cci_full_02_ANOS1_FGFR1_weak_on/papers.json",
+  "output_path": "papers.json",
+  "total_papers": 30,
+  "coverage": {
+    "genes_covered": [
+      "ANOS1",
+      "FGFR1"
+    ],
+    "genes_matched_by": {
+      "ANOS1": "biomcp_tag_only",
+      "FGFR1": "biomcp_tag+text_confirmed"
+    },
+    "pathways_covered": [
+      "Hypoxia"
+    ],
+    "pathways_matched_by": {
+      "Hypoxia": "hypoxia"
+    },
+    "celltypes_covered": [
+      "Stromal",
+      "Endothelial",
+      "Macrophages 2"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 100.0,
+    "celltypes_coverage_pct": 75.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Myoepi ACTA2+"
+    ]
+  },
+  "paper_titles": [
+    "Metastatic phenotype and immunosuppressive tumour microenvironment in pancreatic ductal adenocarcino",
+    "TNFAIP3 mediates FGFR1 activation-induced breast cancer angiogenesis by promoting VEGFA expression a",
+    "The Underexplored Landscape of Hypoxia-Inducible Factor 2 Alpha and Potential Roles in Tumor Macroph",
+    "The role of hypoxia-inducible factor-1 alpha in multidrug-resistant breast cancer",
+    "TARBP2 Suppresses Ubiquitin-Proteasomal Degradation of HIF-1alpha in Breast Cancer",
+    "Cannabidiol Suppresses Angiogenesis and Stemness of Breast Cancer Cells by Downregulation of Hypoxia",
+    "Unraveling the role of hypoxia-inducible factors in cutaneous melanoma: from mechanisms to therapeut",
+    "Hypoxia-Inducible Factor-2alpha Signaling in the Skeletal System",
+    "Targeting HIF-2alpha in the Tumor Microenvironment: Redefining the Role of HIF-2alpha for Solid Canc",
+    "Hypoxia-inducible factor (HIF): The link between obesity and COVID-19"
+  ],
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_sufficient": true,
+  "recommended_actions": [],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0,
+  "message": "Full results (30 papers) saved to papers.json. Use read_file('/papers.json') to access complete data."
+}

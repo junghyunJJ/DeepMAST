@@ -1,0 +1,189 @@
+[
+  {
+    "category": "direct_mention",
+    "prompt": "OpenTargets에서 BRAF의 druggability를 확인해",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 71.927,
+    "error": null
+  },
+  {
+    "category": "direct_mention",
+    "prompt": "OpenTargets에서 BRAF의 druggability를 확인해",
+    "variant": "B_forced_eval",
+    "activated_skills": [
+      "chembl-database",
+      "opentargets-database"
+    ],
+    "read_skill_calls": 3,
+    "latency_s": 99.396,
+    "error": null
+  },
+  {
+    "category": "direct_mention",
+    "prompt": "ChEMBL에서 EGFR의 clinical phase 정보를 조회해",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 91.726,
+    "error": null
+  },
+  {
+    "category": "direct_mention",
+    "prompt": "ChEMBL에서 EGFR의 clinical phase 정보를 조회해",
+    "variant": "B_forced_eval",
+    "activated_skills": [
+      "chembl-database"
+    ],
+    "read_skill_calls": 2,
+    "latency_s": 105.432,
+    "error": null
+  },
+  {
+    "category": "indirect_reference",
+    "prompt": "BRAF의 target validation 증거를 모아줘",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 5.641,
+    "error": null
+  },
+  {
+    "category": "indirect_reference",
+    "prompt": "BRAF의 target validation 증거를 모아줘",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 11.945,
+    "error": null
+  },
+  {
+    "category": "indirect_reference",
+    "prompt": "이 유전자의 약물 표적 가능성을 평가해",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 6.816,
+    "error": null
+  },
+  {
+    "category": "indirect_reference",
+    "prompt": "이 유전자의 약물 표적 가능성을 평가해",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 97.823,
+    "error": null
+  },
+  {
+    "category": "no_skill_needed",
+    "prompt": "Stage 1 biological context를 수집해",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 99.336,
+    "error": null
+  },
+  {
+    "category": "no_skill_needed",
+    "prompt": "Stage 1 biological context를 수집해",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "read_skill_calls": 6,
+    "latency_s": 100.2,
+    "error": null
+  },
+  {
+    "category": "no_skill_needed",
+    "prompt": "L-R pair의 STRING PPI 스코어를 확인해",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 98.316,
+    "error": null
+  },
+  {
+    "category": "no_skill_needed",
+    "prompt": "L-R pair의 STRING PPI 스코어를 확인해",
+    "variant": "B_forced_eval",
+    "activated_skills": [
+      "opentargets-database"
+    ],
+    "read_skill_calls": 1,
+    "latency_s": 15.946,
+    "error": null
+  },
+  {
+    "category": "composite",
+    "prompt": "GWAS + ChEMBL 데이터로 deep dive 수행",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 5.096,
+    "error": null
+  },
+  {
+    "category": "composite",
+    "prompt": "GWAS + ChEMBL 데이터로 deep dive 수행",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "read_skill_calls": 6,
+    "latency_s": 14.901,
+    "error": null
+  },
+  {
+    "category": "composite",
+    "prompt": "유전적 증거와 druggability를 종합 평가해",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 5.754,
+    "error": "EOF (status code: -1)"
+  },
+  {
+    "category": "composite",
+    "prompt": "유전적 증거와 druggability를 종합 평가해",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 100.366,
+    "error": null
+  },
+  {
+    "category": "ambiguous",
+    "prompt": "이 타겟에 대한 모든 증거를 수집해",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 96.422,
+    "error": null
+  },
+  {
+    "category": "ambiguous",
+    "prompt": "이 타겟에 대한 모든 증거를 수집해",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 96.658,
+    "error": "EOF (status code: -1)"
+  },
+  {
+    "category": "ambiguous",
+    "prompt": "Stage 2 scoring을 진행해",
+    "variant": "A_passive",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 94.16,
+    "error": null
+  },
+  {
+    "category": "ambiguous",
+    "prompt": "Stage 2 scoring을 진행해",
+    "variant": "B_forced_eval",
+    "activated_skills": [],
+    "read_skill_calls": 0,
+    "latency_s": 12.768,
+    "error": null
+  }
+]

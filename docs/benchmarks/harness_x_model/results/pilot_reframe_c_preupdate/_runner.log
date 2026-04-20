@@ -1,0 +1,322 @@
+REFLECTION_TOOL_SERVER not set and no server found at candidate paths. Set REFLECTION_TOOL_SERVER environment variable to the server.py path. Falling back to: /home/jungj2/.mcp/reflection_tool/server.py
+BIOMEDICAL_THINKING_SERVER not set and no server found at candidate paths. Set BIOMEDICAL_THINKING_SERVER environment variable to the server.py path. Falling back to: /home/jungj2/.mcp/biomedical_thinking/server.py
+[04/16/26 05:31:57] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 05:35:29] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 05:43:51] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 05:43:57] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 05:47:30] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 05:53:49] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 06:06:49] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+REFLECTION_TOOL_SERVER not set and no server found at candidate paths. Set REFLECTION_TOOL_SERVER environment variable to the server.py path. Falling back to: /home/jungj2/.mcp/reflection_tool/server.py
+BIOMEDICAL_THINKING_SERVER not set and no server found at candidate paths. Set BIOMEDICAL_THINKING_SERVER environment variable to the server.py path. Falling back to: /home/jungj2/.mcp/biomedical_thinking/server.py
+[04/16/26 10:11:25] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 10:17:57] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 10:18:04] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 10:25:23] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 10:28:47] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 10:38:36] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 10:48:40] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:08:13] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:08:19] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:13:03] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:19:02] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:19:06] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:19:10] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:19:15] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:19:19] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:19:24] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:22:58] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:23:06] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+{
+  "gate_a": {
+    "passed": true,
+    "strong_on_median_pct": 100.0,
+    "strong_off_median_pct": 0.0,
+    "threshold_pct": 95.0
+  },
+  "gate_b": {
+    "passed": false,
+    "error_rate": 0.5417,
+    "latency_ms_median": 65186.0,
+    "error_rate_threshold": 0.05,
+    "latency_ms_threshold": 600000,
+    "n_rows": 48,
+    "n_errors": 26
+  },
+  "gate_c": {
+    "passed": false,
+    "unique_rounded_values_per_condition": {
+      "strong_on": 1,
+      "strong_off": 1,
+      "weak_on": 1,
+      "weak_off": 1
+    },
+    "minimum_observed": 1,
+    "threshold": 3
+  },
+  "variance": {
+    "passed": true,
+    "mean_per_case_stdev_pct": 57.735,
+    "threshold_pct": 2.0,
+    "n_cases_with_multi_rows": 12
+  },
+  "all_passed": false,
+  "messages": [
+    "Gate B FAIL: BioMCP error rate 54.17% (threshold < 5%) or median latency 65.2s (threshold < 600s). Apply §6 outage exclusion or re-pilot.",
+    "Gate C FAIL: at least one condition has <= 3 discrete rounded coverage values ({'strong_on': 1, 'strong_off': 1, 'weak_on': 1, 'weak_off': 1}). LMM secondary invalid — drop to GLMM-only per REV5 §8.3."
+  ],
+  "generated_at": "2026-04-16T18:24:44Z"
+}
+REFLECTION_TOOL_SERVER not set and no server found at candidate paths. Set REFLECTION_TOOL_SERVER environment variable to the server.py path. Falling back to: /home/jungj2/.mcp/reflection_tool/server.py
+BIOMEDICAL_THINKING_SERVER not set and no server found at candidate paths. Set BIOMEDICAL_THINKING_SERVER environment variable to the server.py path. Falling back to: /home/jungj2/.mcp/biomedical_thinking/server.py
+[04/16/26 11:28:58] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:29:06] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:32:13] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:34:38] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:44:23] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:47:16] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:50:17] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:54:05] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:54:10] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 11:55:57] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:09:59] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:10:02] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:10:06] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:10:11] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:16:52] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:17:02] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:20:51] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:23:23] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:33:02] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:41:34] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:45:27] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:45:35] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:52:40] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:56:26] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 12:58:34] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 13:02:10] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 13:03:53] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 13:07:11] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 13:07:18] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 13:12:15] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 13:23:29] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 13:23:39] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 13:23:47] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+{
+  "gate_a": {
+    "passed": false,
+    "strong_on_median_pct": 100.0,
+    "strong_off_median_pct": 100.0,
+    "threshold_pct": 95.0
+  },
+  "gate_b": {
+    "passed": false,
+    "error_rate": 0.0833,
+    "latency_ms_median": 211358.0,
+    "error_rate_threshold": 0.05,
+    "latency_ms_threshold": 600000,
+    "n_rows": 48,
+    "n_errors": 4
+  },
+  "gate_c": {
+    "passed": false,
+    "unique_rounded_values_per_condition": {
+      "strong_on": 1,
+      "strong_off": 1,
+      "weak_on": 1,
+      "weak_off": 1
+    },
+    "minimum_observed": 1,
+    "threshold": 3
+  },
+  "variance": {
+    "passed": false,
+    "mean_per_case_stdev_pct": 0.0,
+    "threshold_pct": 2.0,
+    "n_cases_with_multi_rows": 12
+  },
+  "all_passed": false,
+  "messages": [
+    "Gate A FAIL: endpoint saturated in both strong arms (strong_on median 100.0%, strong_off median 100.0%); switch to retrieval diversity / novelty per REV5 §8.1.",
+    "Gate B FAIL: BioMCP error rate 8.33% (threshold < 5%) or median latency 211.4s (threshold < 600s). Apply §6 outage exclusion or re-pilot.",
+    "Gate C FAIL: at least one condition has <= 3 discrete rounded coverage values ({'strong_on': 1, 'strong_off': 1, 'weak_on': 1, 'weak_off': 1}). LMM secondary invalid — drop to GLMM-only per REV5 §8.3.",
+    "Variance LOW: mean per-case between-condition std-dev 0.00pp < 2pp. Consider raising temperature to 0.5 per REV5 §8 step 5."
+  ],
+  "generated_at": "2026-04-16T20:25:47Z"
+}
+REFLECTION_TOOL_SERVER not set and no server found at candidate paths. Set REFLECTION_TOOL_SERVER environment variable to the server.py path. Falling back to: /home/jungj2/.mcp/reflection_tool/server.py
+BIOMEDICAL_THINKING_SERVER not set and no server found at candidate paths. Set BIOMEDICAL_THINKING_SERVER environment variable to the server.py path. Falling back to: /home/jungj2/.mcp/biomedical_thinking/server.py
+[04/16/26 13:28:41] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+REFLECTION_TOOL_SERVER not set and no server found at candidate paths. Set REFLECTION_TOOL_SERVER environment variable to the server.py path. Falling back to: /home/jungj2/.mcp/reflection_tool/server.py
+BIOMEDICAL_THINKING_SERVER not set and no server found at candidate paths. Set BIOMEDICAL_THINKING_SERVER environment variable to the server.py path. Falling back to: /home/jungj2/.mcp/biomedical_thinking/server.py
+[04/16/26 13:33:03] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 13:38:17] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 13:41:57] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+[04/16/26 13:44:02] ERROR    File not found:                    filesystem.py:68
+                             /home/jungj2/.mcp/reflection_tool/                 
+                             server.py                                          
+{
+  "gate_a": {
+    "passed": false,
+    "strong_on_median_pct": 100.0,
+    "strong_off_median_pct": 100.0,
+    "threshold_pct": 95.0
+  },
+  "gate_b": {
+    "passed": true,
+    "error_rate": 0.0,
+    "latency_ms_median": 207467.0,
+    "error_rate_threshold": 0.05,
+    "latency_ms_threshold": 600000,
+    "n_rows": 48,
+    "n_errors": 0
+  },
+  "gate_c": {
+    "passed": false,
+    "unique_rounded_values_per_condition": {
+      "strong_on": 1,
+      "strong_off": 1,
+      "weak_on": 1,
+      "weak_off": 1
+    },
+    "minimum_observed": 1,
+    "threshold": 3
+  },
+  "variance": {
+    "passed": false,
+    "mean_per_case_stdev_pct": 0.0,
+    "threshold_pct": 2.0,
+    "n_cases_with_multi_rows": 12
+  },
+  "all_passed": false,
+  "messages": [
+    "Gate A FAIL: endpoint saturated in both strong arms (strong_on median 100.0%, strong_off median 100.0%); switch to retrieval diversity / novelty per REV5 §8.1.",
+    "Gate C FAIL: at least one condition has <= 3 discrete rounded coverage values ({'strong_on': 1, 'strong_off': 1, 'weak_on': 1, 'weak_off': 1}). LMM secondary invalid — drop to GLMM-only per REV5 §8.3.",
+    "Variance LOW: mean per-case between-condition std-dev 0.00pp < 2pp. Consider raising temperature to 0.5 per REV5 §8 step 5."
+  ],
+  "generated_at": "2026-04-16T20:45:28Z"
+}

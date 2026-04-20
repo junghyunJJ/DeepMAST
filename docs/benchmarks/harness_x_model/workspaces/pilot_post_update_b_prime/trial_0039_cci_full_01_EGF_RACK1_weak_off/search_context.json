@@ -1,0 +1,17 @@
+{
+  "genes": [
+    "EGF",
+    "RACK1"
+  ],
+  "pathways": [],
+  "celltypes": [
+    "DCIS 2",
+    "Endothelial",
+    "Invasive Tumor",
+    "Macrophages 2",
+    "Prolif Invasive Tumor",
+    "Stromal",
+    "T Cell & Tumor Hybrid"
+  ],
+  "disease": "breast cancer"
+}

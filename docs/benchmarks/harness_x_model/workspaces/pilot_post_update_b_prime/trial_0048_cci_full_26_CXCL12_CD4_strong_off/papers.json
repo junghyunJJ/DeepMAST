@@ -1,0 +1,1135 @@
+{
+  "papers": [
+    {
+      "pmid": "35197632",
+      "title": "A trispecific antibody targeting HER2 and T cells inhibits breast cancer growth via CD4 cells.",
+      "abstract": "Effective antitumour immunity depends on the orchestration of potent T cell responses against malignancies1. Regression of human cancers has been induced by immune checkpoint inhibitors, T cell engagers or chimeric antigen receptor T cell therapies2-4. Although CD8 T cells function as key effectors of these responses, the role of CD4 T cells beyond their helper function has not been defined. Here we demonstrate that a trispecific antibody to HER2, CD3 and CD28 stimulates regression of breast cancers in a humanized mouse model through a mechanism involving CD4-dependent inhibition of tumour cell cycle progression. Although CD8 T cells directly mediated tumour lysis in vitro, CD4 T cells exerted antiproliferative effects by blocking cancer cell cycle progression at G1/S. Furthermore, when T cell subsets were adoptively transferred into a humanized breast cancer tumour mouse model, CD4 T cells alone inhibited HER2+ breast cancer growth in vivo. RNA microarray analysis revealed that CD4 T cells markedly decreased tumour cell cycle progression and proliferation, and also increased pro-inflammatory signalling pathways. Collectively, the trispecific antibody to HER2 induced T cell-dependent tumour regression through direct antitumour and indirect pro-inflammatory/immune effects driven by CD4 T cells.",
+      "journal_quality": 0.711,
+      "authors": [
+        "Seung E",
+        "Xing Z",
+        "Wu L",
+        "Rao E",
+        "Cortez-Retamozo V",
+        "Ospina B",
+        "Chen L",
+        "Beil C",
+        "Song Z",
+        "Zhang B",
+        "Levit M",
+        "Deng G",
+        "Hebert A",
+        "Kirby P",
+        "Li A",
+        "Poulton EJ",
+        "Vicente R",
+        "Garrigou A",
+        "Piepenhagen P",
+        "Ulinski G",
+        "Sanicola-Nadel M",
+        "Bangari DS",
+        "Qiu H",
+        "Pao L",
+        "Wiederschain D",
+        "Wei R",
+        "Yang ZY",
+        "Nabel GJ"
+      ],
+      "journal": "Nature",
+      "date": "2022-03-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37564657",
+      "title": "Integrative multi-omics analyses unravel the immunological implication and prognostic significance of CXCL12 in breast cancer",
+      "abstract": "Background\n\nCXCL12 is a vital factor in physiological and pathological processes, by inducing migration of multiple cells. We aimed to comprehensively detect the role of CXCL12 in breast cancer, and explore novel CXCL12-related biomarkers through integrative multi-omics analyses to build a powerful prognostic model for breast cancer patients.\n\nMethods\n\nImmunohistochemistry analysis of the tissue microarray was performed to evaluate the correlation between CXCL12 expression levels and breast cancer patient outcomes. Combined single-nucleus and spatial transcriptomics data was used to uncover the expression distribution of CXCL12 in breast cancer microenvironment. CXCL12-related genes were identified by WGCNA analysis. Univariate Cox and LASSO regression analyses were then conducted to screen prognostic genes from above CXCL12-related genes, followed by the construction of the CXCL12-related prognostic signature, identification of risk groups, and external validation of the prognostic signature. Analyses of biological function, mutation landscape, immune checkpoint genes and immune cells, were performed to further reveal the differences between high/low-risk groups. Paired single-cell RNA-seq and bulk RNA-seq were analyzed to further disclose the association between the risk score and the complex tumor immune microenvironment. To screen potential therapeutic agents for breast cancer patients, analyses of gene-drug correlation and sensitivity to immunotherapy were conducted.\n\nRe",
+      "journal_quality": 0.5,
+      "authors": [
+        "Gao ZJ",
+        "Fang Z",
+        "Yuan JP",
+        "Sun SR",
+        "Li B"
+      ],
+      "journal": "Front Immunol",
+      "date": "2023-07-26T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32487616",
+      "title": "Possible Diagnostic Application of CXCL12 and CXCR4 as Tumor Markers in Breast Cancer Patients.",
+      "abstract": "BACKGROUND/AIM: Chemokines are cytokines involved not only in inflammatory but also in inappropriate response of the immune system in breast cancer (BC) progression. We examined the diagnostic usefulness of CXCL12, CXCR4 and CA 15-3 in BC patients, based on ROC curve analysis. MATERIALS AND METHODS: The study group consisted of 100 patients with BC; the control group consisted of 35 women with benign breast disease and 35 healthy patients. The median concentration of chemokines was measured by ELISA and that of CA 15-3 by chemiluminescent microparticle immunoassay. RESULTS: The concentrations of CXCL12 and CXCR4 in the BC group were significantly higher than those in the control groups. The AUC value of CXCL12 (0.7502) was the highest of all the chemokines measured in the BC patients. CONCLUSION: There may be a link between CXCL12, CXCR4 and BC that can assist in the diagnosis, markedly when combined with CA 15-3.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Dąbrowska E",
+        "Przylipiak A",
+        "Zajkowska M",
+        "Piskor BM",
+        "Sidorkiewicz I",
+        "Szmitkowski M",
+        "Lawicki S"
+      ],
+      "journal": "Anticancer Res",
+      "date": "2020-06-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "29800557",
+      "title": "Prognostic and clinicopathological value of CXCL12/SDF1 expression in breast cancer: A meta-analysis.",
+      "abstract": "BACKGROUND: Several studies have demonstrated that stromal cell derived factor-1 (SDF1, also known as CXCL12) expression is a biomarker for breast cancer treatment; however, its significance of prognosis is inconsistent. This study uses a meta-analysis to explore the prognostic value of CXCL12/SDF1 expression in breast cancer. MATERIALS AND METHODS: PubMed, Embase, Cochrane Library, and Web of Science databases were searched from inception to November 25, 2017. Studies investigating the correlation between CXCL12/SDF1 expression and survival in breast carcinoma were included. The pooled hazard ratio (HR) and 95% confidence interval (95% CI) was used to assess the prognostic value of CXCL12/SDF1 in breast cancer. The pooled odds radio (OR) and 95% CI was applied to evaluate the relationship between CXCL12/SDF1 expression and the clinical characteristics of breast cancer. RESULTS: Eight eligible studies involving 2205 patients were identified. Higher CXCL12/SDF1 protein expression was associated with better disease-free survival (DFS) (HR, 0.76; 95% CI, 0.68-0.86; P < .0001) and overall survival (OS) (HR, 0.66; 95% CI, 0.49-0.87; P = .004) in breast cancer. Furthermore, higher CXCL12/SDF1 protein expression was associated with positive ER status (OR, 1.92; 95% CI, 1.08-3.45; P = .03), negative HER2 status (OR, 2.64; 95% CI, 1.06-6.59; P = .04), and small tumor size (OR, 2.49; 95% CI, 1.47-4.22; P = .0007) in breast cancer, respectively. However, there were no significant associ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Liu H",
+        "Li Z",
+        "Deng M",
+        "Liu Q",
+        "Zhang T",
+        "Guo W",
+        "Li P",
+        "Qiao W"
+      ],
+      "journal": "Clin Chim Acta",
+      "date": "2018-09-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25738143",
+      "title": "The role of chemokine receptor 4 and its ligand stromal cell derived factor 1 in breast cancer.",
+      "abstract": "Breast tumour cells express the chemokine receptor C-X-C chemokine receptor type 4 (CXCR4) and frequently metastasize to organs with an abundant source of CXCR4 ligand, stromal cell derived factor1 (SDF1). For this reason, CXCR4/SDF1 has garnered much interest as a target for therapeutic intervention. The present study is an attempt to correlate the CXCR4/SDF1 expression patterns with clinicopathological factors, patient survival, and its coexistence and response to 17-beta estradiol (E2) and 4-hydoxytamoxifen (4OHT) in breast cancer cells. Immunohistochemistry and Reverse Transcriptase-Polymerase Chain Reaction were performed to assess the protein and gene level expressions of CXCR4 and SDF1 in normal and tumour breast tissue. The effect of E2 and 4OHT on expression of CXCR4 and SDF1 in breast cancer cells were assessed using RT-PCR, Immunofluorescence microscopy and colocalization. The CXCR4 and SDF1 were over expressed and have a significant correlation with each other as well as with histological grade, tumour size and poor survival of patients. The study also showed a modulatory effect of E2 and 4OHT on the expression and colocalization of CXCR4/SDF1 in breast cancer cells. The correlation of CXCR4/SDF1 with other parameters and modulatory effect of E2 and 4OHT on the expression and colocalization of CXCR4/SDF1 in breast cancer cells are likely to open up new avenues for the successful management of this malignancy. ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Aravindan BK",
+        "Prabhakar J",
+        "Somanathan T",
+        "Subhadra L"
+      ],
+      "journal": "Ann Transl Med",
+      "date": "2015-02-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25400746",
+      "title": "CXCL12 chemokine expression suppresses human breast cancer growth and metastasis in vitro and in vivo.",
+      "abstract": "Chemokine receptors are now known to play an important role in cancer growth and metastasis. However, there is little information regarding chemokine expression in breast cancer. The aim of this study was to evaluate CXCL12 expression in breast cancer and to investigate the question of whether reduced expression of CXCL12 may have any pathological significance in breast cancer development or progression. In this study, we performed western blotting and immunohistochemistry to evaluate the expression of CXCL12 and relevance with clinicopathological factors in the invasive ductal carcinoma. Reduction of CXCL12 was significantly correlated with tumor size, lymph node metastasis, TNM stage and Her-2 expression in breast cancer. Patients with negative CXCL12 expression had significantly lower cumulative postoperative 5 year survival rate than those with positive CXCL12 expression. In addition, we demonstrated that upregulation of CXCL12 expression by infection with an adenovirus containing a CXCL12 vector significantly inhibited cell growth and reduced the migration of breast cancer cells. Furthermore, animal studies revealed that nude mice injected with the Ad-CXCL12 cell lines featured a lighter weight than the control cell lines. These data suggest that CXCL12 plays an important role in cell growth and invasion in human breast cancer and it appears to be a potential prognostic marker for patients with breast cancer. ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Lv ZD",
+        "Kong B",
+        "Liu XP",
+        "Dong Q",
+        "Niu HT",
+        "Wang YH",
+        "Li FN",
+        "Wang HB"
+      ],
+      "journal": "Int J Clin Exp Pathol",
+      "date": "2014-09-15T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "18670789",
+      "title": "Down-regulation of CXCL12 mRNA expression by promoter hypermethylation and its association with metastatic progression in human breast carcinomas.",
+      "abstract": "PURPOSE: Not only is the expression of CXCR4 on breast cancers a key determinant of tumor metastasis, CXCL12 exhibiting peak levels of constitutive expression in organs representing the first destinations of cancer metastasis, but is proposed to be also essential for the organ-specific metastatic process. METHODS: In this study, the expressions of CXCR4 and CXCL12 were investigated using quantitative RT-PCR and immunohistochemistry in samples of 63 primary breast carcinomas and 20 normal breast tissues. Using methylation-specific PCR, we also analyzed the methylation status of CXCL12. RESULTS: Both up-regulation of CXCR4 and down-regulation of CXCL12 were observed in primary breast carcinomas. Over-expression of CXCR4 mRNA was significantly related to lymph node metastasis status and strong Her-2 expression, while decreased expression of CXCL12 mRNA was significantly associated with positive lymph node metastasis and estrogen receptor negativity. Methylation-specific PCR showed that 52.4% of breast tumors were hypermethylated in the CXCL12 promoter region. The expression levels of DNA methyltransferase (DNMT) 1 and DNMT3B were significantly higher in the CXCL12-methylated breast carcinomas than in the CXCL12-unmethylated ones. CONCLUSIONS: In summary, DNA hypermethylation of CXCL12 plays an important role in the down-regulation of CXCL12 expression in breast carcinomas. Cancer cells lacking expression of CXCL12, but maintaining over-expression of CXCR4, can selectively spread",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zhou W",
+        "Jiang Z",
+        "Liu N",
+        "Xu F",
+        "Wen P",
+        "Liu Y",
+        "Zhong W",
+        "Song X",
+        "Chang X",
+        "Zhang X",
+        "Wei G",
+        "Yu J"
+      ],
+      "journal": "J Cancer Res Clin Oncol",
+      "date": "2009-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "18223219",
+      "title": "Plasma stromal cell-derived factor-1: host derived marker predictive of distant metastasis in breast cancer.",
+      "abstract": "PURPOSE: Homing of breast cancer cells to metastatic sites may be regulated by the production of stromal cell-derived factor (SDF)-1 by specific target organs, which attracts CXCR4-expressing breast cancer cells. We investigated the value of SDF-1 as a predictive blood marker of distant metastasis in breast cancer, together with a common polymorphism of SDF-1, SDF-1-3'A. EXPERIMENTAL DESIGN: Plasma samples were collected prospectively for 270 consecutive primary breast cancer patients with a median follow-up of 3.3 years. Plasma SDF-1 levels were measured using an ELISA, and the polymorphism was identified via PCR-RFLP analysis. RESULTS: Plasma SDF-1 levels were divided into two groups, low and high, based on the median SDF-1 value of 2,661 pg/mL. Patients with low SDF-1 showed an increased risk of developing distant metastasis (relative risk, 1.94; P = 0.02) and poorer breast cancer-specific survival [adjusted hazard ratio (AHR), 3.92; P = 0.007]. Patients with both low plasma SDF-1 levels and the SDF-1-3'A polymorphism showed a poorer breast cancer-specific survival (AHR, 3.98; P = 0.001) and distant disease-free survival (AHR, 2.88; P = 0.003). In a separate cohort of 22 breast cancer patients, we found no significant difference in SDF-1 levels before and posttumor resection. CONCLUSION: We found that low plasma SDF-1 is an independent host-derived predictive marker of distant metastasis in breast cancer. The prognostic value of the combination of a low plasma SDF-1 level ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Hassan S",
+        "Baccarelli A",
+        "Salvucci O",
+        "Basik M"
+      ],
+      "journal": "Clin Cancer Res",
+      "date": "2008-01-15T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "15809737",
+      "title": "Genetic manipulation of stromal cell-derived factor-1 attests the pivotal role of the autocrine SDF-1-CXCR4 pathway in the aggressiveness of breast cancer cells.",
+      "abstract": "Stromal cell-derived factor-1 (SDF-1), via its receptor CXCR4, has been implicated in metastasis of cancer, including breast cancer. Exogenous SDF-1 is known to regulate locomotion, chemotaxis and adhesion. The knowledge regarding the effect of autocrine SDF-1 on breast cancer cells is not available. The current study evaluated the effects of SDF-1 on the biological behaviour of breast cancer cells by genetically modifying the expression of SDF-1 in breast cancer cells. Two human breast cancer cell lines (MDA-MB-231 and MDA-MB-435s) and a human fetal lung fibroblast cell line (MRC5) were used. The expression of SDF-1 and the SDF-1 receptor, CXCR4 in the cell lines were studied. Expression cassettes of human SDF-1 and hammerhead ribozyme transgenes specifically targeting human SDF-1 were constructed and used to over-express SDF-1 or to knockout the expression of SDF-1 in cancer cells, respectively. Invasiveness, migration and growth of the genetically modified cells were assessed. SDF-1 was expressed in wild-type human breast cancer cell line MDA-MB-435s and fibroblast cell line MRC5, but not in MDA-MB-231 cell line. In contrast, CXCR4 expression was observed in all three cell lines tested. The ability of invasion and migration was significantly reduced in SDF-1 knockout MDA-MB-435s cells, compared with wild-type and vector control cells (p<0.01). On the other hand, SDF-1 transfected MDA-MB-231epsilonSDF1+/+ cells that stably expressed SDF-1 showed a different behaviour from M",
+      "journal_quality": 0.5,
+      "authors": [
+        "Kang H",
+        "Mansel RE",
+        "Jiang WG"
+      ],
+      "journal": "Int J Oncol",
+      "date": "2005-05-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "24761914",
+      "title": "The G801A polymorphism in the CXCL12 gene and risk of breast carcinoma: evidence from a meta-analysis including 2,931 subjects.",
+      "abstract": "More and more evidence indicates that the G801A polymorphism in the CXCL12 gene might be associated with susceptibility to breast carcinoma in humans being. However, individually published results have been inconsistent. The purpose of this meta-analysis was to investigate the association between the G801A polymorphism in the CXCL12 gene and breast carcinoma risk. A complete search strategy was done by the electronic databases including PubMed and Chinese Biomedical Literature Database. A meta-analysis including seven individual studies was carried out in order to explore the association between the G801A polymorphism in the CXCL12 gene polymorphisms and breast carcinoma. The pooled odds ratios (ORs) and their corresponding 95% confidence intervals (95%CIs) between the G801A polymorphism in the CXCL12 gene and breast carcinoma risk were assessed by the random-effects model. A significant relationship between the G801A polymorphism in the CXCL12 gene and breast carcinoma was discovered in an allelic genetic model (OR: 1.214, 95%CI: 1.085- 1.358, p=0.001), a homozygote model (OR: 1.663, 95%CI: 1.240-2.232, p=0.001), a heterozygote model (OR: 1.392, 95%CI: 1.190-1.629, p=0.000), a recessive genetic model (OR: 1.407, 95%CI: 1.060-1.868, p=0.018) and a dominant genetic model (OR: 1.427, 95%CI: 1.228-1.659, p=0.000). On sub-group analysis based on ethnicity, significance was observed between the European group and the mixed group. A significant relationship was found between the G8",
+      "journal_quality": 0.5,
+      "authors": [
+        "Xia Y",
+        "Guo XG",
+        "Ji TX"
+      ],
+      "journal": "Asian Pac J Cancer Prev",
+      "date": "2014-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36925914",
+      "title": "Characteristics and postoperative dynamic changes in circulating CD4+ helper T lymphocytes in patients with breast cancer",
+      "abstract": "Introduction\n\nCirculating CD4+ helper T cell (Th) subsets provide potentially important information on disease progression in several cancers. In this study, we explored the characteristics and postoperative dynamic changes in circulating CD4+Th subsets in patients with breast cancer.\n\nMethods\n\nCirculating CD4+Th subsets, including CD4+ naive T cells (Tn), CD4+ central memory T cells (Tcm), CD4+ effector memory T cells (Tem), CD4+CD57+T, and CD4+PD-1+T, were detected with multiparameter flow cytometry. T-test and Wilcoxon rank-sum test were used to compare differences between groups for normally and non-normally distributed continuous variables, respectively. Postoperative dynamic changes in CD4+Th subsets were assessed using the paired-sample rank-sum test.\n\nResults\n\nSeventy-five patients with invasive breast cancer and fifty-three patients with benign breast tumors were enrolled. Compared with that in patients with benign tumors, the proportion of CD4+Tn in patients with breast cancer patients decreased, whereas the proportion and absolute number of CD4+CD57+T and CD4+PD-1+T increased. Moreover, the proportion of CD4+PD-1+T was correlated with the clinicopathology of breast cancer. After tumor resection, the proportion and absolute number of CD4+Tcm significantly decreased, while those of CD4+Tem significantly increased, compared with preoperative values. Tumor resection caused significant changes in the proportion and absolute number of CD4+CD57+T and CD4+PD-1+ T, both of ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Lu Y",
+        "Zhang Q",
+        "Wang J",
+        "Zhang L"
+      ],
+      "journal": "Front Oncol",
+      "date": "2023-02-28T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35663830",
+      "title": "Prognostic Impact of Cytotoxic CD4 T Cells in Tumor Immune Microenvironment of Patients with Breast Cancer",
+      "abstract": "Article: 35663830",
+      "journal_quality": 0.5,
+      "authors": [
+        "Shohdy KS",
+        "Almeldin DS",
+        "Ghaly R",
+        "Kassem L",
+        "Pagani O"
+      ],
+      "journal": "J Immunother Precis Oncol",
+      "date": "2021-10-26T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33103515",
+      "title": "Frequency of CD4+ regulatory T cells, CD8+ T cells, and human papilloma virus infection in Egyptian Women with breast cancer",
+      "abstract": "Several subsets of regulatory CD4+ T cells (CD4+ Tregs) have been described in peripheral blood and tumor microenvironment of breast cancer (BC) patients and may play a role in the progression of BC. High-risk human papilloma virus (HR-HPV) has a causal role in cervical, head, and neck tumors but the role of HR-HPV in evoking neoplasia in BC is still unclear. In this study we assessed the prevalence of CD4+CD25+ FOXP3+ regulatory T cells (CD4+Tregs) and CD3+ CD8+ T cells by flow cytometry in peripheral blood from a total of 55 Egyptian women, including 20 treatment-naive BC, 15 with breast benign lesions (BBL), and 20 healthy volunteers (HV). HR-HPV genotypes type 16, 18, and 31 were investigated in breast tissue from all BC and BBL patients using Real-Time PCR. HR-HPV was detected in 4/20 (20%) and 0/15 (0%) BC and BBL patients respectively. The frequency of CD4+ Tregs was significantly higher in BC compared to BBL and HV, (P < 0.001). In addition, we observed a significantly higher frequency of CD3+ CD8+ T cells in peripheral blood of patients with late stage III BC compared to early stage I and II BC (P = 0.011). However, there was no significant association between the ratio of CD8+ T cell to CD4+ Tregs frequencies and the expression of Estrogen Receptor (ER), Progesterone Receptor (PR), and Human Epidermal Growth Factor Receptor 2 (HER2). These results lead us to postulate that the association between the frequency of CD4+ Tregs and CD8+ T cells in the peripheral blood m",
+      "journal_quality": 0.5,
+      "authors": [
+        "Tawfeik AM",
+        "Mora A",
+        "Osman A",
+        "Moneer MM",
+        "El-Sheikh N",
+        "Elrefaei M"
+      ],
+      "journal": "Int J Immunopathol Pharmacol",
+      "date": "2020-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26146069",
+      "title": "[Highly expressed CD147 on CD4+ tumor infiltrating lymphocytes promotes the progress of breast cancer].",
+      "abstract": "OBJECTIVE: To investigate the expression of CD147 in CD4+ tumor infiltrating lymphocytes and explore the clinical significance of CD147 transcripts in breast cancer patients by comparing CD147 level in healthy controls' peripheral blood, breast cancer patients' peripheral blood, lymph nodes and CD4+ tumor infiltrating lymphocytes. METHODS: CD147 expression data were derived by Robust Multi-array Averaging method from three different microarrays, GSE14308, GSE36765 and GSE6532. ANOVA, Kaplan-Meier curve and multivariate Cox proportional hazards model were used for the statistical analysis. RESULTS: The expression of CD147 in Th1, Th2 and Th17 cells was 8-12 times higher than that in Th0 cells in normal C57BL/6J mice. The expression level of CD147 in the CD4+ tumor infiltrating lymphocytes from breast cancer patients was significantly higher than that in the CD4+ lymphocytes from peripheral blood of healthy donors, peripheral blood and axillary lymph nodes of breast cancer patients. High expression of CD147 was significantly associated with an increased risk of relapse in the Kaplan-Meier curve analysis (Log-Rank, P=0.019) and multivariate analysis (hazard ratio=1.764; 95% confidence interval: 1.088-2.859). CONCLUSION: CD147 might promote the progress of breast cancer through up-regulating CD4+ tumor infiltrating lymphocytes and aggravating inflammatory reaction.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zheng M",
+        "Zhang X",
+        "Guo H",
+        "Fan C",
+        "Chen Z",
+        "Zhu P"
+      ],
+      "journal": "Xi Bao Yu Fen Zi Mian Yi Xue Za Zhi",
+      "date": "2015-07-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25973310",
+      "title": "Profile of differentially expressed intratumoral cytokines to predict the immune-polarizing side effects of tamoxifen in breast cancer treatment.",
+      "abstract": "Factors within the tissue of breast cancer (BC) may shift the polarization of CD4+ T cells towards Th2 direction. This tendency can promote tumor development and be enhanced by the use of tamoxifen during the treatment. Thus, the patients with low levels of tumor-induced Th2 polarization prior to tamoxifen treatment may better endure the immune-polarizing side effects (IPSE) of tamoxifen and have better prognoses. Estimation of Th2 polarization status should help predict the IPSE among tamoxifen-treated patients and guide the use of tamoxifen among all BC patients before the tamoxifen therapy. Here, we report profiling of differentially expressed (DE) intratumoral cytokines as a signature to evaluate the IPSE of tamoxifen. The DE genes of intratumoral CD4+ T cells (CD4 DEGs) were identified by gene expression profiles of purified CD4+ T cells from BC patients and validated by profiling of cultured intratumoral CD4+ T cells. Functional enrichment analyses showed a directed Th2 polarization of intratumoral CD4+ T cells. To find the factors inducing the Th2 polarization of CD4+ T cells, we identified 995 common DE genes of bulk BC tissues (BC DEGs) by integrating five independent datasets. Five DE cytokines observed in bulk BC tissues with dysregulated receptors in the intratumoral CD4+ T cells were selected as the predictor of the IPSE of tamoxifen. The patients predicted to suffer low IPSE (low Th2 polarization) had a significantly lower distant relapse risk than the patients ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Li B",
+        "Li Y",
+        "Wang XY",
+        "Yan ZQ",
+        "Liu H",
+        "Liu GR",
+        "Liu SL"
+      ],
+      "journal": "Am J Cancer Res",
+      "date": "2015-01-15T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "24816762",
+      "title": "T helper responses are maintained by basal-like breast cancer cells and confer to immune modulation via upregulation of PD-1 ligands.",
+      "abstract": "A conspicuous T cell infiltration is frequently observed in triple-negative and/or basal-like breast cancers. Since the immunological course of breast cancer is explicitly directed by helper T cells, this study aims to determine the influence of basal-like breast cancer (BLBC) cells on CD4(+) T cell responses. Co-cultures were established with breast cancer cell lines and CD4(+) T cells under stimulatory conditions. Helper T cell activation, proliferation, cytokine secretion, and differentiation were assessed. Protein and mRNA expression of PD-1 ligands were determined on breast cancer cell lines. Blockade assays were performed in order to determine the functional assets of PD-1 ligation. In contrast to luminal breast cancer cells, BLBC cells allowed CD4(+) T cell activation, proliferation, and IFN-gamma secretion, but only to a certain extent. A substantial population of CD25(+)CD127(low/-) regulatory T (Treg) cells was also induced in BLBC co-cultures. In return, IFN-gamma stimulated the upregulation of PD-L1 (B7-H1) and/or PD-L2 (B7-DC) inhibitory molecules on the basal-like cells. In prolonged periods of co-culturing, blockade of PD-1 ligands on BLBC cell lines impaired Treg differentiation, restored IL-2 secretion, and increased CD8(+) T cell activation. In conclusion, T helper responses were maintained by BLBC cells. On the other hand, IFN-gamma secreted from Th1 and other immune cells upregulated the expression of PD-1 ligands on BLBC cells and modulated the immune rea",
+      "journal_quality": 0.5,
+      "authors": [
+        "Karasar P",
+        "Esendagli G"
+      ],
+      "journal": "Breast Cancer Res Treat",
+      "date": "2014-06-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23778140",
+      "title": "CD4+ follicular helper T cell infiltration predicts breast cancer survival.",
+      "abstract": "CD4+ T cells are critical regulators of immune responses, but their functional role in human breast cancer is relatively unknown. The goal of this study was to produce an image of CD4+ T cells infiltrating breast tumors using limited ex vivo manipulation to better understand the in vivo differences associated with patient prognosis. We performed comprehensive molecular profiling of infiltrating CD4+ T cells isolated from untreated invasive primary tumors and found that the infiltrating T cell subpopulations included follicular helper T (Tfh) cells, which have not previously been found in solid tumors, as well as Th1, Th2, and Th17 effector memory cells and Tregs. T cell signaling pathway alterations included a mixture of activation and suppression characterized by restricted cytokine/chemokine production, which inversely paralleled lymphoid infiltration levels and could be reproduced in activated donor CD4+ T cells treated with primary tumor supernatant. A comparison of extensively versus minimally infiltrated tumors showed that CXCL13-producing CD4+ Tfh cells distinguish extensive immune infiltrates, principally located in tertiary lymphoid structure germinal centers. An 8-gene Tfh signature, signifying organized antitumor immunity, robustly predicted survival or preoperative response to chemotherapy. Our identification of CD4+ Tfh cells in breast cancer suggests that they are an important immune element whose presence in the tumor is a prognostic factor.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Gu-Trantien C",
+        "Loi S",
+        "Garaud S",
+        "Equeter C",
+        "Libin M",
+        "de Wind A",
+        "Ravoet M",
+        "Le Buanec H",
+        "Sibille C",
+        "Manfouo-Foutsop G",
+        "Veys I",
+        "Haibe-Kains B",
+        "Singhal SK",
+        "Michiels S",
+        "Rothé F",
+        "Salgado R",
+        "Duvillier H",
+        "Ignatiadis M",
+        "Desmedt C",
+        "Bron D",
+        "Larsimont D",
+        "Piccart M",
+        "Sotiriou C",
+        "Willard-Gallo K"
+      ],
+      "journal": "J Clin Invest",
+      "date": "2013-07-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34123826",
+      "title": "Bioinformatics, Molecular Docking and Experiments In Vitro Analyze the Prognostic Value of CXC Chemokines in Breast Cancer",
+      "abstract": "The increasing incidence and mortality rate of Breast cancer (BC) make it a major public health problem around the world. CXC chemokines can mediate the migration of immune cells and regulate apoptosis in tumor. However, the expression and prognostic value of them in BC and their targeted drugs have not been clarified. Therefore, in this study, ONCOMINE, GEPIA2.0, UALCAN, Venny2.1.0, cBioPortal, STRING, Gene MANIA, Pathway Commons, DAVID6.8, Omicshare, Cytoscape3.6.1, TIMER2.0, Drug Bank, TCMSP, RSCBPDB, PubChem, pkCSM, Chem Draw, AutoDockTools-1.5.6 and PyMOL were utilized for analysis. The expression of CXCL1-3, CXCL9-13 between BC and normal tissues was significantly different in all the three databases. And the expression of CXCL1-2, CXCL12-13 was correlated with the stages of BC. But only CXCL1-3 were prone to mutation, and negatively correlated with survival and prognosis of BC patients. Taken together, CXCL1-2 might be therapeutic targets and biomarkers for BC patients. In addition, both of them were associated with immune infiltration. The results of molecular docking showed that Quercetin was most likely to be developed as drugs that interacted directly with CXCL1-2. And GLU29 of CXCL1, ASP-1, PRO-96, TRP-47 and LEU-45 of CXCL2 were the most potential sites, which provided valuable reference for further study of pharmacodynamics and mechanism. In addition, the inhibitory effect of Quercetin on proliferation and promoting apoptosis of BC related cell lines were confir",
+      "journal_quality": 0.5,
+      "authors": [
+        "Wang F",
+        "Yuan C",
+        "Wu HZ",
+        "Liu B",
+        "Yang YF"
+      ],
+      "journal": "Front Oncol",
+      "date": "2021-05-26T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine ligand",
+          "receptor binding",
+          "cell migration",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33096815",
+      "title": "The Signaling Duo CXCL12 and CXCR4: Chemokine Fuel for Breast Cancer Tumorigenesis",
+      "abstract": "Simple Summary\n\nBreast cancer remains the most common malignancy in women. In this review, we explore the role of the CXCL12/CXCR4 pathway in breast cancer. We show that the CXCL12/CXCR4 cascade is involved in nearly every aspect of breast cancer tumorigenesis including proliferation, cell motility and distant metastasis. Moreover, we summarize current knowledge about the CXCL12/CXCR4-targeted therapies. Due to the critical roles of this pathway in breast cancer and other malignancies, we believe that audiences in different fields will find this overview helpful.\n\nAbstract\n\nThe CXCL12/CXCR4 signaling pathway has emerged in the recent years as a key player in breast cancer tumorigenesis. This pathway controls many aspects of breast cancer development including cancer cell proliferation, motility and metastasis to all target organs. Moreover, the CXCL12/CXCR4 cascade affects both immune and stromal cells, creating tumor-supporting microenvironment. In this review, we examine state-of-the-art knowledge about detrimental roles of the CXCL12/CXCR4 signaling, discuss its therapeutic potential and suggest further research directions beneficial both for basic research and personalized medicine in breast cancer.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zielińska KA",
+        "Katanaev VL"
+      ],
+      "journal": "Cancers (Basel)",
+      "date": "2020-10-21T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine ligand",
+          "receptor binding",
+          "cell migration",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26161302",
+      "title": "Immunohistochemical Expression of CXCR4 on Breast Cancer and Its Clinical Significance",
+      "abstract": "Many tumor cells express chemokines and chemokine receptors, and, for this reason, these molecules can affect the tumor progression. It is known that breast cancer is a complex and heterogeneous neoplasia comprising distinct diseases, histological characteristics, and clinical outcomes. The most studied role for CXCL12 chemokine and its receptor CXCR4 in breast cancer pathogenesis is the metastasis event, although several reports have demonstrated its involvement in other processes, such as angiogenesis and tumor growth. It has been found that CXCR4 is required for breast cancer cell migration to other sites such as lung, bone, and lymph nodes, which express high levels of CXCL12 chemokine. Therefore, CXCR4 is being considered a prognostic marker in breast cancer. Within this context, this review summarizes established studies involving expression of CXCR4 on breast cancer, focusing on its clinical significance.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Okuyama Kishima M",
+        "de Oliveira CE",
+        "Banin-Hirata BK",
+        "Losi-Guembarovski R",
+        "Brajão de Oliveira K",
+        "Amarante MK",
+        "Watanabe MA"
+      ],
+      "journal": "Anal Cell Pathol (Amst)",
+      "date": "2015-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine ligand",
+          "receptor binding",
+          "cell migration",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "24810923",
+      "title": "CXCL12-CXCR4 axis promotes the natural selection of breast cancer cell metastasis",
+      "abstract": "CXCR4 and its ligand CXCL12 can promote the proliferation, survival, and invasion of cancer cells. They have been shown to play an important role in regulating metastasis of breast cancer to specific organs. High CXCR4 expression was also correlated to poor clinical outcome. Previous study also showed that tumor cells express a high level of CXCR4 and that tumor metastasis target tissues (lung, liver, and bone) express high levels of the ligand CXCL12, allowing tumor cells to directionally migrate to target organs via a CXCL12-CXCR4 chemotactic gradient. However, the exact mechanisms of how CXCR4 and CXCL12 enhance metastasis and/or tumor growth and their full implications on breast cancer progression are unknown. Yet it is likely that chemokine receptor signaling may provide more than just a migrational advantage by also helping the metastasized cells establish and survive in secondary environments. In this study, we investigated CXCR4 and CXCL12 expression in breast cancer and analyzed its association with clinicopathological factors by immunohistochemistry first. Then, we detected the mRNA and protein expression of CXCR4 and CXCL12 in breast cancer cell lines by Western blot and RT-PCR. The MDA-MB-231 has CXCR4 expression and very weak CXCL12 expression. So, we constructed the functional CXCL12 expression in MDA-MB-231 using a gene transfection technique. Further experiments were conducted to evaluate the effect of CXCL12 transfection on the biological behaviors of MDA-MB-",
+      "journal_quality": 0.5,
+      "authors": [
+        "Sun Y",
+        "Mao X",
+        "Fan C",
+        "Liu C",
+        "Guo A",
+        "Guan S",
+        "Jin Q",
+        "Li B",
+        "Yao F",
+        "Jin F"
+      ],
+      "journal": "Tumour Biol",
+      "date": "2014-08-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine ligand",
+          "receptor binding",
+          "cell migration",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25237365",
+      "title": "The Effects of Tamoxifen in Combination with Tranilast on CXCL12-CXCR4 Axis and Invasion in Breast Cancer Cell Lines",
+      "abstract": "It has been reported that CXCL12 binding to CXCR4 induces several intracellular signaling pathways, and enhances survival, proliferation, and migration of malignant cells.\n\nIn the present study, we examined the effects of anti-estrogen tamoxifen and anti-allergic tranilast drugs as a single or in combination on invasion by two in-vitro invasion assays, wound-healing and matrigel invasion on MCF-7 and MDA-MB-231 human breast cancer cell lines. The mRNA expression levels of CXCR4 and CXCL12 were measured by quantitative real time-RT PCR and CXCL12 protein levels were evaluated by ELISA assay.\n\nThe data showed that treatment with tamoxifen and tranilast as a single or in combination resulted in decreased CXCR4 and CXCL12 mRNA and CXCL12 protein expression levels. Both in-vitro invasion assays markedly showed synergistic effect of tamoxifen when combined with tranilast drug. Either ER-positive or ER-negative breast cancer cells were sensitive to this combination therapy.\n\nIn conclusion, Tranilast increases antimetastatic effect of tamoxifen. The synergistic effect of tranilast is not estrogen dependent; however tamoxifen may sensitize the cells for the action of tranilast. The data also support the importance of the CXCR4/CXCL12 interaction in breast cancer metastasis, and further suggest that CXCR4 and CXCL12 are critical targets for tamoxifen and tranilast in combination or alone. ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Darakhshan S",
+        "Bidmeshkipour A",
+        "Mansouri K",
+        "Saeid HM",
+        "Ghanbari A"
+      ],
+      "journal": "Iran J Pharm Res",
+      "date": "2014-04-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CXCL12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine ligand",
+          "receptor binding",
+          "cell migration",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35603183",
+      "title": "Identification of CD4+ Conventional T Cells-Related lncRNA Signature to Improve the Prediction of Prognosis and Immunotherapy Response in Breast Cancer",
+      "abstract": "Background\n\nBreast cancer (BC) is one of the most common malignancies in women, and long non-coding RNAs (lncRNAs) are key regulators of its development. T cells can recognize and kill cancer cells, and CD4+ T conventional (Tconv) cells are the main orchestrators of cancer immune function. However, research on CD4+ Tconv-related lncRNAs (CD4TLAs) prognostic signature in patients with BC is still lacking.\n\nMethod\n\nA TCGA database and a GEO database were used to collect the BC patients. Through LASSO Cox regression analysis CD4TLAs-related prognostic models were further constructed, and risk scores (RS) were generated and developed a nomogram based on CD4TLAs. The accuracy of this model was validated in randomized cohorts and different clinical subgroups. Gene set enrichment analysis (GSEA) was used to explore potential signature-based functions. The role of RS has been further explored in the tumor microenvironment (TME), immunotherapy, and chemotherapy.\n\nResult\n\nA prognostic model based on 16 CD4TLAs was identified. High-RS was significantly associated with a poorer prognosis. RS was shown to be an independent prognostic indicator in BC patients. The low-RS group had a significant expression of immune infiltrating cells and significantly enriched immune-related functional pathways. In addition, the results of immunotherapy prediction indicated that patients with low-RS were more sensitive to immunotherapy.\n\nConclusions\n\nOur signature has potential predictive value for BC prog",
+      "journal_quality": 0.5,
+      "authors": [
+        "Ning S",
+        "Wu J",
+        "Pan Y",
+        "Qiao K",
+        "Li L",
+        "Huang Q"
+      ],
+      "journal": "Front Immunol",
+      "date": "2022-05-04T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "T cell receptor",
+          "immune activation",
+          "co-receptor",
+          "immune infiltration"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33123241",
+      "title": "Association between alphabeta and gammadelta T-cell subsets and clinicopathological characteristics in patients with breast cancer",
+      "abstract": "The aim of the present study was to discuss the effect of surgery on the T-lymphocyte subsets of patients with breast cancer (BC) and investigate the association between peripheral blood alphabeta and gammadelta T-cell counts and the clinicopathological characteristics of BC. The CD3+, CD4+, CD8+ and gammadelta T-cell subsets in the peripheral blood of healthy volunteers and Patients with BC before and after surgery were determined using flow cytometry. The association between alphabeta and gammadelta T-cell counts in the peripheral blood and clinicopathological characteristics was analyzed by comparing the differences in the alphabeta and gammadelta T-cell counts in the peripheral blood of Patients with BC before and after surgery with those of healthy volunteers and combining with clinicopathological data. The CD3+, CD4+ and gammadelta T-cell counts in the peripheral blood of Patients with BC were lower compared with those in healthy volunteers (P=0.0077, 0.0116 and 0.0003, respectively), whereas the number of CD8+ cells was higher (P=0.0241). The CD3+, CD4+ and gammadelta T-cell counts and the CD4+/CD8+ ratio after surgery were significantly higher compared with those before surgery (P=0.0109, 0.0031, 0.0165 and 0.018, respectively). There was no significant difference between the number of CD8+ cells before and after surgery (P=0.0053), but the number of CD8+ cells was higher in healthy volunteers compared with that in Patients with BC (P<0.05). Moreover, the CD3+ cell nu",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zhang M",
+        "Lu X",
+        "Wei C",
+        "Li X"
+      ],
+      "journal": "Oncol Lett",
+      "date": "2020-12-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "T cell receptor",
+          "immune activation",
+          "co-receptor",
+          "immune infiltration"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32323817",
+      "title": "CCL11 increases the proportion of CD4+CD25+Foxp3+ Treg cells and the production of IL-2 and TGF-beta by CD4+ T cells via the STAT5 signaling pathway",
+      "abstract": "CD4+ regulatory T (Treg) cells are associated with immune tolerance and antitumor immunosuppression. The aim of the present study was to investigate the role and molecular mechanism of C-C motif chemokine ligand 11 (CCL11) in the regulation of Treg cells from patients with breast cancer (BC) and healthy individuals in vitro, and from tumor-bearing mice in vivo. CD4+ T cells isolated from patients with BC or healthy individuals were incubated with anti-CCL11 neutralizing antibodies or recombinant human CCL11 protein, in the presence or absence of a STAT5 inhibitor. The serum CCL11 level and proportion of Treg cells characterized as CD4+CD25+forkhead box P3+ (Foxp3) among the CD4+ T cells in patients with BC and healthy individuals were analyzed by ELISA and flow cytometry, respectively. CCL11, C-C motif chemokine receptor 3 (CCR3), Foxp3, phosphorylated-STAT5 and STAT5 expression levels were determined by western blotting. The serum CCL11 level and the proportion of CD4+CD25+Foxp3+ Treg cells were significantly increased in patients with BC compared with healthy individuals. CCL11 blockade reduced the proportion of CD4+CD25+Foxp3+ Treg cells, the expression of CCR3 and Foxp3, and the level of STAT5 activation in tumor-associated CD4+ T cells, in a dose-dependent manner. CCL11 blockade also reduced the proportion of CD4+CD25+Foxp3+ Treg cells and the serum levels of interleukin (IL)-2 and transforming growth factor (TGF)-beta1 in tumor-bearing mice. The recombinant human CCL11 ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Wang R",
+        "Huang K"
+      ],
+      "journal": "Mol Med Rep",
+      "date": "2020-06-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "T cell receptor",
+          "immune activation",
+          "co-receptor",
+          "immune infiltration"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30288049",
+      "title": "Distribution of CD4+ and CD8+ exhausted tumor-infiltrating lymphocytes in molecular subtypes of Chinese breast cancer patients",
+      "abstract": "Purpose\n\nBreast cancer (BC) is the leading cancer affecting Chinese women; however, the immune microenvironment between molecular subtypes is less reported. This study aimed to investigate the distribution of tumor-infiltrating lymphocyte (TIL) subpopulations, especially exhausted CD4+ and CD8+ TILs in Chinese BC patients.\n\nPatients and methods\n\nA total of 133 patients with breast invasive ductal carcinoma were recruited consecutively from January 1, 2012 to December 31, 2013, and TILs were detected in H&E-stained sections. Expression profiling of PD-1, CD4, and CD8 was determined by immunohistochemistry on 4 microm formalin-fixed paraffin-embedded tissue sections. The distribution of TILs was analyzed based on hormone receptor status and molecular subtypes.\n\nResults\n\nPD-1+, CD4+, and CD8+ TILs distributed differently based on molecular subtypes. Compared to Luminal A, triple-negative breast cancer (TNBC) patients had more PD-1+ TILs (39/high-power field [HPF] vs 11/HPF), PD-1+ helper T (CD4+) cells (28/HPF vs 10/HPF), and PD-1+ cytotoxic (CD8+) T-cells (3/HPF vs 2/HPF).\n\nConclusion\n\nTILs are distributed differently based on molecular subtypes. TNBC patients exhibit more PD-1+ exhausted TILs, representing an inhibitory immune microenvironment. PD-1/PD-L1 pathway is a potential therapeutic target of TNBC.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Shi F",
+        "Chang H",
+        "Zhou Q",
+        "Zhao YJ",
+        "Wu GJ",
+        "Song QK"
+      ],
+      "journal": "Onco Targets Ther",
+      "date": "2018-09-21T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "T cell receptor",
+          "immune activation",
+          "co-receptor",
+          "immune infiltration"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30069490",
+      "title": "Expression of PD-1 on CD4+ Tumor-Infiltrating Lymphocytes in Tumor Microenvironment Associated with Pathological Characteristics of Breast Cancer",
+      "abstract": "Objective\n\n This study aimed to investigate the correlation of CD4+/PD-1+ or CD4+/PD-1- tumor-infiltrating lymphocytes with pathological characteristics in breast cancer patients. \n\nMethods\n\n A cross-sectional study consecutively recruited 133 patients with invasive ductal breast cancer. The expression of CD4, programmed cell death protein 1 (PD-1), CK7, CK20, E-cadherin, or Ki-67 was detected by immunohistochemistry. The associations between CD4+/PD-1+ or CD4+/PD-1- tumor-infiltrating lymphocytes and pathological characteristics were evaluated. \n\nResults\n\n Elderly patients intended to have a lower level of CD4+/PD-1- tumor-infiltrating lymphocytes (p < 0.05). Patients with positive E-cadherin expression had higher median cell counts of CD4+/PD-1- tumor-infiltrating lymphocytes than patients with negative E-cadherin expression (30/HPF versus 10/HPF, p < 0.05). Counts of CD4+/PD-1+ tumor-infiltrating lymphocytes had a significant correlation with Ki-67 index that the correlation coefficient was 0.29 (p = 0.001). Positive CK20 expression was related to a higher level of CD4+/PD-1- tumor-infiltrating lymphocytes than negative CK20 expression (73/HPF versus 30/HPF, p < 0.05). \n\nConclusion\n\n CD4+/PD-1+ or CD4+/PD-1- tumor-infiltrating lymphocytes showed diverse association with pathological features of breast cancer. CD4+/PD-1+ tumor-infiltrating lymphocytes had a significant relationship with Ki-67 expression whereas CD4+/PD-1- tumor-infiltrating lymphocytes had a significant rel",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zhao YJ",
+        "Zhang J",
+        "Shi F",
+        "Hu ZP",
+        "Wu JP",
+        "Wu GJ",
+        "Wang RB",
+        "Zhou Q",
+        "Chang H",
+        "Li YN",
+        "Song QK"
+      ],
+      "journal": "J Immunol Res",
+      "date": "2018-07-04T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "T cell receptor",
+          "immune activation",
+          "co-receptor",
+          "immune infiltration"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "29482642",
+      "title": "Prognostic impact of CD4-positive T cell subsets in early breast cancer: a study based on the FinHer trial patient population",
+      "abstract": "Background\n\nThe clinical importance of tumor-infiltrating cluster of differentiation 4 (CD4) T cells is incompletely understood in early breast cancer. We investigated the clinical significance of CD4, forkhead box P3 (FOXP3), and B cell attracting chemokine leukocyte chemoattractant-ligand (C-X-C motif) 13 (CXCL13) in early breast cancer.\n\nMethods\n\nThe study is based on the patient population of the randomized FinHer trial, where 1010 patients with early breast cancer were randomly allocated to adjuvant chemotherapy containing either docetaxel or vinorelbine, and human epidermal growth factor receptor 2 (HER2)-positive patients were also allocated to trastuzumab or no trastuzumab. Breast cancer CD4, FOXP3, and CXCL13 contents were evaluated using quantitative real-time polymerase chain reaction (qRT-PCR), and their influence on distant disease-free survival (DDFS) was examined using univariable and multivariable Cox regression and Kaplan-Meier estimates in the entire cohort and in selected molecular subgroups. Interactions between variables were analyzed using Cox regression. The triple-negative breast cancer (TNBC) subset of the HE10/97 randomized trial was used for confirmation.\n\nResults\n\nHigh CXCL13 was associated with favorable DDFS in univariable analysis, and independently in multivariable analysis (HR 0.44, 95% CI 0.29-0.67, P <= 0.001), most strongly in TNBC (HR 0.39, 95% CI 0.19-0.79, P = 0.009). No significant interaction with chemotherapy or trastuzumab administra",
+      "journal_quality": 0.5,
+      "authors": [
+        "Schmidt M",
+        "Weyer-Elberich V",
+        "Hengstler JG",
+        "Heimes AS",
+        "Almstedt K",
+        "Gerhold-Ay A",
+        "Lebrecht A",
+        "Battista MJ",
+        "Hasenburg A",
+        "Sahin U",
+        "Kalogeras KT",
+        "Kellokumpu-Lehtinen PL",
+        "Fountzilas G",
+        "Wirtz RM",
+        "Joensuu H"
+      ],
+      "journal": "Breast Cancer Res",
+      "date": "2018-02-26T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "T cell receptor",
+          "immune activation",
+          "co-receptor",
+          "immune infiltration"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28290464",
+      "title": "Blocking the recruitment of naive CD4+ T cells reverses immunosuppression in breast cancer",
+      "abstract": "The origin of tumor-infiltrating Tregs, critical mediators of tumor immunosuppression, is unclear. Here, we show that tumor-infiltrating naive CD4+ T cells and Tregs in human breast cancer have overlapping TCR repertoires, while hardly overlap with circulating Tregs, suggesting that intratumoral Tregs mainly develop from naive T cells in situ rather than from recruited Tregs. Furthermore, the abundance of naive CD4+ T cells and Tregs is closely correlated, both indicating poor prognosis for breast cancer patients. Naive CD4+ T cells adhere to tumor slices in proportion to the abundance of CCL18-producing macrophages. Moreover, adoptively transferred human naive CD4+ T cells infiltrate human breast cancer orthotopic xenografts in a CCL18-dependent manner. In human breast cancer xenografts in humanized mice, blocking the recruitment of naive CD4+ T cells into tumor by knocking down the expression of PITPNM3, a CCL18 receptor, significantly reduces intratumoral Tregs and inhibits tumor progression. These findings suggest that breast tumor-infiltrating Tregs arise from chemotaxis of circulating naive CD4+ T cells that differentiate into Tregs in situ. Inhibiting naive CD4+ T cell recruitment into tumors by interfering with PITPNM3 recognition of CCL18 may be an attractive strategy for anticancer immunotherapy.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Su S",
+        "Liao J",
+        "Liu J",
+        "Huang D",
+        "He C",
+        "Chen F",
+        "Yang L",
+        "Wu W",
+        "Chen J",
+        "Lin L",
+        "Zeng Y",
+        "Ouyang N",
+        "Cui X",
+        "Yao H",
+        "Su F",
+        "Huang JD",
+        "Lieberman J",
+        "Liu Q",
+        "Song E"
+      ],
+      "journal": "Cell Res",
+      "date": "2017-04-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "T cell receptor",
+          "immune activation",
+          "co-receptor",
+          "immune infiltration"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "17438063",
+      "title": "Breast cancer instructs dendritic cells to prime interleukin 13-secreting CD4+ T cells that facilitate tumor development",
+      "abstract": "We previously reported (Bell, D., P. Chomarat, D. Broyles, G. Netto, G.M. Harb, S. Lebecque, J. Valladeau, J. Davoust, K.A. Palucka, and J. Banchereau. 1999. J. Exp. Med. 190: 1417-1426) that breast cancer tumors are infiltrated with mature dendritic cells (DCs), which cluster with CD4+ T cells. We now show that CD4+ T cells infiltrating breast cancer tumors secrete type 1 (interferon gamma) as well as high levels of type 2 (interleukin [IL] 4 and IL-13) cytokines. Immunofluorescence staining of tissue sections revealed intense IL-13 staining on breast cancer cells. The expression of phosphorylated signal transducer and activator of transcription 6 in breast cancer cells suggests that IL-13 actually delivers signals to cancer cells. To determine the link between breast cancer, DCs, and CD4+ T cells, we implanted human breast cancer cell lines in nonobese diabetic/LtSz-scid/scid beta2 microglobulin-deficient mice engrafted with human CD34+ hematopoietic progenitor cells and autologous T cells. There, CD4+ T cells promote early tumor development. This is dependent on DCs and can be partially prevented by administration of IL-13 antagonists. Thus, breast cancer targets DCs to facilitate its development.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Aspord C",
+        "Pedroza-Gonzalez A",
+        "Gallegos M",
+        "Tindle S",
+        "Burton EC",
+        "Su D",
+        "Marches F",
+        "Banchereau J",
+        "Palucka AK"
+      ],
+      "journal": "J Exp Med",
+      "date": "2007-05-14T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "T cell receptor",
+          "immune activation",
+          "co-receptor",
+          "immune infiltration"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "CXCL12"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CD4"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CXCL12"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "chemokine ligand",
+        "receptor binding",
+        "cell migration",
+        "tumor progression"
+      ]
+    },
+    {
+      "genes": [
+        "CD4"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "T cell receptor",
+        "immune activation",
+        "co-receptor",
+        "immune infiltration"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "androgen signaling",
+        "androgen receptor pathway",
+        "hormone signaling",
+        "tumor microenvironment"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "MAPK pathway",
+        "ERK signaling",
+        "cell proliferation",
+        "tumor progression"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "endothelial cells",
+        "macrophage",
+        "stromal cells",
+        "tumor microenvironment",
+        "immune infiltration"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "stromal T cell hybrid",
+        "tumor microenvironment",
+        "cell composition",
+        "immune infiltration"
+      ]
+    },
+    {
+      "genes": [
+        "CXCL12",
+        "CD4"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "spatial transcriptomics",
+        "cell-cell interaction",
+        "chemokine signaling",
+        "immune microenvironment"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "CD4",
+      "CXCL12"
+    ],
+    "genes_matched_by": {
+      "CD4": "t",
+      "CXCL12": "cxcl12"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Stromal",
+      "Macrophages 1",
+      "Macrophages 2"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 60.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Endothelial",
+      "Stromal & T Cell Hybrid"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 39,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": "final",
+      "papers": 30,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    }
+  ],
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with 'signaling' + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

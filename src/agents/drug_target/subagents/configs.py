@@ -1,13 +1,17 @@
 """Subagent configurations for Drug Target Assessment Agent.
 
-Four-subagent architecture with staged funnel:
-- evidence_assessor: 2-stage funnel (Stage 2: validation & scoring ->
-  Stage 1: biological context) with inline rubric assessment
-- deep_diver: Stage 3 deep dive (ChEMBL) for FEATURED genes
-- hypothesis_writer: Hypothesis generation with UCB scoring from all evidence
-- report_writer: Generate drug.md with featured candidate emphasis
+Three-subagent staged funnel (happy path):
+- evidence_assessor: 3-stage funnel (Stage 2: validation & scoring ->
+  Stage 1: biological context -> Stage 3: ChEMBL drug profiles inline)
+  with inline rubric assessment.
+- hypothesis_writer: Hypothesis generation with UCB scoring from all evidence.
+- report_writer: Generate drug.md with featured candidate emphasis.
 
-Workflow order: evidence_assessor -> deep_diver -> hypothesis_writer -> report_writer
+Workflow order: evidence_assessor -> hypothesis_writer -> report_writer
+
+The `deep_diver` subagent is preserved in SUBAGENT_CONFIGS as an optional
+standalone subagent (for manual re-runs or debug flows), but is NOT part
+of the default happy path — Stage 3 now runs inside evidence_assessor.
 """
 
 from typing import Callable, Sequence
@@ -75,13 +79,13 @@ SUBAGENT_CONFIGS = {
     "evidence_assessor": {
         "name": "evidence_assessor",
         "description": (
-            "Reordered 2-stage funnel: Stage 2 first (all genes: OpenTargets/GWAS) -> "
+            "3-stage funnel: Stage 2 first (all genes: OpenTargets/GWAS) -> "
             "rubric scoring (combined_total >= 10) -> gene selection -> "
             "Stage 1 (FEATURED pairs only: Cellxgene, KEGG/Reactome, STRING, Census) -> "
-            "Stage 1 gate validation. "
+            "Stage 1 gate validation -> Stage 3 (ChEMBL drug profiles for FEATURED genes). "
             "Includes inline rubric assessment via compute_rubric_scores. "
             "Uses Plan->Execute->Reflect cycle per stage. "
-            "Stage 3 (ChEMBL, PubMed) is handled by the deep_diver subagent."
+            "Stage 3 (ChEMBL drug profiles) runs inline after Stage 1 gate passes."
         ),
         "system_prompt": SUBAGENT_PROMPTS["evidence_assessor"],
         "tools": [
@@ -105,6 +109,9 @@ SUBAGENT_CONFIGS = {
             run_stage1_batch,
             finalize_stage1_artifacts,
             validate_stage1_gate,
+            # Stage 3: ChEMBL deep dive (inline after Stage 1)
+            query_chembl_target_profile,
+            validate_stage3_gate,
             read_skill_file,
             # Cognitive
             sequential_thinking,
@@ -147,7 +154,9 @@ SUBAGENT_CONFIGS = {
             read_skill_file,
             save_evidence,
             validate_evidence_references,
-            sequential_thinking,
+            # sequential_thinking removed: this subagent is template-driven (fixed Phases 1→5);
+            # planning tool induced infinite-loop stalls on small local LLMs (qwen3.5).
+            # Reflection is still available via think_tool below.
             think_tool,
             validate_quality,
         ],
@@ -189,10 +198,10 @@ SUBAGENT_CONFIGS = {
 # Workflow Order
 # =============================================================================
 
-WORKFLOW_ORDER = ["evidence_assessor", "deep_diver", "hypothesis_writer", "report_writer"]
+WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer", "report_writer"]
 
 WORKFLOW_DESCRIPTION = """
-Drug Target Assessment 4-Agent Workflow (Staged Funnel):
+Drug Target Assessment 3-Agent Workflow (Staged Funnel):
 
 1. EVIDENCE_ASSESSOR (Plan->Execute->Reflect per stage)
    Stage 2 FIRST (ALL unique genes): batch OpenTargets + batch GWAS + VEP (conditional)
@@ -201,23 +210,21 @@ Drug Target Assessment 4-Agent Workflow (Staged Funnel):
      -> Gene→Pair mapping to identify FEATURED L-R pairs
    Stage 1 (FEATURED pairs ONLY): Cellxgene + KEGG/Reactome + STRING + Census
      -> Stage 1 gate validation (validate_stage1_gate)
+   Stage 3 (FEATURED genes, inline): ChEMBL drug profiles
+     -> stage3_{GENE}.json per gene (idempotent, skips completed genes)
+     -> validate_stage3_gate (skipped on zero-candidate)
    Outputs: evidence/*.json (per stage, per L-R pair/gene)
-            assessment_results.json, rubric_scores.csv
+            assessment_results.json, rubric_scores.csv, stage3_{GENE}.json
    Gate: assessment_results.json must exist with stage3_candidates
 
-2. DEEP_DIVER (Plan->Execute->Reflect)
-   Stage 3 (FEATURED genes only): ChEMBL drug profiles
-   Outputs: stage3_{GENE}.json per gene
-   Gate: validate_stage3_gate must return success
-
-3. HYPOTHESIS_WRITER (Plan->Execute->Reflect)
+2. HYPOTHESIS_WRITER (Plan->Execute->Reflect)
    Reads all Stage 1-3 evidence files
    Generates 4-6 mechanistic hypotheses across 4 thematic categories
    Applies gap detection and UCB scoring
    Outputs: hypothesis_report.json
    Gate: hypothesis_report.json must exist
 
-4. REPORT_WRITER (Plan->Execute->Reflect)
+3. REPORT_WRITER (Plan->Execute->Reflect)
    - Generates target_assessment.json (structured contract)
    - Generates drug.md with structure:
      1. Executive Summary
@@ -227,6 +234,10 @@ Drug Target Assessment 4-Agent Workflow (Staged Funnel):
      4. [NOVEL] Candidate Deep Dives
      5. Pipeline Execution Summary & Recommendations
    - Quality validation (threshold >= 0.7)
+
+Optional/standalone subagents (NOT in happy path):
+- DEEP_DIVER: preserved in SUBAGENT_CONFIGS for manual re-runs or debug flows.
+  Stage 3 ChEMBL logic also runs inline inside evidence_assessor by default.
 """
 
 
@@ -245,11 +256,12 @@ def get_subagents(
 ) -> list[dict]:
     """Get the subagent configurations for Drug Target Assessment.
 
-    Returns 4 subagents in workflow order:
-    1. evidence_assessor - 2-stage funnel with inline rubric assessment
-    2. deep_diver - Stage 3 deep dive (ChEMBL)
-    3. hypothesis_writer - hypothesis generation with UCB scoring
-    4. report_writer - drug.md generation
+    Returns 3 subagents in workflow order (deep_diver remains in
+    SUBAGENT_CONFIGS as an optional standalone but is NOT in the happy path):
+    1. evidence_assessor - 3-stage funnel with inline rubric assessment
+       (Stage 2 -> Stage 1 -> Stage 3 ChEMBL inline)
+    2. hypothesis_writer - hypothesis generation with UCB scoring
+    3. report_writer - drug.md generation
 
     Args:
         custom_tools: Optional list of additional tools to include in all subagents

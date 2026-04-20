@@ -1,0 +1,83 @@
+{
+  "case_id": "cci_full_17_COL1A1_CD93",
+  "category": "medium_morans_unknown",
+  "lr_pair": "COL1A1-CD93",
+  "genes": [
+    "COL1A1",
+    "CD93"
+  ],
+  "pathways": [],
+  "celltypes": [
+    "DCIS 2",
+    "Endothelial",
+    "Invasive Tumor",
+    "Macrophages 2",
+    "Myoepi ACTA2+",
+    "Prolif Invasive Tumor",
+    "Stromal",
+    "Stromal & T Cell Hybrid",
+    "T Cell & Tumor Hybrid"
+  ],
+  "disease": "breast cancer",
+  "search_context": {
+    "genes": [
+      "COL1A1",
+      "CD93"
+    ],
+    "pathways": [],
+    "celltypes": [
+      "DCIS 2",
+      "Endothelial",
+      "Invasive Tumor",
+      "Macrophages 2",
+      "Myoepi ACTA2+",
+      "Prolif Invasive Tumor",
+      "Stromal",
+      "Stromal & T Cell Hybrid",
+      "T Cell & Tumor Hybrid"
+    ],
+    "disease": "breast cancer",
+    "lr_pair": "COL1A1-CD93",
+    "category": "medium_morans_unknown"
+  },
+  "raw_case": {
+    "case_id": "cci_full_17_COL1A1_CD93",
+    "benchmark_type": "cci_interpretation_v2",
+    "lr_pair": "COL1A1-CD93",
+    "category": "medium_morans_unknown",
+    "input_bundle": {
+      "ligand": "COL1A1",
+      "receptor": "CD93",
+      "interaction": "COL1A1^CD93",
+      "morans_r": 0.107326,
+      "morans_pval": 0.0,
+      "ligand_means": 4.078,
+      "ligand_props": 0.998,
+      "receptor_means": 0.4573,
+      "receptor_props": 0.5776,
+      "factor1": 0.9654,
+      "factor2": 1.2549,
+      "factor3": 0.5062,
+      "pathway_associations": [],
+      "disease_associations": [],
+      "ligand_cell_types": [
+        "DCIS 2",
+        "Endothelial",
+        "Invasive Tumor",
+        "Macrophages 2",
+        "Myoepi ACTA2+",
+        "Prolif Invasive Tumor",
+        "Stromal",
+        "Stromal & T Cell Hybrid",
+        "T Cell & Tumor Hybrid"
+      ],
+      "receptor_cell_types": [
+        "Endothelial"
+      ],
+      "mean_interest": -0.13272,
+      "pval_interest": 1.3711716206898927e-09,
+      "pval_interest_adj": 1.5802191768225263e-08,
+      "tissue_context": "Breast cancer Visium spatial transcriptomics"
+    }
+  }
+}

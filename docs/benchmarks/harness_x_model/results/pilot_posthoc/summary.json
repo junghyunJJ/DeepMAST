@@ -1,0 +1,534 @@
+{
+  "strong_on": {
+    "n_trials": 12,
+    "genes_coverage_pct": {
+      "n": 12,
+      "mean": 100.0,
+      "median": 100.0,
+      "stdev": 0.0,
+      "min": 100.0,
+      "max": 100.0
+    },
+    "celltypes_coverage_pct": {
+      "n": 12,
+      "mean": 63.628,
+      "median": 62.5,
+      "stdev": 17.064,
+      "min": 40.0,
+      "max": 100.0
+    },
+    "lr_cooccurrence_count": {
+      "n": 12,
+      "mean": 0.083,
+      "median": 0.0,
+      "stdev": 0.289,
+      "min": 0,
+      "max": 1
+    },
+    "lr_title_cooccurrence_count": {
+      "n": 12,
+      "mean": 0.0,
+      "median": 0.0,
+      "stdev": 0.0,
+      "min": 0,
+      "max": 0
+    },
+    "ligand_only_count": {
+      "n": 12,
+      "mean": 7.667,
+      "median": 8.0,
+      "stdev": 4.053,
+      "min": 3,
+      "max": 16
+    },
+    "receptor_only_count": {
+      "n": 12,
+      "mean": 6.333,
+      "median": 5.0,
+      "stdev": 3.651,
+      "min": 2,
+      "max": 13
+    },
+    "unique_pmids": {
+      "n": 12,
+      "mean": 30.0,
+      "median": 30.0,
+      "stdev": 0.0,
+      "min": 30,
+      "max": 30
+    },
+    "n_generated_queries": {
+      "n": 12,
+      "mean": 11.25,
+      "median": 11.0,
+      "stdev": 0.754,
+      "min": 10,
+      "max": 13
+    },
+    "n_unique_query_types": {
+      "n": 12,
+      "mean": 0.0,
+      "median": 0.0,
+      "stdev": 0.0,
+      "min": 0,
+      "max": 0
+    },
+    "iterations": {
+      "n": 12,
+      "mean": 2.0,
+      "median": 2.0,
+      "stdev": 0.0,
+      "min": 2,
+      "max": 2
+    },
+    "journal_quality_mean": {
+      "n": 12,
+      "mean": 0.503,
+      "median": 0.5,
+      "stdev": 0.004,
+      "min": 0.5,
+      "max": 0.508
+    },
+    "mean_abstract_length": {
+      "n": 12,
+      "mean": 1346.475,
+      "median": 1374.1,
+      "stdev": 78.633,
+      "min": 1168.5,
+      "max": 1448.5
+    },
+    "latency_s": {
+      "n": 12,
+      "mean": 266.065,
+      "median": 205.337,
+      "stdev": 149.856,
+      "min": 81.472,
+      "max": 579.945
+    },
+    "n_deterministic_queries": {
+      "n": 12,
+      "mean": 2.0,
+      "median": 2.0,
+      "stdev": 0.0,
+      "min": 2,
+      "max": 2
+    },
+    "n_llm_queries": {
+      "n": 12,
+      "mean": 9.25,
+      "median": 9.0,
+      "stdev": 0.754,
+      "min": 8,
+      "max": 11
+    },
+    "lr_cooccurrence_rate": {
+      "n": 12,
+      "mean": 0.003,
+      "median": 0.0,
+      "stdev": 0.01,
+      "min": 0.0,
+      "max": 0.033
+    },
+    "used_lr_pair_queries_rate": 1.0,
+    "used_lr_pair_queries_n": 12
+  },
+  "strong_off": {
+    "n_trials": 12,
+    "genes_coverage_pct": {
+      "n": 12,
+      "mean": 100.0,
+      "median": 100.0,
+      "stdev": 0.0,
+      "min": 100.0,
+      "max": 100.0
+    },
+    "celltypes_coverage_pct": {
+      "n": 12,
+      "mean": 37.731,
+      "median": 37.5,
+      "stdev": 26.569,
+      "min": 0.0,
+      "max": 100.0
+    },
+    "lr_cooccurrence_count": {
+      "n": 12,
+      "mean": 0.083,
+      "median": 0.0,
+      "stdev": 0.289,
+      "min": 0,
+      "max": 1
+    },
+    "lr_title_cooccurrence_count": {
+      "n": 12,
+      "mean": 0.0,
+      "median": 0.0,
+      "stdev": 0.0,
+      "min": 0,
+      "max": 0
+    },
+    "ligand_only_count": {
+      "n": 12,
+      "mean": 8.5,
+      "median": 9.5,
+      "stdev": 4.758,
+      "min": 3,
+      "max": 16
+    },
+    "receptor_only_count": {
+      "n": 12,
+      "mean": 8.917,
+      "median": 7.0,
+      "stdev": 5.107,
+      "min": 3,
+      "max": 17
+    },
+    "unique_pmids": {
+      "n": 12,
+      "mean": 30.0,
+      "median": 30.0,
+      "stdev": 0.0,
+      "min": 30,
+      "max": 30
+    },
+    "n_generated_queries": {
+      "n": 12,
+      "mean": 11.083,
+      "median": 11.0,
+      "stdev": 1.621,
+      "min": 10,
+      "max": 16
+    },
+    "n_unique_query_types": {
+      "n": 12,
+      "mean": 0.0,
+      "median": 0.0,
+      "stdev": 0.0,
+      "min": 0,
+      "max": 0
+    },
+    "iterations": {
+      "n": 12,
+      "mean": 2.0,
+      "median": 2.0,
+      "stdev": 0.0,
+      "min": 2,
+      "max": 2
+    },
+    "journal_quality_mean": {
+      "n": 12,
+      "mean": 0.491,
+      "median": 0.496,
+      "stdev": 0.017,
+      "min": 0.45,
+      "max": 0.507
+    },
+    "mean_abstract_length": {
+      "n": 12,
+      "mean": 1369.1,
+      "median": 1380.9,
+      "stdev": 63.735,
+      "min": 1243.8,
+      "max": 1465.6
+    },
+    "latency_s": {
+      "n": 12,
+      "mean": 249.507,
+      "median": 213.949,
+      "stdev": 190.866,
+      "min": 93.936,
+      "max": 811.635
+    },
+    "n_deterministic_queries": {
+      "n": 12,
+      "mean": 2.0,
+      "median": 2.0,
+      "stdev": 0.0,
+      "min": 2,
+      "max": 2
+    },
+    "n_llm_queries": {
+      "n": 12,
+      "mean": 9.083,
+      "median": 9.0,
+      "stdev": 1.621,
+      "min": 8,
+      "max": 14
+    },
+    "lr_cooccurrence_rate": {
+      "n": 12,
+      "mean": 0.003,
+      "median": 0.0,
+      "stdev": 0.01,
+      "min": 0.0,
+      "max": 0.033
+    },
+    "used_lr_pair_queries_rate": 1.0,
+    "used_lr_pair_queries_n": 12
+  },
+  "weak_on": {
+    "n_trials": 12,
+    "genes_coverage_pct": {
+      "n": 12,
+      "mean": 100.0,
+      "median": 100.0,
+      "stdev": 0.0,
+      "min": 100.0,
+      "max": 100.0
+    },
+    "celltypes_coverage_pct": {
+      "n": 12,
+      "mean": 47.847,
+      "median": 47.222,
+      "stdev": 21.564,
+      "min": 0.0,
+      "max": 75.0
+    },
+    "lr_cooccurrence_count": {
+      "n": 12,
+      "mean": 0.083,
+      "median": 0.0,
+      "stdev": 0.289,
+      "min": 0,
+      "max": 1
+    },
+    "lr_title_cooccurrence_count": {
+      "n": 12,
+      "mean": 0.0,
+      "median": 0.0,
+      "stdev": 0.0,
+      "min": 0,
+      "max": 0
+    },
+    "ligand_only_count": {
+      "n": 12,
+      "mean": 7.25,
+      "median": 7.5,
+      "stdev": 4.351,
+      "min": 1,
+      "max": 14
+    },
+    "receptor_only_count": {
+      "n": 12,
+      "mean": 6.667,
+      "median": 6.5,
+      "stdev": 3.822,
+      "min": 2,
+      "max": 13
+    },
+    "unique_pmids": {
+      "n": 12,
+      "mean": 30.0,
+      "median": 30.0,
+      "stdev": 0.0,
+      "min": 30,
+      "max": 30
+    },
+    "n_generated_queries": {
+      "n": 12,
+      "mean": 11.25,
+      "median": 11.0,
+      "stdev": 0.754,
+      "min": 10,
+      "max": 13
+    },
+    "n_unique_query_types": {
+      "n": 12,
+      "mean": 0.0,
+      "median": 0.0,
+      "stdev": 0.0,
+      "min": 0,
+      "max": 0
+    },
+    "iterations": {
+      "n": 12,
+      "mean": 2.0,
+      "median": 2.0,
+      "stdev": 0.0,
+      "min": 2,
+      "max": 2
+    },
+    "journal_quality_mean": {
+      "n": 12,
+      "mean": 0.498,
+      "median": 0.5,
+      "stdev": 0.006,
+      "min": 0.485,
+      "max": 0.507
+    },
+    "mean_abstract_length": {
+      "n": 12,
+      "mean": 1351.958,
+      "median": 1375.85,
+      "stdev": 60.619,
+      "min": 1228.7,
+      "max": 1437.0
+    },
+    "latency_s": {
+      "n": 12,
+      "mean": 257.37,
+      "median": 208.297,
+      "stdev": 168.193,
+      "min": 125.573,
+      "max": 732.774
+    },
+    "n_deterministic_queries": {
+      "n": 12,
+      "mean": 2.0,
+      "median": 2.0,
+      "stdev": 0.0,
+      "min": 2,
+      "max": 2
+    },
+    "n_llm_queries": {
+      "n": 12,
+      "mean": 9.25,
+      "median": 9.0,
+      "stdev": 0.754,
+      "min": 8,
+      "max": 11
+    },
+    "lr_cooccurrence_rate": {
+      "n": 12,
+      "mean": 0.003,
+      "median": 0.0,
+      "stdev": 0.01,
+      "min": 0.0,
+      "max": 0.033
+    },
+    "used_lr_pair_queries_rate": 1.0,
+    "used_lr_pair_queries_n": 12
+  },
+  "weak_off": {
+    "n_trials": 12,
+    "genes_coverage_pct": {
+      "n": 12,
+      "mean": 100.0,
+      "median": 100.0,
+      "stdev": 0.0,
+      "min": 100.0,
+      "max": 100.0
+    },
+    "celltypes_coverage_pct": {
+      "n": 12,
+      "mean": 33.264,
+      "median": 25.0,
+      "stdev": 25.585,
+      "min": 0.0,
+      "max": 100.0
+    },
+    "lr_cooccurrence_count": {
+      "n": 12,
+      "mean": 0.083,
+      "median": 0.0,
+      "stdev": 0.289,
+      "min": 0,
+      "max": 1
+    },
+    "lr_title_cooccurrence_count": {
+      "n": 12,
+      "mean": 0.0,
+      "median": 0.0,
+      "stdev": 0.0,
+      "min": 0,
+      "max": 0
+    },
+    "ligand_only_count": {
+      "n": 12,
+      "mean": 7.667,
+      "median": 9.0,
+      "stdev": 4.499,
+      "min": 1,
+      "max": 14
+    },
+    "receptor_only_count": {
+      "n": 12,
+      "mean": 8.917,
+      "median": 9.0,
+      "stdev": 5.744,
+      "min": 3,
+      "max": 20
+    },
+    "unique_pmids": {
+      "n": 12,
+      "mean": 30.0,
+      "median": 30.0,
+      "stdev": 0.0,
+      "min": 30,
+      "max": 30
+    },
+    "n_generated_queries": {
+      "n": 12,
+      "mean": 10.833,
+      "median": 11.0,
+      "stdev": 0.389,
+      "min": 10,
+      "max": 11
+    },
+    "n_unique_query_types": {
+      "n": 12,
+      "mean": 0.0,
+      "median": 0.0,
+      "stdev": 0.0,
+      "min": 0,
+      "max": 0
+    },
+    "iterations": {
+      "n": 12,
+      "mean": 2.0,
+      "median": 2.0,
+      "stdev": 0.0,
+      "min": 2,
+      "max": 2
+    },
+    "journal_quality_mean": {
+      "n": 12,
+      "mean": 0.492,
+      "median": 0.493,
+      "stdev": 0.01,
+      "min": 0.473,
+      "max": 0.507
+    },
+    "mean_abstract_length": {
+      "n": 12,
+      "mean": 1361.808,
+      "median": 1380.5,
+      "stdev": 61.472,
+      "min": 1280.5,
+      "max": 1448.0
+    },
+    "latency_s": {
+      "n": 12,
+      "mean": 192.331,
+      "median": 189.91,
+      "stdev": 51.16,
+      "min": 116.637,
+      "max": 287.595
+    },
+    "n_deterministic_queries": {
+      "n": 12,
+      "mean": 2.0,
+      "median": 2.0,
+      "stdev": 0.0,
+      "min": 2,
+      "max": 2
+    },
+    "n_llm_queries": {
+      "n": 12,
+      "mean": 8.833,
+      "median": 9.0,
+      "stdev": 0.389,
+      "min": 8,
+      "max": 9
+    },
+    "lr_cooccurrence_rate": {
+      "n": 12,
+      "mean": 0.003,
+      "median": 0.0,
+      "stdev": 0.01,
+      "min": 0.0,
+      "max": 0.033
+    },
+    "used_lr_pair_queries_rate": 1.0,
+    "used_lr_pair_queries_n": 12
+  }
+}

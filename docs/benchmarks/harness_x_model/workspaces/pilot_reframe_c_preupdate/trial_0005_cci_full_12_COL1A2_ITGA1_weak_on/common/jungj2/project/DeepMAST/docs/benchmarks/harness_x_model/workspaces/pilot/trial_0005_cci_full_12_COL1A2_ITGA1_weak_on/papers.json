@@ -1,0 +1,60 @@
+{
+  "saved_to": "/common/jungj2/project/DeepMAST/docs/benchmarks/harness_x_model/workspaces/pilot/trial_0005_cci_full_12_COL1A2_ITGA1_weak_on/papers.json",
+  "output_path": "papers.json",
+  "total_papers": 30,
+  "coverage": {
+    "genes_covered": [
+      "COL1A2",
+      "ITGA1"
+    ],
+    "genes_matched_by": {
+      "COL1A2": "col1a2",
+      "ITGA1": "itga"
+    },
+    "pathways_covered": [
+      "VEGF"
+    ],
+    "pathways_matched_by": {
+      "VEGF": "vegf"
+    },
+    "celltypes_covered": [
+      "Stromal",
+      "Endothelial"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 100.0,
+    "celltypes_coverage_pct": 25.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "DCIS 1",
+      "DCIS 2",
+      "Macrophages 2",
+      "Myoepi ACTA2+",
+      "Perivascular-Like",
+      "Stromal & T Cell Hybrid"
+    ]
+  },
+  "paper_titles": [
+    "Patient-derived cell lines unveil COL1A2 as a predictor of docetaxel resistance in breast cancer.",
+    "Comparative machine learning analysis for predicting organ tropism in breast cancer and identifying ",
+    "Radiation increases COL1A1, COL3A1, and COL1A2 expression in breast cancer",
+    "Aggressive breast cancer leads to discrepant serum levels of the type I procollagen propeptides PINP",
+    "Article 40055751",
+    "Interaction of smad3 with a proximal smad-binding element of the human alpha2(I) procollagen gene pr",
+    "ARHGEF6 downregulation as a key mediator of tumor cell apoptosis in breast cancer.",
+    "Abnormal promoter DNA hypermethylation of the integrin, nidogen, and dystroglycan genes in breast ca",
+    "Hypoxia Selectively Enhances Integrin alpha5beta1 Receptor Expression in Breast Cancer to Promote Me",
+    "Expression of estrogen receptor beta increases integrin alpha1 and integrin beta1 levels and enhance"
+  ],
+  "search_method": "search_literature_dynamic",
+  "think_success": true,
+  "iterations": 2,
+  "coverage_sufficient": true,
+  "recommended_actions": [],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0,
+  "message": "Full results (30 papers) saved to papers.json. Use read_file('/papers.json') to access complete data."
+}

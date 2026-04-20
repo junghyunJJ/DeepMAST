@@ -1016,7 +1016,7 @@ def check_stage1_completion(data_dir: str) -> str:
     """Check whether Stage 1 was completed by evidence_assessor.
 
     Call this AFTER evidence_assessor completes and BEFORE proceeding to
-    deep_diver. Returns a JSON object with stage1_complete flag,
+    hypothesis_writer. Returns a JSON object with stage1_complete flag,
     stage3_candidates count, and a recommendation for next steps.
     """
     base = _resolve_data_dir(data_dir)
@@ -1046,7 +1046,7 @@ def check_stage1_completion(data_dir: str) -> str:
         return json.dumps(result, indent=2)
 
     result["has_assessment_results"] = True
-    # check_stage1_completion gates downstream stages (deep_diver, hypothesis_writer).
+    # check_stage1_completion gates the downstream hypothesis_writer stage.
     # Single narrowed set = stage3_candidates (rubric ∩ Stage 1 PASS).
     stage3_candidates = assessment.get("stage3_candidates", [])
     result["stage3_candidates_count"] = len(stage3_candidates)
@@ -1056,7 +1056,7 @@ def check_stage1_completion(data_dir: str) -> str:
         result["stage1_complete"] = True
         result["recommendation"] = (
             "No stage3_candidates (zero featured genes). "
-            "Skip deep_diver and hypothesis_writer, proceed to report_writer."
+            "Skip hypothesis_writer, proceed to report_writer."
         )
         return json.dumps(result, indent=2)
 
@@ -1069,13 +1069,13 @@ def check_stage1_completion(data_dir: str) -> str:
 
     if stage1_files or has_stage1_aggregate:
         result["stage1_complete"] = True
-        result["recommendation"] = "Stage 1 complete. Proceed to deep_diver."
+        result["recommendation"] = "Stage 1 complete. Proceed to hypothesis_writer."
     else:
         result["stage1_complete"] = False
         result["recommendation"] = (
             "WARNING: Stage 1 was NOT completed. No stage1_*.json files found. "
             "evidence_assessor likely hit recursion limit before Stage 1. "
-            "Proceeding to deep_diver will produce incomplete results."
+            "Proceeding to hypothesis_writer will produce incomplete results."
         )
 
     return json.dumps(result, indent=2)

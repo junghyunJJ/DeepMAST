@@ -1,0 +1,19 @@
+{
+  "genes": [
+    "EGF",
+    "RACK1"
+  ],
+  "pathways": [],
+  "celltypes": [
+    "DCIS 2",
+    "Endothelial",
+    "Invasive Tumor",
+    "Macrophages 2",
+    "Prolif Invasive Tumor",
+    "Stromal",
+    "T Cell & Tumor Hybrid"
+  ],
+  "disease": "breast cancer",
+  "lr_pair": "EGF-RACK1",
+  "category": "low_morans_known"
+}

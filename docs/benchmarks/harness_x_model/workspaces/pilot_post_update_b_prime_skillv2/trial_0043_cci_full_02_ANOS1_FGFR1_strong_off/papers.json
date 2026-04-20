@@ -1,0 +1,1116 @@
+{
+  "papers": [
+    {
+      "pmid": "37118404",
+      "title": "Assessment of Bone Health Awareness and Education in Breast Cancer Patients with Bone Metastasis in the USA",
+      "abstract": "Bone metastases are common in advanced breast cancer (BC) patients and increase the risk for skeletal-related events (SREs), which present a significant health and economic burden. Bone targeting agents (BTAs) can improve health-related quality of life by delaying or preventing SREs; nevertheless, a significant portion of eligible BC patients are not receiving this therapy. A bone health education needs assessment survey was conducted to examine cancer-related bone health awareness and to identify opportunities to improve bone health education. Direct-to-patient outreach was used to recruit adult BC patients in the USA self-reporting a diagnosis of bone metastasis within the past 3 years. Of the 200 patients, 59% experienced at least one SRE prior to survey participation (44% radiation to bone, 29% bone fracture, 17% spinal cord compression, 15% surgery to bone), and 83% were currently receiving a BTA. Awareness of general cancer bone health, protection strategies against SREs, and screening tests were low to moderate. Patients currently not receiving a BTA were least knowledgeable about cancer bone health, with only 40% aware of BTAs as a protective strategy, and only 26% were very or extremely satisfied with the information received from healthcare providers. Sixty-two percent of patients wanted to receive information by more than one mode of communication. Notable gaps in bone health education were observed in bone metastatic BC patients at risk for SREs, suggesting the ne",
+      "journal_quality": 0.5,
+      "authors": [
+        "Flora DR",
+        "Schenfeld J",
+        "Saad H",
+        "Cadieux B",
+        "Boike G",
+        "Lowe KA"
+      ],
+      "journal": "J Cancer Educ",
+      "date": "2023-04-28T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36374169",
+      "title": "Protein disulfide isomerase A3 activity promotes extracellular accumulation of proteins relevant to basal breast cancer outcomes in human MDA-MB-A231 breast cancer cells",
+      "abstract": "Metastasis and recurrence of breast cancer remain major causes of patient mortality, and there is an ongoing need to identify new therapeutic targets relevant to tumor invasion. Protein disulfide isomerase A3 (PDIA3) is a disulfide oxidoreductase and isomerase of the endoplasmic reticulum that has known extracellular substrates and has been correlated with aggressive breast cancers. We show that either prior PDIA3 inhibition by the disulfide isomerase inhibitor 16F16 or depletion of heparin-binding proteins strongly reduces the activity of conditioned medium (CM) of MDA-MB-231 human breast cancer cells to support promigratory cell spreading and F-actin organization by newly adherent MDA-MB-231 cells. Quantitative proteomics to investigate effects of 16F16 inhibition on heparin-binding proteins in the CM of MDA-MB-231 cells identified 80 proteins reproducibly decreased at least twofold (at q <= 0.05) after 16F16 treatment. By Gene Ontology analysis, many of these have roles in extracellular matrix (ECM) structure and function and cell adhesion; ribosomal proteins that also correlate with extracellular vesicles were also identified. Protein-protein interaction analysis showed that many of the extracellular proteins have known network interactions with each other. The predominant types of disulfide-bonded domains in the extracellular proteins contained beta-hairpin folds, with the knottin fold the most common. From human breast cancer data sets, the extracellular proteins were f",
+      "journal_quality": 0.5,
+      "authors": [
+        "Germon A",
+        "Heesom KJ",
+        "Amoah R",
+        "Adams JC"
+      ],
+      "journal": "Am J Physiol Cell Physiol",
+      "date": "2023-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35193394",
+      "title": "Fibroblast growth factor receptor signalling dysregulation and targeting in breast cancer",
+      "abstract": "Fibroblast Growth Factor Receptor (FGFR) signalling plays a critical role in breast embryonal development, tissue homeostasis, tumorigenesis and metastasis. FGFR, its numerous FGF ligands and signalling partners are often dysregulated in breast cancer progression and are one of the causes of resistance to treatment in breast cancer. Furthermore, FGFR signalling on epithelial cells is affected by signals from the breast microenvironment, therefore increasing the possibility of breast developmental abnormalities or cancer progression. Increasing our understanding of the multi-layered roles of the complex family of FGFRs, their ligands FGFs and their regulatory partners may offer novel treatment strategies for breast cancer patients, as a single agent or rational co-target, which will be explored in depth in this review.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Francavilla C",
+        "O'Brien CS"
+      ],
+      "journal": "Open Biol",
+      "date": "2022-02-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26649025",
+      "title": "\"OMIC\" tumor markers for breast cancer: A review",
+      "abstract": "Breast cancer is a global health issue, and as the tumor burden increases, we need to come up with newer, better technologies which are convenient, cheap, rapid, sensitive with a high specificity. Technological advancements in the field of cancer biomarker has led to the development of techniques such as mass spectrometric analysis and microarray analysis in which genes, proteins and hundreds and thousands of metabolites can be identified with the emergence of genomics, proteomics and metabolomics. This research is focused on finding biomarkers for diagnosis, prognosis, staging, treatment response and targets for chemotherapy, generating a panel of markers which provide better clinical information compared to a single marker in the panel. This review briefly summarizes application of genomics and proteomics followed by key concepts and applications of metabolomics in breast cancer, with the conclusion that an integration of the three \"OMIC\" technologies may hold the key to future biomarker discovery.\n\nSources of Data Study Selection:\n\nThe information for this review was collected by searching the Google Scholar and PubMed database for English articles published in the period from 2002 to 2015. The search terms included \"biomarkers in breast cancer\" along with the following search terms: \"genomics\", \"proteomics\", \"metabolomics\", \"breast cancer\", \"mass spectrometry\", \"molecular markers\" and \"cancer biomarker\". We have endeavored to quote only the primary sources. Titles and abs",
+      "journal_quality": 0.5,
+      "authors": [
+        "Hadi NI",
+        "Jamal Q"
+      ],
+      "journal": "Pak J Med Sci",
+      "date": "2015-09-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "41749431",
+      "title": "ANOS1 Facilitated Tumorigenesis in Gastric Cancer through the Regulation of Oxidative Phosphorylation Pathway.",
+      "abstract": "Gastric cancer (GC) is the fifth leading cause of cancer-related deaths, with poor early detection and prognosis. Biomarkers related to its development are desperately needed. This study explores ANOS1 expression in GC and its mechanism in tumor metabolic reprogramming. Core molecules were identified via co-expression analysis of The Cancer Genome Atlas (TCGA) and Gene Expression Omnibus (GEO) data. RT-PCR and Western blot were used to confirm the levels of ANOS1 in GC and normal tissues. Assays conducted both in vitro and in vivo verified that ANOS1 accelerates the development of GC. Seahorse XF was used to quantify oxygen consumption rate and extracellular acidification rate as well as glucose absorption, lactate generation, and mtROS levels. Finally, the correlation between the ANOS1 and immune infiltration in gastric cancer was analyzed. Weighted Gene Co-expression Network Analysis of TCGA and GEO datasets identified 44 candidates, from which six prognostic genes were further pinpointed using univariate Cox and least absolute shrinkage and selection operator regression analyses. Gene Set Enrichment Analysis revealed ANOS1 as a potential core regulator. ANOS1 was highly expressed in GC and promoted migration, invasion, and proliferation. Mechanistically, knockdown of ANOS1 promotes oxidative phosphorylation via the receptor tyrosine kinase pathway, suppresses glycolysis, and inhibits the proliferative, migratory, and invasive capacities of tumor cells. The results of immun",
+      "journal_quality": 0.5,
+      "authors": [
+        "Tao L",
+        "Ming W",
+        "Wang X"
+      ],
+      "journal": "J Microbiol Biotechnol",
+      "date": "2026-02-26T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39606641",
+      "title": "Integrating Machine Learning and the SHapley Additive exPlanations (SHAP) Framework to Predict Lymph Node Metastasis in Gastric Cancer Patients Based on Inflammation Indices and Peripheral Lymphocyte Subpopulations",
+      "abstract": "Background\n\nThe prediction of lymph node metastasis in gastric cancer, a pivotal determinant affecting treatment approaches and prognosis, continues to pose a significant challenge in terms of accuracy.\n\nMethods\n\nIn this study, we employed a combination of machine learning methods and the SHapley Additive exPlanations (SHAP) framework to develop an integrated predictive model. This model utilizes the preoperatively obtainable parameter of the inflammatory index, aiming to enhance the accuracy of predicting lymph node metastasis in gastric cancer patients.\n\nResults\n\nLymph node metastasis stands as an independent prognostic risk factor for gastric cancer patients. Among various models, XGBoost emerges as the optimal machine learning model. In the training set, the XGBoost model exhibited the highest AUC value of 0.705. In the test set, XGBoost demonstrated the highest AUC of 0.695, and the lowest Brier score of 0.218. Notably, in terms of feature importance, PLR emerged as the most significant factor influencing lymph node metastasis in gastric cancer patients. Through the screening of differentially expressed genes, we ultimately identified the prognostic value of six genes: IGFN1, CLEC11A, STC2, TFEC, MUC5AC, and ANOS1, in predicting survival.\n\nConclusion\n\nThe XGBoost model can predict lymph node metastasis (LNM) in gastric cancer patients based on the inflammation index and peripheral lymphocyte subgroups. Combined with SHAP, it provides a more intuitive reflection of the im",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zhu Z",
+        "Wang C",
+        "Shi L",
+        "Li M",
+        "Li J",
+        "Liang S",
+        "Yin Z",
+        "Xue Y"
+      ],
+      "journal": "J Inflamm Res",
+      "date": "2024-11-23T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35158856",
+      "title": "IGF-I and Hyaluronic Acid Mitigate the Negative Effect of Irradiation on Human Skin Keratinocytes",
+      "abstract": "Simple Summary\n\nPatients undergoing radiation therapy for the treatment of various types of cancer often experience side effects such as radiation dermatitis. A gold standard treatment is still lacking. The objective of the present study was to find novel therapeutic strategies for the regeneration and repair of damaged skin areas after irradiation. An in vitro 2D and 3D primary keratinocyte model was used to test the effect of insulin-like growth factor I (IGF-I), keratinocyte growth factor (KGF), platelet lysate (PL), hyaluronic acid (HA), and adipose-derived stem cell (ADSC) conditioned medium on the functional abilities (viability, migration) and the gene expression of irradiated keratinocytes. Hyaluronic acid and IGF-I effectively reduced the irradiation damage of primary keratinocytes by stimulating viability and migration and reducing cell apoptosis and necrosis. These findings indicate that the negative effects of irradiation on keratinocytes located in the patient's skin can be counterbalanced with HA and IGF-I treatment.\n\nAbstract\n\nIonizing radiation has become an integral part of modern cancer therapy regimens. Various side effects, such as radiation dermatitis, affect patients in acute and chronic forms and decrease therapy compliance significantly. In this study, primary keratinocytes were irradiated in a 2-dimensional (2D) culture as well as on a 3-dimensional (3D) collagen-elastin matrix with doses of 2 and 5 Gy. The effect of different concentrations of IGF-I,",
+      "journal_quality": 0.5,
+      "authors": [
+        "Sörgel CA",
+        "Schmid R",
+        "Stadelmann N",
+        "Weisbach V",
+        "Distel L",
+        "Horch RE",
+        "Kengelbach-Weigand A"
+      ],
+      "journal": "Cancers (Basel)",
+      "date": "2022-01-24T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35047120",
+      "title": "Molecular diagnosis of Kallmann syndrome with diabetes by whole exome sequencing and bioinformatic approaches",
+      "abstract": "BACKGROUND\n\nKallmann syndrome (KS) is a hypogonadotropic hypogonadism accompanied by anosmia or hyposmia. It is associated with the low secretion of gonadotropins which can lead to other abnormal endocrine metabolism disorders such as diabetes. Through genetic and molecular biological methods, more than 10 KS pathogenic genes have been found. \n\nAIM\n\nTo identify the existing mutation sites of KS with diabetes and reveal the relationship between genotype and phenotype.\n\nMETHODS\n\nWe studied KS pathogenesis through high-throughput exome sequencing on four diabetes' patients with KS for screening the potential pathogenic sites and exploring the genotype-phenotype correlation. Clinical data and peripheral blood samples were collected from the patients. White blood cells were separated and genomic DNA was extracted. High-throughput sequencing of all exons in the candidate pathogenic genes of probands was performed, and the results obtained were analyzed. \n\nRESULTS\n\nSequencing revealed mutations in the KLB p.T313M, ANOS1 p.C172F, and IGSF10 gene (p.Lys1819Arg and p.Arg1035Thr) at different sites, which may have been associated with disease onset. \n\nCONCLUSION\n\nThe diagnosis of KS is challenging, especially in early puberty, and the clinical manifestations reflect physical delays in development and puberty. Timely diagnosis and treatment can induce puberty, thereby improving sexual, bone, metabolic and mental health.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Sun SS",
+        "Wang RX"
+      ],
+      "journal": "World J Diabetes",
+      "date": "2021-12-15T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34745928",
+      "title": "The Prognostic Value of Bone Morphogenetic Proteins and Their Receptors in Lung Adenocarcinoma",
+      "abstract": "Background\n\nBone morphogenetic proteins (BMPs) regulate tumor progression via binding to their receptors (BMPRs). However, the expression and clinical significance of BMPs/BMPRs in lung adenocarcinoma remain unclear due to a lack of systematic studies.\n\nMethods\n\nThis study screened differentially expressed BMPs/BMPRs (deBMPs/BMPRs) in a training dataset combining TCGA-LUAD and GTEx-LUNG and verified them in four GEO datasets. Their prognostic value was evaluated via univariate and multivariate Cox regression analyses. LASSO was performed to construct an initial risk model. Subsequently, after weighted gene co-expression network analysis (WGCNA), differential expression analysis, and univariate Cox regression analysis, hub genes co-expressed with differentially expressed BMPs/BMPRs were filtered out to improve the risk model and explore potential mechanisms. The improved risk model was re-established via LASSO combining hub genes with differentially expressed BMPs/BMPRs as the core. In the testing cohort including 93 lung adenocarcinoma patients, immunohistochemistry (IHC) was performed to verify BMP5 protein expression and its association with prognosis.\n\nResults\n\nBMP2, BMP5, BMP6, GDF10, and ACVRL1 were verified as downregulated in lung adenocarcinoma. Survival analysis identified BMP5 as an independent protective prognostic factor. We also found that BMP5 was significantly correlated with EGFR expression and mutations, suggesting that BMP5 may play a role in targeted therap",
+      "journal_quality": 0.5,
+      "authors": [
+        "Meng W",
+        "Xiao H",
+        "Zhao R",
+        "Li D",
+        "Li K",
+        "Meng Y",
+        "Chen J",
+        "Wang Y",
+        "Liao Y"
+      ],
+      "journal": "Front Oncol",
+      "date": "2021-10-22T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "41795985",
+      "title": "[FGFR1 mRNA expression in different molecular subtypes of breast cancer].",
+      "abstract": "Objective: To investigate FGFR1 mRNA expression and gene characteristics in breast cancer tissue. Methods: Breast cancer samples from 45 female patients (10 HER2-positive, 15 triple-negative and 20 HR-positive/HER2-negative cases) were collected from Peking Union Medical College Hospital between December 2022 and January 2024. FGFR1 mRNA expression was identified using reverse transcription droplet digital PCR, and the FGFR1 gene characteristics was analyzed from 30 samples by fluorescence in situ hybridization. Results: In the group of HER2-positive, 2 cases (2/10) of high FGFR1 mRNA expression and one case (1/7) of high FGFR1 gene amplification were found. Five tumors (5/15) with high FGFR1 mRNA expression, one (1/10) with gene amplification and one (1/10) with low-level amplification of FGFR gene were identified in triple-negative breast cancer. Among HR-positive/HER2-negative samples, high FGFR1 mRNA expressions were confirmed in 4 cases (4/20), with no FGFR1 gene amplification (0/13). Additionally, 3 cases (3/10) showed high FGFR1 mRNA expression in HER2-low expression (IHC 1+and IHC 2+/FISH-) samples. Conclusions: High FGFR1 mRNA expression is observed across different molecular subtypes of breast cancer. High-level FGFR1 gene amplification is uncommonly detected; therefore, further studies with large amount samples are required.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Liu ML",
+        "Wu SF",
+        "Liu YY",
+        "Zhang HX",
+        "Zhao DC",
+        "Huang X",
+        "Lian J",
+        "Zeng X"
+      ],
+      "journal": "Zhonghua Bing Li Xue Za Zhi",
+      "date": "2026-03-08T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38553760",
+      "title": "Paradoxical cancer cell proliferation after FGFR inhibition through decreased p21 signaling in FGFR1-amplified breast cancer cells",
+      "abstract": "Fibroblast growth factors (FGFs) control various cellular functions through fibroblast growth factor receptor (FGFR) activation, including proliferation, differentiation, migration, and survival. FGFR amplification in ER + breast cancer patients correlate with poor prognosis, and FGFR inhibitors are currently being tested in clinical trials. By comparing three-dimensional spheroid growth of ER + breast cancer cells with and without FGFR1 amplification, our research discovered that FGF2 treatment can paradoxically decrease proliferation in cells with FGFR1 amplification or overexpression. In contrast, FGF2 treatment in cells without FGFR1 amplification promotes classical FGFR proliferative signaling through the MAPK cascade. The growth inhibitory effect of FGF2 in FGFR1 amplified cells aligned with an increase in p21, a cell cycle inhibitor that hinders the G1 to S phase transition in the cell cycle. Additionally, FGF2 addition in FGFR1 amplified cells activated JAK-STAT signaling and promoted a stem cell-like state. FGF2-induced paradoxical effects were reversed by inhibiting p21 or the JAK-STAT pathway and with pan-FGFR inhibitors. Analysis of patient ER + breast tumor transcriptomes from the TCGA and METABRIC datasets demonstrated a strong positive association between expression of FGF2 and stemness signatures, which was further enhanced in tumors with high FGFR1 expression. Overall, our findings reveal a divergence in FGFR signaling, transitioning from a proliferative to s",
+      "journal_quality": 0.5,
+      "authors": [
+        "Chi F",
+        "Griffiths JI",
+        "Nath A",
+        "Bild AH"
+      ],
+      "journal": "Breast Cancer Res",
+      "date": "2024-03-29T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37569547",
+      "title": "Knockdown of PTK7 Reduces the Oncogenic Potential of Breast Cancer Cells by Impeding Receptor Tyrosine Kinase Signaling",
+      "abstract": "Protein tyrosine kinase 7 (PTK7), a catalytically defective receptor tyrosine kinase (RTK), is often upregulated in various cancers. This study aimed to validate PTK7 as a target for breast cancer (BC) and investigate its oncogenic signaling mechanism. BC tissue analysis showed significantly elevated PTK7 mRNA levels, especially in refractory triple-negative breast cancer (TNBC) tissues, compared with normal controls. Similarly, BC cell lines exhibited increased PTK7 expression. Knockdown of PTK7 inhibited the proliferation of T-47D and MCF-7 hormone-receptor-positive BC cell-lines and of HCC1187, MDA-MB-231, MDA-MB-436, and MDA-MB-453 TNBC cells. PTK7 knockdown also inhibited the adhesion, migration, and invasion of MDA-MB-231, MDA-MB-436, and MDA-MB-453 cells, and reduced the phosphorylation levels of crucial oncogenic regulators including extracellular signal-regulated kinase (ERK), Akt, and focal adhesion kinase (FAK). Furthermore, PTK7 interacts with fibroblast growth factor receptor 1 (FGFR1) and epidermal growth factor receptor (EGFR) expressed in MDA-MB-231 cells. Knockdown of PTK7 decreased the growth-factor-induced phosphorylation of FGFR1 and EGFR in MDA-MB-231 cells, indicating its association with RTK activation. In conclusion, PTK7 plays a significant role in oncogenic signal transduction by enhancing FGFR1 and EGFR activation, influencing BC tumorigenesis and metastasis. Hence, PTK7 represents a potential candidate for targeted BC therapy, including TNBC.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Shin WS",
+        "Oh SW",
+        "Park HN",
+        "Kim JH",
+        "Lee ST"
+      ],
+      "journal": "Int J Mol Sci",
+      "date": "2023-07-29T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37496658",
+      "title": "Fibroblast growth factor 3 promotes spontaneous mammary tumorigenesis in Tientsin albino 2 mice via the FGF3/FGFR1/STAT3 pathway",
+      "abstract": "Introduction\n\nTientsin albino 2 (TA2) mice can develop spontaneous breast cancer (SBC), which is associated with multiple pregnancies and infection with the mouse mammary tumor virus (MMTV). In this study, we sought to elucidate the molecular mechanisms underlying the development of SBC in TA2 mice induced by MMTV.\n\nMethods\n\nThe integration site of MMTV in TA2 SBC was identified using whole-genome sequencing. The expression of fibroblast growth factor 3 (FGF3) in SBCs and normal breast tissues was compared. The primary cell line, TA-1106, derived from SBC, was cultured. The proliferation, cell cycle, migration, invasion, and tumorigenicity abilities, as well as the expression of epithelial-mesenchymal transition-related proteins, phosphorylated STAT3, and phosphorylated Akt, were assessed in MA-891cell line from TA2 and TA-1106 cells after FGF3 knockdown. The binding of FGF3 to FGF receptor 1 (FGFR1) was determined by co-immunoprecipitation. Additionally, the relationship between STAT3 and Akt phosphorylation was investigated using a small molecule inhibitor and STAT3 knockdown.\n\nResults\n\nMMTV integrated upstream of the FGF3 gene, and the FGF3 protein was highly expressed in TA2 SBCs. FGF3 knockdown in MA-891 and TA-1106 decreased their proliferation, migration, and invasion abilities, affected the cell cycle and expression of epithelial-mesenchymal transition-related proteins, and inhibited the growth of animal xenografts. FGF3 binds to FGFR1, and either FGF3 or FGFR1 knockd",
+      "journal_quality": 0.5,
+      "authors": [
+        "Chen L",
+        "Zhang X",
+        "Liu G",
+        "Chen S",
+        "Zheng M",
+        "Zhu S",
+        "Zhang S"
+      ],
+      "journal": "Front Oncol",
+      "date": "2023-07-11T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36083147",
+      "title": "FGFR1 Antibody Validation and Characterization of FGFR1 Protein Expression in ER+ Breast Cancer.",
+      "abstract": "Clinical trials in patients with ER+ breast cancer with or without FGFR pathway somatic alterations have shown limited clinical benefit from treatment with FGFR tyrosine kinase inhibitors alone or in combination with endocrine therapy. This is likely because of an inadequate predictive biomarker to select appropriate patients. In this study, we evaluated 4 anti-FGFR1 antibodies in breast cancer cell lines and patient-derived xenografts with FGFR1 amplification. We correlated D8E4 expression in 209 tumors from postmenopausal patients with stage I-III operable ER+ breast cancer with FGFR1 amplification status as determined by fluorescence in situ hybridization. FGFR1 amplification was identified in 10% of tumors (21/209), 80% of which exhibited membranous FGFR1 expression; however, only 50% of amplified cases showed strong, complete membranous staining (3+) based on established criteria to score HER2 by immunohistochemistry. These findings suggest the combined evaluation of FGFR1 status by immunohistochemistry and fluorescence in situ hybridization may need to be incorporated into the selection of patients for trials with FGFR inhibitors.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Gonzalez-Ericsson PI",
+        "Servetto A",
+        "Formisano L",
+        "Sánchez V",
+        "Mayer IA",
+        "Arteaga CL",
+        "Sanders ME"
+      ],
+      "journal": "Appl Immunohistochem Mol Morphol",
+      "date": "2022-10-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33579347",
+      "title": "FGFR1 amplification or overexpression and hormonal resistance in luminal breast cancer: rationale for a triple blockade of ER, CDK4/6, and FGFR1",
+      "abstract": "Background\n\nFGFR1 amplification, but not overexpression, has been related to adverse prognosis in hormone-positive breast cancer (HRPBC). Whether FGFR1 overexpression and amplification are correlated, what is their distribution among luminal A or B HRPBC, and if there is a potential different prognostic role for amplification and overexpression are currently unknown features. The role of FGFR1 inhibitors in HRPBC is also unclear.\n\nMethods\n\nFGFR1 amplification (FISH) and overexpression (RNAscope) were investigated in a N = 251 HRPBC patients cohort and the METABRIC cohort; effects on survival and FISH-RNAscope concordance were determined. We generated hormonal deprivation resistant (LTED-R) and FGFR1-overexpressing cell line variants of the ER+ MCF7 and T47-D and the ER+, FGFR1-amplified HCC1428 cell lines. The role of ER, CDK4/6, and/or FGFR1 blockade alone or in combinations in Rb phosphorylation, cell cycle, and survival were studied.\n\nResults\n\nFGFR1 overexpression and amplification was non-concordant in > 20% of the patients, but both were associated to a similar relapse risk (~ 2.5-fold; P < 0.05). FGFR1 amplification or overexpression occurred regardless of the luminal subtype, but the incidence was higher in luminal B (16.3%) than A (6.6%) tumors; P < 0.05. The Kappa index for overexpression and amplification was 0.69 (P < 0.001). Twenty-four per cent of the patients showed either amplification and/or overexpression of FGFR1, what was associated to a hazard ratio for re",
+      "journal_quality": 0.5,
+      "authors": [
+        "Mouron S",
+        "Manso L",
+        "Caleiras E",
+        "Rodriguez-Peralto JL",
+        "Rueda OM",
+        "Caldas C",
+        "Colomer R",
+        "Quintela-Fandino M",
+        "Bueno MJ"
+      ],
+      "journal": "Breast Cancer Res",
+      "date": "2021-02-12T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33783288",
+      "title": "FGFR1 Is Associated With Tamoxifen Resistance and Poor Prognosis of ER-Positive Breast Cancers by Suppressing ER Protein Expression",
+      "abstract": "Fibroblast growth factor receptor 1 (FGFR1) is widely recognized as a key player in mammary carcinogenesis and associated with the prognosis and therapeutic response of breast cancers. With the aim of investigating the correlation between FGFR1 expression and estrogen receptor (ER) and exploring the effect of FGFR1 on endocrine therapy response and ER+ breast cancer prognosis, we examined the FGFR1 protein expression among 184 ER-positive breast cancers by the immunohistochemistry (IHC) method, analyzed the association between FGFR1 expression and disease characters using the Pearson's chi-square test, and assessed the prognostic role of FGFR1 among breast cancers using Cox regression and Kaplan-Meier analyses. Moreover, in vitro assays were conducted to confirm the correlation between FGFR1 and ER expression and investigate the effect of FGFR1 on tamoxifen (TAM) sensitivity in ER+ breast cancer. The results showed that ER expression was negatively correlated with FGFR1 expression (P = 0.011, r = -0.221). Moreover, FGFR1 expression was one of the prognostic factors of ER-positive breast cancer (OR = 1.974, 95% CI = 1.043-3.633), and high FGFR1 expression was correlated with decreased breast cancer overall survival. In addition, knocking down FGFR1 inhibited cell proliferation and enhanced TAM sensitivity in TAM-resistant cells. In conclusion, we found that there was a significant negative correlation between FGFR1 and ER levels in ER+ breast cancers, high FGFR1 protein expres",
+      "journal_quality": 0.5,
+      "authors": [
+        "Lv Q",
+        "Guan S",
+        "Zhu M",
+        "Huang H",
+        "Wu J",
+        "Dai X"
+      ],
+      "journal": "Technol Cancer Res Treat",
+      "date": "2021-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39590377",
+      "title": "Pharmacological and Biological Targeting of FGFR1 in Cancer",
+      "abstract": "FGFR1 is a key member of the fibroblast growth factor receptor family, mediating critical signaling pathways such as RAS-MAPK and PI3K-AKT. which are integral to regulating essential cellular processes, including proliferation, differentiation, and survival. Alterations in FGFR1 can lead to constitutive activation of signaling pathways that drive oncogenesis by promoting uncontrolled cell division, inhibiting apoptosis, and enhancing the metastatic potential of cancer cells. This article reviews the activation mechanisms and signaling pathways of FGFR1 and provides a detailed exposition of the types of FGFR1 aberration. Furthermore, we have compiled a comprehensive overview of current therapies targeting FGFR1 aberration in cancer, aiming to offer new perspectives for future cancer treatments by focusing on drugs that address specific FGFR1 alterations.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Fan S",
+        "Chen Y",
+        "Wang W",
+        "Xu W",
+        "Tian M",
+        "Liu Y",
+        "Zhou Y",
+        "Liu D",
+        "Xia Q",
+        "Dong L"
+      ],
+      "journal": "Curr Issues Mol Biol",
+      "date": "2024-11-18T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35626002",
+      "title": "Frequent 4EBP1 Amplification Induces Synthetic Dependence on FGFR Signaling in Cancer",
+      "abstract": "Simple Summary\n\nOur work establishes that amplification of 4EBP1, as a part of Chr. 8p11, creates a synthetic dependency on FGFR1 signaling in cancer. 4EBP1 is phosphorylated by FGFR1 and PI3K signaling, and accordingly cancer with 4EBP1-FGFR1 amplification is more sensitive to FGFR1 and PI3K inhibition due to inhibition of 4EBP1 phosphorylation. Moreover, we characterize the translational targets of 4EBP1 and identify that 4EBP1 specifically regulates the translation of genes involved in insulin signaling, glucose metabolism, and the inositol pathway that plays a role in cancer progression.\n\nAbstract\n\nThe eIF4E translation initiation factor has oncogenic properties and concordantly, the inhibitory eIF4E-binding protein (4EBP1) is considered a tumor suppressor. The exact molecular effects of 4EBP1 activation in cancer are still unknown. Surprisingly, 4EBP1 is a target of genomic copy number gains (Chr. 8p11) in breast and lung cancer. We noticed that 4EBP1 gains are genetically linked to gains in neighboring genes, including WHSC1L1 and FGFR1. Our results show that FGFR1 gains act to attenuate the function of 4EBP1 via PI3K-mediated phosphorylation at Thr37/46, Ser65, and Thr70 sites. This implies that not 4EBP1 but instead FGFR1 is the genetic target of Chr. 8p11 gains in breast and lung cancer. Accordingly, these tumors show increased sensitivity to FGFR1 and PI3K inhibition, and this is a therapeutic vulnerability through restoring the tumor-suppressive function of 4EBP1. ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Mohan P",
+        "Pasion J",
+        "Ciriello G",
+        "Lailler N",
+        "de Stanchina E",
+        "Viale A",
+        "van den Berg A",
+        "Diepstra A",
+        "Wendel HG",
+        "Sanghvi VR",
+        "Singh K"
+      ],
+      "journal": "Cancers (Basel)",
+      "date": "2022-05-13T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "41645323",
+      "title": "Obesity- and tumor-derived signals drive cancer-associated state transitions in breast mesenchymal stromal/stem cells reprogrammed by IL1RA or JAK inhibition",
+      "abstract": "The tumor microenvironment (TME) in breast cancer is shaped by reciprocal interactions between cancer cells and their surrounding stromal populations. Here, we show that breast adipose tissue-derived stromal/stem cells (bASCs) undergo distinct state transitions in response to tumor cues and systemic metabolic status. Using primary bASCs derived from tumor-adjacent and tumor-distant adipose tissues of breast cancer patients with or without obesity, we identify two functionally distinct, tumor-educated stromal phenotypes: a cytokine-rich inflammatory CAF-like (iCAF) state predominating in lean-adjacent bASCs (ln-aT), and a myofibroblastic CAF-like (myCAF) state emerging in obese-adjacent bASCs (ob-aT). Importantly, transforming growth factor beta (TGFbeta) is sufficient to induce myCAF-like reprogramming in obesity-primed bASCs, while interleukin 1 (IL1)-Janus kinase (JAK) signaling promotes iCAF features. Re-analysis of single-cell RNA-seq data of breast cancer samples reveals an increased TGFbeta expression across stromal and immune cell types in individuals with obesity. Mechanistically, IL1 receptor blockade (anakinra) or JAK inhibition (AZD1480) reverses both iCAF and myCAF phenotypes and functionally suppresses stromal-driven epithelial-mesenchymal transition as well as cancer stemness in breast cancer cells. These findings establish a mechanistic link between obese cues, stromal plasticity, and breast cancer progression, and reveal IL1/JAK signaling as a tractable axis t",
+      "journal_quality": 0.5,
+      "authors": [
+        "Ritter A",
+        "Hoock SC",
+        "Kreis NN",
+        "Roth S",
+        "Torres Colin RC",
+        "Friemel A",
+        "Wildner JM",
+        "Scherr I",
+        "Louwen F",
+        "Solbach C",
+        "Yuan J"
+      ],
+      "journal": "Exp Hematol Oncol",
+      "date": "2026-02-05T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "cell adhesion",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35116374",
+      "title": "Identification of key genes involved in tamoxifen-resistant breast cancer using bioinformatics analysis",
+      "abstract": "Background\n\nThe purpose of the present study was to investigate the molecular mechanisms of tamoxifen resistance in breast cancer and to identify potential targets for antitamoxifen resistance.\n\nMethods\n\nDifferentially expressed genes (DEGs) in tamoxifen-resistant and tamoxifen-sensitive breast cancer cells were assessed using the GSE67916 dataset acquired from the Gene Expression Omnibus database. Gene ontology (GO) and pathway enrichment analyses were applied to investigate the functions and pathways of the DEGs. Subsequently, the protein-protein interaction (PPI) network was constructed using the Search Tool for the Retrieval of Interacting Genes (STRING), and subnetworks were further analyzed by Molecular Complex Detection (MCODE). The PPI network and subnetworks were visualized using Cytoscape software.\n\nResults\n\nIn total, 438 DEGs were identified, of which 300 were upregulated and 138 were downregulated. The DEGs were significantly enriched in the protein binding, cellular response to estradiol stimulus, and immune response GO terms while the most significant pathways included the mitogen-activated protein kinase (MAPK) signaling pathway in cancer. The PPI network of DEGs was constructed with 288 nodes and 629 edges, and 2 subnetworks were screened out from the entire network.\n\nConclusions\n\nA number of significant hub DEGs were identified based on their degree of connectivity in the PPI network, , included MAPK1 (node degree 36), ESR1 (node degree 27), SMARCA4 (node deg",
+      "journal_quality": 0.5,
+      "authors": [
+        "Wang X",
+        "Wang S"
+      ],
+      "journal": "Transl Cancer Res",
+      "date": "2021-12-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "cell adhesion",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40201173",
+      "title": "CTHRC1: a key player in colorectal cancer progression and immune evasion",
+      "abstract": "The multifunctional secreted protein, collagen triple helix repeat containing 1 (CTHRC1), has recently emerged as a significant focus within oncology research. CTHRC1 expression in tumors is governed by a complex interplay of regulatory signals, including methylation, glycosylation, and notably, non-coding RNAs, which constitute its predominant regulatory mechanism. Colorectal cancer (CRC), a highly prevalent epithelial malignancy, sees CTHRC1 influencing tumor progression and metastasis through its modulation of several downstream signaling cascades, such as Wnt/PCP, TGF-beta/Smad, and MEK/ERK pathways. Furthermore, CTHRC1 contributes to immune evasion in CRC via diverse mechanisms. It is intricately associated with macrophage phenotypic switching within the tumor microenvironment (TME), favoring M2 macrophage polarization and facilitating the infiltration of T cells and neutrophils. CTHRC1 is also instrumental in immune escape by driving the remodeling of the extracellular matrix through interactions with cancer-associated fibroblasts. Additionally, CTHRC1's roles extend to the regulation of hypoxia-related pathways, metabolism of glycolysis and fatty acids, and involvement in tumor angiogenesis, all of which support tumor immune evasion. Considering its multifaceted activities, CTHRC1 emerges as a promising therapeutic target in CRC, with the potential to enhance the outcomes of existing radiotherapeutic and immunotherapeutic regimens. This review endeavors to delineate th",
+      "journal_quality": 0.5,
+      "authors": [
+        "Chen Q",
+        "Wang H",
+        "Liu Q",
+        "Luo C"
+      ],
+      "journal": "Front Immunol",
+      "date": "2025-03-25T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "cell adhesion",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39539553",
+      "title": "The role of cuproptosis in gastric cancer",
+      "abstract": "As a biologically essential transition metal, copper is widely involved in various enzymatic reactions and crucial biological processes in the body. It plays an increasingly important role in maintaining normal cellular metabolism and supporting the growth and development of the human body. As a trace element, copper maintains the dynamic balance of its concentration in body fluids through active homeostatic mechanisms. Both excess and deficiency of copper ions can impair cell function, ultimately leading to cell damage and death. Cuproptosis is a novel form of cell death where copper ions cause cell death by directly binding to the lipoylated components of the citric acid cycle (CAC) in mitochondrial respiration and interfering with the levels of iron-sulfur cluster (Fe-S cluster) proteins, ultimately causing protein toxic stress. Its primary characteristics are Cu2+ concentration dependence and high expression in mitochondrial respiratory cells. Recent research has revealed that, compared to other forms of programmed cell death such as apoptosis, necrosis, and autophagy, cuproptosis has unique morphological and biochemical features. Cuproptosis is associated with the occurrence and development of various diseases, including cancer, neurodegenerative diseases, and cardiovascular diseases. This article focuses on a review of the relevance of cuproptosis in gastric cancer (GC).",
+      "journal_quality": 0.5,
+      "authors": [
+        "Li Y",
+        "Sun W",
+        "Yuan S",
+        "Liu X",
+        "Zhang Z",
+        "Gu R",
+        "Li P",
+        "Gu X"
+      ],
+      "journal": "Front Immunol",
+      "date": "2024-10-30T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "cell adhesion",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37547445",
+      "title": "Immune gene signatures as prognostic criteria for cancer patients",
+      "abstract": "Recently, the possibility of using immune gene signatures (IGSs) has been considered as a novel prognostic tool for numerous cancer types. State-of-the-art methods of genomic, transcriptomic, and protein analysis have allowed the identification of a number of immune signatures correlated to disease outcome. The major adaptive and innate immune components are the T lymphocytes and macrophages, respectively. Herein, we collected essential data on IGSs consisting of subsets of T cells and tumor-associated macrophages and indicating cancer patient outcomes. We discuss factors that can introduce errors in the recognition of immune cell types and explain why the significance of immune signatures can be interpreted with uncertainty. The unidirectional functions of cell types should be entirely addressed in the signatures constructed by the combination of innate and adaptive immune cells. The state of the antitumor immune response is the key basis for IGSs and should be considered in gene signature construction. We also analyzed immune signatures for the prediction of immunotherapy response. Finally, we attempted to explain the present-day limitations in the use of immune signatures as robust criteria for prognosis.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Larionova I",
+        "Tashireva L"
+      ],
+      "journal": "Ther Adv Med Oncol",
+      "date": "2023-08-02T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "cell adhesion",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36591282",
+      "title": "Metastatic phenotype and immunosuppressive tumour microenvironment in pancreatic ductal adenocarcinoma: Key role of the urokinase plasminogen activator (PLAU)",
+      "abstract": "Background\n\nPrevious studies have revealed the role of dysregulated urokinase plasminogen activator (encoded by PLAU) expression and activity in several pathways associated with cancer progression. However, systematic investigation into the association of PLAU expression with factors that modulate PDAC (pancreatic ductal adenocarcinoma) progression is lacking, such as those affecting stromal (pancreatic stellate cell, PSC)-cancer cell interactions, tumour immunity, PDAC subtypes and clinical outcomes from potential PLAU inhibition.\n\nMethods\n\nThis study used an integrated bioinformatics approach to identify prognostic markers correlated with PLAU expression using different transcriptomics, proteomics, and clinical data sets. We then determined the association of dysregulated PLAU and correlated signatures with oncogenic pathways, metastatic phenotypes, stroma, immunosuppressive tumour microenvironment (TME) and clinical outcome. Finally, using an in vivo orthotopic model of pancreatic cancer, we confirmed the predicted effect of inhibiting PLAU on tumour growth and metastasis.\n\nResults\n\nOur analyses revealed that PLAU upregulation is not only associated with numerous other prognostic markers but also associated with the activation of various oncogenic signalling pathways, aggressive phenotypes relevant to PDAC growth and metastasis, such as proliferation, epithelial-mesenchymal transition (EMT), stemness, hypoxia, extracellular cell matrix (ECM) degradation, upregulation of st",
+      "journal_quality": 0.5,
+      "authors": [
+        "Hosen SMZ",
+        "Uddin MN",
+        "Xu Z",
+        "Buckley BJ",
+        "Perera C",
+        "Pang TCY",
+        "Mekapogu AR",
+        "Moni MA",
+        "Notta F",
+        "Gallinger S",
+        "Pirola R",
+        "Wilson J",
+        "Ranson M",
+        "Goldstein D",
+        "Apte M"
+      ],
+      "journal": "Front Immunol",
+      "date": "2022-12-14T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "cell adhesion",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34055068",
+      "title": "Cascades between miRNAs, lncRNAs and the NF-kappaB signaling pathway in gastric cancer (Review)",
+      "abstract": "Gastric cancer is a common digestive tract malignancy that is mainly treated with surgery combined with perioperative adjuvant chemoradiotherapy and biological targeted therapy. However, the diagnosis rate of early gastric cancer is low and both postoperative recurrence and distant metastasis are thorny problems. Therefore, it is essential to study the pathogenesis of gastric cancer and search for more effective means of treatment. The nuclear factor-kappaB (NF-kappaB) signaling pathway has an important role in the occurrence and development of gastric cancer and recent studies have revealed that microRNAs (miRNAs) and long non-coding RNAs (lncRNAs) are able to regulate this pathway through a variety of mechanisms. Understanding these interrelated molecular mechanisms is helpful in guiding improvements in gastric cancer treatment. In the present review, the functional associations between miRNAs, lncRNAs and the NF-kappaB signaling pathway in the occurrence, development and prognosis of gastric cancer were discussed. It was concluded that miRNAs and lncRNAs have complex relations with the NF-kappaB signaling pathway in gastric cancer. miRNAs/target genes/NF-kappaB/target proteins, signaling molecules/NF-kappaB/miRNAs/target genes, lncRNAs/miRNAs/NF-kappaB/genes or mRNAs, lncRNAs/target genes/NF-Kappab/target proteins, and lncRNAs/NF-kappaB/target proteins cascades are all important factors in the occurrence and development of gastric cancer.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Chen R",
+        "Yang M",
+        "Huang W",
+        "Wang B"
+      ],
+      "journal": "Exp Ther Med",
+      "date": "2021-07-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ANOS1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "cell adhesion",
+          "tumor progression"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34722544",
+      "title": "Targeted Inhibition of Fibroblast Growth Factor Receptor 1-GLI Through AZD4547 and GANT61 Modulates Breast Cancer Progression",
+      "abstract": "The underlying mechanism of fibroblast growth factor receptor 1 (FGFR1) mediated carcinogenesis is still not fully understood. For instance, FGFR1 upregulation leads to endocrine therapy resistance in breast cancer patients. The current study aimed to identify FGFR1-linked genes to devise improved therapeutic strategies. RNA-seq and microarray expression data of 1,425 breast cancer patients from two independent cohorts were downloaded for the analysis. Gene Set Enrichment Analysis (GSEA) was performed to identify differentially expressed pathways associated with FGFR1 expression. Validation was done using 150 fresh tumor biopsy samples of breast cancer patients. The clinical relevance of mRNA and protein expression of FGFR1 and its associated genes were also evaluated in mouse embryonic fibroblasts (MEFs) and breast cancer cell line (MDA-MB-231). Furthermore, MDA-MB-231 cell line was treated with AZD4547 and GANT61 to identify the probable role of FGFR1 and its associated genes on cells motility and invasion. According to GSEA results, SHH pathway genes were significantly upregulated in FGFR1 patients in both discovery cohorts of breast cancer. Statistical analyses using both discovery cohorts and 150 fresh biopsy samples revealed strong association of FGFR1 and GLI1, a member of SHH pathway. The increase in the expression of these molecules was associated with poor prognosis, lymph node involvement, late stage, and metastasis. Combined exposures to AZD4547 (FGFR1 inhibitor) ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Riaz SK",
+        "Khan W",
+        "Wang F",
+        "Khaliq T",
+        "Malik A",
+        "Razia ET",
+        "Khan JS",
+        "Haque S",
+        "Hashem AM",
+        "Alkhayyat SS",
+        "Azhar NE",
+        "Harakeh S",
+        "Ansari MJ",
+        "Haq F",
+        "Malik MFA"
+      ],
+      "journal": "Front Cell Dev Biol",
+      "date": "2021-10-13T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "growth factor receptor",
+          "signaling",
+          "tumor growth"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32852708",
+      "title": "Impact of fibroblast growth factor receptor 1 (FGFR1) amplification on the prognosis of breast cancer patients",
+      "abstract": "Purpose\n\nVarious aberrations in the fibroblast growth factor receptor genes FGFR1, FGFR2, and FGFR3 are found in different cancers, including breast cancer (BC). This study analyzed the impact of FGFR amplification on the BC prognosis.\n\nMethods\n\nThe study included 894 BC patients. The amplification rates of FGFR1, FGFR2, and FGFR3 were evaluated on tissue microarrays using fluorescence in situ hybridization (FISH). Associations between these parameters and prognosis were analyzed using multivariate Cox regression analyses.\n\nResults\n\nFGFR1 FISH was assessable in 503 samples, FGFR2 FISH in 447, and FGFR3 FISH in 562. The FGFR1 amplification rate was 6.6% (n = 33). Increased FGFR2 copy numbers were seen in 0.9% (n = 4); only one patient had FGFR3 amplification (0.2%). Most patients with FGFR1 amplification had luminal B-like tumors (69.7%, n = 23); only 32.6% (n = 153) of patients without FGFR1 amplification had luminal B-like BC. Other patient and tumor characteristics appeared similar between these two groups. Observed outcome differences between BC patients with and without FGFR1 amplification did not achieve statistical significance; however, there was a trend toward poorer distant metastasis-free survival in BC patients with FGFR1 amplification (HR = 2.08; 95% CI 0.98 to 4.39, P = 0.05).\n\nConclusion\n\nFGFR1 amplification occurs most frequently in patients with luminal B-like BC. The study showed a nonsignificant correlation with the prognosis, probably due to the small sampl",
+      "journal_quality": 0.5,
+      "authors": [
+        "Erber R",
+        "Rübner M",
+        "Davenport S",
+        "Hauke S",
+        "Beckmann MW",
+        "Hartmann A",
+        "Häberle L",
+        "Gass P",
+        "Press MF",
+        "Fasching PA"
+      ],
+      "journal": "Breast Cancer Res Treat",
+      "date": "2020-11-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "growth factor receptor",
+          "signaling",
+          "tumor growth"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33000910",
+      "title": " Hsa_circRNA_0000518 facilitates breast cancer development via regulation of the miR-326/FGFR1 axis",
+      "abstract": "Background\n\nBreast cancer (BC) is a heterogeneous malignant tumor that threatens the health of women worldwide. Hsa_circRNA_0000518 (circ_0000518) has been revealed to be upregulated in BC tissues. However, the role and mechanism of circ_0000518 in BC are indistinct.\n\nMethods\n\nQuantitative real-time polymerase chain reaction (qRT-PCR) was implemented to detect the levels of circ_0000518, microRNA (miR)-326, and fibroblast growth factor receptor 1 (FGFR1) mRNA in BC tissues and cells. Cell counting kit-8 (CCK-8), colony formation, flow cytometry, and transwell assays were executed to estimate BC cell proliferation, cell cycle progression, apoptosis, migration, and invasion. The relationship between circ_0000518 or FGFR1 and miR-326 was verified by dual-luciferase reporter and/or RNA immunoprecipitation (RIP) assays. The role of circ_0000518 in vivo was confirmed by xenograft assay.\n\nResults\n\nCirc_0000518 and FGFR1 were upregulated while miR-326 was downregulated in BC tissues and cells. Circ_0000518 silencing impeded tumor growth in vivo and induced cell cycle arrest, apoptosis, cured proliferation, colony formation, migration, and invasion of BC cells in vitro. Circ_0000518 regulated FGFR1 expression via competitively binding to miR-326 in BC cells. MiR-326 inhibitor reversed the inhibitory influence of circ_0000518 knockdown on the malignant behaviors of BC cells. FGFR1 overexpression abolished miR-326 mimic-mediated influence on the malignant behaviors of BC cells.\n\nConclus",
+      "journal_quality": 0.5,
+      "authors": [
+        "Jiang J",
+        "Lin H",
+        "Shi S",
+        "Hong Y",
+        "Bai X",
+        "Cao X"
+      ],
+      "journal": "Thorac Cancer",
+      "date": "2020-11-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "growth factor receptor",
+          "signaling",
+          "tumor growth"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28433771",
+      "title": "A Versatile Tumor Gene Deletion System Reveals a Crucial Role for FGFR1 in Breast Cancer Metastasis",
+      "abstract": "RCAS avian viruses have been used to deliver oncogene expression and induce tumors in transgenic mice expressing the virus receptor TVA. Here we report the generation and characterization of a novel RCAS-Cre-IRES-PyMT (RCI-PyMT) virus designed to specifically knockout genes of interest in tumors generated in appropriate mutant mouse hosts. FGF receptor 1 (FGFR1) is a gene that is amplified in human breast cancer, but there have been no definitive studies on its function in mammary tumorigenesis, progression, and metastasis in vivo in spontaneous tumors in mice. We used the retroviral tumor knockout, or TuKO, strategy to delete fgfr1 in PyMT-induced mammary tumors in K19-tva/fgfr1loxP/loxP mice. The similarly injected control K19-tva mice developed mammary tumors exhibiting high metastasis to lung, making this an ideal model for breast cancer metastasis. The fgfr1 TuKO tumors showed significantly decreased primary tumor growth and, most importantly, greatly reduced metastasis to lung. In contrast to previous reports, FGFR1 action in this spontaneous mammary tumor model does not significantly induce epithelial-to-mesenchymal transition. Loss of FGFR1 does generate a gene signature that is reverse correlated with FGFR1 gene amplification and/or upregulation in human breast cancer. Our results suggest that FGFR1 signaling is a key pathway driving breast cancer lung metastasis and that targeting FGFR1 in breast cancer is an exciting approach to inhibit metastasis.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Wang W",
+        "Meng Y",
+        "Dong B",
+        "Dong J",
+        "Ittmann MM",
+        "Creighton CJ",
+        "Lu Y",
+        "Zhang H",
+        "Shen T",
+        "Wang J",
+        "Rowley DR",
+        "Li Y",
+        "Chen F",
+        "Moore DD",
+        "Yang F"
+      ],
+      "journal": "Neoplasia",
+      "date": "2017-05-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "growth factor receptor",
+          "signaling",
+          "tumor growth"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23270564",
+      "title": "FGFR-1 amplification in metastatic lymph-nodal and haematogenous lobular breast carcinoma",
+      "abstract": "Background\n\nLobular breast carcinoma usually shows poor responsiveness to chemotherapies and often lacks targeted therapies. Since FGFR1 expression has been shown to play pivotal roles in primary breast cancer tumorigenesis, we sought to analyze the status of FGFR1 gene in a metastatic setting of lobular breast carcinoma, since promising FGFR1 inhibitors has been recently developed.\n\nMethods\n\nFifteen tissue metastases from lobular breast carcinomas with matched primary infiltrative lobular breast carcinoma were recruited. Eleven cases showed loco-regional lymph-nodal and four haematogenous metastases.\n\nFGFR-1 gene (8p12) amplification was evaluated by chromogenic in situ hybridization (CISH) analysis. Her-2/neu and topoisomerase-IIalpha gene status was assessed. E-cadherin and Hercept Test were also performed. We distinguished amplification (>6 or cluster of signals) versus gains (3-6 signals) of the locus specific FGFR-1 gene.\n\nResults\n\nThree (20%) primary lobular breast carcinomas showed >6 or cluster of FGFR1 signals (amplification), six cases (40%) had a mean of three (range 3-6) chromogenic signals (gains) whereas in 6 (40%) was not observed any abnormality. Three of 15 metastasis (20%) were amplified, 2/15 (13,4%) did not. The ten remaining cases (66,6%) showed three chromogenic signals.\n\nThe three cases with FGFR-1 amplification matched with those primary breast carcinomas showing FGFR-1 amplification. The six cases showing FGFR-1 gains in the primary tumour again show",
+      "journal_quality": 0.5,
+      "authors": [
+        "Brunello E",
+        "Brunelli M",
+        "Bogina G",
+        "Caliò A",
+        "Manfrin E",
+        "Nottegar A",
+        "Vergine M",
+        "Molino A",
+        "Bria E",
+        "Massari F",
+        "Tortora G",
+        "Cingarlini S",
+        "Pedron S",
+        "Chilosi M",
+        "Zamboni G",
+        "Miller K",
+        "Martignoni G",
+        "Bonetti F"
+      ],
+      "journal": "J Exp Clin Cancer Res",
+      "date": "2012-12-27T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "growth factor receptor",
+          "signaling",
+          "tumor growth"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "ANOS1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "FGFR1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ANOS1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "receptor",
+        "ligand",
+        "cell adhesion",
+        "tumor progression"
+      ]
+    },
+    {
+      "genes": [
+        "FGFR1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "receptor tyrosine kinase",
+        "growth factor receptor",
+        "signaling",
+        "tumor growth"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "hypoxia",
+        "HIF-1 signaling",
+        "oxygen deprivation",
+        "tumor microenvironment",
+        "angiogenesis"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "hypoxia pathway",
+        "cellular response to hypoxia",
+        "metabolic adaptation",
+        "tumor progression"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "endothelial cells",
+        "macrophages",
+        "myoepithelial ACTA2+",
+        "stromal cells",
+        "tumor microenvironment"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "endothelial",
+        "macrophage",
+        "stromal",
+        "tumor microenvironment",
+        "immune infiltration"
+      ]
+    },
+    {
+      "genes": [
+        "ANOS1",
+        "FGFR1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "hypoxia",
+        "tumor microenvironment",
+        "spatial transcriptomics",
+        "cell-cell interaction",
+        "endothelial"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "FGFR1",
+      "ANOS1"
+    ],
+    "genes_matched_by": {
+      "FGFR1": "fgfr",
+      "ANOS1": "anos1"
+    },
+    "pathways_covered": [
+      "Hypoxia"
+    ],
+    "pathways_matched_by": {
+      "Hypoxia": "hypoxia"
+    },
+    "celltypes_covered": [
+      "Stromal",
+      "Macrophages 2"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 100.0,
+    "celltypes_coverage_pct": 50.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Endothelial",
+      "Myoepi ACTA2+"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 37,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 1.0
+    },
+    {
+      "iteration": "final",
+      "papers": 30,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 1.0
+    }
+  ],
+  "coverage_sufficient": true,
+  "recommended_actions": [],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

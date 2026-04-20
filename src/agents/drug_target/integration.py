@@ -34,7 +34,7 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
     """Run the Drug Target Assessment agent on lr_candidates.json.
 
     Delegates the full therapeutic target assessment to the DrugTargetAgent,
-    which uses 4 subagents (evidence_assessor, deep_diver, hypothesis_writer, report_writer)
+    which uses 3 subagents (evidence_assessor, hypothesis_writer, report_writer)
     to gather evidence, score targets, generate hypotheses, and produce drug.md.
 
     Args:

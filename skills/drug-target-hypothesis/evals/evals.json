@@ -1,0 +1,23 @@
+{
+  "skill_name": "drug-target-hypothesis",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Using data_dir=<SCRATCH_COPY_OF_res_ipf_qwen2>, generate evidence/hypothesis_report.json from the existing Stage 1-3 evidence. Validate every cited filename before saving and do not produce markdown output.",
+      "expected_output": "Skill triggers and follows the runtime-aligned JSON hypothesis flow using load_evidence_files(..., scope=\"hypothesis\"), validate_evidence_references(...), and save_evidence(..., \"hypothesis_report.json\", ...).",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The hypothesis-writer stage already has non-empty assessment_results.json.stage3_candidates. Build the final mechanistic hypothesis JSON for data_dir=<SCRATCH_COPY_OF_res_ipf_qwen2>, keep citations valid, and persist through the runtime evidence API.",
+      "expected_output": "Skill triggers on a paraphrased request and still chooses the same evidence-backed JSON workflow rather than markdown or free-form brainstorming.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Brainstorm novel fibrosis drug targets from first principles and recent literature, without relying on an existing data_dir evidence bundle.",
+      "expected_output": "Skill does not trigger because the request is general ideation without a completed Stage 1-3 evidence bundle.",
+      "files": []
+    }
+  ]
+}

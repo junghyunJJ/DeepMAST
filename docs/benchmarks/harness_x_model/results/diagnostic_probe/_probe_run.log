@@ -1,0 +1,34 @@
+=== P2.0 Diagnostic Probe starting at 2026-04-17T22:14:20Z ===
+OLLAMA_HOST=http://localhost:7000
+OLLAMA_BASE_URL=http://localhost:7000
+Mode: B_prime, Case: cci_full_01_EGF_RACK1
+
+--- Trial 1: strong_off at 2026-04-17T22:14:20Z ---
+  "trial_workspace": "docs/benchmarks/harness_x_model/workspaces/diagnostic_probe/trial_0001_cci_full_01_EGF_RACK1_strong_off",
+  "papers_path": "docs/benchmarks/harness_x_model/workspaces/diagnostic_probe/trial_0001_cci_full_01_EGF_RACK1_strong_off/papers.json",
+  "search_context_path": "docs/benchmarks/harness_x_model/workspaces/diagnostic_probe/trial_0001_cci_full_01_EGF_RACK1_strong_off/search_context.json",
+  "error": null
+}
+
+--- Trial 2: strong_on at 2026-04-17T22:16:30Z ---
+  "trial_workspace": "docs/benchmarks/harness_x_model/workspaces/diagnostic_probe/trial_0002_cci_full_01_EGF_RACK1_strong_on",
+  "papers_path": "docs/benchmarks/harness_x_model/workspaces/diagnostic_probe/trial_0002_cci_full_01_EGF_RACK1_strong_on/papers.json",
+  "search_context_path": "docs/benchmarks/harness_x_model/workspaces/diagnostic_probe/trial_0002_cci_full_01_EGF_RACK1_strong_on/search_context.json",
+  "error": null
+}
+
+--- Trial 3: weak_off at 2026-04-17T22:17:57Z ---
+  "trial_workspace": "docs/benchmarks/harness_x_model/workspaces/diagnostic_probe/trial_0003_cci_full_01_EGF_RACK1_weak_off",
+  "papers_path": "docs/benchmarks/harness_x_model/workspaces/diagnostic_probe/trial_0003_cci_full_01_EGF_RACK1_weak_off/papers.json",
+  "search_context_path": "docs/benchmarks/harness_x_model/workspaces/diagnostic_probe/trial_0003_cci_full_01_EGF_RACK1_weak_off/search_context.json",
+  "error": null
+}
+
+--- Trial 4: weak_on at 2026-04-17T22:20:33Z ---
+  "trial_workspace": "docs/benchmarks/harness_x_model/workspaces/diagnostic_probe/trial_0004_cci_full_01_EGF_RACK1_weak_on",
+  "papers_path": "docs/benchmarks/harness_x_model/workspaces/diagnostic_probe/trial_0004_cci_full_01_EGF_RACK1_weak_on/papers.json",
+  "search_context_path": "docs/benchmarks/harness_x_model/workspaces/diagnostic_probe/trial_0004_cci_full_01_EGF_RACK1_weak_on/search_context.json",
+  "error": null
+}
+
+=== P2.0 probe finished at 2026-04-17T22:22:29Z ===

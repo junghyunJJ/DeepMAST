@@ -1,0 +1,1228 @@
+{
+  "papers": [
+    {
+      "pmid": "36835413",
+      "title": "Crosstalk of Inflammatory Cytokines within the Breast Tumor Microenvironment",
+      "abstract": "Several immune and immunocompetent cells, including dendritic cells, macrophages, adipocytes, natural killer cells, T cells, and B cells, are significantly correlated with the complex discipline of oncology. Cytotoxic innate and adaptive immune cells can block tumor proliferation, and others can prevent the immune system from rejecting malignant cells and provide a favorable environment for tumor progression. These cells communicate with the microenvironment through cytokines, a chemical messenger, in an endocrine, paracrine, or autocrine manner. These cytokines play an important role in health and disease, particularly in host immune responses to infection and inflammation. They include chemokines, interleukins (ILs), adipokines, interferons, colony-stimulating factors (CSFs), and tumor necrosis factor (TNF), which are produced by a wide range of cells, including immune cells, such as macrophages, B-cells, T-cells, and mast cells, as well as endothelial cells, fibroblasts, a variety of stromal cells, and some cancer cells. Cytokines play a crucial role in cancer and cancer-related inflammation, with direct and indirect effects on tumor antagonistic or tumor promoting functions. They have been extensively researched as immunostimulatory mediators to promote the generation, migration and recruitment of immune cells that contribute to an effective antitumor immune response or pro-tumor microenvironment. Thus, in many cancers such as breast cancer, cytokines including leptin, IL",
+      "journal_quality": 0.5,
+      "authors": [
+        "Habanjar O",
+        "Bingula R",
+        "Decombat C",
+        "Diab-Assaf M",
+        "Caldefie-Chezet F",
+        "Delort L"
+      ],
+      "journal": "Int J Mol Sci",
+      "date": "2023-02-16T00:00:00Z",
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine signaling pathway",
+          "immune response pathway",
+          "cytokine signaling",
+          "tumor microenvironment"
+        ]
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "pathway"
+    },
+    {
+      "pmid": "35197632",
+      "title": "A trispecific antibody targeting HER2 and T cells inhibits breast cancer growth via CD4 cells.",
+      "abstract": "Effective antitumour immunity depends on the orchestration of potent T cell responses against malignancies1. Regression of human cancers has been induced by immune checkpoint inhibitors, T cell engagers or chimeric antigen receptor T cell therapies2-4. Although CD8 T cells function as key effectors of these responses, the role of CD4 T cells beyond their helper function has not been defined. Here we demonstrate that a trispecific antibody to HER2, CD3 and CD28 stimulates regression of breast cancers in a humanized mouse model through a mechanism involving CD4-dependent inhibition of tumour cell cycle progression. Although CD8 T cells directly mediated tumour lysis in vitro, CD4 T cells exerted antiproliferative effects by blocking cancer cell cycle progression at G1/S. Furthermore, when T cell subsets were adoptively transferred into a humanized breast cancer tumour mouse model, CD4 T cells alone inhibited HER2+ breast cancer growth in vivo. RNA microarray analysis revealed that CD4 T cells markedly decreased tumour cell cycle progression and proliferation, and also increased pro-inflammatory signalling pathways. Collectively, the trispecific antibody to HER2 induced T cell-dependent tumour regression through direct antitumour and indirect pro-inflammatory/immune effects driven by CD4 T cells.",
+      "journal_quality": 0.711,
+      "authors": [
+        "Seung E",
+        "Xing Z",
+        "Wu L",
+        "Rao E",
+        "Cortez-Retamozo V",
+        "Ospina B",
+        "Chen L",
+        "Beil C",
+        "Song Z",
+        "Zhang B",
+        "Levit M",
+        "Deng G",
+        "Hebert A",
+        "Kirby P",
+        "Li A",
+        "Poulton EJ",
+        "Vicente R",
+        "Garrigou A",
+        "Piepenhagen P",
+        "Ulinski G",
+        "Sanicola-Nadel M",
+        "Bangari DS",
+        "Qiu H",
+        "Pao L",
+        "Wiederschain D",
+        "Wei R",
+        "Yang ZY",
+        "Nabel GJ"
+      ],
+      "journal": "Nature",
+      "date": "2022-03-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39347881",
+      "title": "Novel biomarkers and drug correlations of non-canonical WNT signaling in prostate and breast cancer.",
+      "abstract": "Prostate cancer (PCa) and breast cancer (BC) present formidable challenges in global cancer-related mortality, necessitating effective management strategies. The present study explores non-canonical Wnt signaling in PCa and BC, aiming to identify biomarkers and assess their clinical and therapeutic implications. Co-expression analyses reveal distinct gene patterns, with five overlapping genes (SULF1, ALG3, IL16, PLXNA2 and RASGFR2) exhibiting divergent expression in both cancers. Clinical relevance investigations demonstrate correlations with TNM stages and biochemical recurrence. Drug correlation analyses unveil potential therapeutic avenues, indicating that Wnt5a and ROR2 expressions are related to MEK inhibitor sensitivity in cancers. Meanwhile, further correlation analyses were conducted between drugs and the other novel non-canonical WNT genes (ALG3, IL16, SULF1, PLXNA2, and RASGRF2). Our findings contribute to understanding non-canonical Wnt signaling, offering insights into cancer progression and potential personalized treatment approaches.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Huang Y",
+        "Fan M",
+        "Liu Y",
+        "Jiang X",
+        "Du K",
+        "Wu A",
+        "Li Q",
+        "Wu Y",
+        "Liang J",
+        "Wang K"
+      ],
+      "journal": "Discov Oncol",
+      "date": "2024-09-30T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36539890",
+      "title": "Definition of a novel breast tumor-specific classifier based on secretome analysis",
+      "abstract": "Background\n\nDuring cancer development, the normal tissue microenvironment is shaped by tumorigenic events. Inflammatory mediators and immune cells play a key role during this process. However, which molecular features most specifically characterize the malignant tissue remains poorly explored. \n\nMethods\n\nWithin our institutional tumor microenvironment global analysis (T-MEGA) program, we set a prospective cohort of 422 untreated breast cancer patients. We established a dedicated pipeline to generate supernatants from tumor and juxta-tumor tissue explants and quantify 55 soluble molecules using Luminex or MSD. Those analytes belonged to five molecular families: chemokines, cytokines, growth factors, metalloproteinases, and adipokines. \n\nResults\n\nWhen looking at tissue specificity, our dataset revealed some breast tumor-specific characteristics, as IL-16, as well as some juxta-tumor-specific secreted molecules, as IL-33. Unsupervised clustering analysis identified groups of molecules that were specific to the breast tumor tissue and displayed a similar secretion behavior. We identified a tumor-specific cluster composed of nine molecules that were secreted fourteen times more in the tumor supernatants than the corresponding juxta-tumor supernatants. This cluster contained, among others, CCL17, CCL22, and CXCL9 and TGF-beta1, 2, and 3. The systematic comparison of tumor and juxta-tumor secretome data allowed us to mathematically formalize a novel breast cancer signature composed ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Sirven P",
+        "Faucheux L",
+        "Grandclaudon M",
+        "Michea P",
+        "Vincent-Salomon A",
+        "Mechta-Grigoriou F",
+        "Scholer-Dahirel A",
+        "Guillot-Delost M",
+        "Soumelis V"
+      ],
+      "journal": "Breast Cancer Res",
+      "date": "2022-12-20T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32923685",
+      "title": "Mendelian randomization analyses of genetically predicted circulating levels of cytokines with risk of breast cancer",
+      "abstract": "To determine whether genetically predicted circulating levels of cytokines are associated with risk of overall breast cancer (BC), estrogen receptor (ER)-positive and ER-negative BC, we conducted two-sample MR analyses using data from the most comprehensive genome-wide association studies (GWAS) on cytokines in 8293 Finnish participants and the largest BC GWAS from the Breast Cancer Association Consortium (BCAC) with totally 122,977 BC cases and 105,974 healthy controls. We systematically screened 41 cytokines (of which 24 cytokines have available instruments) and identified that genetically predicted circulating levels (1-SD increase) of MCP1 (OR: 1.08; 95% CIs: 1.03-1.12; P value: 3.55 x 10-4), MIP1b (OR: 1.02; 95% CIs: 1.01-1.04; P value: 2.70 x 10-3) and IL13 (OR: 1.06; 95% CIs: 1.03-1.10; P value: 3.33 x 10-4) were significantly associated with increased risk of overall BC, as well as ER-positive BC. In addition, higher levels of MIP1b and IL13 were also significantly associated with increased risk of ER-negative BC. These findings suggest the crucial role of cytokines in BC carcinogenesis and potential of targeting specific inflammatory cytokines for BC prevention.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Li S",
+        "Xu Y",
+        "Zhang Y",
+        "Nie L",
+        "Ma Z",
+        "Ma L",
+        "Fang X",
+        "Ma X"
+      ],
+      "journal": "NPJ Precis Oncol",
+      "date": "2020-09-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30544398",
+      "title": "Preoperative elevated neutrophil-to-lymphocyte ratio (NLR) and derived NLR are associated with poor prognosis in patients with breast cancer",
+      "abstract": "Abstract\n\nBackground:\n\nPreoperative neutrophil-lymphocyte ratio (NLR) and derived NLR (dNLR) have been suggested to be correlated with the prognosis of patients with breast cancer (BC). However, the results still remain controversial. Therefore, this study was to further evaluate the prognostic potential of preoperative NLR and dNLR for BC patients using a meta-analysis.\n\nMethods:\n\nRelevant articles were sought in PubMed and Cochrane Library databases up to September 2018. The associations between preoperative NLR/dNLR and overall survival (OS), disease-free survival (DFS) and recurrence-free survival (RFS) were assessed by the STATA software with the results presented as pooled hazard ratio (HR) with 95% confidence interval (CI).\n\nResults:\n\nTwenty-one studies were enrolled. Pooled results showed that elevated NLR was significantly associated with poorer OS (HR = 2.45, 95% CI: 1.69-3.54), DFS (HR = 1.54, 95% CI: 1.28-1.87) and RFS (HR = 4.05, 95% CI: 1.94-8.47) in BC patients undergoing surgery. High-preoperative dNLR was also significantly associated with worse OS (HR = 1.75, 95% CI: 1.39-2.19) and DFS (HR = 1.62, 95% CI: 1.09-2.41). Moreover, subgroup analysis showed significant associations between preoperative elevated NLR and poor prognosis were not changed by the stratification of ethnicity, cutoff of NLR, pathological stage, neoadjuvant, and adjuvant therapy.\n\nConclusion:\n\nPreoperative NLR and dNLR may be effective predictive biomarkers for prognosis in patients with B",
+      "journal_quality": 0.5,
+      "authors": [
+        "Duan J",
+        "Pan L",
+        "Yang M"
+      ],
+      "journal": "Medicine (Baltimore)",
+      "date": "2018-12-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23893766",
+      "title": "Regulation of cellular processes by interleukin-16 in homeostasis and cancer.",
+      "abstract": "Interleukin-16 (IL-16) is generated as a precursor molecule that is cleaved by caspase-3 to produce a pro-IL-16 molecule that functions as a regulator of T cell growth, and a secreted peptide that functions as a CD4 and/or CD9 ligand for induction of cell motility and activation. IL-16 has been predominantly studied as a contributing factor in the orchestration of an immune response; however, more recently IL-16 bioactivity has been closely associated with the progression of a number of different cancers. While the association between IL-16 plasma levels and tumor progression has been reported for many types of cancer, the mechanism for IL-16 involvement has been partially elucidated for three of the cancer types, cutaneous T cell lymphoma (CTCL), multiple myeloma (MM), and breast cancer. The mechanism for promoting cell growth is different in each of these cancers and involves a sequence mutation in the pro-molecule facilitating decreased p27(KIP1) levels in CTCL; over expression of the secreted IL-16 molecule to induce proliferation in CTCL T cells, and plasma cells in MM; and increased secreted IL-16 acting to recruit CD4+ pro-tumor macrophages in breast cancer. This article will review the cellular process for generating IL-16, the biological activities for both the pro- and secreted forms of the protein, and then the mechanism by which these forms contribute to cancer progression. As a soluble cytokine the ability to reduce or eliminate IL-16 synthesis through siRNA appr",
+      "journal_quality": 0.5,
+      "authors": [
+        "Richmond J",
+        "Tuzova M",
+        "Cruikshank W",
+        "Center D"
+      ],
+      "journal": "J Cell Physiol",
+      "date": "2014-02-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23076779",
+      "title": "Serum protein levels following surgery in breast cancer patients: a protein microarray approach.",
+      "abstract": "Surgery is the primary treatment for non-metastatic breast cancer. However,             the risk of early recurrence remains after surgical removal of the primary tumor.             Recurrence is suggested to result from hidden micrometastatic foci, which are             triggered to escape from dormancy by surgical resection of the primary tumor.             In this study, we focused on the differential impact of breast surgery on the             serum profiles of early breast cancer patients and healthy women. Serum samples             from invasive breast cancer patients, in situ carcinoma breast cancer patients             and healthy women were analyzed using reverse phase protein array technology.             Samples were collected prior to breast surgery and 24 h following breast surgery.             Both the expression level and the velocity of 42 serum proteins were quantified             and compared among groups. We found that surgery increased the concentration of             several proteins (CSF1, THSB2, IL6, IL7, IL16, FasL and VEGF-B) in the overall             population. Compared with healthy women and patients with non-invasive tumors,             invasive tumor patients exhibited higher preoperative levels of several serum             proteins, such as alphaFP, IFNbeta1, VEGF-A, IL18, E-cadherin or CD31, and lower postoperative             levels of TNFalpha and IL5. Similarly, we detected significant surgery-induced changes             in the velocity of ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Perez-Rivas LG",
+        "Jerez JM",
+        "Fernandez-De Sousa CE",
+        "de Luque V",
+        "Quero C",
+        "Pajares B",
+        "Franco L",
+        "Sanchez-Muñoz A",
+        "Ribelles N",
+        "Alba E"
+      ],
+      "journal": "Int J Oncol",
+      "date": "2012-12-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40064918",
+      "title": "Interleukin-16 enhances anti-tumor immune responses by establishing a Th1 cell-macrophage crosstalk through reprogramming glutamine metabolism in mice",
+      "abstract": "Overcoming immunosuppression in the tumor microenvironment (TME) is crucial for developing novel cancer immunotherapies. Here, we report that IL-16 administration enhances the polarization of T helper 1 (Th1) cells by inhibiting glutamine catabolism through the downregulation of glutaminase in CD4+ T cells and increases the production of Th1 effector cytokine IFN-gamma, thus improving anti-tumor immune responses. Moreover, we find that establishing an IL-16-dependent, Th1-dominant TME relies on mast cell-produced histamine and results in the increased expression of the CXCR3 ligands in tumor-associated macrophages (TAM), thereby improving the therapeutic effectiveness of immune checkpoint blockade (ICB). Cancer patients exhibit impaired production of IL-16, which correlates with poorer prognosis. Additionally, low IL-16 production is associated with unresponsiveness to immunotherapy in cancer patients. Collectively, our findings provided new insights into the biological function of IL-16, emphasizing its potential clinical significance as a therapeutic approach to augment anti-tumor immunity and sensitize ICB-based cancer immunotherapy.\n\nOvercoming the suppressive tumor microenvironment (TME) is crucial to improving the efficacy of cancer therapy. Here the authors show that, in mouse cancer models, administration of exogenous IL-16 establishes a Th1-dominant TME via regulation of glutamine catabolism and triggers a Th1 cell-macrophage crosstalk, enhancing anti-tumor immune re",
+      "journal_quality": 0.5,
+      "authors": [
+        "Wen Z",
+        "Liu T",
+        "Xu X",
+        "Acharya N",
+        "Shen Z",
+        "Lu Y",
+        "Xu J",
+        "Guo K",
+        "Shen S",
+        "Zhao Y",
+        "Wang P",
+        "Li S",
+        "Chen W",
+        "Li H",
+        "Ding Y",
+        "Shang M",
+        "Guo H",
+        "Hou Y",
+        "Cui B",
+        "Shen M",
+        "Huang Y",
+        "Pan T",
+        "Qingqing W",
+        "Cao Q",
+        "Wang K",
+        "Xiao P"
+      ],
+      "journal": "Nat Commun",
+      "date": "2025-03-10T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "29123422",
+      "title": "Neutrophil-Derived Interleukin 16 in Premetastatic Lungs Promotes Breast Tumor Cell Seeding",
+      "abstract": "The premetastatic niche in distant organs prior to metastatic cell arrival emerged as an important step in the metastatic cascade. However, molecular mechanisms underlying this process are still poorly understood. In particular, whether neutrophil recruitment at a premetastatic stage promotes or inhibits metastatic cell seeding has to be clarified. We aimed at unraveling how neutrophil infiltration in lung parenchyma induced by the distant primary tumor influences the establishment of lung metastasis. Elevated neutrophil counts and IL-16 levels were found in premetastatic lungs in a syngenic mouse model using 4T1 tumor cells. 4T1 cell-derived soluble factors stimulated IL-16 secretion by neutrophils. The functional contribution of IL-16 is supported by metastasis burden reduction in lungs observed on instillation of an IL-16 neutralizing antibody. Moreover, IL-16 promotes in vitro 4T1 cell adhesiveness, invasiveness, and migration. In conclusion, at a premetastatic stage, neutrophil-derived IL-16 favors tumor cell engraftment in lung parenchyma.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Donati K",
+        "Sépult C",
+        "Rocks N",
+        "Blacher S",
+        "Gérard C",
+        "Noel A",
+        "Cataldo D"
+      ],
+      "journal": "Cancer Growth Metastasis",
+      "date": "2017-10-27T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36925914",
+      "title": "Characteristics and postoperative dynamic changes in circulating CD4+ helper T lymphocytes in patients with breast cancer",
+      "abstract": "Introduction\n\nCirculating CD4+ helper T cell (Th) subsets provide potentially important information on disease progression in several cancers. In this study, we explored the characteristics and postoperative dynamic changes in circulating CD4+Th subsets in patients with breast cancer.\n\nMethods\n\nCirculating CD4+Th subsets, including CD4+ naive T cells (Tn), CD4+ central memory T cells (Tcm), CD4+ effector memory T cells (Tem), CD4+CD57+T, and CD4+PD-1+T, were detected with multiparameter flow cytometry. T-test and Wilcoxon rank-sum test were used to compare differences between groups for normally and non-normally distributed continuous variables, respectively. Postoperative dynamic changes in CD4+Th subsets were assessed using the paired-sample rank-sum test.\n\nResults\n\nSeventy-five patients with invasive breast cancer and fifty-three patients with benign breast tumors were enrolled. Compared with that in patients with benign tumors, the proportion of CD4+Tn in patients with breast cancer patients decreased, whereas the proportion and absolute number of CD4+CD57+T and CD4+PD-1+T increased. Moreover, the proportion of CD4+PD-1+T was correlated with the clinicopathology of breast cancer. After tumor resection, the proportion and absolute number of CD4+Tcm significantly decreased, while those of CD4+Tem significantly increased, compared with preoperative values. Tumor resection caused significant changes in the proportion and absolute number of CD4+CD57+T and CD4+PD-1+ T, both of ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Lu Y",
+        "Zhang Q",
+        "Wang J",
+        "Zhang L"
+      ],
+      "journal": "Front Oncol",
+      "date": "2023-02-28T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35663830",
+      "title": "Prognostic Impact of Cytotoxic CD4 T Cells in Tumor Immune Microenvironment of Patients with Breast Cancer",
+      "abstract": "Article: 35663830",
+      "journal_quality": 0.5,
+      "authors": [
+        "Shohdy KS",
+        "Almeldin DS",
+        "Ghaly R",
+        "Kassem L",
+        "Pagani O"
+      ],
+      "journal": "J Immunother Precis Oncol",
+      "date": "2021-10-26T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33103515",
+      "title": "Frequency of CD4+ regulatory T cells, CD8+ T cells, and human papilloma virus infection in Egyptian Women with breast cancer",
+      "abstract": "Several subsets of regulatory CD4+ T cells (CD4+ Tregs) have been described in peripheral blood and tumor microenvironment of breast cancer (BC) patients and may play a role in the progression of BC. High-risk human papilloma virus (HR-HPV) has a causal role in cervical, head, and neck tumors but the role of HR-HPV in evoking neoplasia in BC is still unclear. In this study we assessed the prevalence of CD4+CD25+ FOXP3+ regulatory T cells (CD4+Tregs) and CD3+ CD8+ T cells by flow cytometry in peripheral blood from a total of 55 Egyptian women, including 20 treatment-naive BC, 15 with breast benign lesions (BBL), and 20 healthy volunteers (HV). HR-HPV genotypes type 16, 18, and 31 were investigated in breast tissue from all BC and BBL patients using Real-Time PCR. HR-HPV was detected in 4/20 (20%) and 0/15 (0%) BC and BBL patients respectively. The frequency of CD4+ Tregs was significantly higher in BC compared to BBL and HV, (P < 0.001). In addition, we observed a significantly higher frequency of CD3+ CD8+ T cells in peripheral blood of patients with late stage III BC compared to early stage I and II BC (P = 0.011). However, there was no significant association between the ratio of CD8+ T cell to CD4+ Tregs frequencies and the expression of Estrogen Receptor (ER), Progesterone Receptor (PR), and Human Epidermal Growth Factor Receptor 2 (HER2). These results lead us to postulate that the association between the frequency of CD4+ Tregs and CD8+ T cells in the peripheral blood m",
+      "journal_quality": 0.5,
+      "authors": [
+        "Tawfeik AM",
+        "Mora A",
+        "Osman A",
+        "Moneer MM",
+        "El-Sheikh N",
+        "Elrefaei M"
+      ],
+      "journal": "Int J Immunopathol Pharmacol",
+      "date": "2020-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26146069",
+      "title": "[Highly expressed CD147 on CD4+ tumor infiltrating lymphocytes promotes the progress of breast cancer].",
+      "abstract": "OBJECTIVE: To investigate the expression of CD147 in CD4+ tumor infiltrating lymphocytes and explore the clinical significance of CD147 transcripts in breast cancer patients by comparing CD147 level in healthy controls' peripheral blood, breast cancer patients' peripheral blood, lymph nodes and CD4+ tumor infiltrating lymphocytes. METHODS: CD147 expression data were derived by Robust Multi-array Averaging method from three different microarrays, GSE14308, GSE36765 and GSE6532. ANOVA, Kaplan-Meier curve and multivariate Cox proportional hazards model were used for the statistical analysis. RESULTS: The expression of CD147 in Th1, Th2 and Th17 cells was 8-12 times higher than that in Th0 cells in normal C57BL/6J mice. The expression level of CD147 in the CD4+ tumor infiltrating lymphocytes from breast cancer patients was significantly higher than that in the CD4+ lymphocytes from peripheral blood of healthy donors, peripheral blood and axillary lymph nodes of breast cancer patients. High expression of CD147 was significantly associated with an increased risk of relapse in the Kaplan-Meier curve analysis (Log-Rank, P=0.019) and multivariate analysis (hazard ratio=1.764; 95% confidence interval: 1.088-2.859). CONCLUSION: CD147 might promote the progress of breast cancer through up-regulating CD4+ tumor infiltrating lymphocytes and aggravating inflammatory reaction.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zheng M",
+        "Zhang X",
+        "Guo H",
+        "Fan C",
+        "Chen Z",
+        "Zhu P"
+      ],
+      "journal": "Xi Bao Yu Fen Zi Mian Yi Xue Za Zhi",
+      "date": "2015-07-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25973310",
+      "title": "Profile of differentially expressed intratumoral cytokines to predict the immune-polarizing side effects of tamoxifen in breast cancer treatment.",
+      "abstract": "Factors within the tissue of breast cancer (BC) may shift the polarization of CD4+ T cells towards Th2 direction. This tendency can promote tumor development and be enhanced by the use of tamoxifen during the treatment. Thus, the patients with low levels of tumor-induced Th2 polarization prior to tamoxifen treatment may better endure the immune-polarizing side effects (IPSE) of tamoxifen and have better prognoses. Estimation of Th2 polarization status should help predict the IPSE among tamoxifen-treated patients and guide the use of tamoxifen among all BC patients before the tamoxifen therapy. Here, we report profiling of differentially expressed (DE) intratumoral cytokines as a signature to evaluate the IPSE of tamoxifen. The DE genes of intratumoral CD4+ T cells (CD4 DEGs) were identified by gene expression profiles of purified CD4+ T cells from BC patients and validated by profiling of cultured intratumoral CD4+ T cells. Functional enrichment analyses showed a directed Th2 polarization of intratumoral CD4+ T cells. To find the factors inducing the Th2 polarization of CD4+ T cells, we identified 995 common DE genes of bulk BC tissues (BC DEGs) by integrating five independent datasets. Five DE cytokines observed in bulk BC tissues with dysregulated receptors in the intratumoral CD4+ T cells were selected as the predictor of the IPSE of tamoxifen. The patients predicted to suffer low IPSE (low Th2 polarization) had a significantly lower distant relapse risk than the patients ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Li B",
+        "Li Y",
+        "Wang XY",
+        "Yan ZQ",
+        "Liu H",
+        "Liu GR",
+        "Liu SL"
+      ],
+      "journal": "Am J Cancer Res",
+      "date": "2015-01-15T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "24816762",
+      "title": "T helper responses are maintained by basal-like breast cancer cells and confer to immune modulation via upregulation of PD-1 ligands.",
+      "abstract": "A conspicuous T cell infiltration is frequently observed in triple-negative and/or basal-like breast cancers. Since the immunological course of breast cancer is explicitly directed by helper T cells, this study aims to determine the influence of basal-like breast cancer (BLBC) cells on CD4(+) T cell responses. Co-cultures were established with breast cancer cell lines and CD4(+) T cells under stimulatory conditions. Helper T cell activation, proliferation, cytokine secretion, and differentiation were assessed. Protein and mRNA expression of PD-1 ligands were determined on breast cancer cell lines. Blockade assays were performed in order to determine the functional assets of PD-1 ligation. In contrast to luminal breast cancer cells, BLBC cells allowed CD4(+) T cell activation, proliferation, and IFN-gamma secretion, but only to a certain extent. A substantial population of CD25(+)CD127(low/-) regulatory T (Treg) cells was also induced in BLBC co-cultures. In return, IFN-gamma stimulated the upregulation of PD-L1 (B7-H1) and/or PD-L2 (B7-DC) inhibitory molecules on the basal-like cells. In prolonged periods of co-culturing, blockade of PD-1 ligands on BLBC cell lines impaired Treg differentiation, restored IL-2 secretion, and increased CD8(+) T cell activation. In conclusion, T helper responses were maintained by BLBC cells. On the other hand, IFN-gamma secreted from Th1 and other immune cells upregulated the expression of PD-1 ligands on BLBC cells and modulated the immune rea",
+      "journal_quality": 0.5,
+      "authors": [
+        "Karasar P",
+        "Esendagli G"
+      ],
+      "journal": "Breast Cancer Res Treat",
+      "date": "2014-06-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23778140",
+      "title": "CD4+ follicular helper T cell infiltration predicts breast cancer survival.",
+      "abstract": "CD4+ T cells are critical regulators of immune responses, but their functional role in human breast cancer is relatively unknown. The goal of this study was to produce an image of CD4+ T cells infiltrating breast tumors using limited ex vivo manipulation to better understand the in vivo differences associated with patient prognosis. We performed comprehensive molecular profiling of infiltrating CD4+ T cells isolated from untreated invasive primary tumors and found that the infiltrating T cell subpopulations included follicular helper T (Tfh) cells, which have not previously been found in solid tumors, as well as Th1, Th2, and Th17 effector memory cells and Tregs. T cell signaling pathway alterations included a mixture of activation and suppression characterized by restricted cytokine/chemokine production, which inversely paralleled lymphoid infiltration levels and could be reproduced in activated donor CD4+ T cells treated with primary tumor supernatant. A comparison of extensively versus minimally infiltrated tumors showed that CXCL13-producing CD4+ Tfh cells distinguish extensive immune infiltrates, principally located in tertiary lymphoid structure germinal centers. An 8-gene Tfh signature, signifying organized antitumor immunity, robustly predicted survival or preoperative response to chemotherapy. Our identification of CD4+ Tfh cells in breast cancer suggests that they are an important immune element whose presence in the tumor is a prognostic factor.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Gu-Trantien C",
+        "Loi S",
+        "Garaud S",
+        "Equeter C",
+        "Libin M",
+        "de Wind A",
+        "Ravoet M",
+        "Le Buanec H",
+        "Sibille C",
+        "Manfouo-Foutsop G",
+        "Veys I",
+        "Haibe-Kains B",
+        "Singhal SK",
+        "Michiels S",
+        "Rothé F",
+        "Salgado R",
+        "Duvillier H",
+        "Ignatiadis M",
+        "Desmedt C",
+        "Bron D",
+        "Larsimont D",
+        "Piccart M",
+        "Sotiriou C",
+        "Willard-Gallo K"
+      ],
+      "journal": "J Clin Invest",
+      "date": "2013-07-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35677046",
+      "title": "Systemic Immune Dysregulation in Early Breast Cancer Is Associated With Decreased Plasma Levels of Both Soluble Co-Inhibitory and Co-Stimulatory Immune Checkpoint Molecules",
+      "abstract": "Breast cancer cells exploit the up-regulation or down-regulation of immune checkpoint proteins to evade anti-tumor immune responses. To explore the possible involvement of this mechanism in promoting systemic immunosuppression, the pre-treatment levels of soluble co-inhibitory and co-stimulatory immune checkpoint molecules, as well as those of cytokines, chemokines, and growth factors were measured in 98 newly diagnosed breast cancer patients and compared with those of 45 healthy controls using multiplex bead array and ELISA technologies. Plasma concentrations of the co-stimulatory immune checkpoints, GITR, GITRL, CD27, CD28, CD40, CD80, CD86 and ICOS, as well as the co-inhibitory molecules, PD-L1, CTLA-4 and TIM-3, were all significantly lower in early breast cancer patients compared to healthy controls, as were those of HVEM and sTLR-2, whereas the plasma concentrations of CX3CL1 (fractalkine), CCL5 (RANTES) and those of the growth factors, M-CSF, FGF-21 and GDF-15 were significantly increased. However, when analyzed according to the patients' breast cancer characteristics, these being triple negative breast cancer (TNBC) vs. non-TNBC, tumor size, stage, nodal status and age, no significant differences were detected between the plasma levels of the various immune checkpoint molecules, cytokines, chemokines and growth factors. Additionally, none of these biomarkers correlated with pathological complete response. This study has identified low plasma levels of soluble co-stimu",
+      "journal_quality": 0.5,
+      "authors": [
+        "Rapoport BL",
+        "Steel HC",
+        "Hlatshwayo N",
+        "Theron AJ",
+        "Meyer PWA",
+        "Nayler S",
+        "Benn CA",
+        "Smit T",
+        "Kwofie LLI",
+        "Heyman L",
+        "Anderson R"
+      ],
+      "journal": "Front Immunol",
+      "date": "2022-05-23T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine",
+          "cytokine",
+          "pro-inflammatory",
+          "expression",
+          "prognosis"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33401546",
+      "title": "A Psychosocial Genomics Pilot Study in Oncology for Verifying Clinical, Inflammatory and Psychological Effects of Mind-Body Transformations-Therapy (MBT-T) in Breast Cancer Patients: Preliminary Results",
+      "abstract": "Several studies have highlighted the key role of chronic inflammation in breast cancer development, progression, metastasis, and therapeutic outcome. These processes are mediated through a variety of cytokines and hormones that exert their biological actions either locally or distantly via systemic circulation. Recent findings suggest that positive psychosocial experiences, including psychotherapeutic interventions and therapeutic mind-body protocols, can modulate the inflammatory response by reducing the expression of genes/proteins associated with inflammation and stress-related pathways. Our preliminary results indicate that a specific mind-body therapy (MBT-T) could induce a significant reduction of the release of different cytokines and chemokines, such as SCGFbeta, SDF-1alpha, MCP3, GROalpha, LIF, and IL-18, in the sera of breast cancer patients compared to a control group, suggesting that MBT-T could represent a promising approach to improve the wellness and outcome of breast cancer patients.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Cozzolino M",
+        "Cocco S",
+        "Piezzo M",
+        "Celia G",
+        "Costantini S",
+        "Abate V",
+        "Capone F",
+        "Barberio D",
+        "Girelli L",
+        "Cavicchiolo E",
+        "Ascierto PA",
+        "Madonna G",
+        "Budillon A",
+        "De Laurentiis M"
+      ],
+      "journal": "J Clin Med",
+      "date": "2021-01-03T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine",
+          "cytokine",
+          "pro-inflammatory",
+          "expression",
+          "prognosis"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26604799",
+      "title": "Baseline blood immunological profiling differentiates between Her2-breast cancer molecular subtypes: implications for immunomediated mechanisms of treatment response",
+      "abstract": "Purpose\n\nBreast cancer patients' response to treatment is highly dependent on the primary tumor molecular features, with triple-negative breast tumors having the worst prognosis of all subtypes. According to the molecular features, tumors stimulate the microenvironment to induce distinct immune responses, baseline immune activation being associated with higher likelihood of pathologic response. In this study, we investigated the deconvolution of the immunological status of triple-negative tumors in comparison with luminal tumors and the association with patients' clinicopathological characteristics.\n\nPatients and methods\n\nGene expression of 84 inflammatory molecules and their receptors were analyzed in 40 peripheral blood samples from patients with Her2- primary breast cancer tumors. We studied the association of triple-negative phenotype with age, clinical stage, tumor size, lymph nodes, and menopausal status.\n\nResults\n\nWe observed that more patients with estrogen (ER)/progesterone (PR)-negative tumors had grade III, while more patients with ER/PR-positive tumors had grade II tumors. Gene expression analysis revealed a panel of 14 genes to have differential expression between the two groups: several interleukins: IL13, IL16, IL17C and IL17F, IL1A, IL3; interleukin receptors: IL10RB, IL5RA; chemokines: CXCL13 and CCL26; and cytokines: CSF2, IFNA2, OSM, TNSF13.\n\nConclusion\n\nThe expression levels of these genes have been previously shown to be associated with reduced immunologi",
+      "journal_quality": 0.5,
+      "authors": [
+        "Tudoran O",
+        "Virtic O",
+        "Balacescu L",
+        "Lisencu C",
+        "Fetica B",
+        "Gherman C",
+        "Balacescu O",
+        "Berindan-Neagoe I"
+      ],
+      "journal": "Onco Targets Ther",
+      "date": "2015-11-18T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine",
+          "cytokine",
+          "pro-inflammatory",
+          "expression",
+          "prognosis"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26361584",
+      "title": "Pro-oncogenic cytokines and growth factors are differentially expressed in the post-surgical wound fluid from malignant compared to benign breast lesions",
+      "abstract": "Purpose\n\nThe accumulation of wound fluid known as seroma in the chest cavity following breast surgery is a common occurrence that can persist for many weeks. While the pro-inflammatory composition of seroma is well established, there has been remarkably little research to determine whether seroma contains pro-oncogenic factors, and whether this is influenced by previous malignant disease.\n\nMethods\n\nWe developed a clinical trial in which we obtained post-surgical seroma fluids from women with benign or malignant disease 1 or 2 weeks following lumpectomy or mastectomy. We conducted an analysis of more than 80 different cytokines, chemokines and growth factors.\n\nResults\n\nWe found that surgical cavity seroma from breast cancer patients has a higher expression of key tumor-promoting cytokines and lower expression of important tumor-inhibiting factors when compared to benign lesions from non-cancer patients. Patients with high body mass index also had higher levels of leptin regardless of malignancy.\n\nConclusions\n\nWe conclude that the breast post-surgical tumor cavity contains factors that are pro-inflammatory regardless of malignant or benign disease, but in malignant disease there is significant enrichment of additional pro-oncogenic chemokines, cytokines and growth factors, and reduction in tumor-inhibiting factors. These results are consistent with tumor conditioning of surrounding normal stromal tissue and creation of a pro-oncogenic environment that persists long after surgic",
+      "journal_quality": 0.5,
+      "authors": [
+        "Valeta-Magara A",
+        "Hatami R",
+        "Axelrod D",
+        "Roses DF",
+        "Guth A",
+        "Formenti SC",
+        "Schneider RJ"
+      ],
+      "journal": "Springerplus",
+      "date": "2015-09-05T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine",
+          "cytokine",
+          "pro-inflammatory",
+          "expression",
+          "prognosis"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40750580",
+      "title": "Persistent accumulation of therapy-induced senescent cells: an obstacle to long-term cancer treatment efficacy",
+      "abstract": "In the ever-evolving landscape of cancer therapy, while cancer treatments such as chemotherapy, radiotherapy, and targeted therapy aim to eradicate malignant cells, they also inadvertently trigger cellular senescence in both cancerous and microenvironmental tissues. Therapy-induced senescence (TIS) can act as a barrier against tumor growth by halting cell proliferation in the short term, but the long-term persistence of therapy-induced senescent (TISnt) cells may pose a significant challenge in cancer management. Their distinct characteristics, like senescence-associated secretory phenotype (SASP), metabolic dysregulation, and immune evasion, make them exhibit remarkable heterogeneity to orchestrate the tumor microenvironment (TME), resulting in therapy resistance. However, how these TISnt cells functioning differently in cancer progression, and the intricate mechanisms by which they remodel the senescence-associated immunosuppressive microenvironment present challenges for improving anticancer therapy. Therefore, this review summarizes the heterogeneous TISnt cell phenotypes contributing to an accumulated senescent state, outlines their multidimensional interactions in the senescent microenvironment, and discusses current senescence-targeting strategies. Building on the current understanding of TIS, we propose potential avenues for improving TIS-targeting methodologies in the context of head and neck cancer, a representative heterogeneous malignancy, which can substantially ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Luo J",
+        "Sun T",
+        "Liu Z",
+        "Liu Y",
+        "Liu J",
+        "Wang S",
+        "Shi X",
+        "Zhou H"
+      ],
+      "journal": "Int J Oral Sci",
+      "date": "2025-08-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine",
+          "cytokine",
+          "pro-inflammatory",
+          "expression",
+          "prognosis"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39408600",
+      "title": "Association of the Single Nucleotide Polymorphisms rs11556218, rs4778889, rs4072111, and rs1131445 of the Interleukin-16 Gene with Ovarian Cancer",
+      "abstract": "Single nucleotide polymorphisms (SNPs) of the IL-16 gene have been reported to influence the risk of several cancers, but their role in ovarian cancer (OC) has not been studied. Using the restriction fragment length polymorphism (PCR-RFLP) method, we examined four IL-16 SNPs: rs11556218 (T > G), rs4778889 (T > C), rs4072111 (C > T), and rs1131445 (T > C) in blood samples from 413 women of Central European descent, including 200 OC patients and 213 healthy controls. Among the patients, 62% were postmenopausal, 84.5% were diagnosed in late stages (FIGO IIb-IV), and 73.5% had high-grade serous OC (HGSOC). Minor allele frequencies in controls were 9.2% for rs11556218 (G allele), 13.7% for rs4778889 (C allele), 10.4% for rs4072111 (T allele), and 32.3% for rs1131445 (C allele). We found significant associations of rs11556218 (G vs. T allele: OR 2.76, 95% CI 1.84-4.14, p < 0.0001) with elevated OC risk in the whole cohort (p < 0.001) and in both premenopausal (p < 0.001) and postmenopausal (p = 0.001) subgroups. These associations remained significant across heterozygote (p < 0.001), dominant (p < 0.001), and overdominant (p < 0.001) models. IL-16 rs4778889 was associated with OC risk predominantly in premenopausal women (p < 0.0001 in almost all models). In the whole cohort, the C allele was associated with OC risk (OR 1.54, CI 95% 1.06-2.23, p = 0.024), and the association of rs4778889 was significant in dominant (p = 0.019), overdominant (p = 0.033), and heterozygote (p = 0.027)",
+      "journal_quality": 0.5,
+      "authors": [
+        "Watrowski R",
+        "Schuster E",
+        "Van Gorp T",
+        "Hofstetter G",
+        "Fischer MB",
+        "Mahner S",
+        "Polterauer S",
+        "Zeillinger R",
+        "Obermayr E"
+      ],
+      "journal": "Int J Mol Sci",
+      "date": "2024-09-24T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine",
+          "cytokine",
+          "pro-inflammatory",
+          "expression",
+          "prognosis"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36248881",
+      "title": "miR-aculous new avenues for cancer immunotherapy",
+      "abstract": "The rising toll of cancer globally necessitates ingenuity in early detection and therapy. In the last decade, the utilization of immune signatures and immune-based therapies has made significant progress in the clinic; however, clinical standards leave many current and future patients without options. Non-coding RNAs, specifically microRNAs, have been explored in pre-clinical contexts with tremendous success. MicroRNAs play indispensable roles in programming the interactions between immune and cancer cells, many of which are current or potential immunotherapy targets. MicroRNAs mechanistically control a network of target genes that can alter immune and cancer cell biology. These insights provide us with opportunities and tools that may complement and improve immunotherapies. In this review, we discuss immune and cancer cell-derived miRNAs that regulate cancer immunity and examine miRNAs as an integral part of cancer diagnosis, classification, and therapy.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Tang WW",
+        "Bauer KM",
+        "Barba C",
+        "Ekiz HA",
+        "O'Connell RM"
+      ],
+      "journal": "Front Immunol",
+      "date": "2022-09-28T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine",
+          "cytokine",
+          "pro-inflammatory",
+          "expression",
+          "prognosis"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33925575",
+      "title": "Chemokine-Cytokine Networks in the Head and Neck Tumor Microenvironment",
+      "abstract": "Head and neck squamous cell carcinomas (HNSCCs) are aggressive diseases with a dismal patient prognosis. Despite significant advances in treatment modalities, the five-year survival rate in patients with HNSCC has improved marginally and therefore warrants a comprehensive understanding of the HNSCC biology. Alterations in the cellular and non-cellular components of the HNSCC tumor micro-environment (TME) play a critical role in regulating many hallmarks of cancer development including evasion of apoptosis, activation of invasion, metastasis, angiogenesis, response to therapy, immune escape mechanisms, deregulation of energetics, and therefore the development of an overall aggressive HNSCC phenotype. Cytokines and chemokines are small secretory proteins produced by neoplastic or stromal cells, controlling complex and dynamic cell-cell interactions in the TME to regulate many cancer hallmarks. This review summarizes the current understanding of the complex cytokine/chemokine networks in the HNSCC TME, their role in activating diverse signaling pathways and promoting tumor progression, metastasis, and therapeutic resistance development. ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Nisar S",
+        "Yousuf P",
+        "Masoodi T",
+        "Wani NA",
+        "Hashem S",
+        "Singh M",
+        "Sageena G",
+        "Mishra D",
+        "Kumar R",
+        "Haris M",
+        "Bhat AA",
+        "Macha MA"
+      ],
+      "journal": "Int J Mol Sci",
+      "date": "2021-04-27T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "chemokine",
+          "cytokine",
+          "pro-inflammatory",
+          "expression",
+          "prognosis"
+        ]
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37940345",
+      "title": "MDR1-expressing CD4+ T cells with Th1.17 features resist to neoadjuvant chemotherapy and are associated with breast cancer clinical response",
+      "abstract": "Background\n\nMultidrug resistance-1 (MDR1) transporter limits the intracellular accumulation of chemotherapies (paclitaxel, anthracyclines) used in breast cancer (BC) treatment. In addition to tumor cells, MDR1 is expressed on immune cell subsets in which it confers chemoresistance. Among human T cells, MDR1 is expressed by most CD8+ T cells, and a subset of CD4+ T helper (Th) cells. Here we explored the expression, function and regulation of MDR1 on CD4+ T cells and investigated the role of this population in response to neoadjuvant chemotherapy (NAC) in BC.\n\nMethods\n\nPhenotypic and functional characteristics of MDR1+ CD4 Th cells were assessed on blood from healthy donors and patients with BC by flow cytometry. These features were extended to CD4+ Th cells from untreated breast tumor by flow cytometry and RNA-sequencing (RNA-seq). We performed in vitro polarization assays to decipher MDR1 regulation on CD4 Th cells. We evaluated in vitro the impact of chemotherapy agents on MDR1+ CD4+ Th cells. We analyzed the impact of NAC treatment on MDR1+ CD4+ Th cells from blood and tumors and their association with treatment efficacy in two independent BC cohorts and in a public RNA-seq data set of BC tumor biopsies before and after NAC. Finally, we performed single cell (sc) RNAseq of blood CD4+ memory T cells from NAC-treated patients and combined them with an scRNAseq public data set.\n\nResults\n\nMDR1+ CD4 Th cells were strongly enriched in Th1.17 polyfunctional cells but also in Th17",
+      "journal_quality": 0.5,
+      "authors": [
+        "Di Roio A",
+        "Hubert M",
+        "Besson L",
+        "Bossennec M",
+        "Rodriguez C",
+        "Grinberg-Bleyer Y",
+        "Lalle G",
+        "Moudombi L",
+        "Schneider R",
+        "Degletagne C",
+        "Treilleux I",
+        "Campbell DJ",
+        "Metzger S",
+        "Duhen T",
+        "Trédan O",
+        "Caux C",
+        "Ménétrier-Caux C"
+      ],
+      "journal": "J Immunother Cancer",
+      "date": "2023-11-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "T cell co-receptor",
+          "immune checkpoint",
+          "lymphocyte",
+          "infiltration"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35711946",
+      "title": "CILP, a Putative Gene Associated With Immune Infiltration in Breast Cancer Brain Metastases",
+      "abstract": "Breast cancer (BC) is the second leading cause of brain metastases (BM), with high morbidity and mortality. The aim of our study was to explore the effect of the cartilage intermediate layer protein (CILP) on breast cancer brain metastases (BCBM). Using a weighted gene coexpression network analysis (WGCNA) in GSE100534 and GSE125989 datasets, we found that the yellow module was closely related to the occurrence of BCBM, and CILP was a hub gene in the yellow module. Low CILP expression was associated with a poor prognosis, and it was an independent prognostic factor for stage III-IV BC determined using Cox regression analysis. A nomogram model including CILP expression was established to predict the 5-, 7-, and 10-year overall survival (OS) probabilities of stage III-IV BC patients. We found that CILP mRNA expression was downregulated in BCBM through GSE100534, GSE125989, and GSE43837 datasets. In addition, we found that CILP mRNA expression was negatively correlated with vascular endothelial growth factor A (VEGFA), which is involved in regulating the development of BM. UALCAN analysis showed that CILP expression was downregulated in HER2-positive (HER2+) and triple-negative breast cancer (TNBC), which are more prone to BM. The vitro experiments demonstrated that CILP significantly inhibited BC cell proliferation and metastasis. Western blot (WB) results further showed that the mesenchymal protein marker vimentin was significantly downregulated following CILP overexpression, ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Sun X",
+        "Yang N",
+        "Zhou X",
+        "Dai H",
+        "Li Q",
+        "Feng A",
+        "Xu G",
+        "Liu Y",
+        "Xu L",
+        "Zhang Z",
+        "Yang Z",
+        "Li X"
+      ],
+      "journal": "Front Genet",
+      "date": "2022-05-30T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "T cell co-receptor",
+          "immune checkpoint",
+          "lymphocyte",
+          "infiltration"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34532469",
+      "title": "The characteristics and novel clinical implications of CD4+CXCR5+Foxp3+ follicular regulatory T cells in breast cancer",
+      "abstract": "Background\n\nFollicular regulatory T cells (Tfr) are a subset of regulatory T cells (Tregs) that suppress the humoral immune response in the germinal center. They are associated with increased rates of disease stabilization and decreased autoantibody levels in a variety of tumor and autoimmune diseases. The binding of T-cell immunoglobulin mucin 3 (TIM-3) and its ligand on the surface of Tfr cells could result in the depletion of T lymphocytes and the termination of the immune response mediated by helper T cell 1. However, the role of Tfr cells in breast cancer (BC) remains unclear.\n\nMethods\n\nIn this study, we detected the expression of CD4+CXCR5+Foxp3+Tfr cells in the peripheral blood of 35 BC patients and 30 healthy control patients by flow cytometry, and analyzed the relationship between Tfr cells and the clinical characteristics of patients. In addition, the expression of TIM-3 on the surface of Tfr cells in 6 triple-negative BC (TNBC) patients was further investigated using mass spectrometry.\n\nResults\n\nWe found a significant increase in Tfr cells in BC patients compared to healthy control patients (23.47%+-9.70% vs. 10.99%+-4.68%; P=0.001). Notably, the increase was more significant in early stage than advanced stage TNBC patients (28.52%+-10.75% vs. 18.69%+-5.19%; P=0.006), and there was a negative correlation between Tfr cells and serum lactate dehydrogenase (LDH) in early stage TNBC patients (r=-0.585; P=0.008). Additionally, we found that the expression of Tfr cells w",
+      "journal_quality": 0.5,
+      "authors": [
+        "Miao X",
+        "Guo Q",
+        "Pan Z",
+        "Xu X",
+        "Shao X",
+        "Wang X"
+      ],
+      "journal": "Ann Transl Med",
+      "date": "2021-08-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "T cell co-receptor",
+          "immune checkpoint",
+          "lymphocyte",
+          "infiltration"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30288049",
+      "title": "Distribution of CD4+ and CD8+ exhausted tumor-infiltrating lymphocytes in molecular subtypes of Chinese breast cancer patients",
+      "abstract": "Purpose\n\nBreast cancer (BC) is the leading cancer affecting Chinese women; however, the immune microenvironment between molecular subtypes is less reported. This study aimed to investigate the distribution of tumor-infiltrating lymphocyte (TIL) subpopulations, especially exhausted CD4+ and CD8+ TILs in Chinese BC patients.\n\nPatients and methods\n\nA total of 133 patients with breast invasive ductal carcinoma were recruited consecutively from January 1, 2012 to December 31, 2013, and TILs were detected in H&E-stained sections. Expression profiling of PD-1, CD4, and CD8 was determined by immunohistochemistry on 4 microm formalin-fixed paraffin-embedded tissue sections. The distribution of TILs was analyzed based on hormone receptor status and molecular subtypes.\n\nResults\n\nPD-1+, CD4+, and CD8+ TILs distributed differently based on molecular subtypes. Compared to Luminal A, triple-negative breast cancer (TNBC) patients had more PD-1+ TILs (39/high-power field [HPF] vs 11/HPF), PD-1+ helper T (CD4+) cells (28/HPF vs 10/HPF), and PD-1+ cytotoxic (CD8+) T-cells (3/HPF vs 2/HPF).\n\nConclusion\n\nTILs are distributed differently based on molecular subtypes. TNBC patients exhibit more PD-1+ exhausted TILs, representing an inhibitory immune microenvironment. PD-1/PD-L1 pathway is a potential therapeutic target of TNBC.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Shi F",
+        "Chang H",
+        "Zhou Q",
+        "Zhao YJ",
+        "Wu GJ",
+        "Song QK"
+      ],
+      "journal": "Onco Targets Ther",
+      "date": "2018-09-21T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "T cell co-receptor",
+          "immune checkpoint",
+          "lymphocyte",
+          "infiltration"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30069490",
+      "title": "Expression of PD-1 on CD4+ Tumor-Infiltrating Lymphocytes in Tumor Microenvironment Associated with Pathological Characteristics of Breast Cancer",
+      "abstract": "Objective\n\n This study aimed to investigate the correlation of CD4+/PD-1+ or CD4+/PD-1- tumor-infiltrating lymphocytes with pathological characteristics in breast cancer patients. \n\nMethods\n\n A cross-sectional study consecutively recruited 133 patients with invasive ductal breast cancer. The expression of CD4, programmed cell death protein 1 (PD-1), CK7, CK20, E-cadherin, or Ki-67 was detected by immunohistochemistry. The associations between CD4+/PD-1+ or CD4+/PD-1- tumor-infiltrating lymphocytes and pathological characteristics were evaluated. \n\nResults\n\n Elderly patients intended to have a lower level of CD4+/PD-1- tumor-infiltrating lymphocytes (p < 0.05). Patients with positive E-cadherin expression had higher median cell counts of CD4+/PD-1- tumor-infiltrating lymphocytes than patients with negative E-cadherin expression (30/HPF versus 10/HPF, p < 0.05). Counts of CD4+/PD-1+ tumor-infiltrating lymphocytes had a significant correlation with Ki-67 index that the correlation coefficient was 0.29 (p = 0.001). Positive CK20 expression was related to a higher level of CD4+/PD-1- tumor-infiltrating lymphocytes than negative CK20 expression (73/HPF versus 30/HPF, p < 0.05). \n\nConclusion\n\n CD4+/PD-1+ or CD4+/PD-1- tumor-infiltrating lymphocytes showed diverse association with pathological features of breast cancer. CD4+/PD-1+ tumor-infiltrating lymphocytes had a significant relationship with Ki-67 expression whereas CD4+/PD-1- tumor-infiltrating lymphocytes had a significant rel",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zhao YJ",
+        "Zhang J",
+        "Shi F",
+        "Hu ZP",
+        "Wu JP",
+        "Wu GJ",
+        "Wang RB",
+        "Zhou Q",
+        "Chang H",
+        "Li YN",
+        "Song QK"
+      ],
+      "journal": "J Immunol Res",
+      "date": "2018-07-04T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "T cell co-receptor",
+          "immune checkpoint",
+          "lymphocyte",
+          "infiltration"
+        ]
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "IL16"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CD4"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "IL16"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "chemokine",
+        "cytokine",
+        "pro-inflammatory",
+        "expression",
+        "prognosis"
+      ]
+    },
+    {
+      "genes": [
+        "CD4"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "T cell co-receptor",
+        "immune checkpoint",
+        "lymphocyte",
+        "infiltration"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "chemokine signaling pathway",
+        "immune response pathway",
+        "cytokine signaling",
+        "tumor microenvironment"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "T cell activation pathway",
+        "adaptive immune response",
+        "inflammatory pathway",
+        "immune regulation"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "M2 macrophage",
+        "tumor-associated macrophage",
+        "macrophage polarization",
+        "immune infiltration"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "endothelial cell",
+        "stromal cell",
+        "cancer-associated fibroblast",
+        "angiogenesis",
+        "vascularization"
+      ]
+    },
+    {
+      "genes": [
+        "IL16",
+        "CD4"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "spatial transcriptomics",
+        "cell-cell communication",
+        "ligand-receptor",
+        "macrophage",
+        "tumor microenvironment"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "spatial transcriptomics",
+        "tumor microenvironment",
+        "immune cell composition",
+        "spatial distribution",
+        "single cell"
+      ]
+    },
+    {
+      "genes": [
+        "IL16",
+        "CD4"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "endothelial interaction",
+        "stromal interaction",
+        "cell-cell interaction",
+        "immune evasion"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "IL16",
+      "CD4"
+    ],
+    "genes_matched_by": {
+      "IL16": "il",
+      "CD4": "t"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Endothelial",
+      "Macrophages 2",
+      "Stromal"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 100.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": []
+  },
+  "search_method": "search_literature_dynamic",
+  "think_success": true,
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 96,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": "final",
+      "papers": 30,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    }
+  ],
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with 'signaling' + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

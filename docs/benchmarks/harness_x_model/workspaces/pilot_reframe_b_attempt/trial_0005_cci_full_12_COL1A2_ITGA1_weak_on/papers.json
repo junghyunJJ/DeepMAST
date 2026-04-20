@@ -1,0 +1,791 @@
+{
+  "papers": [
+    {
+      "pmid": "36835413",
+      "title": "Crosstalk of Inflammatory Cytokines within the Breast Tumor Microenvironment",
+      "abstract": "Several immune and immunocompetent cells, including dendritic cells, macrophages, adipocytes, natural killer cells, T cells, and B cells, are significantly correlated with the complex discipline of oncology. Cytotoxic innate and adaptive immune cells can block tumor proliferation, and others can prevent the immune system from rejecting malignant cells and provide a favorable environment for tumor progression. These cells communicate with the microenvironment through cytokines, a chemical messenger, in an endocrine, paracrine, or autocrine manner. These cytokines play an important role in health and disease, particularly in host immune responses to infection and inflammation. They include chemokines, interleukins (ILs), adipokines, interferons, colony-stimulating factors (CSFs), and tumor necrosis factor (TNF), which are produced by a wide range of cells, including immune cells, such as macrophages, B-cells, T-cells, and mast cells, as well as endothelial cells, fibroblasts, a variety of stromal cells, and some cancer cells. Cytokines play a crucial role in cancer and cancer-related inflammation, with direct and indirect effects on tumor antagonistic or tumor promoting functions. They have been extensively researched as immunostimulatory mediators to promote the generation, migration and recruitment of immune cells that contribute to an effective antitumor immune response or pro-tumor microenvironment. Thus, in many cancers such as breast cancer, cytokines including leptin, IL",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "VEGF signaling",
+          "angiogenic signaling",
+          "tumor microenvironment",
+          "macrophage",
+          "immune infiltration"
+        ]
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "pathway"
+    },
+    {
+      "pmid": "39555055",
+      "title": "Unraveling the role of cancer-associated fibroblasts in B cell lymphoma",
+      "abstract": "Recent breakthroughs in research have sparked a paradigm shift in our understanding of cancer biology, uncovering the critical role of the crosstalk between tumor cells and the immune cells of the tumor microenvironment (TME) in malignant transformation. Fibroblasts have long been viewed as ancillary participants in cancer progression, often eclipsed by the prominence given to malignant cells. Novel investigations, however, have increasingly acknowledged the essential part played by the fibroblasts and their phenotypic doppelganger cancer-associated fibroblasts (CAFs) in fostering immunosuppression and promoting tumor progression. Here we review the cell-of-origin from which CAFs derive and their altered programs compared to their normal counterpart. We will also discuss the complex interplay between CAFs and the surrounding immune cells of the TME in the context of solid tumors and B cell lymphomas, with a focus on the \"reprogrammable\" role of CAFs in immunosuppression, immuno-activation and immuno-avoidance, and their implications on drug resistance. Finally, we will examine the existing and plausible therapeutic approaches targeting CAFs as a strategy to enhance treatment response.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A2",
+          "ITGA1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "VEGF signaling",
+          "endothelial",
+          "macrophage",
+          "stromal",
+          "spatial transcriptomics"
+        ]
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "41404713",
+      "title": "The spectrum of breast in situ papillary carcinomas with invasion and invasive breast carcinomas with papillary features: an overview of histological subtypes and diagnostic challenges",
+      "abstract": "Invasive breast carcinomas with papillary features (IBCP) constitute a distinct and morphologically diverse group of breast cancers characterised by varying degrees of papillary architecture and invasive behaviour. IBCP encompass (1) papillary carcinoma in situ associated with invasion, (2) invasive solid papillary carcinoma (ISPC), (3) encapsulated papillary carcinoma (EPC)-like invasive carcinoma, (4) Papillary DCIS-like invasive carcinoma, (5) high-grade carcinomas with EPC-like or SPC-like morphology, and (6) invasive papillary carcinoma not otherwise specified (IPC), including the tubulopapillary pattern. This review summarises the evolving classification, histopathological features, diagnostic criteria, differential diagnoses, clinical prognosis, and treatment implications of various subtypes of IBCP. Particular attention is given to the diagnostic challenges and clinical relevance of recognising these tumour types. Standardised diagnostic criteria and further research into the biological behaviour of these entities are essential to guide appropriate management and improve prognostication.\n\nInvasive breast carcinomas with papillary features (IBCP) comprise diverse subtypes with variable architecture, histopathology, and clinical behaviour. This review outlines evolving classification, diagnostic criteria, and treatment implications, highlighting challenges in distinguishing in situ from invasive lesions. Standardised diagnostic approaches are essential to improve consis",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "ductal carcinoma in situ",
+          "myoepithelial cells",
+          "perivascular-like cells",
+          "stromal cells"
+        ]
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "pathway"
+    },
+    {
+      "pmid": "33401382",
+      "title": "Diagnostic Value of VEGF-A, VEGFR-1 and VEGFR-2 in Feline Mammary Carcinoma",
+      "abstract": "Simple Summary\n\nFeline mammary carcinoma (FMC) is the third most common neoplasia in the cat, showing a highly malignant behavior, with both HER2-positive and triple negative (TN) subtypes presenting worse prognosis than luminal A and B subtypes. Furthermore, FMC has become a reliable cancer model for the study of human breast cancer, due to the similarities of clinicopathological, histopathological, and epidemiological features among the two species. Therefore, the identification of novel diagnostic biomarkers and therapeutic targets is needed to improve the clinical outcome of these patients. The aim of this study was to assess the potential of the VEGF-A/VEGFRs pathway, in order to validate future diagnostic and checkpoint-blocking therapies. Results showed that serum VEGF-A, VEGFR-1, and VEGFR-2 levels were significantly higher in cats with HER2-positive and TN normal-like tumors, presenting a positive association with its tumor-infiltrating lymphocytes expression, suggesting that these molecules may serve as promising non-invasive diagnostic biomarkers for these subtypes.\n\nAbstract\n\nVascular endothelial growth factor (VEGF-A) plays an essential role in tumor-associated angiogenesis, exerting its biological activity by binding and activating membrane receptors, as vascular endothelial growth factor receptor 1 and 2 (VEGFR-1, VEGFR-2). In this study, serum VEGF-A, VEGFR-1, and VEGFR-2 levels were quantified in 50 cats with mammary carcinoma and 14 healthy controls. The exp",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "VEGFA",
+          "KDR",
+          "FLT1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vegf"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "27165081",
+      "title": "Regulatory Proteins of Epithelial-Mesenchymal Transition and Some Components of VEGF Signaling Pathway in Breast Cancer.",
+      "abstract": "Immunohistochemical method was used to assay for Snail family regulatory proteins of epithelial-mesenchymal transition, their NF-kappaB coactivator, and the components of VEGF signaling pathway (VEGF and its receptors VEGFR1 and VEGFR2) in 157 specimens of breast tumors. Most tumors did not express SNAI1, while 65% tumors demonstrated mid- or high-level SNAI2 expression. There were significant correlations between the expression of SNAI1, SNAI2, and their NF-kappaB co-activator. Correlation was also detected between expression of Snail and VEGFR1 protein families in the tumors. In addition, the study revealed tumoral co-expression of SNAI2 and VEGFR2. The data attest to coordinated activation of regulatory proteins of epithelial-mesenchymal transition and the major components of VEGF signaling pathway in breast tumors. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "VEGFA",
+          "KDR",
+          "FLT1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vegf"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "22690749",
+      "title": "Expression of vascular endothelial growth factor and vascular endothelial growth factor receptors 1 and 2 in invasive breast carcinoma: prognostic significance and relationship with markers for aggressiveness.",
+      "abstract": "AIMS: Vascular endothelial growth factor (VEGF), VEGF receptor 1 (VEGFR-1) and VEGF receptor 2 (VEGFR-2) play a role in breast cancer growth and angiogenesis. We examined the expression and relationship with clinical outcome and other prognostic factors. METHODS AND RESULTS: Tumour sections from 468 breast cancer patients were immunostained for VEGF, VEGFR-1, and VEGFR-2, and their relationships with tumour vascularity, disseminated tumour cells (DTCs) in bone marrow and other clinicopathological parameters were evaluated. VEGF, VEGFR-1 and VEGFR-2 immunoreactivities were observed in invasive breast carcinoma cells. VEGF expression was significantly associated with VEGFR-1 and VEGFR-2 expression (P < 0.001). High-level cytoplasmic expression of VEGFR-1 was associated with significantly reduced distant disease-free survival (DDFS) (P = 0.017, log-rank) and breast cancer-specific survival (BCSS) (P = 0.005, log-rank) for all patients, and for node-negative patients without systemic treatment (DDFS, P = 0.03, log-rank; BCSS, P = 0.009, log-rank). VEGFR-1 expression was significantly associated with histopathological markers of aggressiveness (P < 0.05). Significantly reduced survival was observed in DTC-positive patients as compared with DTC-negative patients in the combined moderate/high VEGFR-1 group (P < 0.001 for DDFS and BCSS), and the same was true for DDFS in the moderate VEGFR-2 group (P = 0.006). CONCLUSIONS: High-level expression of VEGFR-1 indicates reduced survival. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "VEGFA",
+          "KDR",
+          "FLT1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vegf"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "22281842",
+      "title": "An open-label, phase 2 trial of RPI.4610 (Angiozyme) in the treatment of metastatic breast cancer.",
+      "abstract": "BACKGROUND: Serum and plasma levels of vascular endothelial growth factor (VEGF) correlate with prognosis in patients with metastatic breast cancer (MBC). VEGF binds to 2 receptors on endothelial cells, VEGFR-1 and VEGFR-2. RPI.4610 (Angiozyme0) is an antiangiogenic ribozyme targeting the VEGFR-1 mRNA. Preclinical and phase 1 studies suggested that RPI.4610 is a well-tolerated agent with clinical activity in solid tumors. The authors' trial evaluated the efficacy of RPI.4610 in the treatment of patients with progressive MBC. METHODS: This phase 2, multicenter, single-arm study was designed to assess the objective response rate of RPI.4610 in patients with MBC who had experienced disease progression with at least 1 course of chemotherapy for MBC. Patients received daily subcutaneous injections of RPI.4610 100 mg/m(2) for 12 weeks. RESULTS: Most patients (93%) had received at least 2 lines of chemotherapy previously; 69% of patients had received at least 3 lines of chemotherapy. Median follow-up was 2.76 months (range, 0.89-36.6 months). No partial responses nor complete responses were found. Median progression-free survival was 1.41 months (95% confidence interval [CI], 1.35-1.45). The median overall survival from start of treatment was 11.89 months (95% CI, 4.11-23.66). Treatment-related adverse events (AEs) were primarily grade 1 to 2 in intensity. Most common AEs were: injection site reactions, abdominal pain, anorexia, chromaturia, constipation, dyspnea, fatigue, headache,",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "VEGFA",
+          "KDR",
+          "FLT1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vegf"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "17550303",
+      "title": "Vascular Endothelial Growth Factor Mediates Intracrine Survival in Human Breast Carcinoma Cells through Internally Expressed VEGFR1/FLT1",
+      "abstract": "Background\n\nWhile vascular endothelial growth factor (VEGF) expression in breast tumors has been correlated with a poor outcome in the pathogenesis of breast cancer, the expression, localization, and function of VEGF receptors VEGFR1 (also known as FLT1) and VEGFR2 (also known as KDR or FLK1), as well as neuropilin 1 (NRP1), in breast cancer are controversial.\n\nMethods and Findings\n\nWe investigated the expression and function of VEGF and VEGF receptors in breast cancer cells. We observed that VEGFR1 expression was abundant, VEGFR2 expression was low, and NRP1 expression was variable. MDA-MB-231 and MCF-7 breast cancer cells, transfected with antisense VEGF cDNA or with siVEGF (VEGF-targeted small interfering RNA), showed a significant reduction in VEGF expression and increased apoptosis as compared to the control cells. Additionally, specifically targeted knockdown of VEGFR1 expression by siRNA (siVEGFR1) significantly decreased the survival of breast cancer cells through down-regulation of protein kinase B (AKT) phosphorylation, while targeted knockdown of VEGFR2 or NRP1 expression had no effect on the survival of these cancer cells. Since a VEGFR1-specific ligand, placenta growth factor (PGF), did not, as expected, inhibit the breast cancer cell apoptosis induced by siVEGF, and since VEGFR1 antibody also had no effects on the survival of these cells, we examined VEGFR1 localization. VEGFR1 was predominantly expressed internally in MDA-MB-231 and MCF-7 breast cancer cells. S",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "VEGFA",
+          "KDR",
+          "FLT1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vegf"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "15766573",
+      "title": "Antiangiogenic activity of 11,11'-dideoxyverticillin, a natural product isolated from the fungus Shiraia bambusicola.",
+      "abstract": "The fungus Shiraia bambusicola yields the phytochemical 11,11'-dideoxyverticillin, which has been shown to possess potent anticancer activity both in vitro and in vivo. In this study, we reveal that 11,11'-dideoxyverticillin has anti-angiogenic activities and explore the potential mechanisms for this effect. Treatment with 11,11'-dideoxyverticillin inhibited the proliferation of human umbilical vein endothelial cells (HUVECs) with IC(50) values of 0.17+/-0.05muM for VEGF-stimulated cells and 0.39+/-0.08muM for serum-stimulated cells. 11,11'-Dideoxyverticillin also antagonized the antiapoptotic effects of VEGF on serum-deprived HUVECs, inhibited VEGF-induced HUVEC migration in vitro, and blocked serum-induced HUVEC tube formation. Moreover, 11,11'-dideoxyverticillin completely blocked VEGF-induced microvessel sprouting from Matrigel-embedded rat aortic rings and vessel growth in Matrigel plugs in mice. In addition, 11,11'-dideoxyverticillin decreased VEGF secretion by MDA-MB-468 breast cancer cells, and significantly suppressed VEGF-induced tyrosine phosphorylation of Flt-1 and KDR/Flk-1. This inhibition of receptor phosphorylation was correlated with a marked decrease in VEGF-triggered pERK activation and a dramatic increase in pP38 MAPK, but no apparent change in pAkt. Together, these findings strongly suggest that 11,11'-dideoxyverticillin is a structurally novel angiogenesis inhibitor.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "VEGFA",
+          "KDR",
+          "FLT1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vegf"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "12783674",
+      "title": "[Expression of vascular endothelial cell growth factor and its receptor mRNA in breast cancer tissues].",
+      "abstract": "OBJECTIVE: To study the expression of vascular endothelial cell growth factor (VEGF) and its receptor FLT-1, FLK-1 mRNA in breast cancer tissues and their correlation with clinicopathological factors. METHODS: The expression of VEGF and and its receptor FLT-1, FLK-1 mRNA were analyzed by reverse transcription - polymerase chain reaction (RT-PCR) in the specimens from 47 patients with breast cancer and 11 patients with benign breast disease. RESULTS: VEGF121, 165 mRNA were all detected in malignant and benign breast tissues, with higher level, (0.420 +/- 0.133 and 0.291 +/- 0.094 respectively) in breast cancer tissues than in benign breast tissues, [0.196 +/- 0.067 (P = 0.000) and 0.206 +/- 0.058 (P = 0.001) respectively]. VEGF121 mRNA expression was stronger than VEGF165 mRNA expression (P = 0.000) in breast cancer tissues, whereas there is no significant difference in benign breast tissues (P = 0.666). FLT-1, FLK-1 mRNA were expressed in 18 of 47 (38.3%) and 12 of 47 (25.5%) breast cancer tissues respectively, but not in benign breast tissues. Moreover, no correlation was observed between the expression of VEGF121, VEGF165, FLT-1, FLK-1 mRNA in breast cancer tissues and patients' age, tumor size, lymph node metastasis, tumor stages, estrogen or progesterone receptor status. CONCLUSION: The expression of VEGF and its receptor FLT-1, FLK-1 mRNA were up-regulated in breast cancer tissues, suggesting its important role in angiogenesis of breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "VEGFA",
+          "KDR",
+          "FLT1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vegf"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "10604730",
+      "title": "Co-expression of vascular endothelial growth factor (VEGF) and its receptors (flk-1 and flt-1) in hormone-induced mammary cancer in the Noble rat",
+      "abstract": "Vascular endothelial growth factor (VEGF) is recognized to play a predominant role in breast cancer prognosis. The action of VEGF is mediated by two high-affinity receptors with ligand-stimulated tyrosine kinase activity: VEGFR-1/flt-1 and VEGFR-2/flk-1, which are expressed mainly in vascular endothelial cells. To the best of our knowledge, no previous studies on the expression of these receptors in breast cancer cells has been made. We have established a new animal model for breast cancer, using a combination of 17beta-oestradiol and testosterone as 'carcinogens'. Taking advantage of the animal model, we have demonstrated that mammary cancer cells expressed not only high levels of VEGF but also, surprisingly, its receptors (flt-1 and flk-1) in mammary cancer cells. Intense reactivities to VEGF, flt-1 and flk-1 were observed in mammary cancer cells, especially in invasive mammary carcinoma. Western blot analysis confirmed the increase in flk-1 and flt-1 proteins in induced mammary cancers. Based on these observations, we hypothesize that in mammary cancer, VEGF regulates, in addition to endothelial proliferation and angiogenesis, also growth of cancer cells by an autocrine mechanism mediated through its receptors. To further verify this hypothesis, we investigated the correlation between cellular proliferation and the expression of VEGF, flt-1 and flk-1. Using double-labelling immunocytochemistry, we have shown a correlation between high VEGF activity and Ki-67 expression. Th",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "VEGFA",
+          "KDR",
+          "FLT1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vegf"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "10360672",
+      "title": "Production of VEGF and expression of the VEGF receptors Flt-1 and KDR in primary cultures of epithelial and stromal cells derived from breast tumours",
+      "abstract": "Production of vascular endothelial growth factor (VEGF) and expression of its receptors Flt-1 and KDR was determined in primary cultures of separated epithelial and stromal-enriched cultures derived from ten primary human breast carcinomas. By enzyme-linked immunosorbent assay, epithelial cells produced a mean VEGF of 33 +- 7 pg ml-1 mug-1 RNA (range 11-70). Stromal cells produced similar levels, with a mean of 48 +- 11 pg ml-1 mug-1 RNA (range 7-92). This was significantly greater than the amount produced by similar cultures derived from normal breast tissue (epithelial mean 19 +- 5 pg ml-1 mug-1 RNA, range 9-34, P < 0.05 vs tumour epithelial culture; stromal mean 26 +- 8 pg ml-1 mug-1 RNA, range 3-56). Flt-1 and KDR receptors were analysed by semi-quantitative reverse transcription polymerase chain reaction. Flt-1 was expressed by four of six epithelial and five of six stromal cultures. When expressed by both cell types, Flt-1 appeared to be significantly more abundant on stromal cells compared with epithelial cultures. Only a single tumour, a lobular carcinoma, failed to express Flt-1 on either cell type. With KDR, the reverse was true with constitutive expression of this receptor by epithelial cultures and zero or reduced (3/6) expression by stromal cultures. Differences in the expression pattern of VEGF receptors may reflect a differential response to VEGF by specific cell types. Thus, production of VEGF and expression of VEGF receptors Flt-1 and KDR by breast cancer epi",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "VEGFA",
+          "KDR",
+          "FLT1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vegf"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "22547351",
+      "title": "Predicting the effects of anti-angiogenic agents targeting specific VEGF isoforms.",
+      "abstract": "Vascular endothelial growth factor (VEGF) is a key mediator of angiogenesis, whose effect on cancer growth and development is well characterized. Alternative splicing of VEGF leads to several different isoforms, which are differentially expressed in various tumor types and have distinct functions in tumor blood vessel formation. Many cancer therapies aim to inhibit angiogenesis by targeting VEGF and preventing intracellular signaling leading to tumor vascularization; however, the effects of targeting specific VEGF isoforms have received little attention in the clinical setting. In this work, we investigate the effects of selectively targeting a single VEGF isoform, as compared with inhibiting all isoforms. We utilize a molecular-detailed whole-body compartment model of VEGF transport and kinetics in the presence of breast tumor. The model includes two major VEGF isoforms, VEGF(121) and VEGF(165), receptors VEGFR1 and VEGFR2, and co-receptors Neuropilin-1 and Neuropilin-2. We utilize the model to predict the concentrations of free VEGF, the number of VEGF/VEGFR2 complexes (considered to be pro-angiogenic), and the receptor occupancy profiles following inhibition of VEGF using isoform-specific anti-VEGF agents. We predict that targeting VEGF(121) leads to a 54% and 84% reduction in free VEGF in tumors that secrete both VEGF isoforms or tumors that overexpress VEGF(121), respectively. Additionally, 21% of the VEGFR2 molecules in the blood are ligated following inhibition of VEGF",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "VEGFA",
+          "KDR",
+          "FLT1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vegf"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "41846871",
+      "title": "Patient-derived cell lines unveil COL1A2 as a predictor of docetaxel resistance in breast cancer.",
+      "abstract": "Introduction: Breast cancer is the most common malignant tumor among women worldwide and a major cause of cancer-related mortality. Chemoresistance presents a significant challenge in breast cancer therapy and is a primary driver of tumor recurrence and metastasis. However, effective predictive strategies for chemoresistance remain limited. This study aimed to investigate the mechanisms and predictive models underlying chemotherapy resistance in HR+/HER2- breast cancer. Methods: Patient-derived primary cancer cell lines (PCCLs) were successfully established from four patients with HR+/HER2- breast cancer (Luminal B, HER2 non-amplified) using primary cell culture techniques. The retention of the original tumors' pathological characteristics and drug response heterogeneity was confirmed. The sensitivities of PCCLs to taxanes, including docetaxel, were evaluated. RNA sequencing followed by protein-protein interaction (PPI) network analysis was performed to identify candidate genes associated with docetaxel resistance. The expression of COL1A2 was then correlated with pathological complete response (pCR) and recurrence-free survival (RFS) in patients who received neoadjuvant chemotherapy (AC-T regimen). Functional assays were conducted to assess the impact of COL1A2 expression on docetaxel sensitivity in HR+/HER2- breast cancer cells. Results: PCCLs derived from HR+/HER2- breast cancer exhibited heterogeneous sensitivity to taxanes, including docetaxel. RNA sequencing and PPI net",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40652757",
+      "title": "Comparative machine learning analysis for predicting organ tropism in breast cancer and identifying key gene signatures.",
+      "abstract": "BACKGROUND: Breast cancer metastasis (BCM) metastasizes preferentially to certain organs. Important genetic markers can be used for early detection and treatment. Machine learning (ML) can efficiently handle gene expression data to enhance metastasis prediction. METHODS: This study employed the GSE14020 dataset of gene expression profiles of 65 breast cancer patients with liver, lung, bone, or brain metastasis, covering 22,474 genes. Feature selection by Gini reduction reduced the top 25 important genes to nine important genes. Three machine learning models-Random Forest (RF), Support Vector Machine (SVM), and Artificial Neural Networks (ANN)-were employed to predict metastatic sites from gene expression profiles. Model performance was assessed by accuracy, precision, recall, and F1-score measures. Radviz visualization investigated gene-metastasis correlations and validated the biological relevance of the identified gene markers. RESULTS: ANN had the best accuracy (>90 %), followed by RF and SVM. Nine significant genes, i.e., CCL19, FABP7, and COL1A2, were identified as potential biomarkers. Radviz visualization confirmed gene-metastasis relationships, in agreement with biological literature. RF was effective for brain and liver metastasis but was poor for bone and lung classification. CONCLUSION: This study is an example of the potential of ML in precision oncology through enhanced biomarker discovery and prediction of metastasis. The incorporation of ML models with biologic",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40055751",
+      "title": "Integrating spatial and single-cell transcriptomes reveals the role of COL1A2(+) MMP1(+/-) cancer-associated fibroblasts in ER-positive breast cancer.",
+      "abstract": "Cancer-associated fibroblasts (CAFs) are highly heterogeneous cells and important components of the breast tumor microenvironment (TME). However, their role and clinical value in ER-positive breast cancer have not been fully clarified. Our study aims to comprehensively characterize the heterogeneity, potential biological functions, and molecular mechanisms of CAFs in ER-positive breast cancer within the tumor microenvironment using multi-omics data, to provide new strategies for the diagnosis and treatment of ER-positive breast cancer patients. In this study, we found that COL1A2(+) MMP1(+) and COL1A2(+) MMP1(-) CAFs were associated with unfavorable prognosis. The dynamic evolution and cell-cell communications of CAFs were analyzed, revealing that COL1A2(+) MMP1(+/-) CAFs show extensive crosstalk with tumor-associated macrophages (TAMs), contributing to an immunosuppressive TME. Moreover, the somatic mutation of TP53 may be a potential indicator for evaluating the infiltration of COL1A2(+) MMP1(+/-) CAFs. Finally, an MRI-based radiomic model was constructed to estimate the abundance of these CAFs. In conclusion, our findings provide a theoretical basis for targeting CAFs and offer a noninvasive approach to evaluate the infiltration level of COL1A2(+) MMP1(+/-) CAFs.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39930421",
+      "title": "Proteomic profiling reveals biological processes and biomarkers involved in the pathogenesis of occult breast cancer",
+      "abstract": "Background\n\nOccult breast cancer (OBC) is defined as axillary lymph node metastasis without any evidence of a primary tumor in the breast. Because of the limited number of clinical cases, the clinicopathological features and treatment recommendations of OBC are still controversial. In addition, its natural history is poorly understood and its proteomic signature remains unknown.\n\nMaterials and Methods\n\nWe compared the clinicopathological features and prognosis of OBC patients and Non-OBC patients from the Surveillance, Epidemiology, and End Results (SEER) database and analyzed the effects of local treatment on the survival outcomes of OBC patients. Additionally, we performed a quantitative proteomic analysis for tissue samples of metastatic lymph nodes from OBC patients (OBC-LN), and paired tissue samples of metastatic lymph nodes (Non-OBC-LN) and primary tumors (Non-OBC-PT) from Non-OBC patients. We identified differentially expressed proteins in different comparable groups using Student's t test. Functional enrichment and protein-protein interaction network analyses were used to interpret the functions and interactions of the differentially expressed proteins in the comparison of OBC-LN vs Non-OBC-LN. Immunohistochemistry was used for the validation of the hub proteins.\n\nResults\n\nAnalysis of data from the SEER database demonstrated that OBC patients had a better prognosis than Non-OBC patients did and that either mastectomy or radiation therapy improved the outcomes of OBC ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35741056",
+      "title": "Delineation of Pathogenomic Insights of Breast Cancer in Young Women",
+      "abstract": "The prognosis of breast cancer (BC) in young women (BCYW) aged <=40 years tends to be poorer than that in older patients due to aggressive phenotypes, late diagnosis, distinct biologic, and poorly understood genomic features of BCYW. Considering the estimated predisposition of only approximately 15% of the BC population to BC-promoting genes, the underlying reasons for an increased occurrence of BCYW, at large, cannot be completely explained based on general risk factors for BC. This underscores the need for the development of next-generation of tissue- and body fluid-based prognostic and predictive biomarkers for BCYW. Here, we identified the genes associated with BCYW with a particular focus on the age, intrinsic BC subtypes, matched normal or normal breast tissues, and BC laterality. In young women with BC, we observed dysregulation of age-associated cancer-relevant gene sets in both cancer and normal breast tissues, sub-sets of which substantially affected the overall survival (OS) or relapse-free survival (RFS) of patients with BC and exhibited statically significant correlations with several gene modules associated with cellular processes such as the stroma, immune responses, mitotic progression, early response, and steroid responses. For example, high expression of COL1A2, COL5A2, COL5A1, NPY1R, and KIAA1644 mRNAs in the BC and normal breast tissues from young women correlated with a substantial reduction in the OS and RFS of BC patients with increased levels of these ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35274048",
+      "title": "Radiation increases COL1A1, COL3A1, and COL1A2 expression in breast cancer",
+      "abstract": "Abstract\n\nBackground\n\nRadiotherapy-associated secondary cancer is an important issue for the treatment of breast cancer (BCa). This study aimed to investigate the molecular mechanism and genetic risk factors for radiation-associated secondary diseases in BCa.\n\nMethods\n\nThe differentially expressed genes (DEGs) between preradiation and postradiation BCa samples in the GSE65505 dataset were obtained. The pathways related to the radiation-associated DEGs in the protein-protein interaction (PPI) network modules were identified. miRNAs targeted to the key genes in the PPI network were identified, and their association with BCa prognosis was analyzed.\n\nResults\n\nA total of 136 radiation-associated DEGs preradiation and postradiation BCa samples were screened out. The PPI network consisted of a significant module that consisted of 21 upregulated DEGs that were associated with \"hsa04512: ECM-receptor interaction,\" \"hsa04151: PI3K-Akt signaling pathway,\" and \"hsa04115: p53 signaling pathway.\" Sixteen DEGs, including three collagen genes collagen type I alpha 1 chain (COL1A1), COL3A1, and COL1A2, were enriched in 17 radiation-associated pathways. The three genes were upregulated in BCa tissues compared with controls and were also elevated by radiation. They were targeted by hsa-miR-29a/c, and the expression levels of hsa-miR-29a/c were associated with a poor prognosis of BCa.\n\nConclusions\n\nThe upregulation of COL1A1, COL3A1, and COL1A2 might be genetic risk factors for radiation-associa",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35045088",
+      "title": "Comparative analysis of protein-protein interaction networks in metastatic breast cancer",
+      "abstract": "Metastatic lesions leading causes of the majority of deaths in patients with the breast cancer. The present study aimed to provide a comprehensive analysis of the differentially expressed genes (DEGs) in the brain (MDA-MB-231 BrM2) and lung (MDA-MB-231 LM2) metastatic cell lines obtained from breast cancer patients compared with those who have primary breast cancer. We identified 981 and 662 DEGs for brain and lung metastasis, respectively. Protein-protein interaction (PPI) analysis revealed seven shared (PLCB1, FPR1, FPR2, CX3CL1, GABBR2, GPR37, and CXCR4) hub genes between brain and lung metastasis in breast cancer. Moreover, GNG2 and CXCL8, C3, and PTPN6 in the brain and SAA1 and CCR5 in lung metastasis were found as unique hub genes. Besides, five co-regulation of clusters via seven important co-expression genes (COL1A2, LUM, SPARC, THBS2, IL1B, CXCL8, THY1) were identified in the brain PPI network. Clusters screening followed by biological process (BP) function and pathway enrichment analysis for both metastatic cell lines showed that complement receptor signalling, acetylcholine receptor signalling, and gastric acid secretion pathways were common between these metastases, whereas other pathways were site-specific. According to our findings, there are a set of genes and functional pathways that mark and mediate breast cancer metastasis to the brain and lungs, which may enable us understand the molecular basis of breast cancer development in a deeper levele to the brain a",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "20525369",
+      "title": "Prediction of epigenetically regulated genes in breast cancer cell lines",
+      "abstract": "Background\n\nMethylation of CpG islands within the DNA promoter regions is one mechanism that leads to aberrant gene expression in cancer. In particular, the abnormal methylation of CpG islands may silence associated genes. Therefore, using high-throughput microarrays to measure CpG island methylation will lead to better understanding of tumor pathobiology and progression, while revealing potentially new biomarkers. We have examined a recently developed high-throughput technology for measuring genome-wide methylation patterns called mTACL. Here, we propose a computational pipeline for integrating gene expression and CpG island methylation profles to identify epigenetically regulated genes for a panel of 45 breast cancer cell lines, which is widely used in the Integrative Cancer Biology Program (ICBP). The pipeline (i) reduces the dimensionality of the methylation data, (ii) associates the reduced methylation data with gene expression data, and (iii) ranks methylation-expression associations according to their epigenetic regulation. Dimensionality reduction is performed in two steps: (i) methylation sites are grouped across the genome to identify regions of interest, and (ii) methylation profles are clustered within each region. Associations between the clustered methylation and the gene expression data sets generate candidate matches within a fxed neighborhood around each gene. Finally, the methylation-expression associations are ranked through a logistic regression, and their",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "9407961",
+      "title": "Aggressive breast cancer leads to discrepant serum levels of the type I procollagen propeptides PINP and PICP.",
+      "abstract": "The propeptides PICP and PINP are derived from the synthesis of type I collagen, a major matrix protein of bone and soft tissues. The aim of this cross-sectional study was to investigate their value as indicators of the aggressivity of breast cancer. Serum PINP, PICP, and total alkaline phosphatase were determined from 89 breast cancer patients. Forty had major bone and/or soft tissue metastases with an aggressive disease course: the progressive disease (PD) group. Forty-nine had either none or minor bone and/or soft tissue metastases with a stable clinical course: the stable disease group (SD). The mean value of PINP in the PD group was 7.2 times higher than that in the SD group (276 +/- 79 microg/l versus 38 +/- 3 microg/l, respectively; P = 0.005), whereas PICP mean value was only 1.7 times higher in the PD group (174 +/- 20 microg/l versus 100 +/- 5 microg/l; P = 0.001). The ratio of PICP to PINP was 1.02 +/- 0.07 in the PD group and 3.07 +/- 0.18 in the SD group (P < 0.001). The correlation between PICP and PINP was linear in the SD group and nonlinear in the PD group. The results indicate that high serum PICP and PINP concentrations and a low PICP:PINP ratio are associated with a highly aggressive nature of breast cancer. Determination of PINP, in particular, may be valuable when evaluating the clinical status of a breast cancer patient.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "10797313",
+      "title": "Interaction of smad3 with a proximal smad-binding element of the human alpha2(I) procollagen gene promoter required for transcriptional activation by TGF-beta.",
+      "abstract": "Transcription of the alpha2(I) collagen gene (COL1A2) in fibroblasts is potently induced by transforming growth factor-beta (TGF-beta). Smad family proteins function as intracellular signal transducers for TGF-beta that convey information from the cell membrane to the nucleus. In the present study, we establish the functional requirement for endogenous Smad3 and Smad4 in TGF-beta-stimulated COL1A2 transcription in human skin fibroblasts in vitro. Furthermore, using transfections with a series of 5' deletions of the human COL1A2 promoter, we identify a proximal region between -353 and -148 bp, which is required for full stimulation of transcription by a constitutively active TGF-beta type I receptor. This region of the COL1A2 promoter contains a CAGA motif also found in the promoter of the plasminogen activator inhibitor-1. Substitutions disrupting this sequence decreased the binding of nuclear extracts or recombinant Smad3 to the CAGACA oligonucleotide, and markedly reduced the transcriptional response to TGF-beta or overexpressed Smad3 in transient transfection assays. The insertion of tandem repeats of CAGACA conferred TGF-beta stimulation to a heterologous minimal promoter-reporter construct. Inhibition of endogenous Smad expression in fibroblasts by antisense oligonucleotides or cDNA against Smad3 or Smad4, and transfection of COL1A2 promoter constructs into Smad4-deficient breast adenocarcinoma cells, indicated the critical role of Smads for the full TGF-beta response. T",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40995140",
+      "title": "ARHGEF6 downregulation as a key mediator of tumor cell apoptosis in breast cancer.",
+      "abstract": "The present study aimed to identify novel clinical biomarkers for breast cancer (BRCA) through bioinformatics analyses and cellular experiments, due to the ongoing need for improved diagnosis and prognosis in BRCA. The GSE21422 and The Cancer Genome Atlas-BRCA (TCGA-BRCA) datasets were utilized to identify differentially expressed genes (DEGs) in BRCA. Common DEGs were subjected to comprehensive analyses, including risk score modeling, expression profiling, receiver operating characteristic curve evaluation, survival analysis and the development of a prognostic nomogram, to pinpoint clinically significant genes. Cellular assays were subsequently performed to investigate the functional roles of these key genes in BRCA. Through bioinformatics analyses, 5 genes with diagnostic value were identified: Aldehyde dehydrogenase 1 family member A1 (ALDH1A1), Rac/Cdc42 guanine nucleotide exchange factor 6 (ARHGEF6), enhancer of zeste 2 polycomb repressive complex 2 subunit, integrin alpha1 (ITGA1) and PIK3R1, as well as 3 genes with prognostic value: ALDH1A1, ARHGEF6 and ITGA1. Among them, ARHGEF6 was recognized as the key gene in BRCA. Overexpression of ARHGEF6 was shown to suppress cell proliferation, invasion and migration, while promoting apoptosis in BRCA. In conclusion, by bioinformatics analysis, new diagnostic and prognostic biomarkers for patients with BRCA have been identified and the key gene, ARHGEF6, is a suppressor gene in BRCA progression. These findings provide new direc",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33500458",
+      "title": "Abnormal promoter DNA hypermethylation of the integrin, nidogen, and dystroglycan genes in breast cancer",
+      "abstract": "Cell transmembrane receptors and extracellular matrix components play a pivotal role in regulating cell activity and providing for the concerted integration of cells in the tissue structures. We have assessed DNA methylation in the promoter regions of eight integrin genes, two nidogen genes, and the dystroglycan gene in normal breast tissues and breast carcinomas (BC). The protein products of these genes interact with the basement membrane proteins LAMA1, LAMA2, and LAMB1; abnormal hypermethylation of the LAMA1, LAMA2, and LAMB1 promoters in BC has been described in our previous publications. In the present study, the frequencies of abnormal promoter hypermethylation in BC were 13% for ITGA1, 31% for ITGA4, 4% for ITGA7, 39% for ITGA9, 38% for NID1, and 41% for NID2. ITGA2, ITGA3, ITGA6, ITGB1, and DAG1 promoters were nonmethylated in normal and BC samples. ITGA4, ITGA9, and NID1 promoter hypermethylation was associated with the HER2 positive tumors, and promoter hypermethylation of ITGA1, ITGA9, NID1 and NID2 was associated with a genome-wide CpG island hypermethylated BC subtype. Given that ITGA4 is not expressed in normal breast, one might suggest that its abnormal promoter hypermethylation in cancer is non-functional and is thus merely a passenger epimutation. Yet, this assumption is not supported by our finding that it is not associated with a hypermethylated BC subtype. ITGA4 acquires expression in a subset of breast carcinomas, and methylation of its promoter may be pr",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28213554",
+      "title": "Hypoxia Selectively Enhances Integrin alpha5beta1 Receptor Expression in Breast Cancer to Promote Metastasis.",
+      "abstract": "Metastasis is the leading cause of breast cancer mortality. Previous studies have implicated hypoxia-induced changes in the composition and stiffness of the extracellular matrix (ECM) in the metastatic process. Therefore, the contribution of potential ECM-binding receptors in this process was explored. Using a bioinformatics approach, the expression of all integrin receptor subunits, in two independent breast cancer patient datasets, were analyzed to determine whether integrin status correlates with a validated hypoxia-inducible gene signature. Subsequently, a large panel of breast cancer cell lines was used to validate that hypoxia induces the expression of integrins that bind to collagen (ITGA1, ITGA11, ITGB1) and fibronectin (ITGA5, ITGB1). Hypoxia-inducible factors (HIF-1 and HIF-2) are directly required for ITGA5 induction under hypoxic conditions, which leads to enhanced migration and invasion of single cells within a multicellular 3D tumor spheroid but did not affect migration in a 2D microenvironment. ITGB1 expression requires HIF-1alpha, but not HIF-2alpha, for hypoxic induction in breast cancer cells. ITGA5 (alpha5 subunit) is required for metastasis to lymph nodes and lungs in breast cancer models, and high ITGA5 expression in clinical biopsies is associated with an increased risk of mortality.Implications: These results reveal that targeting ITGA5 using inhibitors that are currently under consideration in clinical trials may be beneficial for patients with hypoxic",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "19780039",
+      "title": "Expression of estrogen receptor beta increases integrin alpha1 and integrin beta1 levels and enhances adhesion of breast cancer cells.",
+      "abstract": "Estrogen effects on mammary gland development and differentiation are mediated by two receptors (ERalpha and ERbeta). Estrogen-bound ERalpha induces proliferation of mammary epithelial and cancer cells, while ERbeta is important for maintenance of the differentiated epithelium and inhibits proliferation in different cell systems. In addition, the normal breast contains higher ERbeta levels compared to the early stage breast cancers, suggesting that loss of ERbeta could be important in cancer development. Analysis of ERbeta-/- mice has consistently revealed reduced expression of cell adhesion proteins. As such, ERbeta is a candidate modulator of epithelial homeostasis and metastasis. Consequently, the aim of this study was to analyze estrogenic effects on adhesion of breast cancer cells expressing ERalpha and ERbeta. As ERbeta is widely found in breast cancer but not in cell lines, we used ERalpha positive T47-D and MCF-7 human breast cancer cells to generate cells with inducible ERbeta expression. Furthermore, the colon cancer cell lines SW480 and HT-29 were also used. Integrin alpha1 mRNA and protein levels increased following ERbeta expression. Integrin beta1-the unique partner for integrin alpha1-increased only at the protein level. ERbeta expression enhanced the formation of vinculin containing focal complexes and actin filaments, indicating a more adhesive potential. This was confirmed by adhesion assays where ERbeta increased adhesion to different extracellular matrix p",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39939698",
+      "title": "A machine learning-based investigation of integrin expression patterns in cancer and metastasis",
+      "abstract": "Integrins, a family of transmembrane receptor proteins, are well known to play important roles in cancer development and metastasis. However, a comprehensive understanding of these roles has not been achieved due to the complex relationships between specific integrins, cancer types, and the stages of cancer progression. Publicly accessible repositories from the Genotype-Tissue Expression (GTEx) and The Cancer Genome Atlas (TCGA) projects provide rich datasets for exploring these relationships using machine learning (ML). In this study, integrin RNA-Seq expression data of ~ 8 healthy tissues in GTEx and corresponding tumors in TCGA were selected. Integrin expression was used to train ML models to distinguish between different healthy tissues, solid tumors, as well as normal and tumor samples from the same tissue type. These ML models can classify samples by tissue origin or disease status with high accuracy, and the integrins essential to these classifiers were identified. In some cases, the expression of only one or two integrins was needed to classify tissue type, tumor type or disease status with accuracy > 0.9. For example, expression of ITGA7 alone can distinguish healthy and cancerous breast tissue. Additionally, integrin co-expression networks in healthy and cancerous breast tissues were compared and were found to change significantly from healthy to cancer, indicating changes in functional involvement of integrins due to cancer. Integrin expression in metastatic tumors",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39502752",
+      "title": "ITGA1 Promotes Glioma Cell Proliferation and Affects Immune Cell Infiltration in Low-Grade Glioma",
+      "abstract": " Background: Low-grade glioma (LGG) is a commonly occurring type of central nervous system cancer. Integrin alpha1 (ITGA1), a family member of integrins, is implied in the malignant development of cancers, but the fundamental role of ITGA1 has not been illustrated yet in glioma. This study aimed to evaluate the prognostic value of ITGA1.\n\n Methods: Correlations between ITGA1 and relevant clinical features were analyzed in the LGG datasets based on Chinese Glioma Genome Atlas (CGGA) and Tumor Genome Atlas (TCGA). Glioma clinical samples and glioma cell lines were identified at the level of mRNA and protein level by Western blot. Cox regression were developed to assess the involvement of ITGA1 expression in predicting survival in LGG patients. Application of GSEA enrichment analysis to reveal ITGA1-mediated biological functions in LGG. Using TIMER 2.0 to analyze correlations between immune cell infiltration. In addition, ITGA1 high expression was analyzed for correlation with immune checkpoint-related genes and cumulative survival time.\n\n Results: ITGA1 was significantly more expressed in LGG than in normal samples. Cox regression indicated that ITGA1 was a risk factor independently for prognosis in LGG patients. GSEA enrichment analysis indicated that ITGA1 was engaged in several immunomodulatory processes. ITGA1 expression was shown to be highly correlated with the immune score, stromal score, and estimate score in LGG. ITGA1 was significantly related to the immune checkpoint",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33354413",
+      "title": "Identification of key genes and pathways in endometriosis by integrated expression profiles analysis",
+      "abstract": "The purpose of this study was to integrate the existing expression profile data on endometriosis (EM)-related tissues in order to identify the differentially expressed genes. In this study, three series of raw expression data were downloaded from GEO database. Differentially expressed genes (DEGs) in three tissue types were screened. GO, KEGG pathway enrichment analysis, core differential genes (CDGs) protein-protein interaction (PPI) network and weighted gene co-expression network analysis (WGCNA) were performed, finally, the dysregulation of Hippo pathway in ectopic endometrium (EC) was detected by Western blotting. A total of 1,811 DEGs between eutopic (EU) and normal endometrium (NE), 5,947 DEGs between EC and EU, and 3,192 DEGs between EC and NE datasets were identified. After screening, 394 CDGs were obtained, and 5 hub genes identified in the PPI network. CDGs enrichment and WGCNA network analysis revealed cell proliferation, differentiation, migration and other biological processes, Hippo and Wnt signaling pathways, and a variety of tumor-related pathways. Western blotting results showed that YAP/TAZ was upregulated, and MOB1, pMOB1, SAV1, LATS1 and LATS2 were downregulated in EC. Moreover, CDGs, especially the hub genes, are potential biomarkers and therapeutic targets. Finally, the Hippo pathway might play a key role in the development of endometriosis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "VEGFA",
+        "KDR",
+        "FLT1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "vegf"
+      ]
+    },
+    {
+      "genes": [
+        "COL1A2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ITGA1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "COL1A2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "collagen",
+        "extracellular matrix",
+        "stromal remodeling",
+        "receptor",
+        "ligand"
+      ]
+    },
+    {
+      "genes": [
+        "ITGA1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "integrin",
+        "cell adhesion",
+        "receptor",
+        "extracellular matrix interaction"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "VEGF pathway",
+        "vascular endothelial growth factor",
+        "angiogenesis",
+        "endothelial cells",
+        "tumor vasculature"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "VEGF signaling",
+        "angiogenic signaling",
+        "tumor microenvironment",
+        "macrophage",
+        "immune infiltration"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "DCIS",
+        "ductal carcinoma in situ",
+        "myoepithelial cells",
+        "perivascular-like cells",
+        "stromal cells"
+      ]
+    },
+    {
+      "genes": [
+        "COL1A2",
+        "ITGA1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "VEGF signaling",
+        "endothelial",
+        "macrophage",
+        "stromal",
+        "spatial transcriptomics"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "stromal cells",
+        "fibroblast",
+        "immune infiltration",
+        "tumor microenvironment",
+        "cell composition"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "COL1A2",
+      "ITGA1"
+    ],
+    "genes_matched_by": {
+      "COL1A2": "biomcp_tag_only",
+      "ITGA1": "biomcp_tag_only"
+    },
+    "pathways_covered": [
+      "VEGF"
+    ],
+    "pathways_matched_by": {
+      "VEGF": "biomcp_tag_only"
+    },
+    "celltypes_covered": [
+      "Endothelial",
+      "Macrophages 2",
+      "Stromal",
+      "DCIS 1",
+      "DCIS 2"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 100.0,
+    "celltypes_coverage_pct": 62.5,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Myoepi ACTA2+",
+      "Perivascular-Like",
+      "Stromal & T Cell Hybrid"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "think_success": true,
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 84,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 1.0
+    },
+    {
+      "iteration": "final",
+      "papers": 30,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 1.0
+    }
+  ],
+  "coverage_sufficient": true,
+  "recommended_actions": [],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

@@ -61,6 +61,15 @@ _ONCOLOGY_KEYWORDS = (
     "oncology",
 )
 
+_STAGE1_NON_PAIR_ARTIFACTS = frozenset({
+    "stage1_evidence.json",
+    "stage1_confidence.json",
+    "stage1_filter.json",
+    "stage1_audit.json",
+    "stage1_filter_results.json",
+})
+_STAGE1_PAIR_ARTIFACT_RE = re.compile(r"^stage1_[A-Za-z0-9-]+--[A-Za-z0-9-]+\.json$")
+
 
 def _to_float(value: Any, default: float = 0.0) -> float:
     """Best-effort numeric conversion with [0,1] clamp for scoring fields."""
@@ -101,6 +110,14 @@ def normalize_st_colocalization_score(value: Any) -> float:
     return _to_float(value, default=0.0)
 
 
+def _is_stage1_pair_artifact(path: Path) -> bool:
+    """Return True only for per-pair Stage 1 detail artifacts."""
+    name = path.name
+    if name in _STAGE1_NON_PAIR_ARTIFACTS:
+        return False
+    return bool(_STAGE1_PAIR_ARTIFACT_RE.match(name))
+
+
 def compute_stage1_filter(stage1_evidence: dict[str, Any]) -> dict[str, Any]:
     """Pass/fail filter for Stage 1 L-R pairs.
 
@@ -114,7 +131,8 @@ def compute_stage1_filter(stage1_evidence: dict[str, Any]) -> dict[str, Any]:
     found in the STRING TSV but never changes the pass/fail decision.
     """
     string_data = stage1_evidence.get("string_ppi", {})
-    raw_string = float(string_data.get("max_combined_score", 0))
+    _raw_score = string_data.get("max_combined_score", 0)
+    raw_string = float(_raw_score) if _raw_score is not None else 0.0
     string_combined = min(raw_string, 1.0) if raw_string <= 1.0 else min(raw_string / 1000.0, 1.0)
     string_record_found = bool(
         string_data.get("string_record_found",
@@ -123,9 +141,15 @@ def compute_stage1_filter(stage1_evidence: dict[str, Any]) -> dict[str, Any]:
 
     census = stage1_evidence.get("census_validation", {})
     tvr = census.get("target_vs_rest", {})
-    coexpr_p = float(tvr.get("coexpression", {}).get("p_value", 1.0))
-    gene_a_p = float(tvr.get("gene_a", {}).get("p_value", 1.0))
-    gene_b_p = float(tvr.get("gene_b", {}).get("p_value", 1.0))
+
+    def _pvalue_or_fail(container: dict, key: str = "p_value") -> float:
+        """Null-safe p-value parse. Explicit None → 1.0 (non-passing)."""
+        v = container.get(key)
+        return 1.0 if v is None else float(v)
+
+    coexpr_p = _pvalue_or_fail(tvr.get("coexpression", {}))
+    gene_a_p = _pvalue_or_fail(tvr.get("gene_a", {}))
+    gene_b_p = _pvalue_or_fail(tvr.get("gene_b", {}))
 
     string_status = "in_db" if string_record_found else "no_record"
     passed = (
@@ -534,7 +558,7 @@ def apply_stage1_filter(data_dir: str) -> str:
         tvr = census.get("target_vs_rest", {})
         for prefix, key in [("gene_a", "gene_a"), ("gene_b", "gene_b"), ("coexpr", "coexpression")]:
             sub = tvr.get(key, {})
-            filt[f"{prefix}_target_pct"] = round(float(sub.get("target_pct", 0)), 4)
+            filt[f"{prefix}_target_pct"] = round(float(sub.get("target_pct") or 0), 4)
             filt[f"{prefix}_risk_ratio"] = round(float(sub.get("risk_ratio") or 0), 4)
         results.append(filt)
         if filt["passed"]:
@@ -1889,11 +1913,20 @@ def build_evidence_summary(data_dir: str) -> str:
     # 3. Load stage1_*.json → per-pair biological context
     stage1_data: dict[str, dict] = {}
     for s1_path in sorted(evidence_dir.glob("stage1_*.json")):
-        if s1_path.name in ("stage1_evidence.json", "stage1_confidence.json", "stage1_filter.json", "stage1_audit.json"):
+        if s1_path.name in _STAGE1_NON_PAIR_ARTIFACTS:
+            continue
+        if not _is_stage1_pair_artifact(s1_path):
+            logger.warning("Skipping non-pair Stage 1 artifact in reference card: %s", s1_path.name)
             continue
         try:
             s1 = json.loads(s1_path.read_text())
         except Exception:
+            continue
+        if not isinstance(s1, dict):
+            logger.warning(
+                "Skipping non-dict Stage 1 artifact payload in reference card: %s",
+                s1_path.name,
+            )
             continue
         ligand = s1.get("ligand", "")
         receptor = s1.get("receptor", "")

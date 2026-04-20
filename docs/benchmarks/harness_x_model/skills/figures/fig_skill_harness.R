@@ -1,0 +1,332 @@
+# Publication figure: SkillLoadHarness Benchmark
+# Panel A: Protocol comparison diagram (Passive vs SkillLoadHarness)
+# Panel B: Metric comparison (Precision, Recall, F1) with Bootstrap CI
+# Panel C: Per-category accuracy heatmap
+
+rm(list = ls())
+
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(patchwork)
+  library(jsonlite)
+  library(grid)
+  library(pheatmap)
+  library(gtable)
+})
+
+# ---- Paths ----
+project_root <- here::here()
+data_dir     <- file.path(project_root, "docs/benchmarks/skills/results")
+out_dir      <- file.path(project_root, "docs/benchmarks/skills/figures")
+
+# ---- Load data ----
+agg    <- fromJSON(file.path(data_dir, "compare_expanded_qwen3_5_122b.json"))
+stats  <- fromJSON(file.path(data_dir, "compare_expanded_qwen3_5_122b_stats.json"))
+trials <- stream_in(file(file.path(data_dir, "compare_expanded_qwen3_5_122b_trials.jsonl")),
+                    verbose = FALSE)
+
+# ---- Colors & labels ----
+cond_colors <- c(
+  "Passive Listing" = "#999999",
+  "SkillLoadHarness" = "#CC79A7"
+)
+
+category_labels <- c(
+  stage2_direct      = "Stage 2\n(Target validation)",
+  stage3_direct      = "Stage 3\n(Drug profiling)",
+  composite          = "Composite\n(Stage 2 + 3)",
+  stage1_tools_only  = "Stage 1\n(Tool-only)",
+  internal_pipeline  = "Internal\npipeline",
+  general_biology    = "General\nbiology",
+  data_visualization = "Data\nvisualization"
+)
+
+category_order <- names(category_labels)
+
+
+# ====================================================================
+# Panel B: Metric Comparison (Grouped Bar + significance)
+# ====================================================================
+metric_names <- c("F1", "Precision", "Recall", "Specificity", "Activation\nRate")
+
+metrics_df <- tibble(
+  metric = rep(metric_names, 2),
+  Condition = rep(c("Passive Skill Listing", "SkillLoadHarness"), each = length(metric_names)),
+  value = c(
+    agg$A_passive$f1 * 100,
+    agg$A_passive$precision * 100,
+    agg$A_passive$recall * 100,
+    agg$A_passive$specificity * 100,
+    agg$A_passive$activation_rate * 100,
+    agg$B_NO_hints$f1 * 100,
+    agg$B_NO_hints$precision * 100,
+    agg$B_NO_hints$recall * 100,
+    agg$B_NO_hints$specificity * 100,
+    agg$B_NO_hints$activation_rate * 100
+  )
+) %>%
+  mutate(
+    metric = factor(metric, levels = metric_names),
+    Condition = factor(Condition, levels = c("SkillLoadHarness", "Passive Skill Listing"))
+  )
+metrics_df$metric <- factor(metrics_df$metric, levels = c("Activation\nRate", "F1", "Precision", "Recall", "Specificity"))
+
+# Significance bracket position (over F1, which is at x=1)
+f1_bracket_x_1 <- 1
+f1_bracket_x_2 <- 2
+f1_bracket_x_4 <- 4
+
+panel_b <- ggplot(metrics_df, aes(metric, value, fill = Condition)) +
+  geom_col(position = position_dodge(), alpha = 0.8, color = "black", width = 0.8) +
+  scale_fill_manual(values = c("firebrick3", "grey60")) +
+  scale_y_continuous(limits = c(0, 110), breaks = seq(0, 100, 20)) +
+  theme_bw() +
+
+  # Significance bracket over 'Activation Rate'
+  annotate("segment",
+    x = f1_bracket_x_1 - 0.18, xend = f1_bracket_x_1 + 0.18,
+    y = 105, yend = 105
+  ) +
+  annotate("segment",
+    x = f1_bracket_x_1 - 0.18, xend = f1_bracket_x_1 - 0.18,
+    y = 105, yend = 103
+  ) +
+  annotate("segment",
+    x = f1_bracket_x_1 + 0.18, xend = f1_bracket_x_1 + 0.18,
+    y = 105, yend = 103
+  ) +
+  annotate("text",
+    x = f1_bracket_x_1, y = 110,
+    label = paste0(
+      "***"
+    ),
+  ) +
+
+  # Significance bracket over 'F1'
+  annotate("segment",
+    x = f1_bracket_x_2 - 0.18, xend = f1_bracket_x_2 + 0.18,
+    y = 105, yend = 105
+  ) +
+  annotate("segment",
+    x = f1_bracket_x_2 - 0.18, xend = f1_bracket_x_2 - 0.18,
+    y = 105, yend = 103
+  ) +
+  annotate("segment",
+    x = f1_bracket_x_2 + 0.18, xend = f1_bracket_x_2 + 0.18,
+    y = 105, yend = 103
+  ) +
+  annotate("text",
+    x = f1_bracket_x_2, y = 110,
+    label = paste0(
+      "***"
+    ),
+  ) +
+
+  # Significance bracket over 'Recal'
+  annotate("segment",
+    x = f1_bracket_x_4 - 0.18, xend = f1_bracket_x_4 + 0.18,
+    y = 105, yend = 105
+  ) +
+  annotate("segment",
+    x = f1_bracket_x_4 - 0.18, xend = f1_bracket_x_4 - 0.18,
+    y = 105, yend = 103
+  ) +
+  annotate("segment",
+    x = f1_bracket_x_4 + 0.18, xend = f1_bracket_x_4 + 0.18,
+    y = 105, yend = 103
+  ) +
+  annotate("text",
+    x = f1_bracket_x_4, y = 110,
+    label = paste0(
+      "***"
+    ),
+  ) +
+
+  labs(x = NULL, y = "Score (%)") +
+  theme(
+    legend.position = "none",
+    axis.text = element_text(color = "black"),
+    axis.text.x = element_text(angle = 50, hjust = 1),
+    plot.margin = margin(5, 30, 5, 5)
+  )
+panel_b
+
+# ====================================================================
+# Panel C: Per-Category Accuracy Heatmap
+# ====================================================================
+
+# Compute per-category accuracy from trials
+cat_acc <- trials %>%
+  filter(is.na(error) | error == "null" | error == "") %>%
+  mutate(
+    expected_set = map_chr(expected_skills, ~ paste(sort(.), collapse = ",")),
+    activated_set = map_chr(activated_skills, ~ paste(sort(.), collapse = ",")),
+    correct = (expected_set == activated_set)
+  ) %>%
+  group_by(condition, category) %>%
+  summarise(
+    n_correct = sum(correct),
+    n_total = n(),
+    accuracy = n_correct / n_total * 100,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    label = sprintf("%d/%d", n_correct, n_total),
+    condition = ifelse(condition == "A_passive", "Passive Skill Listing", "SkillLoadHarness"),
+    condition = factor(condition, levels = c("SkillLoadHarness", "Passive Skill Listing")),
+    category = factor(category, levels = rev(category_order),
+                      labels = rev(category_labels[category_order]))
+  )
+
+cat_acc$category
+
+
+#cat_acc$category[cat_acc$category == "Stage 1\n(Tool-only)"] <- "Tool-only\n(Stage 1)"
+#cat_acc$category[cat_acc$category == "Stage 2\n(Target validation)"] <- "Target validation\n(Stage 2)"
+#cat_acc$category[cat_acc$category == "Stage 3\n(Drug profiling)"] <- 'Drug profiling\n(Stage 3)' 
+
+
+# Group annotation: TP categories (top 3) vs TN categories (bottom 4)
+# Category order (reversed for heatmap): data_vis, general, internal, stage1, composite, stage3, stage2
+# So in the plot: stage2=top(7), stage3(6), composite(5), stage1(4), internal(3), general(2), data_vis=bottom(1)
+# TP group = positions 5,6,7 (composite, stage3, stage2)
+# TN group = positions 1,2,3,4 (data_vis, general, internal, stage1)
+
+# ---- pheatmap: build accuracy matrix ----
+# Clean labels (no newlines) for pheatmap row names
+pheatmap_labels <- c(
+  stage2_direct      = "Target validation\n(Stage 2)",
+  stage3_direct      = "Drug profiling\n(Stage 3)",
+  composite          = "Composite\n(Stage 2 + 3)",
+  stage1_tools_only  = "Tool-only\n(Stage 1)",
+  internal_pipeline  = "Internal pipeline",
+  general_biology    = "General biology",
+  data_visualization = "Data visualization"
+)
+
+# Reverse-lookup: map factor labels (with \n) back to category_order keys
+label_to_key <- setNames(names(category_labels), category_labels)
+
+# Accuracy matrix (rows = categories top→bottom, cols = conditions)
+acc_mat <- cat_acc %>%
+  mutate(
+    cat_key  = pheatmap_labels[label_to_key[as.character(category)]],
+    cond_str = as.character(condition)
+  ) %>%
+  select(cond_str, cat_key, accuracy) %>%
+  pivot_wider(names_from = cond_str, values_from = accuracy) %>%
+  column_to_rownames("cat_key") %>%
+  as.matrix()
+acc_mat <- acc_mat[pheatmap_labels, , drop = FALSE]
+
+# Display-number matrix (n_correct / n_total)
+lab_mat <- cat_acc %>%
+  mutate(
+    cat_key  = pheatmap_labels[label_to_key[as.character(category)]],
+    cond_str = as.character(condition)
+  ) %>%
+  select(cond_str, cat_key, label) %>%
+  pivot_wider(names_from = cond_str, values_from = label) %>%
+  column_to_rownames("cat_key") %>%
+  as.matrix()
+lab_mat <- lab_mat[pheatmap_labels, , drop = FALSE]
+
+
+
+
+# Row annotation — group bar for Skill Reading Expected / Not Expected
+row_ann <- data.frame(
+  Group = factor(
+    c(rep("Skill Reading Expected", 3),
+      rep("No Skill Reading Expected", 4)),
+    levels = c("Skill Reading Expected", "No Skill Reading Expected")
+  ),
+  row.names = pheatmap_labels
+)
+
+# Column annotation — Condition
+col_ann <- data.frame(
+  Condition = factor(
+    colnames(acc_mat),
+    levels = c("SkillLoadHarness", "Passive Skill Listing")
+  ),
+  row.names = colnames(acc_mat)
+)
+
+ann_colors <- list(
+  Group = c("Skill Reading Expected"    = "purple",
+            "No Skill Reading Expected" = "royalblue1"),
+  Condition = c("SkillLoadHarness"       = "firebrick3",
+                "Passive Skill Listing"  = "grey60")
+)
+
+# Color ramp matching original gradient2
+ph_breaks <- seq(60, 100, length.out = 101)
+ph_colors <- colorRampPalette(c("#D55E00", "#FFF9C4", "#009E73"))(100)
+
+panel_c_obj <- pheatmap(
+  acc_mat,
+  display_numbers   = lab_mat,
+  number_color      = "black",
+  cluster_rows      = FALSE,
+  cluster_cols      = FALSE,
+  annotation_row    = row_ann,
+  annotation_col    = col_ann,
+  annotation_colors = ann_colors,
+  annotation_names_row = FALSE,
+  annotation_names_col = FALSE,
+  color             = ph_colors,
+  breaks            = ph_breaks,
+  gaps_row          = 3,
+  border_color      = "black",
+  angle_col         = "45",
+  legend_breaks     = seq(60, 100, 10),
+  legend_labels     = paste0(seq(60, 100, 10), "%"),
+  main              = "",
+  silent            = TRUE
+)
+# Bold cell numbers via gtable grob manipulation
+panel_c <- panel_c_obj$gtable
+
+# # ---- Move Group legend position via gtable manipulation ----
+# gt <- panel_c_obj$gtable
+
+# # Find the annotation legend grob and move it below the heatmap
+# # gt$layout$name shows all grob names; "annotation_legend" is the Group legend
+# leg_idx <- which(gt$layout$name == "annotation_legend")
+# if (length(leg_idx) > 0) {
+#   # Move legend: place it at the bottom of the heatmap
+#   # Get matrix row range for reference
+#   mat_idx <- which(gt$layout$name == "matrix")
+#   mat_bottom <- gt$layout$b[mat_idx]
+
+#   # Add a new row at the bottom for the legend
+#   gt <- gtable_add_rows(gt, unit(1.5, "cm"), pos = mat_bottom + 1)
+
+#   # Copy legend grob to the new bottom row, spanning all columns
+#   gt <- gtable_add_grob(
+#     gt,
+#     grobs = gt$grobs[[leg_idx]],
+#     t = mat_bottom + 2,
+#     l = gt$layout$l[mat_idx],
+#     b = mat_bottom + 2,
+#     r = gt$layout$r[mat_idx] + 2,
+#     name = "annotation_legend_bottom"
+#   )
+
+#   # Remove original legend
+#   gt$grobs[[leg_idx]] <- nullGrob()
+# }
+
+# panel_c <- gt
+# # ====================================================================
+# Compose & Save
+# ====================================================================
+# cowplot handles both ggplot and gtable objects
+fig3 <- cowplot::plot_grid(panel_b, panel_c,
+  align = "h",
+  labels = c("B", "C"),
+  rel_widths = c(0.4, 0.5)
+)
+fig3
+ggsave(file.path(out_dir, "fig3.svg"), fig3, width = 10, height = 5, bg = "white")

@@ -1,0 +1,18 @@
+{
+  "genes": [
+    "COL1A2",
+    "ITGB1"
+  ],
+  "pathways": [],
+  "celltypes": [
+    "DCIS 1",
+    "DCIS 2",
+    "Endothelial",
+    "Macrophages 2",
+    "Myoepi ACTA2+",
+    "Perivascular-Like",
+    "Stromal",
+    "Stromal & T Cell Hybrid"
+  ],
+  "disease": "breast cancer"
+}

@@ -1,0 +1,20 @@
+{
+  "qwen3.5:35b": {
+    "total_trials": 42,
+    "errors": 0,
+    "activation_rate_A_passive": 1.0,
+    "false_positive_rate_A_passive": 0.1667,
+    "precision_A_passive": 0.8421,
+    "recall_A_passive": 0.8889,
+    "specificity_A_passive": 0.9655,
+    "f1_A_passive": 0.8649,
+    "avg_latency_A_passive": 37.39,
+    "activation_rate_B_forced_eval": 1.0,
+    "false_positive_rate_B_forced_eval": 0.0833,
+    "precision_B_forced_eval": 0.9474,
+    "recall_B_forced_eval": 1.0,
+    "specificity_B_forced_eval": 0.9885,
+    "f1_B_forced_eval": 0.973,
+    "avg_latency_B_forced_eval": 42.78
+  }
+}

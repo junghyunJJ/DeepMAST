@@ -934,20 +934,30 @@ def run_stage1_batch(
         errors.append(f"apply_stage1_filter: {exc}")
         filter_status = f"failed: {exc}"
 
+    _finalize_ok = finalize_status == "completed"
+    _filter_ok = filter_status == "applied"
+    _all_ok = _finalize_ok and _filter_ok and not errors
+
     return _as_json({
-        "success": True,
+        "success": _all_ok,
+        "status": "success" if _all_ok else "partial",
         "featured_genes": sorted(featured_genes),
         "pairs_processed": len(featured_pairs),
         "saved_files": saved_files,
         "census_batch": census_status,
         "finalize": finalize_status,
+        "finalize_status": finalize_status,
         "stage1_filter": filter_status,
+        "filter_status": filter_status,
         "stage1_filter_summary": filter_summary,
         "errors": errors if errors else [],
         "note": (
             "Stage 1 evidence files auto-saved and filter applied. "
             "assessment_results.json updated with filtered stage3_candidates. "
             "Call validate_stage1_gate(data_dir) to confirm."
+        ) if _all_ok else (
+            "Stage 1 batch completed with partial failures. Check finalize_status, "
+            "filter_status, and errors for details. assessment_results.json may be stale."
         ),
     })
 

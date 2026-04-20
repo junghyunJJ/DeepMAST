@@ -1,228 +1,167 @@
 ---
 name: hypothesis-generation
-description: Structured hypothesis formulation from observations. Use when you have experimental observations or data and need to formulate testable hypotheses with predictions, propose mechanisms, and design experiments to test them. Follows scientific method framework. For open-ended ideation use scientific-brainstorming; for automated LLM-driven hypothesis testing on datasets use hypogenic.
+description: Generate structured, testable scientific hypotheses from observations, literature, or preliminary data. Use whenever the user asks what could explain a pattern, wants competing mechanisms, needs falsifiable predictions, or wants experiments that can discriminate between explanations. Prefer this skill for evidence-backed hypothesis formulation; for open-ended ideation use brainstorming, for automated dataset-scale hypothesis generation and testing use hypogenic, and for drug-target evidence workflows use drug-target-hypothesis.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
-    skill-author: K-Dense Inc.
+  skill-author: K-Dense Inc.
+  version: 1.1.0
 ---
 
 # Scientific Hypothesis Generation
 
-## Overview
-
-Hypothesis generation is a systematic process for developing testable explanations. Formulate evidence-based hypotheses from observations, design experiments, explore competing explanations, and develop predictions. Apply this skill for scientific inquiry across domains.
+Generate evidence-backed, testable scientific hypotheses from observations, literature, and preliminary data. The default job of this skill is to produce a structured hypothesis brief, not a publication-formatted report.
 
 ## When to Use This Skill
 
-This skill should be used when:
-- Developing hypotheses from observations or preliminary data
-- Designing experiments to test scientific questions
-- Exploring competing explanations for phenomena
-- Formulating testable predictions for research
-- Conducting literature-based hypothesis generation
-- Planning mechanistic studies across scientific domains
+Use this skill when the user needs to:
+- Explain an observation, pattern, or unexpected result
+- Formulate 3-5 competing mechanistic hypotheses
+- Derive falsifiable predictions from existing evidence
+- Design experiments or analyses that can distinguish between explanations
+- Turn literature and preliminary findings into a focused hypothesis set
+- Compare multiple plausible explanations instead of committing to one too early
 
-## Visual Enhancement with Scientific Schematics
+## Do Not Use This Skill
 
-**⚠️ MANDATORY: Every hypothesis generation report MUST include at least 1-2 AI-generated figures using the scientific-schematics skill.**
+Do not use this skill when:
+- The user wants wide-open ideation without an evidence-backed framing; use `brainstorming`
+- The task is automated hypothesis generation or testing over tabular datasets; use `hypogenic`
+- The task is a runtime-scoped drug-target hypothesis workflow tied to saved evidence artifacts; use `drug-target-hypothesis`
+- The user only wants a figure, schematic, or visual summary; use `scientific-schematics`
 
-This is not optional. Hypothesis reports without visual elements are incomplete. Before finalizing any document:
-1. Generate at minimum ONE schematic or diagram (e.g., hypothesis framework showing competing explanations)
-2. Prefer 2-3 figures for comprehensive reports (mechanistic pathway, experimental design flowchart, prediction decision tree)
+## Default Output
 
-**How to generate figures:**
-- Use the **scientific-schematics** skill to generate AI-powered publication-quality diagrams
-- Simply describe your desired diagram in natural language
-- Nano Banana Pro will automatically generate, review, and refine the schematic
+By default, return a structured Markdown hypothesis brief using this shape:
 
-**How to generate schematics:**
-```bash
-python scripts/generate_schematic.py "your diagram description" -o figures/output.png
+```markdown
+## Phenomenon
+- What needs explanation
+- Relevant scope, context, and constraints
+
+## Current Evidence
+- Key observations
+- Important literature anchors
+- Known unknowns
+
+## Competing Hypotheses
+### Hypothesis 1: [short title]
+- Mechanism:
+- Why it fits:
+- What would weaken it:
+
+### Hypothesis 2: [short title]
+- Mechanism:
+- Why it fits:
+- What would weaken it:
+
+## Discriminating Predictions
+- Prediction A:
+- Prediction B:
+
+## Proposed Experiments or Analyses
+- Experiment 1:
+- Experiment 2:
+
+## Key Uncertainties
+- Remaining gaps
+- Assumptions that need validation
 ```
 
-The AI will automatically:
-- Create publication-quality images with proper formatting
-- Review and refine through multiple iterations
-- Ensure accessibility (colorblind-friendly, high contrast)
-- Save outputs in the figures/ directory
-
-**When to add schematics:**
-- Hypothesis framework diagrams showing competing explanations
-- Experimental design flowcharts
-- Mechanistic pathway diagrams
-- Prediction decision trees
-- Causal relationship diagrams
-- Theoretical model visualizations
-- Any complex concept that benefits from visualization
-
-For detailed guidance on creating schematics, refer to the scientific-schematics skill documentation.
-
----
+Keep the brief concise, comparative, and falsifiable. Default to 3-5 competing hypotheses unless the user asks for a different count.
 
 ## Workflow
 
-Follow this systematic process to generate robust scientific hypotheses:
+Follow this process in order.
 
-### 1. Understand the Phenomenon
+### Step 1: Clarify the Phenomenon
 
-Start by clarifying the observation, question, or phenomenon that requires explanation:
+Start by pinning down the thing that needs explanation:
+- Identify the exact observation, trend, or discrepancy
+- Separate established facts from inference
+- Note the domain, system, and scale involved
+- Capture important constraints such as model system, tissue, intervention, timepoint, or measurement limits
 
-- Identify the core observation or pattern that needs explanation
-- Define the scope and boundaries of the phenomenon
-- Note any constraints or specific contexts
-- Clarify what is already known vs. what is uncertain
-- Identify the relevant scientific domain(s)
+### Step 2: Ground the Problem in Existing Evidence
 
-### 2. Conduct Comprehensive Literature Search
+Build a compact evidence base before proposing mechanisms:
+- Summarize the most relevant prior knowledge
+- Look for known pathways, analogies, and competing theories
+- Identify contradictions, missing links, and unresolved debates
+- Use `references/literature_search_strategies.md` for search tactics when the literature needs to be expanded
 
-Search existing scientific literature to ground hypotheses in current evidence. Use both PubMed (for biomedical topics) and general web search (for broader scientific domains):
+For biomedical topics, prioritize authoritative sources and recent reviews before leaning on speculative mechanism-building.
 
-**For biomedical topics:**
-- Use WebFetch with PubMed URLs to access relevant literature
-- Search for recent reviews, meta-analyses, and primary research
-- Look for similar phenomena, related mechanisms, or analogous systems
+### Step 3: Generate Competing Mechanistic Hypotheses
 
-**For all scientific domains:**
-- Use WebSearch to find recent papers, preprints, and reviews
-- Search for established theories, mechanisms, or frameworks
-- Identify gaps in current understanding
+Produce 3-5 genuinely different hypotheses:
+- Make each one mechanistic rather than purely descriptive
+- Keep them distinguishable from one another
+- Vary the level of explanation when useful, such as molecular, cellular, systems, or population level
+- Avoid collapsing similar ideas into cosmetic variants
 
-**Search strategy:**
-- Begin with broad searches to understand the landscape
-- Narrow to specific mechanisms, pathways, or theories
-- Look for contradictory findings or unresolved debates
-- Consult `references/literature_search_strategies.md` for detailed search techniques
+Use hypotheses to cover the plausible space, not to force premature certainty.
 
-### 3. Synthesize Existing Evidence
+### Step 4: Evaluate Hypothesis Quality
 
-Analyze and integrate findings from literature search:
+Assess each candidate against the criteria in `references/hypothesis_quality_criteria.md`:
+- Testability
+- Falsifiability
+- Parsimony
+- Explanatory power
+- Scope
+- Consistency with established knowledge
+- Novelty
 
-- Summarize current understanding of the phenomenon
-- Identify established mechanisms or theories that may apply
-- Note conflicting evidence or alternative viewpoints
-- Recognize gaps, limitations, or unanswered questions
-- Identify analogies from related systems or domains
+Call out the strongest and weakest feature of each hypothesis. If one is too vague to test, discard or rewrite it.
 
-### 4. Generate Competing Hypotheses
+### Step 5: Derive Discriminating Predictions
 
-Develop 3-5 distinct hypotheses that could explain the phenomenon. Each hypothesis should:
+For each retained hypothesis:
+- State what should be observed if it is true
+- Identify observations that would argue against it
+- Prefer predictions that separate one hypothesis from the others
+- Be quantitative when the context supports it
 
-- Provide a mechanistic explanation (not just description)
-- Be distinguishable from other hypotheses
-- Draw on evidence from the literature synthesis
-- Consider different levels of explanation (molecular, cellular, systemic, population, etc.)
+### Step 6: Design Experiments or Analyses
 
-**Strategies for generating hypotheses:**
-- Apply known mechanisms from analogous systems
-- Consider multiple causative pathways
-- Explore different scales of explanation
-- Question assumptions in existing explanations
-- Combine mechanisms in novel ways
+Propose the smallest set of tests that can resolve the main uncertainty:
+- Define what would be measured
+- Specify controls or comparison groups
+- Note likely confounds
+- Favor experiments that clearly discriminate between competing explanations
 
-### 5. Evaluate Hypothesis Quality
+Use `references/experimental_design_patterns.md` when you need a study-design menu across experimental settings.
 
-Assess each hypothesis against established quality criteria from `references/hypothesis_quality_criteria.md`:
+### Step 7: Present the Structured Brief
 
-**Testability:** Can the hypothesis be empirically tested?
-**Falsifiability:** What observations would disprove it?
-**Parsimony:** Is it the simplest explanation that fits the evidence?
-**Explanatory Power:** How much of the phenomenon does it explain?
-**Scope:** What range of observations does it cover?
-**Consistency:** Does it align with established principles?
-**Novelty:** Does it offer new insights beyond existing explanations?
+End the default path with the Markdown hypothesis brief described above.
 
-Explicitly note the strengths and weaknesses of each hypothesis.
+Prefer a focused deliverable:
+- concise phenomenon summary
+- 3-5 competing hypotheses
+- evidence basis for each
+- falsifiable predictions
+- experiments or analyses that can separate them
 
-### 6. Design Experimental Tests
+Do not switch into publication formatting unless the user explicitly asks for it.
 
-For each viable hypothesis, propose specific experiments or studies to test it. Consult `references/experimental_design_patterns.md` for common approaches:
+## Optional: Publication-ready Output
 
-**Experimental design elements:**
-- What would be measured or observed?
-- What comparisons or controls are needed?
-- What methods or techniques would be used?
-- What sample sizes or statistical approaches are appropriate?
-- What are potential confounds and how to address them?
+Activate this branch only if the user explicitly asks for:
+- a publication-ready report
+- LaTeX or template-based export
+- appendix-style formatted output
+- figures or schematics alongside the hypothesis brief
 
-**Consider multiple approaches:**
-- Laboratory experiments (in vitro, in vivo, computational)
-- Observational studies (cross-sectional, longitudinal, case-control)
-- Clinical trials (if applicable)
-- Natural experiments or quasi-experimental designs
+If that happens:
+- Treat the structured hypothesis brief as the source content
+- Use `assets/hypothesis_report_template.tex` as the starting template
+- Use `assets/hypothesis_generation.sty` and `assets/FORMATTING_GUIDE.md` for layout details
+- Keep the scientific logic identical; this branch changes packaging, not reasoning
+- If figures are requested, route figure generation through `scientific-schematics` rather than a local script
 
-### 7. Formulate Testable Predictions
-
-For each hypothesis, generate specific, quantitative predictions:
-
-- State what should be observed if the hypothesis is correct
-- Specify expected direction and magnitude of effects when possible
-- Identify conditions under which predictions should hold
-- Distinguish predictions between competing hypotheses
-- Note predictions that would falsify the hypothesis
-
-### 8. Present Structured Output
-
-Generate a professional LaTeX document using the template in `assets/hypothesis_report_template.tex`. The report should be well-formatted with colored boxes for visual organization and divided into a concise main text with comprehensive appendices.
-
-**Document Structure:**
-
-**Main Text (Maximum 4 pages):**
-1. **Executive Summary** - Brief overview in summary box (0.5-1 page)
-2. **Competing Hypotheses** - Each hypothesis in its own colored box with brief mechanistic explanation and key evidence (2-2.5 pages for 3-5 hypotheses)
-   - **IMPORTANT:** Use `\newpage` before each hypothesis box to prevent content overflow
-   - Each box should be ≤0.6 pages maximum
-3. **Testable Predictions** - Key predictions in amber boxes (0.5-1 page)
-4. **Critical Comparisons** - Priority comparison boxes (0.5-1 page)
-
-Keep main text highly concise - only the most essential information. All details go to appendices.
-
-**Page Break Strategy:**
-- Always use `\newpage` before hypothesis boxes to ensure they start on fresh pages
-- This prevents content from overflowing off page boundaries
-- LaTeX boxes (tcolorbox) do not automatically break across pages
-
-**Appendices (Comprehensive, Detailed):**
-- **Appendix A:** Comprehensive literature review with extensive citations
-- **Appendix B:** Detailed experimental designs with full protocols
-- **Appendix C:** Quality assessment tables and detailed evaluations
-- **Appendix D:** Supplementary evidence and analogous systems
-
-**Colored Box Usage:**
-
-Use the custom box environments from `hypothesis_generation.sty`:
-
-- `hypothesisbox1` through `hypothesisbox5` - For each competing hypothesis (blue, green, purple, teal, orange)
-- `predictionbox` - For testable predictions (amber)
-- `comparisonbox` - For critical comparisons (steel gray)
-- `evidencebox` - For supporting evidence highlights (light blue)
-- `summarybox` - For executive summary (blue)
-
-**Each hypothesis box should contain (keep concise for 4-page limit):**
-- **Mechanistic Explanation:** 1-2 brief paragraphs (6-10 sentences max) explaining HOW and WHY
-- **Key Supporting Evidence:** 2-3 bullet points with citations (most important evidence only)
-- **Core Assumptions:** 1-2 critical assumptions
-
-All detailed explanations, additional evidence, and comprehensive discussions belong in the appendices.
-
-**Critical Overflow Prevention:**
-- Insert `\newpage` before each hypothesis box to start it on a fresh page
-- Keep each complete hypothesis box to ≤0.6 pages (approximately 15-20 lines of content)
-- If content exceeds this, move additional details to Appendix A
-- Never let boxes overflow off page boundaries - this creates unreadable PDFs
-
-**Citation Requirements:**
-
-Aim for extensive citation to support all claims:
-- **Main text:** 10-15 key citations for most important evidence only (keep concise for 4-page limit)
-- **Appendix A:** 40-70+ comprehensive citations covering all relevant literature
-- **Total target:** 50+ references in bibliography
-
-Main text citations should be selective - cite only the most critical papers. All comprehensive citation and detailed literature discussion belongs in the appendices. Use `\citep{author2023}` for parenthetical citations.
-
-**LaTeX Compilation:**
-
-The template requires XeLaTeX or LuaLaTeX for proper rendering:
+Compile LaTeX only when the user actually needs a local report artifact:
 
 ```bash
 xelatex hypothesis_report.tex
@@ -231,67 +170,89 @@ xelatex hypothesis_report.tex
 xelatex hypothesis_report.tex
 ```
 
-**Required packages:** The `hypothesis_generation.sty` style package must be in the same directory or LaTeX path. It requires: tcolorbox, xcolor, fontspec, fancyhdr, titlesec, enumitem, booktabs, natbib.
-
-**Page Overflow Prevention:**
-
-To prevent content from overflowing on pages, follow these critical guidelines:
-
-1. **Monitor Box Content Length:** Each hypothesis box should fit comfortably on a single page. If content exceeds ~0.7 pages, it will likely overflow.
-
-2. **Use Strategic Page Breaks:** Insert `\newpage` before boxes that contain substantial content:
-   ```latex
-   \newpage
-   \begin{hypothesisbox1}[Hypothesis 1: Title]
-   % Long content here
-   \end{hypothesisbox1}
-   ```
-
-3. **Keep Main Text Boxes Concise:** For the 4-page main text limit:
-   - Each hypothesis box: Maximum 0.5-0.6 pages
-   - Mechanistic explanation: 1-2 brief paragraphs only (6-10 sentences max)
-   - Key evidence: 2-3 bullet points only
-   - Core assumptions: 1-2 items only
-   - If content is longer, move details to appendices
-
-4. **Break Long Content:** If a hypothesis requires extensive explanation, split across main text and appendix:
-   - Main text box: Brief mechanistic overview + 2-3 key evidence points
-   - Appendix A: Detailed mechanism explanation, comprehensive evidence, extended discussion
-
-5. **Test Page Boundaries:** Before each new box, consider if remaining page space is sufficient. If less than 0.6 pages remain, use `\newpage` to start the box on a fresh page.
-
-6. **Appendix Page Management:** In appendices, use `\newpage` between major sections to avoid overflow in detailed content areas.
-
-**Quick Reference:** See `assets/FORMATTING_GUIDE.md` for detailed examples of all box types, color schemes, and common formatting patterns.
-
 ## Quality Standards
 
-Ensure all generated hypotheses meet these standards:
+Every final hypothesis brief should be:
+- Evidence-backed rather than purely imaginative
+- Mechanistic rather than descriptive
+- Falsifiable rather than vague
+- Comparative across multiple plausible explanations
+- Actionable enough to support a next experiment or analysis
 
-- **Evidence-based:** Grounded in existing literature with citations
-- **Testable:** Include specific, measurable predictions
-- **Mechanistic:** Explain how/why, not just what
-- **Comprehensive:** Consider alternative explanations
-- **Rigorous:** Include experimental designs to test predictions
+## Examples
+
+### Example 1: Positive trigger from an experimental result
+
+User says: "We see cytokine X rise only after stress exposure. Give me 3 competing mechanisms and experiments to separate them."
+
+Result: produce a structured hypothesis brief with competing mechanisms, discriminating predictions, and experiments.
+
+### Example 2: Positive trigger from literature plus preliminary data
+
+User says: "Based on these pilot RNA-seq results and the literature, what mechanisms could explain the phenotype?"
+
+Result: synthesize current evidence, propose competing mechanistic hypotheses, and identify the next validation steps.
+
+### Example 3: Positive paraphrase
+
+User says: "What could explain this pattern, and what data would falsify each explanation?"
+
+Result: treat this as a direct request for evidence-backed competing hypotheses and falsifiable predictions.
+
+### Example 4: Boundary case
+
+User says: "Make me a schematic of this pathway."
+
+Result: do not use this skill as the primary path unless hypothesis formulation is also requested. Route figure-only work to `scientific-schematics`.
+
+## Common Issues
+
+### The request is too broad
+
+If the user asks for "some ideas" without a clear phenomenon:
+1. Narrow the problem to a specific observation, discrepancy, or research question.
+2. Identify the system, context, and available evidence.
+3. If the user only wants open-ended ideation, use `brainstorming` instead.
+
+### The evidence base is too thin
+
+If there is not enough grounding to build strong mechanisms:
+- **Cause:** The observation is underspecified or the literature search is too shallow.
+- **Solution:** Summarize what is actually known, identify the biggest missing facts, and propose provisional hypotheses with explicit uncertainty.
+- **Prevention:** Gather a minimal literature set before trying to rank mechanisms confidently.
+
+### The task is really about automated dataset mining
+
+If the user wants large-scale or automated hypothesis generation over tabular data:
+- **Cause:** The task is drifting from manual scientific reasoning into programmatic hypothesis generation and testing.
+- **Solution:** Route that work to `hypogenic`.
+- **Prevention:** Reserve this skill for analyst-style hypothesis formulation rather than batch automation.
+
+### The user actually wants formatting or figures
+
+If the request is mostly about presentation:
+- **Cause:** The hypothesis content already exists and the remaining work is packaging.
+- **Solution:** Use the optional publication-ready branch for report export, and use `scientific-schematics` for figures.
+- **Prevention:** Treat formatting as downstream of reasoning, not as the default contract.
 
 ## Resources
 
 ### references/
 
-- `hypothesis_quality_criteria.md` - Framework for evaluating hypothesis quality (testability, falsifiability, parsimony, explanatory power, scope, consistency)
-- `experimental_design_patterns.md` - Common experimental approaches across domains (RCTs, observational studies, lab experiments, computational models)
-- `literature_search_strategies.md` - Effective search techniques for PubMed and general scientific sources
+- `hypothesis_quality_criteria.md` - rubric for evaluating testability, falsifiability, parsimony, explanatory power, scope, consistency, and novelty
+- `experimental_design_patterns.md` - common study and experiment patterns across domains
+- `literature_search_strategies.md` - practical literature search guidance for biomedical and broader scientific topics
 
 ### assets/
 
-- `hypothesis_generation.sty` - LaTeX style package providing colored boxes, professional formatting, and custom environments for hypothesis reports
-- `hypothesis_report_template.tex` - Complete LaTeX template with main text structure and comprehensive appendix sections
-- `FORMATTING_GUIDE.md` - Quick reference guide with examples of all box types, color schemes, citation practices, and troubleshooting tips
+- `hypothesis_report_template.tex` - optional LaTeX template for publication-style packaging
+- `hypothesis_generation.sty` - LaTeX style file used by the optional report template
+- `FORMATTING_GUIDE.md` - optional formatting reference for the publication-ready branch
 
-### Related Skills
+## Related Skills
 
-When preparing hypothesis-driven research for publication, consult the **venue-templates** skill for writing style guidance:
-- `venue_writing_styles.md` - Master guide comparing styles across venues
-- Venue-specific guides for Nature/Science, Cell Press, medical journals, and ML/CS conferences
-- `reviewer_expectations.md` - What reviewers look for when evaluating research hypotheses
-
+- `brainstorming` - open-ended ideation before evidence-backed hypothesis work
+- `hypogenic` - automated dataset-scale hypothesis generation and testing
+- `drug-target-hypothesis` - structured drug-target hypothesis generation from scoped evidence artifacts
+- `scientific-schematics` - figure and schematic generation once the hypothesis content is already defined
+- `pubmed-eutils-search` - deeper PubMed-specific search support when the evidence base needs to be expanded
