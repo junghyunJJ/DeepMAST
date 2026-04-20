@@ -313,13 +313,10 @@ def save_target_assessment(
     schema_valid = _validate_contract(payload, schema_errors, base=base)
     out_path = base / "target_assessment.json"
 
-    # Persist schema-validation outcome into the saved JSON's
-    # `pipeline_quality_flags.schema_validation` sub-section so that the
-    # report_writer subagent (and any downstream reader) sees it. The
-    # file is written unconditionally — refusing to save on schema
-    # failure historically let the LLM dismiss the error as "probably a
-    # schema bug". With this field baked in, the flag is visible to
-    # human reviewers and to the HTML report consumer.
+    # Persist schema-validation outcome into the `pipeline_quality_flags.
+    # schema_validation` sub-section so that the report_writer subagent
+    # (and any downstream reader) sees it. This closes the LLM-dismissal
+    # loophole that let the orchestrator wave away "schema bug" complaints.
     existing_flags: dict = payload.get("pipeline_quality_flags", {}) or {}
     if not isinstance(existing_flags, dict):
         existing_flags = {}
@@ -331,21 +328,26 @@ def save_target_assessment(
     }
     payload["pipeline_quality_flags"] = existing_flags
 
-    out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    # Gate-block behavior preserved (callers depend on saved=False when
+    # domain contract fails, e.g. pair-set mismatch): only write when
+    # validation passes. When write happens, the flags above are baked
+    # into the file.
+    if schema_valid:
+        out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     return json.dumps(
         {
-            # File always written (even when schema validation fails) so that
-            # pipeline_quality_flags.schema_validation is persisted for
-            # downstream human review. The `schema_valid` field below is the
-            # authoritative quality signal.
-            "saved": True,
+            "saved": schema_valid,
             "path": str(out_path),
             "schema_path": str(schema_file),
             "schema_loaded": schema_loaded,
             "schema_valid": schema_valid and not schema_errors,
             "errors": schema_errors,
-            "quality_flags_persisted": True,
+            # Quality flags are baked into the written file when save
+            # succeeds. When save is gated (schema_valid=False), flags
+            # are still computed and available in the tool return for
+            # the orchestrator; they simply are not persisted on disk.
+            "quality_flags_persisted": schema_valid,
         },
         indent=2,
     )
