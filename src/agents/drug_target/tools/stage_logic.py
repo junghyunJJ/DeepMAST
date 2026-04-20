@@ -1696,10 +1696,26 @@ def _prebuild_target_assessment(
     for pair in lr_pairs:
         ligand = pair.get("ligand", "")
         receptor = pair.get("receptor", "")
-        rubric = rubric_by_gene.get(receptor, rubric_by_gene.get(ligand, {}))
+        # Pair rubric inherits the scores of whichever gene has rubric data:
+        # receptor preferred, ligand as fallback. Record which gene provided
+        # the scores so downstream consumers can distinguish pair-intrinsic
+        # from gene-inherited signal (e.g. HLA-DQB1--CD4 inherits CD4, not
+        # HLA-DQB1, and without this annotation the HLA pair appeared as a
+        # top-ranked candidate despite HLA-DQB1 itself being
+        # insufficient_evidence at the gene level).
+        if receptor in rubric_by_gene:
+            rubric = rubric_by_gene[receptor]
+            score_source = receptor
+        elif ligand in rubric_by_gene:
+            rubric = rubric_by_gene[ligand]
+            score_source = ligand
+        else:
+            rubric = {}
+            score_source = ""
         pair_matrix.append({
             "ligand": ligand,
             "receptor": receptor,
+            "score_source": score_source,
             "existing_drug_evidence": rubric.get("existing_drug_evidence", 0),
             "clinical_trial_activity": rubric.get("clinical_trial_activity", 0),
             "safety_profile": rubric.get("safety_profile", 0),
