@@ -398,7 +398,7 @@ def get_target_associations(ensembl_id: str, min_score: float = 0.0) -> List[Dic
     query = """
       query targetAssociations($ensemblId: String!) {
         target(ensemblId: $ensemblId) {
-          associatedDiseases(page: {index: 0, size: 100}) {
+          associatedDiseases(page: {index: 0, size: 500}) {
             count
             rows {
               disease {
@@ -561,7 +561,7 @@ async def async_query_full_target(
         assoc_query = """
           query targetAssociations($ensemblId: String!) {
             target(ensemblId: $ensemblId) {
-              associatedDiseases(page: {index: 0, size: 100}) {
+              associatedDiseases(page: {index: 0, size: 500}) {
                 count
                 rows {
                   disease { id name }
