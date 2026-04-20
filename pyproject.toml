@@ -33,3 +33,13 @@ dependencies = [
 markers = [
     "api: live external API connectivity tests (may be slow, requires network)",
 ]
+
+[tool.ruff]
+# Keep project-wide defaults loose; opt in to B023 as a regression guard
+# after a loop-variable leak at stage_logic.py (deep-dive `track` field was
+# assigned from a stale `row` variable — see fix/drug-target-pipeline-errors
+# commit "derive deep-dive track from gene-level classification").
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["B023"]
