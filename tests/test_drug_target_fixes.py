@@ -153,18 +153,30 @@ def test_stage1_ztest_no_infinity(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def test_hypothesis_grounding_classifier() -> None:
-    label, tokens = _classify_prediction_grounding(
+    # Tightened regex (followup B7a) requires `from stage\d_*.json` or
+    # `from ot_*.json`. Return tuple is now 3-element.
+    label, tokens, cited = _classify_prediction_grounding(
         "Blocking ICAM1-ITGB2 interaction will reduce markers by at least 50% in explants."
     )
     assert label == "unverified"
     assert tokens == ["50%"]
+    assert cited == []
 
-    label, _ = _classify_prediction_grounding(
-        "Based on stage1_ICAM1--MUC1.json risk_ratio=17.86, dual blockade reduces IL-8 by 50%."
+    # "from stage1_..." + numeric token → grounded (cue-only, no evidence_dir)
+    label, tokens, cited = _classify_prediction_grounding(
+        "from stage1_ICAM1--MUC1.json risk_ratio=17.86, dual blockade reduces IL-8 by 50%."
     )
     assert label == "grounded"
+    assert cited == ["stage1_ICAM1--MUC1.json"]
 
-    label, tokens = _classify_prediction_grounding(
+    # Loose "Based on" cue without "from <file>" → no longer counts as grounded
+    label, tokens, cited = _classify_prediction_grounding(
+        "Based on the passed stage1 filter, reduce markers by 40%"
+    )
+    assert label == "unverified"
+    assert cited == []
+
+    label, tokens, cited = _classify_prediction_grounding(
         "Significant reduction in fibroblast migration compared to controls."
     )
     assert label == "qualitative"
@@ -175,17 +187,21 @@ def test_hypothesis_grounding_tag_summary() -> None:
     parsed = {
         "hypotheses": [
             {"falsifiable_prediction": "Reduce COL1A1 by 50% in cultures"},
-            {"falsifiable_prediction": "Based on stage3_CD47.json index 0.3 → 2-fold increase"},
+            {"falsifiable_prediction": "from stage3_CD47.json index 0.3 → 2-fold increase"},
             {"falsifiable_prediction": "Significant reduction observed"},
+            # Loose cue (old regex would match, new regex does not)
+            {"falsifiable_prediction": "Based on the stage1 filter pass, 30% reduction"},
         ]
     }
     s = _tag_hypothesis_prediction_grounding(parsed)
-    assert s["unverified"] == 1
-    assert s["grounded"] == 1
-    assert s["qualitative"] == 1
+    assert s["unverified"] == 2, s
+    assert s["grounded"] == 1, s          # (stage3_CD47.json cited, no evidence_dir for verify)
+    assert s["grounded_verified"] == 0, s
+    assert s["qualitative"] == 1, s
     assert parsed["hypotheses"][0]["prediction_grounding"] == "unverified"
     assert parsed["hypotheses"][1]["prediction_grounding"] == "grounded"
     assert parsed["hypotheses"][2]["prediction_grounding"] == "qualitative"
+    assert parsed["hypotheses"][3]["prediction_grounding"] == "unverified"
 
 
 def test_hypothesis_prompt_has_quantitative_constraint() -> None:
