@@ -292,6 +292,16 @@ def query_opentargets_target_data(
         ensembl_id = hits[0]["id"]
         result["ensembl_id"] = ensembl_id
 
+        # true_total captures the OT-reported count BEFORE any local
+        # truncation. Sources in priority order:
+        #   1. Parquet `get_target_bundle` -> bundle["associations_api_total_count"]
+        #   2. GraphQL `get_target_associations` dict -> assocs["api_total_count"]
+        #   3. len(associations) fallback with provenance = "list_length"
+        # `associations_total_source` lets downstream scoring code (and
+        # debugging) know which counter it is trusting.
+        true_total: int | None = None
+        true_total_source: str = "list_length"
+
         if hasattr(mod, "get_target_bundle"):
             bundle = mod.get_target_bundle(
                 ensembl_id,
@@ -301,6 +311,10 @@ def query_opentargets_target_data(
             result["target_info"] = bundle.get("target_info", {})
             result["disease_evidence"] = bundle.get("disease_evidence", [])
             result["associations"] = bundle.get("associations", [])
+            _tt = bundle.get("associations_api_total_count")
+            if _tt is not None:
+                true_total = int(_tt)
+                true_total_source = "parquet_pre_head"
         else:
             result["target_info"] = mod.get_target_info(ensembl_id, include_diseases=True)
             if disease_context.get("efo_id"):
@@ -308,14 +322,26 @@ def query_opentargets_target_data(
                     ensembl_id,
                     disease_context["efo_id"],
                 )
-            result["associations"] = mod.get_target_associations(ensembl_id, min_score=0.1)
+            assocs_payload = mod.get_target_associations(ensembl_id, min_score=0.1)
+            # Accept both dict (post-A1) and list (legacy mock/test).
+            if isinstance(assocs_payload, dict):
+                result["associations"] = assocs_payload.get("associations", [])
+                _tt = assocs_payload.get("api_total_count")
+                if _tt is not None:
+                    true_total = int(_tt)
+                    true_total_source = "api_count"
+            else:
+                result["associations"] = assocs_payload or []
 
         # Persist the TRUE total BEFORE truncation — `_score_novelty_opportunity`
         # uses the capped list length today, which makes well-studied targets
         # (TGFB1, thousands of associations) look identical to nearly-novel
         # targets (CD99, ~20 associations). The score function will prefer
         # this field when present.
-        result["associations_total_count"] = len(result["associations"])
+        if true_total is None:
+            true_total = len(result["associations"])
+        result["associations_total_count"] = true_total
+        result["associations_total_source"] = true_total_source
         # Truncate large payloads to prevent token bloat
         if len(result["associations"]) > 20:
             result["associations"] = sorted(
