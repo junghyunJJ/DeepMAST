@@ -1147,7 +1147,8 @@ def _score_biological_plausibility(
 
 
 def _score_novelty_opportunity(associations: list[dict],
-                                associations_truncated: bool = False) -> int:
+                                associations_truncated: bool = False,
+                                associations_total_count: int | None = None) -> int:
     """Score novelty_opportunity (0-5) inverse of how well-established the target is.
 
     0: 30+ associations (truncated, well-established)
@@ -1157,10 +1158,16 @@ def _score_novelty_opportunity(associations: list[dict],
     4: 1-2 associations
     5: 0 associations (completely novel, e.g. ST-only discovery)
 
-    When truncated=True, actual count exceeds what's returned (20+).
-    Cap novelty at 1.
+    Prefers ``associations_total_count`` (persisted before truncation) over
+    ``len(associations)``, because the pipeline truncates to 20 entries
+    and a raw length count cannot distinguish TGFB1 (thousands of
+    associations) from CD99 (~20). When the total is unavailable and
+    ``associations_truncated=True``, cap novelty at 1 (20+ floor).
     """
-    count = len(associations) if associations else 0
+    if associations_total_count is not None:
+        count = int(associations_total_count)
+    else:
+        count = len(associations) if associations else 0
     if count == 0:
         score = 5
     elif count <= 2:
@@ -1173,8 +1180,10 @@ def _score_novelty_opportunity(associations: list[dict],
         score = 1
     else:
         score = 0
-    # If truncated, at least 20+ associations exist → cap novelty at 1
-    if associations_truncated and score > 1:
+    # When the true total is unknown and the list is truncated, at least 20+
+    # associations exist → cap novelty at 1. Skip this cap when the caller
+    # passed the authoritative `associations_total_count`.
+    if associations_total_count is None and associations_truncated and score > 1:
         score = 1
     return score
 
@@ -1329,7 +1338,11 @@ def compute_rubric_scores(data_dir: str) -> str:
         gwas = _score_gwas_support(gwas_data)
         tract = _score_tractability(tractability_data)
         bio_plaus = _score_biological_plausibility(disease_evidence, vep_data)
-        novelty = _score_novelty_opportunity(associations, ot.get("associations_truncated", False))
+        novelty = _score_novelty_opportunity(
+            associations,
+            ot.get("associations_truncated", False),
+            ot.get("associations_total_count"),
+        )
 
         validated_total = existing_drug + clinical_trial + safety
         exploratory_total = gwas + tract + bio_plaus + novelty

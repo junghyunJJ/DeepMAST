@@ -310,6 +310,12 @@ def query_opentargets_target_data(
                 )
             result["associations"] = mod.get_target_associations(ensembl_id, min_score=0.1)
 
+        # Persist the TRUE total BEFORE truncation — `_score_novelty_opportunity`
+        # uses the capped list length today, which makes well-studied targets
+        # (TGFB1, thousands of associations) look identical to nearly-novel
+        # targets (CD99, ~20 associations). The score function will prefer
+        # this field when present.
+        result["associations_total_count"] = len(result["associations"])
         # Truncate large payloads to prevent token bloat
         if len(result["associations"]) > 20:
             result["associations"] = sorted(
