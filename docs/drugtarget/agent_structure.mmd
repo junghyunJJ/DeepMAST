@@ -1,0 +1,89 @@
+flowchart TB
+    classDef config fill:#7aa2f7,stroke:#2f5dbe,color:#ffffff,stroke-width:2px;
+    classDef helper fill:#9ece6a,stroke:#4f7a2c,color:#101418,stroke-width:2px;
+    classDef pipeline fill:#e0af68,stroke:#9a6b1f,color:#101418,stroke-width:2px;
+    classDef artifact fill:#bb9af7,stroke:#6e4bb6,color:#ffffff,stroke-width:2px;
+    classDef decision fill:#f7768e,stroke:#a63c50,color:#ffffff,stroke-width:2px;
+
+    subgraph Config["Configuration"]
+        CFG["DrugTargetConfig<br/>provider, data_dir, docker_image,<br/>skills, subagent_models"]
+        POST["__post_init__()<br/>load_subagent_models_from_env(...)"]
+        GUIDE["DRUG_TARGET_SKILLS_GUIDANCE"]
+        PROMPT["ORCHESTRATOR_SYSTEM_PROMPT"]
+        CFG --> POST
+    end
+
+    subgraph Helpers["Path & Backend Helpers"]
+        ROOT["_find_project_root()"]
+        SKILLS["_resolve_skills_dir(config)"]
+        DOCKER["_create_docker_backend(config,<br/>resolved_data_dir)"]
+        ROOT --> SKILLS
+        SKILLS --> DOCKER
+    end
+
+    subgraph Assembly["Agent Assembly Pipeline"]
+        ENTRY["create_drug_target_agent(config=None)"]
+        DATA["Resolve data_dir<br/>create evidence/ directory"]
+        D1{"docker_image set?"}
+        TOOLS["Build orchestrator tools<br/>load_lr_candidates, evidence I/O,<br/>thinking, quality, + custom_tools"]
+        SUBS["get_subagents(...data_dir,<br/>custom_tools, model_overrides)"]
+        LLM["create_llm(provider)"]
+        D2{"use_checkpointer?"}
+        MEM["MemorySaver()"]
+        NOMEM["None"]
+        D3{"enable_progressive_disclosure?"}
+        MW["SkillsMiddleware<br/>allowed_skill_names + guidance"]
+        NOMW["No middleware"]
+        KW["Assemble create_kwargs"]
+        AGENT["create_deep_agent(**create_kwargs)"]
+        RET["return (agent, backend)"]
+
+        ENTRY --> DATA
+        DATA --> D1
+        D1 -->|yes| DOCKER
+        D1 -->|no| NOBACK["backend = None"]
+        DATA --> TOOLS
+        DATA --> SUBS
+        ENTRY --> LLM
+        ENTRY --> D2
+        D2 -->|yes| MEM
+        D2 -->|no| NOMEM
+        ENTRY --> D3
+        D3 -->|yes| MW
+        D3 -->|no| NOMW
+
+        DOCKER --> KW
+        NOBACK --> KW
+        TOOLS --> KW
+        SUBS --> KW
+        LLM --> KW
+        MEM --> KW
+        NOMEM --> KW
+        MW --> KW
+        NOMW --> KW
+        PROMPT --> KW
+        AGENT --> RET
+        KW --> AGENT
+    end
+
+    subgraph Deployment["Deployment Entry"]
+        GRAPH["create_drug_target_graph()"]
+        D4{"backend exists?"}
+        CLEAN["atexit.register(backend.cleanup)"]
+        RETURN["return agent"]
+        GRAPH --> D4
+        D4 -->|yes| CLEAN
+        D4 -->|no| RETURN
+        CLEAN --> RETURN
+    end
+
+    CFG --> ENTRY
+    GUIDE --> MW
+    SKILLS --> MW
+    RET --> GRAPH
+
+    class CFG,POST,GUIDE,PROMPT config
+    class ROOT,SKILLS,DOCKER helper
+    class ENTRY,DATA,TOOLS,SUBS,LLM,MEM,NOMEM,MW,NOMW,KW,AGENT,GRAPH,CLEAN,RETURN pipeline
+    class RET artifact
+    class D1,D2,D3,D4 decision
