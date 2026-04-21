@@ -521,37 +521,65 @@ def _proximity_match(
     trait_assocs: list[dict],
     window: int = 500_000,
 ) -> list[dict]:
-    """Find trait SNPs within ±window bp of any gene-associated locus."""
+    """Find trait SNPs within ±window bp of any gene-associated locus.
+
+    Accepts trait_assocs entries in either shape:
+      - structured: ``{"chromosome": "11", "position": 1219991, ...}``
+      - legacy:     ``{"rsId": "chr11:1219991", ...}``
+
+    Requires gene_assocs[*].locations entries with ``chromosome`` + ``position``.
+    Returns the subset of trait_assocs whose (chrom, pos) lies within
+    ``window`` bp of at least one gene region. Dedupes on rsId.
+    """
     gene_regions: list[tuple[str, int]] = []
     for ga in gene_assocs:
         for loc in ga.get("locations", []):
             chrom = loc.get("chromosome") or loc.get("chromosomeName")
             pos = loc.get("position") or loc.get("chromosomePosition")
-            if chrom and pos:
-                gene_regions.append((str(chrom), int(pos)))
+            if chrom and pos is not None:
+                try:
+                    gene_regions.append((str(chrom), int(pos)))
+                except (ValueError, TypeError):
+                    continue
     if not gene_regions:
         return []
 
-    nearby: list[dict] = []
-    seen: set[str] = set()
-    for ta in trait_assocs:
-        rsid = ta.get("rsId", "")
-        if rsid in seen:
-            continue
-        # Parse chr:pos format (e.g., "chr11:1219991")
+    def _trait_coords(ta: dict) -> tuple[str, int] | None:
+        """Extract (chrom, pos) from a trait association in either shape."""
+        chrom = ta.get("chromosome")
+        pos = ta.get("position")
+        if chrom and pos is not None:
+            try:
+                return (str(chrom), int(pos))
+            except (ValueError, TypeError):
+                pass
+        rsid = str(ta.get("rsId", "") or "")
         if ":" in rsid:
             raw = rsid.replace("chr", "")
             parts = raw.split(":")
             if len(parts) == 2:
                 try:
-                    t_chrom, t_pos = parts[0], int(parts[1])
-                    for g_chrom, g_pos in gene_regions:
-                        if str(t_chrom) == str(g_chrom) and abs(t_pos - g_pos) <= window:
-                            nearby.append(ta)
-                            seen.add(rsid)
-                            break
+                    return (parts[0], int(parts[1]))
                 except (ValueError, TypeError):
-                    pass
+                    return None
+        return None
+
+    nearby: list[dict] = []
+    seen: set[str] = set()
+    for ta in trait_assocs:
+        key = str(ta.get("rsId", "") or "")
+        if key and key in seen:
+            continue
+        coords = _trait_coords(ta)
+        if coords is None:
+            continue
+        t_chrom, t_pos = coords
+        for g_chrom, g_pos in gene_regions:
+            if str(t_chrom) == str(g_chrom) and abs(t_pos - g_pos) <= window:
+                nearby.append(ta)
+                if key:
+                    seen.add(key)
+                break
     return nearby
 
 
