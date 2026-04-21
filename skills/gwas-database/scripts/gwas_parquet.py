@@ -149,6 +149,8 @@ def get_trait_associations(
             "genes": genes,
             "studyId": row.get("studyAccession", ""),
             "trait": row.get("trait", ""),
+            "chromosome": (str(row.get("chromosome")) if pd.notna(row.get("chromosome")) and row.get("chromosome") != "" else None),
+            "position": int(row["position"]) if pd.notna(row.get("position")) else None,
         })
 
     return results
