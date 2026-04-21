@@ -67,3 +67,4 @@ docs/benchmarks/*
 large_tool_results/
 conversation_history/
 workspace/
+.omx/
