@@ -1,0 +1,1210 @@
+{
+  "papers": [
+    {
+      "pmid": "26299867",
+      "title": "[DNA methylation in the promoter regions of the laminin family genes in normal and breast carcinoma tissues].",
+      "abstract": "Extracellular glycoproteins of the laminin family are essential components of basement membranes involved in a number of biological processes, including tissue differentiation, wound healing, and tumorigenesis. We present the first comprehensive study of promoter methylation status of the genes encoding laminin chains in normal tissues (peripheral blood leucocytes, buccal epithelial cells, autopsy breast tissue samples) and in breast carcinoma samples. Based on the results of this study, we divide laminin genes into three categories. Genes, constitutively methylated in breast tissues include LAMA3A, LAMB2, LAMB3, and LAMC2. Genes prone to abnormal methylation in breast carcinoma include LAMA1, LAMA2, LAMA3B, LAMA4, LAMB1, and LAMC3. Genes that are rarely if ever methylated in breast carcinoma include LAMA5 and LAMC1. The constitutively methylated group includes all of the genes that encode subunits of laminin-5 (the historical name of laminin 332), the promoters of which were previously considered unmethylated in normal tissues and prone to abnormal methylation in breast cancer. ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Simonova OA",
+        "Kuznetsova EB",
+        "Poddubskaya EV",
+        "Kekeeva TV",
+        "Kerimov RA",
+        "Trotsenko ID",
+        "Tanas AS",
+        "Rudenko VV",
+        "Alekseeva EA",
+        "Zaletayev DV",
+        "Strelnikov VV"
+      ],
+      "journal": "Mol Biol (Mosk)",
+      "date": "2015-07-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "LAMB2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35063072",
+      "title": "Transition to invasive breast cancer is associated with progressive changes in the structure and composition of tumor stroma",
+      "abstract": "SUMMARY\n\nDuctal carcinoma in situ (DCIS) is a pre-invasive lesion that is thought to be a precursor to invasive breast cancer (IBC). To understand the changes in the tumor microenvironment (TME) accompanying transition to IBC, we used multiplexed ion beam imaging by time of flight (MIBI-TOF) and a 37-plex antibody staining panel to interrogate 79 clinically annotated surgical resections using machine learning tools for cell segmentation, pixel-based clustering, and object morphometrics. Comparison of normal breast with patient-matched DCIS and IBC revealed coordinated transitions between four TME states that were delineated based on the location and function of myoepithelium, fibroblasts, and immune cells. Surprisingly, myoepithelial disruption was more advanced in DCIS patients that did not develop IBC, suggesting this process could be protective against recurrence. Taken together, this HTAN Breast PreCancer Atlas study offers insight into drivers of IBC relapse and emphasizes the importance of the TME in regulating these processes.\n\nIn brief\n\nA spatial imaging atlas of patient-matched ductal carcinoma in situ and invasive breast cancer depicts coordinated changes in the tumor microenviroment associated with invasive relapse, suggesting a potential protective role of myoepithelial disruption against invasive progression.\n\nGraphical Abstract",
+      "journal_quality": 0.7365,
+      "authors": [
+        "Risom T",
+        "Glass DR",
+        "Averbukh I",
+        "Liu CC",
+        "Baranski A",
+        "Kagel A",
+        "McCaffrey EF",
+        "Greenwald NF",
+        "Rivero-Gutiérrez B",
+        "Strand SH",
+        "Varma S",
+        "Kong A",
+        "Keren L",
+        "Srivastava S",
+        "Zhu C",
+        "Khair Z",
+        "Veis DJ",
+        "Deschryver K",
+        "Vennam S",
+        "Maley C",
+        "Hwang ES",
+        "Marks JR",
+        "Bendall SC",
+        "Colditz GA",
+        "West RB",
+        "Angelo M"
+      ],
+      "journal": "Cell",
+      "date": "2022-01-20T00:00:00Z",
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ductal carcinoma in situ",
+          "invasive tumor",
+          "tumor microenvironment",
+          "spatial transcriptomics",
+          "immune cell infiltration"
+        ]
+      },
+      "query_index": 21,
+      "iteration": 0,
+      "query_type": "pathway"
+    },
+    {
+      "pmid": "37044238",
+      "title": "A novel computational predictive biological approach distinguishes Integrin beta1 as a salient biomarker for breast cancer chemoresistance.",
+      "abstract": "Chemoresistance is a primary cause of breast cancer treatment failure, and protein-protein interactions significantly contribute to chemoresistance during different stages of breast cancer progression. In pursuit of novel biomarkers and relevant protein-protein interactions occurring during the emergence of breast cancer chemoresistance, we used a computational predictive biological (CPB) approach. CPB identified associations of adhesion molecules with proteins connected with different breast cancer proteins associated with chemoresistance. This approach identified an association of Integrin beta1 (ITGB1) with chemoresistance and breast cancer stem cell markers. ITGB1 activated the Focal Adhesion Kinase (FAK) pathway promoting invasion, migration, and chemoresistance in breast cancer by upregulating Erk phosphorylation. FAK also activated Wnt/Sox2 signaling, which enhanced self-renewal in breast cancer. Activation of the FAK pathway by ITGB1 represents a novel mechanism linked to breast cancer chemoresistance, which may lead to novel therapies capable of blocking breast cancer progression by intervening in ITGB1-regulated signaling pathways.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Das S",
+        "Kundu M",
+        "Hassan A",
+        "Parekh A",
+        "Jena BC",
+        "Mundre S",
+        "Banerjee I",
+        "Yetirajam R",
+        "Das CK",
+        "Pradhan AK",
+        "Das SK",
+        "Emdad L",
+        "Mitra P",
+        "Fisher PB",
+        "Mandal M"
+      ],
+      "journal": "Biochim Biophys Acta Mol Basis Dis",
+      "date": "2023-08-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "29909039",
+      "title": "Integrin alpha6 and EGFR signaling converge at mechanosensitive calpain 2.",
+      "abstract": "Cells sense and respond to mechanical cues from the extracellular matrix (ECM) via integrins. ECM stiffness is known to enhance integrin clustering and response to epidermal growth factor (EGF), but we lack information on when or if these mechanosensitive growth factor receptors and integrins converge intracellularly. Towards closing this knowledge gap, we combined a biomaterial platform with transcriptomics, molecular biology, and functional assays to link integrin-mediated mechanosensing and epidermal growth factor receptor (EGFR) signaling. We found that high integrin alpha6 expression controlled breast cancer cell adhesion and motility on soft, laminin-coated substrates, and this mimicked the response of cells to EGF stimulation. The mechanisms that drove both mechanosensitive cell adhesion and motility converged on calpain 2, an intracellular protease important for talin cleavage and focal adhesion turnover. EGF stimulation enhanced adhesion and motility on soft substrates, but required integrin alpha6 and calpain 2 signaling. In sum, we identified a new role for integrin alpha6 mechanosensing in breast cancer, wherein cell adhesion to laminin on soft substrates mimicked EGF stimulation. We identified calpain 2, downstream of both integrin alpha6 engagement and EGFR phosphorylation, as a common intracellular signaling node, and implicate integrin alpha6 and calpain 2 as potential targets to inhibit the migration of cancer cells in stiff tumor environments.",
+      "journal_quality": 0.5183,
+      "authors": [
+        "Schwartz AD",
+        "Hall CL",
+        "Barney LE",
+        "Babbitt CC",
+        "Peyton SR"
+      ],
+      "journal": "Biomaterials",
+      "date": "2018-09-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGA6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35092356",
+      "title": "Mouse Modeling Dissecting Macrophage-Breast Cancer Communication Uncovered Roles of PYK2 in Macrophage Recruitment and Breast Tumorigenesis",
+      "abstract": "Abstract\n\nMacrophage infiltration in mammary tumors is associated with enhanced tumor progression, metastasis, and poor clinical outcome, and considered as target for therapeutic intervention. By using different genetic mouse models, the authors show that ablation of the tyrosine kinase PYK2, either in breast cancer cells, only in the tumor microenvironment, or in both, markedly reduces the number of infiltrating tumor macrophages and concomitantly inhibits tumor angiogenesis and tumor growth. Strikingly, PYK2 ablation only in macrophages is sufficient to induce similar effects. These phenotypic changes are associated with reduced monocyte recruitment and a substantial decrease in tumor-associated macrophages (TAMs). Mechanistically, the authors show that PYK2 mediates mutual communication between breast cancer cells and macrophages through critical effects on key receptor signaling. Specifically, PYK2 ablation inhibits Notch1 signaling and consequently reduces CCL2 secretion by breast cancer cells, and concurrently reduces the levels of CCR2, CXCR4, IL-4Ralpha, and Stat6 activation in macrophages. These bidirectional effects modulate monocyte recruitment, macrophage polarization, and tumor angiogenesis. The expression of PYK2 is correlated with infiltrated macrophages in breast cancer patients, and its effects on macrophage infiltration and pro-tumorigenic phenotype suggest that PYK2 targeting can be utilized as an effective strategy to modulate TAMs and possibly sensitize b",
+      "journal_quality": 0.5,
+      "authors": [
+        "Müller AK",
+        "Köhler UA",
+        "Trzebanski S",
+        "Vinik Y",
+        "Raj HM",
+        "Girault JA",
+        "Ben-Chetrit N",
+        "Maraver A",
+        "Jung S",
+        "Lev S"
+      ],
+      "journal": "Adv Sci (Weinh)",
+      "date": "2022-03-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "PTK2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 9,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32782265",
+      "title": "First-in-human pilot study of an integrin alpha6-targeted radiotracer for SPECT imaging of breast cancer",
+      "abstract": "Article: 32782265",
+      "journal_quality": 0.5,
+      "authors": [
+        "Gao S",
+        "Jia B",
+        "Feng G",
+        "Dong C",
+        "Du H",
+        "Bai L",
+        "Zhong Q",
+        "Ma Q",
+        "Zeng M",
+        "Wang F"
+      ],
+      "journal": "Signal Transduct Target Ther",
+      "date": "2020-08-11T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGA6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32494122",
+      "title": "Pranlukast Antagonizes CD49f and Reduces Stemness in Triple-Negative Breast Cancer Cells",
+      "abstract": "Introduction\n\nCancer stem cells (CSCs) drive the initiation, maintenance, and therapy response of breast tumors. CD49f is expressed in breast CSCs and functions in the maintenance of stemness. Thus, blockade of CD49f is a potential therapeutic approach for targeting breast CSCs. In the present study, we aimed to repurpose drugs as CD49f antagonists.\n\nMaterials and Methods\n\nWe performed consensus molecular docking using a subdomain of CD49f that is critical for heterodimerization and a collection of pharmochemicals clinically tested. Molecular dynamics simulations were employed to further characterize drug-target binding. Using MDA-MB-231 cells, we evaluated the effects of potential CD49f antagonists on 1) cell adhesion to laminin; 2) mammosphere formation; and 3) cell viability. We analyzed the effects of the drug with better CSC-selectivity on the activation of CD49f-downstream signaling by Western blot (WB) and co-immunoprecipitation. Expressions of the stem cell markers CD44 and SOX2 were analyzed by flow cytometry and WB, respectively. Transactivation of SOX2 promoter was evaluated by luciferase reporter assays. Changes in the number of CSCs were assessed by limiting-dilution xenotransplantation.\n\nResults\n\nPranlukast, a drug used to treat asthma, bound to CD49f in silico and inhibited the adhesion of CD49f+ MDA-MB-231 cells to laminin, indicating that it antagonizes CD49f-containing integrins. Molecular dynamics analysis showed that pranlukast binding induces conformation",
+      "journal_quality": 0.5,
+      "authors": [
+        "Velázquez-Quesada I",
+        "Ruiz-Moreno AJ",
+        "Casique-Aguirre D",
+        "Aguirre-Alvarado C",
+        "Cortés-Mendoza F",
+        "de la Fuente-Granada M",
+        "García-Pérez C",
+        "Pérez-Tapia SM",
+        "González-Arenas A",
+        "Segura-Cabrera A",
+        "Velasco-Velázquez MA"
+      ],
+      "journal": "Drug Des Devel Ther",
+      "date": "2020-05-12T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGA6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "31295752",
+      "title": "In silico analysis-based identification of the target residue of integrin alpha6 for metastasis inhibition of basal-like breast cancer.",
+      "abstract": "Metastasis causes death in breast cancer patients. To inhibit breast cancer metastasis, we focused on integrin alpha6, a membrane protein that contributes to cell migration and metastasis. According to in silico analysis, we identified Asp-358 as an integrin alpha6-specific vertebrate-conserved residue and consequently as a potential therapeutic target. Because Asp-358 is located on the surface of the beta propeller domain that interacts with other molecules for integrin alpha6 function, we hypothesized that a peptide with the sequence around Asp-358 competitively inhibits integrin alpha6 complex formation. We treated basal-like breast cancer cells with the peptide and observed reductions in cell migration and metastasis. The result of the immunoprecipitation assay showed that the peptide inhibited integrin alpha6 complex formation. Our immunofluorescence for phosphorylated paxillin, a marker of integrin-regulated focal adhesion, showed that the peptide reduced the number of focal adhesions. These results indicate that the peptide inhibits integrin alpha6 function. This study identified the functional residue of integrin alpha6 and designed the inhibitory peptide. For breast cancer patients, metastasis inhibition therapy may be developed in the future based on this study.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Tanaka S",
+        "Senda N",
+        "Iida A",
+        "Sehara-Fujisawa A",
+        "Ishii T",
+        "Sato F",
+        "Toi M",
+        "Itou J"
+      ],
+      "journal": "Genes Cells",
+      "date": "2019-09-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGA6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28690650",
+      "title": "CD49f Can Act as a Biomarker for Local or Distant Recurrence in Breast Cancer",
+      "abstract": "Purpose\n\nMetastasis and local recurrence are the primary causes of treatment failure and patient death in breast cancer. The aim of this study was to validate a metastasis- and local recurrenceassociated biomarker for prognostic evaluation and planning treatment strategies.\n\nMethods\n\nFormalin-fixed, paraffin-embedded tissues from a cohort of 312 patients (all stage II and III) were used. The prevalence of CD49f+ cells in the patients' tumors was analyzed and correlated with clinical characteristics to determine its prognostic and clinical implications.\n\nResults\n\nCD49f+ tumor cells were found in a minority of tumors, with 62.8% of the samples showing not a single cell of this subtype. In the clinical characteristics analysis, which were performed with t-tests, CD49f+ tumors were not associated with age, tumor size, World Health Organization grade, nodal status, human epidermal growth factor receptor 2 status, progesterone receptor status, or estrogen receptor status, although they were significantly associated with disease recurrence (distant metastasis or/and local recurrence). Univariate survival analysis using the Kaplan-Meier method showed that CD49f+ tumors were associated with markedly decreased disease-free survival (DFS); the same result was found using multivariate Cox analysis, even when only chemotherapy-treated patients were analyzed.\n\nConclusion\n\nOur results indicated that breast tumors with CD49f+ cancer cells are associated with an increased risk for disease rec",
+      "journal_quality": 0.5,
+      "authors": [
+        "Ye F",
+        "Zhong X",
+        "Qiu Y",
+        "Yang L",
+        "Wei B",
+        "Zhang Z",
+        "Bu H"
+      ],
+      "journal": "J Breast Cancer",
+      "date": "2017-06-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGA6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "27624978",
+      "title": "Integrin alpha6/Akt/Erk signaling is essential for human breast cancer resistance to radiotherapy",
+      "abstract": "Integrin alpha6 (ITGA6), a transmembrane glycoprotein adhesion receptor protein, is widely upregulated in many types of tumors and promotes migration and invasion in cancer cells. However, the role that the ITGA6-associated signaling network plays in radiosensitivity in breast cancer has not been described. The expression of ITGA6 was examined in human breast cancer and normal breast cell lines using western blot analysis. We also explored the role of ITGA6 in the regulation of radiation sensitivity in breast cancer using the colony formation assays, cell cycle analyses, apoptosis assays and immunofluorescence analyses. The results showed that the protein and mRNA expression levels of ITGA6 was higher in breast cancer cells than in normal cells. ITGA6 protectived responses to radiotherapy in breast cancer cells by altering cell apoptosis, DNA damage repair and cell-cycle regulation. Furthermore, ITGA6 enhanced radiation resistance via PI3K/Akt and MEK/Erk signaling. In addition, overexpressing ITGA6 promoted radiation resistance in cells, and this effect was neutralized by the PI3K inhibitor LY294002 and MEK inhibitor U0126. Taken together, these findings indicate that ITGA6 might be involved in a mechanism that underlies radiation resistance and that ITGA6 could be a potential target for therapies aimed at overcoming radiation resistance in breast cancer.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Hu T",
+        "Zhou R",
+        "Zhao Y",
+        "Wu G"
+      ],
+      "journal": "Sci Rep",
+      "date": "2016-09-14T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGA6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "27001172",
+      "title": "ITGA6 is directly regulated by hypoxia-inducible factors and enriches for cancer stem cell activity and invasion in metastatic breast cancer models",
+      "abstract": "Background\n\nHypoxia-inducible factors (HIFs) are well-established mediators of tumor growth, the epithelial to mesenchymal transition (EMT) and metastasis. In several types of solid tumors, including breast cancers, the HIFs play a critical role in maintaining cancer stem cell (CSC) activity. Thus, we hypothesized that HIFs may also regulate transcription of markers of breast CSC activity. One approach to enrich for breast cells with stem-like phenotypes is FACS sorting, in which sub-populations of live cells are gated based on the expression of cell surface antigens, including various integrin subunits. Integrin alpha 6 (ITGA6; CD49f) is routinely used in combination with other integrin subunits to enrich for breast stem cells by FACS. Integrins not only mediate interactions with the extracellular matrix (ECM), but also drive intracellular signaling events that communicate from the tumor microenvironment to inside of the tumor cell to alter phenotypes including migration and invasion.\n\nMethods\n\nWe used two models of metastatic breast cancer (MBC), polyoma middle T (MMTV-PyMT) and MDA-MB-231 cells, to compare the expression of ITGA6 in wild type and knockout (KO) or knockdown cells. Chromatin immunoprecipitation (ChIP) and luciferase reporter assays verified that ITGA6 is a direct HIF transcriptional target. We also used FACS sorting to enrich for CD49f + cells to compare tumorsphere formation, tumor initiating cell activity, invasion and HIF activity relative to CD49fneg or ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Brooks DL",
+        "Schwab LP",
+        "Krutilina R",
+        "Parke DN",
+        "Sethuraman A",
+        "Hoogewijs D",
+        "Schörg A",
+        "Gotwald L",
+        "Fan M",
+        "Wenger RH",
+        "Seagroves TN"
+      ],
+      "journal": "Mol Cancer",
+      "date": "2016-03-22T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGA6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26472974",
+      "title": "The Presence of EpCAM-/CD49f+ Cells in Breast Cancer Is Associated with a Poor Clinical Outcome",
+      "abstract": "Purpose\n\nIt is well established that breast cancer stem cells (BCSCs) play an essential role in tumor invasion for both local and distant metastasis. The aim of this study was to establish whether BCSCs could act as a prognostic and clinical marker.\n\nMethods\n\nWe analyzed tumor tissues from 161 breast cancer patients. Dual immunohistochemistry and immunofluorescence were performed on all the slides, and we analyzed the relationship between EpCAM-/CD49f+ tumor cells and key clinical and prognostic factors.\n\nResults\n\nUnivariate survival analysis using the Kaplan-Meier method showed that the presence of EpCAM-/CD49f+ tumor cells in breast cancer was significantly associated with shorter disease-free survival (DFS) and overall survival (OS). Multivariate analysis showed that the presence of EpCAM-/CD49f+ cells was associated with shorter DFS (p=0.010; hazard ratio [HR], 2.070) and OS (p=0.002; HR, 3.235). Tumors containing EpCAM-/CD49f+ cells were also more likely to metastasize after initial surgery (p=0.048).\n\nConclusion\n\nOur study suggests that breast tumors containing EpCAM-/CD49f+ cells are more likely to undergo distant metastasis after initial surgery and are associated with a shorter DFS and OS.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Ye F",
+        "Qiu Y",
+        "Li L",
+        "Yang L",
+        "Cheng F",
+        "Zhang H",
+        "Wei B",
+        "Zhang Z",
+        "Sun L",
+        "Bu H"
+      ],
+      "journal": "J Breast Cancer",
+      "date": "2015-09-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGA6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23879988",
+      "title": "Understanding breast cancer stem cell heterogeneity: time to move on to a new research paradigm",
+      "abstract": "Human breast cancer (BC) is one of the leading causes of death for women worldwide, and is characterized by a group of highly heterogeneous lesions. The morphological and biomolecular heterogeneity of BC cells, accompanied by dynamic plasticity of the BC microenvironment and the presence of stem-like cells, make tumor categorization an urgent and demanding task.\n\nThe major limitations in BC research include the high flexibility rate of breast cancer stem cells (BCSCs) and the difficulty of their identification. Improved profiling methods and extensive characterization of BCSCs were recently presented in BMC Cancer, highlighting that the majority of BC cells had a luminal EpCAMhigh/CD49f+ phenotype, and identification of CD44high/CD24low subpopulation of cancer stem cells significantly improves the flow cytometry measurement of BCSCs with higher stem/progenitor ability.\n\nFuture developments in single-cell omics will potentially revolutionize cancer biology and clinical practice, providing better understanding of BC heterogeneity, how BCSCs evolve, and which BC cells to target to avoid drug resistance.\n\nPlease see related research published in BMC Cancer: http://www.biomedcentral.com/1471-2407/13/289/abstract",
+      "journal_quality": 0.5,
+      "authors": [
+        "Mannello F"
+      ],
+      "journal": "BMC Med",
+      "date": "2013-07-23T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGA6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "41367007",
+      "title": "Identification of breast cancer susceptibility genes via trans-ethnic Mendelian randomization and colocalization analyses.",
+      "abstract": "Breast cancer remains a major global health burden, with persistent challenges including recurrence, metastasis, and drug resistance limiting the efficacy of current treatments. The identification of novel therapeutic targets is essential for advancing precision oncology. We employed a 2-sample Mendelian randomization (MR) framework utilizing large-scale eQTL and genome-wide association study (GWAS) datasets from European cohorts to identify genetic targets for breast cancer. Colocalization analysis, phenome-wide association studies (PheWAS), protein-protein interaction networks, and functional enrichment analyses (GO/KEGG) were conducted. Single-cell gene expression was also analyzed. Candidate drugs were predicted using pharmacogenomic databases and subsequently validated through molecular docking simulations. MR analysis identified 480 candidate targets, among which 51 were successfully validated. Colocalization analysis highlighted 7 genes - DNPH1, SYT11, RCCD1, LAMB2, SLC22A5, CBX6, and FAAH - with strong evidence of causal association. Functional annotation and protein-protein interaction (PPI) network analysis revealed their involvement in key cancer-related pathways. Their expression patterns were also analyzed at the single-cell level. Molecular docking confirmed stable binding affinities between the identified target proteins and their predicted drug candidates. This integrative genomics and bioinformatics approach identified 7 promising drug targets for breast canc",
+      "journal_quality": 0.5,
+      "authors": [
+        "Huang K",
+        "Huang H",
+        "Ma LL",
+        "Liu Y",
+        "Li Q"
+      ],
+      "journal": "Medicine (Baltimore)",
+      "date": "2025-12-05T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "LAMB2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33616312",
+      "title": "The tumor cell-derived matrix of lobular breast cancer: a new vulnerability",
+      "abstract": "Invasive lobular carcinoma (ILC) of the breast is a very common disease. Despite its prevalence, these tumors are relatively understudied. One reason for this is a relative lack of models for ILC. This challenge was addressed by Brisken and colleagues through development of an intraductal injection-based xenograft system for the study of ERalpha+ breast cancers, including both ILC and more common invasive ductal carcinoma (IDC; Sflomos et al, 2016). In this issue of EMBO Molecular Medicine, the same group have applied intraductal injection-based xenografts to identify novel tumor cell-specific transcriptional signatures in ILC (Sflomos et al, 2021). In doing so they found overexpression of lysyl oxidase-like 1 (LOXL1) to be both responsible for the frequently seen stiff collagen-rich extracellular matrix of lobular breast cancer and essential for their robust growth and metastatic dissemination in vivo, thereby identifying a novel therapeutic target.\n\nDespite its prevalence, invasive lobular carcinoma (ILC) is relatively understudied. In their recent study, Brisken and colleagues apply intraductal injection based xenografts to characterize tumor-cell specific transcriptional signatures in ILC and identify a novel therapeutic target. ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Kozma KJ",
+        "Done SJ",
+        "Egan SE"
+      ],
+      "journal": "EMBO Mol Med",
+      "date": "2021-03-05T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "LAMB2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33477804",
+      "title": "Integrin alpha3beta1 Represses Reelin Expression in Breast Cancer Cells to Promote Invasion",
+      "abstract": "Simple Summary\n\nBreast cancer remains the second leading cause of cancer-related deaths in women, and about 1 in 8 women in the United States develops invasive breast cancer in her lifetime. Integrin alpha3beta1 has been linked to breast cancer progression, but mechanisms whereby it promotes tumor invasion remain unclear. The goal of our study was to determine how alpha3beta1 drives invasion, towards exploiting this integrin as a therapeutic target for breast cancer. We found that alpha3beta1 represses the expression of Reelin, a secreted glycoprotein that inhibits invasion and for which loss of expression is associated with poor prognosis in breast cancer. We also show that increased Reelin expression following RNAi-mediated suppression of alpha3beta1 causes a significant decrease in breast cancer cell invasion. Our findings demonstrate a critical role for alpha3beta1 in promoting cell invasion through repression of Reelin, highlighting the potential value of this integrin as a therapeutic target for breast cancer.\n\nAbstract\n\nIntegrin alpha3beta1, a cell adhesion receptor for certain laminins, is known to promote breast tumor growth and invasion. Our previous gene microarray study showed that the RELN gene, which encodes the extracellular glycoprotein Reelin, was upregulated in alpha3beta1-deficient (i.e., alpha3 knockdown) MDA-MB-231 cells. In breast cancer, reduced RELN expression is associated with increased invasion and poor prognosis. In this study we demonstrate that a",
+      "journal_quality": 0.5,
+      "authors": [
+        "Ndoye A",
+        "Miskin RP",
+        "DiPersio CM"
+      ],
+      "journal": "Cancers (Basel)",
+      "date": "2021-01-19T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "LAMB2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26743193",
+      "title": "The extracellular matrix in breast cancer.",
+      "abstract": "The extracellular matrix (ECM) is increasingly recognized as an important regulator in breast cancer. ECM in breast cancer development features numerous changes in composition and organization when compared to the mammary gland under homeostasis. Matrix proteins that are induced in breast cancer include fibrillar collagens, fibronectin, specific laminins and proteoglycans as well as matricellular proteins. Growing evidence suggests that many of these induced ECM proteins play a major functional role in breast cancer progression and metastasis. A number of the induced ECM proteins have moreover been shown to be essential components of metastatic niches, promoting stem/progenitor signaling pathways and metastatic growth. ECM remodeling enzymes are also markedly increased, leading to major changes in the matrix structure and biomechanical properties. Importantly, several ECM components and ECM remodeling enzymes are specifically induced in breast cancer or during tissue regeneration while healthy tissues under homeostasis express exceedingly low levels. This may indicate that ECM and ECM-associated functions may represent promising drug targets against breast cancer, providing important specificity that could be utilized when developing therapies. ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Insua-Rodríguez J",
+        "Oskarsson T"
+      ],
+      "journal": "Adv Drug Deliv Rev",
+      "date": "2016-02-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "LAMB2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26648682",
+      "title": "High Expression of Three-Gene Signature Improves Prediction of Relapse-Free Survival in Estrogen Receptor-Positive and Node-Positive Breast Tumors",
+      "abstract": "The objective of the present study was to validate prognostic gene signature for estrogen receptor alpha-positive (ER03B1+) and lymph node (+) breast cancer for improved selection of patients for adjuvant therapy. In our previous study, we identified a group of seven genes (GATA3, NTN4, SLC7A8, ENPP1, MLPH, LAMB2, and PLAT) that show elevated messenger RNA (mRNA) expression levels in ERalpha (+) breast cancer patient samples. The prognostic values of these genes were evaluated using gene expression data from three public data sets of breast cancer patients (n = 395). Analysis of ERalpha (+) breast cancer cohort (n = 195) showed high expression of GATA3, NTN4, and MLPH genes significantly associated with longer relapse-free survival (RFS). Next cohort of ERalpha (+) and node (+) samples (n = 109) revealed high mRNA expression of GATA3, SLC7A8, and MLPH significantly associated with longer RFS. Multivariate analysis of combined three-gene signature for ERalpha (+) cohort, and ERalpha (+) and node (+) cohorts showed better hazard ratio than individual genes. The validated three-gene signature sets for ERalpha (+) cohort, and ERalpha (+) and node (+) cohort may have potential clinical utility since they demonstrated predictive and prognostic ability in three independent public data sets.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Thakkar A",
+        "Raj H",
+        "Ravishankar",
+        "Muthuvelan B",
+        "Balakrishnan A",
+        "Padigaru M"
+      ],
+      "journal": "Biomark Insights",
+      "date": "2015-11-30T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "LAMB2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "24179381",
+      "title": "Identification of Gene Expression Signature in Estrogen Receptor Positive Breast Carcinoma",
+      "abstract": "A significant group of patient with estrogen receptor (ER) alpha positive breast tumors fails to appreciably respond to endocrine therapy. An increased understanding of the molecular basis of estrogen-mediated signal transduction and resultant gene expression may lead to novel strategies for treating breast cancer. In this study, we sought to identify the dysregulated genes in breast tumors related to ERalpha status. Microarray analyses of 31 tumor samples showed 108 genes differentially expressed in ERalpha (+) and ERalpha (-) primary breast tumors. Further analyses of gene lists indicated that a significant number of dysregulated genes were involved in mRNA transcription and cellular differentiation. The majority of these genes were found to have promoter-binding sites for E74-like factor 5 (ELF5; 54.6% genes), E2F transcription factor 1 (E2F1; 22.2% genes), and nuclear transcription factor Y alpha (NFYA; 32.4% genes). Six candidate genes (NTN4, SLC7A8, MLPH, ENPP1, LAMB2, and PLAT) with differential expression were selected for further validation studies using RT-qPCR (76 clinical specimen) and immunohistochemistry (48 clinical specimen). Our studies indicate significant over-expression of all the six genes in ERalpha (+) breast tumors as compared to ERalpha (-) breast tumors. In vitro studies using T-47D breast cancer cell line confirmed the estrogen dependant expression of four of the above six genes (SLC7A8, ENPP1, LAMB2, and PLAT). Collectively, our study provides furt",
+      "journal_quality": 0.5,
+      "authors": [
+        "Thakkar AD",
+        "Raj H",
+        "Chakrabarti D",
+        "Ravishankar",
+        "Saravanan N",
+        "Muthuvelan B",
+        "Balakrishnan A",
+        "Padigaru M"
+      ],
+      "journal": "Biomark Cancer",
+      "date": "2010-02-11T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "LAMB2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "15987446",
+      "title": "Overexpression of beta1-chain-containing laminins in capillary basement membranes of human breast cancer and its metastases",
+      "abstract": "Introduction\n\nLaminins are the major components of vascular and parenchymal basement membranes. We previously documented a switch in the expression of vascular laminins containing the alpha4 chain from predominantly laminin-9 (alpha4beta2gamma1) to predominantly laminin-8 (alpha4beta1gamma1) during progression of human brain gliomas to high-grade glioblastoma multiforme. Here, differential expression of laminins was studied in blood vessels and ductal epithelium of the breast.\n\nMethod\n\nIn the present study the expressions of laminin isoforms alpha1-alpha5, beta1-beta3, gamma1, and gamma2 were examined during progression of breast cancer. Forty-five clinical samples of breast tissues including normal breast, ductal carcinomas in situ, invasive ductal carcinomas, and their metastases to the brain were compared using Western blot analysis and immunohistochemistry for various chains of laminin, in particular laminin-8 and laminin-9.\n\nResults\n\nLaminin alpha4 chain was observed in vascular basement membranes of most studied tissues, with the highest expression in metastases. At the same time, the expression of laminin beta2 chain (a constituent of laminin-9) was mostly seen in normal breast and carcinomas in situ but not in invasive carcinomas or metastases. In contrast, laminin beta1 chain (a constituent of laminin-8) was typically found in vessel walls of carcinomas and their metastases but not in those of normal breast. The expression of laminin-8 increased in a progression-depe",
+      "journal_quality": 0.5,
+      "authors": [
+        "Fujita M",
+        "Khazenzon NM",
+        "Bose S",
+        "Sekiguchi K",
+        "Sasaki T",
+        "Carter WG",
+        "Ljubimov AV",
+        "Black KL",
+        "Ljubimova JY"
+      ],
+      "journal": "Breast Cancer Res",
+      "date": "2005-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "LAMB2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "20641540",
+      "title": "L36-Cy5 anti-laminin trimerbody",
+      "abstract": "The laminin family of glycoproteins is a major constituent of both epithelial and vascular basement membranes (BMs) (1, 2). L36-Cy5 anti-laminin trimerbody is an anti-laminin single-chain variable fragment (scFv) trimerbody labeled with the fluorescent reporter Cy5, and it has been developed for optical imaging of solid tumors (3, 4). Monoclonal antibodies (mAbs) and antibody fragments have been used for tumor targeting for many years. An ideal tumor-targeting antibody should fulfill several requirements: rapid tissue penetration, high target retention, and rapid blood clearance (5, 6). The format and molecular weight of an antibody are critical factors that influence its pharmacokinetics and <i>in vivo</i> efficacy (5-7). Intact mAbs (~150 kDa) display low blood clearance and incomplete tumor penetration. The production yield of mAbs is limited (5). These disadvantages of mAbs are partially overcome by developing recombinant scFv antibody fragments. Monovalent scFv (25-30 kDa) represents the smallest functional component of an antibody, and it is more efficient in tumor penetration. However, the scFv fragment is cleared from blood too rapidly, and it has poor binding affinity and tumor retention. Bivalent antibodies such as diabodies (55-60 kDa) and minibodies (~80 kDa) possess more ideal tumor-targeting characteristics such as compact size and higher binding affinity than monovalent scFv (6). Diabodies are dimeric molecules consisting of two scFv fragments connected with a ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Shan L"
+      ],
+      "journal": "",
+      "date": "2009-08-18T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "LAMB2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "15987470",
+      "title": "Laminin isoform expression in breast tumors",
+      "abstract": "Certain laminins of vascular basement membranes have been identified in human breast tumors and brain gliomas that share the same beta1 chain. These laminins are new carcinoma angiogenic markers and might represent potential targets for antiangiogenic therapy.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Holler E"
+      ],
+      "journal": "Breast Cancer Res",
+      "date": "2005-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "LAMB2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30719702",
+      "title": "beta1 Integrin is essential for fascin-mediated breast cancer stem cell function and disease progression",
+      "abstract": "Breast cancer remains the second cause of tumor-related mortality in women worldwide mainly due to chemoresistance and metastasis. The chemoresistance and metastasis are attributed to a rare subpopulation with enriched stem-like characteristics, thus called Cancer Stem Cells (CSCs). We have previously reported aberrant expression of the actin-bundling protein (fascin) in breast cancer cells, which enhances their chemoresistance, metastasis and enriches CSC population. The intracellular mechanisms that link fascin with its downstream effectors are not fully elucidated. Here, loss and gain of function approaches in two different breast cancer models were used to understand how fascin promotes disease progression. Importantly, findings were aligned with expression data from actual breast cancer patients. Expression profiling of a large breast cancer dataset (TCGA, 530 patients) showed statistically significant correlation between fascin expression and a key adherence molecule, beta1 integrin (ITGB1). In vitro manipulation of fascin expression in breast cancer cells exhibited its direct effect on ITGB1 expression. Fascin-mediated regulation of ITGB1 was critical for several breast cancer cell functions including adhesion to different extracellular matrix, self-renewability and chemoresistance. Importantly, there was a significant relationship between fascin and ITGB1 co-expression and short disease-free as well as overall survival in chemo-treated breast cancer patients. This nov",
+      "journal_quality": 0.5,
+      "authors": [
+        "Barnawi R",
+        "Al-Khaldi S",
+        "Colak D",
+        "Tulbah A",
+        "Al-Tweigeri T",
+        "Fallatah M",
+        "Monies D",
+        "Ghebeh H",
+        "Al-Alwan M"
+      ],
+      "journal": "Int J Cancer",
+      "date": "2019-08-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28829502",
+      "title": "Expression of long non-coding RNA linc-ITGB1 in breast cancer and its influence on prognosis and survival.",
+      "abstract": "OBJECTIVE: Long noncoding RNA linc-ITGB1 (linc-ITGB1) was reported to serve as a tumor promoter in breast cancer (BC). However, the clinical significance of linc-ITGB1 has not been reported. The present study aimed to determine the relationship between linc-ITGB1 expression and clinicopathological features and survival. PATIENTS AND METHODS: qRT-PCR was used to quantify the expression levels of linc-ITGB1 in BC and adjacent non-cancerous breast tissues. The X2 test was performed to determine the associations between linc-ITGB expression and the clinicopathological characters. The overall survival time (OS) and disease-free survival (DFS) were collected by follow-up and analyzed by Kaplan-Meier analysis. Multivariate Cox regression analysis was used to identify the independent risk factors for BC. RESULTS: The results showed that linc-ITGB1 levels were lower in tumor tissues of BC patients in comparison to adjacent non-cancerous breast tissues (p < 0.001). Linc-ITGB1 expression was significantly associated with lymph node metastasis, pathological differentiation and TNM stage (all p < 0.05). Furthermore, Kaplan-Meier analysis demonstrated that high-linc-ITGB1 expression level was associated with poorer OS (p = 0.006) and DFS (p = 0.003). Cox proportional hazards risk analysis demonstrated that linc-ITGB1 was an independent predictor for both OS (p = 0.004) and DFS (p = 0.002) in BC. CONCLUSIONS: These results indicated, for the first time, that linc-ITGB1 be a potential biomar",
+      "journal_quality": 0.5,
+      "authors": [
+        "Li WX",
+        "Sha RL",
+        "Bao JQ",
+        "Luan W",
+        "Su RL",
+        "Sun SR"
+      ],
+      "journal": "Eur Rev Med Pharmacol Sci",
+      "date": "2017-08-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28160423",
+      "title": "Polymeric Delivery of siRNA against Integrin-beta1 (CD29) to Reduce Attachment and Migration of Breast Cancer Cells.",
+      "abstract": "Cell surface integrins, which play important roles in the survival, proliferation, migration, and invasion of cancer cells, are a viable target for treatment of metastatic breast cancer. This line of therapy still remains challenging due to the lack of proper identification and validation of effective targets as well as the lack of suitable therapeutic agents for treatment. The focus is on one such molecular target for this purpose, namely integrin-beta1, and effective lowering of integrin-beta1 levels on a breast cancer model (MDA-MB-231 cells) is achieved by delivering a dicer-substrate short interfering RNA (siRNA) targeting integrin-beta1 with lipid-modified low molecular weight polyethylenimine polymers. Reduction of integrin-beta1 levels leads to reduced adhesion of MDA-MB-231 cells to extracellular matrix component fibronectin as well as to human bone marrow cells. A reduced migration of the breast cancer cells is also observed after integrin-beta1 silencing in \"scratch\" and \"transwell\" migration assays. These results highlight the importance of integrin-beta1 for the migration of metastatic breast cancer cells by effectively silencing this target with a practical dose of siRNA.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Meenakshi Sundaram DN",
+        "Kucharski C",
+        "Parmar MB",
+        "Kc RB",
+        "Uludağ H"
+      ],
+      "journal": "Macromol Biosci",
+      "date": "2017-06-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21400218",
+      "title": "Expression of Toll-like receptor 4 and beta 1 integrin in breast cancer.",
+      "abstract": "Toll-like receptor (TLR) 4 signaling pathway has been shown to support tumor cell growth in vitro and in vivo. Its stimulation on breast cancer cell lines induces beta1 integrin and promotes tumor invasiveness. However, its role in predicting clinical behavior of tumor is not yet clarified. Therefore, we investigated TLR4 and beta1 integrin expression on 133 primary breast cancer samples by immunohistochemistry and correlated it with overall survival and disease-free survival of patients as well as with clinicopathological characteristics of the tumor. We found higher beta1 integrin expression in invasive lobular cancer in comparison with other tumor types. No significant association of TLR4 and beta1 integrin expression with overall survival or disease-free survival was seen. Therefore, we conclude that expression of these markers is of biological interest but appears to be of little additional use as predictive clinical marker.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Petricevic B",
+        "Vrbanec D",
+        "Jakic-Razumovic J",
+        "Brcic I",
+        "Rabic D",
+        "Badovinac T",
+        "Ozimec E",
+        "Bali V"
+      ],
+      "journal": "Med Oncol",
+      "date": "2012-06-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "17234776",
+      "title": "Increased beta1 integrin is associated with decreased survival in invasive breast cancer.",
+      "abstract": "Aberrant microenvironments and loss of balance in cell-extracellular matrix signaling are associated with breast cancer invasion, metastasis, and resistance to therapy. We have recently shown that increased beta1 integrin signaling is involved in malignant progression and that inhibitory antibody to beta1 integrin leads to selective apoptosis and decreased proliferation in three-dimensional cultures and in xenograft models of breast cancer in vivo. To investigate the clinical importance of these findings, in the present study we examined the expression of beta1 integrin and extracellular beta1 integrin ligands fibronectin and laminin-1 in a cohort of 249 breast cancer patients who had a median follow-up of 8.4 years. Among the 149 scorable cases, the highest beta1 integrin intensity score (3+ versus 0-2+) was associated with significantly decreased 10-year overall survival of 48% versus 71% (P<0.03) and decreased disease-free survival of 50% versus 80% (P<0.05). Importantly, high fibronectin expression was associated with decreased overall and disease-free survival on univariate analysis (P<0.04) and beta1 integrin intensity score was significantly correlated with fibronectin expression (Kendall's tau-b=0.19; P=0.03). In a multivariate Cox proportional hazards model, beta1 integrin intensity score remained a significant independent predictor of overall survival [hazard ratio (HR), 1.69; 95% confidence interval (95% CI), 1.19-2.38; P<0.003] and disease-free survival (HR, 1.87;",
+      "journal_quality": 0.5,
+      "authors": [
+        "Yao ES",
+        "Zhang H",
+        "Chen YY",
+        "Lee B",
+        "Chew K",
+        "Moore D",
+        "Park C"
+      ],
+      "journal": "Cancer Res",
+      "date": "2007-01-15T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "11408736",
+      "title": "Potential role of beta 1 integrin and collagen biosynthesis in estrogen-dependent reduction of apoptosis in tamoxifen-treated breast cancer cells.",
+      "abstract": "It was found that 10 microM tamoxifen induced apoptosis and a significant (approximately 50%) depletion of beta 1 integrin levels in human breast cancer cells. Estradiol-treated MCF-7 cells exhibited exceptional viability and adherence, high levels of beta 1 integrin and increased (by 100%) collagen biosynthesis. Pretreatment of MCF-7 cells with 1 nM estradiol prevented tamoxifen-induced cell death, loss of cell adherence and decrease in beta 1 integrin level. Tamoxifen and estradiol had an opposite effect on the beta 1 integrin level and adherence in breast cancer cells, suggesting that the decrease in the beta 1 integrin level may be an early event during tamoxifen-induced apoptosis in breast cancer cells.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Dabrowska M",
+        "Palka J",
+        "Wolczynski S",
+        "Pietruczuk M",
+        "Osada J"
+      ],
+      "journal": "Gynecol Obstet Invest",
+      "date": "2001-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36769251",
+      "title": "The Association of Integrins beta3, beta4, and alphaVbeta5 on Exosomes, CTCs and Tumor Cells with Localization of Distant Metastasis in Breast Cancer Patients",
+      "abstract": "Integrins are cell adhesion receptors, which play a role in breast cancer invasion, angiogenesis, and metastasis. Moreover, it has been shown that exosomal integrins provide organotropic metastasis in a mouse model. In our study, we aimed to investigate the expression of integrins beta3, beta4, and alphaVbeta5 on exosomes and tumor cells (circulating tumor cells and primary tumor) and their association with the localization of distant metastasis. We confirmed the association of exosomal integrin beta4 with lung metastasis in breast cancer patients. However, we were unable to evaluate the role of integrin beta3 in brain metastasis due to the rarity of this localization. We established no association of exosomal integrin alphaVbeta5 with liver metastasis in our cohort of breast cancer patients. The further evaluation of beta3, beta4, and alphaVbeta5 integrin expression on CTCs revealed an association of integrin beta4 and alphaVbeta5 with liver, but not the lung metastases. Integrin beta4 in the primary tumor was associated with liver metastasis. Furthermore, an in-depth analysis of phenotypic characteristics of beta4+ tumor cells revealed a significantly increased proportion of E-cadherin+ and CD44+CD24- cells in patients with liver metastases compared to patients with lung or no distant metastases.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Grigoryeva ES",
+        "Tashireva LA",
+        "Savelieva OE",
+        "Zavyalova MV",
+        "Popova NO",
+        "Kuznetsov GA",
+        "Andryuhova ES",
+        "Perelmuter VM"
+      ],
+      "journal": "Int J Mol Sci",
+      "date": "2023-02-02T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33097423",
+      "title": "Corrigendum to \"The soluble nectin-4 ecto-domain promotes breast cancer induced angiogenesis via endothelial Integrin-beta4\" [Int J Biochem Cell Biol, 2018, Sep, 102, 151-160].",
+      "abstract": "Article: 33097423",
+      "journal_quality": 0.5,
+      "authors": [
+        "Siddharth S",
+        "Nayak A",
+        "Das S",
+        "Nayak D",
+        "Panda J",
+        "Wyatt MD",
+        "Kundu CN"
+      ],
+      "journal": "Int J Biochem Cell Biol",
+      "date": "2021-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "ITGB4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "ITGA6"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "LAMB2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ITGB1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ITGB4"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "LAMA5"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "LAMC1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "LAMA2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "LAMB1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CD151"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "PTK2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "LAMC2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "LAMC3"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "COL17A1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "LAMA3"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "LAMA4"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ITGA6",
+        "ITGB1",
+        "ITGB4",
+        "CD151"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "integrin receptor",
+        "cell adhesion",
+        "extracellular matrix interaction"
+      ]
+    },
+    {
+      "genes": [
+        "LAMA5",
+        "LAMB2",
+        "LAMC1",
+        "COL17A1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "laminin",
+        "basement membrane",
+        "cell-matrix adhesion",
+        "protease substrate"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "androgen signaling",
+        "androgen receptor pathway",
+        "hormone signaling",
+        "tumor progression"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "PI3K/AKT pathway",
+        "MAPK signaling",
+        "NF-kB pathway",
+        "estrogen receptor signaling"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "macrophage",
+        "T cell",
+        "tumor microenvironment",
+        "immune infiltration",
+        "spatial distribution"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "ductal carcinoma in situ",
+        "invasive tumor",
+        "tumor microenvironment",
+        "spatial transcriptomics",
+        "immune cell infiltration"
+      ]
+    },
+    {
+      "genes": [
+        "ITGA6",
+        "PTK2",
+        "LAMA3"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "PI3K/AKT pathway",
+        "MAPK signaling",
+        "spatial transcriptomics",
+        "cell-cell interaction",
+        "tumor microenvironment"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "LAMB2",
+      "LAMA5",
+      "LAMC1",
+      "LAMA2",
+      "LAMB1",
+      "LAMC2",
+      "LAMC3",
+      "COL17A1",
+      "LAMA3",
+      "LAMA4",
+      "CD151",
+      "ITGB1",
+      "ITGB4",
+      "PTK2",
+      "ITGA6"
+    ],
+    "genes_matched_by": {
+      "LAMB2": "biomcp_tag+text_confirmed",
+      "LAMA5": "lama5",
+      "LAMC1": "lamc1",
+      "LAMA2": "lama",
+      "LAMB1": "lamb",
+      "LAMC2": "lamb",
+      "LAMC3": "lamc3",
+      "COL17A1": "ered",
+      "LAMA3": "lama3",
+      "LAMA4": "lama3",
+      "CD151": "raph",
+      "ITGB1": "biomcp_tag+text_confirmed",
+      "ITGB4": "itgb",
+      "PTK2": "fak",
+      "ITGA6": "biomcp_tag_only"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "DCIS 2",
+      "Macrophages 2"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 40.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Invasive Tumor",
+      "Prolif Invasive Tumor",
+      "T Cell & Tumor Hybrid"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 185,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": "final",
+      "papers": 30,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    }
+  ],
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with 'signaling' + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

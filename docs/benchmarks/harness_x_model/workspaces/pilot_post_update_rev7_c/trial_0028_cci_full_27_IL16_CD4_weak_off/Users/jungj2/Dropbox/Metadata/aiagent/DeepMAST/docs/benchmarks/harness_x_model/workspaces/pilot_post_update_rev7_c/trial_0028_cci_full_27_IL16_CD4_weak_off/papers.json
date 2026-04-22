@@ -1,0 +1,75 @@
+{
+  "saved_to": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/docs/benchmarks/harness_x_model/workspaces/pilot_post_update_rev7_c/trial_0028_cci_full_27_IL16_CD4_weak_off/papers.json",
+  "output_path": "papers.json",
+  "total_papers": 30,
+  "coverage": {
+    "genes_covered": [
+      "CD4",
+      "CD8A",
+      "CD5",
+      "CD2",
+      "CD3E",
+      "LCK",
+      "IL16",
+      "ITIH4",
+      "CXCR4",
+      "CCR5"
+    ],
+    "genes_matched_by": {
+      "CD4": "t",
+      "CD8A": "cd8",
+      "CD5": "t",
+      "CD2": "t",
+      "CD3E": "t",
+      "LCK": "p",
+      "IL16": "il",
+      "ITIH4": "h",
+      "CXCR4": "cxcr",
+      "CCR5": "ccr5"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Macrophages 2",
+      "Stromal"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 66.66666666666666,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 66.66666666666666,
+    "genes_missing": [
+      "HLA-DRA",
+      "ERVW-1",
+      "ZAP70",
+      "ENPEP",
+      "HLA-DRB1"
+    ],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Endothelial"
+    ]
+  },
+  "paper_titles": [
+    "A trispecific antibody targeting HER2 and T cells inhibits breast cancer growth via CD4 cells.",
+    "Characteristics and postoperative dynamic changes in circulating CD4+ helper T lymphocytes in patien",
+    "Prognostic Impact of Cytotoxic CD4 T Cells in Tumor Immune Microenvironment of Patients with Breast ",
+    "Frequency of CD4+ regulatory T cells, CD8+ T cells, and human papilloma virus infection in Egyptian ",
+    "[Highly expressed CD147 on CD4+ tumor infiltrating lymphocytes promotes the progress of breast cance",
+    "Profile of differentially expressed intratumoral cytokines to predict the immune-polarizing side eff",
+    "T helper responses are maintained by basal-like breast cancer cells and confer to immune modulation ",
+    "CD4+ follicular helper T cell infiltration predicts breast cancer survival.",
+    "Novel biomarkers and drug correlations of non-canonical WNT signaling in prostate and breast cancer.",
+    "Definition of a novel breast tumor-specific classifier based on secretome analysis"
+  ],
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with 'signaling' + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0,
+  "message": "Full results (30 papers) saved to papers.json. Use read_file('/papers.json') to access complete data."
+}

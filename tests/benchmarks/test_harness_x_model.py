@@ -60,6 +60,29 @@ def test_normalize_case_extracts_search_fields(sample_case: dict) -> None:
     assert normalized["disease"] == "breast cancer"
 
 
+def test_normalize_case_prefers_enriched_genes_when_present(sample_case: dict) -> None:
+    """Rev 7: when a case carries `enriched_genes` (STRING+KEGG), normalize_case
+    must use that list verbatim (order + dedup preserved) instead of falling
+    back to the 2-gene ligand+receptor split. Legacy cases without the field
+    continue to use the fallback path (covered by the preceding test)."""
+    enriched_case = {
+        **sample_case,
+        "enriched_genes": [
+            "EGF", "RACK1", "EGFR", "ERBB2", "ERBB3",
+            "HIF1A", "VHL", "EPAS1", "VEGFA", "KDR",
+            "FLT1", "GRB2", "SOS1", "SHC1", "PIK3CA",
+        ],
+    }
+
+    normalized = normalize_case(enriched_case)
+
+    assert normalized["genes"] == enriched_case["enriched_genes"]
+    assert len(normalized["genes"]) == 15
+    # Fallback path must still resolve ligand/receptor correctly for downstream
+    # prompt rendering even when enriched_genes is in control.
+    assert normalized["lr_pair"] == "EGF-RACK1"
+
+
 def test_build_trial_schedule_is_deterministic_and_case_grouped(sample_case: dict) -> None:
     cases = [
         sample_case,

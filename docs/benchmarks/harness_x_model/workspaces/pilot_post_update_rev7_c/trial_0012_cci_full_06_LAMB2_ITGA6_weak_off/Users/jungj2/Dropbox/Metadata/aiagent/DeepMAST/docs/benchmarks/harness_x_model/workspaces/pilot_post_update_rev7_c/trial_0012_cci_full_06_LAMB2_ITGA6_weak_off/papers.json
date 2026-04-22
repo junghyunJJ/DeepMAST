@@ -1,0 +1,80 @@
+{
+  "saved_to": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/docs/benchmarks/harness_x_model/workspaces/pilot_post_update_rev7_c/trial_0012_cci_full_06_LAMB2_ITGA6_weak_off/papers.json",
+  "output_path": "papers.json",
+  "total_papers": 30,
+  "coverage": {
+    "genes_covered": [
+      "ITGA6",
+      "LAMB2",
+      "LAMB1",
+      "LAMC2",
+      "LAMA5",
+      "LAMC1",
+      "LAMA2",
+      "LAMC3",
+      "COL17A1",
+      "LAMA3",
+      "LAMA4",
+      "ITGB1",
+      "ITGB4",
+      "PTK2"
+    ],
+    "genes_matched_by": {
+      "ITGA6": "cd49f",
+      "LAMB2": "lamb2",
+      "LAMB1": "lamb",
+      "LAMC2": "lamb",
+      "LAMA5": "lama",
+      "LAMC1": "lamc",
+      "LAMA2": "lama",
+      "LAMC3": "lamc3",
+      "COL17A1": "ered",
+      "LAMA3": "lama",
+      "LAMA4": "lama",
+      "ITGB1": "itgb1",
+      "ITGB4": "itgb",
+      "PTK2": "fak"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [],
+    "total_papers": 30,
+    "genes_coverage_pct": 93.33333333333333,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 0.0,
+    "genes_missing": [
+      "CD151"
+    ],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "DCIS 2",
+      "Invasive Tumor",
+      "Macrophages 2",
+      "Prolif Invasive Tumor",
+      "T Cell & Tumor Hybrid"
+    ]
+  },
+  "paper_titles": [
+    "Integrin alpha6 and EGFR signaling converge at mechanosensitive calpain 2.",
+    "First-in-human pilot study of an integrin alpha6-targeted radiotracer for SPECT imaging of breast ca",
+    "Pranlukast Antagonizes CD49f and Reduces Stemness in Triple-Negative Breast Cancer Cells",
+    "In silico analysis-based identification of the target residue of integrin alpha6 for metastasis inhi",
+    "CD49f Can Act as a Biomarker for Local or Distant Recurrence in Breast Cancer",
+    "Integrin alpha6/Akt/Erk signaling is essential for human breast cancer resistance to radiotherapy",
+    "ITGA6 is directly regulated by hypoxia-inducible factors and enriches for cancer stem cell activity ",
+    "The Presence of EpCAM-/CD49f+ Cells in Breast Cancer Is Associated with a Poor Clinical Outcome",
+    "Understanding breast cancer stem cell heterogeneity: time to move on to a new research paradigm",
+    "Identification of breast cancer susceptibility genes via trans-ethnic Mendelian randomization and co"
+  ],
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with 'signaling' + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0,
+  "message": "Full results (30 papers) saved to papers.json. Use read_file('/papers.json') to access complete data."
+}

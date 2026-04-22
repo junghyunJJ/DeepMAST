@@ -1,0 +1,122 @@
+{
+  "case_id": "cci_full_02_ANOS1_FGFR1",
+  "category": "low_morans_known",
+  "lr_pair": "ANOS1-FGFR1",
+  "genes": [
+    "ANOS1",
+    "FGFR1",
+    "FGF1",
+    "FGF10",
+    "FGF16",
+    "FGF17",
+    "FGF18",
+    "FGF2",
+    "FGF20",
+    "FGF22",
+    "FGF23",
+    "FGF3",
+    "FGF4",
+    "FGF5",
+    "FGF6"
+  ],
+  "pathways": [
+    "Hypoxia"
+  ],
+  "celltypes": [
+    "Endothelial",
+    "Macrophages 2",
+    "Myoepi ACTA2+",
+    "Stromal"
+  ],
+  "disease": "breast cancer",
+  "search_context": {
+    "genes": [
+      "ANOS1",
+      "FGFR1",
+      "FGF1",
+      "FGF10",
+      "FGF16",
+      "FGF17",
+      "FGF18",
+      "FGF2",
+      "FGF20",
+      "FGF22",
+      "FGF23",
+      "FGF3",
+      "FGF4",
+      "FGF5",
+      "FGF6"
+    ],
+    "pathways": [
+      "Hypoxia"
+    ],
+    "celltypes": [
+      "Endothelial",
+      "Macrophages 2",
+      "Myoepi ACTA2+",
+      "Stromal"
+    ],
+    "disease": "breast cancer",
+    "lr_pair": "ANOS1-FGFR1",
+    "category": "low_morans_known"
+  },
+  "raw_case": {
+    "case_id": "cci_full_02_ANOS1_FGFR1",
+    "benchmark_type": "cci_interpretation_v2",
+    "lr_pair": "ANOS1-FGFR1",
+    "category": "low_morans_known",
+    "input_bundle": {
+      "ligand": "ANOS1",
+      "receptor": "FGFR1",
+      "interaction": "ANOS1^FGFR1",
+      "morans_r": 0.007995,
+      "morans_pval": 0.017,
+      "ligand_means": 0.2024,
+      "ligand_props": 0.3799,
+      "receptor_means": 0.7669,
+      "receptor_props": 0.7845,
+      "factor1": 0.5785,
+      "factor2": 0.6747,
+      "factor3": 0.6341,
+      "pathway_associations": [
+        "Hypoxia"
+      ],
+      "disease_associations": [
+        "Idiopathic hypogonadotropic hypogonadism",
+        "Kallmann Syndrome",
+        "Kallmann Syndrome 1",
+        "Kallmann syndrome, type 3, recessive",
+        "Kallmann Syndrome 2 (disorder)"
+      ],
+      "ligand_cell_types": [
+        "Myoepi ACTA2+"
+      ],
+      "receptor_cell_types": [
+        "Endothelial",
+        "Macrophages 2",
+        "Stromal"
+      ],
+      "mean_interest": -0.593955,
+      "pval_interest": 3.1061233585205623e-09,
+      "pval_interest_adj": 1.9835369376043444e-08,
+      "tissue_context": "Breast cancer Visium spatial transcriptomics"
+    },
+    "enriched_genes": [
+      "ANOS1",
+      "FGFR1",
+      "FGF1",
+      "FGF10",
+      "FGF16",
+      "FGF17",
+      "FGF18",
+      "FGF2",
+      "FGF20",
+      "FGF22",
+      "FGF23",
+      "FGF3",
+      "FGF4",
+      "FGF5",
+      "FGF6"
+    ]
+  }
+}

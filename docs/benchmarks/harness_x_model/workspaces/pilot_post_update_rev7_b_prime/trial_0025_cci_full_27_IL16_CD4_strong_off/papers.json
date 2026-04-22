@@ -1,0 +1,1187 @@
+{
+  "papers": [
+    {
+      "pmid": "35197632",
+      "title": "A trispecific antibody targeting HER2 and T cells inhibits breast cancer growth via CD4 cells.",
+      "abstract": "Effective antitumour immunity depends on the orchestration of potent T cell responses against malignancies1. Regression of human cancers has been induced by immune checkpoint inhibitors, T cell engagers or chimeric antigen receptor T cell therapies2-4. Although CD8 T cells function as key effectors of these responses, the role of CD4 T cells beyond their helper function has not been defined. Here we demonstrate that a trispecific antibody to HER2, CD3 and CD28 stimulates regression of breast cancers in a humanized mouse model through a mechanism involving CD4-dependent inhibition of tumour cell cycle progression. Although CD8 T cells directly mediated tumour lysis in vitro, CD4 T cells exerted antiproliferative effects by blocking cancer cell cycle progression at G1/S. Furthermore, when T cell subsets were adoptively transferred into a humanized breast cancer tumour mouse model, CD4 T cells alone inhibited HER2+ breast cancer growth in vivo. RNA microarray analysis revealed that CD4 T cells markedly decreased tumour cell cycle progression and proliferation, and also increased pro-inflammatory signalling pathways. Collectively, the trispecific antibody to HER2 induced T cell-dependent tumour regression through direct antitumour and indirect pro-inflammatory/immune effects driven by CD4 T cells.",
+      "journal_quality": 0.711,
+      "authors": [
+        "Seung E",
+        "Xing Z",
+        "Wu L",
+        "Rao E",
+        "Cortez-Retamozo V",
+        "Ospina B",
+        "Chen L",
+        "Beil C",
+        "Song Z",
+        "Zhang B",
+        "Levit M",
+        "Deng G",
+        "Hebert A",
+        "Kirby P",
+        "Li A",
+        "Poulton EJ",
+        "Vicente R",
+        "Garrigou A",
+        "Piepenhagen P",
+        "Ulinski G",
+        "Sanicola-Nadel M",
+        "Bangari DS",
+        "Qiu H",
+        "Pao L",
+        "Wiederschain D",
+        "Wei R",
+        "Yang ZY",
+        "Nabel GJ"
+      ],
+      "journal": "Nature",
+      "date": "2022-03-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36925914",
+      "title": "Characteristics and postoperative dynamic changes in circulating CD4+ helper T lymphocytes in patients with breast cancer",
+      "abstract": "Introduction\n\nCirculating CD4+ helper T cell (Th) subsets provide potentially important information on disease progression in several cancers. In this study, we explored the characteristics and postoperative dynamic changes in circulating CD4+Th subsets in patients with breast cancer.\n\nMethods\n\nCirculating CD4+Th subsets, including CD4+ naive T cells (Tn), CD4+ central memory T cells (Tcm), CD4+ effector memory T cells (Tem), CD4+CD57+T, and CD4+PD-1+T, were detected with multiparameter flow cytometry. T-test and Wilcoxon rank-sum test were used to compare differences between groups for normally and non-normally distributed continuous variables, respectively. Postoperative dynamic changes in CD4+Th subsets were assessed using the paired-sample rank-sum test.\n\nResults\n\nSeventy-five patients with invasive breast cancer and fifty-three patients with benign breast tumors were enrolled. Compared with that in patients with benign tumors, the proportion of CD4+Tn in patients with breast cancer patients decreased, whereas the proportion and absolute number of CD4+CD57+T and CD4+PD-1+T increased. Moreover, the proportion of CD4+PD-1+T was correlated with the clinicopathology of breast cancer. After tumor resection, the proportion and absolute number of CD4+Tcm significantly decreased, while those of CD4+Tem significantly increased, compared with preoperative values. Tumor resection caused significant changes in the proportion and absolute number of CD4+CD57+T and CD4+PD-1+ T, both of ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Lu Y",
+        "Zhang Q",
+        "Wang J",
+        "Zhang L"
+      ],
+      "journal": "Front Oncol",
+      "date": "2023-02-28T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35663830",
+      "title": "Prognostic Impact of Cytotoxic CD4 T Cells in Tumor Immune Microenvironment of Patients with Breast Cancer",
+      "abstract": "Article: 35663830",
+      "journal_quality": 0.5,
+      "authors": [
+        "Shohdy KS",
+        "Almeldin DS",
+        "Ghaly R",
+        "Kassem L",
+        "Pagani O"
+      ],
+      "journal": "J Immunother Precis Oncol",
+      "date": "2021-10-26T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33103515",
+      "title": "Frequency of CD4+ regulatory T cells, CD8+ T cells, and human papilloma virus infection in Egyptian Women with breast cancer",
+      "abstract": "Several subsets of regulatory CD4+ T cells (CD4+ Tregs) have been described in peripheral blood and tumor microenvironment of breast cancer (BC) patients and may play a role in the progression of BC. High-risk human papilloma virus (HR-HPV) has a causal role in cervical, head, and neck tumors but the role of HR-HPV in evoking neoplasia in BC is still unclear. In this study we assessed the prevalence of CD4+CD25+ FOXP3+ regulatory T cells (CD4+Tregs) and CD3+ CD8+ T cells by flow cytometry in peripheral blood from a total of 55 Egyptian women, including 20 treatment-naive BC, 15 with breast benign lesions (BBL), and 20 healthy volunteers (HV). HR-HPV genotypes type 16, 18, and 31 were investigated in breast tissue from all BC and BBL patients using Real-Time PCR. HR-HPV was detected in 4/20 (20%) and 0/15 (0%) BC and BBL patients respectively. The frequency of CD4+ Tregs was significantly higher in BC compared to BBL and HV, (P < 0.001). In addition, we observed a significantly higher frequency of CD3+ CD8+ T cells in peripheral blood of patients with late stage III BC compared to early stage I and II BC (P = 0.011). However, there was no significant association between the ratio of CD8+ T cell to CD4+ Tregs frequencies and the expression of Estrogen Receptor (ER), Progesterone Receptor (PR), and Human Epidermal Growth Factor Receptor 2 (HER2). These results lead us to postulate that the association between the frequency of CD4+ Tregs and CD8+ T cells in the peripheral blood m",
+      "journal_quality": 0.5,
+      "authors": [
+        "Tawfeik AM",
+        "Mora A",
+        "Osman A",
+        "Moneer MM",
+        "El-Sheikh N",
+        "Elrefaei M"
+      ],
+      "journal": "Int J Immunopathol Pharmacol",
+      "date": "2020-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26146069",
+      "title": "[Highly expressed CD147 on CD4+ tumor infiltrating lymphocytes promotes the progress of breast cancer].",
+      "abstract": "OBJECTIVE: To investigate the expression of CD147 in CD4+ tumor infiltrating lymphocytes and explore the clinical significance of CD147 transcripts in breast cancer patients by comparing CD147 level in healthy controls' peripheral blood, breast cancer patients' peripheral blood, lymph nodes and CD4+ tumor infiltrating lymphocytes. METHODS: CD147 expression data were derived by Robust Multi-array Averaging method from three different microarrays, GSE14308, GSE36765 and GSE6532. ANOVA, Kaplan-Meier curve and multivariate Cox proportional hazards model were used for the statistical analysis. RESULTS: The expression of CD147 in Th1, Th2 and Th17 cells was 8-12 times higher than that in Th0 cells in normal C57BL/6J mice. The expression level of CD147 in the CD4+ tumor infiltrating lymphocytes from breast cancer patients was significantly higher than that in the CD4+ lymphocytes from peripheral blood of healthy donors, peripheral blood and axillary lymph nodes of breast cancer patients. High expression of CD147 was significantly associated with an increased risk of relapse in the Kaplan-Meier curve analysis (Log-Rank, P=0.019) and multivariate analysis (hazard ratio=1.764; 95% confidence interval: 1.088-2.859). CONCLUSION: CD147 might promote the progress of breast cancer through up-regulating CD4+ tumor infiltrating lymphocytes and aggravating inflammatory reaction.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zheng M",
+        "Zhang X",
+        "Guo H",
+        "Fan C",
+        "Chen Z",
+        "Zhu P"
+      ],
+      "journal": "Xi Bao Yu Fen Zi Mian Yi Xue Za Zhi",
+      "date": "2015-07-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25973310",
+      "title": "Profile of differentially expressed intratumoral cytokines to predict the immune-polarizing side effects of tamoxifen in breast cancer treatment.",
+      "abstract": "Factors within the tissue of breast cancer (BC) may shift the polarization of CD4+ T cells towards Th2 direction. This tendency can promote tumor development and be enhanced by the use of tamoxifen during the treatment. Thus, the patients with low levels of tumor-induced Th2 polarization prior to tamoxifen treatment may better endure the immune-polarizing side effects (IPSE) of tamoxifen and have better prognoses. Estimation of Th2 polarization status should help predict the IPSE among tamoxifen-treated patients and guide the use of tamoxifen among all BC patients before the tamoxifen therapy. Here, we report profiling of differentially expressed (DE) intratumoral cytokines as a signature to evaluate the IPSE of tamoxifen. The DE genes of intratumoral CD4+ T cells (CD4 DEGs) were identified by gene expression profiles of purified CD4+ T cells from BC patients and validated by profiling of cultured intratumoral CD4+ T cells. Functional enrichment analyses showed a directed Th2 polarization of intratumoral CD4+ T cells. To find the factors inducing the Th2 polarization of CD4+ T cells, we identified 995 common DE genes of bulk BC tissues (BC DEGs) by integrating five independent datasets. Five DE cytokines observed in bulk BC tissues with dysregulated receptors in the intratumoral CD4+ T cells were selected as the predictor of the IPSE of tamoxifen. The patients predicted to suffer low IPSE (low Th2 polarization) had a significantly lower distant relapse risk than the patients ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Li B",
+        "Li Y",
+        "Wang XY",
+        "Yan ZQ",
+        "Liu H",
+        "Liu GR",
+        "Liu SL"
+      ],
+      "journal": "Am J Cancer Res",
+      "date": "2015-01-15T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "24816762",
+      "title": "T helper responses are maintained by basal-like breast cancer cells and confer to immune modulation via upregulation of PD-1 ligands.",
+      "abstract": "A conspicuous T cell infiltration is frequently observed in triple-negative and/or basal-like breast cancers. Since the immunological course of breast cancer is explicitly directed by helper T cells, this study aims to determine the influence of basal-like breast cancer (BLBC) cells on CD4(+) T cell responses. Co-cultures were established with breast cancer cell lines and CD4(+) T cells under stimulatory conditions. Helper T cell activation, proliferation, cytokine secretion, and differentiation were assessed. Protein and mRNA expression of PD-1 ligands were determined on breast cancer cell lines. Blockade assays were performed in order to determine the functional assets of PD-1 ligation. In contrast to luminal breast cancer cells, BLBC cells allowed CD4(+) T cell activation, proliferation, and IFN-gamma secretion, but only to a certain extent. A substantial population of CD25(+)CD127(low/-) regulatory T (Treg) cells was also induced in BLBC co-cultures. In return, IFN-gamma stimulated the upregulation of PD-L1 (B7-H1) and/or PD-L2 (B7-DC) inhibitory molecules on the basal-like cells. In prolonged periods of co-culturing, blockade of PD-1 ligands on BLBC cell lines impaired Treg differentiation, restored IL-2 secretion, and increased CD8(+) T cell activation. In conclusion, T helper responses were maintained by BLBC cells. On the other hand, IFN-gamma secreted from Th1 and other immune cells upregulated the expression of PD-1 ligands on BLBC cells and modulated the immune rea",
+      "journal_quality": 0.5,
+      "authors": [
+        "Karasar P",
+        "Esendagli G"
+      ],
+      "journal": "Breast Cancer Res Treat",
+      "date": "2014-06-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23778140",
+      "title": "CD4+ follicular helper T cell infiltration predicts breast cancer survival.",
+      "abstract": "CD4+ T cells are critical regulators of immune responses, but their functional role in human breast cancer is relatively unknown. The goal of this study was to produce an image of CD4+ T cells infiltrating breast tumors using limited ex vivo manipulation to better understand the in vivo differences associated with patient prognosis. We performed comprehensive molecular profiling of infiltrating CD4+ T cells isolated from untreated invasive primary tumors and found that the infiltrating T cell subpopulations included follicular helper T (Tfh) cells, which have not previously been found in solid tumors, as well as Th1, Th2, and Th17 effector memory cells and Tregs. T cell signaling pathway alterations included a mixture of activation and suppression characterized by restricted cytokine/chemokine production, which inversely paralleled lymphoid infiltration levels and could be reproduced in activated donor CD4+ T cells treated with primary tumor supernatant. A comparison of extensively versus minimally infiltrated tumors showed that CXCL13-producing CD4+ Tfh cells distinguish extensive immune infiltrates, principally located in tertiary lymphoid structure germinal centers. An 8-gene Tfh signature, signifying organized antitumor immunity, robustly predicted survival or preoperative response to chemotherapy. Our identification of CD4+ Tfh cells in breast cancer suggests that they are an important immune element whose presence in the tumor is a prognostic factor.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Gu-Trantien C",
+        "Loi S",
+        "Garaud S",
+        "Equeter C",
+        "Libin M",
+        "de Wind A",
+        "Ravoet M",
+        "Le Buanec H",
+        "Sibille C",
+        "Manfouo-Foutsop G",
+        "Veys I",
+        "Haibe-Kains B",
+        "Singhal SK",
+        "Michiels S",
+        "Rothé F",
+        "Salgado R",
+        "Duvillier H",
+        "Ignatiadis M",
+        "Desmedt C",
+        "Bron D",
+        "Larsimont D",
+        "Piccart M",
+        "Sotiriou C",
+        "Willard-Gallo K"
+      ],
+      "journal": "J Clin Invest",
+      "date": "2013-07-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39347881",
+      "title": "Novel biomarkers and drug correlations of non-canonical WNT signaling in prostate and breast cancer.",
+      "abstract": "Prostate cancer (PCa) and breast cancer (BC) present formidable challenges in global cancer-related mortality, necessitating effective management strategies. The present study explores non-canonical Wnt signaling in PCa and BC, aiming to identify biomarkers and assess their clinical and therapeutic implications. Co-expression analyses reveal distinct gene patterns, with five overlapping genes (SULF1, ALG3, IL16, PLXNA2 and RASGFR2) exhibiting divergent expression in both cancers. Clinical relevance investigations demonstrate correlations with TNM stages and biochemical recurrence. Drug correlation analyses unveil potential therapeutic avenues, indicating that Wnt5a and ROR2 expressions are related to MEK inhibitor sensitivity in cancers. Meanwhile, further correlation analyses were conducted between drugs and the other novel non-canonical WNT genes (ALG3, IL16, SULF1, PLXNA2, and RASGRF2). Our findings contribute to understanding non-canonical Wnt signaling, offering insights into cancer progression and potential personalized treatment approaches.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Huang Y",
+        "Fan M",
+        "Liu Y",
+        "Jiang X",
+        "Du K",
+        "Wu A",
+        "Li Q",
+        "Wu Y",
+        "Liang J",
+        "Wang K"
+      ],
+      "journal": "Discov Oncol",
+      "date": "2024-09-30T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32923685",
+      "title": "Mendelian randomization analyses of genetically predicted circulating levels of cytokines with risk of breast cancer",
+      "abstract": "To determine whether genetically predicted circulating levels of cytokines are associated with risk of overall breast cancer (BC), estrogen receptor (ER)-positive and ER-negative BC, we conducted two-sample MR analyses using data from the most comprehensive genome-wide association studies (GWAS) on cytokines in 8293 Finnish participants and the largest BC GWAS from the Breast Cancer Association Consortium (BCAC) with totally 122,977 BC cases and 105,974 healthy controls. We systematically screened 41 cytokines (of which 24 cytokines have available instruments) and identified that genetically predicted circulating levels (1-SD increase) of MCP1 (OR: 1.08; 95% CIs: 1.03-1.12; P value: 3.55 x 10-4), MIP1b (OR: 1.02; 95% CIs: 1.01-1.04; P value: 2.70 x 10-3) and IL13 (OR: 1.06; 95% CIs: 1.03-1.10; P value: 3.33 x 10-4) were significantly associated with increased risk of overall BC, as well as ER-positive BC. In addition, higher levels of MIP1b and IL13 were also significantly associated with increased risk of ER-negative BC. These findings suggest the crucial role of cytokines in BC carcinogenesis and potential of targeting specific inflammatory cytokines for BC prevention.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Li S",
+        "Xu Y",
+        "Zhang Y",
+        "Nie L",
+        "Ma Z",
+        "Ma L",
+        "Fang X",
+        "Ma X"
+      ],
+      "journal": "NPJ Precis Oncol",
+      "date": "2020-09-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30544398",
+      "title": "Preoperative elevated neutrophil-to-lymphocyte ratio (NLR) and derived NLR are associated with poor prognosis in patients with breast cancer",
+      "abstract": "Abstract\n\nBackground:\n\nPreoperative neutrophil-lymphocyte ratio (NLR) and derived NLR (dNLR) have been suggested to be correlated with the prognosis of patients with breast cancer (BC). However, the results still remain controversial. Therefore, this study was to further evaluate the prognostic potential of preoperative NLR and dNLR for BC patients using a meta-analysis.\n\nMethods:\n\nRelevant articles were sought in PubMed and Cochrane Library databases up to September 2018. The associations between preoperative NLR/dNLR and overall survival (OS), disease-free survival (DFS) and recurrence-free survival (RFS) were assessed by the STATA software with the results presented as pooled hazard ratio (HR) with 95% confidence interval (CI).\n\nResults:\n\nTwenty-one studies were enrolled. Pooled results showed that elevated NLR was significantly associated with poorer OS (HR = 2.45, 95% CI: 1.69-3.54), DFS (HR = 1.54, 95% CI: 1.28-1.87) and RFS (HR = 4.05, 95% CI: 1.94-8.47) in BC patients undergoing surgery. High-preoperative dNLR was also significantly associated with worse OS (HR = 1.75, 95% CI: 1.39-2.19) and DFS (HR = 1.62, 95% CI: 1.09-2.41). Moreover, subgroup analysis showed significant associations between preoperative elevated NLR and poor prognosis were not changed by the stratification of ethnicity, cutoff of NLR, pathological stage, neoadjuvant, and adjuvant therapy.\n\nConclusion:\n\nPreoperative NLR and dNLR may be effective predictive biomarkers for prognosis in patients with B",
+      "journal_quality": 0.5,
+      "authors": [
+        "Duan J",
+        "Pan L",
+        "Yang M"
+      ],
+      "journal": "Medicine (Baltimore)",
+      "date": "2018-12-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23893766",
+      "title": "Regulation of cellular processes by interleukin-16 in homeostasis and cancer.",
+      "abstract": "Interleukin-16 (IL-16) is generated as a precursor molecule that is cleaved by caspase-3 to produce a pro-IL-16 molecule that functions as a regulator of T cell growth, and a secreted peptide that functions as a CD4 and/or CD9 ligand for induction of cell motility and activation. IL-16 has been predominantly studied as a contributing factor in the orchestration of an immune response; however, more recently IL-16 bioactivity has been closely associated with the progression of a number of different cancers. While the association between IL-16 plasma levels and tumor progression has been reported for many types of cancer, the mechanism for IL-16 involvement has been partially elucidated for three of the cancer types, cutaneous T cell lymphoma (CTCL), multiple myeloma (MM), and breast cancer. The mechanism for promoting cell growth is different in each of these cancers and involves a sequence mutation in the pro-molecule facilitating decreased p27(KIP1) levels in CTCL; over expression of the secreted IL-16 molecule to induce proliferation in CTCL T cells, and plasma cells in MM; and increased secreted IL-16 acting to recruit CD4+ pro-tumor macrophages in breast cancer. This article will review the cellular process for generating IL-16, the biological activities for both the pro- and secreted forms of the protein, and then the mechanism by which these forms contribute to cancer progression. As a soluble cytokine the ability to reduce or eliminate IL-16 synthesis through siRNA appr",
+      "journal_quality": 0.5,
+      "authors": [
+        "Richmond J",
+        "Tuzova M",
+        "Cruikshank W",
+        "Center D"
+      ],
+      "journal": "J Cell Physiol",
+      "date": "2014-02-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23076779",
+      "title": "Serum protein levels following surgery in breast cancer patients: a protein microarray approach.",
+      "abstract": "Surgery is the primary treatment for non-metastatic breast cancer. However,             the risk of early recurrence remains after surgical removal of the primary tumor.             Recurrence is suggested to result from hidden micrometastatic foci, which are             triggered to escape from dormancy by surgical resection of the primary tumor.             In this study, we focused on the differential impact of breast surgery on the             serum profiles of early breast cancer patients and healthy women. Serum samples             from invasive breast cancer patients, in situ carcinoma breast cancer patients             and healthy women were analyzed using reverse phase protein array technology.             Samples were collected prior to breast surgery and 24 h following breast surgery.             Both the expression level and the velocity of 42 serum proteins were quantified             and compared among groups. We found that surgery increased the concentration of             several proteins (CSF1, THSB2, IL6, IL7, IL16, FasL and VEGF-B) in the overall             population. Compared with healthy women and patients with non-invasive tumors,             invasive tumor patients exhibited higher preoperative levels of several serum             proteins, such as alphaFP, IFNbeta1, VEGF-A, IL18, E-cadherin or CD31, and lower postoperative             levels of TNFalpha and IL5. Similarly, we detected significant surgery-induced changes             in the velocity of ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Perez-Rivas LG",
+        "Jerez JM",
+        "Fernandez-De Sousa CE",
+        "de Luque V",
+        "Quero C",
+        "Pajares B",
+        "Franco L",
+        "Sanchez-Muñoz A",
+        "Ribelles N",
+        "Alba E"
+      ],
+      "journal": "Int J Oncol",
+      "date": "2012-12-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40064918",
+      "title": "Article 40064918",
+      "abstract": "",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36539890",
+      "title": "Article 36539890",
+      "abstract": "",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "29123422",
+      "title": "Article 29123422",
+      "abstract": "",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40395152",
+      "title": "Non-invasive prediction of DCE-MRI radiomics model on CCR5 in breast cancer based on a machine learning algorithm.",
+      "abstract": "BackgroundNon-invasive methods with universal prognostic guidance for detecting breast cancer (BC) survival biomarkers need to be further explored.ObjectiveThis study aimed to investigate C-C motif chemokine receptor type 5 (CCR5) prognosis value in BC and develop a radiomics model for noninvasive prediction of CCR5 expression in BC.MethodsA total of 840 cases with genomic information were included and divided into CCR5 high- and low-expression groups for clinical characteristic differences exploration. Bioinformatics and survival analysis including Kaplan-Meier (KM) survival analysis, Cox regression, immunoinfiltration analysis, and tumor mutation load (TMB) were performed. For radiomics model development, 98 cases with dynamic contrast-enhancement magnetic resonance imaging (DCE-MRI) scans were used. Radiomics features extracted were using Pyradiomics and filtered by maximum-relevance minimum-redundancy (mRMR) and recursive feature elimination (REF) algorithms. Support vector machine (SVM) and logistic regression (LR) models were developed to predict CCR5 expression, with the radiomics score (Rad_score) representing the predicted probability of CCR5 expression. The models' performance was compared using the Delong test, and the model with the superior area under the curve (AUC) values was selected to analyze the correlation between CCR5 expression, Rad_score, and immune genes.ResultsThe CCR5 high-expression group exhibited better overall survival (OS) (p < 0.01). Six radiom",
+      "journal_quality": 0.5,
+      "authors": [
+        "Li Q",
+        "Li W",
+        "Wang J",
+        "Li X",
+        "Ji Y",
+        "Wu M"
+      ],
+      "journal": "Cancer Biomark",
+      "date": "2025-05-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CCR5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34178806",
+      "title": "Evaluating the Association between CCR5delta32 Polymorphism (rs333) and the Risk of Breast Cancer in a Cohort of Iranian Population",
+      "abstract": "Background:\n\nCC chemokine receptor 5 (CCR5) is introduced as an immune response modulator. The activity of CCR5 influences breast tumour development in a p53-dependent manner. This study aimed to investigate the frequency of CCR5delta32 and its association with the risk of breast cancer in 1038 blood samples in North East of Iran.\n\nMethods:\n\nIn this case-control study, we genotyped 570 control samples and 468 breast cancer patients by a gel electrophoresis-based gap-polymerase chain reaction (gap-PCR) method Mashhad, Iran. The data were analyzed using the SPSS software.\n\nResults:\n\nOf 570 controls included, 542 (95.09%) had CCR5delta32 wild/wild (W/W) genotype, 28 samples (4.91%) had CCR5delta32 wild/deletion (W/D) genotype and none of them were CCR5delta32 deletion/deletion (D/D) genotype (0%). While 428 samples of patients (91.45%) had CCR5delta32 W/W genotype, 40 samples (8.55%) had CCR5delta32 W/D and CCR5delta32 D/D homozygous was nil (0%) amongst cases. All samples were in the Hardy-Weinberg equilibrium (P>0.05). According to the allele frequency, D allele, as a risky allele, in the cases was more than the control samples (0.0427 vs 0.0245, respectively) (P=0.0206). Hence, W/D genotype may confer a risk effect (OR=1.77, CI: 1.09-2.90; P=0.0206) compared with WW genotype between case and control groups.\n\nConclusion:\n\nThere is a statistically significant association between CCR5W/D and breast cancer risk. CCR5 may be regarded as a target for the prevention of breast cancer",
+      "journal_quality": 0.5,
+      "authors": [
+        "Tajbakhsh A",
+        "Farjami Z",
+        "Nesaei-Bajestani A",
+        "Afzaljavan F",
+        "Rivandi M",
+        "Moezzi A",
+        "Abedini S",
+        "Asghari M",
+        "Kooshyar MM",
+        "Homaei Shandiz F",
+        "Pasdar A"
+      ],
+      "journal": "Iran J Public Health",
+      "date": "2021-03-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CCR5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33245226",
+      "title": "C-C motif chemokine ligand 5 and C-C chemokine receptor type 5: possible diagnostic application in breast cancer patients.",
+      "abstract": "The chemokine CCL5 and its receptor CCR5 play important roles in cancer invasion and metastasis. Based on our knowledge, our results were the first that presented the diagnostic usefulness of CCL5 and CCR5 in breast cancer (BC) patients, based on receiver operating characteristic (ROC) curve analysis. We wished to examine further if CCL5 and CCR5 are appropriate to be applied as BC markers for early screening. Values of tested parameters in patients' plasma were determined by CMIA method (Chemiluminescent Microparticle Immunoassay, CA 15-3) as well as by ELISA method (Enzyme-Linked Immunosorbent Assay, CCL5 and CCR5). Levels of CCL5 in the plasma were markedly increased, while those of CCR5 were remarkably lower in BC patients when compared to the control groups. Moreover, higher levels of CCL5 in BC corresponded to advanced tumor stage, while the levels of CCR5 decreased with increasing the disease stage. CCL5 concentration was characterized by high sensitivity (SE) (68.04%) and high specificity (SP) (100.00%) in the BC patients. Results indicated that area under the curve (AUC) corresponding to CCL5 (0.8116) had a higher value than this corresponding to CA 15-3. The AUC value of CCL5 was significantly increased in the early phase of BC (stage I - 0.7089; stage II - 0.8313). The maximum range in the BC patients was observed for the combined analysis of the tested measurands with CA 15-3 (0.8335). In conclusion, our research indicates that examination of plasma CCL5 and CCR5 ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Dąbrowska E",
+        "Przylipiak A",
+        "Zajkowska M",
+        "Piskór BM",
+        "Borowik-Zaręba A",
+        "Ławicki S"
+      ],
+      "journal": "Acta Biochim Pol",
+      "date": "2020-11-27T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CCR5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30456574",
+      "title": "CCR5 blockage by maraviroc: a potential therapeutic option for metastatic breast cancer.",
+      "abstract": "PURPOSE: Bone metastasis is observed in up to 70% of breast cancer patients. The currently available treatment options are palliative in nature. Chemokine receptor 5 (CCR5) has gained attention as therapeutic target in various malignancies. Here, we investigated the effects of targeting CCR5 by its antagonist maraviroc in metastatic breast cancer cells. METHODS: In response to maraviroc exposure, cytotoxicity was assessed using an MTT proliferation assay, whereas the effects on colony formation and migration were assessed using colony formation, transwell chamber migration and scratch wound healing assays, respectively. Apoptosis-related activities were investigated using nuclear staining, annexin-V FITC staining and Western blotting. Cell cycle changes were analysed using flow cytometry and qRT-PCR for cell cycle relevant genes. A nude rat model for breast cancer bone metastasis was used to evaluate the in vivo efficacy of CCR5 targeting by maraviroc. Circulatory levels of the three cognate ligands for CCR5 (CCL3, CCL4, CCL5) were analysed in sera of breast cancer patients using ELISA. RESULTS: We found that blockade of CCR5 attenuated the proliferation, colony formation and migration of metastatic breast cancer cells, and induced apoptosis and arrest in the G1 phase of the cell cycle. Expression profiling highlighted the involvement of cell cycle related signalling cascades. We also found that treatment with maraviroc significantly inhibited bone metastasis in nude rats imp",
+      "journal_quality": 0.5,
+      "authors": [
+        "Pervaiz A",
+        "Zepp M",
+        "Mahmood S",
+        "Ali DM",
+        "Berger MR",
+        "Adwan H"
+      ],
+      "journal": "Cell Oncol (Dordr)",
+      "date": "2019-02-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CCR5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "29358169",
+      "title": "CCR5 Governs DNA Damage Repair and Breast Cancer Stem Cell Expansion.",
+      "abstract": "The functional significance of the chemokine receptor CCR5 in human breast cancer epithelial cells is poorly understood. Here, we report that CCR5 expression in human breast cancer correlates with poor outcome. CCR5+ breast cancer epithelial cells formed mammospheres and initiated tumors with >60-fold greater efficiency in mice. Reintroduction of CCR5 expression into CCR5-negative breast cancer cells promoted tumor metastases and induced DNA repair gene expression and activity. CCR5 antagonists Maraviroc and Vicriviroc dramatically enhanced cell killing mediated by DNA-damaging chemotherapeutic agents. Single-cell analysis revealed CCR5 governs PI3K/Akt, ribosomal biogenesis, and cell survival signaling. As CCR5 augments DNA repair and is reexpressed selectively on cancerous, but not normal breast epithelial cells, CCR5 inhibitors may enhance the tumor-specific activities of DNA damage response-based treatments, allowing a dose reduction of standard chemotherapy and radiation.Significance: This study offers a preclinical rationale to reposition CCR5 inhibitors to improve the treatment of breast cancer, based on their ability to enhance the tumor-specific activities of DNA-damaging chemotherapies administered in that disease. Cancer Res; 78(7); 1657-71.  2018 AACR.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Jiao X",
+        "Velasco-Velázquez MA",
+        "Wang M",
+        "Li Z",
+        "Rui H",
+        "Peck AR",
+        "Korkola JE",
+        "Chen X",
+        "Xu S",
+        "DuHadaway JB",
+        "Guerrero-Rodriguez S",
+        "Addya S",
+        "Sicoli D",
+        "Mu Z",
+        "Zhang G",
+        "Stucky A",
+        "Zhang X",
+        "Cristofanilli M",
+        "Fatatis A",
+        "Gray JW",
+        "Zhong JF",
+        "Prendergast GC",
+        "Pestell RG"
+      ],
+      "journal": "Cancer Res",
+      "date": "2018-04-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CCR5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25256399",
+      "title": "The potential to target CCL5/CCR5 in breast cancer.",
+      "abstract": "INTRODUCTION: Chemokines play a crucial role in breast cancer tumorigenesis and progression. Recently, the chemokine (C-C motif) ligand 5 (CCL5), which can be secreted either by tumor cells or by mesenchymal stromal cells recruited to the tumor, has been identified as a key node in the bidirectional communication between breast cancer and normal cells. AREAS COVERED: In this review, the authors discuss the role of CCL5/chemokine receptor 5 (CCR5) axis in promoting breast cancer onset and progression. Interrogation of large clinical databases has demonstrated increased expression of the CCL5/CCR5 axis in specific subtypes of breast cancer. The activation of the receptor CCR5 in breast cancer cells controls their invasiveness serving as a driver for metastasis. Furthermore, the CCL5/CCR5 axis participates in the recruitment of specific immune cells into tumors, inducing local immunosuppression and favoring tumor progression. EXPERT OPINION: The role of CCR5 in HIV infection led to the development of specific and potent CCR5 antagonists. The data reviewed here includes basic and translational studies that support the use of such CCR5 antagonists in breast cancer patients as adjuvant therapy to block the metastasis.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Velasco-Velázquez M",
+        "Xolalpa W",
+        "Pestell RG"
+      ],
+      "journal": "Expert Opin Ther Targets",
+      "date": "2014-11-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CCR5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "24301790",
+      "title": "Association of chemotactic factor receptor 5 gene with breast cancer.",
+      "abstract": "We designed a 2-stage study to investigate chemotactic factor receptor 5 (CCR5) gene expression in breast cancer tissues and axillary lymph nodes and analyze the association between the CCR5-I\"32 gene polymorphism and the clinical features and prognosis of breast cancer patients. The first stage examined 72 cases of invasive ductal carcinoma and axillary lymph node tissue, 50 cases of breast fibroadenoma tissue, and 40 cases of normal breast tissue. The tissues specimens were embedded in paraffin, and CCR5 expression was detected using immunohistochemical methods. C-erbB-2, p53, Ki-67, estrogen receptor, and progesterone receptor expression were also detected in the breast cancer tissues. The second stage examined 35 cases of surgically removed tissue. Relative expression levels of CCR5 messenger RNA (mRNA) in primary foci, axillary lymph node, and cancer-adjacent tissues of the breast cancer and breast fibroadenoma samples were detected using real-time quantitative reverse transcription-polymerase chain reaction assay. We found that 1) CCR5 mRNA relative expression levels in breast cancer tissue were significantly higher than those in adjacent normal tissue (P < 0.01) and benign tumors (P < 0.05). The relative CCR5 mRNA relative expression level between phase II and phase III breast cancer tissues was statistically significant (P < 0.05). The CCR5 mRNA relative expression level between adjacent normal tissues and fibroadenoma tissues was not significantly different (P > 0.05",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zhang Y",
+        "Meng FY",
+        "Li WL",
+        "Zhou CX",
+        "Guan Z",
+        "Fan HY"
+      ],
+      "journal": "Genet Mol Res",
+      "date": "2013-11-07T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CCR5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "22637726",
+      "title": "CCR5 antagonist blocks metastasis of basal breast cancer cells.",
+      "abstract": "The roles of the chemokine CCL5 and its receptor CCR5 in breast cancer progression remain unclear. Here, we conducted microarray analysis on 2,254 human breast cancer specimens and found increased expression of CCL5 and its receptor CCR5, but not CCR3, in the basal and HER-2 genetic subtypes. The subpopulation of human breast cancer cell lines found to express CCR5 displayed a functional response to CCL5. In addition, oncogene transformation induced CCR5 expression, and the subpopulation of cells that expressed functional CCR5 also displayed increased invasiveness. The CCR5 antagonists maraviroc or vicriviroc, developed to block CCR5 HIV coreceptor function, reduced in vitro invasion of basal breast cancer cells without affecting cell proliferation or viability, and maraviroc decreased pulmonary metastasis in a preclinical mouse model of breast cancer. Taken together, our findings provide evidence for the key role of CCL5/CCR5 in the invasiveness of basal breast cancer cells and suggest that CCR5 antagonists may be used as an adjuvant therapy to reduce the risk of metastasis in patients with the basal breast cancer subtype.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Velasco-Velázquez M",
+        "Jiao X",
+        "De La Fuente M",
+        "Pestell TG",
+        "Ertel A",
+        "Lisanti MP",
+        "Pestell RG"
+      ],
+      "journal": "Cancer Res",
+      "date": "2012-08-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CCR5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23734321",
+      "title": "The CCL5/CCR5 axis promotes metastasis in basal breast cancer",
+      "abstract": "Recently, we have shown that the CCL5/CCR5 axis is active in patients affected by an aggressive basal subtype of breast cancer. Using preclinical models, we have demonstrated that CCR5 promotes breast cancer invasiveness and metastatic potential, while CCR5 inhibition abrogates them. Thus, CCR5 antagonists may constitute an alternative therapeutic approach for patients affected by metastatic basal breast cancer.",
+      "journal_quality": 0.4138,
+      "authors": [
+        "Velasco-Velázquez M",
+        "Pestell RG"
+      ],
+      "journal": "Oncoimmunology",
+      "date": "2013-04-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CCR5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37759462",
+      "title": "The Role and Therapeutic Targeting of CCR5 in Breast Cancer",
+      "abstract": "The G-protein-coupled receptor C-C chemokine receptor 5 (CCR5) functions as a co-receptor for the entry of HIV into immune cells. CCR5 binds promiscuously to a diverse array of ligands initiating cell signaling that includes guided migration. Although well known to be expressed on immune cells, recent studies have shown the induction of CCR5 on the surface of breast cancer epithelial cells. The function of CCR5 on breast cancer epithelial cells includes the induction of aberrant cell survival signaling and tropism towards chemo attractants. As CCR5 is not expressed on normal epithelium, the receptor provides a potential useful target for therapy. Inhibitors of CCR5 (CCR5i), either small molecules (maraviroc, vicriviroc) or humanized monoclonal antibodies (leronlimab) have shown anti-tumor and anti-metastatic properties in preclinical studies. In early clinical studies, reviewed herein, CCR5i have shown promising results and evidence for effects on both the tumor and the anti-tumor immune response. Current clinical studies have therefore included combination therapy approaches with checkpoint inhibitors.",
+      "journal_quality": 0.3955,
+      "authors": [
+        "Hamid R",
+        "Alaziz M",
+        "Mahal AS",
+        "Ashton AW",
+        "Halama N",
+        "Jaeger D",
+        "Jiao X",
+        "Pestell RG"
+      ],
+      "journal": "Cells",
+      "date": "2023-09-08T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CCR5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37910571",
+      "title": "Inflammatory cytokines and two subtypes of breast cancer: A two-sample mendelian randomization study",
+      "abstract": "Background\n\nBreast cancer is a common cancer type that leads to cancer-related deaths among women. HER2-positive breast cancer, in particular, is associated with poor prognosis due to its high aggressiveness, increased risk of recurrence, and metastasis potential. Previous observational studies have explored potential associations between inflammatory cytokines and the risk of two breast cancer subtypes (HER2-positive and HER2-negative), but the results have been inconsistent. To further elucidate the causal relationship between inflammatory cytokines and the two breast cancer subtypes, we conducted a two-sample Mendelian randomization (MR) study.\n\nMethods\n\nWe employed a two-sample bidirectional MR analysis using publicly available genome-wide association study (GWAS) statistics. After obtaining instrumental variables, we conducted MR analyses using five different methods to ensure the reliability of our results. Additionally, we performed tests for heterogeneity and horizontal pleiotropy. Subsequently, we conducted a reverse MR study by reversing exposure and outcome variables.\n\nResults\n\nEvidence from our IVW analysis revealed that genetically predicted levels of IL-5 [odds ratio (OR): 1.18, 95% confidence interval (CI): 1.04-1.35, P = 0.012], IL-7 (OR: 1.11, 95% CI: 1.01-1.22, P = 0.037), and IL-16 (OR: 1.13, 95% CI: 1.02-1.25, P = 0.025) were associated with an increased risk of HER2-positive breast cancer. Conversely, IL-10 (OR: 1.14, 95% CI: 1.03-1.26, P = 0.012) was ass",
+      "journal_quality": 0.3792,
+      "authors": [
+        "Zhou H",
+        "Cai Z",
+        "Yang Q",
+        "Yang X",
+        "Chen J",
+        "Huang T"
+      ],
+      "journal": "PLoS One",
+      "date": "2023-11-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23241166",
+      "title": "Depletion of tristetraprolin in breast cancer cells increases interleukin-16 expression and promotes tumor infiltration with monocytes/macrophages.",
+      "abstract": "The RNA-binding protein tristetraprolin (TTP) destabilizes target messenger RNAs (mRNAs) containing AU-rich elements within their 3' untranslated region. Thereby, it controls the expression of multiple inflammatory and tumor-associated transcripts. Moreover, a loss of TTP in tumors predicts disease-associated survival. Although tumor intrinsic functions of TTP have previously been studied, the impact of TTP on the interaction of tumors with their microenvironment remains elusive. As immune cell infiltration into tumors is a critical determinant for tumor progression, this study aimed at determining the influence of tumor cell TTP on the interaction between tumor and immune cells, specifically monocytes (MO)/macrophages (MPhi). Knockdown (k/d) of TTP in T47D breast cancer cells enhanced tumor growth both in vitro and in vivo and increased infiltration of MO into 3D tumor spheroids in vitro and of MPhi into tumor xenografts in vivo. Enhanced migration of MO toward supernatants of TTP-deficient tumor spheroids was determined as the underlying principle. Interestingly, we noticed interleukin-16 (IL-16) mRNA stabilization when TTP was depleted. In line, IL-16 protein levels were elevated in TTP-deficient spheroids and their supernatants as well as in TTP k/d tumor xenografts and critically contributed to the enhanced chemotactic behavior. In summary, we show that the loss of TTP in tumors not only affects tumor cell proliferation and survival but also enhances infiltration of MO/M",
+      "journal_quality": 0.3595,
+      "authors": [
+        "Milke L",
+        "Schulz K",
+        "Weigert A",
+        "Sha W",
+        "Schmid T",
+        "Brüne B"
+      ],
+      "journal": "Carcinogenesis",
+      "date": "2013-04-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "IL16"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25968569",
+      "title": "CD4+ and CD8+ T cells have opposing roles in breast cancer progression and outcome",
+      "abstract": "The Cancer Immunoediting concept has provided critical insights suggesting dual functions of immune system during the cancer initiation and development. However, the dynamics and roles of CD4+ and CD8+ T cells in the pathogenesis of breast cancer remain unclear. Here we utilized two murine breast cancer models (4T1 and E0771) and demonstrated that both CD4+ and CD8+ T cells were increased and involved in immune responses, but with distinct dynamic trends in breast cancer development. In addition to cell number increases, CD4+ T cells changed their dominant subsets from Th1 in the early stages to Treg and Th17 cells in the late stages of the cancer progression. We also analyzed CD4+ and CD8+ T cell infiltration in primary breast cancer tissues from cancer patients. We observed that CD8+ T cells are the key effector cell population mediating effective anti-tumor immunity resulting in better clinical outcomes. In contrast, intra-tumoral CD4+ T cells have negative prognostic effects on breast cancer patient outcomes. These studies indicate that CD4+ and CD8+ T cells have opposing roles in breast cancer progression and outcomes, which provides new insights relevant for the development of effective cancer immunotherapeutic approaches.",
+      "journal_quality": 0.3198,
+      "authors": [
+        "Huang Y",
+        "Ma C",
+        "Zhang Q",
+        "Ye J",
+        "Wang F",
+        "Zhang Y",
+        "Hunborg P",
+        "Varvares MA",
+        "Hoft DF",
+        "Hsueh EC",
+        "Peng G"
+      ],
+      "journal": "Oncotarget",
+      "date": "2015-07-10T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "1436231",
+      "title": "T-lymphocyte subsets (CD4/CD8 ratio) in breast cancer patients.",
+      "abstract": "T-lymphocyte subsets (CD4/CD8 antigen positive cells) were determined in peripheral lymphocytes from 48 patients with breast cancer of different stages by flow immunocytometry with the aid of anti-CD4 and CD8 monoclonal antibodies. A broad individual variability of the CD4/CD8 ratio among both healthy donors and breast cancer patients was observed. The average value of CD4/CD8 ratio decreased in groups as follows: Healthy donors and Stage I patients, Stage IIA, IIB and Stage IV breast cancer patients. These differences were generally statistically not significant. The difference between healthy donors and Stage IV breast cancer patients was statistically significant (p < 0.01), if one exceedingly elevated value of the CD4/CD8 ratio was excluded from statistical evaluation. The average CD4/CD8 value in the group of breast cancer patients with lymph node or distant metastases was lower than that of patients without metastases, but their difference was not statistically significant either.",
+      "journal_quality": 0.2786,
+      "authors": [
+        "Sevcíková L",
+        "Hunáková L",
+        "Chorváth B",
+        "Turzová M",
+        "Boljesíková E"
+      ],
+      "journal": "Neoplasma",
+      "date": "1992-01-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD4"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "CD4"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "IL16"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CCR5"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CD8A"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CXCR4"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ITIH4"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "LCK"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CD5"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "HLA-DRA"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CD2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ERVW-1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ZAP70"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ENPEP"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "HLA-DRB1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CD3E"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CD4",
+        "CCR5",
+        "CXCR4",
+        "CD8A"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "receptor",
+        "chemokine receptor",
+        "immune cell signaling"
+      ]
+    },
+    {
+      "genes": [
+        "LCK",
+        "ZAP70",
+        "CD3E",
+        "CD5"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "tyrosine kinase",
+        "T cell receptor signaling",
+        "signal transduction"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "androgen signaling",
+        "androgen receptor pathway",
+        "hormone signaling",
+        "tumor microenvironment"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "MAPK pathway",
+        "ERK signaling",
+        "PI3K/AKT",
+        "cell proliferation",
+        "tumor progression"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "endothelial cells",
+        "tumor microenvironment",
+        "immune infiltration",
+        "spatial distribution"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "macrophage",
+        "tumor-associated macrophage",
+        "immune infiltration",
+        "cell composition",
+        "spatial transcriptomics"
+      ]
+    },
+    {
+      "genes": [
+        "CD4",
+        "CCR5",
+        "LCK"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "androgen signaling",
+        "tumor microenvironment",
+        "spatial transcriptomics",
+        "cell-cell interaction"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "CD4",
+      "CD8A",
+      "CD5",
+      "CD2",
+      "CD3E",
+      "LCK",
+      "IL16",
+      "ITIH4",
+      "CCR5",
+      "CXCR4"
+    ],
+    "genes_matched_by": {
+      "CD4": "cd4",
+      "CD8A": "cd8",
+      "CD5": "t",
+      "CD2": "t",
+      "CD3E": "t",
+      "LCK": "p",
+      "IL16": "il",
+      "ITIH4": "h",
+      "CCR5": "ccr5",
+      "CXCR4": "d"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Macrophages 2",
+      "Stromal"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 66.66666666666666,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 66.66666666666666,
+    "genes_missing": [
+      "HLA-DRA",
+      "ERVW-1",
+      "ZAP70",
+      "ENPEP",
+      "HLA-DRB1"
+    ],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Endothelial"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 30,
+      "gene_coverage": 0.6666666666666665,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": "final",
+      "papers": 30,
+      "gene_coverage": 0.6666666666666665,
+      "pathway_coverage": 0.0
+    }
+  ],
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with 'signaling' + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

@@ -1,0 +1,33 @@
+{
+  "genes": [
+    "COL1A2",
+    "ITGB1",
+    "COL1A1",
+    "COL3A1",
+    "FN1",
+    "ILK",
+    "ITGA1",
+    "ITGA2",
+    "ITGA3",
+    "ITGA4",
+    "ITGA5",
+    "ITGA6",
+    "ITGAV",
+    "LUM",
+    "TLN1"
+  ],
+  "pathways": [],
+  "celltypes": [
+    "DCIS 1",
+    "DCIS 2",
+    "Endothelial",
+    "Macrophages 2",
+    "Myoepi ACTA2+",
+    "Perivascular-Like",
+    "Stromal",
+    "Stromal & T Cell Hybrid"
+  ],
+  "disease": "breast cancer",
+  "lr_pair": "COL1A2-ITGB1",
+  "category": "high_morans_known"
+}

@@ -1,0 +1,30 @@
+{
+  "genes": [
+    "CD4",
+    "CXCL12",
+    "ACKR3",
+    "CCL20",
+    "CCL21",
+    "CCL5",
+    "CCR5",
+    "CCR7",
+    "CD8A",
+    "CXCL10",
+    "CXCL11",
+    "CXCL2",
+    "CXCL6",
+    "CXCL9",
+    "CXCR4"
+  ],
+  "pathways": [],
+  "celltypes": [
+    "Endothelial",
+    "Macrophages 1",
+    "Macrophages 2",
+    "Stromal",
+    "Stromal & T Cell Hybrid"
+  ],
+  "disease": "breast cancer",
+  "lr_pair": "CXCL12-CD4",
+  "category": "high_morans_unknown"
+}

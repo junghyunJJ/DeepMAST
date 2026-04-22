@@ -1,0 +1,99 @@
+Auto-save to /workspace/papers.json failed: [Errno 30] Read-only file system: '/workspace'
+{
+  "gate_a": {
+    "passed": true,
+    "endpoint": "celltypes_coverage_pct",
+    "strong_on_median_pct": 62.5,
+    "strong_off_median_pct": 61.25,
+    "threshold_pct": 90.0
+  },
+  "gate_null": {
+    "passed": true,
+    "delta_strong_pp": 1.25,
+    "delta_weak_pp": 0.0,
+    "max_abs_delta_pp": 1.25,
+    "threshold_pp": 3.0,
+    "mode": "B"
+  },
+  "gate_b": {
+    "passed": false,
+    "error_rate": 0.0625,
+    "latency_ms_median": 151534.5,
+    "error_rate_threshold": 0.05,
+    "latency_ms_threshold": 600000,
+    "n_rows": 48,
+    "n_errors": 3
+  },
+  "gate_c": {
+    "passed": true,
+    "unique_rounded_values_per_condition": {
+      "strong_on": 9,
+      "strong_off": 9,
+      "weak_on": 8,
+      "weak_off": 9
+    },
+    "minimum_observed": 8,
+    "threshold": 3
+  },
+  "variance": {
+    "passed": true,
+    "mean_per_case_stdev_pct": 4.157,
+    "threshold_pct": 2.0,
+    "n_cases_with_multi_rows": 12
+  },
+  "all_passed": false,
+  "messages": [
+    "Gate B FAIL: BioMCP error rate 6.25% (threshold < 5%) or median latency 151.5s (threshold < 600s). Apply §6 outage exclusion or re-pilot."
+  ],
+  "generated_at": "2026-04-22T04:23:29Z",
+  "benchmark_mode": "B"
+}
+{
+  "gate_a": {
+    "passed": true,
+    "endpoint": "celltypes_coverage_pct",
+    "strong_on_median_pct": 62.5,
+    "strong_off_median_pct": 62.5,
+    "threshold_pct": 90.0
+  },
+  "gate_null": {
+    "passed": true,
+    "delta_strong_pp": 0.0,
+    "delta_weak_pp": 0.0,
+    "max_abs_delta_pp": 0.0,
+    "threshold_pp": 3.0,
+    "mode": "B"
+  },
+  "gate_b": {
+    "passed": true,
+    "error_rate": 0.0,
+    "latency_ms_median": 146380.5,
+    "error_rate_threshold": 0.05,
+    "latency_ms_threshold": 600000,
+    "n_rows": 48,
+    "n_errors": 0
+  },
+  "gate_c": {
+    "passed": true,
+    "unique_rounded_values_per_condition": {
+      "strong_on": 8,
+      "strong_off": 8,
+      "weak_on": 8,
+      "weak_off": 9
+    },
+    "minimum_observed": 8,
+    "threshold": 3
+  },
+  "variance": {
+    "passed": false,
+    "mean_per_case_stdev_pct": 1.15,
+    "threshold_pct": 2.0,
+    "n_cases_with_multi_rows": 12
+  },
+  "all_passed": false,
+  "messages": [
+    "Variance LOW: mean per-case between-condition std-dev 1.15pp < 2pp. Consider raising temperature to 0.5 per REV5 §8 step 5."
+  ],
+  "generated_at": "2026-04-22T04:31:55Z",
+  "benchmark_mode": "B"
+}

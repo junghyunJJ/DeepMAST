@@ -1,0 +1,29 @@
+{
+  "genes": [
+    "ADAM12",
+    "ITGB1",
+    "FN1",
+    "ILK",
+    "ITGA1",
+    "ITGA2",
+    "ITGA3",
+    "ITGA4",
+    "ITGA5",
+    "ITGA6",
+    "ITGAV",
+    "TLN1",
+    "VCAM1",
+    "ITGA8",
+    "ITGB1BP1"
+  ],
+  "pathways": [],
+  "celltypes": [
+    "Endothelial",
+    "Macrophages 2",
+    "Perivascular-Like",
+    "Stromal",
+    "Stromal & T Cell Hybrid"
+  ],
+  "disease": "breast cancer",
+  "lr_pair": "ADAM12-ITGB1"
+}

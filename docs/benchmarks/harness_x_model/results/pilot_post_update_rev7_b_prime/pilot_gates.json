@@ -1,0 +1,44 @@
+{
+  "gate_a": {
+    "passed": true,
+    "endpoint": "celltypes_coverage_pct",
+    "strong_on_median_pct": 62.5,
+    "strong_off_median_pct": 25.0,
+    "threshold_pct": 90.0
+  },
+  "gate_null": {
+    "passed": true,
+    "skipped": true,
+    "reason": "Gate Null only applies to mode=B; got mode=B_prime"
+  },
+  "gate_b": {
+    "passed": true,
+    "error_rate": 0.0,
+    "latency_ms_median": 127657.0,
+    "error_rate_threshold": 0.05,
+    "latency_ms_threshold": 600000,
+    "n_rows": 48,
+    "n_errors": 0
+  },
+  "gate_c": {
+    "passed": true,
+    "unique_rounded_values_per_condition": {
+      "strong_on": 7,
+      "strong_off": 7,
+      "weak_on": 8,
+      "weak_off": 7
+    },
+    "minimum_observed": 7,
+    "threshold": 3
+  },
+  "variance": {
+    "passed": true,
+    "mean_per_case_stdev_pct": 19.937,
+    "threshold_pct": 2.0,
+    "n_cases_with_multi_rows": 12
+  },
+  "all_passed": true,
+  "messages": [],
+  "generated_at": "2026-04-22T06:36:00Z",
+  "benchmark_mode": "B_prime"
+}

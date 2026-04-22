@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-04-21T19:42:38Z",
+  "trial_count": 24,
+  "conditions": {
+    "strong_off": {
+      "n": 6,
+      "coverage_pass_rate": 0.1667,
+      "mean_genes_coverage_pct": 63.333,
+      "mean_total_papers": 30.0,
+      "mean_latency_s": 104.455,
+      "errors": 0
+    },
+    "strong_on": {
+      "n": 6,
+      "coverage_pass_rate": 1.0,
+      "mean_genes_coverage_pct": 100.0,
+      "mean_total_papers": 30.0,
+      "mean_latency_s": 184.994,
+      "errors": 0
+    },
+    "weak_off": {
+      "n": 6,
+      "coverage_pass_rate": 0.1667,
+      "mean_genes_coverage_pct": 63.333,
+      "mean_total_papers": 30.0,
+      "mean_latency_s": 258.394,
+      "errors": 0
+    },
+    "weak_on": {
+      "n": 6,
+      "coverage_pass_rate": 1.0,
+      "mean_genes_coverage_pct": 100.0,
+      "mean_total_papers": 30.0,
+      "mean_latency_s": 200.63,
+      "errors": 0
+    }
+  },
+  "mode": "pilot",
+  "case_count": 6,
+  "repeats": 1
+}

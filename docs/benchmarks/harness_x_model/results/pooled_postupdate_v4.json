@@ -1,0 +1,53 @@
+{
+  "mode": "pooled_multi_dir",
+  "datasets": ["B", "B_prime", "C"],
+  "n_total": 144,
+  "n_cases": 12,
+  "per_dataset": {
+    "B": {
+      "n": 48,
+      "n_cases": 12,
+      "celltype_mean": 63.9914,
+      "coverage_pass_rate": 1,
+      "pathway_n": 16
+    },
+    "B_prime": {
+      "n": 48,
+      "n_cases": 12,
+      "celltype_mean": 46.5807,
+      "coverage_pass_rate": 0.5625,
+      "pathway_n": 16
+    },
+    "C": {
+      "n": 48,
+      "n_cases": 12,
+      "celltype_mean": 43.7335,
+      "coverage_pass_rate": 0.4792,
+      "pathway_n": 16
+    }
+  },
+  "celltype_primary_summary": "Linear mixed model fit by REML ['lmerMod']\nFormula: celltypes_coverage_pct ~ skill_on * model_strength + dataset +  \n    (1 | case_id)\n   Data: df\n\nREML criterion at convergence: 1177.7\n\nScaled residuals: \n     Min       1Q   Median       3Q      Max \n-2.51785 -0.75867  0.09781  0.73147  2.41225 \n\nRandom effects:\n Groups   Name        Variance Std.Dev.\n case_id  (Intercept) 291.7    17.08   \n Residual             202.9    14.24   \nNumber of obs: 144, groups:  case_id, 12\n\nFixed effects:\n                                   Estimate Std. Error t value\n(Intercept)                        54.17769    5.72379   9.465\nskill_onTRUE                       16.20811    3.35742   4.828\nmodel_strengthstrong               -0.08818    3.35742  -0.026\ndatasetB_prime                    -17.41071    2.90761  -5.988\ndatasetC                          -20.25794    2.90761  -6.967\nskill_onTRUE:model_strengthstrong   7.01499    4.74811   1.477\n\nCorrelation of Fixed Effects:\n            (Intr) sk_TRUE mdl_st dtstB_ datstC\nskill_nTRUE -0.293                             \nmdl_strngth -0.293  0.500                      \ndatastB_prm -0.254  0.000   0.000              \ndatasetC    -0.254  0.000   0.000  0.500       \nskll_TRUE:_  0.207 -0.707  -0.707  0.000  0.000",
+  "coverage_glmm_summary": "Generalized linear mixed model fit by maximum likelihood (Laplace\n  Approximation) [glmerMod]\n Family: binomial  ( logit )\nFormula: coverage_pass ~ skill_on * model_strength + dataset + (1 | case_id)\n   Data: df\n\n      AIC       BIC    logLik -2*log(L)  df.resid \n     47.6      68.4     -16.8      33.6       137 \n\nScaled residuals: \n     Min       1Q   Median       3Q      Max \n-1.11263  0.00000  0.00000  0.00001  1.05299 \n\nRandom effects:\n Groups  Name        Variance Std.Dev.\n case_id (Intercept) 742.5    27.25   \nNumber of obs: 144, groups:  case_id, 12\n\nFixed effects:\n                                    Estimate Std. Error z value Pr(>|z|)    \n(Intercept)                        5.436e+02  1.131e+02   4.807 1.53e-06 ***\nskill_onTRUE                       3.083e+01  9.191e+00   3.354 0.000795 ***\nmodel_strengthstrong              -2.050e-06  4.804e+00   0.000 1.000000    \ndatasetB_prime                    -5.542e+02  1.131e+02  -4.902 9.49e-07 ***\ndatasetC                          -5.648e+02  1.133e+02  -4.987 6.15e-07 ***\nskill_onTRUE:model_strengthstrong  1.092e+01  6.647e+00   1.642 0.100554    \n---\nSignif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1\n\nCorrelation of Fixed Effects:\n            (Intr) sk_TRUE mdl_st dtstB_ datstC\nskill_nTRUE -0.001                             \nmdl_strngth -0.038  0.262                      \ndatastB_prm -0.999 -0.029   0.016              \ndatasetC    -0.998 -0.061   0.016  0.999       \nskll_TRUE:_  0.036  0.290  -0.723 -0.030 -0.054",
+  "pathway_secondary_summary": "\nCall:\nstats::lm(formula = pathways_coverage_pct ~ skill_on * model_strength + \n    dataset, data = df_path)\n\nResiduals:\n    Min      1Q  Median      3Q     Max \n-62.500 -29.167   8.333  20.833  70.833 \n\nCoefficients:\n                                    Estimate Std. Error t value Pr(>|t|)    \n(Intercept)                        7.917e+01  1.279e+01   6.188 2.13e-07 ***\nskill_onTRUE                       3.333e+01  1.477e+01   2.256 0.029317 *  \nmodel_strengthstrong              -5.387e-17  1.477e+01   0.000 1.000000    \ndatasetB_prime                    -3.750e+01  1.279e+01  -2.931 0.005445 ** \ndatasetC                          -5.000e+01  1.279e+01  -3.908 0.000333 ***\nskill_onTRUE:model_strengthstrong  1.667e+01  2.089e+01   0.798 0.429518    \n---\nSignif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1\n\nResidual standard error: 36.19 on 42 degrees of freedom\nMultiple R-squared:  0.4454,\tAdjusted R-squared:  0.3794 \nF-statistic: 6.745 on 5 and 42 DF,  p-value: 0.0001073\n",
+  "tost_equivalence": {
+    "contrast": "B_prime - C",
+    "estimate_pp": 5.6944,
+    "se_pp": 4.1152,
+    "margin_pp": 5,
+    "p_lower": 0.0069,
+    "p_upper": 0.5665,
+    "p_tost": 0.5665,
+    "equivalent_at_alpha_0_05": false
+  },
+  "boot_ci": {
+    "n_iter": 1000,
+    "n_successful": 1000,
+    "coef_names": ["(Intercept)", "skill_onTRUE", "model_strengthstrong", "skill_onTRUE:model_strengthstrong"],
+    "ci_95": [
+      [-0.6931, 1.4201, -3.9731e-07, 0.0016],
+      [-0.2398, 2.2749, 9.2872e-10, 1.9562],
+      [0.9922, 3.9346, 4.8196e-07, 18.6161]
+    ]
+  },
+  "analysis_notes": ["Rev 4 primary endpoint: celltypes_coverage_pct (continuous, LMM).", "Coverage_pass GLMM retained as binary-endpoint robustness check.", "Dataset FE controls for B / B_prime / C baseline differences.", "TOST on C - B_prime celltype contrast with 5 pp margin (Rev 4 equivalence test)."]
+}

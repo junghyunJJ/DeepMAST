@@ -223,6 +223,38 @@ Any deviation from the pre-update protocol is listed here:
 
 ---
 
+## 16b. Rev 7 Amendment (registered 2026-04-21)
+
+**Scope of amendment**: Input data design change only — no change to primary/secondary endpoints, statistical models, or pre-registered windows. Celltype coverage remains primary per §5.
+
+**Motivation**: The v0–v3 pilots (Rev 3 → Rev 6) revealed that gene coverage is structurally saturated at 100% because legacy cases carried exactly 2 input genes (ligand + receptor), so `target_gene_coverage = 0.6` = 2/2 was trivially met. This was flagged in `SESSION_SUMMARY.md` (Option α / Path A) as mathematically — not statistically — dispositive. Running the pre-registered full campaign (360 trials/mode × 3 modes = 1,080 trials) with that saturated gene endpoint would have produced a null on the gene dimension regardless of n.
+
+**Change**:
+1. **Input data**: each of the 30 cases receives a new top-level `enriched_genes` field — exactly 15 genes including the original ligand + receptor, sourced from STRING-DB high-confidence interaction partners (species=9606, required_score ≥ 700) and KEGG `PATHWAY_TO_GENES` hub genes (from `src/agents/deep_interpreter/tools/literature.py`). Enrichment sources are orthogonal to the LIANA spatial co-expression table (`interest_sig_liana.csv`) that ranked the original L-R pair; orthogonality is guaranteed by source selection, not by exclusion list.
+2. **Case-file physical separation**: the enriched cases are written to a *new* file `docs/benchmarks/cci_skill_ablation/cases/cci_full_cases_enriched_v1.json`. The original `cci_full_cases.json` (sha256 `4c29fa35…`) is left untouched so the sibling `cci_skill_ablation` benchmark (Table 3 in the paper) is not re-run and not contaminated. `benchmark_cci_core.py:381-422` uses a whitelist prompt renderer that ignores unknown fields, so even a shared-file design would have been safe, but physical separation gives cleaner audit provenance for reviewers.
+3. **Threshold change**: the `coverage_pass` gate's gene floor is raised from `>= 60%` to `>= 90%` so that the composite pass/fail endpoint remains meaningful now that 15 genes are available. Pathway floor (`>= 50%`) unchanged.
+
+**Endpoints after amendment**:
+- *Primary*: celltype coverage — UNCHANGED per §5.
+- *Secondary* (gene coverage): upgraded from "saturated, descriptive-only" to "first-time measurable". Reported alongside celltype in `FINDINGS_5_ERAS_SUMMARY.md`.
+- *Secondary* (pathway coverage): unchanged.
+- *Replication windows*: unchanged (`[+12, +22]` = strengthened; `[+5, +12]` or `[+22, +30]` = nuanced; `< +5` = non-replication).
+
+**Dry-run gate** (new, preserves OSF commitment against wasted compute):
+- 1 case × 4 conditions × 1 repeat (~30 min Ollama).
+- **ABORT** if both strong arms hit ≥95% gene coverage (endpoint saturation recurs → pivot to Rev 6 celltype-only narrative as paper-shippable fallback).
+- **PROCEED** if both <95% AND `strong_on − strong_off` ≥ +5 pp.
+- Audit artifact: `results/pilot_post_update_rev7_dryrun/REV7_DRYRUN_DECISION.md`.
+
+**Provenance**:
+- Enrichment script: `docs/benchmarks/harness_x_model/enrich_cases_string_kegg.py` (SHA captured in the enriched file's sidecar `.provenance.json`).
+- STRING release: recorded in provenance header at enrichment time.
+- `cases_sha256` in every Rev 7 trial row differs from v0–v3 hashes (by design — resume safety guards enforce this).
+
+**Unchanged since registration**: §5 primary test (celltype), §6 replication windows, §7 power analysis framework, §8 pilot gates (now evaluated against the new threshold), §11 statistical analysis specification, §12–15 pre-specified reporting format.
+
+---
+
 ## 17. Conflict of Interest
 
 None declared.

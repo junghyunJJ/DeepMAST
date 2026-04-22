@@ -1,0 +1,1341 @@
+{
+  "papers": [
+    {
+      "pmid": "38778448",
+      "title": "Integrating single-cell and spatial analysis reveals MUC1-mediated cellular crosstalk in mucinous colorectal adenocarcinoma",
+      "abstract": "Abstract\n\nBackground\n\nMucinous colorectal adenocarcinoma (MCA) is a distinct subtype of colorectal cancer (CRC) with the most aggressive pattern, but effective treatment of MCA remains a challenge due to its vague pathological characteristics. An in-depth understanding of transcriptional dynamics at the cellular level is critical for developing specialised MCA treatment strategies.\n\nMethods\n\nWe integrated single-cell RNA sequencing and spatial transcriptomics data to systematically profile the MCA tumor microenvironment (TME), particularly the interactome of stromal and immune cells. In addition, a three-dimensional bioprinting technique, canonical ex vivo co-culture system, and immunofluorescence staining were further applied to validate the cellular communication networks within the TME.\n\nResults\n\nThis study identified the crucial intercellular interactions that engaged in MCA pathogenesis. We found the increased infiltration of FGF7 +/THBS1 + myofibroblasts in MCA tissues with decreased expression of genes associated with leukocyte-mediated immunity and T cell activation, suggesting a crucial role of these cells in regulating the immunosuppressive TME. In addition, MS4A4A + macrophages that exhibit M2-phenotype were enriched in the tumoral niche and high expression of MS4A4A + was associated with poor prognosis in the cohort data. The ligand-receptor-based intercellular communication analysis revealed the tight interaction of MUC1 + malignant cells and ZEB1 + endothelial c",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zhou H",
+        "Shen Y",
+        "Zheng G",
+        "Zhang B",
+        "Wang A",
+        "Zhang J",
+        "Hu H",
+        "Lin J",
+        "Liu S",
+        "Luan X",
+        "Zhang W"
+      ],
+      "journal": "Clin Transl Med",
+      "date": "2024-05-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "COL1A1",
+          "COL1A2",
+          "COL3A1",
+          "FN1",
+          "SPP1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "fibrosis",
+          "stromal remodeling",
+          "ligand"
+        ]
+      },
+      "query_index": 18,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39998776",
+      "title": "Cancer brain metastasis: molecular mechanisms and therapeutic strategies",
+      "abstract": "Brain metastases (BMs) are the most common intracranial tumors in adults and the major cause of cancer-related morbidity and mortality. The occurrence of BMs varies according to the type of primary tumors with most frequence in lung cancer, melanoma and breast cancer. Among of them, lung cancer has been reported to have a higher risk of BMs than other types of cancers with 40 ~ 50% of such patients will develop BMs during the course of disease. BMs lead to many neurological complications and result in a poor quality of life and short life span. Although the treatment strategies were improved for brain tumors in the past decades, the prognosis of BMs patients is grim. Poorly understanding of the molecular and cellular characteristics of BMs and the complicated interaction with brain microenvironment are the major reasons for the dismal prognosis of BM patients. Recent studies have enhanced understanding of the mechanisms of BMs. The newly identified potential therapeutic targets and the advanced therapeutic strategies have brought light for a better cure of BMs. In this review, we summarized the mechanisms of BMs during the metastatic course, the molecular and cellular landscapes of BMs, and the advances of novel drug delivery systems for overcoming the obstruction of blood-brain barrier (BBB). We further discussed the challenges of the emerging therapeutic strategies, such as synergistic approach of combining targeted therapy with immunotherapy, which will provide vital clues",
+      "journal_quality": 0.5,
+      "authors": [
+        "Lu Y",
+        "Huang Y",
+        "Zhu C",
+        "Li Z",
+        "Zhang B",
+        "Sheng H",
+        "Li H",
+        "Liu X",
+        "Xu Z",
+        "Wen Y",
+        "Zhang J",
+        "Zhang L"
+      ],
+      "journal": "Mol Biomed",
+      "date": "2025-02-25T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD44",
+          "MMP9",
+          "EGFR",
+          "ERBB2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "NF-kB",
+          "TNF-alpha",
+          "macrophage",
+          "invasive tumor",
+          "spatial transcriptomics"
+        ]
+      },
+      "query_index": 19,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33198344",
+      "title": "Physiological Roles of ERM Proteins and Transcriptional Regulators in Supporting Membrane Expression of Efflux Transporters as Factors of Drug Resistance in Cancer",
+      "abstract": "Simple Summary\n\nMultidrug resistance and infiltration/metastasis of cancer are two major issues that must be overcome during chemotherapy. Efflux transporters, such as P-glycoprotein (P-gp), multidrug resistance-associated proteins, and breast cancer resistance protein play an important role in multidrug resistance of cancer. The ERM scaffold protein ezrin, radixin, and moesin acts as an anchor to support the expression of these transporters on the cell membrane. This review summarizes the organ-specific relationship between efflux transporters and ERM proteins. Furthermore, we also describe how transcriptional regulatory factors such as Snail that play an active role in cancer metastasis, are involved in the activation of P-gp through the expression of ERM proteins. We hope that this review will be useful to many researchers in understanding how to overcome multidrug resistance in cancer.\n\nAbstract\n\nOne factor contributing to the malignancy of cancer cells is the acquisition of drug resistance during chemotherapy via increased expression of efflux transporters, such as P-glycoprotein (P-gp), multidrug resistance-associated proteins (MRPs), and breast cancer resistance protein (BCRP). These transporters operate at the cell membrane, and are anchored in place by the scaffold proteins ezrin (Ezr), radixin (Rdx), and moesin (Msn) (ERM proteins), which regulate their functional activity. The identity of the regulatory scaffold protein(s) differs depending upon the transporter, an",
+      "journal_quality": 0.5,
+      "authors": [
+        "Ogihara T",
+        "Mizoi K",
+        "Kamioka H",
+        "Yano K"
+      ],
+      "journal": "Cancers (Basel)",
+      "date": "2020-11-12T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "RDX"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 9,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30983941",
+      "title": "Immunophenotyping of the cluster of differentiation 74, migration inhibitory factor, and cluster of differentiation 44 expression on human breast cancer-derived cell lines",
+      "abstract": "Objective:\n\nCluster of differentiation (CD) 74, CD44, and macrophage migration inhibitory factor (MIF) are well known for their immunological functions; however, it has been shown that recently, CD74, CD44, and MIF have a role in tumor and tumor progression. This study was undertaken to investigate the expression of CD74, MIF, and CD44 in breast cancer cells.\n\nMaterials and Methods:\n\nThe expression of CD74, MIF, and CD44 molecules on the breast cancer-derived cell lines CAMA-1, 3,4-methylenedioxyamphetamine (MDA)-MB-231, and MDA-MB-43 was determined by flow cytometry, western immunoblotting, and confocal microscope. To validate the study the studying expression of CD74, MIF, and CD44 on the normal breast cell line 266LDM, whole cell lysate obtained from adult normal breast tissue and normal breast tissue.\n\nResults:\n\nThe results show that all breast cancer cells overexpress CD74 isoforms, MIF, and CD44, in contrast to the normal cell lines and normal breast tissues, which express only CD44 and MIF in low levels. The expression of CD74, MIF, and CD44 was studied in the immortalized normal breast luminal cell line 226LDM, normal breast tissues, and lysate to validate the study.\n\nConclusion:\n\nThe data show, in this study, the evidence that breast cancer cell lines expressing three different isoforms of CD74. The results of the present study indicate a crucial role of CD74 in breast cancer cells along with MIF and CD44. The results also suggest that CAMA-1, MDA-MB-231, and MDA-MB-",
+      "journal_quality": 0.5,
+      "authors": [
+        "Ssadh HA",
+        "Abdulmonem WA"
+      ],
+      "journal": "Int J Health Sci (Qassim)",
+      "date": "2019-03-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD74"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "27510781",
+      "title": "[Expression and clinical significance of moesin and E-cadherin in invasive carcinoma of breast, no specific type].",
+      "abstract": "OBJECTIVE: To investigate the correlation of moesin and E-cadherin with biological behavior of breast cancer and its mechanism by comparing expression of moesin and E-cadherin in breast invasive carcinoma of no specific type(BIC-NST), breast ductal carcinoma in situ(BDCIS) and normal breast tissues adjacent to carcinoma. METHODS: Breast cancer cases of the Huizhou Municipal Center People Hospital were collected between Jan 2008 and Dec 2010, expression of moesin and E-cadherin in 104 cases of BIC-NST, 84 cases of BDCIS and 53 cases of normal breast tissues adjacent to carcinoma were detected by tissue-microarray and SP immunohistochemical staining. Western blot was used to detect moesin expression of 16 BIC-NST fresh tissues. RESULTS: Expression rate of moesin in BIC-NST and BDCIS were significantly higher than normal tissues(P<0.01), but the expression rate of E-cadherin in BIC-NST and BDCIS were significantly lower than those of normal tissues(P<0.01). Expression rate of moesin in BIC-NST grade III group was significantly higher than that of the grade I group.There was a significantly positive correlation between histological grade and moesin expression(P<0.05). However, E-cadherin expression rate in BIC-NST grade III group was significantly lower than that in grade I group , and there was a significantly negative correlation between histological grade and E-cadherin expression(P<0.05). Moreover, no significant correlation was observed between moesin and E-cadherin expressi",
+      "journal_quality": 0.5,
+      "authors": [
+        "Pei XJ",
+        "Xue XF",
+        "Zhu YL",
+        "Liu SJ",
+        "Han AJ",
+        "Yang QX"
+      ],
+      "journal": "Zhonghua Bing Li Xue Za Zhi",
+      "date": "2016-08-08T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "MSN"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 16,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36412644",
+      "title": "Nuclear Factor-kappaB Clinical Significance in Breast Cancer: An Immunohistochemical Study",
+      "abstract": "Objectives\n\nNuclear factor kappaB (NF-kappaB) is a superfamily of transcription factors that plays a key role in cancer genesis and progression. The present study aimed to examine the expression of NF-kappaB/p65 in breast cancer and its relationship with prognostic markers such as tumour grade, tumour size, hormone receptors, and HER-2.\n\nMethods\n\nNinety-nine unselected formalin-fixed paraffin-embedded invasive ductal and lobular tissue sections were evaluated by immunohistochemistry methods to measure the expression of NF-kappaB/p65, oestrogen receptor (ER), progesterone receptor (PR), human epidermal growth factor receptor-2 (HER-2), and Ki-67. We assessed the correlation between NF-kappaB/p65 and clinicopathological parameters.\n\nResults\n\nNF-kappaB/p65 was found only in the cytoplasm and positively correlated with large tumours (>=2 cm) and high-grade tumours (p < 0.001 and p = 0.018, respectively). Other breast cancer markers, such as histological type (p = 0.766), HER-2 (p = 0.416), PR (p = 0.356), and ER (p = 0.606), had no significant link with the expression of NF-kappaB/p65. Furthermore, no significant relation with the Ki-67 marker was detected (p = 0.117).\n\nConclusions\n\nThe current study is indicative of a link between overexpression of NF-kappaB/p65 and both large tumour size and higher grade. This suggests that the expression of NF-kappaB/p65 is associated with aggressive biological activity in breast cancer; elucidating the mechanisms that lead to NF-kappaB/p65 cy",
+      "journal_quality": 0.5,
+      "authors": [
+        "Al-Mutairi MS",
+        "Habashy HO"
+      ],
+      "journal": "Med Princ Pract",
+      "date": "2022-11-22T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "RELA",
+          "NFKB1",
+          "IKBKB"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "nf-kb"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39834817",
+      "title": "An updated review summarizing the anticancer potential of flavonoids via targeting NF-kB pathway",
+      "abstract": "Nuclear factor-kappaB (NF-kappaB) cell signaling pathway is essential for the progression and development of numerous human disorders, including cancer. NF-kappaB signaling pathway regulates a wide range of physiological processes, such as cell survival, growth, and migration. Deregulated NF-kB signaling resulted in unregulated cell proliferation, viability, movement, and invasion, thus promoting tumor development. Recent findings have increasingly shown that plant derived phytochemicals that inhibit NF-kappaB signaling have the potential to be employed in cancer therapeutics. Flavonoids are a group of polyphenolic natural compounds present in various plants and their fruits, vegetables, and leaves. These compounds have numerous medicinal properties owing to their antioxidant, anti-inflammatory, antiviral, and antitumor characteristics. The main mechanism by which these flavonoids exhibit their anticancer potential is via potent antioxidative and immunomodulatory actions. Current research reports have demonstrated that these flavonoids exhibited their anticancer effects via suppressing the NF-kappaB signaling. Based on these facts, we have comprehensively outlined the cancer promoting role of NF-kappaB pathway in various processes including tumor progression, drug resistance, angiogenesis and metastasis. In addition to these, we also summarize the anticancer potential of flavonoids by specifically targeting the NF-kappaB pathway in various types of cancers.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Pandey P",
+        "Lakhanpal S",
+        "Mahmood D",
+        "Kang HN",
+        "Kim B",
+        "Kang S",
+        "Choi J",
+        "Choi M",
+        "Pandey S",
+        "Bhat M",
+        "Sharma S",
+        "Khan F",
+        "Park MN",
+        "Kim B"
+      ],
+      "journal": "Front Pharmacol",
+      "date": "2025-01-06T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "RELA",
+          "NFKB1",
+          "IKBKB"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "nf-kb"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39014491",
+      "title": "Versatile function of NF-kB in inflammation and cancer",
+      "abstract": "Nuclear factor-kappaB (NF-kB) plays a crucial role in both innate and adaptive immune systems, significantly influencing various physiological processes such as cell proliferation, migration, differentiation, survival, and stemness. The function of NF-kB in cancer progression and response to chemotherapy has gained increasing attention. This review highlights the role of NF-kB in inflammation control, biological mechanisms, and therapeutic implications in cancer treatment. NF-kB is instrumental in altering the release of inflammatory factors such as TNF-alpha, IL-6, and IL-1beta, which are key in the regulation of carcinogenesis. Specifically, in conditions including colitis, NF-kB upregulation can intensify inflammation, potentially leading to the development of colorectal cancer. Its pivotal role extends to regulating the tumor microenvironment, impacting components such as macrophages, fibroblasts, T cells, and natural killer cells. This regulation influences tumorigenesis and can dampen anti-tumor immune responses. Additionally, NF-kB modulates cell death mechanisms, notably by inhibiting apoptosis and ferroptosis. It also has a dual role in stimulating or suppressing autophagy in various cancers. Beyond these functions, NF-kB plays a role in controlling cancer stem cells, fostering angiogenesis, increasing metastatic potential through EMT induction, and reducing tumor cell sensitivity to chemotherapy and radiotherapy. Given its oncogenic capabilities, research has focuse",
+      "journal_quality": 0.5,
+      "authors": [
+        "Ma Q",
+        "Hao S",
+        "Hong W",
+        "Tergaonkar V",
+        "Sethi G",
+        "Tian Y",
+        "Duan C"
+      ],
+      "journal": "Exp Hematol Oncol",
+      "date": "2024-07-16T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "RELA",
+          "NFKB1",
+          "IKBKB"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "nf-kb"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37832719",
+      "title": "LncRNA NKILA inhibits HBV replication by repressing NF-kappaB signalling activation",
+      "abstract": "Hepatitis B virus (HBV) infection results in liver cirrhosis and hepatocellular carcinoma (HCC). HBx/nuclear factor (NF)-kappaB pathway plays a role in HBV replication. However, whether NF-kappaB-interacting long noncoding RNA (NKILA), a suppressor of NF-kappaB activation, regulates HBV replication remains largely unknown. In this study, gain-and-loss experiments showed that NKILA inhibited HBV replication by inhibiting NF-kappaB activity. In turn, HBV infection down-regulated NKILA expression. In addition, expression levels of NKILA were lower in the peripheral blood-derived monocytes (PBMCs) of HBV-positive patients than in healthy individuals, which were correlated with HBV viral loads. And a negative correlation between NKILA expression level and HBV viral loads was observed in blood serum from HBV-positive patients. Lower levels of endogenous NKILA were also observed in HepG2 cells expressing a 1.3-fold HBV genome, HBV-infected HepG2-NTCP cells, stable HBV-producing HepG2.2.15 and HepAD38 cells, compared to those HBV-negative cells. Furthermore, HBx was required for NKILA-mediated inhibition on HBV replication. NKILA decreased HBx-induced NF-kappaB activation by interrupting the interaction between HBx and p65, whereas NKILA mutants lack of essential domains for NF-kB inhibition, lost the ability to inhibit HBV replication. Together, our data demonstrate that NKILA may serve as a suppressor of HBV replication via NF-kB signalling.\n\nHighlights\n\nNKILA inhibits HBV replicat",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zhang X",
+        "Li Y",
+        "Huan C",
+        "Hou Y",
+        "Liu R",
+        "Shi H",
+        "Zhang P",
+        "Zheng B",
+        "Wang Y",
+        "Wang H",
+        "Zhang W"
+      ],
+      "journal": "Virol Sin",
+      "date": "2023-10-11T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "RELA",
+          "NFKB1",
+          "IKBKB"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "nf-kb"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37835430",
+      "title": "Expression and Activity of the NF-kappaB Subunits in Chronic Lymphocytic Leukaemia: A Role for RelB and Non-Canonical Signalling",
+      "abstract": "Simple Summary\n\nChronic lymphocytic leukaemia (CLL) patients frequently experience drug-resistance. Signalling via the transcription factor NF-kappaB is a major contributor to resistance due to its ability to regulate the expression of genes that confer growth and survival of CLL cells. NF-kappaB signalling comprises 'canonical' and 'non-canonical' pathways involving the subunits RelA and RelB, respectively. RelA has been widely investigated in resistance and outcome in CLL but RelB activity and therapeutic implications are less well understood. We sought to examine RelB expression and function using a large cohort of comprehensively annotated patient-derived CLL cells. We demonstrate that RelB activity is associated with specific subsets of patients and with poorer outcome. Use of CD40L-expressing cells to represent the in vivo microenvironment led to RelB activation and CLL cell proliferation. Strategies to develop novel agents that target non-canonical NF-kB signalling will enable patient stratification and the development of more personalized therapy for CLL patients.\n\nAbstract\n\nBackground: Canonical NF-kappaB signalling by p65 (RelA) confers chemo-resistance and poor survival in chronic lymphocytic leukaemia (CLL). The role of non-canonical NF-kappaB signalling (leading to RelB and p52 subunit activation) in CLL is less understood, but given its importance in other B-cell tumour types, we theorised that RelB and p52 may also contribute to the pathology of CLL. Methods: D",
+      "journal_quality": 0.5,
+      "authors": [
+        "Mulligan EA",
+        "Tudhope SJ",
+        "Hunter JE",
+        "Clift AEG",
+        "Elliott SL",
+        "Summerfield GP",
+        "Wallis J",
+        "Pepper CJ",
+        "Durkacz B",
+        "Veuger S",
+        "Willmore E"
+      ],
+      "journal": "Cancers (Basel)",
+      "date": "2023-09-26T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "RELA",
+          "NFKB1",
+          "IKBKB"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "nf-kb"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37705738",
+      "title": "IkappaB kinase beta (IKKbeta): Structure, transduction mechanism, biological function, and discovery of its inhibitors",
+      "abstract": "The effective approach to discover innovative drugs will ask natural products for answers because of their complex and changeable structures and multiple biological activities. Inhibitory kappa B kinase beta (IKKbeta), known as IKK2, is a key regulatory kinase responsible for the activation of NF-kappaB through its phosphorylation at Ser177 and Ser181 to promote the phosphorylation of inhibitors of kappa B (IkappaBs), triggering their ubiquitination and degradation to active the nuclear factor kappa-B (NF-kappaB) cascade. Chemical inhibition of IKKbeta or its genetic knockout has become an effective method to block NF-kappaB-mediated proliferation and migration of tumor cells and inflammatory response. In this review, we summarized the structural feature and transduction mechanism of IKKbeta and the discovery of inhibitors from natural resources (e.g. sesquiterpenoids, diterpenoids, triterpenoids, flavonoids, and alkaloids) and chemical synthesis (e.g. pyrimidines, pyridines, pyrazines, quinoxalines, thiophenes, and thiazolidines). In addition, the biosynthetic pathway of novel natural IKKbeta inhibitors and their biological potentials were discussed. This review will provide inspiration for the structural modification of IKKbeta inhibitors based on the skeleton of natural products or chemical synthesis and further phytochemistry investigations.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zhang J",
+        "Zhang R",
+        "Li W",
+        "Ma XC",
+        "Qiu F",
+        "Sun CP"
+      ],
+      "journal": "Int J Biol Sci",
+      "date": "2023-08-06T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "RELA",
+          "NFKB1",
+          "IKBKB"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "nf-kb"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37533858",
+      "title": "NF-kB's contribution to B cell fate decisions",
+      "abstract": "NF-kappaB signaling is essential to an effective innate and adaptive immune response. Many immune-specific functional and developmental outcomes depend in large on NF-kappaB. The formidable task of sorting out the mechanisms behind the regulation and outcome of NF-kappaB signaling remains an important area of immunology research. Here we briefly discuss the role of NF-kappaB in regulating cell fate decisions at various times in the path of B cell development, activation, and the generation of long-term humoral immunity.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Guldenpfennig C",
+        "Teixeiro E",
+        "Daniels M"
+      ],
+      "journal": "Front Immunol",
+      "date": "2023-07-18T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "RELA",
+          "NFKB1",
+          "IKBKB"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "nf-kb"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36138344",
+      "title": "Hsa-microRNA-27b-3p inhibits hepatocellular carcinoma progression by inactivating transforming growth factor-activated kinase-binding protein 3/nuclear factor kappa B signalling",
+      "abstract": "Background\n\nMicroRNAs (miRNAs) play crucial roles in the development of hepatocellular carcinoma (HCC). Hsa-microRNA-27b-3p (hsa-miR-27b) is involved in the formation and progression of various cancers, but its role and clinical value in HCC remain unclear.\n\nMethods\n\nThe expression of hsa-miR-27b in HCC was examined by quantitative real-time PCR (qRT-PCR) and in situ hybridization (ISH) assays of clinical samples. Cell Counting Kit-8 assays (CCK-8), 5-ethynyl-2'-deoxyuridine (EdU) incorporation assays, Transwell assays, filamentous actin (F-actin) staining and western blot analyses were used to determine the effects of hsa-miR-27b on HCC cells in vitro. Subcutaneous xenograft and lung metastatic animal experiments were conducted to verify the role of hsa-miR-27b in HCC in vivo. In silico prediction, qRT-PCR, western blot, anti-Argonaute 2 (AGO2) RNA immunoprecipitation (RIP) and dual luciferase reporter assays were applied to identify the target genes of hsa-miR-27b. To detect the impacts of hsa-miR-27b on nuclear factor kappa B (NF-kB) signalling cascades mediated by transforming growth factor-activated kinase-binding protein 3 (TAB3), we performed qRT-PCR, western blot assays, immunofluorescence staining, immunohistochemistry (IHC) and dual-luciferase reporter assays. Recombinant oncolytic adenovirus (OncoAd) overexpressing hsa-miR-27b was constructed to detect their therapeutic value in HCC.\n\nResults\n\nThe expression of hsa-miR-27b was lower in HCC than in adjacent non-tumo",
+      "journal_quality": 0.5,
+      "authors": [
+        "Wen J",
+        "Huang Z",
+        "Wei Y",
+        "Xue L",
+        "Wang Y",
+        "Liao J",
+        "Liang J",
+        "Chen X",
+        "Chu L",
+        "Zhang B"
+      ],
+      "journal": "Cell Mol Biol Lett",
+      "date": "2022-09-23T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "RELA",
+          "NFKB1",
+          "IKBKB"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "nf-kb"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36123565",
+      "title": "The ERK5/NF-kappaB signaling pathway targets endometrial cancer proliferation and survival",
+      "abstract": "Endometrial cancer (EC) is the most common type of gynecologic cancer in women of developed countries. Despite surgery combined with chemo-/radiotherapy regimens, overall survival of patients with high-risk EC tumors is poor, indicating a need for novel therapies. The MEK5-ERK5 pathway is activated in response to growth factors and to different stressors, including oxidative stress and cytokines. Previous evidence supports a role for the MEK5-ERK5 pathway in the pathology of several cancers. We investigated the role of ERK5 in EC. In silico analysis of the PanCancer Atlas dataset showed alterations in components of the MEK5-ERK5 pathway in 48% of EC patients. Here, we show that ERK5 inhibition or silencing decreased EGF-induced EC cell proliferation, and that genetic deletion of MEK5 resulted in EC impaired proliferation and reduced tumor growth capacity in nude mice. Pharmacologic inhibition or ERK5 silencing impaired NF-kB pathway in EC cells and xenografts. Furthermore, we found a positive correlation between ERK5 and p65/RELA protein levels in human EC tumor samples. Mechanistically, genetic or pharmacologic impairment of ERK5 resulted in downregulation of NEMO/IKKgamma expression, leading to impaired p65/RELA activity and to apoptosis in EC cells and xenografts, which was rescued by NEMO/IKKgamma overexpression. Notably, ERK5 inhibition, MEK5 deletion or NF-kB inhibition sensitized EC cells to standard EC chemotherapy (paclitaxel/carboplatin) toxicity, whereas ERK5 inhib",
+      "journal_quality": 0.5,
+      "authors": [
+        "Diéguez-Martínez N",
+        "Espinosa-Gil S",
+        "Yoldi G",
+        "Megías-Roda E",
+        "Bolinaga-Ayala I",
+        "Viñas-Casas M",
+        "Gorgisen G",
+        "Domingo-Ortí I",
+        "Pérez-Montoyo H",
+        "Bayascas JR",
+        "Colas E",
+        "Dolcet X",
+        "Lizcano JM"
+      ],
+      "journal": "Cell Mol Life Sci",
+      "date": "2022-09-19T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "RELA",
+          "NFKB1",
+          "IKBKB"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "nf-kb"
+        ]
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39863855",
+      "title": "Omega-3 fatty acids: molecular weapons against chemoresistance in breast cancer",
+      "abstract": "Breast cancer is the most commonly diagnosed type of cancer and the leading cause of cancer-related death in women worldwide. Highly targeted therapies have been developed for different subtypes of breast cancer, including hormone receptor (HR)-positive and human epidermal growth factor receptor 2 (HER2)-positive breast cancer. However, triple-negative breast cancer (TNBC) and metastatic breast cancer disease are primarily treated with chemotherapy, which improves disease-free and overall survival, but does not offer a curative solution for these aggressive forms of breast cancer. Moreover, the development of chemoresistance is a major cause of therapeutic failure in this neoplasia, leading to disease relapse and patient death. In addition, chemotherapy's adverse side effects may substantially worsen health-related quality of life. Therefore, to improve the outcome of patients with breast cancer who are undergoing chemotherapy, several therapeutic options are under investigation, including the combination of chemotherapeutic drugs with natural compounds. Omega-3 (omega-3) polyunsaturated fatty acids (PUFAs), including docosahexaenoic and eicosapentaenoic acids, have drawn attention for their antitumoral properties and their preventive activities against chemotherapy-induced toxicities in breast cancer. A literature review was conducted on PubMed using keywords related to breast cancer, omega-3, chemoresistance, and chemotherapy. This review aims to provide an overview of the ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Marchio V",
+        "Augimeri G",
+        "Morelli C",
+        "Vivacqua A",
+        "Giordano C",
+        "Catalano S",
+        "Sisci D",
+        "Barone I",
+        "Bonofiglio D"
+      ],
+      "journal": "Cell Mol Biol Lett",
+      "date": "2025-01-25T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "TNF",
+          "TNFRSF1A",
+          "TRADD"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tnf"
+        ]
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38412664",
+      "title": "XIAP overexpressing inflammatory breast cancer patients have high infiltration of immunosuppressive subsets and increased TNFR1 signaling targetable with Birinapant",
+      "abstract": "HIGHLIGHTS\n\nInflammatory Breast Cancer is a rare but highly aggressive variant responsible for 10 % of breast cancer-related mortality.\n\nXIAP is involved in the regulation of programmed cell death.\n\nIn IBC, XIAP is associated with more tumor associated macrophages and an immunosuppressive tumor microenvironment.\n\nThe TNF-a signaling pathway is a likely candidate governing macrophage-induced XIAP overexpression in IBC.\n\nBirinapant, a pan IAP antagonist, induced apoptotic signals by decreasing XIAP and has potential as therapy to overcome an immunosuppressive tumor microenvironment.\n\nObjective\n\nTo assess the expression pattern of X-linked inhibitor of apoptosis protein (XIAP), a cellular stress sensor, and delineate the associated changes in the tumor immune microenvironment (TiME) for prognostic value and new therapeutic targets in inflammatory breast cancer (IBC).\n\nMethods\n\nImmunohistochemistry was conducted to assess the spatial localization of immune subsets, XIAP, and PDL1 expression in IBC and non-inflammatory breast cancer (nIBC) pretreatment tumors (n = 142). Validation and further exploration were performed by gene expression analysis of patient tumors along with signaling studies in a co-culture model.\n\nResults\n\nHigh XIAP in 37/81 IBC patients correlated significantly with high PD-L1, increased infiltration of FOXP3+ Tregs, CD163+ tumor-associated macrophages (TAMs), low CD8/CD163 ratio in both tumor stroma (TS) and invasive margins (IM), and higher CD8+ T cells and C",
+      "journal_quality": 0.5,
+      "authors": [
+        "Van Berckelaer C",
+        "Van Laere S",
+        "Lee S",
+        "Morse MA",
+        "Geradts J",
+        "Dirix L",
+        "Kockx M",
+        "Bertucci F",
+        "Van Dam P",
+        "Devi GR"
+      ],
+      "journal": "Transl Oncol",
+      "date": "2024-02-26T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "TNF",
+          "TNFRSF1A",
+          "TRADD"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tnf"
+        ]
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39815286",
+      "title": "Exploring TNFR1: from discovery to targeted therapy development",
+      "abstract": "This review seeks to elucidate the therapeutic potential of tumor necrosis factor receptor 1 (TNFR1) and enhance our comprehension of its role in disease mechanisms. As a critical cell-surface receptor, TNFR1 regulates key signaling pathways, such as nuclear factor kappa-B (NF-kappaB) and mitogen-activated protein kinase (MAPK), which are associated with pro-inflammatory responses and cell death. The intricate regulatory mechanisms of TNFR1 signaling and its involvement in various diseases, including inflammatory disorders, infectious diseases, cancer, and metabolic syndromes, have attracted increasing scholarly attention. Given the potential risks associated with targeting tumor necrosis factor-alpha (TNF-alpha), selective inhibition of the TNFR1 signaling pathway has been proposed as a promising strategy to reduce side effects and enhance therapeutic efficacy. This review emphasizes the emerging field of targeted therapies aimed at selectively modulating TNFR1 activity, identifying promising therapeutic strategies that exploit TNFR1 as a drug target through an evaluation of current clinical trials and preclinical studies. In conclusion, this study contributes novel insights into the biological functions of TNFR1 and presents potential therapeutic strategies for clinical application, thereby having substantial scientific and clinical significance.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Li Y",
+        "Ye R",
+        "Dai H",
+        "Lin J",
+        "Cheng Y",
+        "Zhou Y",
+        "Lu Y"
+      ],
+      "journal": "J Transl Med",
+      "date": "2025-01-15T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "TNF",
+          "TNFRSF1A",
+          "TRADD"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tnf"
+        ]
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36555740",
+      "title": "Anticancer Effects of Fucoxanthin through Cell Cycle Arrest, Apoptosis Induction, Angiogenesis Inhibition, and Autophagy Modulation",
+      "abstract": "Cancer accounts for one in seven deaths worldwide and is the second leading cause of death in the United States, after heart disease. One of the standard cancer treatments is chemotherapy which sometimes can lead to chemoresistance and treatment failure. Therefore, there is a great need for novel therapeutic approaches to treat these patients. Novel natural products have exhibited anticancer effects that may be beneficial in treating many kinds of cancer, having fewer side effects, low toxicity, and affordability. Numerous marine natural compounds have been found to inhibit molecular events and signaling pathways associated with various stages of cancer development. Fucoxanthin is a well-known marine carotenoid of the xanthophyll family with bioactive compounds. It is profusely found in brown seaweeds, providing more than 10% of the total creation of natural carotenoids. Fucoxanthin is found in edible brown seaweed macroalgae such as Undaria pinnatifida, Laminaria japonica, and Eisenia bicyclis. Many of fucoxanthin's pharmacological properties include antioxidant, anti-tumor, anti-inflammatory, antiobesity, anticancer, and antihypertensive effects. Fucoxanthin inhibits many cancer cell lines' proliferation, angiogenesis, migration, invasion, and metastasis. In addition, it modulates miRNA and induces cell cycle growth arrest, apoptosis, and autophagy. Moreover, the literature shows fucoxanthin's ability to inhibit cytokines and growth factors such as TNF-alpha and VEGF, which",
+      "journal_quality": 0.5,
+      "authors": [
+        "Ahmed SA",
+        "Mendonca P",
+        "Elhag R",
+        "Soliman KFA"
+      ],
+      "journal": "Int J Mol Sci",
+      "date": "2022-12-17T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "TNF",
+          "TNFRSF1A",
+          "TRADD"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tnf"
+        ]
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35979166",
+      "title": "Downregulation of TNFR2 decreases survival gene expression, promotes apoptosis and affects the cell cycle of gastric cancer cells",
+      "abstract": "BACKGROUND\n\nChronic inflammation due to Helicobacter pylori (H. pylori) infection promotes gastric carcinogenesis. Tumour necrosis factor-alpha (TNF-alpha), a key mediator of inflammation, induces cell survival or apoptosis by binding to two receptors (TNFR1 and TNFR2). TNFR1 can induce both survival and apoptosis, while TNFR2 results only in cell survival. The dysregulation of these processes may contribute to carcinogenesis.\n\nAIM\n\nTo evaluate the effects of TNFR1 and TNFR2 downregulation in AGS cells treated with H. pylori extract on the TNF-alpha pathway.\n\nMETHODS\n\nAGS cell lines containing TNFR1 and TNFR2 receptors downregulated by specific shRNAs and nonsilenced AGS cells were treated with H. pylori extract for 6 h. Subsequently, quantitative polymerase chain reaction with TaqMan  assays was used for the relative quantification of the mRNAs (TNFA, TNFR1, TNFR2, TRADD, TRAF2, CFLIP, NFKB1, NFKB2, CASP8, CASP3) and miRNAs (miR-19a, miR-34a, miR-103a, miR-130a, miR-181c) related to the TNF-alpha signalling pathway. Flow cytometry was employed for cell cycle analysis and apoptosis assays.\n\nRESULTS\n\nIn nonsilenced AGS cells, H. pylori extract treatment increased the expression of genes involved in cell survival and inhibited both apoptosis (NFKB1, NFKB2 and CFLIP) and the TNFR1 receptor. TNFR1 downregulation significantly decreased the expression of the TRADD and CFLIP genes, although no change was observed in the cellular process or miRNA expression. In contrast, TNFR2 downr",
+      "journal_quality": 0.5,
+      "authors": [
+        "Rossi AFT",
+        "da Silva Manoel-Caetano F",
+        "Biselli JM",
+        "Cabral ÁS",
+        "Saiki MFC",
+        "Ribeiro ML",
+        "Silva AE"
+      ],
+      "journal": "World J Gastroenterol",
+      "date": "2022-06-28T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "TNF",
+          "TNFRSF1A",
+          "TRADD"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tnf"
+        ]
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35280697",
+      "title": "Mannan-Binding Lectin Deficiency Limits Inflammation-induced Myeloid-Derived Suppressor Cells Expansion via Modulating Tumor Necrosis Factor Alpha-triggered Apoptosis",
+      "abstract": "Background: Mannan-binding lectin (MBL), a soluble pattern recognition molecule in the innate immune system, is reported to be associated with the function of immune cells. Myeloid-derived suppressor cells (MDSCs) are mainly characterized by immunosuppressive activities involving several inflammatory diseases such as cancer, infection, and arthritis. Some of the factors inducing their apoptosis are known, however, mechanisms have not been identified. The underlying impact of MBL on the MDSCs especially under inflammatory conditions remains unknown. This study was designed to investigate whether MBL affects MDSCs survival during inflammation conditions.\n\nMethods: WT and MBL-deficient (MBL-/-) mice were induced on day 0 of the experiment by subcutaneous injection of complete Freund's adjuvant and then injected with incomplete Freund's adjuvant into the knee joint space under general anesthesia on day 14 to induce inflammatory arthritis. The proportions of MDSCs in the spleen and blood and the serum level of the inflammatory cytokines were measured. In vitro study, MDSCs were isolated from the bone marrow of WT and MBL-/- mice and cultured in the presence of interleukin-6 (IL-6) and granulocyte-macrophage colony-stimulating factor (GM-CSF) for 5 days with or without tumor necrosis factor-alpha (TNF-alpha).\n\nResults: After adjuvant treatment, MBL-/- mice had a significantly lower frequency of MDSCs as well as elevated serum inflammatory cytokines levels compared to WT mice. MBL d",
+      "journal_quality": 0.5,
+      "authors": [
+        "Dong L",
+        "Jiang H",
+        "Chen K",
+        "Xie J",
+        "An Q",
+        "Deng F",
+        "Sun Z",
+        "Liu Y",
+        "Zhou J",
+        "Zhang L",
+        "Lu X",
+        "Wang M",
+        "Chen Z",
+        "Zou X",
+        "Zuo D"
+      ],
+      "journal": "Int J Biol Sci",
+      "date": "2022-01-26T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "TNF",
+          "TNFRSF1A",
+          "TRADD"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tnf"
+        ]
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34830347",
+      "title": "RIPK1 and TRADD Regulate TNF-Induced Signaling and Ripoptosome Formation",
+      "abstract": "TNF is a proinflammatory cytokine that is critical for the coordination of tissue homeostasis. RIPK1 and TRADD are the main participants in the transduction of TNF signaling. However, data on the cell fate-controlling functions of both molecules are quite controversial. Here, we address the functions of RIPK1 and TRADD in TNF signaling by generating RIPK1- or TRADD-deficient human cell lines. We demonstrate that RIPK1 is relevant for TNF-induced apoptosis and necroptosis in conditions with depleted IAPs. In addition, TRADD is dispensable for necroptosis but required for apoptosis. We reveal a new possible function of TRADD as a negative regulator of NIK stabilization and subsequent ripoptosome formation. Furthermore, we show that RIPK1 and TRADD do not appear to be essential for the activation of MAPK signaling. Moreover, partially repressing NF-kappaB activation in both RIPK1 and TRADD KO cells does not result in sensitization to TNF alone due to the absence of NIK stabilization. Importantly, we demonstrate that RIPK1 is essential for preventing TRADD from undergoing TNF-induced ubiquitination and degradation. Taken together, our findings provide further insights into the specific functions of RIPK1 and TRADD in the regulation of TNF-dependent signaling, which controls the balance between cell death and survival.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Feoktistova M",
+        "Makarov R",
+        "Yazdi AS",
+        "Panayotova-Dimitrova D"
+      ],
+      "journal": "Int J Mol Sci",
+      "date": "2021-11-18T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "TNF",
+          "TNFRSF1A",
+          "TRADD"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tnf"
+        ]
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34311079",
+      "title": "Activation of CD44-Lipoprotein lipase axis in breast cancer stem cells promotes tumorigenesis.",
+      "abstract": "Breast cancer stem cells (CSCs) are distinct CD44+-subpopulations that are involved in metastasis and chemoresistance. However, the underlying molecular mechanism of CD44 in breast CSCs-mediated tumorigenesis remains elusive. We observed high CD44 expression in advanced-stage clinical breast tumor samples. CD44 activation in breast CSCs sorted from various triple negative breast cancer (TNBC) cell lines induced proliferation, migration, invasion, mammosphere formation that were reversed in presence of inhibitor, 4-methyl umbelliferone or CD44 silencing. CD44 activation in breast CSCs induced Src, Akt, and nuclear translocation of pSTAT3. PCR arrays revealed differential expression of a metabolic gene, Lipoprotein lipase (LPL), and transcription factor, SNAI3. Differential transcriptional regulation of LPL by pSTAT3 and SNAI3 was confirmed by promoter-reporter and chromatin immunoprecipitation analysis. Orthotopic xenograft murine breast tumor model revealed high tumorigenicity of CD24-/CD44+-breast CSCs as compared with CD24+-breast cancer cells. Furthermore, stable breast CSCs-CD44 shRNA and/or intratumoral administration of Tetrahydrolipstatin (LPL inhibitor) abrogated tumor progression and neoangiogenesis. Thus, LPL serves as a potential target for an efficacious therapeutics against aggressive breast cancer.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Manupati K",
+        "Yeeravalli R",
+        "Kaushik K",
+        "Singh D",
+        "Mehra B",
+        "Gangane N",
+        "Gupta A",
+        "Goswami K",
+        "Das A"
+      ],
+      "journal": "Biochim Biophys Acta Mol Basis Dis",
+      "date": "2021-11-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35117513",
+      "title": "ALDH1+ stem cells demonstrate more stem cell-like characteristics than CD44+/CD24-/low stem cells in different molecular subtypes of breast cancer",
+      "abstract": "Background\n\nCD44+/CD24-/low and ALDH1+ are both markers of breast cancer stem cell (BCSC), we compared the biological characteristics of CD44+/CD24-/low and ALDH1+ BCSCs in the four molecular subtypes of breast cancer.\n\nMethods\n\nFour fresh blocks of breast cancer tissue were obtained from patients with Luminal A, Luminal B, human epidermal receptor-2 (HER2)-overexpression and triple-negative breast cancer, respectively. Flow cytometry was used to sort CD44+/CD24-/low and ALDH1+ BCSCs. The mammosphere (MS) formation experiment and NOD/SCID mouse xenograft experiment were performed to compare the self-renewal and tumorigenic abilities of CD44+/CD24-/low with those of ALDH1+ BCSCs.\n\nResults\n\nThe proportions of CD44+/CD24-/low BCSC and ALDH1+ BCSC in Luminal A, Luminal B, HER2 overexpression and triple-negative subtypes were 12.1% and 8.7%, 2.7% and 5.7%, 0.8% and 8.7%, 0.7% and 4.5%, respectively. The MS formation experiment demonstrated that ALDH1+ BCSC formed significantly more MSs than CD44+/CD24-/low BCSC in the four molecular subtypes (P<0.001). The NOD/SCID mouse xenograft experiment demonstrated that the sizes of grafted tumors formed by ALDH1+ BCSC were larger than those formed by CD44+/CD24-/low BCSC in the four molecular subtypes (P<0.05).\n\nConclusions\n\nIn the four molecular subtypes of breast cancer, ALDH1+ BCSC demonstrated better self-renewal and tumorigenic abilities than CD44+/CD24-/low BCSC.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Chen J",
+        "Liu S",
+        "Su Y",
+        "Zhang X"
+      ],
+      "journal": "Transl Cancer Res",
+      "date": "2020-03-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "27121210",
+      "title": "MicroRNA-143 targets CD44 to inhibit breast cancer progression and stem cell-like properties.",
+      "abstract": "CD44 is closely linked to breast cancer progression; however, the regulatory functions of microRNAs (miRs) in breast cancer have yet to be fully elucidated. In order to investigate the regulation of CD44 by miRs in breast cancer, the present study isolated CD44+ and CD44- breast cancer cells by flow cytometry, revealing that CD44+ cells were enriched in transplanted compared with those in primary breast cancers, and that their proliferation and stem-cell sphere formation ability were enhanced. A miRNA array assay indicated that miR-143 expression in CD44+ breast cancer cells was lower than that in CD44- cells. Furthermore, miR-143 was decreased in breast cancer tissues and cell lines compared with that in normal tissues and cells. Restoration of miR-143 expression in CD44+ breast cancer cells inhibited their proliferation and sphere formation. A luciferase reporter assay demonstrated that miR-143 directly tartgeted the 3'-untranslated region of CD44. In addition, miR-143 inhibited metastasis-associated features in breast cancer and reduced tumor growth in a mouse model of breast cancer. In conclusion, the results of the present study demonstrated that miR-143 inhibited the progression and stem-cell properties of breast cancer cells by targeting CD44. ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Yang Z",
+        "Chen D",
+        "Nie J",
+        "Zhou S",
+        "Wang J",
+        "Tang Q",
+        "Yang X"
+      ],
+      "journal": "Mol Med Rep",
+      "date": "2016-06-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25683728",
+      "title": "FOXP3 suppresses breast cancer metastasis through downregulation of CD44.",
+      "abstract": "Forkhead box protein 3 (FOXP3) plays an important role in breast cancer as an X-linked tumor suppressor gene. However, the biological functions and significance of FOXP3 in breast cancer metastasis remain unclear. Here, we find that, clinically, nuclear FOXP3 expression is inversely correlated with breast cancer metastasis. Moreover, we demonstrate that FOXP3 significantly inhibits adhesion, invasion and metastasis of breast cancer cells in vivo and in vitro. In addition, the adhesion molecule CD44 is found to be suppressed by FOXP3 through transcriptome sequence analysis (RNA-seq). A luciferase reporter assay, chromatin immunoprecipitation and electrophoretic mobility shift assay identify CD44 as a direct target of FOXP3. The expression of CD44 is downregulated by FOXP3 in breast cancer cells. Importantly, anti-CD44 antibody reverses the FOXP3 siRNA-induced effects on the breast cancer cells in vitro and FOXP3 expression level in the nucleus of breast cancer cells is inversely correlated with CD44 expression level in clinic breast cancer tissues. Taken together, the results from the present study suggest that FOXP3 is a suppressor of breast cancer metastasis. FOXP3 directly binds to the promoter of CD44 and inhibits its protein expression, thereby suppressing adhesion and invasion of human breast cancer cells. This finding highlights the therapeutic potential of FOXP3-CD44 signaling to inhibit breast cancer metastasis. ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zhang C",
+        "Xu Y",
+        "Hao Q",
+        "Wang S",
+        "Li H",
+        "Li J",
+        "Gao Y",
+        "Li M",
+        "Li W",
+        "Xue X",
+        "Wu S",
+        "Zhang Y",
+        "Zhang W"
+      ],
+      "journal": "Int J Cancer",
+      "date": "2015-09-15T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25815697",
+      "title": "Blocking the adhesion cascade at the premetastatic niche for prevention of breast cancer metastasis.",
+      "abstract": "Shear-resistant adhesion and extravasation of disseminated cancer cells at the target organ is a crucial step in hematogenous metastasis. We found that the vascular adhesion molecule E-selectin preferentially promoted the shear-resistant adhesion and transendothelial migration of the estrogen receptor (ER)(-)/CD44(+) hormone-independent breast cancer cells, but not of the ER(+)/CD44(-/low) hormone-dependent breast cancer cells. Coincidentally, CD44(+) breast cancer cells were abundant in metastatic lung and brain lesions in ER(-) breast cancer, suggesting that E-selectin supports hematogenous metastasis of ER(-)/CD44(+) breast cancer. In an attempt to prevent hematogenous metastasis through the inhibition of a shear-resistant adhesion of CD44(+) cancer cells to E-selectin-expressing blood vessels on the premetastatic niche, an E-selectin targeted aptamer (ESTA) was developed. We demonstrated that a single intravenous injection of ESTA reduced metastases to a baseline level in both syngeneic and xenogeneic forced breast cancer metastasis models without relocating the site of metastasis. The effect of ESTA was absent in E-selectin knockout mice, suggesting that E-selectin is a molecular target of ESTA. Our data highlight the potential application of an E-selectin antagonist for the prevention of hematogenous metastasis of ER(-)/CD44(+) breast cancer. ",
+      "journal_quality": 0.5,
+      "authors": [
+        "Kang SA",
+        "Hasan N",
+        "Mann AP",
+        "Zheng W",
+        "Zhao L",
+        "Morris L",
+        "Zhu W",
+        "Zhao YD",
+        "Suh KS",
+        "Dooley WC",
+        "Volk D",
+        "Gorenstein DG",
+        "Cristofanilli M",
+        "Rui H",
+        "Tanaka T"
+      ],
+      "journal": "Mol Ther",
+      "date": "2015-06-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "22152097",
+      "title": "Differentiation of breast cancer stem cells by knockdown of CD44: promising differentiation therapy",
+      "abstract": "Background\n\nBreast cancer stem cells (BCSCs) are the source of breast tumors. Compared with other cancer cells, cancer stem cells show high resistance to both chemotherapy and radiotherapy. Targeting of BCSCs is thus a potentially promising and effective strategy for breast cancer treatment. Differentiation therapy represents one type of cancer stem-cell-targeting therapy, aimed at attacking the stemness of cancer stem cells, thus reducing their chemo- and radioresistance. In a previous study, we showed that down-regulation of CD44 sensitized BCSCs to the anti-tumor agent doxorubicin. This study aimed to determine if CD44 knockdown caused BCSCs to differentiate into breast cancer non-stem cells (non-BCSCs).\n\nMethods\n\nWe isolated a breast cancer cell population (CD44+CD24- cells) from primary cultures of malignant breast tumors. These cells were sorted into four sub-populations based on their expression of CD44 and CD24 surface markers. CD44 knockdown in the BCSC population was achieved using small hairpin RNA lentivirus particles. The differentiated status of CD44 knock-down BCSCs was evaluated on the basis of changes in CD44+CD24- phenotype, tumorigenesis in NOD/SCID mice, and gene expression in relation to renewal status, metastasis, and cell cycle in comparison with BCSCs and non-BCSCs.\n\nResults\n\nKnockdown of CD44 caused BCSCs to differentiate into non-BCSCs with lower tumorigenic potential, and altered the cell cycle and expression profiles of some stem cell-related genes",
+      "journal_quality": 0.5,
+      "authors": [
+        "Pham PV",
+        "Phan NL",
+        "Nguyen NT",
+        "Truong NH",
+        "Duong TT",
+        "Le DV",
+        "Truong KD",
+        "Phan NK"
+      ],
+      "journal": "J Transl Med",
+      "date": "2011-12-07T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21970856",
+      "title": "Understanding the dual nature of CD44 in breast cancer progression.",
+      "abstract": "CD44 has been the subject of extensive research for more than 3 decades because of its role in breast cancer, in addition to many physiological processes, but interestingly, conflicting data implicate CD44 in both tumor suppression and tumor promotion. CD44 has been shown to promote protumorigenic signaling and advance the metastatic cascade. On the other hand, CD44 has been shown to suppress growth and metastasis. Histopathological studies of human breast cancer have correlated CD44 expression with both favorable and unfavorable clinical outcomes. In recent years, CD44 has garnered significant attention because of its utility as a stem cell marker and has surfaced as a potential therapeutic target, necessitating a greater understanding of CD44 in breast cancer. In this review, we attempt to unify the literature implicating CD44 in both tumor promotion and suppression, and explain its dualistic nature.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Louderbough JM",
+        "Schroeder JA"
+      ],
+      "journal": "Mol Cancer Res",
+      "date": "2011-12-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21804359",
+      "title": "Implications of single nucleotide polymorphisms in CD44 exon 2 for risk of breast cancer.",
+      "abstract": "CD44 is a cell-surface glycoprotein involved in many cellular functions including lymphocyte activation, recirculation and homing, hematopoiesis and tumor metastasis, suggesting that CD44 may play an important role in breast cancer development. In this study, we examined whether CD44 exon 2 polymorphisms are associated with increased susceptibility to breast cancer. Direct nucleotide sequencing analysis showed that multiple single nucleotide polymorphisms were present in the CD44 exon 2 coding region in female patients with breast cancer. There was no significant difference in the frequency of any one single nucleotide polymorphism in the CD44 exon 2 coding region between patients with breast cancer and normal donors. However, CD44 polymorphisms in the CD44 exon 2 coding region were identified in approximately 40% of patients with breast cancer, which was significantly higher than in normal donors (odds ratio, 9.34; 95% confidence interval = 2.58-33.82; P < 0.0001). The Wilcoxon-Mann-Whitney test analysis showed that the patients with the CD44 polymorphisms in CD44 exon 2 coding sequence had breast cancer at earlier ages, 49 +- 3 versus 62 +- 2 years (P < 0.0005), and larger tumor burdens (4.9 +- 1.22 vs. 1.6 +- 0.15 mm, P < 0.01) at the time of diagnosis. Interestingly, African-American female patients having the CD44 polymorphisms in CD44 exon 2 coding sequence were diagnosed with breast cancer at very young age (41 +- 2 years). Our results show that CD44 exon 2 polymorphis",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zhou J",
+        "Nagarkatti PS",
+        "Zhong Y",
+        "Zhang J",
+        "Nagarkatti M"
+      ],
+      "journal": "Eur J Cancer Prev",
+      "date": "2011-09-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "20530438",
+      "title": "Unique SNP in CD44 intron 1 and its role in breast cancer development.",
+      "abstract": "In the current study, we investigated if CD44 polymorphisms are associated with increased susceptibility to breast cancer. Direct nucleotide sequencing analysis identified a novel and unique single nucleotide polymorphism (SNP, designated as CD44 Ex2+14 A>G) in the CD44 intron 1 region in 84% of breast cancer patients, which was significantly higher than that seen in normal donors. Moreover, the breast cancer patients with homozygous unique SNP in CD44 intron 1 had breast cancer at earlier ages, larger tumor burden, more regional lymph node metastases at the time of diagnosis, and higher cancer recurrence rate. There was a strong association between the unique SNP in CD44 intron 1 and CD44 expression on peripheral blood mononuclear cells. Our results suggest that CD44 polymorphism is associated with breast cancer development, and CD44 polymorphism analysis may be effectively used in the risk assessment, prediction, prevention, diagnosis and genetic epidemiological analysis of breast cancer.",
+      "journal_quality": 0.5,
+      "authors": [
+        "Zhou J",
+        "Nagarkatti PS",
+        "Zhong Y",
+        "Creek K",
+        "Zhang J",
+        "Nagarkatti M"
+      ],
+      "journal": "Anticancer Res",
+      "date": "2010-04-01T00:00:00Z",
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": []
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "RELA",
+        "NFKB1",
+        "IKBKB"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "nf-kb"
+      ]
+    },
+    {
+      "genes": [
+        "TNF",
+        "TNFRSF1A",
+        "TRADD"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "tnf"
+      ]
+    },
+    {
+      "genes": [
+        "CD44"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "COL1A1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CD74"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "COL1A2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "COL3A1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ERBB2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "FN1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "RDX"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "SPP1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "EGFR"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "MMP9"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "SELL"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "SELE"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "EZR"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "MSN"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CD44",
+        "MMP9",
+        "EGFR",
+        "ERBB2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "receptor",
+        "protease",
+        "oncogene",
+        "ligand"
+      ]
+    },
+    {
+      "genes": [
+        "COL1A1",
+        "COL1A2",
+        "COL3A1",
+        "FN1",
+        "SPP1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "extracellular matrix",
+        "fibrosis",
+        "stromal remodeling",
+        "ligand"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "NF-kB",
+        "NFkB signaling",
+        "nuclear factor kappa B",
+        "inflammation",
+        "tumor microenvironment"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "TNF-alpha",
+        "TNFa",
+        "tumor necrosis factor",
+        "apoptosis",
+        "inflammatory signaling"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "DCIS",
+        "ductal carcinoma in situ",
+        "invasive tumor",
+        "myoepithelial",
+        "stromal"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "macrophage",
+        "T cell",
+        "fibroblast",
+        "endothelial",
+        "epithelial"
+      ]
+    },
+    {
+      "genes": [
+        "CD44",
+        "MMP9",
+        "EGFR",
+        "ERBB2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "NF-kB",
+        "TNF-alpha",
+        "macrophage",
+        "invasive tumor",
+        "spatial transcriptomics"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "COL1A1",
+      "COL1A2",
+      "COL3A1",
+      "FN1",
+      "SPP1",
+      "CD44",
+      "ERBB2",
+      "EGFR",
+      "MMP9",
+      "CD74",
+      "RDX",
+      "EZR",
+      "MSN",
+      "SELL",
+      "SELE"
+    ],
+    "genes_matched_by": {
+      "COL1A1": "biomcp_tag_only",
+      "COL1A2": "biomcp_tag_only",
+      "COL3A1": "biomcp_tag_only",
+      "FN1": "biomcp_tag_only",
+      "SPP1": "biomcp_tag_only",
+      "CD44": "biomcp_tag_only",
+      "ERBB2": "biomcp_tag_only",
+      "EGFR": "biomcp_tag_only",
+      "MMP9": "biomcp_tag_only",
+      "CD74": "p",
+      "RDX": "biomcp_tag+text_confirmed",
+      "EZR": "ezr",
+      "MSN": "msn",
+      "SELL": "cd",
+      "SELE": "cd"
+    },
+    "pathways_covered": [
+      "NFkB",
+      "TNFa"
+    ],
+    "pathways_matched_by": {
+      "NFkB": "biomcp_tag_only",
+      "TNFa": "biomcp_tag_only"
+    },
+    "celltypes_covered": [
+      "Endothelial",
+      "Macrophages 2",
+      "Stromal",
+      "DCIS 2"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 100.0,
+    "celltypes_coverage_pct": 44.44444444444444,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Invasive Tumor",
+      "Myoepi ACTA2+",
+      "Prolif Invasive Tumor",
+      "Stromal & T Cell Hybrid",
+      "T Cell & Tumor Hybrid"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 223,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 1.0
+    },
+    {
+      "iteration": "final",
+      "papers": 30,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 1.0
+    }
+  ],
+  "coverage_sufficient": true,
+  "recommended_actions": [],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

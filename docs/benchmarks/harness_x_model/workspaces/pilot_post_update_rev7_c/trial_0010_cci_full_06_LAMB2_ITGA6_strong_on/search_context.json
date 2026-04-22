@@ -1,0 +1,30 @@
+{
+  "genes": [
+    "ITGA6",
+    "LAMB2",
+    "ITGB1",
+    "ITGB4",
+    "LAMA5",
+    "LAMC1",
+    "LAMA2",
+    "LAMB1",
+    "CD151",
+    "PTK2",
+    "LAMC2",
+    "LAMC3",
+    "COL17A1",
+    "LAMA3",
+    "LAMA4"
+  ],
+  "pathways": [],
+  "celltypes": [
+    "DCIS 2",
+    "Invasive Tumor",
+    "Macrophages 2",
+    "Prolif Invasive Tumor",
+    "T Cell & Tumor Hybrid"
+  ],
+  "disease": "breast cancer",
+  "lr_pair": "LAMB2-ITGA6",
+  "category": "low_morans_unknown"
+}

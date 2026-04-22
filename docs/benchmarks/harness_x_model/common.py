@@ -259,7 +259,18 @@ def normalize_case(case: dict[str, Any]) -> dict[str, Any]:
     bundle = case.get("input_bundle") or {}
     ligand = str(bundle.get("ligand", "")).strip()
     receptor = str(bundle.get("receptor", "")).strip()
-    genes = list(dict.fromkeys(_split_gene_symbol(ligand) + _split_gene_symbol(receptor)))
+    # Rev 7: prefer top-level `enriched_genes` (STRING+KEGG, len=15 incl.
+    # ligand+receptor) when present. Legacy cases without the field fall back
+    # to the 2-gene ligand+receptor split so pre-Rev7 pilots replay identically.
+    enriched = case.get("enriched_genes")
+    if enriched:
+        genes = list(
+            dict.fromkeys(
+                str(g).strip() for g in enriched if isinstance(g, str) and str(g).strip()
+            )
+        )
+    else:
+        genes = list(dict.fromkeys(_split_gene_symbol(ligand) + _split_gene_symbol(receptor)))
     pathways = [str(x).strip() for x in (bundle.get("pathway_associations") or []) if str(x).strip()]
     celltypes = sorted(
         {
@@ -725,14 +736,22 @@ def run_single_trial(
     result.total_papers = int(coverage.get("total_papers", len(papers)))
     result.genes_coverage_pct = gene_pct
     result.pathways_coverage_pct = None if not normalized["pathways"] else float(pathway_pct or 0.0)
-    result.coverage_pass = gene_pct >= 60.0 and (
+    # Rev 7: gene threshold raised 60.0 → 90.0 to keep coverage_pass meaningful
+    # now that `enriched_genes` (len=15) replaces the 2-gene ligand+receptor
+    # split. The 0.9 floor was architect-endorsed in SESSION_SUMMARY Path A to
+    # prevent the post-enrichment endpoint from re-saturating. Pathway
+    # threshold (0.5) unchanged — pathway endpoint stays secondary per
+    # PREREGISTRATION §5. Pre-Rev7 pilots with 2-gene cases will always fail
+    # this gate (2/2=100% only passes if both are recognized), which is the
+    # intended behavior: the threshold change is how Rev7 differentiates.
+    result.coverage_pass = gene_pct >= 90.0 and (
         not normalized["pathways"] or float(pathway_pct or 0.0) >= 50.0
     )
     result.genes_coverage_pct_tagoff = gene_pct_tagoff
     result.pathways_coverage_pct_tagoff = (
         None if not normalized["pathways"] else float(pathway_pct_tagoff or 0.0)
     )
-    result.coverage_pass_tagoff = gene_pct_tagoff >= 60.0 and (
+    result.coverage_pass_tagoff = gene_pct_tagoff >= 90.0 and (
         not normalized["pathways"] or float(pathway_pct_tagoff or 0.0) >= 50.0
     )
     # Rev 4 — celltype coverage (primary endpoint, per PREREGISTRATION.md).

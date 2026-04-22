@@ -1,0 +1,85 @@
+{
+  "saved_to": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/docs/benchmarks/harness_x_model/workspaces/pilot_post_update_rev7_c/trial_0034_cci_full_11_COL1A1_CD44_weak_off/papers.json",
+  "output_path": "papers.json",
+  "total_papers": 30,
+  "coverage": {
+    "genes_covered": [
+      "CD44",
+      "CD74",
+      "ERBB2",
+      "SELE",
+      "COL1A1",
+      "COL1A2",
+      "COL3A1",
+      "SPP1",
+      "EGFR",
+      "SELL",
+      "FN1"
+    ],
+    "genes_matched_by": {
+      "CD44": "cd44",
+      "CD74": "p",
+      "ERBB2": "her2",
+      "SELE": "selectin-e",
+      "COL1A1": "col1a1",
+      "COL1A2": "col",
+      "COL3A1": "col",
+      "SPP1": "eta1",
+      "EGFR": "her",
+      "SELL": "sell",
+      "FN1": "fn1"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Endothelial",
+      "Stromal",
+      "Macrophages 2"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 73.33333333333333,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 33.33333333333333,
+    "genes_missing": [
+      "RDX",
+      "MMP9",
+      "EZR",
+      "MSN"
+    ],
+    "pathways_missing": [
+      "NFkB",
+      "TNFa"
+    ],
+    "celltypes_missing": [
+      "DCIS 2",
+      "Invasive Tumor",
+      "Myoepi ACTA2+",
+      "Prolif Invasive Tumor",
+      "Stromal & T Cell Hybrid",
+      "T Cell & Tumor Hybrid"
+    ]
+  },
+  "paper_titles": [
+    "Activation of CD44-Lipoprotein lipase axis in breast cancer stem cells promotes tumorigenesis.",
+    "ALDH1+ stem cells demonstrate more stem cell-like characteristics than CD44+/CD24-/low stem cells in",
+    "MicroRNA-143 targets CD44 to inhibit breast cancer progression and stem cell-like properties.",
+    "FOXP3 suppresses breast cancer metastasis through downregulation of CD44.",
+    "Blocking the adhesion cascade at the premetastatic niche for prevention of breast cancer metastasis.",
+    "Differentiation of breast cancer stem cells by knockdown of CD44: promising differentiation therapy",
+    "Understanding the dual nature of CD44 in breast cancer progression.",
+    "Implications of single nucleotide polymorphisms in CD44 exon 2 for risk of breast cancer.",
+    "Unique SNP in CD44 intron 1 and its role in breast cancer development.",
+    "Expression of the CD44 glycoprotein (lymphocyte-homing receptor) in untreated human breast cancer an"
+  ],
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: ['NFkB', 'TNFa']. Search with 'signaling' + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0,
+  "message": "Full results (30 papers) saved to papers.json. Use read_file('/papers.json') to access complete data."
+}

@@ -1,0 +1,86 @@
+{
+  "saved_to": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/docs/benchmarks/harness_x_model/workspaces/pilot_post_update_rev7_c/trial_0019_cci_full_22_BAMBI_ACVR2B_weak_off/papers.json",
+  "output_path": "papers.json",
+  "total_papers": 30,
+  "coverage": {
+    "genes_covered": [
+      "ACVR2B",
+      "ACVR1B",
+      "BMP2",
+      "GDF11",
+      "ACVR2A",
+      "BMP7",
+      "ACVR1C",
+      "BMP6",
+      "GDF2",
+      "BMPR1A",
+      "ACVR1",
+      "TGFBR1",
+      "MSTN",
+      "BAMBI",
+      "INHBA"
+    ],
+    "genes_matched_by": {
+      "ACVR2B": "acvr2b",
+      "ACVR1B": "acvr",
+      "BMP2": "bmp",
+      "GDF11": "bmp",
+      "ACVR2A": "acvr",
+      "BMP7": "bmp",
+      "ACVR1C": "acvr",
+      "BMP6": "bmp",
+      "GDF2": "bmp",
+      "BMPR1A": "bmpr",
+      "ACVR1": "acvr",
+      "TGFBR1": "tgfbr1",
+      "MSTN": "mstn",
+      "BAMBI": "bambi",
+      "INHBA": "inhba"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Stromal"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 12.5,
+    "genes_missing": [],
+    "pathways_missing": [
+      "EGFR"
+    ],
+    "celltypes_missing": [
+      "DCIS 2",
+      "Endothelial",
+      "Invasive Tumor",
+      "Macrophages 2",
+      "Prolif Invasive Tumor",
+      "Stromal & T Cell Hybrid",
+      "T Cell & Tumor Hybrid"
+    ]
+  },
+  "paper_titles": [
+    "Editorial: Inflammatory tumor microenvironment: role of cytokines and virokines in breast cancer pro",
+    "Bioinformatics Analysis of the Genetic and Epigenetic Alterations of Bone Morphogenetic Protein Rece",
+    "Aberrant expression of bone morphogenetic proteins in the disease progression and metastasis of brea",
+    "Landscape of tumor suppressor long noncoding RNAs in breast cancer",
+    "Applications of RNA Indexes for Precision Oncology in Breast Cancer",
+    "Genetic variation in bone morphogenetic proteins and breast cancer risk in hispanic and non-hispanic",
+    "A comprehensive expression survey of bone morphogenetic proteins in breast cancer highlights the imp",
+    "Signalling Pathways Implicated in Early Mammary Gland Morphogenesis and Breast Cancer",
+    "Down-regulation of activin, activin receptors, and Smads in high-grade breast cancer.",
+    "Tumor lineage-specific immune response in brain metastatic disease: opportunities for targeted immun"
+  ],
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: ['EGFR']. Search with 'signaling' + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0,
+  "message": "Full results (30 papers) saved to papers.json. Use read_file('/papers.json') to access complete data."
+}
