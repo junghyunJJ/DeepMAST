@@ -12,6 +12,9 @@ Usage:
     # Real data
     python scripts/run_drug_target_traced.py --data-dir res_bc_ollama --disease "breast cancer"
 
+    # Force Ollama on port 6000 for this run
+    python scripts/run_drug_target_traced.py --port 6000
+
     # Node tracing only (no verbose LLM debug output)
     python scripts/run_drug_target_traced.py --no-debug
 """
@@ -82,7 +85,15 @@ MOCK_SELECTED_TOP3 = [
 ]
 
 
-def parse_args() -> argparse.Namespace:
+def _parse_port(value: str) -> int:
+    """Validate TCP port values for Ollama localhost overrides."""
+    port = int(value)
+    if not 1 <= port <= 65535:
+        raise argparse.ArgumentTypeError("port must be between 1 and 65535")
+    return port
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="DrugTarget traced execution")
     p.add_argument(
         "--data-dir",
@@ -100,6 +111,12 @@ def parse_args() -> argparse.Namespace:
         help="LLM provider (default: ollama).",
     )
     p.add_argument(
+        "--port",
+        type=_parse_port,
+        default=None,
+        help="Override Ollama port for this run (localhost only, ollama provider only).",
+    )
+    p.add_argument(
         "--no-debug",
         action="store_true",
         help="Disable set_debug(True) — only show node transitions.",
@@ -107,8 +124,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--timeout",
         type=int,
-        default=150,
-        help="Timeout in minutes (default: 150).",
+        default=120,
+        help="Timeout in minutes (default: 120).",
     )
     p.add_argument(
         "--census",
@@ -117,7 +134,21 @@ def parse_args() -> argparse.Namespace:
         help="Enable Census API tools (query_cellxgene_lr_context, run_compare_census_lr_pair). "
              "Disabled by default due to slow API response times.",
     )
-    return p.parse_args()
+    args = p.parse_args(argv)
+    if args.port is not None and args.provider.lower() != "ollama":
+        p.error("--port can only be used with --provider ollama")
+    return args
+
+
+def _configure_ollama_port_override(args: argparse.Namespace) -> str | None:
+    """Apply an Ollama localhost port override for the current process."""
+    if args.provider.lower() != "ollama" or args.port is None:
+        return None
+
+    base_url = f"http://localhost:{args.port}"
+    os.environ["OLLAMA_BASE_URL"] = base_url
+    os.environ["OLLAMA_HOST"] = base_url
+    return base_url
 
 
 def _setup_mock_data() -> Path:
@@ -198,6 +229,8 @@ def _capture_drug_md_from_update(node_data: dict, holder: dict) -> None:
 async def run_traced(args: argparse.Namespace) -> int:
     """Run the DrugTarget agent with step-by-step tracing."""
 
+    ollama_base_url = _configure_ollama_port_override(args)
+
     # ── Debug mode ────────────────────────────────────────────────────
     if not args.no_debug:
         from langchain_core.globals import set_debug
@@ -252,6 +285,8 @@ async def run_traced(args: argparse.Namespace) -> int:
     agent, backend = create_drug_target_agent(config)
     print(f"[CONFIG] Agent created (provider={args.provider})")
     print(f"[CONFIG] Disease: {args.disease}")
+    if ollama_base_url:
+        print(f"[CONFIG] Ollama base URL: {ollama_base_url}")
     print(f"[CONFIG] Census API: {'ENABLED' if args.census else 'DISABLED'}")
 
     # ── Stream with tracing ───────────────────────────────────────────
