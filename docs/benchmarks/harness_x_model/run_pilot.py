@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from docs.benchmarks.harness_x_model.common import (
     append_jsonl,
+    apply_ollama_host_override,
     build_trial_schedule,
     check_cases_coherence,
     check_mode_coherence,
@@ -38,6 +39,7 @@ def main() -> int:
         help="Skip the non-zero exit on gate failure (gate report is still written).",
     )
     args = parser.parse_args()
+    apply_ollama_host_override(args)
 
     results_dir = Path(args.results_dir)
     workspace_root = Path(args.workspace_root)

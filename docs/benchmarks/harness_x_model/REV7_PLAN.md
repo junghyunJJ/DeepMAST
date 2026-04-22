@@ -206,4 +206,51 @@ done
 
 ---
 
+## Part 5 — Parallel Multi-Port Full-Run Protocol
+
+### Prerequisites
+
+1. **3 Ollama instances** running on separate ports (e.g., 7000 / 7001 / 7002) — either on separate machines or one machine with GPU-partitioned Ollama instances.
+2. **Both models loaded on each instance**: `qwen3.5:122b` (strong) + `qwen3.5:35b` (weak). Verify with `curl http://localhost:70XX/api/tags` on each port.
+3. **Sufficient VRAM per instance**: ~80 GB for 122b + ~30 GB for 35b non-concurrent (`keep_alive` swap handled by `_ensure_ollama_model_ready`).
+4. **`LANGSMITH_TRACING=false`** strongly recommended — Rev 7 pilot saw heavy 429 log noise from monthly-trace cap with tracing enabled.
+
+### Execution commands
+
+```bash
+# Terminal / nohup session 1 — mode B on port 7000
+nohup python -u docs/benchmarks/harness_x_model/run_full.py \
+  --mode B --cases-file docs/benchmarks/cci_skill_ablation/cases/cci_full_cases_enriched_v1.json \
+  --results-dir docs/benchmarks/harness_x_model/results/full_rev7_b \
+  --workspace-root docs/benchmarks/harness_x_model/workspaces/full_rev7_b \
+  --max-cases 30 --repeats 3 --ollama-host http://localhost:7000 \
+  > docs/benchmarks/harness_x_model/results/_rev7_full_b.log 2>&1 &
+
+# Terminal / nohup session 2 — mode B' on port 7001
+nohup python -u docs/benchmarks/harness_x_model/run_full.py \
+  --mode B_prime --cases-file docs/benchmarks/cci_skill_ablation/cases/cci_full_cases_enriched_v1.json \
+  --results-dir docs/benchmarks/harness_x_model/results/full_rev7_b_prime \
+  --workspace-root docs/benchmarks/harness_x_model/workspaces/full_rev7_b_prime \
+  --max-cases 30 --repeats 3 --ollama-host http://localhost:7001 \
+  > docs/benchmarks/harness_x_model/results/_rev7_full_b_prime.log 2>&1 &
+
+# Terminal / nohup session 3 — mode C on port 7002
+nohup python -u docs/benchmarks/harness_x_model/run_full.py \
+  --mode C --cases-file docs/benchmarks/cci_skill_ablation/cases/cci_full_cases_enriched_v1.json \
+  --results-dir docs/benchmarks/harness_x_model/results/full_rev7_c \
+  --workspace-root docs/benchmarks/harness_x_model/workspaces/full_rev7_c \
+  --max-cases 30 --repeats 3 --ollama-host http://localhost:7002 \
+  > docs/benchmarks/harness_x_model/results/_rev7_full_c.log 2>&1 &
+```
+
+### Resume protocol
+
+Re-run the same command; resume is automatic and independent per-mode. Each mode's `results_dir` is separate, so one mode crashing does not affect the others. The `load_completed_trial_indices` function skips completed (non-error) trials, and failed trials are retried.
+
+### Robustness guarantee
+
+If a SIGKILL occurs mid-`append_jsonl`, the final JSONL line may be truncated. Both `load_completed_trial_indices` and `load_trial_rows` now tolerate malformed JSON lines (logged at WARN, skipped). The truncated trial will not appear in the completed set and will be automatically retried on resume. This preserves the invariant that "resume = re-run the same command".
+
+---
+
 *End of Rev 7 execution plan.*

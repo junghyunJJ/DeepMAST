@@ -627,7 +627,15 @@ def load_completed_trial_indices(results_dir: str | Path) -> set[int]:
         for line in item.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
-            payload = json.loads(line)
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                logger.warning(
+                    "load_completed_trial_indices: skipping malformed JSON line in %s "
+                    "(likely truncated by hard crash during append_jsonl)",
+                    item,
+                )
+                continue
             trial_index = payload.get("trial_index")
             if isinstance(trial_index, int):
                 latest[trial_index] = payload
@@ -872,7 +880,15 @@ def load_trial_rows(results_dir: str | Path) -> list[dict[str, Any]]:
         for line in path.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
-            payload = json.loads(line)
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                logger.warning(
+                    "load_trial_rows: skipping malformed JSON line in %s "
+                    "(likely truncated by hard crash during append_jsonl)",
+                    path,
+                )
+                continue
             trial_index = payload.get("trial_index")
             if not isinstance(trial_index, int):
                 continue
@@ -1162,7 +1178,29 @@ def parse_common_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
             "C (B_prime + tool-schema isolation on OFF arm, default)."
         ),
     )
+    parser.add_argument(
+        "--ollama-host",
+        default=None,
+        help=(
+            "Ollama instance URL (e.g. http://localhost:7001). When set, overrides "
+            "OLLAMA_HOST and OLLAMA_BASE_URL env vars for this process. Required "
+            "for multi-port parallel mode-B/B'/C execution. Defaults to env vars."
+        ),
+    )
     return parser
+
+
+def apply_ollama_host_override(args: argparse.Namespace) -> None:
+    """Apply --ollama-host → both OLLAMA_HOST and OLLAMA_BASE_URL.
+
+    Must be called before any LLM construction. Unifies the two env-var
+    readers (common._ensure_ollama_model_ready uses OLLAMA_HOST;
+    src.agents.model.create_ollama_llm uses OLLAMA_BASE_URL) so a single
+    CLI flag configures both.
+    """
+    if getattr(args, "ollama_host", None):
+        os.environ["OLLAMA_HOST"] = args.ollama_host
+        os.environ["OLLAMA_BASE_URL"] = args.ollama_host
 
 
 def serialize_result(result: SearchTrialResult) -> dict[str, Any]:

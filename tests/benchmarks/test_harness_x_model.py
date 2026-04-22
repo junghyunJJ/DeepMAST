@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +21,7 @@ from docs.benchmarks.harness_x_model.common import (
     _make_benchmark_search_tool,
     _searcher_tools,
     _SEARCHER_PROMPT_KWARG_STRIPS,
+    apply_ollama_host_override,
     build_trial_schedule,
     check_cases_coherence,
     check_mode_coherence,
@@ -26,6 +29,7 @@ from docs.benchmarks.harness_x_model.common import (
     compute_cases_sha256,
     load_cases,
     load_completed_trial_indices,
+    load_trial_rows,
     normalize_case,
     select_pilot_cases,
 )
@@ -676,3 +680,51 @@ def test_gate_null_skipped_for_mode_c() -> None:
     gates = check_pilot_gates(rows, benchmark_mode="C")
     assert gates["gate_null"]["passed"] is True
     assert gates["gate_null"].get("skipped") is True
+
+
+# ---------------------------------------------------------------------------
+# Rev 7 Extension — malformed-line tolerance + ollama-host override
+# ---------------------------------------------------------------------------
+
+
+def test_load_completed_trial_indices_tolerates_malformed_line(tmp_path: Path) -> None:
+    """A truncated final line (SIGKILL during append_jsonl) must be skipped, not crash."""
+    f = tmp_path / "trial_0001.jsonl"
+    f.write_text(
+        json.dumps({"trial_index": 1, "condition": "strong_on"}) + "\n"
+        + '{"trial_index": 2, "condition": "strong_off", trunc',
+        encoding="utf-8",
+    )
+    completed = load_completed_trial_indices(tmp_path)
+    assert completed == {1}
+
+
+def test_load_trial_rows_tolerates_malformed_line(tmp_path: Path) -> None:
+    """Same corpus as above — load_trial_rows must return only the valid row."""
+    f = tmp_path / "trial_0001.jsonl"
+    f.write_text(
+        json.dumps({"trial_index": 1, "condition": "strong_on"}) + "\n"
+        + '{"trial_index": 2, "condition": "strong_off", trunc',
+        encoding="utf-8",
+    )
+    rows = load_trial_rows(tmp_path)
+    assert len(rows) == 1
+    assert rows[0]["trial_index"] == 1
+
+
+def test_apply_ollama_host_override_sets_both_env_vars(monkeypatch) -> None:
+    """--ollama-host must set both OLLAMA_HOST and OLLAMA_BASE_URL."""
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+
+    # Case 1: ollama_host is set — both env vars must be populated.
+    apply_ollama_host_override(argparse.Namespace(ollama_host="http://localhost:7001"))
+    assert os.environ["OLLAMA_HOST"] == "http://localhost:7001"
+    assert os.environ["OLLAMA_BASE_URL"] == "http://localhost:7001"
+
+    # Case 2: ollama_host is None — must be a no-op (does not mutate env).
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    apply_ollama_host_override(argparse.Namespace(ollama_host=None))
+    assert "OLLAMA_HOST" not in os.environ
+    assert "OLLAMA_BASE_URL" not in os.environ
