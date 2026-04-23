@@ -39,17 +39,6 @@
 <td class="{{ value|score_class(column) }}">{{ value }}</td>
 {%- endmacro %}
 
-{% macro literature_card(ref) %}
-<div class="paper-card">
-    <div class="paper-title">
-        <a href="{{ ref.url }}" target="_blank">{{ ref.title }}</a>
-    </div>
-    <p style="color: var(--text-secondary); font-size: 0.9em;">
-        <a href="{{ ref.url }}" class="reference" target="_blank">PMID: {{ ref.pmid }}</a>
-    </p>
-</div>
-{% endmacro %}
-
 {% macro bio_context_table(pairs) %}
 <div class="table-container">
     <table>

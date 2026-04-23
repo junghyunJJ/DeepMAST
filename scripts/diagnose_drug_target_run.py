@@ -42,12 +42,10 @@ SUBAGENTS = [
 ]
 
 # Subagents that may appear in traces but are not required — absence is logged
-# as INFO, not ERROR. `deep_diver` is preserved in SUBAGENT_CONFIGS for manual
-# re-runs but is not part of the default 3-agent workflow; Stage 3 ChEMBL now
-# runs inline inside evidence_assessor.
-OPTIONAL_SUBAGENTS = [
-    "deep_diver",
-]
+# as INFO, not ERROR. The active workflow is 3-subagent (evidence_assessor ->
+# hypothesis_writer -> report_writer); Stage 3 ChEMBL runs inline inside
+# evidence_assessor.
+OPTIONAL_SUBAGENTS: list[str] = []
 
 # Mandatory evidence artifacts whose absence means the pipeline failed.
 REQUIRED_ARTIFACTS = [

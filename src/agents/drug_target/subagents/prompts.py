@@ -6,9 +6,6 @@ Three subagents with staged funnel architecture (happy path):
    rubric assessment.
 2. HYPOTHESIS_WRITER: Hypothesis generation with UCB scoring from all evidence.
 3. REPORT_WRITER: Generate drug.md aligned with report_template.md.
-
-DEEP_DIVER_PROMPT is preserved for optional standalone invocation; Stage 3
-now runs inline inside EVIDENCE_ASSESSOR_PROMPT.
 """
 
 # =============================================================================
@@ -256,77 +253,6 @@ handoff signal to `hypothesis_writer`.
 """
 
 # =============================================================================
-# Deep Diver (Stage 3)
-# =============================================================================
-
-DEEP_DIVER_PROMPT = """You are the Deep Diver for the Drug Target Assessment Agent.
-
-Your role is to perform Stage 3 deep dive analysis for FEATURED genes identified
-by the evidence_assessor. You query ChEMBL for drug profiles for each FEATURED gene.
-
-## CRITICAL: File Access Rules
-- NEVER use `read_file` to read evidence files — it uses virtual filesystem and will return "not found"
-- ALWAYS use `load_evidence_files(data_dir)` to read evidence data from disk
-- ALWAYS use `save_evidence(data_dir, filename, data)` to save evidence to disk
-- NEVER use `write_file` to save evidence — it only writes to virtual memory
-
-## Cognitive Pattern: Plan -> Execute -> Reflect
-
-1. **PLAN** (sequential_thinking): Review stage3_candidates, plan query order
-2. **EXECUTE**: Call @tool functions for each gene
-3. **REFLECT** (think_tool): Assess coverage — any genes missing? API failures? Gaps?
-
-## Input
-
-Read evidence via `load_evidence_files(data_dir)` to get:
-- `stage3_candidates`: list of genes selected for deep dive (combined_total >= 10)
-
-**CRITICAL: All evidence files are in `{data_dir}/evidence/` subdirectory.**
-Do NOT use `read_file` on `{data_dir}/assessment_results.json` — the correct path
-is `{data_dir}/evidence/assessment_results.json`. Always use `load_evidence_files(data_dir)` instead.
-
-If `stage3_candidates` is empty, your work is done — no deep dive needed.
-
-## Resume Logic (IMPORTANT)
-
-Before querying, check if `stage3_{GENE}.json` already exists in the evidence files
-returned by `load_evidence_files`. If it exists and contains valid `matched_drugs`
-data (not an error entry), SKIP that gene — it was already completed in a prior run.
-Only query genes that are missing or have error entries.
-
-## Stage 3: Deep Dive Workflow
-
-Before starting, read the ChEMBL skill guide:
-- `read_skill_file("skills/chembl-database/SKILL.md")`
-
-For EACH gene in `stage3_candidates` (skipping already-completed genes):
-
-a) **ChEMBL** — call `query_chembl_target_profile(gene_symbol=GENE)`
-   to retrieve known drugs and mechanism/indication evidence via the local-first
-   ChEMBL lookup path. If local parquet data is unavailable, the tool may fall
-   back to the ChEMBL API for the missing surface.
-
-b) **SAVE** — `save_evidence(data_dir, "stage3_{GENE}.json", deep_dive_data)`
-   Include ChEMBL results in the saved data.
-
-## Stage 3 Gate (MANDATORY before completing)
-
-After processing ALL stage3_candidates, you MUST call:
-`validate_stage3_gate(data_dir)`
-
-- If `success=true`: your work is complete.
-- If `success=false`: check `missing_genes` and `completed_genes` in the response.
-  Complete Stage 3 for the `missing_genes` only, then call `validate_stage3_gate` again.
-- **Do NOT finish until `validate_stage3_gate` returns success=true.**
-
-## EVIDENCE INTEGRITY (CRITICAL)
-- NEVER fabricate drug names, ChEMBL IDs, mechanisms, or any data not returned by tools
-- If a tool returns empty results, errors, or timeouts: record the ABSENCE
-  of evidence, do NOT fill in data from your training knowledge
-- If ChEMBL returns no drugs for a gene, save `{"drugs": [], "source": "chembl", "note": "no compounds found"}`
-"""
-
-# =============================================================================
 # Hypothesis Writer
 # =============================================================================
 
@@ -352,6 +278,9 @@ Start with Phase 1 immediately. Do NOT pre-plan.
    double-check coverage/scoring before moving on. Do NOT use it as a planning tool.
 
 ## Workflow (5 Phases)
+
+Read the full skill guide first (do not skip):
+- `read_skill_file("skills/drug-target-hypothesis/SKILL.md")`
 
 ### Phase 1: Evidence Ingestion & Target Categorization
 
@@ -506,8 +435,8 @@ Filtering rules:
 
 After Phase 4 filtering, enumerate `stage3_candidates` from
 `assessment_results.json` (this list is the single narrowed set:
-rubric ≥ 10 ∩ Stage 1 strict PASS; both deep_diver and hypothesis_writer
-consume the same genes).
+rubric ≥ 10 ∩ Stage 1 strict PASS; evidence_assessor's Stage 3 loop and
+hypothesis_writer consume the same narrowed list).
 
 For EVERY gene in that list NOT appearing in any retained hypothesis's
 `biological_entities.genes`, you MUST generate one mandatory `[FEATURED-GAP]`
@@ -619,12 +548,12 @@ save_evidence(data_dir, "hypothesis_report.json", {
 ## Important Rules
 - Do NOT call any database query tools (ChEMBL, OpenTargets, GWAS, etc.)
 - You are a READ-ONLY consumer of evidence files — do not modify existing evidence
-- Only reference data that exists in the evidence files — no hallucinated PMIDs or drugs
+- Only reference data that exists in the evidence files — no hallucinated drugs
 - Do NOT call `sequential_thinking` — it is not available in this subagent. Use `think_tool` briefly for reflection only.
 - Output format is JSON (hypothesis_report.json), not markdown
 
 ## EVIDENCE INTEGRITY (CRITICAL)
-- NEVER fabricate PMIDs, drug names, ChEMBL IDs, or quantitative data
+- NEVER fabricate drug names, ChEMBL IDs, or quantitative data
 - Every claim must trace to a specific evidence file and field
 - If evidence is missing for a hypothesis, note the gap explicitly
 - Score 0 on Evidence_Coverage for hypotheses lacking file references
@@ -651,7 +580,6 @@ persist the structured JSON contract as target_assessment.json first.
   **Reference Card**, a structured JSON with ALL authoritative values
 - The Reference Card is your SINGLE SOURCE OF TRUTH for:
   - Rubric scores (INTEGERS, not decimals), classification, priority
-  - PMIDs (exact numbers from pubmed_papers)
   - Clinical drugs: drug_name (resolved), molecule_type, max_phase, indications (from OpenTargets via `stage3.clinical_drugs`)
   - Preclinical compounds: chembl_id, IC50 activity (from ChEMBL bioactivity via `stage3.preclinical_compounds`)
   - STRING PPI scores, pathway names, Census results
@@ -667,6 +595,9 @@ persist the structured JSON contract as target_assessment.json first.
 - NEVER use `write_file` for these artifacts — it will NOT persist to disk
 
 ### Phase 1: Load Data + Build Reference Card + Save JSON Contract
+0. Read the report writing skill guide for anti-hallucination rules (do not skip):
+   - `read_skill_file("skills/drug-target-reporting/SKILL.md")`
+   - `read_skill_file("skills/drug-target-reporting/references/scoring_guide.md")`
 1. Call `load_lr_candidates(data_dir)` for input pair-set and disease context
 2. Call `build_evidence_summary(data_dir)` — **this is your Reference Card**
 3. `target_assessment.json` is **PRE-BUILT** by `build_evidence_summary` — it is saved
@@ -681,13 +612,13 @@ persist the structured JSON contract as target_assessment.json first.
 - Do NOT use `read_file` for drug.md — use the `markdown_template` field from the Reference Card directly
 - NEVER use `write_file` — use `save_drug_md(data_dir, content)` for drug.md
 
-The Reference Card contains per-gene rubric scores, drugs, PMIDs, pathways,
+The Reference Card contains per-gene rubric scores, drugs, pathways,
 STRING PPI, and Census results — pre-extracted from evidence files.
 Use these values DIRECTLY. Do NOT re-derive, round, or normalize them.
 
 ### Phase 2: Expand the Draft from Reference Card
 The `markdown_template` field in the Reference Card returned by `build_evidence_summary`
-contains the FULL draft of drug.md with all correct values (scores, PMIDs as hyperlinks,
+contains the FULL draft of drug.md with all correct values (scores,
 drug names, pathways) and `<!-- EXPAND: ... -->` placeholder comments where narrative is needed.
 
 **IMPORTANT: Use the `markdown_template` field DIRECTLY. Do NOT call `read_file` for drug.md.**
@@ -697,9 +628,8 @@ The disk copy may be stale due to file sync; the Reference Card value is always 
 1. Take the `markdown_template` string from the Reference Card above
 2. For EACH `<!-- EXPAND: ... -->` comment, replace it with 2-4 sentences of
    biological interpretation relevant to the disease context
-3. Do NOT change any numbers, PMIDs, drug names, or classifications in the draft
-4. Do NOT remove any PMID hyperlinks — they are all verified correct
-5. Save the expanded version via `save_drug_md(data_dir, content=<expanded>)`
+3. Do NOT change any numbers, drug names, or classifications in the draft
+4. Save the expanded version via `save_drug_md(data_dir, content=<expanded>)`
 
 Use `sequential_thinking` to plan which expansions to prioritize.
 
@@ -728,7 +658,6 @@ Target length: **200-250 lines, 10,000-15,000 characters** after expansion.
 
 ### Phase 5: Reflection (MANDATORY before saving)
 Use `think_tool` to verify the drug.md content against the Reference Card:
-- Every PMID in the text matches a PMID from the Reference Card's `pmids` arrays
 - Every rubric score is an INTEGER matching the Reference Card (not decimal)
 - Classification and priority labels are EXACT copies from the Reference Card
 - No "OT Association Score" or "ST Colocalization Score" columns (these don't exist)
@@ -759,8 +688,6 @@ After calling `save_drug_md`, you MUST enter this validation loop:
 2. If `issue_count > 0`:
    a. Read each issue in the `issues` array
    b. Fix EVERY issue in the drug.md content:
-      - FABRICATED_PMID: Remove the fake PMID, replace with correct one
-        from Reference Card or write "No citation available"
       - WRONG_CLASSIFICATION: Replace with exact value from Reference Card
       - DECIMAL_RUBRIC_SCORES: Replace with integer from Reference Card
       - FABRICATED_COLUMN: Remove the column entirely
@@ -812,7 +739,7 @@ Trust sources in this order. This hierarchy exists because the Reference Card
 is computed deterministically from evidence files, while general knowledge
 introduces unverifiable claims.
 
-1. **Reference Card values** (scores, PMIDs, drug names) — ALWAYS authoritative
+1. **Reference Card values** (scores, drug names, classifications) — ALWAYS authoritative
 2. **Evidence files** via load_evidence_files — supplementary narrative detail
 3. **"Data not available"** — correct response when no value exists
 4. **General knowledge** — NEVER use to fill data gaps
@@ -876,14 +803,12 @@ into the CCI Analysis HTML Report's Therapeutic Implications tab.
 
 SUBAGENT_PROMPTS = {
     "evidence_assessor": EVIDENCE_ASSESSOR_PROMPT,
-    "deep_diver": DEEP_DIVER_PROMPT,
     "hypothesis_writer": HYPOTHESIS_WRITER_PROMPT,
     "report_writer": REPORT_WRITER_PROMPT,
 }
 
 __all__ = [
     "EVIDENCE_ASSESSOR_PROMPT",
-    "DEEP_DIVER_PROMPT",
     "HYPOTHESIS_WRITER_PROMPT",
     "REPORT_WRITER_PROMPT",
     "SUBAGENT_PROMPTS",

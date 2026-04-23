@@ -207,7 +207,7 @@ _THINKING_REPEAT_LIMIT = 3
 def _thinking_session_key(config: Optional[RunnableConfig]) -> str:
     """Derive a stable per-subagent-turn key from RunnableConfig.
 
-    Each LangGraph subagent (evidence_assessor, deep_diver, hypothesis_writer,
+    Each LangGraph subagent (evidence_assessor, hypothesis_writer,
     report_writer) runs sequentially under the same parent thread_id. If the
     counter is scoped only by thread_id, a fresh subagent's legitimate
     thoughtNumber=1 gets falsely rejected because the previous subagent left
@@ -302,7 +302,7 @@ def _check_thinking_monotonicity(
                         "save_evidence(data_dir, 'hypothesis_report.json', "
                         "<your best draft>) IMMEDIATELY. For report_writer "
                         "call save_drug_md with the current draft. For "
-                        "evidence_assessor/deep_diver proceed to the next "
+                        "evidence_assessor proceeds to the next "
                         "tool in the workflow."
                     ),
                 })

@@ -43,7 +43,6 @@ PANEL_H = 0.12
 # Colors (Okabe-Ito safe, muted for publication)
 COLORS = {
     "evidence_assessor": {"fill": "#DCEEFB", "border": "#1565C0", "text": "#0D47A1"},
-    "deep_diver":        {"fill": "#DCEEDC", "border": "#2E7D32", "text": "#1B5E20"},
     "hypothesis_writer": {"fill": "#ECDCF5", "border": "#6A1B9A", "text": "#4A148C"},
     "report_writer":     {"fill": "#FFF3D0", "border": "#E65100", "text": "#BF360C"},
     "panel":             {"fill": "#F5F5F5", "border": "#D0D0D0", "text": "#424242"},
@@ -60,13 +59,6 @@ MODULES = [
         "subtitle": "Multi-database target validation & rubric scoring",
         "ribbon": "Stage 2 (OpenTargets + GWAS + VEP)  \u2192  Rubric Scoring  \u2192  Stage 1 (STRING + Census)",
         "badge": "17 tools",
-    },
-    {
-        "key": "deep_diver",
-        "title": "Deep Diver",
-        "subtitle": "Drug profiles & literature evidence per FEATURED gene",
-        "ribbon": "ChEMBL query  \u2192  PubMed search  \u2192  Stage 3 Gate",
-        "badge": "per gene",
     },
     {
         "key": "hypothesis_writer",

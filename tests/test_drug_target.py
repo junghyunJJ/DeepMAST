@@ -144,7 +144,7 @@ class TestSubagentConfigs:
     def test_evidence_assessor_has_minimum_tools(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         tools = SUBAGENT_CONFIGS["evidence_assessor"]["tools"]
-        assert len(tools) >= 12  # Stage 3 tools moved to deep_diver
+        assert len(tools) >= 12  # Stage 3 ChEMBL tools run inline in evidence_assessor
 
     def test_report_writer_has_minimum_tools(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -174,7 +174,7 @@ class TestSubagentConfigs:
             "validate_quality",
         }
         assert expected.issubset(names)
-        # Stage 3 ChEMBL tools now run inline in evidence_assessor (was deep_diver).
+        # Stage 3 ChEMBL tools now run inline in evidence_assessor.
         assert "query_chembl_target_profile" in names
         assert "validate_stage3_gate" in names
         # PubMed literature search is NOT wired into evidence_assessor.
@@ -227,18 +227,11 @@ class TestSubagentConfigs:
         assert "Stage 2" in prompt
         assert "Stage 3" in prompt
 
-    def test_hypothesis_writer_prompt_uses_no_direct_skill_read(self):
-        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
-
-        prompt = SUBAGENT_CONFIGS["hypothesis_writer"]["system_prompt"]
-        assert 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")' not in prompt
-
-    def test_report_writer_prompt_uses_no_direct_skill_read(self):
+    def test_report_writer_prompt_references_reference_card(self):
+        """report_writer prompt describes the Reference Card anti-hallucination contract."""
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
 
         prompt = SUBAGENT_CONFIGS["report_writer"]["system_prompt"]
-        assert 'read_skill_file("skills/drug-target-reporting/SKILL.md")' not in prompt
-        assert 'read_skill_file("skills/drug-target-reporting/references/scoring_guide.md")' not in prompt
         assert "Reference Card" in prompt
 
     def test_evidence_assessor_has_stage3_tools(self):
@@ -263,8 +256,6 @@ class TestSubagentConfigs:
         assert "EVIDENCE_ASSESSOR" in WORKFLOW_DESCRIPTION
         assert "HYPOTHESIS_WRITER" in WORKFLOW_DESCRIPTION
         assert "REPORT_WRITER" in WORKFLOW_DESCRIPTION
-        # deep_diver preserved as optional/standalone
-        assert "DEEP_DIVER" in WORKFLOW_DESCRIPTION
 
     def test_evidence_assessor_prompt_mentions_census_and_gwas(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -277,25 +268,6 @@ class TestSubagentConfigs:
         prompt = SUBAGENT_CONFIGS["report_writer"]["system_prompt"]
         assert "Featured Candidate" in prompt
         assert "drug.md" in prompt
-
-    def test_deep_diver_has_stage3_tools(self):
-        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
-        tools = SUBAGENT_CONFIGS["deep_diver"]["tools"]
-        names = {t.name for t in tools}
-        assert "query_chembl_target_profile" in names
-        assert "validate_stage3_gate" in names
-        assert "save_evidence" in names
-        assert "load_evidence_files" in names
-        assert "read_skill_file" in names
-        assert "search_literature_dynamic" not in names
-
-    def test_deep_diver_prompt_contains_stage3(self):
-        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
-        prompt = SUBAGENT_CONFIGS["deep_diver"]["system_prompt"]
-        assert "Stage 3" in prompt
-        assert "ChEMBL" in prompt
-        assert "validate_stage3_gate" in prompt
-        assert "Plan" in prompt and "Execute" in prompt and "Reflect" in prompt
 
     def test_hypothesis_writer_has_evidence_tools(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -332,12 +304,12 @@ class TestSubagentConfigs:
         assert "Evidence_Coverage" in prompt
         assert "Specificity" in prompt
 
-    def test_subagent_prompts_registry_has_4_entries(self):
-        """SUBAGENT_PROMPTS keeps 4 entries — deep_diver prompt preserved for optional use."""
+    def test_subagent_prompts_registry_has_3_entries(self):
+        """SUBAGENT_PROMPTS has exactly 3 entries matching the active 3-subagent pipeline."""
         from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
-        assert len(SUBAGENT_PROMPTS) == 4
+        assert len(SUBAGENT_PROMPTS) == 3
         assert set(SUBAGENT_PROMPTS.keys()) == {
-            "evidence_assessor", "deep_diver", "hypothesis_writer", "report_writer",
+            "evidence_assessor", "hypothesis_writer", "report_writer",
         }
 
 
@@ -3218,15 +3190,66 @@ class TestCensusDiseaseTool:
 
     def test_evidence_assessor_prompt_mentions_selected_skill_reads(self):
         """Prompt contains stage-specific progressive disclosure guidance."""
-        from src.agents.drug_target.subagents.prompts import EVIDENCE_ASSESSOR_PROMPT, DEEP_DIVER_PROMPT
+        from src.agents.drug_target.subagents.prompts import EVIDENCE_ASSESSOR_PROMPT
 
         assert "read_skill_file" in EVIDENCE_ASSESSOR_PROMPT
         assert "query_stage2_gene_panel" in EVIDENCE_ASSESSOR_PROMPT
         assert "opentargets-database" in EVIDENCE_ASSESSOR_PROMPT
         assert "gwas-database" in EVIDENCE_ASSESSOR_PROMPT
         assert "chembl-database" in EVIDENCE_ASSESSOR_PROMPT
-        assert "chembl-database" in DEEP_DIVER_PROMPT
         assert "cellxgene-census" in EVIDENCE_ASSESSOR_PROMPT
+
+    def test_report_writer_prompt_contains_skill_read(self):
+        """Phase H1: REPORT_WRITER_PROMPT must hardcode read_skill_file for drug-target-reporting.
+        Removing the hardcoded load makes report_writer depend on SkillActivator's conditional
+        classification, which previously misclassified report_writer's task as NO_SKILLS_NEEDED
+        and silently dropped every hallucination protection."""
+        from src.agents.drug_target.subagents.prompts import REPORT_WRITER_PROMPT
+
+        assert 'read_skill_file("skills/drug-target-reporting/SKILL.md")' in REPORT_WRITER_PROMPT
+        assert 'read_skill_file("skills/drug-target-reporting/references/scoring_guide.md")' in REPORT_WRITER_PROMPT
+
+    def test_report_writer_skill_read_is_first_phase_1_step(self):
+        """Phase H7a (structural proxy): the skill read must appear as step 0 of Phase 1,
+        before any other numbered step. This anchors the LLM's first tool call so the
+        skill loads deterministically regardless of SkillActivator's classification."""
+        from src.agents.drug_target.subagents.prompts import REPORT_WRITER_PROMPT
+
+        phase1_marker = "### Phase 1: Load Data + Build Reference Card + Save JSON Contract"
+        assert phase1_marker in REPORT_WRITER_PROMPT
+        phase1_idx = REPORT_WRITER_PROMPT.index(phase1_marker)
+        skill_read_idx = REPORT_WRITER_PROMPT.index(
+            'read_skill_file("skills/drug-target-reporting/SKILL.md")'
+        )
+        step_1_idx = REPORT_WRITER_PROMPT.index(
+            "1. Call `load_lr_candidates(data_dir)`"
+        )
+        # skill_read must come after the Phase 1 header but BEFORE the first numbered step
+        assert phase1_idx < skill_read_idx < step_1_idx
+
+    def test_hypothesis_writer_prompt_contains_skill_read(self):
+        """Phase H2: HYPOTHESIS_WRITER_PROMPT must hardcode read_skill_file for
+        drug-target-hypothesis. Same regression risk as report_writer (commit 1f9cdd5)."""
+        from src.agents.drug_target.subagents.prompts import HYPOTHESIS_WRITER_PROMPT
+
+        assert 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")' in HYPOTHESIS_WRITER_PROMPT
+
+    def test_hypothesis_writer_skill_read_is_first_workflow_step(self):
+        """Phase H7a (structural proxy): the skill read must appear at the top of the Workflow
+        (5 Phases) section, before Phase 1 begins. Anchors the first tool call deterministically."""
+        from src.agents.drug_target.subagents.prompts import HYPOTHESIS_WRITER_PROMPT
+
+        workflow_marker = "## Workflow (5 Phases)"
+        phase1_marker = "### Phase 1: Evidence Ingestion & Target Categorization"
+        assert workflow_marker in HYPOTHESIS_WRITER_PROMPT
+        assert phase1_marker in HYPOTHESIS_WRITER_PROMPT
+        workflow_idx = HYPOTHESIS_WRITER_PROMPT.index(workflow_marker)
+        phase1_idx = HYPOTHESIS_WRITER_PROMPT.index(phase1_marker)
+        skill_read_idx = HYPOTHESIS_WRITER_PROMPT.index(
+            'read_skill_file("skills/drug-target-hypothesis/SKILL.md")'
+        )
+        # skill_read must come between the Workflow header and Phase 1's start
+        assert workflow_idx < skill_read_idx < phase1_idx
 
     def test_read_skill_file_reads_project_relative_skill_doc(self, tmp_path):
         # read_skill_file now lives in src.agents.shared.skill_reader and uses
@@ -4385,7 +4408,7 @@ class TestP3SchemaValidation:
 
 class TestSchemaV3UnifiedContract:
     """Schema v3: stage3_candidates is the single narrowed set (rubric ∩ Stage 1 PASS);
-    deep_diver and hypothesis_writer consume the same list."""
+    evidence_assessor (Stage 3 inline) and hypothesis_writer consume the same list."""
 
     def test_topn_gate_uses_stage3_candidates_only(self, tmp_path):
         """TOP-N coverage gate enforces every gene in `stage3_candidates`."""

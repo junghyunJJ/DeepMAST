@@ -1,11 +1,10 @@
 """Drug Target Assessment Agent using DeepAgents framework.
 
-4-Subagent Architecture with Staged Funnel:
+3-Subagent Architecture with Staged Funnel:
 1. EVIDENCE_ASSESSOR: 2-stage funnel (Stage 2: validation & scoring ->
    Stage 1: biological context) with inline rubric assessment
-2. DEEP_DIVER: Stage 3 deep dive (ChEMBL) for FEATURED genes
-3. HYPOTHESIS_WRITER: Hypothesis generation with UCB scoring from all evidence
-4. REPORT_WRITER: Generate drug.md with featured candidate emphasis
+2. HYPOTHESIS_WRITER: Hypothesis generation with UCB scoring from all evidence
+3. REPORT_WRITER: Generate drug.md with featured candidate emphasis
 
 All database queries are wrapped as @tool functions that run on the host process.
 Docker backend is OPTIONAL — set docker_image in DrugTargetConfig to enable
@@ -231,8 +230,6 @@ def create_drug_target_agent(
 
     Creates a fully configured agent with:
     - 3 specialized subagents (evidence_assessor, hypothesis_writer, report_writer)
-      (deep_diver is preserved in SUBAGENT_CONFIGS for optional standalone use;
-       Stage 3 ChEMBL now runs inline inside evidence_assessor)
     - All database queries via @tool wrappers (host-side by default)
     - Optional DockerBackend when docker_image is set in config
 
@@ -329,9 +326,9 @@ def create_drug_target_agent(
     agent = create_deep_agent(**create_kwargs)
     # evidence_assessor alone can consume 500-800 steps for large gene panels
     # (41 genes × ~10 steps/gene for Stage 2, plus Stage 1 batch + rubric + gates).
-    # All 4 subagents share this budget. Conservative estimate:
-    #   evidence_assessor: ~1500, deep_diver: ~500, hypothesis_writer: ~300,
-    #   report_writer: ~500, orchestrator: ~200 = ~3000 typical, 10000 for margin.
+    # All 3 subagents share this budget. Conservative estimate:
+    #   evidence_assessor: ~1500, hypothesis_writer: ~300,
+    #   report_writer: ~500, orchestrator: ~200 = ~2500 typical, 10000 for margin.
     agent = agent.with_config({"recursion_limit": 10000})
 
     return agent, backend

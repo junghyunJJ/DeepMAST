@@ -317,7 +317,6 @@ def _parse_deep_dives(body: str) -> list[dict[str, Any]]:
             "classification": classification,
             "priority": priority,
             "drug_profile": {"clinical_drugs": [], "preclinical_compounds": []},
-            "literature": [],
             "biological_context": [],
             "rubric": {},
             "narrative": {},
@@ -369,21 +368,6 @@ def _parse_drug_profile(body: str) -> dict[str, Any]:
             clinical.append(drug)
 
     return {"clinical_drugs": clinical, "preclinical_compounds": preclinical}
-
-
-def _parse_literature(body: str) -> list[dict[str, str]]:
-    """Parse PMID links into structured reference list."""
-    refs: list[dict[str, str]] = []
-    for m in re.finditer(
-        r"\[PMID:\s*(\d+)\]\((https?://[^)]+)\)\s*—\s*\"([^\"]+)\"",
-        body,
-    ):
-        refs.append({
-            "pmid": m.group(1),
-            "url": m.group(2),
-            "title": m.group(3),
-        })
-    return refs
 
 
 def _parse_bio_context(body: str) -> list[dict[str, Any]]:

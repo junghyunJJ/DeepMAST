@@ -121,8 +121,7 @@ Based on observed failures across gpt-4.1-mini and gpt-5.4-mini:
 2. **Classification drift**: validated_target reported as exploratory_target. Copy the exact string.
 3. **Score deflation**: CD4 had combined=16 but was reported as 9. Copy the integer.
 4. **Drug invention**: Reports listed drugs not in ChEMBL/OpenTargets data. Only use provided drugs.
-5. **PMID fabrication**: Reports cited PMIDs that don't exist. Only use PMIDs from evidence files.
-6. **Pathway extrapolation**: Reports described pathways not in the evidence. Only cite detected pathways.
+5. **Pathway extrapolation**: Reports described pathways not in the evidence. Only cite detected pathways.
 
 ## Score Threshold Rationale
 

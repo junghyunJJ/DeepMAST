@@ -8,10 +8,6 @@ Three-subagent staged funnel (happy path):
 - report_writer: Generate drug.md with featured candidate emphasis.
 
 Workflow order: evidence_assessor -> hypothesis_writer -> report_writer
-
-The `deep_diver` subagent is preserved in SUBAGENT_CONFIGS as an optional
-standalone subagent (for manual re-runs or debug flows), but is NOT part
-of the default happy path — Stage 3 now runs inside evidence_assessor.
 """
 
 from typing import Callable, Sequence
@@ -117,28 +113,6 @@ SUBAGENT_CONFIGS = {
             validate_quality,
         ],
     },
-    "deep_diver": {
-        "name": "deep_diver",
-        "description": (
-            "Stage 3 deep dive for FEATURED genes. Queries ChEMBL for drug profiles. "
-            "Produces stage3_{GENE}.json for each stage3_candidate. "
-            "Validates completeness via validate_stage3_gate."
-        ),
-        "system_prompt": SUBAGENT_PROMPTS["deep_diver"],
-        "tools": [
-            # I/O
-            load_evidence_files,
-            save_evidence,
-            # Stage 3: Deep Dive
-            query_chembl_target_profile,
-            validate_stage3_gate,
-            read_skill_file,
-            # Cognitive
-            sequential_thinking,
-            think_tool,
-            validate_quality,
-        ],
-    },
     "hypothesis_writer": {
         "name": "hypothesis_writer",
         "description": (
@@ -232,10 +206,6 @@ Drug Target Assessment 3-Agent Workflow (Staged Funnel):
      4. [NOVEL] Candidate Deep Dives
      5. Pipeline Execution Summary & Recommendations
    - Quality validation (threshold >= 0.7)
-
-Optional/standalone subagents (NOT in happy path):
-- DEEP_DIVER: preserved in SUBAGENT_CONFIGS for manual re-runs or debug flows.
-  Stage 3 ChEMBL logic also runs inline inside evidence_assessor by default.
 """
 
 
@@ -257,8 +227,7 @@ def get_subagents(
 ) -> list[dict]:
     """Get the subagent configurations for Drug Target Assessment.
 
-    Returns 3 subagents in workflow order (deep_diver remains in
-    SUBAGENT_CONFIGS as an optional standalone but is NOT in the happy path):
+    Returns 3 subagents in workflow order:
     1. evidence_assessor - 3-stage funnel with inline rubric assessment
        (Stage 2 -> Stage 1 -> Stage 3 ChEMBL inline)
     2. hypothesis_writer - hypothesis generation with UCB scoring
@@ -376,7 +345,7 @@ def get_subagents(
     elif skills_sources:
         # Legacy path retained for callers that still use deepagents native
         # skill auto-loading.
-        _skill_subagents = {"evidence_assessor", "deep_diver", "report_writer"}
+        _skill_subagents = {"evidence_assessor", "report_writer"}
         for subagent in subagents:
             if subagent["name"] in _skill_subagents:
                 subagent["skills"] = skills_sources

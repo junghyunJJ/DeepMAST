@@ -5,9 +5,15 @@ description: >
   from spatial transcriptomics pipeline evidence. Programmatic score injection,
   narrative expansion, hypothesis integration, and quality validation.
   Use for "generate drug report", "write drug.md", "create target assessment",
-  "generate drug HTML report".
+  "generate drug HTML report", "finalize the drug.md", "render the drug target
+  HTML report", "polish the EXPAND markers", "after hypothesis_writer completes
+  write the report", "validation failed fix the drug.md".
   Do NOT use for general drug target discussion, literature searches, or
   pipeline execution — only for report generation from completed evidence.
+  Do NOT use when evidence files (assessment_results.json, stage3_*.json)
+  are absent — skill assumes a pre-filled draft exists.
+  Do NOT use to re-score or re-classify targets; scores are authoritative
+  inputs, not outputs.
 ---
 
 # Drug Target Report Writing Skill
@@ -15,7 +21,7 @@ description: >
 ## Why This Skill Exists
 
 Drug target assessment reports require precise transcription of rubric scores,
-drug profiles, PMID citations, and biological context from evidence files.
+drug profiles, and biological context from evidence files.
 LLMs consistently fabricate these values when asked to generate reports freely
 (observed with gpt-4.1-mini and gpt-5.4-mini — both hallucinated scores,
 GWAS values, and classifications). This skill prevents fabrication by
@@ -23,10 +29,10 @@ separating factual data (code-injected) from narrative interpretation (LLM-gener
 
 ## Your Role: NARRATIVE EXPANDER
 
-The drug.md draft already contains ALL correct factual data — scores, PMIDs,
+The drug.md draft already contains ALL correct factual data — scores,
 drug names, classifications, pathways, Census results — pre-filled by
 `build_evidence_summary`. Your ONLY job is to replace each
-`<!-- EXPAND: {instruction} -->` comment with 2-4 sentences of biological
+`&lt;!-- EXPAND: {instruction} --&gt;` comment with 2-4 sentences of biological
 interpretation. You must not modify any pre-filled data.
 
 The reason this boundary matters: scores are pre-computed from 41 genes x 14
@@ -36,19 +42,21 @@ full scoring pipeline. The pre-filled values are the single source of truth.
 
 ## Workflow
 
+**Output contract:** On success, returns paths to `drug.md` (always), `drug_report.html` (if Step 4 ran), and a validation pass bit from `validate_drug_md`.
+
 ### Step 1: Load Data and Build Draft
 ```
 Call build_evidence_summary(data_dir="{data_dir}", disease="{disease}")
 ```
 This writes a pre-filled drug.md draft to disk and returns a Reference Card
-JSON with all evidence data. The draft contains `<!-- EXPAND -->` markers
+JSON with all evidence data. The draft contains `&lt;!-- EXPAND --&gt;` markers
 where narrative is needed.
 
 ### Step 2: Read and Expand the Draft
 ```
 Call load_evidence_files(data_dir="{data_dir}")
 ```
-Then read the draft drug.md. For each `<!-- EXPAND: {instruction} -->` marker,
+Then read the draft drug.md. For each `&lt;!-- EXPAND: {instruction} --&gt;` marker,
 write 2-4 sentences following the instruction. Reference ONLY data visible
 in the SAME section of the draft.
 
@@ -74,7 +82,7 @@ all CSS and JS inline — no external dependencies.
 
 When interpreting data, trust sources in this order:
 
-1. **Reference Card values** (scores, PMIDs, drug names) — ALWAYS authoritative
+1. **Reference Card values** (scores, drug names, classifications) — ALWAYS authoritative
 2. **Evidence files** via load_evidence_files — supplementary detail for narrative
 3. **"Data not available"** — the correct response when Reference Card has no value
 4. **General knowledge** — NEVER use to fill data gaps
@@ -87,13 +95,15 @@ from evidence files, while general knowledge introduces unverifiable claims.
 Use this table to calibrate your narrative tone to the evidence strength.
 The combined_total is the sum of validated_total + exploratory_total.
 
-| Combined Total | Classification | Interpretation Tone |
+Read `classification` from the Reference Card first; pick the row whose Classification Field Value matches. Do not infer from `combined_total` alone — rows 3 and 4 share the same 5-9 combined range and diverge only on the `classification` field.
+
+| Combined Total | Classification Field Value | Interpretation Tone |
 |---|---|---|
-| >= 15 | validated_target | "Strong validated target with substantial clinical evidence supporting drug development" |
-| 10-14 | validated_target | "Promising target with moderate clinical and exploratory support warranting further investigation" |
-| 5-9 | exploratory_target | "Early-stage target with exploratory evidence requiring additional validation" |
-| 5-9 (novel) | novel_candidate | "Novel target from spatial transcriptomics; biological plausibility supports further validation" |
-| < 5 | insufficient_evidence | "Insufficient evidence for current prioritization; data gaps should be addressed" |
+| ≥ 15 | `classification == "validated_target"` | "Strong validated target with substantial clinical evidence supporting drug development" |
+| 10-14 | `classification == "validated_target"` | "Promising target with moderate clinical and exploratory support warranting further investigation" |
+| 5-9 | `classification == "exploratory_target"` | "Early-stage target with exploratory evidence requiring additional validation" |
+| 5-9 | `classification == "novel_candidate"` | "Novel target from spatial transcriptomics; biological plausibility supports further validation" |
+| &lt; 5 | `classification == "insufficient_evidence"` | "Insufficient evidence for current prioritization; data gaps should be addressed" |
 
 | Priority | Recommendation Template |
 |---|---|
@@ -133,7 +143,7 @@ introduces fabrication risk because the LLM fills gaps from training data.
 
 ### E. Biological Interaction Filter Results (Section 2.1)
 - This section is PRE-FILLED by the template — the table and legend are code-generated
-- Your ONLY job is to expand the `<!-- EXPAND -->` marker with 2-3 sentences interpreting:
+- Your ONLY job is to expand the `&lt;!-- EXPAND --&gt;` marker with 2-3 sentences interpreting:
   - How many L-R pairs passed vs. failed Stage 1 validation
   - Which biological signals (STRING PPI, Census coexpression) drove pass/fail decisions
   - What the filter results imply for target prioritization
@@ -167,7 +177,7 @@ when generating scientific reports. Each rule addresses an observed failure mode
 
 ## EXPAND Marker Rules
 
-- Each `<!-- EXPAND: {instruction} -->` MUST be replaced with 2-4 sentences
+- Each `&lt;!-- EXPAND: {instruction} --&gt;` MUST be replaced with 2-4 sentences
 - Sentences MUST reference data visible in the SAME section
 - Do NOT cross-reference data from other gene sections
 - Use hedged language ("suggests", "indicates", "consistent with") for interpretations
@@ -210,34 +220,90 @@ showing promise in fibrotic diseases.
 ```
 Why wrong: zanubrutinib targets BTK, not CD4, and is not in the Reference Card.
 
+### Example 3: Correct "Data Not Available" Handling
+
+When Reference Card has `clinical_drugs: []` and `gwas_variants: 0`, do not fill the gap with general knowledge. Report the absence explicitly.
+
+**Pre-filled draft fragment:**
+```
+### COL1A1 — Classification: exploratory_target | Priority: medium
+
+**A. Drug Profile**
+**Clinical Compounds:** (none)
+**Preclinical Compounds:** (none)
+
+**GWAS Catalog Associations:** 0 variants
+```
+
+**Correctly expanded:**
+```
+No clinical compounds are listed in ChEMBL or OpenTargets for COL1A1, and GWAS Catalog
+reports no variants associated with the target disease. This evidence gap warrants
+primary screening rather than repurposing; extracellular matrix proteins are historically
+challenging to drug with small molecules, which is consistent with the empty drug
+landscape here.
+```
+Why correct: every factual claim is anchored to the Reference Card's explicit zeros; the final sentence hedges ("is consistent with") without asserting unsupported mechanism.
+
+### Example 4: Hedged vs Definitive Language
+
+Use definitive verbs ("has", "shows", "contains") ONLY for pre-filled Reference Card data. Use hedged verbs ("suggests", "indicates", "consistent with") for LLM-generated narrative interpretation.
+
+**Correct mix (COL1A1 Biological Context):**
+```
+STRING combined score **has** a value of 0.82 for COL1A1-ITGB1 (pre-filled). Census
+co-expression p-value **shows** 1.2e-4 across fibroblast populations (pre-filled).
+Together these signals **suggest** that COL1A1-ITGB1 interaction is active in the
+fibrotic niche and **are consistent with** a role in ECM remodeling.
+```
+Why correct: numeric values use "has"/"shows" (definitive, anchored to data); biological interpretation uses "suggest"/"consistent with" (hedged, flags as LLM inference).
+
+**Incorrect (inverted hedging):**
+```
+STRING combined score **suggests** ~0.82 for COL1A1-ITGB1. Census co-expression
+p-value **indicates** roughly 1.2e-4. These signals **confirm** that COL1A1-ITGB1
+**drives** fibrosis.
+```
+Why wrong: hedges the factual data ("~0.82", "roughly 1.2e-4") as if uncertain, then upgrades LLM inference ("confirm", "drives") to definitive — the exact inversion that fuels hallucination.
+
 ## Quality Self-Check
 
 Before saving the final drug.md, verify:
 - [ ] Every score in the druggability matrix matches Reference Card
 - [ ] Every classification label matches Reference Card
-- [ ] Every PMID appears in the Reference Card pmids array
 - [ ] Every drug name appears in the Reference Card drugs list
-- [ ] No `<!-- EXPAND -->` markers remain unexpanded
+- [ ] No `&lt;!-- EXPAND --&gt;` markers remain unexpanded
 - [ ] GWAS values are exactly as in Reference Card (likely 0)
 - [ ] All deep dive sections have content (not "Data not available" if data exists)
+- [ ] `combined_total` equals `validated_total + exploratory_total` (no arithmetic drift)
+- [ ] Disease phase reported is for the TARGET indication (not an approved different indication)
+- [ ] `safety_profile` sign preserved (negative scores not rendered as positive)
+- [ ] Cell types cited appear in `stage1_pairs` (not inferred from general knowledge)
 
 ## Troubleshooting
 
 ### `build_evidence_summary` returns error
 **Cause:** Missing evidence files (assessment_results.json, stage3_*.json)
-**Solution:** Verify evidence_assessor and deep_diver completed. Run `load_evidence_files(data_dir)` to check file list.
-
-### `validate_drug_md` reports FABRICATED_PMID
-**Cause:** A PMID in drug.md is not in the Reference Card
-**Solution:** Remove the fabricated PMID. Replace with one from the Reference Card pmids array, or write "No citation available."
+**Solution:** Verify evidence_assessor completed Stages 1-3. Run `load_evidence_files(data_dir)` to check file list.
 
 ### `validate_drug_md` reports WRONG_CLASSIFICATION
 **Cause:** Classification label doesn't match assessment_results.json
 **Solution:** Copy the exact classification string from the Reference Card rubric object.
 
-### Remaining `<!-- EXPAND -->` markers after save
+### Remaining `&lt;!-- EXPAND --&gt;` markers after save
 **Cause:** Some EXPAND markers were not replaced
-**Solution:** Search for `<!-- EXPAND` in the document and replace each with 2-4 sentences per the instruction.
+**Solution:** Search for `&lt;!-- EXPAND` in the document and replace each with 2-4 sentences per the instruction.
 
-Consult `references/scoring_guide.md` for detailed calibration tables and
-evidence interpretation guidelines.
+### `validate_drug_md` reports WRONG_SCORE
+**Cause:** A numeric score in drug.md does not match the Reference Card `rubric` object (e.g., CD4 assessment_results.json = 16 but drug.md renders 9 — the pattern that originally motivated this skill).
+**Solution:** Re-read the Reference Card `rubric` for the flagged gene, copy each integer verbatim (no rounding, no re-deriving from components), and re-save. Do not reinterpret — the pre-computed value is authoritative.
+
+### `validate_drug_md` reports FABRICATED_DRUG
+**Cause:** A drug name in drug.md does not appear in Reference Card `stage3.clinical_drugs` or `stage3.preclinical_compounds`.
+**Solution:** Remove the fabricated drug. If the Reference Card lists no drugs for the gene, write "No known drugs identified in ChEMBL or OpenTargets for this gene" — never substitute a remembered drug name.
+
+### Validation loop diverges (repeated `validate_drug_md` failures)
+**Cause:** Re-save attempts keep failing validation. The underlying data gap or contradiction cannot be resolved by rewriting narrative.
+**Solution:** After 3 consecutive re-save attempts on the same gene or section, STOP. Return the list of unresolved issues to the orchestrator with each issue's type, affected gene, and the Reference Card excerpt you were trying to honor. Do not loop indefinitely — upstream evidence must be corrected before the report can pass.
+
+`references/scoring_guide.md` is a **REQUIRED read when** (a) a gene sits on a score boundary (e.g., combined_total = 10 or 5), (b) the classification label seems inconsistent with `combined_total`, or (c) the therapeutic recommendation requires explaining priority derivation. **OPTIONAL** otherwise. Call `read_skill_file("skills/drug-target-reporting/references/scoring_guide.md")` directly when the trigger conditions hold.

@@ -593,8 +593,8 @@ def apply_stage1_filter(data_dir: str) -> str:
 
     # 4. Update assessment_results.json (schema_version=3):
     # Single-field contract: `stage3_candidates` is overwritten IN PLACE with the
-    # intersection of (rubric >=10) AND (Stage 1 strict PASS). Both deep_diver and
-    # hypothesis_writer consume the same narrowed list.
+    # intersection of (rubric >=10) AND (Stage 1 strict PASS). Both
+    # evidence_assessor's Stage 3 loop and hypothesis_writer consume the same narrowed list.
     assessment_path = evidence_dir / "assessment_results.json"
     updated_assessment = False
     if assessment_path.exists():
@@ -1419,8 +1419,8 @@ def compute_rubric_scores(data_dir: str) -> str:
 
     # Save assessment_results.json (schema_version=3).
     # stage3_candidates is written here as the RUBRIC-QUALIFIED pool; apply_stage1_filter
-    # later overwrites it in place with the (rubric ∩ Stage 1 PASS) intersection so both
-    # deep_diver and hypothesis_writer consume the same narrowed list.
+    # later overwrites it in place with the (rubric ∩ Stage 1 PASS) intersection so
+    # evidence_assessor (Stage 3) and hypothesis_writer consume the same narrowed list.
     assessment = {
         "schema_version": 3,
         "assessment_date": datetime.now().isoformat(),
@@ -1610,7 +1610,7 @@ def validate_stage3_gate(data_dir: str) -> str:
     evidence_dir = data_dir_path / "evidence"
 
     # 1. Load stage3_candidates (single narrowed set — rubric ∩ Stage 1 PASS).
-    # Both deep_diver and hypothesis_writer run on this list.
+    # Evidence_assessor's Stage 3 loop and hypothesis_writer run on this list.
     assessment_path = evidence_dir / "assessment_results.json"
     if not assessment_path.exists():
         return json.dumps({
@@ -1916,12 +1916,6 @@ def _prebuild_target_assessment(
                     or _ot_safety_summary(evidence_dir, gene)
                     or "No safety data available"
                 ),
-                "latest_pubmed_insights": (
-                    ", ".join(
-                        str(p.get("pmid", "")) if isinstance(p, dict) else str(p)
-                        for p in s3.get("pmids", [])[:5]
-                    ) or None
-                ),
             },
             "stage1_biological_context": {
                 "string_ppi_score": string_score,
@@ -1951,7 +1945,7 @@ def build_evidence_summary(data_dir: str) -> str:
     """Build a Reference Card with exact values from all evidence files.
 
     Returns a structured JSON summary that report_writer MUST use as the
-    single source of truth for all numeric values, PMIDs, drug names,
+    single source of truth for all numeric values, drug names,
     classifications, and pathway names.
 
     ALL values in this card are authoritative — use them directly.
@@ -1991,18 +1985,18 @@ def build_evidence_summary(data_dir: str) -> str:
     _validated = assessment.get("stage3_candidates", [])
     stage3_genes = [g for c in _validated if (g := c.get("gene"))]
 
-    # 2. Load stage3_*.json → drugs + PMIDs per gene
+    # 2. Load stage3_*.json → drugs per gene
     stage3_data: dict[str, dict] = {}
     for gene in stage3_genes:
         s3_path = evidence_dir / f"stage3_{gene}.json"
         if not s3_path.exists():
-            stage3_data[gene] = {"drugs": [], "pmids": [], "error": "file not found"}
+            stage3_data[gene] = {"drugs": [], "error": "file not found"}
             continue
         try:
             s3 = json.loads(s3_path.read_text())
         except (json.JSONDecodeError, OSError) as exc:
             logger.warning("Corrupt stage3_%s.json: %s", gene, exc)
-            stage3_data[gene] = {"drugs": [], "pmids": [], "error": f"corrupt: {exc}"}
+            stage3_data[gene] = {"drugs": [], "error": f"corrupt: {exc}"}
             continue
         drugs = []
         # Try multiple keys: chembl_drugs (old format) or matched_drugs (new format)
@@ -2279,10 +2273,9 @@ def build_evidence_summary(data_dir: str) -> str:
         "instruction": (
             "This is the AUTHORITATIVE Reference Card with a PRE-FORMATTED MARKDOWN TEMPLATE. "
             "Use the `markdown_template` field as the SKELETON for drug.md. "
-            "The template contains all correct values (scores, PMIDs, drug names, pathways). "
+            "The template contains all correct values (scores, drug names, pathways). "
             "Your job: EXPAND each section with 2-4 sentences of biological interpretation. "
-            "Do NOT change any numbers, PMIDs, drug names, or classifications in the template. "
-            "Do NOT remove any PMID hyperlinks — they are all verified correct. "
+            "Do NOT change any numbers, drug names, or classifications in the template. "
             "ADD narrative around the pre-filled data to create a comprehensive report."
         ),
         "disease": disease_name,
@@ -2340,10 +2333,9 @@ def validate_drug_md(data_dir: str) -> str:
     """Validate drug.md against evidence files for hallucinations.
 
     Checks:
-    1. All PMIDs in drug.md exist in stage3_*.json pubmed_papers
-    2. Classification/priority labels match assessment_results.json
-    3. Drug names match stage3_*.json chembl_drugs
-    4. No fabricated numeric patterns (e.g. decimal rubric scores)
+    1. Classification/priority labels match assessment_results.json
+    2. Drug names match stage3_*.json chembl_drugs
+    3. No fabricated numeric patterns (e.g. decimal rubric scores)
 
     Returns: {valid: bool, total_checks: int, issues: [...]}
     Call this AFTER save_drug_md to catch hallucinations before finalizing.
@@ -2358,30 +2350,6 @@ def validate_drug_md(data_dir: str) -> str:
 
     drug_text = drug_md_path.read_text()
     issues: list[dict] = []
-
-    # 1. PMID validation
-    evidence_pmids: set[str] = set()
-    for s3_path in evidence_dir.glob("stage3_*.json"):
-        try:
-            s3 = json.loads(s3_path.read_text())
-            for p in s3.get("pubmed_papers", []):
-                pmid = str(p.get("pmid", "")).strip()
-                if pmid:
-                    evidence_pmids.add(pmid)
-        except Exception:
-            pass
-
-    # Find PMIDs in drug.md (patterns: PMID 12345678, PMID: 12345678, (PMID: 12345678))
-    doc_pmids = set(re.findall(r'(?:PMID[:\s]*|pmid[:\s]*)(\d{7,8})', drug_text))
-    fabricated_pmids = doc_pmids - evidence_pmids
-    if fabricated_pmids:
-        issues.append({
-            "type": "FABRICATED_PMID",
-            "severity": "critical",
-            "count": len(fabricated_pmids),
-            "fabricated": sorted(fabricated_pmids),
-            "valid_pmids": sorted(evidence_pmids),
-        })
 
     # 2. Classification/Priority validation
     # drug.md FEATURED Deep Dive section is keyed on stage3_candidates (post Stage 1 narrowing).
@@ -2594,7 +2562,7 @@ def validate_drug_md(data_dir: str) -> str:
         re.IGNORECASE,
     )
     citation_pattern = re.compile(
-        r"(?:\.json|\[from\s+[^\]]+\]|PMID[:\s]*\d|stage[123]_[A-Za-z0-9_\-]+)",
+        r"(?:\.json|\[from\s+[^\]]+\]|stage[123]_[A-Za-z0-9_\-]+)",
         re.IGNORECASE,
     )
     uncited_quant: list[str] = []
@@ -2629,19 +2597,16 @@ def validate_drug_md(data_dir: str) -> str:
             "detail": (
                 "Lines contain precise statistics (p-value=, OR=, HR=, "
                 "logFC=) without citing an evidence file. Every such line "
-                "MUST reference either an evidence filename (e.g. "
-                "stage2_evidence.json, ot_<GENE>.json) or a PMID. Uncited "
+                "MUST reference an evidence filename (e.g. "
+                "stage2_evidence.json, ot_<GENE>.json). Uncited "
                 "statistics are treated as hallucinated."
             ),
         })
 
-    total_checks = len(doc_pmids) + 9  # PMIDs + classification + decimals + columns + approval + phase + hypothesis + expand + quant
+    total_checks = 9  # classification + decimals + columns + approval + phase + hypothesis + expand + quant
     return json.dumps({
         "valid": len(issues) == 0,
         "total_checks": total_checks,
-        "pmids_in_doc": len(doc_pmids),
-        "pmids_in_evidence": len(evidence_pmids),
-        "fabricated_pmid_count": len(fabricated_pmids) if fabricated_pmids else 0,
         "issue_count": len(issues),
         "issues": issues,
     }, indent=2)
