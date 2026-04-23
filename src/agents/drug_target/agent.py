@@ -118,23 +118,25 @@ class DrugTargetConfig:
     enable_census: bool = True
     enable_progressive_disclosure: bool = True
     agent_skill_names: tuple[str, ...] = (
+        "drug-target-hypothesis",
+        "drug-target-reporting",
         "opentargets-database",
         "gwas-database",
         "chembl-database",
-        "string-database",
-        "cellxgene-census",
-        "compare-census-gene-pair-by-cell-type",
     )
-    evidence_assessor_skill_names: tuple[str, ...] = (
+    evidence_assessor_skill_names: tuple[str, ...] = ()
+    hypothesis_writer_skill_names: tuple[str, ...] = (
+        "drug-target-hypothesis",
         "opentargets-database",
         "gwas-database",
         "chembl-database",
-        "string-database",
-        "cellxgene-census",
-        "compare-census-gene-pair-by-cell-type",
     )
-    hypothesis_writer_skill_names: tuple[str, ...] = ("drug-target-hypothesis",)
-    report_writer_skill_names: tuple[str, ...] = ("drug-target-reporting",)
+    report_writer_skill_names: tuple[str, ...] = (
+        "drug-target-reporting",
+        "opentargets-database",
+        "gwas-database",
+        "chembl-database",
+    )
     skills_dir: str | None = None
     subagent_models: dict[str, str] | None = None
     # init_chat_model format per subagent, e.g.:

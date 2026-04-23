@@ -274,8 +274,6 @@ def get_subagents(
                     "`list_census_cell_types`, `run_compare_census_lr_pair`, "
                     "`run_batch_census_lr_pairs`) are NOT available in this run.\n"
                     "- Skip Phase 0 Census disease/cell-type matching entirely.\n"
-                    "- Skip the `cellxgene-census` and "
-                    "`compare-census-gene-pair-by-cell-type` skill guides.\n"
                     "- In Stage 1, rely on STRING-only validation via run_stage1_batch(enable_census=false).\n"
                     "- Do NOT call query_cellxgene_lr_context, run_compare_census_lr_pair, "
                     "or run_batch_census_lr_pairs.\n"

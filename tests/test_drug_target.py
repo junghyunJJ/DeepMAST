@@ -213,10 +213,12 @@ class TestSubagentConfigs:
         assert "rubric" in prompt.lower() or "RUBRIC" in prompt
         assert "validated" in prompt.lower()
         assert "exploratory" in prompt.lower()
-        assert "skills/string-database/SKILL.md" in prompt
-        assert "skills/cellxgene-census/SKILL.md" in prompt
-        assert "skills/compare-census-gene-pair-by-cell-type/SKILL.md" in prompt
-        assert "skills/chembl-database/SKILL.md" in prompt
+        # evidence_assessor is tool-driven: no hard-coded skill reads in prompt.
+        # Skill activation is delegated to SkillActivator on interpretive subagents.
+        assert "skills/string-database/SKILL.md" not in prompt
+        assert "skills/cellxgene-census/SKILL.md" not in prompt
+        assert "skills/compare-census-gene-pair-by-cell-type/SKILL.md" not in prompt
+        assert "skills/chembl-database/SKILL.md" not in prompt
         assert "KEGG" not in prompt
         assert "Reactome" not in prompt
 
@@ -2890,7 +2892,7 @@ class TestIntegration:
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
-    def test_create_drug_target_agent_attaches_skills_to_evidence_assessor(
+    def test_create_drug_target_agent_attaches_skills_to_interpretive_subagents_only(
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
@@ -2911,35 +2913,39 @@ class TestIntegration:
         assert "WriteFileArgGuardMiddleware" in mw_names
         assert "ReadFileBlockMiddleware" in mw_names
         assert "SubagentErrorGuardMiddleware" in mw_names
-        # Primary subagents use allow-listed shared SkillsMiddleware + SkillActivator.
+        # evidence_assessor is tool-driven: no SkillsMiddleware / SkillActivator.
+        # Skills live on the interpretive subagents (hypothesis_writer, report_writer)
+        # — production is aligned with the 93.9% F1 benchmark registry (OT + GWAS + ChEMBL).
         subagents = call_kwargs.get("subagents", [])
         ea = next(s for s in subagents if s["name"] == "evidence_assessor")
         ea_mw = ea.get("middleware", [])
         assert "skills" not in ea
-        assert any(isinstance(m, SkillsMiddleware) for m in ea_mw)
-        ea_activator = next(m for m in ea_mw if isinstance(m, SkillActivator))
-        assert set(ea_activator.skill_registry) == {
-            "opentargets-database",
-            "gwas-database",
-            "chembl-database",
-            "string-database",
-            "cellxgene-census",
-            "compare-census-gene-pair-by-cell-type",
-        }
+        assert not any(isinstance(m, SkillsMiddleware) for m in ea_mw)
+        assert not any(isinstance(m, SkillActivator) for m in ea_mw)
 
         hw = next(s for s in subagents if s["name"] == "hypothesis_writer")
         hw_mw = hw.get("middleware", [])
         assert "skills" not in hw
         assert any(isinstance(m, SkillsMiddleware) for m in hw_mw)
         hw_activator = next(m for m in hw_mw if isinstance(m, SkillActivator))
-        assert set(hw_activator.skill_registry) == {"drug-target-hypothesis"}
+        assert set(hw_activator.skill_registry) == {
+            "drug-target-hypothesis",
+            "opentargets-database",
+            "gwas-database",
+            "chembl-database",
+        }
 
         rw = next(s for s in subagents if s["name"] == "report_writer")
         rw_mw = rw.get("middleware", [])
         assert "skills" not in rw
         assert any(isinstance(m, SkillsMiddleware) for m in rw_mw)
         rw_activator = next(m for m in rw_mw if isinstance(m, SkillActivator))
-        assert set(rw_activator.skill_registry) == {"drug-target-reporting"}
+        assert set(rw_activator.skill_registry) == {
+            "drug-target-reporting",
+            "opentargets-database",
+            "gwas-database",
+            "chembl-database",
+        }
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
@@ -3000,37 +3006,6 @@ class TestIntegration:
             mw = s.get("middleware", [])
             assert not any(isinstance(m, SkillActivator) for m in mw)
             assert not any(isinstance(m, SkillsMiddleware) for m in mw)
-
-    @patch("src.agents.drug_target.agent.create_deep_agent")
-    @patch("src.agents.drug_target.agent.create_llm")
-    def test_create_drug_target_agent_drops_census_skills_when_census_disabled(
-        self, mock_create_llm, mock_create_deep_agent, tmp_path
-    ):
-        from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
-        from src.agents.shared.skill_activator import SkillActivator
-
-        mock_create_llm.return_value = MagicMock()
-        mock_create_deep_agent.return_value = MagicMock()
-
-        config = DrugTargetConfig(
-            data_dir=str(tmp_path),
-            enable_census=False,
-        )
-        create_drug_target_agent(config)
-
-        call_kwargs = mock_create_deep_agent.call_args.kwargs
-        subagents = call_kwargs.get("subagents", [])
-        ea = next(s for s in subagents if s["name"] == "evidence_assessor")
-        ea_activator = next(
-            m for m in ea.get("middleware", []) if isinstance(m, SkillActivator)
-        )
-        assert set(ea_activator.skill_registry) == {
-            "opentargets-database",
-            "gwas-database",
-            "chembl-database",
-            "string-database",
-        }
-
 
 # =========================================================================
 # 9. TestCensusDiseaseTool — list_census_diseases + disease_matched flag
@@ -3188,16 +3163,29 @@ class TestCensusDiseaseTool:
         # disease_matched is now handled internally by run_stage1_batch
         assert "run_stage1_batch" in EVIDENCE_ASSESSOR_PROMPT or "disease_matched" in EVIDENCE_ASSESSOR_PROMPT
 
-    def test_evidence_assessor_prompt_mentions_selected_skill_reads(self):
-        """Prompt contains stage-specific progressive disclosure guidance."""
+    def test_evidence_assessor_prompt_has_no_hardcoded_skill_reads(self):
+        """Regression guard: evidence_assessor is tool-driven — its static prompt
+        must not contain hard-coded skill reads or skill slugs. Skills live on the
+        interpretive subagents (hypothesis_writer, report_writer); evidence_assessor
+        calls only the batch-orchestrator tools."""
         from src.agents.drug_target.subagents.prompts import EVIDENCE_ASSESSOR_PROMPT
 
-        assert "read_skill_file" in EVIDENCE_ASSESSOR_PROMPT
+        assert "read_skill_file" not in EVIDENCE_ASSESSOR_PROMPT
+        for slug in (
+            "opentargets-database",
+            "gwas-database",
+            "chembl-database",
+            "string-database",
+            "cellxgene-census",
+            "compare-census-gene-pair-by-cell-type",
+            "drug-target-hypothesis",
+            "drug-target-reporting",
+        ):
+            assert slug not in EVIDENCE_ASSESSOR_PROMPT, f"Unexpected skill slug: {slug}"
+        # Tool names must still be present
         assert "query_stage2_gene_panel" in EVIDENCE_ASSESSOR_PROMPT
-        assert "opentargets-database" in EVIDENCE_ASSESSOR_PROMPT
-        assert "gwas-database" in EVIDENCE_ASSESSOR_PROMPT
-        assert "chembl-database" in EVIDENCE_ASSESSOR_PROMPT
-        assert "cellxgene-census" in EVIDENCE_ASSESSOR_PROMPT
+        assert "run_stage1_batch" in EVIDENCE_ASSESSOR_PROMPT
+        assert "query_chembl_target_profile" in EVIDENCE_ASSESSOR_PROMPT
 
     def test_report_writer_prompt_contains_skill_read(self):
         """Phase H1: REPORT_WRITER_PROMPT must hardcode read_skill_file for drug-target-reporting.

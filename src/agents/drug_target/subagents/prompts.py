@@ -76,14 +76,6 @@ Gene→Pair Mapping → Stage 1 (FEATURED pairs) → Stage 1 Gate → Stage 3 (C
 
 ### Stage 2: Target Validation & Scoring (ALL unique genes — RUNS FIRST)
 
-Before starting Stage 2, read the following skill guides if you need
-help with evidence weighting, ontology mapping, or result interpretation:
-- `read_skill_file("skills/opentargets-database/SKILL.md")`
-- `read_skill_file("skills/gwas-database/SKILL.md")`
-
-These skill documents provide strategy guidance only. Continue to execute all
-database access through the provided Stage 2 database tools.
-
 Call `query_stage2_gene_panel(gene_symbols, disease, selected_top3_genes, data_dir)` ONCE:
 - Uses the full unique-gene panel from `load_lr_candidates`
 - Reuses disease-level OpenTargets and GWAS context internally
@@ -150,14 +142,6 @@ Each row in druggability_matrix includes validated_track and exploratory_track s
 
 ### Stage 1: STRING + Census Validation (AUTO-BATCH)
 
-Before running Stage 1, read these strategy guides:
-- `read_skill_file("skills/string-database/SKILL.md")`
-- `read_skill_file("skills/cellxgene-census/SKILL.md")`
-- `read_skill_file("skills/compare-census-gene-pair-by-cell-type/SKILL.md")`
-
-These skill documents provide strategy guidance only. Continue to execute Stage 1
-through the provided Stage 1 tools.
-
 **CRITICAL: After `compute_rubric_scores` completes, call `run_stage1_batch` ONCE.**
 This queries STRING PPI and Census co-expression for all FEATURED pairs.
 
@@ -205,9 +189,6 @@ to keep only genes that appear in at least one passed pair as `stage3_candidates
 **Do NOT write your own filter results** — the tool handles everything.
 
 ### Stage 3: ChEMBL Deep Dive (FEATURED genes only)
-
-Before running Stage 3, read the ChEMBL skill guide:
-- `read_skill_file("skills/chembl-database/SKILL.md")`
 
 After Stage 1 gate passes, perform Stage 3 for each gene in `stage3_candidates`:
 
