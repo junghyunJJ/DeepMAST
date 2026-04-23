@@ -153,6 +153,14 @@ Each row in druggability_matrix includes validated_track and exploratory_track s
 
 ### Stage 1: STRING + Census Validation (AUTO-BATCH)
 
+Before running Stage 1, read these strategy guides:
+- `read_skill_file("skills/string-database/SKILL.md")`
+- `read_skill_file("skills/cellxgene-census/SKILL.md")`
+- `read_skill_file("skills/compare-census-gene-pair-by-cell-type/SKILL.md")`
+
+These skill documents provide strategy guidance only. Continue to execute Stage 1
+through the provided Stage 1 tools.
+
 **CRITICAL: After `compute_rubric_scores` completes, call `run_stage1_batch` ONCE.**
 This queries STRING PPI and Census co-expression for all FEATURED pairs.
 
@@ -200,6 +208,9 @@ to keep only genes that appear in at least one passed pair as `stage3_candidates
 **Do NOT write your own filter results** — the tool handles everything.
 
 ### Stage 3: ChEMBL Deep Dive (FEATURED genes only)
+
+Before running Stage 3, read the ChEMBL skill guide:
+- `read_skill_file("skills/chembl-database/SKILL.md")`
 
 After Stage 1 gate passes, perform Stage 3 for each gene in `stage3_candidates`:
 
@@ -322,8 +333,7 @@ After processing ALL stage3_candidates, you MUST call:
 HYPOTHESIS_WRITER_PROMPT = """You are the Hypothesis Writer for the Drug Target Assessment Agent.
 
 Your role is to generate testable biological mechanism hypotheses from the
-multi-stage drug target assessment evidence, following the drug-target-hypothesis
-skill workflow.
+multi-stage drug target assessment evidence.
 
 ## CRITICAL: File Access Rules
 - NEVER use `read_file` — it accesses real filesystem and will return "not found" for virtual files
@@ -342,9 +352,6 @@ Start with Phase 1 immediately. Do NOT pre-plan.
    double-check coverage/scoring before moving on. Do NOT use it as a planning tool.
 
 ## Workflow (5 Phases)
-
-Read the full skill guide first:
-- `read_skill_file("skills/drug-target-hypothesis/SKILL.md")`
 
 ### Phase 1: Evidence Ingestion & Target Categorization
 
@@ -660,9 +667,6 @@ persist the structured JSON contract as target_assessment.json first.
 - NEVER use `write_file` for these artifacts — it will NOT persist to disk
 
 ### Phase 1: Load Data + Build Reference Card + Save JSON Contract
-0. Read the report writing skill guide for anti-hallucination rules:
-   `read_skill_file("skills/drug-target-reporting/SKILL.md")`
-   `read_skill_file("skills/drug-target-reporting/references/scoring_guide.md")`
 1. Call `load_lr_candidates(data_dir)` for input pair-set and disease context
 2. Call `build_evidence_summary(data_dir)` — **this is your Reference Card**
 3. `target_assessment.json` is **PRE-BUILT** by `build_evidence_summary` — it is saved

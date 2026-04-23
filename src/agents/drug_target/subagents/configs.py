@@ -38,8 +38,7 @@ from src.agents.drug_target.tools import (
     # Stage 1: Biological Context (FEATURED pairs only)
     query_cellxgene_lr_context,
     list_census_diseases,
-    query_kegg_pathways,
-    query_reactome_pathways,
+    list_census_cell_types,
     query_string_ppi_pair,
     run_compare_census_lr_pair,
     run_batch_census_lr_pairs,
@@ -81,7 +80,7 @@ SUBAGENT_CONFIGS = {
         "description": (
             "3-stage funnel: Stage 2 first (all genes: OpenTargets/GWAS) -> "
             "rubric scoring (combined_total >= 10) -> gene selection -> "
-            "Stage 1 (FEATURED pairs only: Cellxgene, KEGG/Reactome, STRING, Census) -> "
+            "Stage 1 (FEATURED pairs only: Cellxgene, STRING, Census) -> "
             "Stage 1 gate validation -> Stage 3 (ChEMBL drug profiles for FEATURED genes). "
             "Includes inline rubric assessment via compute_rubric_scores. "
             "Uses Plan->Execute->Reflect cycle per stage. "
@@ -95,14 +94,13 @@ SUBAGENT_CONFIGS = {
             load_evidence_files,
             # Phase 0: Disease vocabulary matching
             list_census_diseases,
+            list_census_cell_types,
             # Stage 2: Target Validation (runs FIRST — batch all genes)
             query_stage2_gene_panel,
             query_ensembl_vep_consequence,
             compute_rubric_scores,
             # Stage 1: Biological Context (FEATURED pairs only, after gene selection)
             query_cellxgene_lr_context,
-            query_kegg_pathways,
-            query_reactome_pathways,
             query_string_ppi_pair,
             run_compare_census_lr_pair,
             run_batch_census_lr_pairs,
@@ -208,7 +206,7 @@ Drug Target Assessment 3-Agent Workflow (Staged Funnel):
      -> Inline DRUG_TARGET_RUBRIC scoring (compute_rubric_scores)
      -> Gene selection (combined_total >= 10) → FEATURED genes
      -> Gene→Pair mapping to identify FEATURED L-R pairs
-   Stage 1 (FEATURED pairs ONLY): Cellxgene + KEGG/Reactome + STRING + Census
+   Stage 1 (FEATURED pairs ONLY): Cellxgene + STRING + Census
      -> Stage 1 gate validation (validate_stage1_gate)
    Stage 3 (FEATURED genes, inline): ChEMBL drug profiles
      -> stage3_{GENE}.json per gene (idempotent, skips completed genes)
@@ -253,6 +251,9 @@ def get_subagents(
     enable_census: bool = True,
     skills_sources: list[str] | None = None,
     skill_registry: dict[str, str] | None = None,
+    skills_dir: str | None = None,
+    subagent_skill_names: dict[str, tuple[str, ...]] | None = None,
+    subagent_skill_registries: dict[str, dict[str, str]] | None = None,
 ) -> list[dict]:
     """Get the subagent configurations for Drug Target Assessment.
 
@@ -270,8 +271,11 @@ def get_subagents(
         model_overrides: Optional per-subagent model overrides.
             Keys are subagent names, values are init_chat_model format strings
             (e.g. "openai:gpt-4.1") or BaseChatModel instances.
-        skills_sources: Native skill discovery paths for evidence_assessor and deep_diver.
-        skill_registry: Skill name → directory path mapping for SkillActivator.
+        skills_sources: Legacy deepagents-native skill source paths.
+        skill_registry: Legacy shared SkillActivator registry.
+        skills_dir: Project skills directory for allow-listed SkillsMiddleware.
+        subagent_skill_names: Per-subagent allowed skill tuples.
+        subagent_skill_registries: Per-subagent registries for SkillActivator.
 
     Returns:
         List of subagent configuration dictionaries
@@ -298,12 +302,14 @@ def get_subagents(
                 subagent["system_prompt"] += (
                     "\n\n## Census API: DISABLED\n"
                     "Census tools (`query_cellxgene_lr_context`, `list_census_diseases`, "
-                    "`run_compare_census_lr_pair`, `run_batch_census_lr_pairs`) are NOT available in this run.\n"
-                    "- In Stage 1 Batch 1: call ONLY query_kegg_pathways, "
-                    "query_reactome_pathways, query_string_ppi_pair.\n"
-                    "- Skip steps (a) and (d) entirely.\n"
-                    "- Skip Batch 2 (Census cross-validation).\n"
-                    "- In finalize_stage1_artifacts, set `rerun_missing_census=false`.\n"
+                    "`list_census_cell_types`, `run_compare_census_lr_pair`, "
+                    "`run_batch_census_lr_pairs`) are NOT available in this run.\n"
+                    "- Skip Phase 0 Census disease/cell-type matching entirely.\n"
+                    "- Skip the `cellxgene-census` and "
+                    "`compare-census-gene-pair-by-cell-type` skill guides.\n"
+                    "- In Stage 1, rely on STRING-only validation via run_stage1_batch(enable_census=false).\n"
+                    "- Do NOT call query_cellxgene_lr_context, run_compare_census_lr_pair, "
+                    "or run_batch_census_lr_pairs.\n"
                 )
 
     # Apply per-subagent model overrides
@@ -343,8 +349,33 @@ def get_subagents(
         mw.insert(0, WriteFileArgGuardMiddleware())
         subagent["middleware"] = mw
 
-    # Apply skills to evidence_assessor and deep_diver (they do DB queries)
-    if skills_sources:
+    # Primary subagents use allow-listed shared SkillsMiddleware + SkillActivator.
+    # Do NOT set `subagent["skills"]` in this path; deepagents would auto-attach
+    # its native SkillsMiddleware and defeat the allow-list.
+    if skills_dir and subagent_skill_names and subagent_skill_registries:
+        from src.agents.shared.skill_activator import SkillActivator
+        from src.agents.shared.skills_middleware import SkillsMiddleware
+
+        for subagent in subagents:
+            allowed_names = subagent_skill_names.get(subagent["name"])
+            if not allowed_names:
+                continue
+            mw = list(subagent.get("middleware", []))
+            mw.append(
+                SkillsMiddleware(
+                    skills_dir=skills_dir,
+                    allowed_skill_names=allowed_names,
+                )
+            )
+            mw.append(
+                SkillActivator(
+                    skill_registry=subagent_skill_registries.get(subagent["name"], {}),
+                )
+            )
+            subagent["middleware"] = mw
+    elif skills_sources:
+        # Legacy path retained for callers that still use deepagents native
+        # skill auto-loading.
         _skill_subagents = {"evidence_assessor", "deep_diver", "report_writer"}
         for subagent in subagents:
             if subagent["name"] in _skill_subagents:

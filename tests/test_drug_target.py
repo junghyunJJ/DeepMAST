@@ -163,8 +163,7 @@ class TestSubagentConfigs:
             "sequential_thinking",
             "query_cellxgene_lr_context",
             "list_census_diseases",
-            "query_kegg_pathways",
-            "query_reactome_pathways",
+            "list_census_cell_types",
             "query_string_ppi_pair",
             "query_stage2_gene_panel",
             "query_ensembl_vep_consequence",
@@ -214,6 +213,12 @@ class TestSubagentConfigs:
         assert "rubric" in prompt.lower() or "RUBRIC" in prompt
         assert "validated" in prompt.lower()
         assert "exploratory" in prompt.lower()
+        assert "skills/string-database/SKILL.md" in prompt
+        assert "skills/cellxgene-census/SKILL.md" in prompt
+        assert "skills/compare-census-gene-pair-by-cell-type/SKILL.md" in prompt
+        assert "skills/chembl-database/SKILL.md" in prompt
+        assert "KEGG" not in prompt
+        assert "Reactome" not in prompt
 
     def test_evidence_assessor_prompt_mentions_3_stages(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -221,7 +226,20 @@ class TestSubagentConfigs:
         assert "Stage 1" in prompt
         assert "Stage 2" in prompt
         assert "Stage 3" in prompt
-        assert "3-Stage Funnel" in prompt
+
+    def test_hypothesis_writer_prompt_uses_no_direct_skill_read(self):
+        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
+
+        prompt = SUBAGENT_CONFIGS["hypothesis_writer"]["system_prompt"]
+        assert 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")' not in prompt
+
+    def test_report_writer_prompt_uses_no_direct_skill_read(self):
+        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
+
+        prompt = SUBAGENT_CONFIGS["report_writer"]["system_prompt"]
+        assert 'read_skill_file("skills/drug-target-reporting/SKILL.md")' not in prompt
+        assert 'read_skill_file("skills/drug-target-reporting/references/scoring_guide.md")' not in prompt
+        assert "Reference Card" in prompt
 
     def test_evidence_assessor_has_stage3_tools(self):
         """Stage 3 ChEMBL tools now run inline inside evidence_assessor (v5 merge)."""
@@ -287,7 +305,7 @@ class TestSubagentConfigs:
         assert "read_skill_file" in names
         assert "save_evidence" in names
         assert "think_tool" in names
-        assert "sequential_thinking" in names
+        assert "sequential_thinking" not in names
 
     def test_hypothesis_writer_has_no_db_tools(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -2753,7 +2771,7 @@ class TestIntegration:
     def test_drug_target_config_defaults(self):
         from src.agents.drug_target.agent import DrugTargetConfig
         config = DrugTargetConfig()
-        assert config.provider == "openrouter"
+        assert config.provider == "ollama"
         assert config.use_checkpointer is False
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
@@ -2776,7 +2794,7 @@ class TestIntegration:
         # Agent is now wrapped with .with_config(recursion_limit=2000)
         assert agent is mock_agent.with_config.return_value
         assert isinstance(backend, FilesystemBackend)
-        mock_create_llm.assert_called_once_with(provider="openrouter")
+        mock_create_llm.assert_called_once_with(provider="ollama")
         mock_create_deep_agent.assert_called_once()
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
@@ -2904,6 +2922,8 @@ class TestIntegration:
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
+        from src.agents.shared.skill_activator import SkillActivator
+        from src.agents.shared.skills_middleware import SkillsMiddleware
 
         mock_create_llm.return_value = MagicMock()
         mock_create_deep_agent.return_value = MagicMock()
@@ -2919,13 +2939,35 @@ class TestIntegration:
         assert "WriteFileArgGuardMiddleware" in mw_names
         assert "ReadFileBlockMiddleware" in mw_names
         assert "SubagentErrorGuardMiddleware" in mw_names
-        # evidence_assessor subagent has skills attached
+        # Primary subagents use allow-listed shared SkillsMiddleware + SkillActivator.
         subagents = call_kwargs.get("subagents", [])
         ea = next(s for s in subagents if s["name"] == "evidence_assessor")
-        assert "skills" in ea
-        # report_writer has NO skills
+        ea_mw = ea.get("middleware", [])
+        assert "skills" not in ea
+        assert any(isinstance(m, SkillsMiddleware) for m in ea_mw)
+        ea_activator = next(m for m in ea_mw if isinstance(m, SkillActivator))
+        assert set(ea_activator.skill_registry) == {
+            "opentargets-database",
+            "gwas-database",
+            "chembl-database",
+            "string-database",
+            "cellxgene-census",
+            "compare-census-gene-pair-by-cell-type",
+        }
+
+        hw = next(s for s in subagents if s["name"] == "hypothesis_writer")
+        hw_mw = hw.get("middleware", [])
+        assert "skills" not in hw
+        assert any(isinstance(m, SkillsMiddleware) for m in hw_mw)
+        hw_activator = next(m for m in hw_mw if isinstance(m, SkillActivator))
+        assert set(hw_activator.skill_registry) == {"drug-target-hypothesis"}
+
         rw = next(s for s in subagents if s["name"] == "report_writer")
+        rw_mw = rw.get("middleware", [])
         assert "skills" not in rw
+        assert any(isinstance(m, SkillsMiddleware) for m in rw_mw)
+        rw_activator = next(m for m in rw_mw if isinstance(m, SkillActivator))
+        assert set(rw_activator.skill_registry) == {"drug-target-reporting"}
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
@@ -2934,6 +2976,7 @@ class TestIntegration:
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
         from src.agents.shared.skill_activator import SkillActivator
+        from src.agents.shared.skills_middleware import SkillsMiddleware
 
         mock_create_llm.return_value = MagicMock()
         mock_create_deep_agent.return_value = MagicMock()
@@ -2958,6 +3001,63 @@ class TestIntegration:
             assert "skills" not in s
             mw = s.get("middleware", [])
             assert not any(isinstance(m, SkillActivator) for m in mw)
+            assert not any(isinstance(m, SkillsMiddleware) for m in mw)
+
+    @patch("src.agents.drug_target.agent.create_deep_agent")
+    @patch("src.agents.drug_target.agent.create_llm")
+    def test_create_drug_target_agent_disables_skill_loading_in_docker_mode(
+        self, mock_create_llm, mock_create_deep_agent, tmp_path
+    ):
+        from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
+        from src.agents.shared.skill_activator import SkillActivator
+        from src.agents.shared.skills_middleware import SkillsMiddleware
+
+        mock_create_llm.return_value = MagicMock()
+        mock_create_deep_agent.return_value = MagicMock()
+
+        config = DrugTargetConfig(
+            data_dir=str(tmp_path),
+            docker_image="python:3.12-slim",
+        )
+        create_drug_target_agent(config)
+
+        call_kwargs = mock_create_deep_agent.call_args.kwargs
+        subagents = call_kwargs.get("subagents", [])
+        for s in subagents:
+            assert "skills" not in s
+            mw = s.get("middleware", [])
+            assert not any(isinstance(m, SkillActivator) for m in mw)
+            assert not any(isinstance(m, SkillsMiddleware) for m in mw)
+
+    @patch("src.agents.drug_target.agent.create_deep_agent")
+    @patch("src.agents.drug_target.agent.create_llm")
+    def test_create_drug_target_agent_drops_census_skills_when_census_disabled(
+        self, mock_create_llm, mock_create_deep_agent, tmp_path
+    ):
+        from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
+        from src.agents.shared.skill_activator import SkillActivator
+
+        mock_create_llm.return_value = MagicMock()
+        mock_create_deep_agent.return_value = MagicMock()
+
+        config = DrugTargetConfig(
+            data_dir=str(tmp_path),
+            enable_census=False,
+        )
+        create_drug_target_agent(config)
+
+        call_kwargs = mock_create_deep_agent.call_args.kwargs
+        subagents = call_kwargs.get("subagents", [])
+        ea = next(s for s in subagents if s["name"] == "evidence_assessor")
+        ea_activator = next(
+            m for m in ea.get("middleware", []) if isinstance(m, SkillActivator)
+        )
+        assert set(ea_activator.skill_registry) == {
+            "opentargets-database",
+            "gwas-database",
+            "chembl-database",
+            "string-database",
+        }
 
 
 # =========================================================================
@@ -3124,10 +3224,9 @@ class TestCensusDiseaseTool:
         assert "query_stage2_gene_panel" in EVIDENCE_ASSESSOR_PROMPT
         assert "opentargets-database" in EVIDENCE_ASSESSOR_PROMPT
         assert "gwas-database" in EVIDENCE_ASSESSOR_PROMPT
-        # chembl-database moved to deep_diver prompt
-        assert "chembl-database" not in EVIDENCE_ASSESSOR_PROMPT
+        assert "chembl-database" in EVIDENCE_ASSESSOR_PROMPT
         assert "chembl-database" in DEEP_DIVER_PROMPT
-        assert "cellxgene-census" not in EVIDENCE_ASSESSOR_PROMPT
+        assert "cellxgene-census" in EVIDENCE_ASSESSOR_PROMPT
 
     def test_read_skill_file_reads_project_relative_skill_doc(self, tmp_path):
         # read_skill_file now lives in src.agents.shared.skill_reader and uses

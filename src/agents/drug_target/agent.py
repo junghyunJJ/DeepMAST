@@ -98,7 +98,10 @@ class DrugTargetConfig:
             to enable container isolation for heavy-dependency tools.
         enable_progressive_disclosure: Whether to expose selected skills metadata
             to the agent and allow on-demand skill reading.
-        agent_skill_names: Agent-facing skills to expose via progressive disclosure.
+        agent_skill_names: Legacy fallback skill tuple retained for registry helpers.
+        evidence_assessor_skill_names: Skills exposed to evidence_assessor.
+        hypothesis_writer_skill_names: Skills exposed to hypothesis_writer.
+        report_writer_skill_names: Skills exposed to report_writer.
         skills_dir: Optional override for the project skills directory.
     """
 
@@ -119,10 +122,20 @@ class DrugTargetConfig:
         "opentargets-database",
         "gwas-database",
         "chembl-database",
-        "kegg-database",
         "string-database",
-        "drug-target-reporting",
+        "cellxgene-census",
+        "compare-census-gene-pair-by-cell-type",
     )
+    evidence_assessor_skill_names: tuple[str, ...] = (
+        "opentargets-database",
+        "gwas-database",
+        "chembl-database",
+        "string-database",
+        "cellxgene-census",
+        "compare-census-gene-pair-by-cell-type",
+    )
+    hypothesis_writer_skill_names: tuple[str, ...] = ("drug-target-hypothesis",)
+    report_writer_skill_names: tuple[str, ...] = ("drug-target-reporting",)
     skills_dir: str | None = None
     subagent_models: dict[str, str] | None = None
     # init_chat_model format per subagent, e.g.:
@@ -171,12 +184,43 @@ def _find_project_root() -> Path:
     return find_project_root()
 
 
-def _build_skill_registry(config: DrugTargetConfig) -> dict[str, str]:
-    """Build skill registry dict from config's allowed skill names."""
+def _build_skill_registry(
+    config: DrugTargetConfig,
+    skill_names: Sequence[str] | None = None,
+) -> dict[str, str]:
+    """Build a skill registry dict from the provided skill names."""
     skills_dir = _resolve_skills_dir(config)
     return {
         name: str(skills_dir / name)
-        for name in config.agent_skill_names
+        for name in (skill_names or config.agent_skill_names)
+    }
+
+
+def _filter_census_skills(
+    skill_names: Sequence[str],
+    *,
+    enable_census: bool,
+) -> tuple[str, ...]:
+    """Drop census-specific skills when Census tooling is disabled."""
+    if enable_census:
+        return tuple(skill_names)
+    disabled = {"cellxgene-census", "compare-census-gene-pair-by-cell-type"}
+    return tuple(name for name in skill_names if name not in disabled)
+
+
+def _build_subagent_skill_name_map(
+    config: DrugTargetConfig,
+    *,
+    enable_census: bool,
+) -> dict[str, tuple[str, ...]]:
+    """Return the per-subagent skill tuples for the primary workflow."""
+    return {
+        "evidence_assessor": _filter_census_skills(
+            config.evidence_assessor_skill_names,
+            enable_census=enable_census,
+        ),
+        "hypothesis_writer": tuple(config.hypothesis_writer_skill_names),
+        "report_writer": tuple(config.report_writer_skill_names),
     }
 
 
@@ -212,16 +256,25 @@ def create_drug_target_agent(
     evidence_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Backend
-    project_root = _find_project_root()
-
     if config.docker_image:
         backend = _create_docker_backend(config, resolved_data_dir)
-        skills_sources = None
+        skills_dir = None
+        subagent_skill_names = None
+        subagent_skill_registries = None
     else:
         backend = FilesystemBackend(root_dir=resolved_data_dir, virtual_mode=True)
-        skills_sources = (
-            [str(_resolve_skills_dir(config)) + "/"]
+        skills_dir = str(_resolve_skills_dir(config)) if config.enable_progressive_disclosure else None
+        subagent_skill_names = (
+            _build_subagent_skill_name_map(config, enable_census=config.enable_census)
             if config.enable_progressive_disclosure
+            else None
+        )
+        subagent_skill_registries = (
+            {
+                name: _build_skill_registry(config, names)
+                for name, names in subagent_skill_names.items()
+            }
+            if subagent_skill_names is not None
             else None
         )
 
@@ -234,19 +287,18 @@ def create_drug_target_agent(
     if config.custom_tools:
         tools.extend(config.custom_tools)
 
-    # 3. Get subagent specs (skills go to evidence_assessor + deep_diver)
+    # 3. Get subagent specs — primary subagents use allow-listed shared
+    #    SkillsMiddleware + SkillActivator instead of deepagents native
+    #    `subagent["skills"]` auto-loading.
     subagent_specs = get_subagents(
         custom_tools=config.custom_tools,
         data_dir=resolved_data_dir,
         disease=config.disease,
         model_overrides=config.subagent_models,
         enable_census=config.enable_census,
-        skills_sources=skills_sources,
-        skill_registry=(
-            _build_skill_registry(config)
-            if config.enable_progressive_disclosure
-            else None
-        ),
+        skills_dir=skills_dir,
+        subagent_skill_names=subagent_skill_names,
+        subagent_skill_registries=subagent_skill_registries,
     )
 
     # 4. Create agent — orchestrator has NO skills (just delegates)
