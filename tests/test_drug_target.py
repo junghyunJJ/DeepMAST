@@ -182,7 +182,7 @@ class TestSubagentConfigs:
 
     def test_workflow_order(self):
         from src.agents.drug_target.subagents.configs import WORKFLOW_ORDER
-        assert WORKFLOW_ORDER == ["evidence_assessor", "hypothesis_writer", "report_writer"]
+        assert WORKFLOW_ORDER == ["evidence_assessor", "hypothesis_writer", "summarizer"]
 
     def test_get_subagents_returns_3(self):
         from src.agents.drug_target.subagents.configs import get_subagents
@@ -193,7 +193,34 @@ class TestSubagentConfigs:
         from src.agents.drug_target.subagents.configs import get_subagents
         subagents = get_subagents()
         names = [s["name"] for s in subagents]
-        assert names == ["evidence_assessor", "hypothesis_writer", "report_writer"]
+        assert names == ["evidence_assessor", "hypothesis_writer", "summarizer"]
+
+    def test_summarizer_is_compiled_subagent(self):
+        """The final top-level stage is an autonomous DeepAgent, not report_writer directly."""
+        from src.agents.drug_target.subagents.configs import get_subagents
+
+        subagents = get_subagents()
+        summarizer = next(s for s in subagents if s["name"] == "summarizer")
+
+        assert "runnable" in summarizer
+        assert "report_writer" in summarizer["description"]
+        assert "critic" in summarizer["description"]
+
+    def test_critic_is_read_only(self):
+        """Critic audits evidence/report consistency but cannot write final artifacts."""
+        from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
+
+        tools = SUBAGENT_CONFIGS["critic"]["tools"]
+        names = {t.name for t in tools}
+
+        assert "validate_drug_md" in names
+        assert "validate_quality" in names
+        assert "build_evidence_summary" in names
+        assert "save_drug_md" not in names
+        assert "save_target_assessment" not in names
+        assert "save_evidence" not in names
+        assert "query_chembl_target_profile" not in names
+        assert "query_stage2_gene_panel" not in names
 
     def test_custom_tools_appended_to_all_subagents(self):
         from src.agents.drug_target.subagents.configs import get_subagents
@@ -201,6 +228,8 @@ class TestSubagentConfigs:
         mock_tool.name = "custom_tool"
         subagents = get_subagents(custom_tools=[mock_tool])
         for s in subagents:
+            if "tools" not in s:
+                continue
             tool_names = [t.name for t in s["tools"]]
             assert "custom_tool" in tool_names
 
@@ -257,7 +286,9 @@ class TestSubagentConfigs:
         assert "3-Agent Workflow" in WORKFLOW_DESCRIPTION
         assert "EVIDENCE_ASSESSOR" in WORKFLOW_DESCRIPTION
         assert "HYPOTHESIS_WRITER" in WORKFLOW_DESCRIPTION
+        assert "SUMMARIZER" in WORKFLOW_DESCRIPTION
         assert "REPORT_WRITER" in WORKFLOW_DESCRIPTION
+        assert "CRITIC" in WORKFLOW_DESCRIPTION
 
     def test_evidence_assessor_prompt_mentions_census_and_gwas(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -307,11 +338,12 @@ class TestSubagentConfigs:
         assert "Specificity" in prompt
 
     def test_subagent_prompts_registry_has_3_entries(self):
-        """SUBAGENT_PROMPTS has exactly 3 entries matching the active 3-subagent pipeline."""
+        """SUBAGENT_PROMPTS includes the top-level stages plus inner summarizer workers."""
         from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
-        assert len(SUBAGENT_PROMPTS) == 3
+        assert len(SUBAGENT_PROMPTS) == 5
         assert set(SUBAGENT_PROMPTS.keys()) == {
-            "evidence_assessor", "hypothesis_writer", "report_writer",
+            "evidence_assessor", "hypothesis_writer", "summarizer",
+            "report_writer", "critic",
         }
 
 
@@ -2890,10 +2922,11 @@ class TestIntegration:
             "chembl-database",
         ]
 
+    @patch("src.agents.drug_target.subagents.configs.get_summarizer_subagent")
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
     def test_create_drug_target_agent_attaches_skills_to_interpretive_subagents_only(
-        self, mock_create_llm, mock_create_deep_agent, tmp_path
+        self, mock_create_llm, mock_create_deep_agent, mock_get_summarizer_subagent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
         from src.agents.shared.skill_activator import SkillActivator
@@ -2901,6 +2934,11 @@ class TestIntegration:
 
         mock_create_llm.return_value = MagicMock()
         mock_create_deep_agent.return_value = MagicMock()
+        mock_get_summarizer_subagent.return_value = {
+            "name": "summarizer",
+            "description": "summarizer",
+            "runnable": MagicMock(),
+        }
 
         config = DrugTargetConfig(data_dir=str(tmp_path))
         create_drug_target_agent(config)
@@ -2914,7 +2952,7 @@ class TestIntegration:
         assert "ReadFileBlockMiddleware" in mw_names
         assert "SubagentErrorGuardMiddleware" in mw_names
         # evidence_assessor is tool-driven: no SkillsMiddleware / SkillActivator.
-        # Skills live on the interpretive subagents (hypothesis_writer, report_writer)
+        # Skills live on interpretive subagents: hypothesis_writer and inner report_writer.
         # — production is aligned with the 93.9% F1 benchmark registry (OT + GWAS + ChEMBL).
         subagents = call_kwargs.get("subagents", [])
         ea = next(s for s in subagents if s["name"] == "evidence_assessor")
@@ -2935,7 +2973,10 @@ class TestIntegration:
             "chembl-database",
         }
 
-        rw = next(s for s in subagents if s["name"] == "report_writer")
+        summarizer = next(s for s in subagents if s["name"] == "summarizer")
+        assert "runnable" in summarizer
+        inner_subagents = mock_get_summarizer_subagent.call_args.kwargs["inner_subagents"]
+        rw = next(s for s in inner_subagents if s["name"] == "report_writer")
         rw_mw = rw.get("middleware", [])
         assert "skills" not in rw
         assert any(isinstance(m, SkillsMiddleware) for m in rw_mw)
@@ -2947,10 +2988,16 @@ class TestIntegration:
             "chembl-database",
         }
 
+        critic = next(s for s in inner_subagents if s["name"] == "critic")
+        critic_tools = {t.name for t in critic["tools"]}
+        assert "save_drug_md" not in critic_tools
+        assert "save_target_assessment" not in critic_tools
+
+    @patch("src.agents.drug_target.subagents.configs.get_summarizer_subagent")
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
     def test_create_drug_target_agent_can_disable_progressive_disclosure(
-        self, mock_create_llm, mock_create_deep_agent, tmp_path
+        self, mock_create_llm, mock_create_deep_agent, mock_get_summarizer_subagent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
         from src.agents.shared.skill_activator import SkillActivator
@@ -2958,6 +3005,11 @@ class TestIntegration:
 
         mock_create_llm.return_value = MagicMock()
         mock_create_deep_agent.return_value = MagicMock()
+        mock_get_summarizer_subagent.return_value = {
+            "name": "summarizer",
+            "description": "summarizer",
+            "runnable": MagicMock(),
+        }
 
         config = DrugTargetConfig(
             data_dir=str(tmp_path),
@@ -2975,16 +3027,18 @@ class TestIntegration:
         assert "SubagentErrorGuardMiddleware" in mw_names
         # No skills on any subagent
         subagents = call_kwargs.get("subagents", [])
-        for s in subagents:
+        inner_subagents = mock_get_summarizer_subagent.call_args.kwargs["inner_subagents"]
+        for s in [*subagents, *inner_subagents]:
             assert "skills" not in s
             mw = s.get("middleware", [])
             assert not any(isinstance(m, SkillActivator) for m in mw)
             assert not any(isinstance(m, SkillsMiddleware) for m in mw)
 
+    @patch("src.agents.drug_target.subagents.configs.get_summarizer_subagent")
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
     def test_create_drug_target_agent_disables_skill_loading_in_docker_mode(
-        self, mock_create_llm, mock_create_deep_agent, tmp_path
+        self, mock_create_llm, mock_create_deep_agent, mock_get_summarizer_subagent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
         from src.agents.shared.skill_activator import SkillActivator
@@ -2992,6 +3046,11 @@ class TestIntegration:
 
         mock_create_llm.return_value = MagicMock()
         mock_create_deep_agent.return_value = MagicMock()
+        mock_get_summarizer_subagent.return_value = {
+            "name": "summarizer",
+            "description": "summarizer",
+            "runnable": MagicMock(),
+        }
 
         config = DrugTargetConfig(
             data_dir=str(tmp_path),
@@ -3001,7 +3060,8 @@ class TestIntegration:
 
         call_kwargs = mock_create_deep_agent.call_args.kwargs
         subagents = call_kwargs.get("subagents", [])
-        for s in subagents:
+        inner_subagents = mock_get_summarizer_subagent.call_args.kwargs["inner_subagents"]
+        for s in [*subagents, *inner_subagents]:
             assert "skills" not in s
             mw = s.get("middleware", [])
             assert not any(isinstance(m, SkillActivator) for m in mw)

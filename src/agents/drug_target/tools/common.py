@@ -208,10 +208,10 @@ def _thinking_session_key(config: Optional[RunnableConfig]) -> str:
     """Derive a stable per-subagent-turn key from RunnableConfig.
 
     Each LangGraph subagent (evidence_assessor, hypothesis_writer,
-    report_writer) runs sequentially under the same parent thread_id. If the
-    counter is scoped only by thread_id, a fresh subagent's legitimate
-    thoughtNumber=1 gets falsely rejected because the previous subagent left
-    last_n=8 in state.
+    summarizer and its inner report_writer/critic) runs under the same parent
+    thread_id. If the counter is scoped only by thread_id, a fresh subagent's
+    legitimate thoughtNumber=1 gets falsely rejected because the previous
+    subagent left last_n=8 in state.
 
     We therefore include the current graph node / subagent namespace so each
     subagent turn starts with a clean counter. ``langgraph_node`` is set by

@@ -1,10 +1,11 @@
 """Drug Target Assessment Agent using DeepAgents framework.
 
-3-Subagent Architecture with Staged Funnel:
+3-Subagent Architecture with Audited Finalization:
 1. EVIDENCE_ASSESSOR: 2-stage funnel (Stage 2: validation & scoring ->
    Stage 1: biological context) with inline rubric assessment
 2. HYPOTHESIS_WRITER: Hypothesis generation with UCB scoring from all evidence
-3. REPORT_WRITER: Generate drug.md with featured candidate emphasis
+3. SUMMARIZER: CompiledSubAgent that runs report_writer -> validators ->
+   critic -> bounded repair loop before final status
 
 All database queries are wrapped as @tool functions that run on the host process.
 Docker backend is OPTIONAL — set docker_image in DrugTargetConfig to enable
@@ -63,13 +64,17 @@ Data directory: {data_dir} | Disease: {disease}
             instruction="Run Stage 1+2+3 for {disease}. Data dir: {data_dir}. <paste lr_candidates output>")
 3. Call task(subagent_type="hypothesis_writer",
             instruction="Generate hypotheses from evidence. Data dir: {data_dir}")
-4. Call task(subagent_type="report_writer",
-            instruction="Generate drug.md and target_assessment.json. Data dir: {data_dir}")
-5. Reply "Pipeline complete." with zero tool calls.
+4. Call task(subagent_type="summarizer",
+            instruction="Finalize drug.md and target_assessment.json with write -> validate -> critic -> repair loop. Data dir: {data_dir}")
+5. If summarizer returns "SUMMARIZER_STATUS: PASS", reply "Pipeline complete." with zero tool calls.
+   If summarizer returns "SUMMARIZER_STATUS: FAIL", reply "Pipeline incomplete: report remains draft." and include the summarizer's remaining gate failures.
 
 ## Rules
 - Execute steps 1-5 in order. Do not skip, reorder, or repeat.
-- Do not read files. Do not summarize subagent returns. Do not analyze evidence.
+- Do not read files. Do not analyze evidence.
+- Only summarize the summarizer return when it reports SUMMARIZER_STATUS: FAIL;
+  include gate failures verbatim so the caller knows the report is incomplete.
+- Completion is fail-closed: never claim success unless summarizer explicitly reports SUMMARIZER_STATUS: PASS.
 - After step 5, stop. Any additional tool call is a failure.
 
 ## Input
@@ -100,7 +105,7 @@ class DrugTargetConfig:
         agent_skill_names: Legacy fallback skill tuple retained for registry helpers.
         evidence_assessor_skill_names: Skills exposed to evidence_assessor.
         hypothesis_writer_skill_names: Skills exposed to hypothesis_writer.
-        report_writer_skill_names: Skills exposed to report_writer.
+        report_writer_skill_names: Skills exposed to inner report_writer.
         skills_dir: Optional override for the project skills directory.
     """
 
@@ -146,7 +151,13 @@ class DrugTargetConfig:
     def __post_init__(self):
         if self.subagent_models is None:
             self.subagent_models = load_subagent_models_from_env(
-                ["evidence_assessor", "hypothesis_writer", "report_writer"]
+                [
+                    "evidence_assessor",
+                    "hypothesis_writer",
+                    "summarizer",
+                    "report_writer",
+                    "critic",
+                ]
             )
 
 
@@ -231,7 +242,8 @@ def create_drug_target_agent(
     """Create the Drug Target Assessment agent using DeepAgents framework.
 
     Creates a fully configured agent with:
-    - 3 specialized subagents (evidence_assessor, hypothesis_writer, report_writer)
+    - 3 top-level subagents (evidence_assessor, hypothesis_writer, summarizer)
+    - summarizer is a CompiledSubAgent with inner report_writer + critic
     - All database queries via @tool wrappers (host-side by default)
     - Optional DockerBackend when docker_image is set in config
 
@@ -286,7 +298,11 @@ def create_drug_target_agent(
     if config.custom_tools:
         tools.extend(config.custom_tools)
 
-    # 3. Get subagent specs — primary subagents use allow-listed shared
+    # 3. Create the orchestrator LLM before subagents so the summarizer
+    #    CompiledSubAgent can share the parent model by default.
+    llm = create_llm(provider=config.provider)
+
+    # 4. Get subagent specs — primary subagents use allow-listed shared
     #    SkillsMiddleware + SkillActivator instead of deepagents native
     #    `subagent["skills"]` auto-loading.
     subagent_specs = get_subagents(
@@ -294,14 +310,15 @@ def create_drug_target_agent(
         data_dir=resolved_data_dir,
         disease=config.disease,
         model_overrides=config.subagent_models,
+        default_model=llm,
+        backend=backend,
         enable_census=config.enable_census,
         skills_dir=skills_dir,
         subagent_skill_names=subagent_skill_names,
         subagent_skill_registries=subagent_skill_registries,
     )
 
-    # 4. Create agent — orchestrator has NO skills (just delegates)
-    llm = create_llm(provider=config.provider)
+    # 5. Create agent — orchestrator has NO skills (just delegates)
     checkpointer = MemorySaver() if config.use_checkpointer else None
 
     # Render system prompt with config values so the LLM knows
@@ -328,9 +345,10 @@ def create_drug_target_agent(
     agent = create_deep_agent(**create_kwargs)
     # evidence_assessor alone can consume 500-800 steps for large gene panels
     # (41 genes × ~10 steps/gene for Stage 2, plus Stage 1 batch + rubric + gates).
-    # All 3 subagents share this budget. Conservative estimate:
+    # All 3 top-level subagents share this budget. Conservative estimate:
     #   evidence_assessor: ~1500, hypothesis_writer: ~300,
-    #   report_writer: ~500, orchestrator: ~200 = ~2500 typical, 10000 for margin.
+    #   summarizer/report loop: ~1200, orchestrator: ~200 = ~3200 typical,
+    #   10000 for margin.
     agent = agent.with_config({"recursion_limit": 10000})
 
     return agent, backend
