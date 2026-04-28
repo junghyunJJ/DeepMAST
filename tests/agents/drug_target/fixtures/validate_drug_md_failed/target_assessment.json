@@ -1,0 +1,22 @@
+{
+  "project_meta": {
+    "disease": "IPF",
+    "total_input_pairs": 1
+  },
+  "druggability_matrix": [
+    {
+      "ligand": "BRCA1",
+      "receptor": "EGFR",
+      "is_featured": true,
+      "is_novel": false,
+      "open_targets_score": 0.3
+    }
+  ],
+  "featured_candidates_deep_dive": [
+    {
+      "gene": "BRCA1",
+      "track": "featured",
+      "summary": "PARP inhibitor; BRCA1-mutant cells."
+    }
+  ]
+}

@@ -1298,7 +1298,7 @@ def check_stage1_completion(data_dir: str) -> str:
         result["stage1_complete"] = True
         result["recommendation"] = (
             "No stage3_candidates (zero featured genes). "
-            "Skip hypothesis_writer, proceed to report_writer."
+            "Skip hypothesis_writer, proceed to summarizer."
         )
         return json.dumps(result, indent=2)
 
@@ -1327,7 +1327,7 @@ def check_stage1_completion(data_dir: str) -> str:
 def check_hypothesis_completion(data_dir: str) -> str:
     """Check whether hypothesis_writer produced hypothesis_report.json.
 
-    Call this AFTER hypothesis_writer completes and BEFORE report_writer.
+    Call this AFTER hypothesis_writer completes and BEFORE summarizer.
     Returns JSON with completion status and recommendation.
     """
     base = _resolve_data_dir(data_dir)
@@ -1339,7 +1339,7 @@ def check_hypothesis_completion(data_dir: str) -> str:
             "hypothesis_complete": False,
             "recommendation": (
                 "hypothesis_report.json not found. hypothesis_writer may have failed. "
-                "Proceed to report_writer — it will generate the report without hypotheses. "
+                "Proceed to summarizer — it will generate the report without hypotheses. "
                 "Section 4 will note that hypothesis generation was not completed."
             ),
         }, indent=2)
@@ -1350,7 +1350,7 @@ def check_hypothesis_completion(data_dir: str) -> str:
         return json.dumps({
             "hypothesis_complete": True,
             "hypothesis_count": count,
-            "recommendation": f"Found {count} hypotheses. Proceed to report_writer.",
+            "recommendation": f"Found {count} hypotheses. Proceed to summarizer.",
         }, indent=2)
     except Exception as e:
         return json.dumps({

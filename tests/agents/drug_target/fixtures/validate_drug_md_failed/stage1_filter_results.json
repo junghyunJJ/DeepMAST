@@ -1,0 +1,9 @@
+{
+  "total": 20,
+  "passed": 2,
+  "failed": 18,
+  "pairs": [
+    {"ligand": "BRCA1", "receptor": "EGFR", "score": 0.88, "featured": true},
+    {"ligand": "EGFR", "receptor": "EGF", "score": 0.91, "featured": true}
+  ]
+}

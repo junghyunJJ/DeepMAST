@@ -35,6 +35,55 @@ _BLOCKED_ARTIFACT_ERROR = (
 )
 
 
+class ReadOnlyToolGuardMiddleware(AgentMiddleware):
+    """Block write-capable tools for read-only reviewer subagents."""
+
+    def __init__(
+        self,
+        *,
+        blocked_tool_names: tuple[str, ...] = (),
+        block_write_file: bool = True,
+    ) -> None:
+        super().__init__()
+        self.blocked_tool_names = set(blocked_tool_names)
+        self.block_write_file = block_write_file
+
+    def _is_blocked(self, request: ToolCallRequest) -> bool:
+        tool_name = request.tool_call.get("name")
+        if self.block_write_file and tool_name == "write_file":
+            return True
+        return tool_name in self.blocked_tool_names
+
+    @staticmethod
+    def _blocked_response(request: ToolCallRequest) -> ToolMessage:
+        tool_name = request.tool_call.get("name", "unknown")
+        return ToolMessage(
+            content=(
+                f"ERROR: `{tool_name}` is not available in this read-only "
+                "review context. Return audit findings instead of modifying files."
+            ),
+            tool_call_id=request.tool_call.get("id", ""),
+        )
+
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        if self._is_blocked(request):
+            return self._blocked_response(request)
+        return handler(request)
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
+    ) -> ToolMessage | Command:
+        if self._is_blocked(request):
+            return self._blocked_response(request)
+        return await handler(request)
+
+
 class WriteFileArgGuardMiddleware(AgentMiddleware):
     """Coerce write_file(content=...) arguments to string and block output artifacts."""
 
@@ -114,8 +163,8 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
 _READ_FILE_BLOCKED_MSG = (
     "ERROR: read_file is not available at the orchestrator level. "
     "Do NOT read evidence files yourself. Instead, use the `task` tool to delegate "
-    "to the next subagent in sequence: evidence_assessor → deep_diver → "
-    "hypothesis_writer → report_writer. Each subagent handles its own file I/O."
+    "to the next subagent in sequence: evidence_assessor → hypothesis_writer → "
+    "summarizer. Each subagent handles its own file I/O."
 )
 
 
@@ -228,4 +277,3 @@ class SubagentErrorGuardMiddleware(AgentMiddleware):
                     tool_call_id=request.tool_call.get("id", ""),
                 )
             raise
-

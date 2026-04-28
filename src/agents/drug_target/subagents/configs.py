@@ -1,13 +1,14 @@
 """Subagent configurations for Drug Target Assessment Agent.
 
-Three-subagent staged funnel (happy path):
+Three-subagent staged funnel with audited finalization (happy path):
 - evidence_assessor: 3-stage funnel (Stage 2: validation & scoring ->
   Stage 1: biological context -> Stage 3: ChEMBL drug profiles inline)
   with inline rubric assessment.
 - hypothesis_writer: Hypothesis generation with UCB scoring from all evidence.
-- report_writer: Generate drug.md with featured candidate emphasis.
+- summarizer: CompiledSubAgent finalizer that runs report_writer, validators,
+  critic, and bounded repair loop.
 
-Workflow order: evidence_assessor -> hypothesis_writer -> report_writer
+Workflow order: evidence_assessor -> hypothesis_writer -> summarizer
 """
 
 from typing import Callable, Sequence
@@ -16,9 +17,11 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
 
 from src.agents.deep_interpreter.middleware.write_file_guard import (
+    ReadOnlyToolGuardMiddleware,
     WriteFileArgGuardMiddleware,
     ReadFileBlockMiddleware,
 )
+from src.agents.drug_target.subagents.summarizer import get_summarizer_subagent
 from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
 from src.agents.drug_target.tools import (
     # Evidence I/O tools
@@ -67,7 +70,7 @@ __all__ = [
 
 
 # =============================================================================
-# 4-Subagent Configuration Definitions
+# Subagent Configuration Definitions
 # =============================================================================
 
 SUBAGENT_CONFIGS = {
@@ -163,6 +166,36 @@ SUBAGENT_CONFIGS = {
             generate_drug_html_report,
         ],
     },
+    "critic": {
+        "name": "critic",
+        "description": (
+            "Read-only report auditor. Validates drug.md against local evidence, "
+            "Reference Card values, deterministic validator outputs, and known "
+            "hallucination failure modes. Returns structured audit findings and "
+            "repair instructions; never writes artifacts."
+        ),
+        "system_prompt": SUBAGENT_PROMPTS["critic"],
+        "tools": [
+            load_lr_candidates,
+            load_evidence_files,
+            validate_evidence_completeness,
+            build_evidence_summary,
+            validate_drug_md,
+            validate_stage3_gate,
+            read_skill_file,
+            think_tool,
+            validate_quality,
+        ],
+        "middleware": [
+            ReadOnlyToolGuardMiddleware(
+                blocked_tool_names=(
+                    "save_drug_md",
+                    "save_target_assessment",
+                    "save_evidence",
+                )
+            )
+        ],
+    },
 }
 
 
@@ -170,7 +203,10 @@ SUBAGENT_CONFIGS = {
 # Workflow Order
 # =============================================================================
 
-WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer", "report_writer"]
+WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer", "summarizer"]
+
+_TOP_LEVEL_SIMPLE_SUBAGENTS = ["evidence_assessor", "hypothesis_writer"]
+_SUMMARIZER_INNER_SUBAGENTS = ["report_writer", "critic"]
 
 WORKFLOW_DESCRIPTION = """
 Drug Target Assessment 3-Agent Workflow (Staged Funnel):
@@ -196,16 +232,12 @@ Drug Target Assessment 3-Agent Workflow (Staged Funnel):
    Outputs: hypothesis_report.json
    Gate: hypothesis_report.json must exist
 
-3. REPORT_WRITER (Plan->Execute->Reflect)
-   - Generates target_assessment.json (structured contract)
-   - Generates drug.md with structure:
-     1. Executive Summary
-     2. Pan-Disease Target Druggability Matrix
-     3. [FEATURED] Candidate Deep Dives
-     3.5. Hypothesis-Driven Analysis (if hypothesis_report.json exists)
-     4. [NOVEL] Candidate Deep Dives
-     5. Pipeline Execution Summary & Recommendations
-   - Quality validation (threshold >= 0.7)
+3. SUMMARIZER (CompiledSubAgent; write -> validate -> critic -> repair)
+   - Delegates initial/fix writes to inner REPORT_WRITER
+   - Runs deterministic validators (validate_drug_md, validate_quality)
+   - Delegates independent evidence audit to read-only CRITIC
+   - Loops back to REPORT_WRITER for bounded repairs
+   - Fails closed when any validator or CRITIC gate remains failed
 """
 
 
@@ -218,6 +250,8 @@ def get_subagents(
     data_dir: str | None = None,
     disease: str | None = None,
     model_overrides: dict[str, BaseChatModel | str] | None = None,
+    default_model: BaseChatModel | str | None = None,
+    backend: object | None = None,
     enable_census: bool = True,
     skills_sources: list[str] | None = None,
     skill_registry: dict[str, str] | None = None,
@@ -231,7 +265,7 @@ def get_subagents(
     1. evidence_assessor - 3-stage funnel with inline rubric assessment
        (Stage 2 -> Stage 1 -> Stage 3 ChEMBL inline)
     2. hypothesis_writer - hypothesis generation with UCB scoring
-    3. report_writer - drug.md generation
+    3. summarizer - CompiledSubAgent report finalization audit loop
 
     Args:
         custom_tools: Optional list of additional tools to include in all subagents
@@ -240,6 +274,9 @@ def get_subagents(
         model_overrides: Optional per-subagent model overrides.
             Keys are subagent names, values are init_chat_model format strings
             (e.g. "openai:gpt-4.1") or BaseChatModel instances.
+        default_model: Parent model to reuse for the summarizer CompiledSubAgent
+            when no explicit summarizer override is configured.
+        backend: Shared DeepAgents backend for summarizer and inner subagents.
         skills_sources: Legacy deepagents-native skill source paths.
         skill_registry: Legacy shared SkillActivator registry.
         skills_dir: Project skills directory for allow-listed SkillsMiddleware.
@@ -251,8 +288,13 @@ def get_subagents(
     """
     subagents = [
         {**SUBAGENT_CONFIGS[name], "tools": list(SUBAGENT_CONFIGS[name]["tools"])}
-        for name in WORKFLOW_ORDER
+        for name in _TOP_LEVEL_SIMPLE_SUBAGENTS
     ]
+    summarizer_inner_subagents = [
+        {**SUBAGENT_CONFIGS[name], "tools": list(SUBAGENT_CONFIGS[name]["tools"])}
+        for name in _SUMMARIZER_INNER_SUBAGENTS
+    ]
+    configurable_subagents = [*subagents, *summarizer_inner_subagents]
 
     # Remove Census tools when disabled (too slow for some providers)
     if not enable_census:
@@ -262,7 +304,7 @@ def get_subagents(
             "run_compare_census_lr_pair",
             "run_batch_census_lr_pairs",
         }
-        for subagent in subagents:
+        for subagent in configurable_subagents:
             if subagent["name"] == "evidence_assessor":
                 subagent["tools"] = [
                     t for t in subagent["tools"]
@@ -281,7 +323,7 @@ def get_subagents(
 
     # Apply per-subagent model overrides
     if model_overrides:
-        for subagent in subagents:
+        for subagent in configurable_subagents:
             if subagent["name"] in model_overrides:
                 subagent["model"] = model_overrides[subagent["name"]]
 
@@ -301,17 +343,20 @@ def get_subagents(
             f"(load_lr_candidates, load_evidence_files, save_evidence).\n"
             f"{disease_line}"
         )
-        for subagent in subagents:
+        for subagent in configurable_subagents:
             subagent["system_prompt"] = subagent["system_prompt"] + data_dir_note
 
     if custom_tools:
+        # Keep the audited finalization surface stable: custom tools are added
+        # only to directly exposed top-level dictionary subagents. The compiled
+        # summarizer owns report finalization with a fixed writer/critic tool set.
         for subagent in subagents:
             current_tools = list(subagent.get("tools", []))
             current_tools.extend(custom_tools)
             subagent["tools"] = current_tools
 
     # Guard write_file tool calls against non-string content emitted by some models.
-    for subagent in subagents:
+    for subagent in configurable_subagents:
         mw = list(subagent.get("middleware", []))
         mw.insert(0, WriteFileArgGuardMiddleware())
         subagent["middleware"] = mw
@@ -323,7 +368,7 @@ def get_subagents(
         from src.agents.shared.skill_activator import SkillActivator
         from src.agents.shared.skills_middleware import SkillsMiddleware
 
-        for subagent in subagents:
+        for subagent in configurable_subagents:
             allowed_names = subagent_skill_names.get(subagent["name"])
             if not allowed_names:
                 continue
@@ -344,7 +389,7 @@ def get_subagents(
         # Legacy path retained for callers that still use deepagents native
         # skill auto-loading.
         _skill_subagents = {"evidence_assessor", "report_writer"}
-        for subagent in subagents:
+        for subagent in configurable_subagents:
             if subagent["name"] in _skill_subagents:
                 subagent["skills"] = skills_sources
                 if skill_registry:
@@ -354,5 +399,19 @@ def get_subagents(
                         skill_registry=skill_registry,
                     ))
                     subagent["middleware"] = mw
+
+    summarizer_model = None
+    if model_overrides:
+        summarizer_model = model_overrides.get("summarizer")
+    if summarizer_model is None:
+        summarizer_model = default_model
+
+    subagents.append(
+        get_summarizer_subagent(
+            model=summarizer_model,
+            backend=backend,
+            inner_subagents=summarizer_inner_subagents,
+        )
+    )
 
     return subagents

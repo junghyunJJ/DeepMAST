@@ -1,0 +1,34 @@
+{
+  "project_meta": {
+    "disease": "IPF",
+    "total_input_pairs": 2
+  },
+  "druggability_matrix": [
+    {
+      "ligand": "EGFR",
+      "receptor": "EGF",
+      "is_featured": true,
+      "is_novel": false,
+      "open_targets_score": 0.5
+    },
+    {
+      "ligand": "TGFB1",
+      "receptor": "TGFBR2",
+      "is_featured": true,
+      "is_novel": false,
+      "open_targets_score": 0.4
+    }
+  ],
+  "featured_candidates_deep_dive": [
+    {
+      "gene": "EGFR",
+      "track": "featured",
+      "summary": "Approved RTK inhibitors; IPF evidence."
+    },
+    {
+      "gene": "TGFB1",
+      "track": "featured",
+      "summary": "TGF-beta pathway; fresolimumab Phase 2."
+    }
+  ]
+}

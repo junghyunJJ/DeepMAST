@@ -1,0 +1,4 @@
+{
+  "EGFR": {"classification": "validated_target", "priority": "high"},
+  "TGFB1": {"classification": "validated_target", "priority": "high"}
+}

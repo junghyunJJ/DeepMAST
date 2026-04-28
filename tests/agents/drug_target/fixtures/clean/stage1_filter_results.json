@@ -1,0 +1,27 @@
+{
+  "total": 20,
+  "passed": 2,
+  "failed": 18,
+  "pairs": [
+    {"ligand": "EGFR", "receptor": "EGF", "score": 0.91, "featured": true},
+    {"ligand": "TGFB1", "receptor": "TGFBR2", "score": 0.87, "featured": true},
+    {"ligand": "VEGFA", "receptor": "FLT1", "score": 0.72, "featured": false},
+    {"ligand": "CXCL12", "receptor": "CXCR4", "score": 0.68, "featured": false},
+    {"ligand": "HGF", "receptor": "MET", "score": 0.65, "featured": false},
+    {"ligand": "FGF2", "receptor": "FGFR1", "score": 0.61, "featured": false},
+    {"ligand": "PDGFB", "receptor": "PDGFRB", "score": 0.58, "featured": false},
+    {"ligand": "WNT5A", "receptor": "FZD7", "score": 0.54, "featured": false},
+    {"ligand": "DLL4", "receptor": "NOTCH1", "score": 0.51, "featured": false},
+    {"ligand": "JAG1", "receptor": "NOTCH3", "score": 0.49, "featured": false},
+    {"ligand": "BMP2", "receptor": "BMPR1A", "score": 0.47, "featured": false},
+    {"ligand": "EFNA1", "receptor": "EPHA2", "score": 0.44, "featured": false},
+    {"ligand": "GDF15", "receptor": "GFRAL", "score": 0.42, "featured": false},
+    {"ligand": "TNFSF10", "receptor": "TNFRSF10B", "score": 0.40, "featured": false},
+    {"ligand": "CDH1", "receptor": "ITGB1", "score": 0.38, "featured": false},
+    {"ligand": "SPP1", "receptor": "CD44", "score": 0.36, "featured": false},
+    {"ligand": "FGF2", "receptor": "FGFR2", "score": 0.33, "featured": false},
+    {"ligand": "VEGFA", "receptor": "KDR", "score": 0.31, "featured": false},
+    {"ligand": "PDGFA", "receptor": "PDGFRA", "score": 0.29, "featured": false},
+    {"ligand": "TGFB2", "receptor": "TGFBR1", "score": 0.27, "featured": false}
+  ]
+}

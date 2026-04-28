@@ -2329,8 +2329,17 @@ def _extract_census_summary(census: dict | Any) -> dict:
 
 
 @tool
-def validate_drug_md(data_dir: str) -> str:
+def validate_drug_md(data_dir: str | Path) -> str:
     """Validate drug.md against evidence files for hallucinations.
+
+    Dual-input contract:
+    - When called with `str` (agent runtime), `_resolve_data_dir` is invoked
+      so the existing env-var fallback (`DRUG_TARGET_DATA_DIR`,
+      `DEEP_INTERPRETER_DATA_DIR`) and LLM-typo tolerance are preserved.
+    - When called with `Path` (e.g. from `validate_drug_report_finalization`),
+      the path is treated as already resolved and `_resolve_data_dir` is
+      bypassed entirely. This prevents the deterministic finalizer from
+      silently re-resolving via env fallback.
 
     Checks:
     1. Classification/priority labels match assessment_results.json
@@ -2340,8 +2349,11 @@ def validate_drug_md(data_dir: str) -> str:
     Returns: {valid: bool, total_checks: int, issues: [...]}
     Call this AFTER save_drug_md to catch hallucinations before finalizing.
     """
-    from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir  # PR2-3
-    data_dir_path = _resolve_data_dir(data_dir)
+    if isinstance(data_dir, Path):
+        data_dir_path = data_dir  # already resolved by caller
+    else:
+        from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir  # PR2-3
+        data_dir_path = _resolve_data_dir(data_dir)
     evidence_dir = data_dir_path / "evidence"
     drug_md_path = data_dir_path / "drug.md"
 
@@ -2609,4 +2621,548 @@ def validate_drug_md(data_dir: str) -> str:
         "total_checks": total_checks,
         "issue_count": len(issues),
         "issues": issues,
+    }, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# Deterministic fail-closed finalization validator
+# ---------------------------------------------------------------------------
+# Robust prose patterns for Stage 1 count claims in drug.md. If `drug.md`
+# makes any such claim, the captured number must match the total pair count
+# in `stage1_filter_results.json`. If no claim matches, the check is a no-op.
+STAGE1_COUNT_PATTERNS = [
+    r"of\s+(\d+)\s+L[-\s]?R\s+pairs",
+    r"of\s+(\d+)\s+ligand[-\s]?receptor\s+pairs",
+    r"across\s+(\d+)\s+L[-\s]?R\s+pairs",
+    r"across\s+(\d+)\s+ligand[-\s]?receptor\s+pairs",
+    r"from\s+(\d+)\s+(?:L[-\s]?R\s+)?pairs",
+]
+
+# MoA cell values that count as explicitly unavailable (case-insensitive,
+# trimmed). When a Drug Profile MoA cell matches one of these, the cell is
+# treated as supported and no UNSUPPORTED_MOA_CLAIM issue is emitted.
+_MOA_UNAVAILABLE_MARKERS = frozenset({
+    "n/a",
+    "na",
+    "mechanism not available",
+    "unknown",
+    "not available",
+    "not characterized",
+})
+
+
+def _count_unescaped_pipes(line: str) -> int:
+    """Count `|` characters that are not preceded by a backslash."""
+    count = 0
+    i = 0
+    n = len(line)
+    while i < n:
+        ch = line[i]
+        if ch == "\\" and i + 1 < n and line[i + 1] == "|":
+            # Skip the escaped pipe entirely.
+            i += 2
+            continue
+        if ch == "|":
+            count += 1
+        i += 1
+    return count
+
+
+def _is_table_separator(line: str) -> bool:
+    """A markdown separator row contains only `|`, `-`, `:`, and whitespace,
+    and includes at least one `---` segment."""
+    stripped = line.strip()
+    if not stripped:
+        return False
+    if not all(ch in "|:- \t" for ch in stripped):
+        return False
+    return "---" in stripped
+
+
+def _check_markdown_table_pipe_drift(drug_text: str) -> list[dict]:
+    """Detect markdown tables whose data rows have an inconsistent unescaped
+    pipe count vs the header/separator. Each divergent row emits a single
+    issue keyed on its line number."""
+    issues: list[dict] = []
+    lines = drug_text.splitlines()
+    n = len(lines)
+    i = 0
+    while i < n:
+        line = lines[i]
+        stripped = line.strip()
+        # A table block starts with a header row (pipe row) followed by a
+        # separator row on the next line.
+        is_pipe_row = stripped.startswith("|") and stripped.endswith("|") and "|" in stripped
+        if not is_pipe_row or i + 1 >= n or not _is_table_separator(lines[i + 1]):
+            i += 1
+            continue
+        header_pipes = _count_unescaped_pipes(line)
+        sep_pipes = _count_unescaped_pipes(lines[i + 1])
+        # Header vs separator drift counts as a single issue at the separator.
+        if header_pipes != sep_pipes:
+            issues.append({
+                "code": "MARKDOWN_TABLE_PIPE_DRIFT",
+                "severity": "high",
+                "message": (
+                    f"Table separator pipe count ({sep_pipes}) does not match "
+                    f"header pipe count ({header_pipes})."
+                ),
+                "location": f"drug.md:{i + 2}",
+                "evidence": {
+                    "header_pipes": header_pipes,
+                    "separator_pipes": sep_pipes,
+                    "header_line": line.strip()[:200],
+                    "separator_line": lines[i + 1].strip()[:200],
+                },
+            })
+        # Walk data rows.
+        j = i + 2
+        while j < n:
+            row = lines[j]
+            row_stripped = row.strip()
+            if not (row_stripped.startswith("|") and row_stripped.endswith("|")):
+                break
+            row_pipes = _count_unescaped_pipes(row)
+            if row_pipes != header_pipes:
+                issues.append({
+                    "code": "MARKDOWN_TABLE_PIPE_DRIFT",
+                    "severity": "high",
+                    "message": (
+                        f"Table row has {row_pipes} unescaped pipes; expected "
+                        f"{header_pipes} (header)."
+                    ),
+                    "location": f"drug.md:{j + 1}",
+                    "evidence": {
+                        "header_pipes": header_pipes,
+                        "row_pipes": row_pipes,
+                        "row_line": row_stripped[:200],
+                        "header_line": line.strip()[:200],
+                    },
+                })
+            j += 1
+        i = j if j > i + 1 else i + 1
+    return issues
+
+
+def _check_stage1_count_mismatch(drug_text: str, data_dir_path: Path) -> list[dict]:
+    """Compare any prose Stage 1 count claim in drug.md against the total
+    pair count derived from stage1_filter_results.json. Skipped silently if
+    the report makes no such claim."""
+    issues: list[dict] = []
+    stage1_path = data_dir_path / "stage1_filter_results.json"
+    if not stage1_path.exists():
+        return issues  # MISSING_REQUIRED_ARTIFACT path covers this case.
+    try:
+        stage1_payload = json.loads(stage1_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        issues.append({
+            "code": "STAGE1_COUNT_MISMATCH",
+            "severity": "high",
+            "message": f"Failed to parse stage1_filter_results.json: {exc}",
+            "location": str(stage1_path),
+            "evidence": {},
+        })
+        return issues
+
+    # Compute total = number of pair entries. The file shape is a dict that
+    # commonly carries a list of pair entries under a top-level key like
+    # `pairs` / `results` / `entries`, or it may itself be a list. Fall back
+    # to summing pass+fail buckets when present.
+    total: int | None = None
+    if isinstance(stage1_payload, list):
+        total = len(stage1_payload)
+    elif isinstance(stage1_payload, dict):
+        for key in ("pairs", "results", "entries", "stage1_pairs"):
+            value = stage1_payload.get(key)
+            if isinstance(value, list):
+                total = len(value)
+                break
+        if total is None:
+            passed = stage1_payload.get("passed") or stage1_payload.get("pass")
+            failed = stage1_payload.get("failed") or stage1_payload.get("fail")
+            if isinstance(passed, list) and isinstance(failed, list):
+                total = len(passed) + len(failed)
+    if total is None:
+        # Cannot determine the authoritative total — skip the check rather
+        # than emit a spurious mismatch.
+        return issues
+
+    for pattern in STAGE1_COUNT_PATTERNS:
+        for match in re.finditer(pattern, drug_text, re.IGNORECASE):
+            try:
+                claimed = int(match.group(1))
+            except (TypeError, ValueError):
+                continue
+            if claimed == total:
+                continue
+            # Compute the line number of the match for `location`.
+            line_no = drug_text.count("\n", 0, match.start()) + 1
+            issues.append({
+                "code": "STAGE1_COUNT_MISMATCH",
+                "severity": "high",
+                "message": (
+                    f"drug.md claims {claimed} L-R pair(s) but "
+                    f"stage1_filter_results.json contains {total}."
+                ),
+                "location": f"drug.md:{line_no}",
+                "evidence": {
+                    "claimed": claimed,
+                    "actual": total,
+                    "matched_phrase": match.group(0),
+                    "pattern": pattern,
+                },
+            })
+    return issues
+
+
+def _check_empty_gap_analysis(drug_text: str) -> list[dict]:
+    """Detect a `### Gap Analysis` heading whose body (until the next heading
+    at the same or shallower depth) is whitespace-only or contains fewer than
+    20 non-whitespace characters."""
+    issues: list[dict] = []
+    lines = drug_text.splitlines()
+    heading_pattern = re.compile(r"^(#{1,6})\s+(.+?)\s*:?\s*$")
+    target_pattern = re.compile(r"^gap\s+analysis$", re.IGNORECASE)
+    for idx, line in enumerate(lines):
+        match = heading_pattern.match(line.strip())
+        if not match:
+            continue
+        depth = len(match.group(1))
+        if depth != 3:
+            continue
+        title = match.group(2).rstrip(":").strip()
+        if not target_pattern.match(title):
+            continue
+        # Walk forward until the next heading at depth <= 3.
+        body_chars: list[str] = []
+        j = idx + 1
+        while j < len(lines):
+            next_match = heading_pattern.match(lines[j].strip())
+            if next_match and len(next_match.group(1)) <= depth:
+                break
+            body_chars.append(lines[j])
+            j += 1
+        body_text = "\n".join(body_chars)
+        non_ws = re.sub(r"\s+", "", body_text)
+        if len(non_ws) < 20:
+            issues.append({
+                "code": "EMPTY_GAP_ANALYSIS",
+                "severity": "medium",
+                "message": (
+                    "### Gap Analysis section is empty or contains fewer than "
+                    "20 non-whitespace characters."
+                ),
+                "location": f"drug.md:{idx + 1}",
+                "evidence": {
+                    "non_whitespace_char_count": len(non_ws),
+                    "body_preview": body_text.strip()[:200],
+                },
+            })
+    return issues
+
+
+def _iter_drug_profile_moa_cells(drug_text: str):
+    """Yield `(line_no, drug_name, moa_value)` tuples for each MoA cell in
+    every markdown table that exposes a MoA / Mechanism of Action column.
+
+    The drug name is taken from the first non-empty cell in the same row
+    (best-effort). `line_no` is 1-indexed and points at the data row line.
+    """
+    lines = drug_text.splitlines()
+    n = len(lines)
+    i = 0
+    while i < n:
+        line = lines[i]
+        stripped = line.strip()
+        is_pipe_row = stripped.startswith("|") and stripped.endswith("|") and "|" in stripped
+        if not is_pipe_row or i + 1 >= n or not _is_table_separator(lines[i + 1]):
+            i += 1
+            continue
+        # Parse header cells.
+        header_cells = [c.strip() for c in stripped.strip("|").split("|")]
+        moa_idx = None
+        for c_idx, cell in enumerate(header_cells):
+            cell_norm = cell.lower()
+            if cell_norm == "moa" or "mechanism of action" in cell_norm:
+                moa_idx = c_idx
+                break
+        if moa_idx is None:
+            i += 1
+            continue
+        j = i + 2
+        while j < n:
+            row = lines[j]
+            row_stripped = row.strip()
+            if not (row_stripped.startswith("|") and row_stripped.endswith("|")):
+                break
+            cells = [c.strip() for c in row_stripped.strip("|").split("|")]
+            if moa_idx < len(cells):
+                moa_value = cells[moa_idx]
+                drug_name = cells[0] if cells else ""
+                yield (j + 1, drug_name, moa_value)
+            j += 1
+        i = j if j > i + 1 else i + 1
+
+
+def _load_stage3_evidence_text(data_dir_path: Path) -> str:
+    """Concatenate the textual content of every `evidence/stage3_*.json`
+    file under the run directory. Returned text is lower-cased so callers
+    can run case-insensitive substring containment."""
+    evidence_dir = data_dir_path / "evidence"
+    if not evidence_dir.is_dir():
+        return ""
+    parts: list[str] = []
+    for stage3_path in sorted(evidence_dir.glob("stage3_*.json")):
+        try:
+            parts.append(stage3_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+    return "\n".join(parts).lower()
+
+
+def _check_unsupported_moa_claim(drug_text: str, data_dir_path: Path) -> list[dict]:
+    """Each Drug Profile MoA cell must be either explicitly unavailable
+    (N/A markers) or have its value appear as a substring inside any
+    `evidence/stage3_*.json` file."""
+    issues: list[dict] = []
+    evidence_text = _load_stage3_evidence_text(data_dir_path)
+    for line_no, drug_name, moa_value in _iter_drug_profile_moa_cells(drug_text):
+        normalized = moa_value.strip().lower()
+        if not normalized:
+            # Empty cells are treated as unavailable (no claim made).
+            continue
+        if normalized in _MOA_UNAVAILABLE_MARKERS:
+            continue
+        if evidence_text and normalized in evidence_text:
+            continue
+        issues.append({
+            "code": "UNSUPPORTED_MOA_CLAIM",
+            "severity": "medium",
+            "message": (
+                f"Drug Profile MoA cell for {drug_name or '<unknown>'} claims "
+                f"'{moa_value}' but the value is absent from every "
+                "evidence/stage3_*.json file and is not in the unavailable-"
+                "marker set."
+            ),
+            "location": f"drug.md:{line_no}",
+            "evidence": {
+                "drug": drug_name,
+                "claimed_moa": moa_value,
+            },
+        })
+    return issues
+
+
+@tool
+def validate_drug_report_finalization(data_dir: str) -> str:
+    """Deterministic fail-closed finalization validator for drug.md.
+
+    Composes the existing `validate_drug_md` and `validate_target_assessment_file`
+    checks with four additional finalization-only checks:
+    `MARKDOWN_TABLE_PIPE_DRIFT`, `STAGE1_COUNT_MISMATCH`, `EMPTY_GAP_ANALYSIS`,
+    and `UNSUPPORTED_MOA_CLAIM`.
+
+    The validator MUST NOT call `_resolve_data_dir` and MUST NOT consult any
+    env var. Path resolution is strictly `Path(data_dir).expanduser().resolve()`.
+    A missing or invalid `data_dir` fails the validator (no env fallback).
+
+    Returns a JSON string with the schema documented in the rev2 plan.
+    """
+    issues: list[dict] = []
+    checks: dict[str, dict] = {
+        "data_dir": {"status": "fail", "path": ""},
+        "required_artifacts": {"status": "fail", "missing": []},
+        "validate_drug_md": {"status": "fail", "raw": {}},
+        "target_assessment": {"status": "fail", "issues": []},
+        "report_finalization": {"status": "fail", "issues": []},
+    }
+
+    # ------------------------------------------------------------------
+    # 1. Path validation — fail closed, no env fallback.
+    # ------------------------------------------------------------------
+    try:
+        data_dir_path = Path(data_dir).expanduser().resolve()
+    except Exception as exc:
+        checks["data_dir"] = {"status": "fail", "path": str(data_dir)}
+        issues.append({
+            "code": "INVALID_DATA_DIR",
+            "severity": "critical",
+            "message": f"Failed to resolve data_dir: {exc}",
+            "location": str(data_dir),
+            "evidence": {},
+        })
+        return json.dumps({
+            "valid": False,
+            "issue_count": len(issues),
+            "issues": issues,
+            "checks": checks,
+            "sources": [],
+        }, indent=2)
+
+    checks["data_dir"]["path"] = str(data_dir_path)
+
+    invalid_reason: str | None = None
+    if not data_dir_path.exists():
+        invalid_reason = "data_dir does not exist"
+    elif not data_dir_path.is_dir():
+        invalid_reason = "data_dir is not a directory"
+    elif str(data_dir_path) == "/":
+        invalid_reason = "data_dir is the filesystem root"
+    elif (data_dir_path / ".git").is_dir():
+        invalid_reason = (
+            "data_dir is the repository root (contains .git/); "
+            "expected a per-run output directory"
+        )
+
+    if invalid_reason is not None:
+        issues.append({
+            "code": "INVALID_DATA_DIR",
+            "severity": "critical",
+            "message": invalid_reason,
+            "location": str(data_dir_path),
+            "evidence": {"path": str(data_dir_path)},
+        })
+        return json.dumps({
+            "valid": False,
+            "issue_count": len(issues),
+            "issues": issues,
+            "checks": checks,
+            "sources": [],
+        }, indent=2)
+
+    checks["data_dir"]["status"] = "pass"
+
+    # ------------------------------------------------------------------
+    # 2. Required artifacts (all unconditional per MR4).
+    # ------------------------------------------------------------------
+    required_artifacts = [
+        "drug.md",
+        "target_assessment.json",
+        "evidence/assessment_results.json",
+        "stage1_filter_results.json",
+    ]
+    missing: list[str] = []
+    for rel in required_artifacts:
+        if not (data_dir_path / rel).exists():
+            missing.append(rel)
+            issues.append({
+                "code": "MISSING_REQUIRED_ARTIFACT",
+                "severity": "critical",
+                "message": f"Required artifact not found: {rel}",
+                "location": str(data_dir_path / rel),
+                "evidence": {"artifact": rel},
+            })
+    checks["required_artifacts"]["missing"] = missing
+    checks["required_artifacts"]["status"] = "pass" if not missing else "fail"
+
+    # ------------------------------------------------------------------
+    # 3. validate_drug_md — pass the resolved Path so _resolve_data_dir
+    #    is bypassed (per MR1 dual-input contract).
+    # ------------------------------------------------------------------
+    drug_md_present = (data_dir_path / "drug.md").exists()
+    if drug_md_present:
+        try:
+            impl = getattr(validate_drug_md, "func", None) or validate_drug_md
+            raw_json = impl(data_dir_path)
+            raw = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+        except Exception as exc:
+            raw = {"valid": False, "error": f"validate_drug_md raised: {exc}"}
+        checks["validate_drug_md"]["raw"] = raw if isinstance(raw, dict) else {}
+        if raw.get("valid", False):
+            checks["validate_drug_md"]["status"] = "pass"
+        else:
+            checks["validate_drug_md"]["status"] = "fail"
+            issues.append({
+                "code": "VALIDATE_DRUG_MD_FAILED",
+                "severity": "high",
+                "message": (
+                    f"validate_drug_md returned valid=false with "
+                    f"{raw.get('issue_count', 'unknown')} issue(s)."
+                ),
+                "location": str(data_dir_path / "drug.md"),
+                "evidence": {
+                    "issues": raw.get("issues", []),
+                    "error": raw.get("error"),
+                },
+            })
+
+    # ------------------------------------------------------------------
+    # 4. target_assessment.json contract.
+    # ------------------------------------------------------------------
+    ta_path = data_dir_path / "target_assessment.json"
+    if not ta_path.exists():
+        issues.append({
+            "code": "MISSING_TARGET_ASSESSMENT",
+            "severity": "critical",
+            "message": "target_assessment.json not found.",
+            "location": str(ta_path),
+            "evidence": {},
+        })
+        checks["target_assessment"]["status"] = "fail"
+        checks["target_assessment"]["issues"] = ["target_assessment.json not found"]
+    else:
+        try:
+            from src.agents.drug_target.tools.assessment_output import (
+                validate_target_assessment_file,
+            )
+            ta_result = validate_target_assessment_file(data_dir_path)
+        except Exception as exc:
+            ta_result = {"valid": False, "errors": [f"validator raised: {exc}"]}
+        ta_errors = list(ta_result.get("errors", []))
+        checks["target_assessment"]["issues"] = ta_errors
+        if ta_result.get("valid", False):
+            checks["target_assessment"]["status"] = "pass"
+        else:
+            checks["target_assessment"]["status"] = "fail"
+            issues.append({
+                "code": "TARGET_ASSESSMENT_INVALID",
+                "severity": "high",
+                "message": "target_assessment.json failed contract validation.",
+                "location": str(ta_path),
+                "evidence": {"errors": ta_errors[:20]},
+            })
+
+    # ------------------------------------------------------------------
+    # 5. Report finalization checks (markdown structure + content).
+    # ------------------------------------------------------------------
+    finalization_issues: list[dict] = []
+    if drug_md_present:
+        try:
+            drug_text = (data_dir_path / "drug.md").read_text(encoding="utf-8")
+        except Exception as exc:
+            finalization_issues.append({
+                "code": "VALIDATE_DRUG_MD_FAILED",
+                "severity": "high",
+                "message": f"Failed to read drug.md for finalization checks: {exc}",
+                "location": str(data_dir_path / "drug.md"),
+                "evidence": {},
+            })
+            drug_text = ""
+
+        if drug_text:
+            finalization_issues.extend(_check_markdown_table_pipe_drift(drug_text))
+            finalization_issues.extend(
+                _check_stage1_count_mismatch(drug_text, data_dir_path)
+            )
+            finalization_issues.extend(_check_empty_gap_analysis(drug_text))
+            finalization_issues.extend(
+                _check_unsupported_moa_claim(drug_text, data_dir_path)
+            )
+
+    checks["report_finalization"]["issues"] = [
+        f"{i['code']} @ {i.get('location', '')}: {i.get('message', '')}"
+        for i in finalization_issues
+    ]
+    checks["report_finalization"]["status"] = "pass" if not finalization_issues else "fail"
+    issues.extend(finalization_issues)
+
+    # ------------------------------------------------------------------
+    # 6. Final verdict.
+    # ------------------------------------------------------------------
+    return json.dumps({
+        "valid": len(issues) == 0,
+        "issue_count": len(issues),
+        "issues": issues,
+        "checks": checks,
+        "sources": [],
     }, indent=2)
