@@ -1,0 +1,9 @@
+{
+  "total": 20,
+  "passed": 2,
+  "failed": 18,
+  "pairs": [
+    {"ligand": "EGFR", "receptor": "EGF", "score": 0.91, "featured": true},
+    {"ligand": "TGFB1", "receptor": "TGFBR2", "score": 0.87, "featured": true}
+  ]
+}

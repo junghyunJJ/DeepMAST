@@ -49,6 +49,7 @@ from src.agents.drug_target.tools.stage_logic import (
     validate_stage3_gate,
     build_evidence_summary,
     validate_drug_md,
+    validate_drug_report_finalization,
 )
 from src.agents.drug_target.tools.skill_reader import (
     read_skill_file,
@@ -103,6 +104,7 @@ __all__ = [
     "validate_stage3_gate",
     "build_evidence_summary",
     "validate_drug_md",
+    "validate_drug_report_finalization",
     # Output contract
     "save_target_assessment",
     "save_drug_md",

@@ -13,9 +13,6 @@ import uuid
 from pathlib import Path
 
 from langchain_core.tools import tool
-from src.agents.drug_target.tools.assessment_output import (
-    validate_target_assessment_file,
-)
 from src.agents.drug_target.tools.stage1_normalization import (
     finalize_stage1_workspace,
 )
@@ -127,13 +124,14 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
             rerun_missing_census=True,
             pair_subset=pair_subset,
         )
-        target_assessment_validation = await asyncio.to_thread(
-            validate_target_assessment_file, resolved_dir
-        )
 
         # Read drug.md — wrap file I/O in thread to avoid blocking async loop
         def _read_results():
-            if stage1_result["success"] and target_assessment_validation["valid"] and drug_md_path.exists():
+            from src.agents.drug_target.tools import validate_drug_report_finalization
+            finalization_raw = validate_drug_report_finalization.func(data_dir=str(resolved_dir))
+            finalization_validation = json.loads(finalization_raw)
+
+            if stage1_result["success"] and finalization_validation["valid"]:
                 content = drug_md_path.read_text()
                 target_assessment = None
                 if target_assessment_path.exists():
@@ -151,7 +149,7 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
                     "drug_md_path": str(drug_md_path),
                     "target_assessment": target_assessment,
                     "stage1_validation": stage1_result["post_validation"],
-                    "target_assessment_validation": target_assessment_validation,
+                    "finalization_validation": finalization_validation,
                     "target_assessment_path": (
                         str(target_assessment_path) if target_assessment_path.exists() else None
                     ),
@@ -163,19 +161,16 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
                         "Stage1 artifacts incomplete: "
                         + "; ".join(stage1_result["post_validation"]["errors"])
                     )
-                if not target_assessment_validation["valid"]:
-                    errors.append(
-                        "target_assessment validation failed: "
-                        + "; ".join(target_assessment_validation["errors"])
-                    )
-                if not drug_md_path.exists():
-                    errors.append("drug.md was not generated")
+                if not finalization_validation["valid"]:
+                    for issue in finalization_validation["issues"]:
+                        errors.append(f"{issue['code']}: {issue.get('message', '')}")
                 return json.dumps({
                     "success": False,
-                    "error": " | ".join(errors) if errors else "DrugTargetAgent artifacts incomplete",
                     "drug_md": None,
+                    "drug_md_path": str(drug_md_path) if drug_md_path.exists() else None,
                     "stage1_validation": stage1_result["post_validation"],
-                    "target_assessment_validation": target_assessment_validation,
+                    "finalization_validation": finalization_validation,
+                    "errors": errors,
                 })
 
         return await asyncio.to_thread(_read_results)

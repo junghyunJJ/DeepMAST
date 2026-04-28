@@ -1,0 +1,14 @@
+{
+  "gene": "EGFR",
+  "chembl_records": [
+    {
+      "molecule_chembl_id": "CHEMBL939",
+      "pref_name": "GEFITINIB",
+      "mechanism_of_action": "EGFR tyrosine kinase inhibitor; blocks ATP-binding pocket",
+      "max_phase": 4,
+      "indication": "non-small cell lung cancer"
+    }
+  ],
+  "target_class": "Kinase",
+  "druggability_tier": "Tier 1"
+}

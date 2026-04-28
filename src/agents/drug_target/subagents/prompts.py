@@ -692,7 +692,7 @@ Maximum iterations: 5 (if still failing after 5 rounds, include remaining
 issues as a warning section at the end of drug.md).
 
 ### Phase 7: Quality Check
-Use `validate_quality` (threshold >= 0.7) on a summary of the drug.md.
+Use `validate_drug_report_finalization` to validate the finalized report. The validator runs a deterministic check; `valid=true` is required for SUMMARIZER PASS.
 
 ### Phase 8: Generate HTML Report (Optional — Graceful Degradation)
 After Phase 7 quality check, generate the interactive HTML version:
@@ -792,24 +792,34 @@ critic -> repair loop.
 1. Call task(subagent_type="report_writer", instruction=<generate report>)
 2. Call validate_drug_md(data_dir)
 3. Call validate_quality on a concise summary of the generated report
+   (advisory only — informs repair, does NOT gate publication)
 4. Call task(subagent_type="critic", instruction=<audit report with validator outputs>)
-5. If every gate passes, return exactly:
+5. If validate_drug_md or critic flag fixable issues, call report_writer
+   again with the critic's repair instructions and repeat steps 2-4.
+6. Stop after 2 repair loops.
+7. After the repair loop concludes (whether passing or exhausted), call
+   validate_drug_report_finalization(data_dir). This is the only required
+   final gate.
+8. If validate_drug_report_finalization returns valid=true, return exactly:
    SUMMARIZER_STATUS: PASS
    Include the validation evidence in 3-5 bullets.
-6. If any gate fails, call report_writer again with the critic's repair
-   instructions and repeat steps 2-4.
-7. Stop after 2 repair loops. If any gate still fails, return exactly:
+9. If validate_drug_report_finalization returns valid=false, return exactly:
    SUMMARIZER_STATUS: FAIL
-   Include remaining validator/critic findings and state that drug.md is a draft.
+   Include the finalization issues verbatim and state that drug.md is a draft.
 
 ## Completion Gates
-- validate_drug_md must return valid=true and issue_count=0
-- validate_quality must return passed=true
-- critic must return passed=true
+- validate_drug_report_finalization must return valid=true (FINAL gate;
+  the only gate that determines SUMMARIZER_STATUS)
 
-If a validator output is ambiguous, missing, or malformed, treat it as a failed
-gate. HTML report generation is supplementary and must never convert a failed
-audit into success.
+`validate_drug_md` and the critic remain in the workflow above; their
+pass/fail outcomes are captured by validate_drug_report_finalization
+(validate_drug_md is composed inside it, and critic findings inform repair).
+`validate_quality` remains available as advisory diagnostics for repair but
+is not a publication gate.
+
+If validate_drug_report_finalization output is ambiguous, missing, or
+malformed, treat it as valid=false. HTML report generation is supplementary
+and must never convert a failed finalization into success.
 
 ## Ownership Rules
 - Do not write drug.md or target_assessment.json yourself.
@@ -824,7 +834,7 @@ Your role is to independently audit drug.md against the Reference Card,
 validator outputs, and local evidence. You must not modify files.
 
 ## Required Audit Checks
-1. Failed quality gates: validate_quality passed=false must be a blocking issue.
+1. Failed quality gates: `validate_drug_report_finalization valid=false` must be a blocking issue. `validate_quality passed=false` is advisory and should be reported as a recommendation, not a block.
 2. Stage 1 consistency: passed/failed language in drug.md must match evidence.
 3. Directionality: p-value significance is not enrichment. If risk_ratio < 1,
    describe depletion or differential expression, not target-cell enrichment.

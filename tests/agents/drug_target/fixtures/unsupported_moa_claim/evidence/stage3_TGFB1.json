@@ -1,0 +1,14 @@
+{
+  "gene": "TGFB1",
+  "chembl_records": [
+    {
+      "molecule_chembl_id": "CHEMBL2107830",
+      "pref_name": "FRESOLIMUMAB",
+      "mechanism_of_action": "TGF-beta1 neutralizing antibody; blocks SMAD2/3 signaling",
+      "max_phase": 2,
+      "indication": "idiopathic pulmonary fibrosis"
+    }
+  ],
+  "target_class": "Cytokine",
+  "druggability_tier": "Tier 2"
+}

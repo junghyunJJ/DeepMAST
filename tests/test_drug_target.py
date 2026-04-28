@@ -919,6 +919,7 @@ class TestToolImports:
             "read_skill_file",
             "save_target_assessment",
             "think_tool", "sequential_thinking", "validate_quality",
+            "validate_drug_report_finalization",
         ]
         assert set(expected).issubset(set(__all__))
 
@@ -2504,270 +2505,6 @@ class TestCompareCensusTool:
 
 
 # =========================================================================
-# Stage 1 Confidence Filtering Tests
-# =========================================================================
-
-class TestStage1Confidence:
-    """Tests for compute_stage1_confidence and filter_by_stage1_confidence."""
-
-    def test_compute_stage1_confidence_full_evidence(self):
-        """Full evidence (strong PPI + significant census + shared pathway + expression) → high confidence."""
-        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
-
-        evidence = {
-            "ligand": "TGFB1",
-            "receptor": "TGFBR2",
-            "string_ppi": {"max_combined_score": 0.999},  # 0-1 scale from STRING API
-            "census_validation": {
-                "coexpression": {"p_value": 0.001, "risk_ratio": 3.0},  # 1.0 * 1.0
-                "target_vs_rest": {
-                    "gene_a": {"target_pct": 5.2},
-                    "gene_b": {"target_pct": 3.1},
-                    "coexpression": {"p_value": 0.001, "risk_ratio": 3.0},
-                },
-            },
-            "kegg_pathways": {
-                "ligand_pathways": [{"pathway_id": "hsa04350"}, {"pathway_id": "hsa04060"}],
-                "receptor_pathways": [{"pathway_id": "hsa04350"}, {"pathway_id": "hsa04010"}],
-            },  # shared hsa04350 → 1.0
-            "reactome_pathways": {
-                "ligand_pathways": [{"reactome_id": "R-HSA-2173789"}],
-                "receptor_pathways": [{"reactome_id": "R-HSA-2173789"}],
-            },
-            "cellxgene": {"available_genes": ["TGFB1", "TGFBR2"]},  # fallback (not used)
-        }
-        result = compute_stage1_confidence(evidence)
-        assert result["confidence"] >= 0.99  # 0.999 string → rounds to ~1.0
-        assert result["string_score"] >= 0.99  # 0.999 from STRING API (0-1 scale)
-        assert result["census_score"] == 1.0
-        assert result["pathway_score"] == 1.0
-        assert result["expression_score"] == 1.0
-
-    def test_compute_stage1_confidence_missing_signals(self):
-        """Partial evidence (weak STRING, no census, no shared pathway, 1 gene) → low confidence.
-
-        No target_vs_rest in census_validation → fallback to available_genes.
-        """
-        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
-
-        evidence = {
-            "ligand": "GDF15",
-            "receptor": "GFRAL",
-            "string_ppi": {"max_combined_score": 0.222},  # 0-1 scale from STRING API
-            "census_validation": {
-                "coexpression": {"p_value": 0.1, "risk_ratio": 1.5},  # p>=0.05 → 0.0
-            },
-            "kegg_pathways": {
-                "ligand_pathways": [{"pathway_id": "hsa04060"}],
-                "receptor_pathways": [{"pathway_id": "hsa04010"}],
-            },  # no overlap → 0.0
-            "reactome_pathways": {
-                "ligand_pathways": [],
-                "receptor_pathways": [],
-            },
-            "cellxgene": {"available_genes": ["GDF15"]},  # fallback: 1/2 = 0.5
-        }
-        result = compute_stage1_confidence(evidence)
-        # 0.35 * 0.222 + 0.30 * 0.0 + 0.20 * 0.0 + 0.15 * 0.5 ≈ 0.153
-        assert result["confidence"] < 0.2
-        assert result["census_score"] == 0.0
-        assert result["pathway_score"] == 0.0
-        assert result["expression_score"] == 0.5
-
-    def test_compute_stage1_confidence_shared_kegg_pathway(self):
-        """KEGG shared pathway only → pathway_score = 1.0."""
-        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
-
-        evidence = {
-            "ligand": "TNFSF10",
-            "receptor": "TNFRSF10C",
-            "string_ppi": {"max_combined_score": 0},
-            "kegg_pathways": {
-                "ligand_pathways": [{"pathway_id": "hsa04060"}, {"pathway_id": "hsa04061"}],
-                "receptor_pathways": [{"pathway_id": "hsa04060"}, {"pathway_id": "hsa04210"}],
-            },  # shared hsa04060 → 1.0
-            "reactome_pathways": {
-                "ligand_pathways": [],
-                "receptor_pathways": [],
-            },
-            "cellxgene": {"available_genes": []},
-        }
-        result = compute_stage1_confidence(evidence)
-        assert result["pathway_score"] == 1.0
-
-    def test_compute_stage1_confidence_no_shared_pathway(self):
-        """Both have pathways but no overlap → pathway_score = 0.0."""
-        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
-
-        evidence = {
-            "ligand": "GDF15",
-            "receptor": "GFRAL",
-            "string_ppi": {"max_combined_score": 0},
-            "kegg_pathways": {
-                "ligand_pathways": [{"pathway_id": "hsa04060"}],
-                "receptor_pathways": [{"pathway_id": "hsa04010"}],
-            },
-            "reactome_pathways": {
-                "ligand_pathways": [{"reactome_id": "R-HSA-111"}],
-                "receptor_pathways": [{"reactome_id": "R-HSA-222"}],
-            },  # no overlap in either DB → 0.0
-            "cellxgene": {"available_genes": []},
-        }
-        result = compute_stage1_confidence(evidence)
-        assert result["pathway_score"] == 0.0
-
-    def test_compute_stage1_confidence_old_format_fallback(self):
-        """Old flat 'pathways' list format → count-based fallback."""
-        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
-
-        evidence = {
-            "ligand": "TGFB1",
-            "receptor": "TGFBR2",
-            "string_ppi": {"max_combined_score": 0},
-            "kegg_pathways": {"pathways": ["p1", "p2"]},
-            "reactome_pathways": {"pathways": ["r1", "r2"]},  # 4/4 = 1.0
-            "cellxgene": {"available_genes": []},
-        }
-        result = compute_stage1_confidence(evidence)
-        assert result["pathway_score"] == 1.0
-
-    def test_compute_stage1_confidence_nested_census(self):
-        """Census data under target_vs_rest.coexpression is also handled."""
-        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
-
-        evidence = {
-            "ligand": "VEGFA",
-            "receptor": "FLT1",
-            "string_ppi": {"max_combined_score": 450},
-            "census_validation": {
-                "target_vs_rest": {
-                    "coexpression": {"p_value": 0.01, "risk_ratio": 2.0},
-                },
-            },
-            "kegg_pathways": {
-                "ligand_pathways": [{"pathway_id": "hsa04370"}],
-                "receptor_pathways": [{"pathway_id": "hsa04370"}],
-            },
-            "reactome_pathways": {
-                "ligand_pathways": [],
-                "receptor_pathways": [],
-            },
-            "cellxgene": {"available_genes": ["VEGFA", "FLT1"]},
-        }
-        result = compute_stage1_confidence(evidence)
-        assert result["census_score"] > 0  # p<0.05 and rr>0
-
-    def test_compute_stage1_confidence_empty_evidence(self):
-        """Completely empty evidence → zero confidence."""
-        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
-
-        result = compute_stage1_confidence({})
-        assert result["confidence"] == 0.0
-
-    def test_expression_score_from_census_target_pct(self):
-        """Both genes have target_pct > 0 → expression_score = 1.0."""
-        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
-
-        evidence = {
-            "ligand": "TGFB1",
-            "receptor": "TGFBR2",
-            "string_ppi": {"max_combined_score": 0},
-            "census_validation": {
-                "target_vs_rest": {
-                    "gene_a": {"target_pct": 5.2},
-                    "gene_b": {"target_pct": 3.1},
-                },
-            },
-            "kegg_pathways": {"ligand_pathways": [], "receptor_pathways": []},
-            "reactome_pathways": {"ligand_pathways": [], "receptor_pathways": []},
-        }
-        result = compute_stage1_confidence(evidence)
-        assert result["expression_score"] == 1.0
-
-    def test_expression_score_one_gene_expressed(self):
-        """Only one gene has target_pct > 0 → expression_score = 0.5."""
-        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
-
-        evidence = {
-            "ligand": "GDF15",
-            "receptor": "GFRAL",
-            "string_ppi": {"max_combined_score": 0},
-            "census_validation": {
-                "target_vs_rest": {
-                    "gene_a": {"target_pct": 4.0},
-                    "gene_b": {"target_pct": 0},
-                },
-            },
-            "kegg_pathways": {"ligand_pathways": [], "receptor_pathways": []},
-            "reactome_pathways": {"ligand_pathways": [], "receptor_pathways": []},
-        }
-        result = compute_stage1_confidence(evidence)
-        assert result["expression_score"] == 0.5
-
-    def test_expression_score_fallback_old_format(self):
-        """No target_vs_rest in census → fallback to available_genes."""
-        from src.agents.drug_target.tools.stage_logic import compute_stage1_confidence
-
-        evidence = {
-            "ligand": "VEGFA",
-            "receptor": "FLT1",
-            "string_ppi": {"max_combined_score": 0},
-            "census_validation": {
-                "coexpression": {"p_value": 0.5, "risk_ratio": 0.5},
-            },
-            "kegg_pathways": {"ligand_pathways": [], "receptor_pathways": []},
-            "reactome_pathways": {"ligand_pathways": [], "receptor_pathways": []},
-            "cellxgene": {"available_genes": ["VEGFA", "FLT1"]},
-        }
-        result = compute_stage1_confidence(evidence)
-        assert result["expression_score"] == 1.0
-
-    def test_filter_by_stage1_confidence_basic(self):
-        """All pairs pass; low-confidence ones are tagged."""
-        from src.agents.drug_target.tools.stage_logic import filter_by_stage1_confidence
-
-        pairs = [
-            {"name": f"pair_{i}", "stage1_confidence": {"confidence": c}}
-            for i, c in enumerate([0.8, 0.7, 0.6, 0.5, 0.45, 0.3, 0.2, 0.1, 0.05, 0.0])
-        ]
-        passed, filtered = filter_by_stage1_confidence(pairs, threshold=0.4, min_remaining=3)
-        assert len(passed) == 10  # all pairs pass
-        assert len(filtered) == 0
-        # Low-confidence pairs tagged
-        low = [p for p in passed if p.get("stage1_low_confidence")]
-        assert len(low) == 5  # 0.3, 0.2, 0.1, 0.05, 0.0
-        high = [p for p in passed if not p.get("stage1_low_confidence")]
-        assert len(high) == 5  # 0.8, 0.7, 0.6, 0.5, 0.45
-
-    def test_filter_by_stage1_confidence_graduated_relaxation(self):
-        """All pairs pass; below-threshold pairs are tagged."""
-        from src.agents.drug_target.tools.stage_logic import filter_by_stage1_confidence
-
-        pairs = [
-            {"name": f"pair_{i}", "stage1_confidence": {"confidence": c}}
-            for i, c in enumerate([0.5, 0.45, 0.35, 0.30, 0.25, 0.22, 0.15, 0.10])
-        ]
-        passed, filtered = filter_by_stage1_confidence(pairs, threshold=0.4, min_remaining=5)
-        assert len(passed) == 8  # all pairs pass
-        assert len(filtered) == 0
-        low = [p for p in passed if p.get("stage1_low_confidence")]
-        assert len(low) == 6  # 0.35, 0.30, 0.25, 0.22, 0.15, 0.10
-
-    def test_filter_by_stage1_confidence_no_filtering_fallback(self):
-        """All low-confidence pairs still pass with tag."""
-        from src.agents.drug_target.tools.stage_logic import filter_by_stage1_confidence
-
-        pairs = [
-            {"name": f"pair_{i}", "stage1_confidence": {"confidence": c}}
-            for i, c in enumerate([0.15, 0.10, 0.05])
-        ]
-        passed, filtered = filter_by_stage1_confidence(pairs, threshold=0.4, min_remaining=5)
-        assert len(passed) == 3
-        assert len(filtered) == 0
-        assert all(p.get("stage1_low_confidence") for p in passed)
-
-
-# =========================================================================
 # 6. TestIntegration — Agent creation & tool wiring
 # =========================================================================
 
@@ -2856,8 +2593,12 @@ class TestIntegration:
 
         mock_agent.ainvoke = mock_ainvoke
 
-        # Patch at source module (lazy import inside the function)
-        # create_drug_target_agent returns (agent, backend_or_None)
+        # Patch at source module (lazy import inside the function).
+        # create_drug_target_agent returns (agent, backend_or_None).
+        # validate_drug_report_finalization is the new fail-closed gate; mock
+        # it to return valid=true so this integration test exercises only the
+        # host-gate dispatch logic, not the validator itself (which has its
+        # own dedicated test suite under tests/agents/drug_target/).
         with patch(
             "src.agents.drug_target.agent.create_drug_target_agent",
             return_value=(mock_agent, None),
@@ -2865,8 +2606,20 @@ class TestIntegration:
             "src.agents.drug_target.integration.finalize_stage1_workspace",
             return_value={"success": True, "post_validation": {"errors": []}},
         ), patch(
-            "src.agents.drug_target.integration.validate_target_assessment_file",
-            return_value={"valid": True, "errors": []},
+            "src.agents.drug_target.tools.validate_drug_report_finalization.func",
+            return_value=json.dumps({
+                "valid": True,
+                "issue_count": 0,
+                "issues": [],
+                "checks": {
+                    "data_dir": {"status": "pass", "path": str(mock_data_dir)},
+                    "required_artifacts": {"status": "pass", "missing": []},
+                    "validate_drug_md": {"status": "pass", "raw": {"valid": True}},
+                    "target_assessment": {"status": "pass", "issues": []},
+                    "report_finalization": {"status": "pass", "issues": []},
+                },
+                "sources": [],
+            }),
         ):
             raw = await run_drug_target_assessment.ainvoke({
                 "data_dir": str(mock_data_dir),

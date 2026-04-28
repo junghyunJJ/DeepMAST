@@ -1,0 +1,14 @@
+{
+  "EGFR": {
+    "classification": "validated_target",
+    "priority": "high",
+    "validated_score": 17,
+    "exploratory_score": 0
+  },
+  "TGFB1": {
+    "classification": "validated_target",
+    "priority": "high",
+    "validated_score": 14,
+    "exploratory_score": 0
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "stage3_candidates": [
+    {
+      "gene": "BRCA1"
+    },
+    {
+      "gene": "EGFR"
+    }
+  ],
+  "rubric_assessment": [
+    {
+      "gene": "BRCA1",
+      "classification": "exploratory_target",
+      "priority": "medium"
+    },
+    {
+      "gene": "EGFR",
+      "classification": "validated_target",
+      "priority": "high"
+    }
+  ]
+}

@@ -18,6 +18,7 @@ from src.agents.drug_target.subagents.prompts import SUMMARIZER_PROMPT
 from src.agents.drug_target.tools import (
     think_tool,
     validate_drug_md,
+    validate_drug_report_finalization,
     validate_quality,
     validate_stage3_gate,
 )
@@ -44,6 +45,7 @@ def create_summarizer_agent(
     """
     summarizer_tools = list(tools or [
         validate_drug_md,
+        validate_drug_report_finalization,
         validate_quality,
         validate_stage3_gate,
         think_tool,

@@ -1,0 +1,373 @@
+"""Unit tests for validate_drug_report_finalization and the validate_drug_md
+signature refactor (str vs Path dispatch).
+
+All tests use synthetic fixtures under tests/agents/drug_target/fixtures/.
+No test depends on any live workspace (res_ipf_qwen* or similar).
+"""
+
+import json
+import shutil
+from pathlib import Path
+
+import pytest
+
+from src.agents.drug_target.tools import (
+    validate_drug_report_finalization,
+    validate_drug_md,
+)
+
+FIXTURE_ROOT = Path(__file__).parent / "fixtures"
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _invoke(data_dir):
+    """Invoke the @tool wrapper with data_dir as a string."""
+    return json.loads(validate_drug_report_finalization.invoke({"data_dir": str(data_dir)}))
+
+
+def _copy_fixture(name, tmp_path):
+    """Copy a fixture into tmp_path and return the path."""
+    src = FIXTURE_ROOT / name
+    dst = tmp_path / name
+    shutil.copytree(src, dst)
+    return dst
+
+
+def _has_issue(result, code):
+    return any(issue["code"] == code for issue in result["issues"])
+
+
+# ---------------------------------------------------------------------------
+# 1. Negative control
+# ---------------------------------------------------------------------------
+
+
+def test_clean_fixture_passes(tmp_path):
+    """The clean fixture must produce valid=True with zero issues."""
+    d = _copy_fixture("clean", tmp_path)
+    result = _invoke(d)
+    assert result["valid"] is True
+    assert result["issue_count"] == 0
+    assert result["issues"] == []
+
+
+# ---------------------------------------------------------------------------
+# 2. INVALID_DATA_DIR
+# ---------------------------------------------------------------------------
+
+
+def test_invalid_data_dir_nonexistent(tmp_path):
+    result = _invoke(tmp_path / "does_not_exist")
+    assert _has_issue(result, "INVALID_DATA_DIR")
+    assert result["valid"] is False
+
+
+def test_invalid_data_dir_root():
+    result = _invoke("/")
+    assert _has_issue(result, "INVALID_DATA_DIR")
+    assert result["valid"] is False
+
+
+def test_invalid_data_dir_repo_root():
+    # Walk up from this file until we find the directory that contains .git/
+    candidate = Path(__file__).resolve()
+    for parent in candidate.parents:
+        if (parent / ".git").is_dir():
+            repo_root = parent
+            break
+    else:
+        pytest.skip("Could not locate repository root via .git/")
+    result = _invoke(repo_root)
+    assert _has_issue(result, "INVALID_DATA_DIR")
+    assert result["valid"] is False
+
+
+def test_invalid_data_dir_does_not_consult_env(tmp_path, monkeypatch):
+    """Even when DRUG_TARGET_DATA_DIR/DEEP_INTERPRETER_DATA_DIR point to a valid
+    clean fixture, invoking on a nonexistent path must still emit INVALID_DATA_DIR.
+    The validator must NOT fall back to env vars."""
+    clean_copy = _copy_fixture("clean", tmp_path)
+    monkeypatch.setenv("DRUG_TARGET_DATA_DIR", str(clean_copy))
+    monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", str(clean_copy))
+    nonexistent = tmp_path / "clean_via_env"  # does not exist
+    result = _invoke(nonexistent)
+    assert _has_issue(result, "INVALID_DATA_DIR")
+    assert result["valid"] is False
+
+
+# ---------------------------------------------------------------------------
+# 3. MISSING_REQUIRED_ARTIFACT  (parametrized over the 4 required files)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "artifact",
+    [
+        "drug.md",
+        "target_assessment.json",
+        "evidence/assessment_results.json",
+        "stage1_filter_results.json",
+    ],
+)
+def test_missing_required_artifact(artifact, tmp_path):
+    """Deleting any one of the four required artifacts must produce
+    MISSING_REQUIRED_ARTIFACT with the missing path mentioned in the issue."""
+    d = _copy_fixture("clean", tmp_path)
+    (d / artifact).unlink()
+    result = _invoke(d)
+    assert _has_issue(result, "MISSING_REQUIRED_ARTIFACT"), (
+        f"Expected MISSING_REQUIRED_ARTIFACT when {artifact} is deleted; "
+        f"got issues: {result['issues']}"
+    )
+    # The location field of the issue should reference the missing artifact name.
+    matching = [i for i in result["issues"] if i["code"] == "MISSING_REQUIRED_ARTIFACT"]
+    assert any(artifact.split("/")[-1] in i["location"] for i in matching), (
+        f"Location field does not mention '{artifact}'; issues: {matching}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 4. VALIDATE_DRUG_MD_FAILED
+# ---------------------------------------------------------------------------
+
+
+def test_validate_drug_md_failed(tmp_path):
+    """The validate_drug_md_failed fixture has a BRCA1 classification mismatch
+    (drug.md claims validated_target; assessment_results.json says exploratory_target).
+    The finalization validator must propagate this as VALIDATE_DRUG_MD_FAILED and
+    record valid=False inside checks.validate_drug_md.raw."""
+    d = _copy_fixture("validate_drug_md_failed", tmp_path)
+    result = _invoke(d)
+    assert _has_issue(result, "VALIDATE_DRUG_MD_FAILED"), (
+        f"Expected VALIDATE_DRUG_MD_FAILED; got issues: {result['issues']}"
+    )
+    raw = result["checks"]["validate_drug_md"]["raw"]
+    assert raw.get("valid") is False
+
+
+# ---------------------------------------------------------------------------
+# 5. MISSING_TARGET_ASSESSMENT / TARGET_ASSESSMENT_INVALID for whitespace file
+# ---------------------------------------------------------------------------
+
+
+def test_missing_target_assessment_whitespace_file(tmp_path):
+    """The missing_target_assessment fixture has a whitespace-only
+    target_assessment.json (1-byte newline). The file exists on disk, so
+    MISSING_REQUIRED_ARTIFACT is NOT emitted. Instead the JSON parse fails and
+    validate_target_assessment_file returns valid=False, causing the finalization
+    validator to emit TARGET_ASSESSMENT_INVALID.
+
+    Implementation note: the validator reaches the target_assessment branch
+    only after required-artifact check passes. Because target_assessment.json
+    exists (albeit unparseable), it does not trigger MISSING_REQUIRED_ARTIFACT.
+    """
+    d = _copy_fixture("missing_target_assessment", tmp_path)
+    result = _invoke(d)
+    assert _has_issue(result, "TARGET_ASSESSMENT_INVALID"), (
+        "Expected TARGET_ASSESSMENT_INVALID for whitespace-only target_assessment.json; "
+        f"got issues: {result['issues']}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 6. TARGET_ASSESSMENT_INVALID
+# ---------------------------------------------------------------------------
+
+
+def test_target_assessment_invalid(tmp_path):
+    """The target_assessment_invalid fixture has a valid JSON object but missing
+    the required druggability_matrix key, causing contract validation to fail."""
+    d = _copy_fixture("target_assessment_invalid", tmp_path)
+    result = _invoke(d)
+    assert _has_issue(result, "TARGET_ASSESSMENT_INVALID"), (
+        f"Expected TARGET_ASSESSMENT_INVALID; got issues: {result['issues']}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 7. MARKDOWN_TABLE_PIPE_DRIFT
+# ---------------------------------------------------------------------------
+
+
+def test_markdown_table_pipe_drift(tmp_path):
+    """The markdown_table_pipe_drift fixture has a TGFB1 Drug Profile row with
+    an extra unescaped pipe (| used as separator inside a cell), shifting columns."""
+    d = _copy_fixture("markdown_table_pipe_drift", tmp_path)
+    result = _invoke(d)
+    assert _has_issue(result, "MARKDOWN_TABLE_PIPE_DRIFT"), (
+        f"Expected MARKDOWN_TABLE_PIPE_DRIFT; got issues: {result['issues']}"
+    )
+    # The location field should reference the divergent row in drug.md.
+    matching = [i for i in result["issues"] if i["code"] == "MARKDOWN_TABLE_PIPE_DRIFT"]
+    assert any("drug.md:" in i["location"] for i in matching), (
+        f"Expected location to reference drug.md line; got: {[i['location'] for i in matching]}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 8. STAGE1_COUNT_MISMATCH
+# ---------------------------------------------------------------------------
+
+
+def test_stage1_count_mismatch_fixture(tmp_path):
+    """The stage1_count_mismatch fixture explicitly states 'of 18 L-R pairs'
+    but stage1_filter_results.json records 19 pairs."""
+    d = _copy_fixture("stage1_count_mismatch", tmp_path)
+    result = _invoke(d)
+    assert _has_issue(result, "STAGE1_COUNT_MISMATCH"), (
+        f"Expected STAGE1_COUNT_MISMATCH; got issues: {result['issues']}"
+    )
+
+
+@pytest.mark.parametrize(
+    "count_phrase",
+    [
+        "of 18 ligand-receptor pairs",
+        "across 18 L-R pairs",
+        "across 18 ligand-receptor pairs",
+        "from 18 pairs",
+    ],
+)
+def test_stage1_count_mismatch_phrasings(count_phrase, tmp_path):
+    """Each supported count-claim phrasing must be detected when it disagrees
+    with stage1_filter_results.json.
+
+    We copy the clean fixture (20 pairs) and inject a count claim of 18.
+    """
+    d = _copy_fixture("clean", tmp_path)
+    drug_md_path = d / "drug.md"
+    original = drug_md_path.read_text(encoding="utf-8")
+    # Prepend a claim line in the Executive Summary to ensure the pattern fires.
+    injected = f"Analysis covers {count_phrase} from the fibrotic cohort.\n\n" + original
+    drug_md_path.write_text(injected, encoding="utf-8")
+    result = _invoke(d)
+    assert _has_issue(result, "STAGE1_COUNT_MISMATCH"), (
+        f"Expected STAGE1_COUNT_MISMATCH for phrase '{count_phrase}'; "
+        f"got issues: {result['issues']}"
+    )
+
+
+def test_stage1_count_mismatch_noop_when_no_claim(tmp_path):
+    """When drug.md contains no count-claim phrase, STAGE1_COUNT_MISMATCH must
+    NOT be emitted (the check is a no-op)."""
+    d = _copy_fixture("clean", tmp_path)
+    drug_md_path = d / "drug.md"
+    text = drug_md_path.read_text(encoding="utf-8")
+    # Verify the clean fixture itself has no count phrase; if it does, remove it.
+    import re
+    count_pattern = re.compile(
+        r"(?:of|across|from)\s+\d+\s+(?:L[-\s]?R|ligand[-\s]?receptor|)[\w\s]*pairs",
+        re.IGNORECASE,
+    )
+    cleaned = count_pattern.sub("", text)
+    drug_md_path.write_text(cleaned, encoding="utf-8")
+    result = _invoke(d)
+    assert not _has_issue(result, "STAGE1_COUNT_MISMATCH"), (
+        f"Expected no STAGE1_COUNT_MISMATCH with no count phrase; got: {result['issues']}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 9. EMPTY_GAP_ANALYSIS
+# ---------------------------------------------------------------------------
+
+
+def test_empty_gap_analysis(tmp_path):
+    """The empty_gap_analysis fixture has '### Gap Analysis' immediately followed
+    by the next heading with no body text."""
+    d = _copy_fixture("empty_gap_analysis", tmp_path)
+    result = _invoke(d)
+    assert _has_issue(result, "EMPTY_GAP_ANALYSIS"), (
+        f"Expected EMPTY_GAP_ANALYSIS; got issues: {result['issues']}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 10. UNSUPPORTED_MOA_CLAIM
+# ---------------------------------------------------------------------------
+
+
+def test_unsupported_moa_claim(tmp_path):
+    """The unsupported_moa_claim fixture has TGFB1 Drug Profile MoA claiming
+    'potent JAK1 selective inhibitor reducing cytokine storm in fibrosis' —
+    a phrase absent from the stage3 evidence files."""
+    d = _copy_fixture("unsupported_moa_claim", tmp_path)
+    result = _invoke(d)
+    assert _has_issue(result, "UNSUPPORTED_MOA_CLAIM"), (
+        f"Expected UNSUPPORTED_MOA_CLAIM; got issues: {result['issues']}"
+    )
+    # The issue message should mention the unsupported MoA value.
+    matching = [i for i in result["issues"] if i["code"] == "UNSUPPORTED_MOA_CLAIM"]
+    assert any("jak1" in i["message"].lower() for i in matching), (
+        f"Expected MoA value 'JAK1' mentioned in issue message; got: {[i['message'] for i in matching]}"
+    )
+
+
+def test_unsupported_moa_claim_negative(tmp_path):
+    """When MoA cell values are present in stage3 evidence, no UNSUPPORTED_MOA_CLAIM
+    should be emitted. The clean fixture has MoA values that match stage3 evidence."""
+    d = _copy_fixture("clean", tmp_path)
+    result = _invoke(d)
+    assert not _has_issue(result, "UNSUPPORTED_MOA_CLAIM"), (
+        f"Expected no UNSUPPORTED_MOA_CLAIM for clean fixture; got: {result['issues']}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 11. validate_drug_md signature dispatch
+# ---------------------------------------------------------------------------
+
+
+def test_validate_drug_md_str_uses_resolve_data_dir(tmp_path, monkeypatch):
+    """When validate_drug_md is called with a str, it invokes _resolve_data_dir
+    (lazily imported from evidence_loader inside the else-branch). We monkeypatch
+    evidence_loader._resolve_data_dir to redirect any path to a valid clean fixture
+    copy. The validator must return valid=True confirming the fallback executed."""
+    clean_copy = _copy_fixture("clean", tmp_path)
+    nonexistent_str = str(tmp_path / "nonexistent_workspace")
+
+    import src.agents.drug_target.tools.evidence_loader as _el
+
+    def _fake_resolve(path_str):
+        # Ignore whatever was passed; return the clean fixture path.
+        return clean_copy
+
+    monkeypatch.setattr(_el, "_resolve_data_dir", _fake_resolve)
+
+    # validate_drug_md is a @tool; unwrap to call the underlying function.
+    impl = getattr(validate_drug_md, "func", None) or validate_drug_md
+    raw_json = impl(nonexistent_str)
+    raw = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+    # The redirect must have succeeded — valid=True (clean fixture passes).
+    assert raw.get("valid") is True, (
+        f"Expected valid=True after _resolve_data_dir redirect; got: {raw}"
+    )
+
+
+def test_validate_drug_md_path_skips_resolve_data_dir(tmp_path, monkeypatch):
+    """When validate_drug_md is called with a Path, _resolve_data_dir must NOT
+    be called. We monkeypatch it to raise AssertionError; if the Path branch
+    fires correctly, no error is raised and valid=True is returned."""
+    clean_copy = _copy_fixture("clean", tmp_path)
+
+    import src.agents.drug_target.tools.stage_logic as _sl
+
+    def _must_not_be_called(path_str):
+        raise AssertionError("_resolve_data_dir must not be called when a Path is passed")
+
+    monkeypatch.setattr(_sl, "_must_not_be_called_sentinel", _must_not_be_called, raising=False)
+
+    # Patch the name actually imported inside validate_drug_md's else-branch.
+    import src.agents.drug_target.tools.evidence_loader as _el
+    monkeypatch.setattr(_el, "_resolve_data_dir", _must_not_be_called)
+
+    impl = getattr(validate_drug_md, "func", None) or validate_drug_md
+    # Pass a Path — must NOT raise AssertionError.
+    raw_json = impl(clean_copy)  # clean_copy is already a Path
+    raw = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+    assert raw.get("valid") is True, (
+        f"Expected valid=True when called with Path; got: {raw}"
+    )

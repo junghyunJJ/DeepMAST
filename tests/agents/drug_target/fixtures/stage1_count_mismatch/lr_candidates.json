@@ -1,0 +1,12 @@
+{
+  "pairs": [
+    {
+      "ligand": "EGFR",
+      "receptor": "EGF"
+    },
+    {
+      "ligand": "TGFB1",
+      "receptor": "TGFBR2"
+    }
+  ]
+}
