@@ -1,0 +1,69 @@
+{
+  "ligand": "APOE",
+  "receptor": "LRP1",
+  "string_ppi": {
+    "gene_a": "APOE",
+    "gene_b": "LRP1",
+    "species": 9606,
+    "required_score": 400,
+    "executed": true,
+    "interaction_found": true,
+    "string_record_found": true,
+    "max_combined_score": 0.999,
+    "ppi_enrichment": {
+      "number_of_nodes": 2,
+      "number_of_edges": 1,
+      "average_node_degree": 1.0,
+      "local_clustering_coefficient": 1.0,
+      "expected_number_of_edges": 0,
+      "p_value": 0.0593
+    },
+    "errors": []
+  },
+  "census_validation": {
+    "disease": "pulmonary fibrosis",
+    "requested_cell_type": "pulmonary alveolar type 2 cell",
+    "resolved_cell_type": "pulmonary alveolar type 2 cell",
+    "resolution_mode": "exact",
+    "target_vs_rest": {
+      "gene_a": {
+        "target_pct": 0.161299,
+        "rest_pct": 0.479469,
+        "diff": -0.31817,
+        "risk_ratio": 0.3364,
+        "risk_ratio_capped": false,
+        "z": -54.5877,
+        "p_value": 0.0
+      },
+      "gene_b": {
+        "target_pct": 0.049834,
+        "rest_pct": 0.319809,
+        "diff": -0.269975,
+        "risk_ratio": 0.1558,
+        "risk_ratio_capped": false,
+        "z": -49.8899,
+        "p_value": 0.0
+      },
+      "coexpression": {
+        "target_pct": 0.015242,
+        "rest_pct": 0.233378,
+        "diff": -0.218136,
+        "risk_ratio": 0.0653,
+        "risk_ratio_capped": false,
+        "z": -44.576,
+        "p_value": 0.0
+      }
+    },
+    "executed": true,
+    "source": "csv_integration",
+    "csv_file": "census_apoe_lrp1_pulmonary_alveolar_type_2_cell.csv"
+  },
+  "stage1_filter": {
+    "passed": true,
+    "string_combined": 0.999,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0
+  }
+}

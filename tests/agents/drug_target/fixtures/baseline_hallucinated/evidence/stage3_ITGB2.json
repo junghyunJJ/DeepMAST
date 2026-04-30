@@ -1,0 +1,253 @@
+{
+  "chembl": {
+    "errors": [],
+    "executed": true,
+    "gene_symbol": "ITGB2",
+    "matched_drugs": [
+      {
+        "chembl_id": "CHEMBL4794300",
+        "drug_name": "4-(2-(Carboxymethyl)-4-oxoazetidine-1-carboxamidomethyl)-benzenaminium Trifluoroacetate",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ITGB2"
+      },
+      {
+        "chembl_id": "CHEMBL88478",
+        "drug_name": "(2S)-1-[(2S)-2-[[(2S)-3-carboxy-2-[[(2S)-4-methyl-2-[[2-[4-(o-tolylcarbamoylamino)phenyl]acetyl]amino]pentanoyl]amino]propanoyl]amino]-3-methyl-butanoyl]pyrrolidine-2-carboxylic acid",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ITGB2"
+      },
+      {
+        "chembl_id": "CHEMBL4634420",
+        "drug_name": "[(3R,7S,8S,8aR)-8-[2-[(4R,6R)-3-[(4-hydroxy-3-methoxy-phenyl)methyl]-4-[2-(methylamino)-2-oxo-ethyl]-2-oxo-1,3-oxazinan-6-yl]ethyl]-3,7-dimethyl-1,2,3,7,8,8a-hexahydronaphthalen-1-yl] (2S)-2-methylbutanoate",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ITGB2"
+      },
+      {
+        "chembl_id": "CHEMBL4647684",
+        "drug_name": "[(1S,3R,7S,8S,8aR)-8-[2-[(4R)-4-hydroxy-1-[[5-(hydroxymethyl)-6-methoxy-2-naphthyl]methyl]-6-oxo-2-piperidyl]ethyl]-3,7-dimethyl-1,2,3,7,8,8a-hexahydronaphthalen-1-yl] (2S)-2-methylbutanoate",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ITGB2"
+      },
+      {
+        "chembl_id": "CHEMBL4461771",
+        "drug_name": "2-(4-Oxoazetidin-2-yl)acetic Acid",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ITGB2"
+      },
+      {
+        "chembl_id": "CHEMBL503",
+        "drug_name": "LOVASTATIN",
+        "indications": [
+          {
+            "efo_term": "Hypercholesterolemia",
+            "max_phase": 4.0,
+            "mesh_heading": "Hypercholesterolemia"
+          },
+          {
+            "efo_term": "atherosclerosis",
+            "max_phase": 4.0,
+            "mesh_heading": "Atherosclerosis"
+          },
+          {
+            "efo_term": "cardiovascular disease",
+            "max_phase": 4.0,
+            "mesh_heading": "Cardiovascular Diseases"
+          },
+          {
+            "efo_term": "coronary artery disease",
+            "max_phase": 4.0,
+            "mesh_heading": "Coronary Disease"
+          },
+          {
+            "efo_term": "coronary atherosclerosis",
+            "max_phase": 4.0,
+            "mesh_heading": "Coronary Artery Disease"
+          },
+          {
+            "efo_term": "Disorder of lipid metabolism",
+            "max_phase": 3.0,
+            "mesh_heading": "Lipid Metabolism Disorders"
+          },
+          {
+            "efo_term": "Myocardial Ischemia",
+            "max_phase": 3.0,
+            "mesh_heading": "Myocardial Ischemia"
+          },
+          {
+            "efo_term": "heart disease",
+            "max_phase": 3.0,
+            "mesh_heading": "Heart Diseases"
+          },
+          {
+            "efo_term": "intermittent vascular claudication",
+            "max_phase": 3.0,
+            "mesh_heading": "Intermittent Claudication"
+          },
+          {
+            "efo_term": "peripheral vascular disease",
+            "max_phase": 3.0,
+            "mesh_heading": "Peripheral Vascular Diseases"
+          },
+          {
+            "efo_term": "Cerebral arteriovenous malformation",
+            "max_phase": 2.0,
+            "mesh_heading": "Intracranial Arteriovenous Malformations"
+          },
+          {
+            "efo_term": "Cognitive impairment",
+            "max_phase": 2.0,
+            "mesh_heading": "Cognitive Dysfunction"
+          },
+          {
+            "efo_term": "HIV infection",
+            "max_phase": 2.0,
+            "mesh_heading": "HIV Infections"
+          },
+          {
+            "efo_term": "Parkinson disease",
+            "max_phase": 2.0,
+            "mesh_heading": "Parkinson Disease"
+          },
+          {
+            "efo_term": "Rett syndrome",
+            "max_phase": 2.0,
+            "mesh_heading": "Rett Syndrome"
+          },
+          {
+            "efo_term": "breast cancer",
+            "max_phase": 2.0,
+            "mesh_heading": "Breast Neoplasms"
+          },
+          {
+            "efo_term": "cerebral atherosclerosis",
+            "max_phase": 2.0,
+            "mesh_heading": "Intracranial Arteriosclerosis"
+          },
+          {
+            "efo_term": "cerebrotendinous xanthomatosis",
+            "max_phase": 2.0,
+            "mesh_heading": "Xanthomatosis, Cerebrotendinous"
+          },
+          {
+            "efo_term": "cerebrovascular disorder",
+            "max_phase": 2.0,
+            "mesh_heading": "Cerebrovascular Disorders"
+          },
+          {
+            "efo_term": "chronic obstructive pulmonary disease",
+            "max_phase": 2.0,
+            "mesh_heading": "Pulmonary Disease, Chronic Obstructive"
+          },
+          {
+            "efo_term": "fragile X syndrome",
+            "max_phase": 2.0,
+            "mesh_heading": "Fragile X Syndrome"
+          },
+          {
+            "efo_term": "internal carotid artery stenosis",
+            "max_phase": 2.0,
+            "mesh_heading": "Carotid Stenosis"
+          },
+          {
+            "efo_term": "learning disability",
+            "max_phase": 2.0,
+            "mesh_heading": "Learning Disabilities"
+          },
+          {
+            "efo_term": "melanoma",
+            "max_phase": 2.0,
+            "mesh_heading": "Melanoma"
+          },
+          {
+            "efo_term": "neurofibromatosis type 1",
+            "max_phase": 2.0,
+            "mesh_heading": "Neurofibromatosis 1"
+          },
+          {
+            "efo_term": "ovarian cancer",
+            "max_phase": 2.0,
+            "mesh_heading": "Ovarian Neoplasms"
+          },
+          {
+            "efo_term": "prostate cancer",
+            "max_phase": 2.0,
+            "mesh_heading": "Prostatic Neoplasms, Castration-Resistant"
+          },
+          {
+            "efo_term": "rheumatoid arthritis",
+            "max_phase": 2.0,
+            "mesh_heading": "Arthritis, Rheumatoid"
+          },
+          {
+            "efo_term": "acute myeloid leukemia",
+            "max_phase": 1.0,
+            "mesh_heading": "Leukemia, Myeloid, Acute"
+          },
+          {
+            "efo_term": "asthma",
+            "max_phase": 1.0,
+            "mesh_heading": "Asthma"
+          },
+          {
+            "efo_term": "metabolic disease",
+            "max_phase": 1.0,
+            "mesh_heading": "Metabolic Diseases"
+          },
+          {
+            "efo_term": "porokeratosis",
+            "max_phase": 1.0,
+            "mesh_heading": "Porokeratosis"
+          },
+          {
+            "efo_term": "stroke",
+            "max_phase": 1.0,
+            "mesh_heading": "Stroke"
+          },
+          {
+            "efo_term": "inflammation",
+            "max_phase": 0.5,
+            "mesh_heading": "Inflammation"
+          }
+        ],
+        "mechanism_of_action": "HMG-CoA reductase inhibitor",
+        "target_gene": "ITGB2"
+      },
+      {
+        "chembl_id": "CHEMBL3289604",
+        "drug_name": "2-(1-(4-(aminomethyl)phenylcarbamoyl)-4-oxoazetidin-2-yl)acetic acid 2,2,2-trifluoroacetic acid",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ITGB2"
+      },
+      {
+        "chembl_id": "CHEMBL3289605",
+        "drug_name": "(4-(2-(2-(carboxymethylamino)-2-oxoethyl)-4-oxoazetidine-1-carboxamido)phenyl)methanaminium 2,2,2-trifluoroacetate",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ITGB2"
+      },
+      {
+        "chembl_id": "CHEMBL3289606",
+        "drug_name": "(2S)-1-[[4-(aminomethyl)phenyl]carbamoyl]-4-oxo-azetidine-2-carboxylic acid;2,2,2-trifluoroacetic acid",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ITGB2"
+      },
+      {
+        "chembl_id": "CHEMBL4461668",
+        "drug_name": "(2S)-1-(o-tolylcarbamoyl)-4-oxo-azetidine-2-carboxylic acid",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ITGB2"
+      }
+    ],
+    "source": "chembl"
+  },
+  "gene": "ITGB2",
+  "source": "chembl"
+}

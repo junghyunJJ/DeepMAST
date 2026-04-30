@@ -1,0 +1,69 @@
+{
+  "ligand": "HLA-DQB1",
+  "receptor": "CD4",
+  "string_ppi": {
+    "gene_a": "HLA-DQB1",
+    "gene_b": "CD4",
+    "species": 9606,
+    "required_score": 400,
+    "executed": true,
+    "interaction_found": true,
+    "string_record_found": true,
+    "max_combined_score": 0.951,
+    "ppi_enrichment": {
+      "number_of_nodes": 2,
+      "number_of_edges": 1,
+      "average_node_degree": 1.0,
+      "local_clustering_coefficient": 1.0,
+      "expected_number_of_edges": 0,
+      "p_value": 0.0998
+    },
+    "errors": []
+  },
+  "census_validation": {
+    "disease": "pulmonary fibrosis",
+    "requested_cell_type": "pulmonary alveolar type 2 cell",
+    "resolved_cell_type": "pulmonary alveolar type 2 cell",
+    "resolution_mode": "exact",
+    "target_vs_rest": {
+      "gene_a": {
+        "target_pct": 0.45381,
+        "rest_pct": 0.483062,
+        "diff": -0.029251,
+        "risk_ratio": 0.9394,
+        "risk_ratio_capped": false,
+        "z": -5.013,
+        "p_value": 5.358789687548438e-07
+      },
+      "gene_b": {
+        "target_pct": 0.013784,
+        "rest_pct": 0.252132,
+        "diff": -0.238348,
+        "risk_ratio": 0.0547,
+        "risk_ratio_capped": false,
+        "z": -47.4285,
+        "p_value": 0.0
+      },
+      "coexpression": {
+        "target_pct": 0.009543,
+        "rest_pct": 0.182343,
+        "diff": -0.1728,
+        "risk_ratio": 0.0523,
+        "risk_ratio_capped": false,
+        "z": -38.7286,
+        "p_value": 0.0
+      }
+    },
+    "executed": true,
+    "source": "csv_integration",
+    "csv_file": "census_hla-dqb1_cd4_pulmonary_alveolar_type_2_cell.csv"
+  },
+  "stage1_filter": {
+    "passed": true,
+    "string_combined": 0.951,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 5.358789687548438e-07,
+    "census_gene_b_pvalue": 0.0
+  }
+}

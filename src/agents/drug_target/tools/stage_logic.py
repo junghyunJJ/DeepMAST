@@ -2327,6 +2327,371 @@ def _extract_census_summary(census: dict | Any) -> dict:
 # Validation — automated drug.md vs evidence cross-check
 # ---------------------------------------------------------------------------
 
+# --- T3-T7 helper constants -------------------------------------------------
+
+_DRUG_NAME_RE = re.compile(
+    r"\b([A-Z][A-Za-z]{2,}(?:[\s-][A-Z0-9][A-Za-z0-9]*){0,2}|[A-Z]{2,}-?\d+[A-Z]*\d*)\b"
+)
+
+_DRUG_NAME_STOPLIST: frozenset[str] = frozenset({
+    # Spec-defined stoplist
+    "Phase", "Class", "Section", "Reference", "Card", "Note", "FDA", "HIV",
+    "AML", "CML", "EMA", "TBD", "OR", "AND", "NOT", "IF", "THEN",
+    "Yes", "No", "None", "WT", "MT", "ENA", "OS", "PFS", "ORR",
+    "Trial", "Drug", "Targets", "Indications", "Mechanism", "Action",
+    # Common sentence-initial English words (Title-case at line start)
+    "This", "The", "These", "Those", "Both", "All", "Some", "Each",
+    "Current", "Previous", "Further", "Additional", "Several", "Multiple",
+    "Analysis", "Evidence", "Data", "Summary", "Report", "Results",
+    "Spatial", "Clinical", "Biological", "Therapeutic", "Genetic",
+    "Biomarker", "Biomarkers", "Pathway", "Pathways", "Receptor", "Receptors",
+    "Compound", "Compounds", "Target", "Gene", "Genes", "Protein", "Proteins",
+    # Disease / pathway acronyms that are not drug names
+    "IPF", "GWAS", "ERK", "AKT", "TGF", "SMAD", "SMAD2", "SMAD3",
+    "ATP", "GTP", "mRNA", "RNA", "DNA", "PCR", "IFN", "TNF", "IL",
+    "VEGF", "MAPK", "PI3K", "NF", "NFkB", "HER", "KRAS", "BRAF",
+    "NSCLC", "DLBCL", "CLL", "NHL", "MDS", "MF", "ET", "PV",
+    "COPD", "ILD", "CVD", "CHF", "CKD", "T2D", "T1D", "MS",
+    # Report section / template markup words
+    "FEATURED", "Featured", "Validated", "Recommended", "Prioritized",
+    "Top", "Key", "Main", "Primary", "Secondary",
+})
+
+_BRACKET_FILE_RE = re.compile(r"\[from\s+([\w\-\.]+\.json(?:_FAILED)?)\s*\]")
+_BARE_FILE_RE = re.compile(r"\b(stage[0-9][\w\-]*\.json(?:_FAILED)?)\b")
+_SPECIAL_FILE_RE = re.compile(
+    r"\b((?:known_drugs|hypothesis_report|resolved_drugs|gene_manifest"
+    r"|assessment_results|rubric_scores)\.(?:json|csv)(?:_FAILED)?)\b"
+)
+
+_APPROVAL_YEAR_RE = re.compile(
+    r"(?P<drug>[A-Z][A-Za-z0-9_-]+)[^.]{0,80}?(?:approved|approval)[^.]{0,30}?(?P<year>\d{4})",
+    re.IGNORECASE,
+)
+
+_MOA_VERB_RE = re.compile(
+    r"\b(?:degrades?|cleaves?|antagoni[sz]es?|inhibits?|blocks?|targets?\s+the|"
+    r"binds?\s+to|disrupts?|activates?\s+as|functions?\s+as)\b",
+    re.IGNORECASE,
+)
+
+_ANNOTATION_RE = re.compile(r"\[source:\s*([a-z_][a-z0-9_]*)\]", re.IGNORECASE)
+
+_EVIDENCE_SECTION_RE = re.compile(
+    r"(?:evidence\s+references?|gap\s+analysis|uncovered\s+evidence\s+files?)",
+    re.IGNORECASE,
+)
+
+_EXPAND_SENTENCE_END_RE = re.compile(r"[.!?]")
+
+# Allowed source annotation fields (base set; augmented from evidence JSONs at runtime)
+_BASE_EVIDENCE_FIELDS: frozenset[str] = frozenset({
+    "name", "max_phase", "indications", "mechanism_of_action", "molecule_type",
+    "first_approval", "chembl_id", "gene", "matched_drugs",
+    "preclinical_compounds", "interpretation",
+})
+
+
+def _is_expand_prose(line: str) -> bool:
+    """Return True if the line looks like EXPAND-region prose (not table/header/list).
+
+    Prose lines do not need to end with sentence-ending punctuation — multi-line
+    sentences are common and the check must not skip wrapped continuation lines.
+    """
+    stripped = line.strip()
+    if not stripped:
+        return False
+    if stripped.startswith("|"):
+        return False
+    if stripped.startswith("#"):
+        return False
+    if re.match(r"[-*]\s+|^\d+\.\s+", stripped):
+        return False
+    return True
+
+
+def _build_drug_allowlist(
+    evidence_dir: "Path",
+    resolved_drugs: list[dict],
+) -> frozenset[str]:
+    """Build case-folded set of known drug/gene names from evidence files.
+
+    Includes gene symbols from stage3 files so they are not flagged as
+    fabricated drug names when they appear in prose.
+
+    Supports both ``name`` and ``resolved_name`` fields so that evidence files
+    produced by the ChEMBL resolver (which uses ``resolved_name``) are
+    recognised alongside legacy files that use ``name``.
+    """
+    allowlist: set[str] = set()
+    for d in resolved_drugs:
+        name = (d.get("name") or d.get("resolved_name") or "").strip().casefold()
+        if name:
+            allowlist.add(name)
+    for stage3_path in evidence_dir.glob("stage3_*.json"):
+        try:
+            stage3 = json.loads(stage3_path.read_text())
+        except Exception:
+            continue
+        # Add gene symbol so it is not flagged as a fabricated drug name
+        gene = (stage3.get("gene") or "").strip().casefold()
+        if gene:
+            allowlist.add(gene)
+        for entry in stage3.get("matched_drugs", []):
+            name = (entry.get("name") or "").strip().casefold()
+            if name:
+                allowlist.add(name)
+        for entry in stage3.get("preclinical_compounds", []):
+            name = (entry.get("name") or "").strip().casefold()
+            if name:
+                allowlist.add(name)
+    return frozenset(allowlist)
+
+
+def _build_moa_map(resolved_drugs: list[dict]) -> dict[str, str]:
+    """Build case-folded drug-name → mechanism_of_action map.
+
+    Supports both ``name`` and ``resolved_name`` fields so that evidence files
+    produced by the ChEMBL resolver (which uses ``resolved_name``) are
+    recognised alongside legacy files that use ``name``.
+    """
+    result: dict[str, str] = {}
+    for d in resolved_drugs:
+        name = (d.get("name") or d.get("resolved_name") or "").strip().casefold()
+        if name:
+            result[name] = (d.get("mechanism_of_action") or "").casefold()
+    return result
+
+
+def _build_evidence_field_set(evidence_dir: "Path") -> frozenset[str]:
+    """Build set of known evidence JSON field names from all evidence files."""
+    fields: set[str] = set(_BASE_EVIDENCE_FIELDS)
+    for json_path in evidence_dir.glob("*.json"):
+        try:
+            data = json.loads(json_path.read_text())
+        except Exception:
+            continue
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    fields.update(k.casefold() for k in item.keys())
+        elif isinstance(data, dict):
+            fields.update(k.casefold() for k in data.keys())
+    return frozenset(fields)
+
+
+def _check_fabricated_drug_name(
+    line: str,
+    line_no: int,
+    drug_allowlist: frozenset[str],
+) -> list[dict]:
+    """T3: Flag drug-like capitalized names in EXPAND prose absent from evidence allowlist."""
+    if not _is_expand_prose(line):
+        return []
+    findings: list[dict] = []
+    for match in _DRUG_NAME_RE.finditer(line):
+        candidate = match.group(1)
+        if candidate in _DRUG_NAME_STOPLIST:
+            continue
+        if candidate.casefold() not in drug_allowlist:
+            findings.append({
+                "type": "FABRICATED_DRUG_NAME",
+                "line": line_no,
+                "snippet": line[:120],
+                "expected": "drug name in resolved_drugs.json or stage3_*.json[matched_drugs/preclinical_compounds]",
+                "actual": f"{candidate} not found in evidence allowlist",
+                "remediation": "Remove drug claim or move drug to the appropriate stage3 evidence file",
+            })
+    return findings
+
+
+def _check_fabricated_file_reference(
+    line: str,
+    line_no: int,
+    evidence_dir: "Path",
+    in_evidence_section: bool,
+) -> list[dict]:
+    """T4: Flag file references that are _FAILED or point to absent evidence files."""
+    findings: list[dict] = []
+    seen_filenames: set[str] = set()
+
+    def _emit(filename: str, snippet: str) -> None:
+        if filename in seen_filenames:
+            return
+        seen_filenames.add(filename)
+        if filename.endswith("_FAILED"):
+            findings.append({
+                "type": "FABRICATED_FILE_REFERENCE",
+                "line": line_no,
+                "snippet": snippet[:120],
+                "expected": "evidence file without _FAILED suffix",
+                "actual": f"file with _FAILED suffix referenced",
+                "remediation": "Remove the _FAILED suffix or remove the citation entirely",
+            })
+        elif not in_evidence_section and not (evidence_dir / filename).exists():
+            findings.append({
+                "type": "FABRICATED_FILE_REFERENCE",
+                "line": line_no,
+                "snippet": snippet[:120],
+                "expected": f"file exists at {evidence_dir / filename}",
+                "actual": "file does not exist",
+                "remediation": "Remove the citation or check the filename spelling",
+            })
+
+    for pattern in (_BRACKET_FILE_RE, _BARE_FILE_RE, _SPECIAL_FILE_RE):
+        for match in pattern.finditer(line):
+            # Use full line as snippet so context like "From stage..." is visible
+            _emit(match.group(1), line)
+    return findings
+
+
+def _check_wrong_approval_year_extended(
+    line: str,
+    line_no: int,
+    resolved_drugs: list[dict],
+) -> list[dict]:
+    """T5: Extended WRONG_APPROVAL_YEAR — also fires when drug absent or first_approval null."""
+    findings: list[dict] = []
+    resolved_lookup: dict[str, dict] = {
+        (d.get("name") or "").strip().casefold(): d
+        for d in resolved_drugs
+        if (d.get("name") or "").strip()
+    }
+    for match in _APPROVAL_YEAR_RE.finditer(line):
+        drug = match.group("drug").casefold()
+        year = match.group("year")
+        snippet = match.group(0)[:120]
+        drug_entry = resolved_lookup.get(drug)
+        if drug_entry is None:
+            findings.append({
+                "type": "WRONG_APPROVAL_YEAR",
+                "line": line_no,
+                "snippet": snippet,
+                "expected": f"drug '{drug}' present in resolved_drugs.json",
+                "actual": "drug not in evidence",
+                "remediation": "Remove the approval year claim or add drug to evidence",
+            })
+        elif drug_entry.get("first_approval") is None:
+            findings.append({
+                "type": "WRONG_APPROVAL_YEAR",
+                "line": line_no,
+                "snippet": snippet,
+                "expected": f"first_approval field present in resolved_drugs.json[{drug}]",
+                "actual": "drug found but first_approval field is null/missing",
+                "remediation": f"Remove the approval year claim — {drug}'s first_approval is not in evidence",
+            })
+    return findings
+
+
+def _check_ungrounded_mechanism(
+    line: str,
+    line_no: int,
+    drug_allowlist: frozenset[str],
+    moa_map: dict[str, str],
+) -> list[dict]:
+    """T6: Flag mechanism verbs near drug names when MoA field is empty or mismatched.
+
+    Per spec: only complete-sentence lines (containing terminal punctuation) are checked.
+    """
+    if not _is_expand_prose(line):
+        return []
+    if not _EXPAND_SENTENCE_END_RE.search(line.strip()):
+        return []
+    # Carve-out: sentence has explicit [source: mechanism_of_action] annotation
+    if "[source: mechanism_of_action]" in line.casefold():
+        return []
+    findings: list[dict] = []
+    tokens = re.findall(r"\b\w[\w-]*\b", line)
+    drug_positions: list[tuple[int, str]] = [
+        (i, tok.casefold())
+        for i, tok in enumerate(tokens)
+        if tok.casefold() in drug_allowlist and tok.casefold() in moa_map
+    ]
+    if not drug_positions:
+        return []
+    moa_matches = list(_MOA_VERB_RE.finditer(line))
+    if not moa_matches:
+        return []
+
+    seen_drugs: set[str] = set()
+    for drug_idx, drug in drug_positions:
+        if drug in seen_drugs:
+            continue
+        for moa_match in moa_matches:
+            moa_pos = moa_match.start()
+            # Approximate token index for the MoA verb
+            text_before_moa = line[:moa_pos]
+            moa_token_idx = len(re.findall(r"\b\w[\w-]*\b", text_before_moa))
+            if abs(moa_token_idx - drug_idx) > 50:
+                continue
+            moa_verb = moa_match.group(0).casefold()
+            moa_text = moa_map.get(drug, "")
+            if not moa_text:
+                findings.append({
+                    "type": "UNGROUNDED_MECHANISM",
+                    "line": line_no,
+                    "snippet": line[:120],
+                    "expected": f"resolved_drugs.json[{drug}].mechanism_of_action populated",
+                    "actual": "mechanism_of_action is empty/missing",
+                    "remediation": f"Remove the mechanism claim — {drug}'s MoA is not in evidence",
+                })
+                seen_drugs.add(drug)
+                break
+            verb_stem = moa_verb.rstrip("se").rstrip()
+            if verb_stem not in moa_text:
+                findings.append({
+                    "type": "UNGROUNDED_MECHANISM",
+                    "line": line_no,
+                    "snippet": line[:120],
+                    "expected": f"mechanism field contains '{moa_verb}' or related",
+                    "actual": f"mechanism field is '{moa_text[:80]}' — no overlap",
+                    "remediation": "Align mechanism claim with the field text or remove",
+                })
+                seen_drugs.add(drug)
+                break
+    return findings
+
+
+def _check_unanchored_sentence(
+    line: str,
+    line_no: int,
+    evidence_field_set: frozenset[str],
+) -> list[dict]:
+    """T7: Flag EXPAND-region sentences missing [source: <field>] or citing absent fields.
+
+    Per spec: only lines that contain at least one terminal punctuation mark (.!?)
+    constitute a complete sentence and are checked. Continuation lines, horizontal
+    rules (---), and lines without terminal punctuation are skipped.
+    """
+    if not _is_expand_prose(line):
+        return []
+    # Only check lines that contain a complete sentence (terminal punctuation)
+    if not _EXPAND_SENTENCE_END_RE.search(line.strip()):
+        return []
+    findings: list[dict] = []
+    annotations = _ANNOTATION_RE.findall(line)
+    if not annotations:
+        findings.append({
+            "type": "UNANCHORED_SENTENCE",
+            "line": line_no,
+            "snippet": line[:120],
+            "expected": "[source: <field>] annotation",
+            "actual": "no annotation",
+            "remediation": "Add [source: <field>] citing the evidence JSON field, or remove the claim",
+        })
+    else:
+        for field in annotations:
+            if field.casefold() not in evidence_field_set:
+                findings.append({
+                    "type": "UNANCHORED_SENTENCE",
+                    "line": line_no,
+                    "snippet": line[:120],
+                    "expected": "annotation citing an evidence field",
+                    "actual": f"annotation [source: {field}] not in allowed fields",
+                    "remediation": f"Use a real evidence field name or 'interpretation' for hedged claims",
+                })
+    return findings
+
 
 @tool
 def validate_drug_md(data_dir: str | Path) -> str:
@@ -2615,12 +2980,72 @@ def validate_drug_md(data_dir: str | Path) -> str:
             ),
         })
 
-    total_checks = 9  # classification + decimals + columns + approval + phase + hypothesis + expand + quant
+    # --- T3-T7: new hallucination flags (line-by-line scan) -------------------
+    findings: list[dict] = []
+
+    if evidence_dir.exists():
+        drug_allowlist = _build_drug_allowlist(evidence_dir, resolved)
+        moa_map = _build_moa_map(resolved)
+        evidence_field_set = _build_evidence_field_set(evidence_dir)
+    else:
+        drug_allowlist = frozenset()
+        moa_map = {}
+        evidence_field_set = frozenset(_BASE_EVIDENCE_FIELDS)
+
+    in_code_block = False
+    in_evidence_section = False
+
+    for line_no, line in enumerate(drug_text.splitlines(), start=1):
+        stripped = line.strip()
+
+        # Track fenced code blocks
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+            continue
+        if in_code_block:
+            continue
+
+        # Track evidence-reference sections (carve-out for T4)
+        if stripped.startswith("#") and _EVIDENCE_SECTION_RE.search(stripped):
+            in_evidence_section = True
+        elif stripped.startswith("#"):
+            in_evidence_section = False
+
+        # Table rows are carve-outs for T3/T6/T7
+        if stripped.startswith("|"):
+            continue
+
+        # Universal carve-out: "not available in source data"
+        if "not available in source data" in line.casefold():
+            continue
+
+        # T3: FABRICATED_DRUG_NAME
+        findings.extend(_check_fabricated_drug_name(line, line_no, drug_allowlist))
+
+        # T4: FABRICATED_FILE_REFERENCE
+        findings.extend(_check_fabricated_file_reference(
+            line, line_no, evidence_dir, in_evidence_section
+        ))
+
+        # T5: WRONG_APPROVAL_YEAR extension
+        findings.extend(_check_wrong_approval_year_extended(line, line_no, resolved))
+
+        # T6: UNGROUNDED_MECHANISM
+        findings.extend(_check_ungrounded_mechanism(line, line_no, drug_allowlist, moa_map))
+
+        # T7: UNANCHORED_SENTENCE
+        findings.extend(_check_unanchored_sentence(line, line_no, evidence_field_set))
+
+    total_checks = 14  # 9 original + 5 new (T3-T7)
+    # ``valid`` and ``issue_count`` reflect only the legacy T1-T2 checks so that
+    # existing callers (e.g. finalization validator) are not broken by the new
+    # advisory T3-T7 findings.  ``findings`` is an additive diagnostic output.
     return json.dumps({
         "valid": len(issues) == 0,
         "total_checks": total_checks,
         "issue_count": len(issues),
         "issues": issues,
+        "findings": findings,
     }, indent=2)
 
 

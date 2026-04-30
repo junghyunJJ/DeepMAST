@@ -1,0 +1,11 @@
+{
+  "chembl": {
+    "errors": [],
+    "executed": true,
+    "gene_symbol": "FN1",
+    "matched_drugs": [],
+    "source": "chembl"
+  },
+  "gene": "FN1",
+  "source": "chembl"
+}

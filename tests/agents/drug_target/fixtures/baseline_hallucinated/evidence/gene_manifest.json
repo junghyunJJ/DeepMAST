@@ -1,0 +1,166 @@
+[
+  {
+    "symbol": "ADGRE5",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "AGTRAP",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "APOE",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "CALR",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "CD4",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "CD44",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "CD47",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "CD55",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "CD74",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "CD81",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "CD99",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "CXCR4",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "EZR",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "FN1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "GPC3",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "HLA-DMA",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "HLA-DMB",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "HLA-DPA1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "HLA-DPB1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "HLA-DQB1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "HLA-DRB1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "ICAM1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "ITGA3",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "ITGB2",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "LAMB2",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "LDLR",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "LRP1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "MMP2",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "MUC1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "P4HB",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "PECAM1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "PLAUR",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "PPIA",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "RACK1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "RPSA",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "SDC2",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "SFTPD",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "TGFB1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "THBS1",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "TREM2",
+    "is_selected_top3": false
+  },
+  {
+    "symbol": "TYROBP",
+    "is_selected_top3": false
+  }
+]

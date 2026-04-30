@@ -174,6 +174,23 @@ when generating scientific reports. Each rule addresses an observed failure mode
 | Classifications | validated_target → exploratory_target | Copy exact string | Read from Reference Card `classification` |
 | Drug names | Invented drug names | Only use provided names | Read from Reference Card `clinical_drugs` |
 | Pathways | Inferred from general knowledge | Only cite evidence pathways | Read from Reference Card `kegg_pathways` |
+| FDA approval year | `ocriplasmin (approved 2010)` — fabricated; `first_approval` field absent in `resolved_drugs.json` | Year may be stated only when `first_approval` field is present | Read year from `resolved_drugs.json[*].first_approval`; otherwise omit the year |
+| Mechanism of action | `lovastatin disrupts ITGB2 signaling` — `mechanism_of_action` field empty for that drug | Mechanism phrase requires non-empty `mechanism_of_action` field with overlapping keyword | Read from `resolved_drugs.json[*].mechanism_of_action`; otherwise omit the mechanism phrase |
+| File reference | `[from known_drugs.json]` — file does not exist; or `stage1_HLA-DPA1--CD4.json_FAILED` — `_FAILED` suffix never valid | Bracket and bare-filename references must point to a real file in `evidence_dir`; never use `*_FAILED` suffix | Reference only files present in `evidence_dir`; cite by exact filename |
+| Sentence-level provenance | `lovastatin's known safety profile and oral bioavailability could enable rapid translation` — no source field anchors this sentence | Every prose sentence in `<!-- EXPAND -->` must carry `[source: <field>]` annotation; `interpretation` annotation allowed only with hedged language | Append `[source: <field>]` per sentence; use `[source: interpretation]` only with `suggests`/`indicates`/`consistent with` |
+
+## Closed-Book Generation
+
+Every factual claim written inside an `<!-- EXPAND -->` region must trace to a named field in the per-gene source bundle (Reference Card, `resolved_drugs.json`, `stage1_pairs`, etc.). If the supporting field is absent or empty, emit `"not available in source data"` or omit the sentence entirely. Do not draw on training-data knowledge to fill the gap.
+
+**Annotation rule:** Append `[source: <field>]` (one or more fields, comma-separated) to every prose sentence inside `<!-- EXPAND -->` regions. Multiple fields may be listed: `[source: molecule_type, mechanism_of_action]`. Annotations are stripped from the saved drug.md by post-processing — they are validator/critic-only markers and are never visible to end-users.
+
+`[source: interpretation]` is allowed only when the sentence uses hedged language: `suggests`, `indicates`, `consistent with`, or `implies`. Using `[source: interpretation]` on a sentence with definitive language (`confirms`, `proves`, `drives`) is a hallucination risk and is forbidden.
+
+**Example with annotations:**
+```
+Ibalizumab is a CD4-binding monoclonal antibody [source: molecule_type, mechanism_of_action].
+```
 
 ## EXPAND Marker Rules
 
@@ -203,12 +220,14 @@ when generating scientific reports. Each rule addresses an observed failure mode
 <!-- EXPAND: Interpret the drug landscape for CD4 in the context of idiopathic pulmonary fibrosis. Note that existing drugs target CD4 for other indications. -->
 ```
 
-**After (correctly expanded):**
+**After (proposed):**
 ```
-CD4-targeting therapeutics include ibalizumab (approved 2018 for HIV) and tregalizumab
-(Phase 2 for rheumatoid arthritis), both monoclonal antibodies. These agents have not
-been evaluated in pulmonary fibrosis. The existing clinical development confirms CD4
-is druggable via antibody-based approaches.
+CD4-targeting therapeutics include ibalizumab and tregalizumab (both monoclonal antibodies per Reference Card `molecule_type`). Ibalizumab is listed at Phase 4 for HIV infection; no approval year is stated because the Reference Card has no `first_approval` field for it. These agents have not been evaluated in pulmonary fibrosis, confirming CD4 is druggable via antibody-based approaches.
+```
+
+**WRONG (forbidden):**
+```
+ibalizumab (approved 2018 for HIV)  ← fabricated; first_approval absent
 ```
 
 ### Example 2: Incorrect Expansion (Hallucinated)
@@ -279,6 +298,10 @@ Before saving the final drug.md, verify:
 - [ ] Disease phase reported is for the TARGET indication (not an approved different indication)
 - [ ] `safety_profile` sign preserved (negative scores not rendered as positive)
 - [ ] Cell types cited appear in `stage1_pairs` (not inferred from general knowledge)
+- [ ] No FDA approval year stated without `first_approval` source field
+- [ ] No mechanism description without `mechanism_of_action` source field
+- [ ] No `[from X.json]` or bare `stageN_*.json` reference to a non-existent or `*_FAILED` file
+- [ ] Every prose sentence in EXPAND regions carries `[source: <field>]` annotation
 
 ## Troubleshooting
 

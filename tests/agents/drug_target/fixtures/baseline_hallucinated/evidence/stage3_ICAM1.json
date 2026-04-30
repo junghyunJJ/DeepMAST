@@ -1,0 +1,103 @@
+{
+  "chembl": {
+    "errors": [],
+    "executed": true,
+    "gene_symbol": "ICAM1",
+    "matched_drugs": [
+      {
+        "chembl_id": "CHEMBL119501",
+        "drug_name": "4-(4-Trifluoromethyl-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid methylamide",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ICAM1"
+      },
+      {
+        "chembl_id": "CHEMBL118113",
+        "drug_name": "4-[4-(Tetrahydro-pyran-2-yloxymethyl)-phenoxy]-thieno[2,3-c]pyridine-2-carboxylic acid amide",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ICAM1"
+      },
+      {
+        "chembl_id": "CHEMBL117198",
+        "drug_name": "4-(4-Cyano-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid amide",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ICAM1"
+      },
+      {
+        "chembl_id": "CHEMBL117279",
+        "drug_name": "4-{4-[2-(2-Methoxy-ethoxy)-ethoxymethyl]-phenoxy}-thieno[2,3-c]pyridine-2-carboxylic acid methylamide",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ICAM1"
+      },
+      {
+        "chembl_id": "CHEMBL119733",
+        "drug_name": "4-(4-Vinyl-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid amide",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ICAM1"
+      },
+      {
+        "chembl_id": "CHEMBL2048028",
+        "drug_name": "LIFITEGRAST",
+        "indications": [
+          {
+            "efo_term": "dry eye syndrome",
+            "max_phase": 4.0,
+            "mesh_heading": "Dry Eye Syndromes"
+          },
+          {
+            "efo_term": "eye disease",
+            "max_phase": 4.0,
+            "mesh_heading": "Eye Diseases"
+          },
+          {
+            "efo_term": "allergic conjunctivitis",
+            "max_phase": 2.0,
+            "mesh_heading": "Conjunctivitis, Allergic"
+          },
+          {
+            "efo_term": "graft versus host disease",
+            "max_phase": 0.5,
+            "mesh_heading": "Graft vs Host Disease"
+          }
+        ],
+        "mechanism_of_action": "Integrin alpha-L/beta-2 (LFA-1) antagonist",
+        "target_gene": "ICAM1"
+      },
+      {
+        "chembl_id": "CHEMBL116070",
+        "drug_name": "4-(4-Bromo-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid amide",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ICAM1"
+      },
+      {
+        "chembl_id": "CHEMBL119335",
+        "drug_name": "4-(4-Cyano-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid methylamide",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ICAM1"
+      },
+      {
+        "chembl_id": "CHEMBL116152",
+        "drug_name": "4-(4-Iodo-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid amide",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ICAM1"
+      },
+      {
+        "chembl_id": "CHEMBL117746",
+        "drug_name": "4-{4-[2-(2-Methoxy-ethoxy)-ethoxymethyl]-phenoxy}-thieno[2,3-c]pyridine-2-carboxylic acid amide",
+        "indications": [],
+        "mechanism_of_action": null,
+        "target_gene": "ICAM1"
+      }
+    ],
+    "source": "chembl"
+  },
+  "gene": "ICAM1",
+  "source": "chembl"
+}

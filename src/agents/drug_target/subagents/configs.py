@@ -11,6 +11,10 @@ Three-subagent staged funnel with audited finalization (happy path):
 Workflow order: evidence_assessor -> hypothesis_writer -> summarizer
 """
 
+import json
+import os
+import shutil
+from pathlib import Path
 from typing import Callable, Sequence
 
 from langchain_core.language_models import BaseChatModel
@@ -64,6 +68,10 @@ from src.agents.drug_target.tools import (
 
 __all__ = [
     "get_subagents",
+    "run_summarizer_loop",
+    "synthesize_repair_instructions",
+    "write_critic_slices",
+    "cleanup_critic_slices",
     "SUBAGENT_CONFIGS",
     "WORKFLOW_ORDER",
 ]
@@ -415,3 +423,248 @@ def get_subagents(
     )
 
     return subagents
+
+
+# =============================================================================
+# T17: Pre-write critic slice files
+# =============================================================================
+
+def write_critic_slices(data_dir: str) -> None:
+    """Write per-gene evidence slices for the critic before it runs.
+
+    For each gene X found in evidence/stage3_<X>.json, writes:
+      data_dir/evidence/_critic_slices/<X>.json
+
+    Contents per gene slice:
+    - Reference Card fields from resolved_drugs.json (entries referencing X)
+    - stage3_<X>.json content
+    - All stage1_*<X>*.json entries
+
+    Also writes:
+      data_dir/evidence/_critic_slices/_hypothesis.json
+    containing hypothesis_report.json union with Reference Cards for all
+    genes listed in hypothesis_report.json[*].entities.
+
+    Cleanup: call cleanup_critic_slices(data_dir) at end of run
+    unless OMB_CRITIC_SLICES_KEEP=1 is set.
+    """
+    evidence_dir = Path(data_dir) / "evidence"
+    slices_dir = evidence_dir / "_critic_slices"
+    slices_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load resolved_drugs for Reference Card fields
+    resolved_drugs: list[dict] = []
+    resolved_path = evidence_dir / "resolved_drugs.json"
+    if resolved_path.exists():
+        try:
+            resolved_drugs = json.loads(resolved_path.read_text())
+        except Exception:
+            resolved_drugs = []
+
+    # Collect all stage3 genes
+    stage3_genes: dict[str, dict] = {}
+    for stage3_file in evidence_dir.glob("stage3_*.json"):
+        gene = stage3_file.stem[len("stage3_"):]
+        try:
+            stage3_genes[gene] = json.loads(stage3_file.read_text())
+        except Exception:
+            stage3_genes[gene] = {}
+
+    # Write per-gene slices
+    for gene, stage3_data in stage3_genes.items():
+        # Reference Card entries referencing this gene
+        ref_card_entries = [
+            entry for entry in resolved_drugs
+            if gene in json.dumps(entry)
+        ]
+        # stage1 files referencing this gene
+        stage1_entries: list[dict] = []
+        for stage1_file in evidence_dir.glob(f"stage1_*{gene}*.json"):
+            try:
+                stage1_entries.append({
+                    "file": stage1_file.name,
+                    "data": json.loads(stage1_file.read_text()),
+                })
+            except Exception:
+                pass
+
+        slice_payload = {
+            "gene": gene,
+            "reference_card": ref_card_entries,
+            "stage3": stage3_data,
+            "stage1": stage1_entries,
+        }
+        (slices_dir / f"{gene}.json").write_text(
+            json.dumps(slice_payload, indent=2)
+        )
+
+    # Write hypothesis slice. The on-disk shape varies:
+    #   1. {"hypotheses": [{"biological_entities": {"genes": [...]}, ...}, ...]}
+    #      — current pipeline output (frozen baseline).
+    #   2. [{"entities": [...]}, ...]
+    #      — legacy/test-fixture shape preserved in unit tests.
+    # Accept both.
+    hyp_path = evidence_dir / "hypothesis_report.json"
+    hyp_raw: object = []
+    if hyp_path.exists():
+        try:
+            hyp_raw = json.loads(hyp_path.read_text())
+        except Exception:
+            hyp_raw = []
+
+    if isinstance(hyp_raw, dict):
+        hyp_data = hyp_raw.get("hypotheses") or []
+    elif isinstance(hyp_raw, list):
+        hyp_data = hyp_raw
+    else:
+        hyp_data = []
+
+    hyp_genes: set[str] = set()
+    for hyp in hyp_data:
+        if not isinstance(hyp, dict):
+            continue
+        for entity in hyp.get("entities", []) or []:
+            hyp_genes.add(str(entity))
+        bio = hyp.get("biological_entities") or {}
+        if isinstance(bio, dict):
+            for entity in bio.get("genes", []) or []:
+                hyp_genes.add(str(entity))
+
+    hyp_ref_cards = [
+        entry for entry in resolved_drugs
+        if any(g in json.dumps(entry) for g in hyp_genes)
+    ]
+    hypothesis_slice = {
+        "hypothesis_report": hyp_data,
+        "genes": sorted(hyp_genes),
+        "reference_cards": hyp_ref_cards,
+    }
+    (slices_dir / "_hypothesis.json").write_text(
+        json.dumps(hypothesis_slice, indent=2)
+    )
+
+
+def cleanup_critic_slices(data_dir: str) -> None:
+    """Remove _critic_slices directory unless OMB_CRITIC_SLICES_KEEP=1."""
+    if os.environ.get("OMB_CRITIC_SLICES_KEEP") == "1":
+        return
+    slices_dir = Path(data_dir) / "evidence" / "_critic_slices"
+    if slices_dir.exists():
+        shutil.rmtree(slices_dir)
+
+
+# =============================================================================
+# Fix 3: Repair-instruction synthesis helper (dedup + Section-4 gate)
+# =============================================================================
+
+def synthesize_repair_instructions(claim_verdicts: list[dict]) -> list[str]:
+    """Build a deduplicated repair instruction list from critic claim_verdicts.
+
+    Applies two filters before generating instructions:
+    1. Skip verdicts where ``verdict != "FAIL"``.
+    2. Skip verdicts where ``section == "section_4"`` — Section 4 hypothesis
+       prose originates from hypothesis_report.json and is not editable by
+       report_writer; passing these causes an oscillation loop.
+    3. Deduplicate on (claim_text, source_field) — case-insensitive. Many
+       critic FAILs target the same source-field gap; one instruction per
+       unique pair is sufficient.
+
+    Args:
+        claim_verdicts: List of critic claim verdict dicts. Each dict may have:
+            - verdict: "FAIL" | "PASS" (required)
+            - claim_text: the offending claim string
+            - source_field: the missing source field name
+            - section: optional section identifier (e.g. "section_4")
+
+    Returns:
+        Deduplicated list of repair instruction strings. Empty list means
+        no actionable repairs — caller should NOT re-invoke report_writer.
+    """
+    seen: set[tuple[str, str]] = set()
+    instructions: list[str] = []
+
+    for entry in claim_verdicts:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("verdict") != "FAIL":
+            continue
+        if entry.get("section") == "section_4":
+            continue
+
+        claim_text = str(entry.get("claim_text", "")).strip().lower()
+        source_field = str(entry.get("source_field", "")).strip().lower()
+        key = (claim_text, source_field)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        raw_claim = str(entry.get("claim_text", "")).strip()
+        raw_field = str(entry.get("source_field", "")).strip()
+        instructions.append(
+            f'Remove or rewrite claim "{raw_claim}" — no source for "{raw_field}".'
+        )
+
+    return instructions
+
+
+# =============================================================================
+# T16: Programmatic repair-loop counter
+# =============================================================================
+
+def run_summarizer_loop(
+    data_dir: str,
+    *,
+    fake_validate_result: dict | None = None,
+    fake_critic_output: dict | None = None,
+    max_cycles: int = 2,
+) -> dict:
+    """Programmatic bounded repair loop for the summarizer orchestration.
+
+    In production the summarizer DeepAgent calls validate_drug_md and the
+    critic subagent directly (prompt-driven). This function encapsulates the
+    counter logic so it can be unit-tested without a live LLM.
+
+    In test mode, inject ``fake_validate_result`` and ``fake_critic_output``
+    to simulate deterministic critic responses. In production these are None
+    and the caller is responsible for driving the actual tool/subagent calls.
+
+    Args:
+        data_dir: Path to the run's evidence directory.
+        fake_validate_result: Injected validate_drug_md result dict (tests only).
+        fake_critic_output: Injected critic output dict (tests only).
+        max_cycles: Maximum number of repair iterations before BLOCKED.
+
+    Returns:
+        dict with keys:
+            - status: "PASS" | "BLOCKED"
+            - repair_cycles: int (number of critic iterations executed)
+            - blocker: list[dict] | None (P0 findings if BLOCKED, else None)
+    """
+    repair_cycles = 0
+    last_critic_output: dict = {}
+
+    for _ in range(max_cycles):
+        # --- validate_drug_md ---
+        validate_result = fake_validate_result or {}
+        if validate_result.get("valid", True):
+            return {"status": "PASS", "repair_cycles": repair_cycles, "blocker": None}
+
+        # --- critic ---
+        critic_output = fake_critic_output or {}
+        last_critic_output = critic_output
+        repair_cycles += 1
+
+        if critic_output.get("passed", False):
+            return {"status": "PASS", "repair_cycles": repair_cycles, "blocker": None}
+
+    # Exhausted max_cycles — extract P0 findings for the blocker payload
+    p0_findings = [
+        f for f in last_critic_output.get("findings", [])
+        if f.get("severity") == "P0"
+    ]
+    blocker = p0_findings if p0_findings else last_critic_output.get("findings", [])
+    return {
+        "status": "BLOCKED",
+        "repair_cycles": repair_cycles,
+        "blocker": blocker,
+    }

@@ -1,0 +1,82 @@
+{
+  "gene": "CD4",
+  "chembl": {
+    "gene_symbol": "CD4",
+    "executed": true,
+    "matched_drugs": [
+      {
+        "chembl_id": "CHEMBL5589596",
+        "drug_name": "N1-(4-((4-(1-ethyl-4-fluoro-2-methyl-1H-benzo[d]imidazol-6-yl)-5-fluoropyrimidin-2-yl)amino)benzyl)-N8-hydroxyoctanediamide",
+        "target_gene": "CD4",
+        "mechanism_of_action": null,
+        "indications": []
+      },
+      {
+        "chembl_id": "CHEMBL3143464",
+        "drug_name": "Chloropeptin I analogue",
+        "target_gene": "CD4",
+        "mechanism_of_action": null,
+        "indications": []
+      },
+      {
+        "chembl_id": "CHEMBL4747494",
+        "drug_name": "13-Cyclohexylmethoxy-6-methylene-4,8-di(p-toluenesulfonyl)-4,8,15-triazabicyclo[9.3.1]pentadeca-1(15),11,13-triene Hydrochloride",
+        "target_gene": "CD4",
+        "mechanism_of_action": null,
+        "indications": []
+      },
+      {
+        "chembl_id": "CHEMBL506605",
+        "drug_name": "ISOCOMPLESTATIN",
+        "target_gene": "CD4",
+        "mechanism_of_action": null,
+        "indications": []
+      },
+      {
+        "chembl_id": "CHEMBL525803",
+        "drug_name": "CHLOROPEPTIN",
+        "target_gene": "CD4",
+        "mechanism_of_action": null,
+        "indications": []
+      },
+      {
+        "chembl_id": "CHEMBL1852155",
+        "drug_name": "9-benzyl-3-methylene-1,5-bis(p-tolylsulfonyl)-1,5,9-triazacyclododecane",
+        "target_gene": "CD4",
+        "mechanism_of_action": null,
+        "indications": []
+      },
+      {
+        "chembl_id": "CHEMBL4791666",
+        "drug_name": "4,8-Di[(p-dimethylamino)benzenesulfonyl]-13-ethyl-6-methylene-4,8,15-triazabicyclo[9.3.1]pentadeca-1(15),11,13-triene Hydrochloride",
+        "target_gene": "CD4",
+        "mechanism_of_action": null,
+        "indications": []
+      },
+      {
+        "chembl_id": "CHEMBL1819181",
+        "drug_name": "CYCLOTRIAZADISULFONAMIDE HYDROCHLORIDE",
+        "target_gene": "CD4",
+        "mechanism_of_action": null,
+        "indications": []
+      },
+      {
+        "chembl_id": "CHEMBL4746252",
+        "drug_name": "13-Benzyloxy-6-methylene-4,8-di(p-toluenesulfonyl)-4,8,15-triazabicyclo[9.3.1]pentadeca-1(15),11,13-triene Hydrochloride",
+        "target_gene": "CD4",
+        "mechanism_of_action": null,
+        "indications": []
+      },
+      {
+        "chembl_id": "CHEMBL4750983",
+        "drug_name": "13-Butyl-6-methylene-4,8-di(p-toluenesulfonyl)-4,8,15-triazabicyclo[9.3.1]pentadeca-1(15),11,13-triene Hydrochloride",
+        "target_gene": "CD4",
+        "mechanism_of_action": null,
+        "indications": []
+      }
+    ],
+    "source": "chembl",
+    "errors": []
+  },
+  "source": "chembl"
+}
