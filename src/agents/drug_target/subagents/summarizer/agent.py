@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from deepagents import create_deep_agent
+from deepagents.backends import FilesystemBackend
 from deepagents.backends.protocol import BackendFactory, BackendProtocol
 from langchain_core.language_models import BaseChatModel
 from langchain_core.runnables import Runnable
@@ -13,6 +14,10 @@ from langchain_core.tools import BaseTool
 
 from src.agents.deep_interpreter.middleware.write_file_guard import (
     ReadOnlyToolGuardMiddleware,
+)
+from src.agents.drug_target.subagents.summarizer.middleware import (
+    BuildEvidenceSummaryGuardMiddleware,
+    RepairCycleCounterMiddleware,
 )
 from src.agents.drug_target.subagents.prompts import SUMMARIZER_PROMPT
 from src.agents.drug_target.tools import (
@@ -28,6 +33,16 @@ _SUMMARIZER_BLOCKED_TOOLS = (
     "save_target_assessment",
     "save_evidence",
 )
+
+
+def _build_disk_backend(data_dir: str) -> FilesystemBackend:
+    """Build a FilesystemBackend rooted at data_dir with virtual path mode.
+
+    Virtual mode ensures that built-in filesystem tools (ls, read_file, glob)
+    resolve paths like /evidence/pair_001.json to data_dir/evidence/pair_001.json
+    on real disk rather than against an in-memory StateBackend.
+    """
+    return FilesystemBackend(root_dir=data_dir, virtual_mode=True)
 
 
 def create_summarizer_agent(
@@ -60,7 +75,9 @@ def create_summarizer_agent(
         middleware=[
             ReadOnlyToolGuardMiddleware(
                 blocked_tool_names=_SUMMARIZER_BLOCKED_TOOLS,
-            )
+            ),
+            BuildEvidenceSummaryGuardMiddleware(),
+            RepairCycleCounterMiddleware(max_cycles=2),
         ],
     )
 
@@ -157,6 +174,9 @@ def get_summarizer_subagent(
     ``evidence/_critic_slices/`` before the first critic call and removed
     afterward.
     """
+    if data_dir is not None and backend is None:
+        backend = _build_disk_backend(data_dir)
+
     agent = create_summarizer_agent(
         model=model,
         backend=backend,

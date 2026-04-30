@@ -215,12 +215,9 @@ def test_baseline_known_issue_detected(case: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="awaits T20 regenerated fixture", strict=False)
 def test_regenerated_drug_md_no_new_fabrications(tmp_path: Path) -> None:
     """Extract sentences in regenerated drug.md not present in baseline,
     write them to a temp .md, run validator on that, assert zero P0 findings.
-
-    Marked xfail until T20 produces tests/agents/drug_target/fixtures/regenerated/drug.md.
     """
     if not REGENERATED_PATH.exists():
         pytest.skip("regenerated fixture not yet created")
@@ -259,12 +256,10 @@ def test_regenerated_drug_md_no_new_fabrications(tmp_path: Path) -> None:
     )
 
 
-@pytest.mark.xfail(reason="awaits T20 regenerated fixture", strict=False)
 def test_regenerated_drug_md_zero_p0_findings() -> None:
     """Regenerated drug.md must have zero P0 findings when run through the full validator.
 
     TC-8: validates the complete regenerated report against the baseline evidence dir.
-    Marked xfail until T20 produces tests/agents/drug_target/fixtures/regenerated/drug.md.
     """
     if not REGENERATED_PATH.exists():
         pytest.skip("regenerated fixture not yet created")
