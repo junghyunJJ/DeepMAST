@@ -104,6 +104,7 @@ Important SEARCHER rules:
 - Pathway fan-out is keyword-only: the tool uses controlled pathway labels and aliases with `genes=[]`, not pathway gene anchors.
 - Pathway evidence is text-confirmed only. A query keyword or `matched_via_query` stamp is provenance and does not by itself prove pathway coverage.
 - `query_type="pathway"` means deterministic pathway fan-out. Generic no-gene keyword retrieval is tracked as `query_type="keyword"` and is not pathway evidence by itself.
+- SEARCHER should not author `query_intent`; LLM/cache-provided intent is ignored by the tool and deterministic pathway intent is assigned internally.
 
 ### Step 2.2: Automatic Internal Fallback
 `search_literature_dynamic` handles fallback internally. If LLM query generation fails, it automatically switches to a fixed search strategy. Do not call a separate fallback tool.
@@ -178,10 +179,15 @@ needs_bundle = (
     or (has_pathways and coverage["pathways_coverage_pct"] < 50)
     or (has_celltypes and coverage["celltypes_coverage_pct"] < 60)
 )
+followup_genes = (
+    coverage["genes_missing"][:3]
+    if coverage["genes_coverage_pct"] < 60
+    else []
+)
 
 if needs_bundle:
     search_literature(
-        genes=coverage["genes_missing"][:3] or search_context["genes"][:2],
+        genes=followup_genes,
         disease="breast cancer",
         keywords=[
             "VEGF signaling",
@@ -318,10 +324,15 @@ needs_bundle = (
     or (has_pathways and coverage["pathways_coverage_pct"] < 50)
     or (has_celltypes and coverage["celltypes_coverage_pct"] < 60)
 )
+followup_genes = (
+    coverage["genes_missing"][:3]
+    if coverage["genes_coverage_pct"] < 60
+    else []
+)
 
 if needs_bundle:
     search_literature(
-        genes=coverage["genes_missing"][:3] or search_context["genes"][:2],
+        genes=followup_genes,
         disease="breast cancer",
         keywords=[
             "VEGF signaling",

@@ -50,6 +50,7 @@ Notes:
 - The compact summary is only the first layer. Rev6 follow-up must inspect the nested `coverage` object directly.
 - SEARCHER pathway fan-out uses controlled pathway labels/aliases with `genes=[]`; pathway query stamps are provenance only and require title/abstract pathway text before coverage is credited.
 - `query_type="pathway"` is reserved for deterministic pathway fan-out. Other no-gene searches are generic keyword retrieval (`query_type="keyword"`).
+- Do not author `query_intent` in SEARCHER prompts or cached queries. The tool strips LLM/cache-provided intent and assigns deterministic pathway intent internally.
 
 **Manual shell wrapper**
 
@@ -182,10 +183,15 @@ needs_bundle = (
     or (has_pathways and coverage["pathways_coverage_pct"] < 50)
     or (has_celltypes and coverage["celltypes_coverage_pct"] < 60)
 )
+followup_genes = (
+    coverage["genes_missing"][:3]
+    if coverage["genes_coverage_pct"] < 60
+    else []
+)
 
 if needs_bundle:
     search_literature(
-        genes=coverage["genes_missing"][:3] or search_context["genes"][:2],
+        genes=followup_genes,
         disease="breast cancer",
         keywords=[
             "VEGF signaling",
@@ -383,13 +389,25 @@ search_literature(
 ### Example Follow-Up Pattern
 
 ```python
-if (
-    result["coverage"]["total_papers"] < 15
-    or result["coverage"]["genes_coverage_pct"] < 60
-    or result["coverage"]["celltypes_coverage_pct"] < 60
-):
+coverage = result["coverage"]
+has_pathways = bool(search_context["pathways"])
+has_celltypes = bool(search_context["celltypes"])
+
+needs_bundle = (
+    coverage["total_papers"] < 15
+    or coverage["genes_coverage_pct"] < 60
+    or (has_pathways and coverage["pathways_coverage_pct"] < 50)
+    or (has_celltypes and coverage["celltypes_coverage_pct"] < 60)
+)
+followup_genes = (
+    coverage["genes_missing"][:3]
+    if coverage["genes_coverage_pct"] < 60
+    else []
+)
+
+if needs_bundle:
     search_literature(
-        genes=result["coverage"]["genes_missing"][:3],
+        genes=followup_genes,
         disease="disease context",
         keywords=["pathway keyword", "celltype keyword", "microenvironment keyword"],
         max_results=10,
