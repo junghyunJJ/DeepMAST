@@ -1,0 +1,154 @@
+{
+  "APOE^LRP1": {
+    "passed": true,
+    "string_combined": 0.999,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "CALR^LRP1": {
+    "passed": true,
+    "string_combined": 0.998,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "FN1^PLAUR": {
+    "passed": false,
+    "string_combined": 0.697,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "FN1^SDC2": {
+    "passed": true,
+    "string_combined": 0.959,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "HLA-DMA^CD74": {
+    "passed": false,
+    "string_combined": 0.994,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 1.0,
+    "census_gene_a_pvalue": 1.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "HLA-DMB^CD74": {
+    "passed": false,
+    "string_combined": 0.982,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 1.0,
+    "census_gene_a_pvalue": 1.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "HLA-DPA1^CD4": {
+    "passed": false,
+    "string_combined": 0.977,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 1.0,
+    "census_gene_a_pvalue": 1.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "HLA-DPB1^CD4": {
+    "passed": false,
+    "string_combined": 0.96,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 1.0,
+    "census_gene_a_pvalue": 1.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "HLA-DQB1^CD4": {
+    "passed": true,
+    "string_combined": 0.951,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 5.358789687548438e-07,
+    "census_gene_b_pvalue": 0.0
+  },
+  "HLA-DRB1^CD4": {
+    "passed": false,
+    "string_combined": 0.994,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 1.0,
+    "census_gene_a_pvalue": 1.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "ICAM1^EZR": {
+    "passed": true,
+    "string_combined": 0.998,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "ICAM1^ITGB2": {
+    "passed": true,
+    "string_combined": 0.999,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "ICAM1^MUC1": {
+    "passed": true,
+    "string_combined": 0.993,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "ICAM1^PECAM1": {
+    "passed": true,
+    "string_combined": 0.873,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 3.450783285785519e-07,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "LAMB2^RPSA": {
+    "passed": false,
+    "string_combined": 0.0,
+    "string_status": "no_record",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0009102218907395265
+  },
+  "MMP2^PECAM1": {
+    "passed": false,
+    "string_combined": 0.75,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "PPIA^CXCR4": {
+    "passed": false,
+    "string_combined": 0.403,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.6843752569765329,
+    "census_gene_b_pvalue": 0.0
+  },
+  "TGFB1^P4HB": {
+    "passed": false,
+    "string_combined": 0.0,
+    "string_status": "no_record",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0
+  },
+  "THBS1^CD47": {
+    "passed": true,
+    "string_combined": 0.999,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 0.0,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0
+  }
+}

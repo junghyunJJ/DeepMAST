@@ -1,0 +1,69 @@
+{
+  "ligand": "ICAM1",
+  "receptor": "PECAM1",
+  "string_ppi": {
+    "gene_a": "ICAM1",
+    "gene_b": "PECAM1",
+    "species": 9606,
+    "required_score": 400,
+    "executed": true,
+    "interaction_found": true,
+    "string_record_found": true,
+    "max_combined_score": 0.873,
+    "ppi_enrichment": {
+      "number_of_nodes": 2,
+      "number_of_edges": 1,
+      "average_node_degree": 1.0,
+      "local_clustering_coefficient": 1.0,
+      "expected_number_of_edges": 0,
+      "p_value": 0.1664
+    },
+    "errors": []
+  },
+  "census_validation": {
+    "disease": "pulmonary fibrosis",
+    "requested_cell_type": "pulmonary alveolar type 2 cell",
+    "resolved_cell_type": "pulmonary alveolar type 2 cell",
+    "resolution_mode": "exact",
+    "target_vs_rest": {
+      "gene_a": {
+        "target_pct": 0.466799,
+        "rest_pct": 0.138886,
+        "diff": 0.327913,
+        "risk_ratio": 3.361,
+        "risk_ratio_capped": false,
+        "z": 79.0596,
+        "p_value": 0.0
+      },
+      "gene_b": {
+        "target_pct": 0.063486,
+        "rest_pct": 0.324416,
+        "diff": -0.26093,
+        "risk_ratio": 0.1957,
+        "risk_ratio_capped": false,
+        "z": -48.0175,
+        "p_value": 0.0
+      },
+      "coexpression": {
+        "target_pct": 0.036183,
+        "rest_pct": 0.048985,
+        "diff": -0.012802,
+        "risk_ratio": 0.7387,
+        "risk_ratio_capped": false,
+        "z": -5.097,
+        "p_value": 3.450783285785519e-07
+      }
+    },
+    "executed": true,
+    "source": "csv_integration",
+    "csv_file": "census_icam1_pecam1_pulmonary_alveolar_type_2_cell.csv"
+  },
+  "stage1_filter": {
+    "passed": true,
+    "string_combined": 0.873,
+    "string_status": "in_db",
+    "census_coexpr_pvalue": 3.450783285785519e-07,
+    "census_gene_a_pvalue": 0.0,
+    "census_gene_b_pvalue": 0.0
+  }
+}

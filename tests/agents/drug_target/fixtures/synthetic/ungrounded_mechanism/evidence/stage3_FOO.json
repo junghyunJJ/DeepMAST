@@ -1,0 +1,7 @@
+{
+  "gene": "FOO",
+  "matched_drugs": [
+    {"name": "DRUG_X", "max_phase": 4, "indications": "test indication"}
+  ],
+  "preclinical_compounds": []
+}

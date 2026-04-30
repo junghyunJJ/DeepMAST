@@ -1,0 +1,11 @@
+{
+  "chembl": {
+    "errors": [],
+    "executed": true,
+    "gene_symbol": "MUC1",
+    "matched_drugs": [],
+    "source": "chembl"
+  },
+  "gene": "MUC1",
+  "source": "chembl"
+}

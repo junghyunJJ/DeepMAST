@@ -1,0 +1,553 @@
+{
+  "APOE^LRP1": {
+    "pair_key": "APOE^LRP1",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.015242,
+      "rest_pct": 0.233378,
+      "diff": -0.218136,
+      "risk_ratio": 0.0653,
+      "risk_ratio_capped": false,
+      "z": -44.576,
+      "p_value": 0.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": true,
+      "string_combined": 0.999,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 0.0,
+      "census_gene_a_pvalue": 0.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "CALR^LRP1": {
+    "pair_key": "CALR^LRP1",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.038038,
+      "rest_pct": 0.152085,
+      "diff": -0.114046,
+      "risk_ratio": 0.2501,
+      "risk_ratio_capped": false,
+      "z": -27.4355,
+      "p_value": 0.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": true,
+      "string_combined": 0.998,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 0.0,
+      "census_gene_a_pvalue": 0.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "FN1^PLAUR": {
+    "pair_key": "FN1^PLAUR",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.045063,
+      "rest_pct": 0.289433,
+      "diff": -0.24437,
+      "risk_ratio": 0.1557,
+      "risk_ratio_capped": false,
+      "z": -46.4774,
+      "p_value": 0.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": false,
+      "string_combined": 0.697,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 0.0,
+      "census_gene_a_pvalue": 0.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "FN1^SDC2": {
+    "pair_key": "FN1^SDC2",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.051822,
+      "rest_pct": 0.229545,
+      "diff": -0.177722,
+      "risk_ratio": 0.2258,
+      "risk_ratio_capped": false,
+      "z": -36.4714,
+      "p_value": 0.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": true,
+      "string_combined": 0.959,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 0.0,
+      "census_gene_a_pvalue": 0.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "HLA-DMA^CD74": {
+    "pair_key": "HLA-DMA^CD74",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.0,
+      "rest_pct": 0.0,
+      "diff": 0.0,
+      "risk_ratio": null,
+      "risk_ratio_capped": true,
+      "z": 0.0,
+      "p_value": 1.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": false,
+      "string_combined": 0.994,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 1.0,
+      "census_gene_a_pvalue": 1.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "HLA-DMB^CD74": {
+    "pair_key": "HLA-DMB^CD74",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.0,
+      "rest_pct": 0.0,
+      "diff": 0.0,
+      "risk_ratio": null,
+      "risk_ratio_capped": true,
+      "z": 0.0,
+      "p_value": 1.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": false,
+      "string_combined": 0.982,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 1.0,
+      "census_gene_a_pvalue": 1.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "HLA-DPA1^CD4": {
+    "pair_key": "HLA-DPA1^CD4",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.0,
+      "rest_pct": 0.0,
+      "diff": 0.0,
+      "risk_ratio": null,
+      "risk_ratio_capped": true,
+      "z": 0.0,
+      "p_value": 1.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": false,
+      "string_combined": 0.977,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 1.0,
+      "census_gene_a_pvalue": 1.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "HLA-DPB1^CD4": {
+    "pair_key": "HLA-DPB1^CD4",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.0,
+      "rest_pct": 0.0,
+      "diff": 0.0,
+      "risk_ratio": null,
+      "risk_ratio_capped": true,
+      "z": 0.0,
+      "p_value": 1.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": false,
+      "string_combined": 0.96,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 1.0,
+      "census_gene_a_pvalue": 1.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "HLA-DQB1^CD4": {
+    "pair_key": "HLA-DQB1^CD4",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.009543,
+      "rest_pct": 0.182343,
+      "diff": -0.1728,
+      "risk_ratio": 0.0523,
+      "risk_ratio_capped": false,
+      "z": -38.7286,
+      "p_value": 0.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": true,
+      "string_combined": 0.951,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 0.0,
+      "census_gene_a_pvalue": 5.358789687548438e-07,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "HLA-DRB1^CD4": {
+    "pair_key": "HLA-DRB1^CD4",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.0,
+      "rest_pct": 0.0,
+      "diff": 0.0,
+      "risk_ratio": null,
+      "risk_ratio_capped": true,
+      "z": 0.0,
+      "p_value": 1.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": false,
+      "string_combined": 0.994,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 1.0,
+      "census_gene_a_pvalue": 1.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "ICAM1^EZR": {
+    "pair_key": "ICAM1^EZR",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.364082,
+      "rest_pct": 0.080949,
+      "diff": 0.283133,
+      "risk_ratio": 4.4977,
+      "risk_ratio_capped": false,
+      "z": 85.197,
+      "p_value": 0.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": true,
+      "string_combined": 0.998,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 0.0,
+      "census_gene_a_pvalue": 0.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "ICAM1^ITGB2": {
+    "pair_key": "ICAM1^ITGB2",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.024122,
+      "rest_pct": 0.057134,
+      "diff": -0.033012,
+      "risk_ratio": 0.4222,
+      "risk_ratio_capped": false,
+      "z": -12.2739,
+      "p_value": 0.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": true,
+      "string_combined": 0.999,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 0.0,
+      "census_gene_a_pvalue": 0.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "ICAM1^MUC1": {
+    "pair_key": "ICAM1^MUC1",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.437508,
+      "rest_pct": 0.024492,
+      "diff": 0.413016,
+      "risk_ratio": 17.863,
+      "risk_ratio_capped": false,
+      "z": 189.6552,
+      "p_value": 0.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": true,
+      "string_combined": 0.993,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 0.0,
+      "census_gene_a_pvalue": 0.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "ICAM1^PECAM1": {
+    "pair_key": "ICAM1^PECAM1",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.036183,
+      "rest_pct": 0.048985,
+      "diff": -0.012802,
+      "risk_ratio": 0.7387,
+      "risk_ratio_capped": false,
+      "z": -5.097,
+      "p_value": 3.450783285785519e-07
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": true,
+      "string_combined": 0.873,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 3.450783285785519e-07,
+      "census_gene_a_pvalue": 0.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "LAMB2^RPSA": {
+    "pair_key": "LAMB2^RPSA",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.181842,
+      "rest_pct": 0.079771,
+      "diff": 0.102072,
+      "risk_ratio": 2.2796,
+      "risk_ratio_capped": false,
+      "z": 31.7471,
+      "p_value": 0.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": false,
+      "string_combined": 0.0,
+      "string_status": "no_record",
+      "census_coexpr_pvalue": 0.0,
+      "census_gene_a_pvalue": 0.0,
+      "census_gene_b_pvalue": 0.0009102218907395265
+    }
+  },
+  "MMP2^PECAM1": {
+    "pair_key": "MMP2^PECAM1",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.000928,
+      "rest_pct": 0.056537,
+      "diff": -0.055609,
+      "risk_ratio": 0.0164,
+      "risk_ratio_capped": false,
+      "z": -20.8923,
+      "p_value": 0.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": false,
+      "string_combined": 0.75,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 0.0,
+      "census_gene_a_pvalue": 0.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "PPIA^CXCR4": {
+    "pair_key": "PPIA^CXCR4",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.030219,
+      "rest_pct": 0.312269,
+      "diff": -0.28205,
+      "risk_ratio": 0.0968,
+      "risk_ratio_capped": false,
+      "z": -52.4919,
+      "p_value": 0.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": false,
+      "string_combined": 0.403,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 0.0,
+      "census_gene_a_pvalue": 0.6843752569765329,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "TGFB1^P4HB": {
+    "pair_key": "TGFB1^P4HB",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.104573,
+      "rest_pct": 0.202676,
+      "diff": -0.098104,
+      "risk_ratio": 0.516,
+      "risk_ratio_capped": false,
+      "z": -21.0058,
+      "p_value": 0.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": false,
+      "string_combined": 0.0,
+      "string_status": "no_record",
+      "census_coexpr_pvalue": 0.0,
+      "census_gene_a_pvalue": 0.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  },
+  "THBS1^CD47": {
+    "pair_key": "THBS1^CD47",
+    "resolved_disease": "pulmonary fibrosis",
+    "disease_source": "cli",
+    "resolved_target_cell_type": "pulmonary alveolar type 2 cell",
+    "latest_target_cell_type": "pulmonary alveolar type 2 cell",
+    "target_cell_type_source": "cli",
+    "requested_target_cell_type": "pulmonary alveolar type 2 cell",
+    "legacy_target_cell_type": null,
+    "latest_coexpression": {
+      "target_pct": 0.059907,
+      "rest_pct": 0.169125,
+      "diff": -0.109217,
+      "risk_ratio": 0.3542,
+      "risk_ratio_capped": false,
+      "z": -25.1329,
+      "p_value": 0.0
+    },
+    "legacy_coexpression": null,
+    "legacy_unknown_csv": null,
+    "stage1_filter": {
+      "passed": true,
+      "string_combined": 0.999,
+      "string_status": "in_db",
+      "census_coexpr_pvalue": 0.0,
+      "census_gene_a_pvalue": 0.0,
+      "census_gene_b_pvalue": 0.0
+    }
+  }
+}

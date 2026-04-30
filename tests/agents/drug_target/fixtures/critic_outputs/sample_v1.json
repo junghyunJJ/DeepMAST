@@ -1,0 +1,27 @@
+{
+  "passed": false,
+  "severity_counts": {"P0": 1, "P1": 0, "P2": 0, "P3": 0},
+  "checked_gates": ["validate_drug_md", "evidence_grounding"],
+  "findings": [
+    {
+      "severity": "P0",
+      "issue": "Drug name 'Durvalumab' not found in resolved_drugs.json",
+      "evidence": "resolved_drugs.json lists only 'Atezolizumab'",
+      "repair": "Replace 'Durvalumab' with the drug name present in resolved_drugs.json or remove the claim.",
+      "claim_text": "Durvalumab targets PD-L1 and is approved for NSCLC.",
+      "source_field": "resolved_drugs"
+    }
+  ],
+  "repair_instructions": [
+    "Replace 'Durvalumab' with the drug name present in resolved_drugs.json or remove the claim."
+  ],
+  "claim_verdicts": [
+    {
+      "section": "section_1",
+      "claim_text": "Durvalumab targets PD-L1 and is approved for NSCLC.",
+      "verdict": "FAIL",
+      "source_field": "resolved_drugs",
+      "reason": "Field 'resolved_drugs' does not contain an entry for Durvalumab."
+    }
+  ]
+}

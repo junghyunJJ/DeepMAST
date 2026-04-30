@@ -67,18 +67,107 @@ def create_summarizer_agent(
     return agent.with_config({"recursion_limit": 3000})
 
 
+class _CriticSliceWrapper:
+    """Thin lifecycle wrapper: write slices -> invoke agent -> cleanup slices.
+
+    This is NOT a LangGraph node or DeepAgent — it is a minimal callable that
+    satisfies the Runnable protocol used by DeepAgents CompiledSubAgent.  The
+    only public method is ``invoke``; ``with_config`` delegates to the inner
+    agent so that recursion_limit and other config flow through unchanged.
+    """
+
+    def __init__(self, agent: Runnable, *, data_dir: str) -> None:
+        self._agent = agent
+        self._data_dir = data_dir
+
+    # ------------------------------------------------------------------
+    # Runnable protocol: delegate with_config so callers can chain it
+    # ------------------------------------------------------------------
+
+    def with_config(self, config: Any, **kwargs: Any) -> "_CriticSliceWrapper":
+        new_agent = self._agent.with_config(config, **kwargs)
+        return _CriticSliceWrapper(new_agent, data_dir=self._data_dir)
+
+    # ------------------------------------------------------------------
+    # Core: write slices, invoke, cleanup
+    # ------------------------------------------------------------------
+
+    def invoke(self, input: Any, config: Any = None, **kwargs: Any) -> Any:  # noqa: A002
+        """Write critic slices, run the inner agent, then clean up."""
+        # Lazy import to avoid circular dependency:
+        # summarizer/agent.py <- configs.py <- summarizer/__init__.py
+        from src.agents.drug_target.subagents.configs import (  # noqa: PLC0415
+            cleanup_critic_slices,
+            write_critic_slices,
+        )
+        write_critic_slices(self._data_dir)
+        try:
+            if config is not None:
+                return self._agent.invoke(input, config, **kwargs)
+            return self._agent.invoke(input, **kwargs)
+        finally:
+            cleanup_critic_slices(self._data_dir)
+
+    async def ainvoke(self, input: Any, config: Any = None, **kwargs: Any) -> Any:  # noqa: A002
+        """Async variant: write critic slices, run the inner agent, then clean up."""
+        from src.agents.drug_target.subagents.configs import (  # noqa: PLC0415
+            cleanup_critic_slices,
+            write_critic_slices,
+        )
+        write_critic_slices(self._data_dir)
+        try:
+            if config is not None:
+                return await self._agent.ainvoke(input, config, **kwargs)
+            return await self._agent.ainvoke(input, **kwargs)
+        finally:
+            cleanup_critic_slices(self._data_dir)
+
+
+def wrap_summarizer_with_critic_slices(
+    agent: Runnable,
+    *,
+    data_dir: str,
+) -> _CriticSliceWrapper:
+    """Wrap a summarizer agent with critic-slice lifecycle management.
+
+    Writes evidence/_critic_slices/ before the agent runs and removes it
+    afterward (unless OMB_CRITIC_SLICES_KEEP=1 is set in the environment).
+
+    Args:
+        agent: The compiled summarizer Runnable to wrap.
+        data_dir: Path to the run's working directory (parent of ``evidence/``).
+
+    Returns:
+        A ``_CriticSliceWrapper`` that satisfies the Runnable invoke protocol.
+    """
+    return _CriticSliceWrapper(agent, data_dir=data_dir)
+
+
 def get_summarizer_subagent(
     *,
     model: str | BaseChatModel | None = None,
     backend: BackendProtocol | BackendFactory | None = None,
     inner_subagents: Sequence[dict[str, Any]] = (),
+    data_dir: str | None = None,
 ) -> dict[str, Any]:
-    """Return the summarizer in DeepAgents CompiledSubAgent format."""
+    """Return the summarizer in DeepAgents CompiledSubAgent format.
+
+    When ``data_dir`` is provided the returned runnable is wrapped with
+    ``_CriticSliceWrapper`` so that per-gene critic slices are written to
+    ``evidence/_critic_slices/`` before the first critic call and removed
+    afterward.
+    """
     agent = create_summarizer_agent(
         model=model,
         backend=backend,
         inner_subagents=inner_subagents,
     )
+
+    runnable: Runnable | _CriticSliceWrapper
+    if data_dir is not None:
+        runnable = wrap_summarizer_with_critic_slices(agent, data_dir=data_dir)
+    else:
+        runnable = agent
 
     return {
         "name": "summarizer",
@@ -87,11 +176,12 @@ def get_summarizer_subagent(
             "deterministic validators, read-only critic, and bounded repair "
             "loop before reporting pass/fail."
         ),
-        "runnable": agent,
+        "runnable": runnable,
     }
 
 
 __all__ = [
     "create_summarizer_agent",
     "get_summarizer_subagent",
+    "wrap_summarizer_with_critic_slices",
 ]

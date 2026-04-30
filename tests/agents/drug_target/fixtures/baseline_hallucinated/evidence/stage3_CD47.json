@@ -1,0 +1,11 @@
+{
+  "chembl": {
+    "errors": [],
+    "executed": true,
+    "gene_symbol": "CD47",
+    "matched_drugs": [],
+    "source": "chembl"
+  },
+  "gene": "CD47",
+  "source": "chembl"
+}
