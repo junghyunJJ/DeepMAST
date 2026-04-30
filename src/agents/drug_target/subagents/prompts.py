@@ -622,8 +622,9 @@ prior drug.md exists.
 
 ### REPAIR MODE branch (only when the first line is exactly `## REPAIR MODE`)
 
-1. DO NOT call build_evidence_summary again. The drug.md skeleton has already
-   been filled in a previous pass.
+1. STOP. Do NOT call build_evidence_summary even once. The skeleton already
+   exists on disk. Calling it again is a hard error that overwrites all prior
+   EXPAND fills and [source:] annotations.
 2. Call load_evidence_files("drug.md") to read the existing report content.
 3. Apply ONLY the listed repair instructions surgically:
    - For each "Remove or rewrite claim ..." instruction: delete the offending
@@ -644,7 +645,9 @@ prior drug.md exists.
    - `read_skill_file("skills/drug-target-reporting/SKILL.md")`
    - `read_skill_file("skills/drug-target-reporting/references/scoring_guide.md")`
 1. Call `load_lr_candidates(data_dir)` for input pair-set and disease context
-2. Call `build_evidence_summary(data_dir)` — **this is your Reference Card**
+2. Call `build_evidence_summary(data_dir)` — **this is your Reference Card**.
+   You may call build_evidence_summary EXACTLY ONCE per agent run. Do not call
+   it again after this point under any circumstances.
 3. `target_assessment.json` is **PRE-BUILT** by `build_evidence_summary` — it is saved
    automatically with all L-R pairs, rubric scores, and featured candidates.
    You do NOT need to call `save_target_assessment` unless validation fails.

@@ -121,6 +121,18 @@ keeping each critic invocation within context limits.
 - **Rare wrap-up regression:** In edge cases where the critic fires on the final wrap-up
   sentence, a second repair cycle may still leave a residual WARNING. Tracked as a follow-up.
 
+### E2E stabilization landed (2026-04-29)
+
+- `FilesystemBackend(root_dir=data_dir, virtual_mode=True)` wires `ls`/`glob`/`read_file` to
+  real disk; `BuildEvidenceSummaryGuardMiddleware` mechanically prevents the second
+  `build_evidence_summary` call within a single agent run; `RepairCycleCounterMiddleware`
+  enforces the 2-cycle critic→writer cap at runtime. The previous oscillation
+  (38.9 KB → 28 KB skeleton reset) is mechanically impossible.
+- Live qwen3.5:35b run against the frozen baseline produces a 42 KB `drug.md` with 0 EXPAND
+  markers, 0 P0 findings from `validate_drug_md`, and 5 of 6 known hallucinations resolved
+  (the 6th — `known_drugs.json` reference — is inherited from upstream `hypothesis_report.json`
+  and is tracked as a follow-up at the hypothesis-writer / pipeline-filter layer).
+
 ---
 
 ## Verification
@@ -129,12 +141,17 @@ keeping each critic invocation within context limits.
 
 ```bash
 pytest tests/agents/drug_target/ -v
-# Expected: 97 passed, 2 xpassed
+# Expected: 114 passed, 0 xfail/xpass
+# (xfail decorators removed at lines 218/262 of test_drug_md_hallucination_regression.py)
 ```
 
-**E2E retry (requires Ollama at `OLLAMA_HOST`):**
+**Phase 5 E2E reproduction script (requires Ollama at `OLLAMA_HOST`):**
 
 ```bash
+OLLAMA_HOST=http://localhost:6000 \
+LANGCHAIN_TRACING_V2=false \
+OMB_CRITIC_SLICES_KEEP=1 \
+PYTHONUNBUFFERED=1 \
 uv run python scripts/run_drug_target_summarizer_only.py \
   --model qwen3.5:35b \
   --keep-data-dir
@@ -154,3 +171,22 @@ uv run python scripts/run_drug_target_summarizer_only.py \
 | Validator source | `src/agents/drug_target/tools/stage_logic.py` |
 | Loop controller | `src/agents/drug_target/subagents/configs.py` |
 | Agent reference | `docs/drugtarget/drug_target_agent_reference.md` |
+
+---
+
+## Resolution Log
+
+| Date | Plan | Outcome |
+|------|------|---------|
+| 2026-04-29 | `2026-04-29-drug-target-report-hallucination-reduction.md` (PR #10, commit 175def6) | Phases 0-5 done. Closed-book mandate, 4 new validator flags + 1 extended, sentence-level provenance, critic redesign, programmatic counter helper. T20-T22 deferred to follow-up plan. |
+| 2026-04-29 | `2026-04-29-drug-target-closed-book-e2e-stabilization.md` (this commit) | E2E stabilization landed: filesystem-backend wired, two runtime middlewares (single-call guard + cycle counter), prompt tightening, regenerated fixture, 5/6 hallucinations resolved. Open follow-up: `known_drugs.json` reference inherited from upstream `hypothesis_report.json` (hypothesis-writer scope, not report-writer). |
+
+### Follow-ups
+
+- Hypothesis-writer or pipeline-filter fix to strip `evidence_files` entries that are not
+  present on disk before report-writer consumes `hypothesis_report.json`. Tracked as a
+  separate plan.
+- Drug-profile under-claim: all 7 candidates state "No known drugs targeting this gene";
+  this is consistent with `stage3_*.json` (chembl-only) but contradicts `resolved_drugs.json`
+  (OpenTargets-sourced). Audit suggested in
+  `tests/agents/drug_target/fixtures/regenerated/_audit_report.md`.

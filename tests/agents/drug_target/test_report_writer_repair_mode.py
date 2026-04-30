@@ -48,9 +48,9 @@ def test_report_writer_repair_branch_instructs_load_not_build():
         'load_evidence_files("drug.md") to read the existing report, not '
         "rebuild from scratch."
     )
-    assert "DO NOT call build_evidence_summary" in REPORT_WRITER_PROMPT, (
+    assert "Do NOT call build_evidence_summary" in REPORT_WRITER_PROMPT, (
         "REPORT_WRITER_PROMPT repair branch must contain the literal instruction "
-        "'DO NOT call build_evidence_summary' to prevent the Phase-1 re-build "
+        "'Do NOT call build_evidence_summary' to prevent the Phase-1 re-build "
         "that discards all prior EXPAND fills and [source:] annotations."
     )
 
@@ -182,4 +182,29 @@ def test_synthesize_repair_instructions_deduplicates_mixed_sections():
     instructions = synthesize_repair_instructions(claim_verdicts)
     assert len(instructions) == 1, (
         f"Expected 1 instruction after dedup+section4 gate, got {len(instructions)}: {instructions}"
+    )
+
+
+# =============================================================================
+# Phase 4 — Tightened REPAIR MODE wording (D4)
+# =============================================================================
+
+
+def test_repair_mode_contains_stop_do_not_call_build_evidence_summary() -> None:
+    """Phase 4 — REPAIR MODE branch must contain the tightened 'STOP. Do NOT call
+    build_evidence_summary even once' language (D4 from the stabilization plan)."""
+    assert "STOP. Do NOT call build_evidence_summary even once" in REPORT_WRITER_PROMPT, (
+        "REPORT_WRITER_PROMPT REPAIR MODE branch must contain "
+        "'STOP. Do NOT call build_evidence_summary even once' to clearly signal "
+        "that calling it in repair mode is a hard error."
+    )
+
+
+def test_initial_write_contains_exactly_once_clause() -> None:
+    """Phase 4 — INITIAL WRITE Phase 1 must contain the 'EXACTLY ONCE per agent run'
+    clause so the LLM knows build_evidence_summary is a single-call operation."""
+    assert "EXACTLY ONCE per agent run" in REPORT_WRITER_PROMPT, (
+        "REPORT_WRITER_PROMPT INITIAL WRITE section must contain "
+        "'EXACTLY ONCE per agent run' near the build_evidence_summary instruction "
+        "to cooperatively reinforce the programmatic guard."
     )
