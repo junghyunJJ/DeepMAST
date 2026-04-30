@@ -40,6 +40,7 @@ from src.agents.deep_interpreter.tools.mcp_clients import (
 
 
 logger = logging.getLogger(__name__)
+QueryRecord = tuple[int, dict[str, Any], str]
 
 
 def _sync_save_json(dir_path: str, file_path: str, data: dict) -> None:
@@ -1501,76 +1502,153 @@ def _build_deterministic_gene_queries(
     return queries
 
 
-def _format_pathway_keyword(part: str) -> str:
-    """Resolve a pathway part to a canonical keyword.
+def _normalize_pathway_token(value: str) -> str:
+    """Normalize pathway labels for conservative vocabulary lookup."""
+    value = value.lower()
+    replacements = {
+        "β": "beta",
+        "α": "alpha",
+        "γ": "gamma",
+        "κ": "kappa",
+    }
+    for src, dst in replacements.items():
+        value = value.replace(src, dst)
+    return re.sub(r"[^a-z0-9]+", "", value)
 
-    Returns the first entry of PATHWAY_KEYWORDS whose key is a substring of
-    part.lower() (mirrors _generate_pathway_patterns matching at literature.py
-    :1586). Falls back to f"{part} signaling" for unknown pathways.
+
+def _pathway_entry_for_part(part: str) -> dict[str, Any] | None:
+    """Return the controlled vocabulary entry matching a pathway string."""
+    part_norm = _normalize_pathway_token(part)
+    if not part_norm:
+        return None
+
+    candidates_by_entry: list[tuple[dict[str, Any], list[str]]] = []
+    for key, entry in PATHWAY_KEYWORDS.items():
+        candidates = [
+            key,
+            str(entry.get("canonical_label", "")),
+            *entry.get("query_terms", []),
+            *entry.get("match_aliases", []),
+        ]
+        candidates_by_entry.append((entry, candidates))
+
+    for entry, candidates in candidates_by_entry:
+        for candidate in candidates:
+            candidate_norm = _normalize_pathway_token(str(candidate))
+            if candidate_norm and candidate_norm == part_norm:
+                return entry
+
+    for entry, candidates in candidates_by_entry:
+        for candidate in candidates:
+            candidate_norm = _normalize_pathway_token(str(candidate))
+            if candidate_norm and candidate_norm in part_norm:
+                return entry
+
+    for entry, candidates in candidates_by_entry:
+        for candidate in candidates:
+            candidate_norm = _normalize_pathway_token(str(candidate))
+            if candidate_norm and len(part_norm) >= 4 and part_norm in candidate_norm:
+                return entry
+    return None
+
+
+def _format_pathway_keywords(part: str) -> list[str]:
+    """Resolve a pathway part to canonical-first controlled query terms.
+
+    Known pathways return 2-3 source-backed pathway-level terms. Unknown
+    pathways fall back to a conservative text keyword and never add genes.
     """
-    part_lower = part.lower()
-    for key, keywords in PATHWAY_KEYWORDS.items():
-        if key in part_lower and keywords:
-            return keywords[0]
-    return f"{part} signaling"
+    entry = _pathway_entry_for_part(part)
+    if entry:
+        terms = [str(t).strip() for t in entry.get("query_terms", []) if str(t).strip()]
+        return terms[:3]
+    part_clean = str(part).strip()
+    if not part_clean:
+        return []
+    if "signaling" in part_clean.lower():
+        return [part_clean]
+    return [f"{part_clean} signaling"]
+
+
+def _format_pathway_keyword(part: str) -> str:
+    """Return the first controlled pathway keyword for backward-compatible callers."""
+    keywords = _format_pathway_keywords(part)
+    return keywords[0] if keywords else ""
 
 
 def _build_deterministic_pathway_queries(
     pathways: list[str],
     disease: str,
-    pathway_to_genes: dict[str, list[str]] | None = None,
-    max_genes_per_query: int = 3,
 ) -> list[dict]:
-    """Hybrid per-pathway fan-out: top-N hub genes + pathway keyword.
+    """Controlled keyword-only per-pathway fan-out.
 
-    F1 follow-up: recovers the pathway coverage regression introduced by Fix A*
-    (84.6% → 76.9%) by emitting one BioMCP query per pathway carrying both the
-    canonical pathway keyword AND the top-N hub genes registered for that
-    pathway in PATHWAY_TO_GENES. Reuses BioMCP's gene-indexed retrieval pipeline
-    so the returned papers are anchored on real pathway members rather than
-    keyword-only fuzzy matches.
+    SEARCHER mode keeps deterministic pathway follow-up, but it no longer
+    injects curated pathway gene anchors. Each pathway part emits one BioMCP query
+    with disease context, no genes, and canonical-first controlled pathway
+    keywords. Pathway evidence is confirmed later from title/abstract text.
 
     Args:
         pathways: Input pathway list. Semicolon-combined entries (e.g.
             "Androgen;MAPK") are split into one query per part.
         disease: Disease context attached to each query.
-        pathway_to_genes: Override mapping for testing. Defaults to module
-            PATHWAY_TO_GENES.
-        max_genes_per_query: Truncate genes per query (default 3).
 
     Returns:
         List of query dicts with shape:
-            {"genes": [...], "diseases": [disease] if disease else [],
-             "keywords": [canonical_keyword]}
-        Unknown pathways yield queries with empty genes list (keyword-only
-        fallback).
+            {"genes": [], "diseases": [disease] if disease else [],
+             "keywords": [controlled_keyword, ...],
+             "query_intent": "deterministic_pathway"}
     """
     if not pathways:
         return []
-    table = pathway_to_genes if pathway_to_genes is not None else PATHWAY_TO_GENES
     queries: list[dict] = []
     for pathway in pathways:
         if not pathway:
             continue
         # Semicolon-split (e.g., "Androgen;MAPK") — one query per part
         for part in [p.strip() for p in pathway.split(";") if p.strip()]:
-            key = part.lower()
-            # Exact-key lookup first; fall back to substring match so callers
-            # passing "MAPK signaling" still resolve to PATHWAY_TO_GENES["mapk"].
-            genes = list(table.get(key, []))
-            if not genes:
-                for tk, tg in table.items():
-                    if tk in key:
-                        genes = list(tg)
-                        break
-            genes = genes[:max_genes_per_query]
-            keyword = _format_pathway_keyword(part)
+            keywords = _format_pathway_keywords(part)
             queries.append({
-                "genes": genes,  # may be [] for unknown pathways
+                "genes": [],
                 "diseases": [disease] if disease else [],
-                "keywords": [keyword],
+                "keywords": keywords,
+                "query_intent": "deterministic_pathway",
             })
     return queries
+
+
+def _classify_literature_query(query: dict[str, Any]) -> str:
+    """Classify a literature query by trusted intent, not by genes=[] alone."""
+    if query.get("genes"):
+        return "gene"
+    if query.get("query_intent") == "deterministic_pathway":
+        return "deterministic_pathway"
+    return "keyword"
+
+
+def _partition_literature_queries(
+    validated_queries: list[dict[str, Any]],
+) -> tuple[list[QueryRecord], list[QueryRecord], list[QueryRecord]]:
+    """Partition queries while preserving their original validated-query index."""
+    gene_records: list[QueryRecord] = []
+    pathway_records: list[QueryRecord] = []
+    keyword_records: list[QueryRecord] = []
+
+    for index, query in enumerate(validated_queries):
+        intent = _classify_literature_query(query)
+        record = (index, query, intent)
+        if intent == "gene":
+            gene_records.append(record)
+        elif intent == "deterministic_pathway":
+            pathway_records.append(record)
+        else:
+            keyword_records.append(record)
+
+    return gene_records, pathway_records, keyword_records
+
+
+def _normalize_replayed_queries(query_cache: list[dict]) -> list[dict]:
+    """Sanitize cached queries through the same trust boundary as LLM output."""
+    return _validate_generated_queries(query_cache)
 
 
 def _validate_generated_queries(queries: list[dict]) -> list[dict]:
@@ -1610,7 +1688,9 @@ def _validate_generated_queries(queries: list[dict]) -> list[dict]:
         if not any([genes, diseases, keywords]):
             continue
 
-        # Limit field lengths to prevent overly broad queries
+        # Limit field lengths to prevent overly broad queries. Deliberately do
+        # not preserve raw query_intent here: LLM and cache replay data are not
+        # trusted to self-declare deterministic pathway evidence semantics.
         validated.append({
             "genes": genes[:5],
             "diseases": diseases[:3],
@@ -1693,45 +1773,193 @@ SPECIAL_GENE_ALIASES = {
     "CXCL12": ["SDF1"],
 }
 
-# Pathway keyword mappings (simplified)
-PATHWAY_KEYWORDS = {
-    "androgen": ["androgen receptor", "ar signaling"],
-    "estrogen": ["estrogen receptor", "er signaling"],
-    "mapk": ["erk signaling", "ras/mapk", "mek/erk", "erk1", "erk2"],
-    "pi3k": ["pi3k/akt", "akt signaling", "mtor"],
-    "nfkb": ["nf-kb", "nf-kappab", "nuclear factor kappa", "nf-κb"],
-    "egfr": ["erbb", "her family", "egf receptor"],
-    "tgf": ["tgf-beta", "tgfb", "smad", "tgf-β"],
-    "wnt": ["beta-catenin", "canonical wnt", "β-catenin"],
-    "notch": ["delta-notch", "notch signaling"],
-    "jak": ["jak/stat", "stat signaling"],
-    "vegf": ["vegf", "vegfa", "angiogenesis", "vegf signaling"],
-    "tnfa": ["tnf", "tnf-alpha", "tumor necrosis factor", "tnfa signaling"],
-    "trail": ["trail", "tnfsf10", "death receptor", "trail signaling"],
-    "p53": ["p53", "tp53", "p53 tumor suppressor"],
-    "hypoxia": ["hif-1alpha", "hif1a", "hypoxia inducible factor", "hif-1α"],
-}
-
-# Pathway → top hub genes mapping for hybrid deterministic pathway fan-out (F1).
-# Keys MUST mirror PATHWAY_KEYWORDS keys so that table.get(pathway.lower(), [])
-# and _format_pathway_keyword(pathway) agree on the canonical form (REV-9 contract).
-# Used by _build_deterministic_pathway_queries to recover pathway coverage via
-# BioMCP's gene-indexed retrieval pipeline (top-3 hub genes + pathway keyword).
-PATHWAY_TO_GENES: dict[str, list[str]] = {
-    "estrogen": ["ESR1", "ESR2", "PGR"],
-    "tgf":      ["TGFB1", "SMAD4", "ACVR2B"],  # key matches PATHWAY_KEYWORDS["tgf"]
-    "mapk":     ["MAPK1", "MAPK3", "RAF1"],
-    "pi3k":     ["PIK3CA", "AKT1", "PTEN"],
-    "jak":      ["JAK2", "STAT3", "STAT5A"],  # REV-9: matches PATHWAY_KEYWORDS["jak"]
-    "egfr":     ["EGFR", "ERBB2", "ERBB3"],
-    "nfkb":     ["RELA", "NFKB1", "IKBKB"],
-    "androgen": ["AR", "KLK3"],
-    "p53":      ["TP53", "MDM2", "CDKN1A"],
-    "hypoxia":  ["HIF1A", "VHL", "EPAS1"],
-    "vegf":     ["VEGFA", "KDR", "FLT1"],
-    "tnfa":     ["TNF", "TNFRSF1A", "TRADD"],
-    "trail":    ["TNFSF10", "TNFRSF10A", "TNFRSF10B"],
-    "wnt":      ["CTNNB1", "WNT3A", "LEF1"],  # closes PROGENy WNT coverage gap
+# Controlled pathway vocabulary for keyword-only deterministic pathway search.
+#
+# query_terms are canonical-first search terms. match_aliases are broader
+# title/abstract confirmation terms. source_refs are compact provenance records
+# for auditability; STRING is deliberately excluded from production aliases.
+PATHWAY_KEYWORDS: dict[str, dict[str, Any]] = {
+    "androgen": {
+        "canonical_label": "Androgen receptor signaling pathway",
+        "query_terms": [
+            "Androgen receptor signaling pathway",
+            "androgen receptor",
+            "AR signaling",
+        ],
+        "match_aliases": ["androgen receptor", "AR signaling", "androgen signaling"],
+        "source_refs": [
+            {"source": "PROGENy", "term": "Androgen"},
+            {"source": "Reactome", "term": "Androgen receptor signaling pathway"},
+        ],
+    },
+    "estrogen": {
+        "canonical_label": "Estrogen signaling pathway",
+        "query_terms": [
+            "Estrogen signaling pathway",
+            "estrogen receptor",
+            "ER signaling",
+        ],
+        "match_aliases": ["estrogen receptor", "ER signaling", "estrogen signaling"],
+        "source_refs": [
+            {"source": "KEGG", "id": "hsa04915", "term": "Estrogen signaling pathway"},
+            {"source": "PROGENy", "term": "Estrogen"},
+        ],
+    },
+    "mapk": {
+        "canonical_label": "MAPK signaling pathway",
+        "query_terms": ["MAPK signaling pathway", "ERK signaling", "RAS/MAPK"],
+        "match_aliases": ["MAPK", "ERK signaling", "MEK/ERK", "ERK1", "ERK2"],
+        "source_refs": [
+            {"source": "KEGG", "id": "hsa04010", "term": "MAPK signaling pathway"},
+            {"source": "PROGENy", "term": "MAPK"},
+        ],
+    },
+    "pi3k": {
+        "canonical_label": "PI3K-Akt signaling pathway",
+        "query_terms": [
+            "PI3K-Akt signaling pathway",
+            "PI3K/AKT",
+            "AKT signaling",
+        ],
+        "match_aliases": ["PI3K", "PI3K/AKT", "AKT signaling", "mTOR"],
+        "source_refs": [
+            {"source": "KEGG", "id": "hsa04151", "term": "PI3K-Akt signaling pathway"},
+            {"source": "PROGENy", "term": "PI3K"},
+        ],
+    },
+    "nfkb": {
+        "canonical_label": "NF-kappa B signaling pathway",
+        "query_terms": [
+            "NF-kappa B signaling pathway",
+            "NF-kB",
+            "nuclear factor kappa B",
+        ],
+        "match_aliases": [
+            "NF-kB",
+            "NF-kappaB",
+            "nuclear factor kappa",
+            "NFKB",
+        ],
+        "source_refs": [
+            {"source": "KEGG", "id": "hsa04064", "term": "NF-kappa B signaling pathway"},
+            {"source": "PROGENy", "term": "NFkB"},
+        ],
+    },
+    "egfr": {
+        "canonical_label": "Signaling by EGFR",
+        "query_terms": ["Signaling by EGFR", "EGFR signaling", "ERBB signaling"],
+        "match_aliases": ["EGFR", "ERBB", "HER family", "EGF receptor"],
+        "source_refs": [
+            {"source": "Reactome", "term": "Signaling by EGFR"},
+            {"source": "PROGENy", "term": "EGFR"},
+        ],
+    },
+    "tgf": {
+        "canonical_label": "TGF-beta signaling pathway",
+        "query_terms": [
+            "TGF-beta signaling pathway",
+            "TGF-beta",
+            "SMAD signaling",
+        ],
+        "match_aliases": ["TGF-beta", "TGFB", "SMAD", "TGF beta"],
+        "source_refs": [
+            {"source": "KEGG", "id": "hsa04350", "term": "TGF-beta signaling pathway"},
+            {"source": "MSigDB Hallmark", "term": "HALLMARK_TGF_BETA_SIGNALING"},
+            {"source": "PROGENy", "term": "TGFb"},
+        ],
+    },
+    "wnt": {
+        "canonical_label": "Wnt signaling pathway",
+        "query_terms": [
+            "Wnt signaling pathway",
+            "WNT beta-catenin signaling",
+            "canonical WNT",
+        ],
+        "match_aliases": ["WNT", "beta-catenin", "canonical WNT", "CTNNB1"],
+        "source_refs": [
+            {"source": "KEGG", "id": "hsa04310", "term": "Wnt signaling pathway"},
+            {"source": "MSigDB Hallmark", "term": "HALLMARK_WNT_BETA_CATENIN_SIGNALING"},
+            {"source": "PROGENy", "term": "WNT"},
+        ],
+    },
+    "notch": {
+        "canonical_label": "Notch signaling pathway",
+        "query_terms": ["Notch signaling pathway", "NOTCH signaling", "Delta-Notch"],
+        "match_aliases": ["NOTCH", "Delta-Notch", "Notch signaling"],
+        "source_refs": [
+            {"source": "KEGG", "id": "hsa04330", "term": "Notch signaling pathway"},
+            {"source": "Reactome", "term": "Signaling by NOTCH"},
+        ],
+    },
+    "jak": {
+        "canonical_label": "JAK-STAT signaling pathway",
+        "query_terms": ["JAK-STAT signaling pathway", "JAK/STAT", "STAT signaling"],
+        "match_aliases": ["JAK-STAT", "JAK/STAT", "STAT signaling"],
+        "source_refs": [
+            {"source": "KEGG", "id": "hsa04630", "term": "JAK-STAT signaling pathway"},
+            {"source": "PROGENy", "term": "JAK-STAT"},
+        ],
+    },
+    "vegf": {
+        "canonical_label": "VEGF signaling pathway",
+        "query_terms": ["VEGF signaling pathway", "VEGFA-VEGFR2 pathway", "angiogenesis"],
+        "match_aliases": ["VEGF", "VEGFA", "VEGFR", "angiogenesis"],
+        "source_refs": [
+            {"source": "KEGG", "id": "hsa04370", "term": "VEGF signaling pathway"},
+            {"source": "Reactome", "term": "VEGFA-VEGFR2 pathway"},
+            {"source": "PROGENy", "term": "VEGF"},
+        ],
+    },
+    "tnfa": {
+        "canonical_label": "TNF signaling pathway",
+        "query_terms": [
+            "TNF signaling pathway",
+            "TNF-alpha signaling",
+            "TNFA signaling via NFKB",
+        ],
+        "match_aliases": ["TNF", "TNF-alpha", "tumor necrosis factor", "TNFA"],
+        "source_refs": [
+            {"source": "KEGG", "id": "hsa04668", "term": "TNF signaling pathway"},
+            {"source": "MSigDB Hallmark", "term": "HALLMARK_TNFA_SIGNALING_VIA_NFKB"},
+            {"source": "PROGENy", "term": "TNFa"},
+        ],
+    },
+    "trail": {
+        "canonical_label": "TRAIL signaling pathway",
+        "query_terms": [
+            "TRAIL signaling pathway",
+            "TRAIL signaling",
+            "death receptor signaling",
+        ],
+        "match_aliases": ["TRAIL", "TNFSF10", "death receptor", "TRAIL signaling"],
+        "source_refs": [
+            {"source": "Reactome", "term": "TRAIL signaling"},
+            {"source": "PROGENy", "term": "Trail"},
+        ],
+    },
+    "p53": {
+        "canonical_label": "p53 signaling pathway",
+        "query_terms": ["p53 signaling pathway", "p53 tumor suppressor", "TP53 pathway"],
+        "match_aliases": ["p53", "TP53", "p53 tumor suppressor"],
+        "source_refs": [
+            {"source": "KEGG", "id": "hsa04115", "term": "p53 signaling pathway"},
+            {"source": "PROGENy", "term": "p53"},
+        ],
+    },
+    "hypoxia": {
+        "canonical_label": "HIF-1 signaling pathway",
+        "query_terms": [
+            "HIF-1 signaling pathway",
+            "hypoxia inducible factor",
+            "cellular response to hypoxia",
+        ],
+        "match_aliases": ["HIF-1alpha", "HIF1A", "hypoxia inducible factor", "hypoxia"],
+        "source_refs": [
+            {"source": "KEGG", "id": "hsa04066", "term": "HIF-1 signaling pathway"},
+            {"source": "Reactome", "term": "Cellular response to hypoxia"},
+            {"source": "PROGENy", "term": "Hypoxia"},
+        ],
+    },
 }
 
 
@@ -1855,10 +2083,19 @@ def _generate_pathway_patterns(pathway: str) -> list[str]:
         part_lower = part.lower()
         patterns.add(part_lower)
 
-        # Add keyword-based patterns
-        for key, keywords in PATHWAY_KEYWORDS.items():
-            if key in part_lower:
-                patterns.update([kw.lower() for kw in keywords])
+        entry = _pathway_entry_for_part(part)
+        if entry:
+            patterns.add(str(entry.get("canonical_label", "")).lower())
+            patterns.update(
+                str(term).lower()
+                for term in entry.get("query_terms", [])
+                if str(term).strip()
+            )
+            patterns.update(
+                str(term).lower()
+                for term in entry.get("match_aliases", [])
+                if str(term).strip()
+            )
 
         # Handle Greek letters
         greek_map = {'β': 'beta', 'α': 'alpha', 'γ': 'gamma'}
@@ -1878,6 +2115,68 @@ def _normalize_text_for_matching(text: str) -> str:
     Keeps hyphens as they're meaningful in gene names.
     """
     return ' '.join(text.lower().split())
+
+
+def _text_contains_pattern(text: str, pattern: str) -> bool:
+    """Return True when normalized text contains a biomedical text pattern."""
+    pattern_norm = _normalize_text_for_matching(pattern)
+    if not pattern_norm:
+        return False
+    if len(pattern_norm) <= 3:
+        return bool(re.search(rf'\b{re.escape(pattern_norm)}\b', text))
+    return pattern_norm in text
+
+
+def _generate_disease_patterns(diseases: list[str]) -> list[str]:
+    """Generate conservative disease aliases for strict title/abstract checks."""
+    patterns: set[str] = set()
+    for disease in diseases:
+        disease_norm = _normalize_text_for_matching(str(disease or ""))
+        if not disease_norm:
+            continue
+        patterns.add(disease_norm)
+        if " cancer" in disease_norm:
+            patterns.add(disease_norm.replace(" cancer", " carcinoma"))
+            patterns.add(disease_norm.replace(" cancer", " tumor"))
+            patterns.add(disease_norm.replace(" cancer", " tumour"))
+            patterns.add(disease_norm.replace(" cancer", " neoplasm"))
+        if disease_norm.endswith(" disease"):
+            patterns.add(disease_norm.removesuffix(" disease").strip())
+    return sorted(p for p in patterns if p)
+
+
+def _paper_has_disease_and_pathway_text(
+    paper: dict[str, Any],
+    diseases: list[str],
+    pathway_terms: list[str],
+) -> bool:
+    """Strict pathway-query retention predicate.
+
+    Query stamps are provenance only. A pathway-query paper is retained only
+    when its title/abstract text contains disease context and pathway context.
+    """
+    combined = _normalize_text_for_matching(
+        paper.get("abstract", "") + " " + paper.get("title", "")
+    )
+    if not combined:
+        return False
+
+    disease_patterns = _generate_disease_patterns(diseases)
+    pathway_patterns: set[str] = set()
+    for term in pathway_terms:
+        term = str(term or "").strip()
+        if not term:
+            continue
+        pathway_patterns.add(term.lower())
+        pathway_patterns.update(_generate_pathway_patterns(term))
+
+    has_disease = (
+        True
+        if not disease_patterns
+        else any(_text_contains_pattern(combined, p) for p in disease_patterns)
+    )
+    has_pathway = any(_text_contains_pattern(combined, p) for p in pathway_patterns)
+    return has_disease and has_pathway
 
 
 def _calculate_coverage(
@@ -1906,10 +2205,10 @@ def _calculate_coverage(
             When provided, adds pair co-occurrence tracking to the coverage dict.
         use_retrieval_tags: F2 two-tier provenance gate. When True, consult each
             paper's `matched_via_query` stamp (populated by _search_with_biomcp)
-            to pre-accept genes/pathways via BioMCP retrieval assertion, labeling
-            hits as `biomcp_tag+text_confirmed` when text also matches, or
-            `biomcp_tag_only` when only the retrieval stamp agrees. Default False
-            preserves legacy regex-only behavior byte-for-byte for PLANNER/REPORTER.
+            to pre-accept genes via BioMCP retrieval assertion. Pathway stamps
+            are provenance only and require title/abstract text confirmation.
+            Default False preserves legacy regex-only behavior byte-for-byte
+            for PLANNER/REPORTER.
 
     Returns:
         Coverage dictionary with covered items and percentages.
@@ -1987,11 +2286,9 @@ def _calculate_coverage(
             if pathway in coverage["pathways_covered"]:
                 continue
             if use_retrieval_tags and tag_kw_lower:
-                # Canonical tag match: any pathway pattern against any stamp
-                # keyword. Minimum length 3 guards against over-match from
-                # short pathway pattern fragments (REV-A arch review NIT-A) —
-                # legitimate 3-char pathway names like "wnt"/"erk"/"jak" still
-                # participate; 1-2 char fragments do not.
+                # Canonical tag match is provenance only for pathways. It can
+                # upgrade a text-confirmed hit, but cannot create coverage by
+                # itself.
                 canonical_hit = False
                 for p in pathway_patterns[pathway]:
                     p_lower = p.lower()
@@ -2004,15 +2301,16 @@ def _calculate_coverage(
                     if canonical_hit:
                         break
                 if canonical_hit:
-                    # Tier check: does regex text also confirm?
-                    text_matched = any(p in combined for p in pathway_patterns[pathway])
-                    coverage["pathways_covered"].append(pathway)
-                    coverage["pathways_matched_by"][pathway] = (
-                        "biomcp_tag+text_confirmed" if text_matched else "biomcp_tag_only"
+                    text_pattern = next(
+                        (p for p in pathway_patterns[pathway] if _text_contains_pattern(combined, p)),
+                        None,
                     )
-                    continue
+                    if text_pattern:
+                        coverage["pathways_covered"].append(pathway)
+                        coverage["pathways_matched_by"][pathway] = "biomcp_tag+text_confirmed"
+                        continue
             for pattern in pathway_patterns[pathway]:
-                if pattern in combined:
+                if _text_contains_pattern(combined, pattern):
                     coverage["pathways_covered"].append(pathway)
                     coverage["pathways_matched_by"][pathway] = pattern
                     break
@@ -2124,15 +2422,11 @@ def _compute_paper_coverage_score(
     )
     covered: set[str] = set()
 
-    # F2: retrieval-tag pre-check (REV-2/REV-7, unconditional fallback-safe).
-    # Reachable only via gap-fill validators at :~2764/:~2819, themselves gated
-    # by `coverage_weighted_sort and iteration > 0` — `coverage_weighted_sort`
-    # defaults False on PLANNER/REPORTER so this pre-check is dead code on the
-    # non-SEARCHER path (REV-7 dead-code chain). Empty sets on unstamped papers
-    # make the pre-check a no-op regardless.
+    # F2: retrieval-tag pre-check for genes only. Pathway stamps are provenance
+    # and must not contribute coverage score unless title/abstract text also
+    # contains pathway evidence.
     mvq = paper.get("matched_via_query") or {}
     tag_genes = set(mvq.get("genes") or [])
-    tag_kws_lower = {k.lower() for k in (mvq.get("keywords") or []) if k}
 
     # Gene matching (reuses existing pattern generator)
     for gene in genes:
@@ -2155,24 +2449,8 @@ def _compute_paper_coverage_score(
     for pathway in pathways:
         if already_covered and pathway in already_covered:
             continue
-        if tag_kws_lower:
-            patterns = _generate_pathway_patterns(pathway)
-            canonical_hit = False
-            for p in patterns:
-                p_lower = p.lower()
-                if len(p_lower) < 3:
-                    continue  # REV-A NIT-A: block 1-2 char over-match
-                for sk in tag_kws_lower:
-                    if p_lower in sk or sk in p_lower:
-                        canonical_hit = True
-                        break
-                if canonical_hit:
-                    break
-            if canonical_hit:
-                covered.add(pathway)
-                continue
         for pattern in _generate_pathway_patterns(pathway):
-            if pattern in combined:
+            if _text_contains_pattern(combined, pattern):
                 covered.add(pathway)
                 break
 
@@ -2464,7 +2742,7 @@ async def search_literature_dynamic_async(
 
     # SEARCHER-mode auto-enable: enable_lr_pair_queries is set ONLY by SEARCHER
     # (verified at subagents/prompts.py:261, 282 — PLANNER and REPORTER never
-    # pass it). Coupling the two flags guarantees SEARCHER gets hub-coverage
+    # pass it). Coupling the two flags guarantees SEARCHER gets coverage-aware
     # behavior deterministically (greedy_coverage_sort + iter>0 gap-fill
     # validator at literature.py:2463/2518), while PLANNER/REPORTER (who never
     # set enable_lr_pair_queries) retain the original signature defaults
@@ -2492,8 +2770,8 @@ async def search_literature_dynamic_async(
         coverage_weighted_sort = True
     if enable_lr_pair_queries:
         # SEARCHER mode candidate pool: ~5x the final cap, floor at 300 (REV-A1)
-        # to absorb F1's hybrid pathway fan-out (~13 extra queries) plus the
-        # singleton hub fan-out (~30 hub queries), so deterministic retrieval
+        # to absorb keyword-only pathway fan-out (~13 extra queries) plus the
+        # singleton gene fan-out (~30 gene queries), so deterministic retrieval
         # can fully run before early break and _greedy_coverage_sort has enough
         # material to maximize per-gene + per-pathway coverage in the final
         # truncation. Math: 13 pathway × 6 + 30 gene singleton × 5 + 8 LLM × 5
@@ -2599,9 +2877,11 @@ async def search_literature_dynamic_async(
         if iteration == 0:
             if query_cache is not None:
                 # REPLAY: use cached queries, skip LLM entirely
-                validated_queries = query_cache
+                validated_queries = _normalize_replayed_queries(query_cache)
                 all_queries.extend(validated_queries)
-                logger.info(f"Replaying {len(validated_queries)} cached iteration-0 queries")
+                logger.info(
+                    f"Replaying {len(validated_queries)} cached iteration-0 queries"
+                )
             else:
                 # GENERATE: initial broad search via LLM
                 # Note: gene_aliases="" - BioMCP article_searcher handles aliases internally
@@ -2630,7 +2910,10 @@ async def search_literature_dynamic_async(
                 covered_genes=", ".join(covered_genes) if covered_genes else "None",
                 covered_pathways=", ".join(covered_pathways) if covered_pathways else "None",
             )
-            logger.info(f"Gap-filling: {len(missing_genes)} missing genes, {len(missing_pathways)} missing pathways")
+            logger.info(
+                f"Gap-filling: {len(missing_genes)} missing genes, "
+                f"{len(missing_pathways)} missing pathways"
+            )
 
         # When replaying cached iteration-0 queries, skip LLM generation
         if iteration == 0 and query_cache is not None:
@@ -2698,7 +2981,9 @@ async def search_literature_dynamic_async(
                     # to a deterministic chunk AND add no keywords. Biologically
                     # enriched queries (e.g., {genes:[TGFB1,SMAD4], keywords:[EMT]})
                     # always pass through. Supersets of a chunk also pass through.
-                    det_gene_sets = [frozenset(q.get("genes", [])) for q in deterministic]
+                    det_gene_sets = [
+                        frozenset(q.get("genes", [])) for q in deterministic
+                    ]
                     llm_kept = []
                     for q in validated_queries:
                         q_gene_set = frozenset(q.get("genes", []) or [])
@@ -2721,7 +3006,7 @@ async def search_literature_dynamic_async(
             if iteration == 0 and record_queries:
                 recorded_iter0_queries = list(validated_queries)
 
-        # F1: Iter-0 hybrid pathway fan-out (REV-4 Option B unconditional).
+        # Iter-0 keyword-only pathway fan-out.
         # Runs in BOTH cache-replay AND LLM-generation paths so deterministic
         # pathway coverage is guaranteed by construction. Gated on
         # enable_lr_pair_queries (SEARCHER only) so PLANNER/REPORTER call sites
@@ -2754,30 +3039,50 @@ async def search_literature_dynamic_async(
                 if record_queries:
                     recorded_iter0_queries = list(validated_queries)
                 logger.info(
-                    f"Iter-0 pathway fan-out: +{len(deterministic_pw)} hybrid "
+                    f"Iter-0 pathway fan-out: +{len(deterministic_pw)} keyword-only "
                     f"pathway queries ({len(pathways)} pathways), "
                     f"{len(pw_kept)} LLM queries retained"
                 )
 
-        # Separate gene-centric and pathway-centric queries for balanced execution
-        gene_queries = [q for q in validated_queries if q.get("genes")]
-        pathway_queries = [q for q in validated_queries if not q.get("genes")]
+        # Separate gene, deterministic pathway, and generic keyword queries.
+        # genes=[] alone is not pathway intent; only trusted deterministic
+        # pathway fan-out receives strict pathway evidence filtering.
+        query_base_index = len(all_queries) - len(validated_queries)
+        gene_records, pathway_records, keyword_records = (
+            _partition_literature_queries(validated_queries)
+        )
+        non_gene_records = pathway_records + keyword_records
 
-        logger.info(f"Query distribution: {len(gene_queries)} gene + {len(pathway_queries)} pathway queries")
+        logger.info(
+            "Query distribution: "
+            f"{len(gene_records)} gene + "
+            f"{len(pathway_records)} deterministic pathway + "
+            f"{len(keyword_records)} keyword queries"
+        )
 
         remaining_slots = _internal_pool_size - len(all_papers)
 
-        # Allocate 60% to gene queries, 40% to pathway queries (minimum 3 per query)
-        gene_slots = int(remaining_slots * 0.6) if gene_queries else 0
-        pathway_slots = remaining_slots - gene_slots if pathway_queries else remaining_slots
+        # Preserve the prior gene vs non-gene slot split while allowing non-gene
+        # records to contain both strict pathway and generic keyword intents.
+        gene_slots = int(remaining_slots * 0.6) if gene_records else 0
+        non_gene_slots = remaining_slots - gene_slots if non_gene_records else remaining_slots
 
-        gene_results_per_query = max(5, gene_slots // len(gene_queries) + 1) if gene_queries else 0
-        pathway_results_per_query = max(3, pathway_slots // len(pathway_queries) + 1) if pathway_queries else 0
+        gene_results_per_query = (
+            max(5, gene_slots // len(gene_records) + 1) if gene_records else 0
+        )
+        non_gene_results_per_query = (
+            max(3, non_gene_slots // len(non_gene_records) + 1)
+            if non_gene_records
+            else 0
+        )
 
-        logger.info(f"Slot allocation: gene={gene_slots} ({gene_results_per_query}/query), pathway={pathway_slots} ({pathway_results_per_query}/query)")
+        logger.info(
+            f"Slot allocation: gene={gene_slots} ({gene_results_per_query}/query), "
+            f"non_gene={non_gene_slots} ({non_gene_results_per_query}/query)"
+        )
 
         # Process gene queries first with higher allocation
-        for i, query in enumerate(gene_queries):
+        for local_index, query, intent in gene_records:
             if len(all_papers) >= _internal_pool_size:
                 break
 
@@ -2805,9 +3110,12 @@ async def search_literature_dynamic_async(
                     pmid = paper.get("pmid", "")
                     if pmid and pmid not in seen_pmids:
                         seen_pmids.add(pmid)
-                        paper["query_index"] = len(all_queries) - len(validated_queries) + i
+                        paper["query_index"] = query_base_index + local_index
                         paper["iteration"] = iteration
                         paper["query_type"] = "gene"
+                        mvq = paper.get("matched_via_query")
+                        if isinstance(mvq, dict):
+                            mvq["query_intent"] = intent
                         # Option D: gap-filling validation for iteration > 0
                         if coverage_weighted_sort and iteration > 0:
                             score, _ = _compute_paper_coverage_score(
@@ -2825,14 +3133,22 @@ async def search_literature_dynamic_async(
                     all_papers.extend(fallback_papers[:slots])
                     new_papers += min(slots, len(fallback_papers))
 
-                logger.debug(f"Gene query {i}: {new_papers} new papers (fallback={len(fallback_papers)})")
+                logger.debug(
+                    f"Gene query {local_index}: "
+                    f"{new_papers} new papers (fallback={len(fallback_papers)})"
+                )
 
             except Exception as e:
-                logger.warning(f"Gene search failed for query {i} at iteration {iteration}: {e}")
+                logger.warning(
+                    f"Gene search failed for query {local_index} "
+                    f"at iteration {iteration}: {e}"
+                )
                 continue
 
-        # Process pathway queries with remaining slots
-        for i, query in enumerate(pathway_queries):
+        # Process non-gene queries with remaining slots. Deterministic pathway
+        # queries are strict text-confirmed evidence; generic keyword queries
+        # keep normal retrieval recall.
+        for local_index, query, intent in non_gene_records:
             if len(all_papers) >= _internal_pool_size:
                 break
 
@@ -2845,7 +3161,7 @@ async def search_literature_dynamic_async(
                     genes=query.get("genes"),
                     diseases=query_diseases,
                     keywords=query.get("keywords"),
-                    page_size=pathway_results_per_query,
+                    page_size=non_gene_results_per_query,
                     biomcp_url=biomcp_url,
                     enforce_disease_match=enforce_disease_match,
                     rerank_mode=normalized_rerank_mode,
@@ -2859,10 +3175,26 @@ async def search_literature_dynamic_async(
                 for paper in results:
                     pmid = paper.get("pmid", "")
                     if pmid and pmid not in seen_pmids:
+                        if (
+                            intent == "deterministic_pathway"
+                            and not _paper_has_disease_and_pathway_text(
+                                paper,
+                                query_diseases or [],
+                                query.get("keywords") or [],
+                            )
+                        ):
+                            continue
                         seen_pmids.add(pmid)
-                        paper["query_index"] = len(all_queries) - len(validated_queries) + len(gene_queries) + i
+                        paper["query_index"] = query_base_index + local_index
                         paper["iteration"] = iteration
-                        paper["query_type"] = "pathway"
+                        paper["query_type"] = (
+                            "pathway"
+                            if intent == "deterministic_pathway"
+                            else "keyword"
+                        )
+                        mvq = paper.get("matched_via_query")
+                        if isinstance(mvq, dict):
+                            mvq["query_intent"] = intent
                         # Option D: gap-filling validation for iteration > 0
                         if coverage_weighted_sort and iteration > 0:
                             score, _ = _compute_paper_coverage_score(
@@ -2880,10 +3212,16 @@ async def search_literature_dynamic_async(
                     all_papers.extend(fallback_papers[:slots])
                     new_papers += min(slots, len(fallback_papers))
 
-                logger.debug(f"Pathway query {i}: {new_papers} new papers (fallback={len(fallback_papers)})")
+                logger.debug(
+                    f"Non-gene query {local_index} ({intent}): "
+                    f"{new_papers} new papers (fallback={len(fallback_papers)})"
+                )
 
             except Exception as e:
-                logger.warning(f"Pathway search failed for query {i} at iteration {iteration}: {e}")
+                logger.warning(
+                    f"Non-gene search failed for query {local_index} "
+                    f"({intent}) at iteration {iteration}: {e}"
+                )
                 continue
 
     # Truncation: coverage-weighted greedy sort or pure SJR sort.
@@ -2937,7 +3275,7 @@ async def search_literature_dynamic_async(
             missing = final_coverage.get("pathways_missing", [])[:3]
             recommended_actions.append(
                 f"Pathway coverage {pathway_pct:.0f}% < {target_pathway_coverage*100:.0f}% target. "
-                f"Missing: {missing}. Search with 'signaling' + disease context."
+                f"Missing: {missing}. Search with controlled pathway labels/aliases + disease context."
             )
         if len(final_papers) < 15:
             recommended_actions.append(

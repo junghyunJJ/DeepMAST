@@ -182,8 +182,10 @@ async def test_dynamic_search_reports_rerank_metadata(monkeypatch):
     )
 
     assert result["filter_stage"] == "hybrid_2stage"
-    assert result["rerank_applied_count"] == 2
-    assert result["rerank_dropped_count"] == 1
+    # Iter-0 deterministic gene fan-out runs before the LLM query, so the fake
+    # reranker is applied once for the singleton query and once for the LLM query.
+    assert result["rerank_applied_count"] == 4
+    assert result["rerank_dropped_count"] == 2
     assert "rerank_promoted_count" not in result
 
 
@@ -354,8 +356,11 @@ class TestQueryCacheReplay:
         )
 
         assert "query_cache" in result
-        assert len(result["query_cache"]) == 1
+        assert len(result["query_cache"]) == 2
         assert result["query_cache"][0]["genes"] == ["CDH1"]
+        assert result["query_cache"][0]["keywords"] == []
+        assert result["query_cache"][1]["genes"] == ["CDH1"]
+        assert result["query_cache"][1]["keywords"] == ["EMT"]
 
     @pytest.mark.asyncio
     async def test_replay_skips_llm(self, monkeypatch):

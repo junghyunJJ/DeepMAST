@@ -190,6 +190,18 @@ def test_arg_parser_accepts_dynamic_no_disease_filter():
     assert args.methods == ["dynamic_no_disease_filter"]
 
 
+def test_harness_enricher_uses_benchmark_local_pathway_fixture():
+    from docs.benchmarks.harness_x_model import enrich_cases_string_kegg as enricher
+    from src.agents.deep_interpreter.tools import literature
+
+    deleted_symbol = "PATHWAY" + "_TO_GENES"
+    assert not hasattr(literature, deleted_symbol)
+    assert "mapk" in enricher.BENCHMARK_PATHWAY_GENE_FIXTURE
+    assert enricher.kegg_hub_genes_for_case(["MAPK"])["MAPK1"] == pytest.approx(
+        enricher.KEGG_FALLBACK_SCORE
+    )
+
+
 def test_extract_continuous_metrics_normalizes_ratios():
     from scripts.benchmarks.score_lit_benchmark import extract_continuous_metrics
 

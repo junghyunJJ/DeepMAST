@@ -3,10 +3,10 @@
 Guards two-tier provenance accounting:
   - `_search_with_biomcp` stamps every returned article with `matched_via_query`.
   - `_calculate_coverage(use_retrieval_tags=True)` emits
-    `biomcp_tag+text_confirmed` vs `biomcp_tag_only` labels in
-    `genes_matched_by` / `pathways_matched_by`.
-  - `_compute_paper_coverage_score` unconditionally honors the stamp but is
-    unreachable on PLANNER/REPORTER paths via the REV-7 dead-code chain.
+    `biomcp_tag+text_confirmed` vs `biomcp_tag_only` labels for genes.
+    Pathways require title/abstract text confirmation.
+  - `_compute_paper_coverage_score` honors gene stamps but not pathway
+    stamp-only matches.
 """
 
 from unittest.mock import AsyncMock, patch
@@ -17,6 +17,7 @@ from src.agents.deep_interpreter.tools import literature as lit
 from src.agents.deep_interpreter.tools.literature import (
     _calculate_coverage,
     _compute_paper_coverage_score,
+    _paper_has_disease_and_pathway_text,
     _search_with_biomcp,
 )
 
@@ -239,11 +240,11 @@ def test_compute_paper_coverage_score_stamp_is_additive():
 
 
 # ---------------------------------------------------------------------------
-# (g) Pathway two-tier resolution via canonical keyword match
+# (g) Pathway stamps are provenance only
 # ---------------------------------------------------------------------------
 
-def test_calculate_coverage_pathway_canonical_tag_match():
-    """Stamp keyword `erk signaling` tags a `MAPK` pathway via canonical match."""
+def test_calculate_coverage_pathway_stamp_only_is_not_evidence():
+    """Stamp keyword `erk signaling` alone must not cover `MAPK`."""
     papers = [
         _paper(
             "1", title="", abstract="",
@@ -254,8 +255,8 @@ def test_calculate_coverage_pathway_canonical_tag_match():
         papers, genes=[], pathways=["MAPK"], celltypes=[],
         use_retrieval_tags=True,
     )
-    assert "MAPK" in cov["pathways_covered"]
-    assert cov["pathways_matched_by"]["MAPK"] == "biomcp_tag_only"
+    assert "MAPK" not in cov["pathways_covered"]
+    assert "MAPK" not in cov["pathways_matched_by"]
 
 
 # ---------------------------------------------------------------------------
@@ -321,8 +322,8 @@ def test_compute_paper_coverage_score_pathway_short_pattern_no_over_match():
     assert "ER" not in covered
 
 
-def test_compute_paper_coverage_score_pathway_three_char_still_matches():
-    """3-char pathway names like WNT/ERK/JAK still participate in stamp matching."""
+def test_compute_paper_coverage_score_pathway_stamp_only_is_not_evidence():
+    """Pathway stamps cannot add scorer coverage without title/abstract text."""
     stamped = _paper(
         "1", abstract="",
         stamp={"genes": [], "diseases": [], "keywords": ["erk signaling"]},
@@ -330,5 +331,43 @@ def test_compute_paper_coverage_score_pathway_three_char_still_matches():
     _, covered = _compute_paper_coverage_score(
         stamped, genes=[], pathways=["MAPK"], celltypes=[],
     )
-    # MAPK's pattern set includes "erk signaling" (3+ chars each) — match holds.
+    assert "MAPK" not in covered
+
+
+def test_compute_paper_coverage_score_pathway_text_still_matches():
+    paper = _paper("1", abstract="ERK signaling drives tumor growth")
+    _, covered = _compute_paper_coverage_score(
+        paper, genes=[], pathways=["MAPK"], celltypes=[],
+    )
     assert "MAPK" in covered
+
+
+def test_pathway_query_filter_requires_disease_and_pathway_text():
+    paper = _paper(
+        "1",
+        title="ERK signaling in breast cancer",
+        abstract="MAPK signaling pathway activity is elevated.",
+    )
+    assert _paper_has_disease_and_pathway_text(
+        paper,
+        diseases=["breast cancer"],
+        pathway_terms=["MAPK signaling pathway", "ERK signaling"],
+    )
+
+
+def test_pathway_query_filter_drops_disease_only_pathway_only_and_stamp_only():
+    disease_only = _paper("1", title="Breast cancer cohort", abstract="")
+    pathway_only = _paper("2", title="ERK signaling mechanism", abstract="")
+    stamp_only = _paper(
+        "3",
+        title="Unrelated title",
+        abstract="",
+        stamp={"genes": [], "diseases": ["breast cancer"], "keywords": ["ERK signaling"]},
+    )
+
+    for paper in (disease_only, pathway_only, stamp_only):
+        assert not _paper_has_disease_and_pathway_text(
+            paper,
+            diseases=["breast cancer"],
+            pathway_terms=["MAPK signaling pathway", "ERK signaling"],
+        )

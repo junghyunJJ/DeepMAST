@@ -101,6 +101,9 @@ Important SEARCHER rules:
 - Always pass `data_dir` from `/data_path.txt` when using `output_path`.
 - `enable_lr_pair_queries=True` is SEARCHER-only. It allows the tool to use saved pair context when available.
 - SEARCHER does not need to set `coverage_weighted_sort` manually. The tool handles the SEARCHER-specific behavior internally when pair queries are enabled.
+- Pathway fan-out is keyword-only: the tool uses controlled pathway labels and aliases with `genes=[]`, not pathway gene anchors.
+- Pathway evidence is text-confirmed only. A query keyword or `matched_via_query` stamp is provenance and does not by itself prove pathway coverage.
+- `query_type="pathway"` means deterministic pathway fan-out. Generic no-gene keyword retrieval is tracked as `query_type="keyword"` and is not pathway evidence by itself.
 
 ### Step 2.2: Automatic Internal Fallback
 `search_literature_dynamic` handles fallback internally. If LLM query generation fails, it automatically switches to a fixed search strategy. Do not call a separate fallback tool.
@@ -356,7 +359,7 @@ If the search returns almost no papers:
 ### High Gene Coverage But Weak Pathway Or Celltype Coverage
 If genes are fine but pathway or celltype coverage is weak:
 1. Read `coverage["pathways_missing"]` and `coverage["celltypes_missing"]`.
-2. Run one bundled follow-up that combines pathway keywords such as `signaling` with the missing celltype and disease context.
+2. Run one bundled follow-up that combines controlled pathway labels/aliases with the missing celltype and disease context.
 3. Only escalate to a dynamic rerun if bundle 1 still leaves both active drivers below target.
 
 ### Auto-Save Was Skipped

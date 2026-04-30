@@ -215,8 +215,9 @@ Follow the workflow defined in SKILL.md:
    - Check `coverage_sufficient` and `recommended_actions` in the search results
    - If `coverage_sufficient: false`, execute the follow-up searches directly from those gaps:
      - Missing genes: use search_literature with gene synonyms + disease context
-     - Missing pathways: use search_literature or search_pubmed_advanced with "signaling" + disease context
+     - Missing pathways: use search_literature or search_pubmed_advanced with controlled pathway labels/aliases + disease context
      - Too few papers: broaden disease context, add key cell types, then rerun search_literature_dynamic once if needed
+   - Pathway coverage requires disease + pathway evidence in title/abstract; do not treat query keywords alone as pathway evidence
    - Coverage thresholds: genes >= 60%, pathways >= 50%, papers >= 15
    - Max 2 follow-up rounds, then proceed with a warning if gaps remain
    - Do **not** add an extra reflection step here — search_literature_dynamic already computes the coverage analysis and gap recommendations
@@ -246,7 +247,7 @@ result = search_literature_dynamic(
     output_path="papers.json",
     data_dir=data_path.strip(),
     enable_lr_pair_queries=True,   # SEARCHER opts in to L-R pair query injection
-    coverage_weighted_sort=True,   # SEARCHER opts in to hub-coverage truncation (auto-enabled by sentinel, this line is documentation belt-and-suspenders)
+    coverage_weighted_sort=True,   # SEARCHER opts in to coverage-aware truncation (auto-enabled by sentinel, this line is documentation belt-and-suspenders)
 )
 # Result: {"saved_to": "...", "total_papers": 30, "coverage": {...}}
 # Full papers already saved — NO need to call write_file
@@ -256,6 +257,10 @@ result = search_literature_dynamic(
 # Iter-0 also injects deterministic singleton gene queries (one gene per query)
 # so every input gene gets its own focused BioMCP search and appears in at least
 # one query slot, regardless of LLM compliance with the prompt instruction.
+# Iter-0 pathway fan-out is keyword-only: genes=[] plus controlled pathway
+# labels/aliases. Pathway stamps are provenance, not evidence by themselves.
+# In paper telemetry, query_type="pathway" means deterministic pathway fan-out;
+# generic no-gene keyword retrieval is tracked separately as query_type="keyword".
 ```
 
 ### IMPORTANT Rules:

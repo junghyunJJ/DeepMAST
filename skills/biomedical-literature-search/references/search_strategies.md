@@ -48,6 +48,8 @@ Notes:
 - `lr_pairs` support is activated through `enable_lr_pair_queries=True` for SEARCHER.
 - When `output_path` is set, always pass `data_dir`.
 - The compact summary is only the first layer. Rev6 follow-up must inspect the nested `coverage` object directly.
+- SEARCHER pathway fan-out uses controlled pathway labels/aliases with `genes=[]`; pathway query stamps are provenance only and require title/abstract pathway text before coverage is credited.
+- `query_type="pathway"` is reserved for deterministic pathway fan-out. Other no-gene searches are generic keyword retrieval (`query_type="keyword"`).
 
 **Manual shell wrapper**
 
@@ -304,20 +306,20 @@ search_literature(
 - `disease`: disease context
 - `celltypes`: associated cell types when available
 
-### Common Pathway Rephrasings
+### Controlled Pathway Rephrasings
 
 | Input | Useful Follow-up Terms |
 |------|-------------------------|
-| WNT | `WNT pathway`, `WNT signaling`, `beta-catenin` |
-| NFkB | `NFkB pathway`, `NF-kappa B`, `inflammatory signaling` |
-| TGFb | `TGF-beta signaling`, `SMAD`, `fibroblast activation` |
-| Hypoxia | `hypoxia signaling`, `HIF1A`, `tumor hypoxia` |
-| MAPK | `MAPK pathway`, `ERK signaling` |
+| WNT | `Wnt signaling pathway`, `WNT beta-catenin signaling`, `canonical WNT` |
+| NFkB | `NF-kappa B signaling pathway`, `NF-kB`, `nuclear factor kappa B` |
+| TGFb | `TGF-beta signaling pathway`, `TGF-beta`, `SMAD signaling` |
+| Hypoxia | `HIF-1 signaling pathway`, `hypoxia inducible factor`, `cellular response to hypoxia` |
+| MAPK | `MAPK signaling pathway`, `ERK signaling`, `RAS/MAPK` |
 
 ### Pattern
 
 When pathway context is weak, combine:
-- pathway-specific keywords
+- controlled pathway labels/aliases
 - disease context
 - one or two missing celltypes
 
@@ -329,6 +331,10 @@ search_literature(
     max_results=10,
 )
 ```
+
+For pathway follow-up, keep `genes=[]` unless the user explicitly asks for a
+gene-specific search. A pathway paper should be retained as pathway evidence
+only when the title/abstract contains both disease context and pathway text.
 
 ---
 

@@ -1,17 +1,17 @@
-"""Unit smoke tests for `_build_deterministic_pathway_queries` (F1 follow-up).
+"""Unit tests for keyword-only deterministic pathway queries."""
 
-These tests guard the hybrid pathway fan-out helper that recovers the 8pp
-pathway coverage regression introduced by Fix A* (84.6% → 76.9%) on
-`res_bc_ollama`. The helper emits one BioMCP query per pathway carrying both
-the canonical pathway keyword AND the top-N hub genes registered for that
-pathway in PATHWAY_TO_GENES, reusing BioMCP's gene-indexed retrieval pipeline.
-"""
+from inspect import signature
 
 from src.agents.deep_interpreter.tools.literature import (
     PATHWAY_KEYWORDS,
-    PATHWAY_TO_GENES,
     _build_deterministic_pathway_queries,
+    _classify_literature_query,
     _format_pathway_keyword,
+    _format_pathway_keywords,
+    _generate_pathway_patterns,
+    _normalize_replayed_queries,
+    _partition_literature_queries,
+    _validate_generated_queries,
 )
 
 
@@ -19,49 +19,46 @@ def test_empty_pathways_returns_empty():
     assert _build_deterministic_pathway_queries([], "breast cancer") == []
 
 
-def test_mapk_resolves_to_canonical_genes_and_keyword():
-    """`mapk` → top-3 hub genes + canonical "erk signaling" keyword."""
+def test_mapk_resolves_to_controlled_keywords_without_genes():
     qs = _build_deterministic_pathway_queries(["mapk"], "breast cancer")
     assert len(qs) == 1
     q = qs[0]
-    assert q["genes"] == ["MAPK1", "MAPK3", "RAF1"]
+    assert q["genes"] == []
     assert q["diseases"] == ["breast cancer"]
-    assert q["keywords"] == ["erk signaling"]
+    assert q["keywords"] == PATHWAY_KEYWORDS["mapk"]["query_terms"][:3]
+    assert q["keywords"][0] == "MAPK signaling pathway"
+    assert q["query_intent"] == "deterministic_pathway"
 
 
 def test_unknown_pathway_falls_back_to_keyword_only():
-    """Unknown pathway → empty genes, fallback "<name> signaling" keyword."""
     qs = _build_deterministic_pathway_queries(["XYZ"], "breast cancer")
     assert len(qs) == 1
     q = qs[0]
     assert q["genes"] == []
     assert q["keywords"] == ["XYZ signaling"]
     assert q["diseases"] == ["breast cancer"]
+    assert q["query_intent"] == "deterministic_pathway"
 
 
-def test_semicolon_split_yields_one_query_per_part():
-    """Combined pathway "Androgen;MAPK" → 2 queries (mirrors _generate_pathway_patterns)."""
+def test_semicolon_split_yields_one_keyword_only_query_per_part():
     qs = _build_deterministic_pathway_queries(["Androgen;MAPK"], "breast cancer")
     assert len(qs) == 2
-    # Order preserved from split
-    assert qs[0]["genes"] == ["AR", "KLK3"]
-    assert qs[0]["keywords"] == ["androgen receptor"]
-    assert qs[1]["genes"] == ["MAPK1", "MAPK3", "RAF1"]
-    assert qs[1]["keywords"] == ["erk signaling"]
+    assert qs[0]["genes"] == []
+    assert qs[0]["keywords"] == PATHWAY_KEYWORDS["androgen"]["query_terms"][:3]
+    assert qs[0]["query_intent"] == "deterministic_pathway"
+    assert qs[1]["genes"] == []
+    assert qs[1]["keywords"] == PATHWAY_KEYWORDS["mapk"]["query_terms"][:3]
+    assert qs[1]["query_intent"] == "deterministic_pathway"
 
 
 def test_empty_disease_yields_empty_disease_list():
     qs = _build_deterministic_pathway_queries(["mapk"], "")
     assert len(qs) == 1
+    assert qs[0]["genes"] == []
     assert qs[0]["diseases"] == []
 
 
-def test_vegf_tnfa_trail_resolve_to_new_entries():
-    """REV-6: VEGF/TNFa/Trail must resolve via PATHWAY_KEYWORDS + PATHWAY_TO_GENES.
-
-    Closes the gap Critic identified — these three pathways were missing from
-    PATHWAY_KEYWORDS pre-F1 and are exactly the ones that regressed post-Fix A*.
-    """
+def test_vegf_tnfa_trail_resolve_to_controlled_entries():
     qs = _build_deterministic_pathway_queries(
         ["vegf", "tnfa", "trail"], "breast cancer"
     )
@@ -69,109 +66,152 @@ def test_vegf_tnfa_trail_resolve_to_new_entries():
 
     vegf_q, tnfa_q, trail_q = qs
 
-    assert vegf_q["genes"] == ["VEGFA", "KDR", "FLT1"]
-    assert vegf_q["keywords"] == [PATHWAY_KEYWORDS["vegf"][0]]  # "vegf"
+    assert vegf_q["genes"] == []
+    assert vegf_q["keywords"] == PATHWAY_KEYWORDS["vegf"]["query_terms"][:3]
 
-    assert tnfa_q["genes"] == ["TNF", "TNFRSF1A", "TRADD"]
-    assert tnfa_q["keywords"] == [PATHWAY_KEYWORDS["tnfa"][0]]  # "tnf"
+    assert tnfa_q["genes"] == []
+    assert tnfa_q["keywords"] == PATHWAY_KEYWORDS["tnfa"]["query_terms"][:3]
 
-    assert trail_q["genes"] == ["TNFSF10", "TNFRSF10A", "TNFRSF10B"]
-    assert trail_q["keywords"] == [PATHWAY_KEYWORDS["trail"][0]]  # "trail"
+    assert trail_q["genes"] == []
+    assert trail_q["keywords"] == PATHWAY_KEYWORDS["trail"]["query_terms"][:3]
 
 
-def test_max_genes_per_query_truncates():
-    """`max_genes_per_query=2` truncates the gene list."""
-    qs = _build_deterministic_pathway_queries(
-        ["mapk"], "breast cancer", max_genes_per_query=2
+def test_jak_and_tgf_alias_inputs_match_controlled_vocabulary():
+    jak = _build_deterministic_pathway_queries(["JAK/STAT"], "breast cancer")
+    tgf = _build_deterministic_pathway_queries(["TGFB"], "breast cancer")
+
+    assert jak[0]["genes"] == []
+    assert jak[0]["keywords"] == PATHWAY_KEYWORDS["jak"]["query_terms"][:3]
+    assert tgf[0]["genes"] == []
+    assert tgf[0]["keywords"] == PATHWAY_KEYWORDS["tgf"]["query_terms"][:3]
+
+
+def test_format_pathway_keywords_substring_match():
+    assert _format_pathway_keywords("mapk") == PATHWAY_KEYWORDS["mapk"]["query_terms"][:3]
+    assert (
+        _format_pathway_keywords("MAPK signaling")
+        == PATHWAY_KEYWORDS["mapk"]["query_terms"][:3]
     )
-    assert len(qs) == 1
-    assert qs[0]["genes"] == ["MAPK1", "MAPK3"]
+    assert _format_pathway_keyword("mapk") == PATHWAY_KEYWORDS["mapk"]["query_terms"][0]
+    assert _format_pathway_keywords("xyz") == ["xyz signaling"]
 
 
-def test_jak_key_matches_pathway_keywords_jak():
-    """REV-9 regression: PATHWAY_TO_GENES["jak"] must exist and match PATHWAY_KEYWORDS["jak"].
-
-    Guards against the prior `jak-stat` key mismatch where the hybrid pathway
-    fan-out would have fallen back to keyword-only because PATHWAY_TO_GENES
-    used a key that didn't agree with PATHWAY_KEYWORDS substring conventions.
-    """
-    assert "jak" in PATHWAY_TO_GENES
-    assert "jak" in PATHWAY_KEYWORDS
-    qs = _build_deterministic_pathway_queries(["jak"], "breast cancer")
-    assert len(qs) == 1
-    assert qs[0]["genes"] == ["JAK2", "STAT3", "STAT5A"]
-    assert qs[0]["keywords"] == ["jak/stat"]
+def test_tnfa_msigdb_phrase_resolves_to_tnfa_not_nfkb():
+    assert (
+        _format_pathway_keywords("TNFA signaling via NFKB")
+        == PATHWAY_KEYWORDS["tnfa"]["query_terms"][:3]
+    )
+    patterns = set(_generate_pathway_patterns("TNFA signaling via NFKB"))
+    assert "tnf" in patterns
+    assert "nf-kb" not in patterns
 
 
-def test_format_pathway_keyword_substring_match():
-    """Substring match mirrors _generate_pathway_patterns at literature.py:1586."""
-    # Exact-key
-    assert _format_pathway_keyword("mapk") == "erk signaling"
-    # Substring (e.g., "MAPK signaling")
-    assert _format_pathway_keyword("MAPK signaling") == "erk signaling"
-    # Unknown → fallback
-    assert _format_pathway_keyword("xyz") == "xyz signaling"
+def test_controlled_vocabulary_entries_have_source_metadata():
+    for key, entry in PATHWAY_KEYWORDS.items():
+        assert entry["canonical_label"], key
+        assert 1 <= len(entry["query_terms"]) <= 3, key
+        assert entry["query_terms"][0] == entry["canonical_label"], key
+        assert entry["match_aliases"], key
+        assert entry["source_refs"], key
+        assert all("source" in ref and "term" in ref for ref in entry["source_refs"]), key
+        assert all(ref["source"] != "STRING" for ref in entry["source_refs"]), key
+
+
+def test_generate_pathway_patterns_uses_controlled_aliases():
+    patterns = {p.lower() for p in _generate_pathway_patterns("MAPK")}
+    assert "mapk signaling pathway" in patterns
+    assert "erk signaling" in patterns
+    assert "mek/erk" in patterns
+
+
+def test_pathway_helper_signature_has_no_gene_anchor_options():
+    params = signature(_build_deterministic_pathway_queries).parameters
+    assert "pathway_to_genes" not in params
+    assert "max_genes_per_query" not in params
 
 
 def test_filters_falsy_pathway_strings():
-    """Empty strings and None entries are dropped silently."""
     qs = _build_deterministic_pathway_queries(
         ["mapk", "", "vegf"], "breast cancer"  # type: ignore[list-item]
     )
     assert len(qs) == 2
-    assert qs[0]["genes"] == ["MAPK1", "MAPK3", "RAF1"]
-    assert qs[1]["genes"] == ["VEGFA", "KDR", "FLT1"]
+    assert qs[0]["genes"] == []
+    assert qs[1]["genes"] == []
 
 
-def test_tgf_key_parity_with_pathway_keywords():
-    """REV-9 parity guard: both `TGF` and `TGFB` inputs must resolve to genes.
-
-    Pre-fix the key was `tgfb` in PATHWAY_TO_GENES which mismatched PATHWAY_KEYWORDS["tgf"].
-    Architect review flagged this — input "TGF" would miss gene resolution.
-    """
-    assert "tgf" in PATHWAY_TO_GENES
-    assert "tgf" in PATHWAY_KEYWORDS
-    # Both short ("TGF") and long ("TGFB") forms must resolve to the same genes.
-    qs_short = _build_deterministic_pathway_queries(["TGF"], "breast cancer")
-    qs_long = _build_deterministic_pathway_queries(["TGFB"], "breast cancer")
-    assert len(qs_short) == 1
-    assert len(qs_long) == 1
-    assert qs_short[0]["genes"] == ["TGFB1", "SMAD4", "ACVR2B"]
-    assert qs_long[0]["genes"] == ["TGFB1", "SMAD4", "ACVR2B"]
-    assert qs_short[0]["keywords"] == ["tgf-beta"]
-    assert qs_long[0]["keywords"] == ["tgf-beta"]
-
-
-def test_all_pathway_to_genes_keys_have_keyword_counterparts():
-    """Full REV-9 parity contract: every PATHWAY_TO_GENES key must exist in PATHWAY_KEYWORDS."""
-    missing = [k for k in PATHWAY_TO_GENES if k not in PATHWAY_KEYWORDS]
-    assert missing == [], f"PATHWAY_TO_GENES keys missing from PATHWAY_KEYWORDS: {missing}"
+def test_classify_literature_query_uses_explicit_intent_only():
+    assert _classify_literature_query(
+        {"genes": ["CDH1"], "diseases": [], "keywords": []}
+    ) == "gene"
+    assert _classify_literature_query(
+        {
+            "genes": [],
+            "diseases": ["breast cancer"],
+            "keywords": ["MAPK signaling pathway"],
+            "query_intent": "deterministic_pathway",
+        }
+    ) == "deterministic_pathway"
+    assert _classify_literature_query(
+        {
+            "genes": [],
+            "diseases": ["breast cancer"],
+            "keywords": ["tumor associated macrophages"],
+        }
+    ) == "keyword"
 
 
-def test_p53_and_hypoxia_resolve_to_canonical_keywords():
-    """Nit 2 fix: p53/hypoxia now have PATHWAY_KEYWORDS entries, not just generic fallback."""
-    qs = _build_deterministic_pathway_queries(["p53", "hypoxia"], "breast cancer")
-    assert len(qs) == 2
-    p53_q, hypoxia_q = qs
-    assert p53_q["genes"] == ["TP53", "MDM2", "CDKN1A"]
-    assert p53_q["keywords"] == [PATHWAY_KEYWORDS["p53"][0]]  # "p53"
-    assert hypoxia_q["genes"] == ["HIF1A", "VHL", "EPAS1"]
-    assert hypoxia_q["keywords"] == [PATHWAY_KEYWORDS["hypoxia"][0]]  # "hif-1alpha"
+def test_validate_generated_queries_ignores_raw_query_intent():
+    validated = _validate_generated_queries([
+        {
+            "genes": [],
+            "diseases": ["breast cancer"],
+            "keywords": ["tumor associated macrophages"],
+            "query_intent": "deterministic_pathway",
+        }
+    ])
+
+    assert validated == [
+        {
+            "genes": [],
+            "diseases": ["breast cancer"],
+            "keywords": ["tumor associated macrophages"],
+        }
+    ]
+    assert _classify_literature_query(validated[0]) == "keyword"
 
 
-def test_wnt_resolves_to_canonical_hub_genes():
-    """Closes the PROGENy WNT coverage gap.
+def test_normalize_replayed_queries_strips_cached_query_intent():
+    normalized = _normalize_replayed_queries([
+        {
+            "genes": [],
+            "diseases": ["breast cancer"],
+            "keywords": ["tumor associated macrophages"],
+            "query_intent": "deterministic_pathway",
+        }
+    ])
 
-    Prior to this fix, PATHWAY_TO_GENES had no "wnt" key and "WNT" inputs
-    fell through substring-matching to an empty genes list — production
-    WNT L-R pairs got keyword-only BioMCP queries with no hub gene anchor.
-    WNT is the 14th PROGENy pathway; this entry completes the dict's
-    PROGENy coverage.
-    """
-    assert "wnt" in PATHWAY_TO_GENES
-    assert "wnt" in PATHWAY_KEYWORDS
-    qs = _build_deterministic_pathway_queries(["WNT"], "breast cancer")
-    assert len(qs) == 1
-    assert qs[0]["genes"] == ["CTNNB1", "WNT3A", "LEF1"]
-    assert qs[0]["keywords"] == [PATHWAY_KEYWORDS["wnt"][0]]  # "beta-catenin"
-    assert qs[0]["diseases"] == ["breast cancer"]
+    assert "query_intent" not in normalized[0]
+    assert _classify_literature_query(normalized[0]) == "keyword"
+
+
+def test_partition_literature_queries_preserves_original_indices():
+    queries = [
+        {"genes": ["CDH1"], "diseases": [], "keywords": []},
+        {
+            "genes": [],
+            "diseases": ["breast cancer"],
+            "keywords": ["MAPK signaling pathway"],
+            "query_intent": "deterministic_pathway",
+        },
+        {
+            "genes": [],
+            "diseases": ["breast cancer"],
+            "keywords": ["tumor associated macrophages"],
+        },
+    ]
+
+    gene_records, pathway_records, keyword_records = _partition_literature_queries(queries)
+
+    assert gene_records == [(0, queries[0], "gene")]
+    assert pathway_records == [(1, queries[1], "deterministic_pathway")]
+    assert keyword_records == [(2, queries[2], "keyword")]
