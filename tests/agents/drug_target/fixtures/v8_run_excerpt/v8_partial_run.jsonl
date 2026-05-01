@@ -1,0 +1,50 @@
+{"level": "INFO", "logger": "drug_target.lifecycle", "ts": 1777667016.1521542, "event": "critic_slice_lifecycle", "phase": "before_filter", "data_dir": "/private/tmp/drug_target_t4_out/data_dir", "timestamp": 1777667016.152128}
+{"level": "INFO", "logger": "drug_target.lifecycle", "ts": 1777667016.153142, "event": "critic_slice_lifecycle", "phase": "before_write", "data_dir": "/private/tmp/drug_target_t4_out/data_dir", "timestamp": 1777667016.153132}
+{"level": "INFO", "logger": "drug_target.lifecycle", "ts": 1777667016.158165, "event": "critic_slice_lifecycle", "phase": "before_invoke", "data_dir": "/private/tmp/drug_target_t4_out/data_dir", "timestamp": 1777667016.1581519}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667048.211533, "tool": "ls", "path": "/private/tmp/drug_target_t4_out/data_dir", "result_count": 0, "error": null, "timestamp": 1777667048.211494}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667056.0795462, "tool": "ls", "path": "/private/tmp/drug_target_t4_out", "result_count": 0, "error": null, "timestamp": 1777667056.0795279}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667060.150835, "tool": "glob", "pattern": "**/lr_candidates.json", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667060.1508129}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667068.3002932, "tool": "ls", "path": "/private/tmp", "result_count": 0, "error": null, "timestamp": 1777667068.3002582}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667073.1108701, "tool": "ls", "path": "/", "result_count": 1, "error": null, "timestamp": 1777667073.110843}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667077.433244, "tool": "ls", "path": "/evidence", "result_count": 35, "error": null, "timestamp": 1777667077.4332108}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667088.633549, "tool": "glob", "pattern": "**/lr_candidates.json", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667088.6335208}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667098.899153, "tool": "glob", "pattern": "**/lr_candidates.json", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667098.899117}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667099.965557, "tool": "ls", "path": "/private/tmp/drug_target_t4_out/data_dir/evidence", "result_count": 0, "error": null, "timestamp": 1777667099.965539}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667107.781418, "tool": "glob", "pattern": "**/evidence/", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667107.781385}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667123.0885482, "tool": "glob", "pattern": "**/*.json", "path": "/", "result_count": 41, "error": null, "timestamp": 1777667123.0885062}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667151.871551, "tool": "ls", "path": "/evidence", "result_count": 35, "error": null, "timestamp": 1777667151.871534}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667291.701268, "tool": "ls", "path": "/private/tmp/drug_target_t4_out/data_dir", "result_count": 0, "error": null, "timestamp": 1777667291.701248}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667296.808929, "tool": "ls", "path": "/private/tmp/drug_target_t4_out", "result_count": 0, "error": null, "timestamp": 1777667296.808907}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667303.04738, "tool": "ls", "path": "/private/tmp", "result_count": 0, "error": null, "timestamp": 1777667303.047362}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667310.960275, "tool": "glob", "pattern": "**/drug.md", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667310.9602392}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667315.185997, "tool": "ls", "path": "/private/tmp/drug_target_t4_out/data_dir", "result_count": 0, "error": null, "timestamp": 1777667315.1859798}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667319.324109, "tool": "ls", "path": "/private/tmp/drug_target_t4_out/data_dir", "result_count": 0, "error": null, "timestamp": 1777667319.324091}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667323.562376, "tool": "ls", "path": "/private/tmp/drug_target_t4_out/data_dir", "result_count": 0, "error": null, "timestamp": 1777667323.562359}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667329.794834, "tool": "glob", "pattern": "**/assessment_results.json", "path": "/", "result_count": 1, "error": null, "timestamp": 1777667329.794812}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667333.224926, "tool": "ls", "path": "/evidence", "result_count": 35, "error": null, "timestamp": 1777667333.224907}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667341.071441, "tool": "ls", "path": "/", "result_count": 1, "error": null, "timestamp": 1777667341.071423}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667437.6074922, "tool": "ls", "path": "/evidence", "result_count": 35, "error": null, "timestamp": 1777667437.607473}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667438.769782, "tool": "ls", "path": "/private/tmp/drug_target_t4_out/data_dir", "result_count": 0, "error": null, "timestamp": 1777667438.7697642}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667440.273513, "tool": "glob", "pattern": "**/drug.md", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667440.27349}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667440.982228, "tool": "glob", "pattern": "**/target_assessment.json", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667440.982207}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667452.976204, "tool": "glob", "pattern": "**/drug.md", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667452.976176}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667453.742847, "tool": "glob", "pattern": "**/target_assessment.json", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667453.7428281}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667454.4154391, "tool": "ls", "path": "/evidence", "result_count": 35, "error": null, "timestamp": 1777667454.4154198}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667473.5033522, "tool": "glob", "pattern": "**/*.md", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667473.503335}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667474.239825, "tool": "glob", "pattern": "**/*.json", "path": "/", "result_count": 41, "error": null, "timestamp": 1777667474.239806}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667491.115844, "tool": "glob", "pattern": "**/*.md", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667491.115818}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667519.71228, "tool": "glob", "pattern": "**/drug.md", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667519.712255}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667538.741256, "tool": "glob", "pattern": "**/*.md", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667538.7412338}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667539.740752, "tool": "ls", "path": "/private/tmp/drug_target_t4_out/data_dir", "result_count": 0, "error": null, "timestamp": 1777667539.7407308}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667579.98272, "tool": "glob", "pattern": "**/*.md", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667579.982692}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667580.706621, "tool": "glob", "pattern": "**/*.json", "path": "/", "result_count": 41, "error": null, "timestamp": 1777667580.7065961}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667664.119056, "tool": "glob", "pattern": "**/*.md", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667664.11903}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667665.126837, "tool": "ls", "path": "/private/tmp/drug_target_t4_out/data_dir", "result_count": 0, "error": null, "timestamp": 1777667665.126821}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667671.873098, "tool": "ls", "path": "/", "result_count": 2, "error": null, "timestamp": 1777667671.8730712}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667672.731842, "tool": "ls", "path": "/large_tool_results", "result_count": 1, "error": null, "timestamp": 1777667672.7318149}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667687.27313, "tool": "glob", "pattern": "**/*.md", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667687.273113}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667688.07841, "tool": "glob", "pattern": "**/*.json", "path": "/", "result_count": 41, "error": null, "timestamp": 1777667688.0783901}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667779.283326, "tool": "glob", "pattern": "**/*.md", "path": "/", "result_count": 0, "error": null, "timestamp": 1777667779.283305}
+{"level": "INFO", "logger": "drug_target.fs_backend", "ts": 1777667780.150453, "tool": "glob", "pattern": "**/*.json", "path": "/", "result_count": 41, "error": null, "timestamp": 1777667780.1504178}
+{"level": "INFO", "logger": "drug_target.lifecycle", "ts": 1777667926.37202, "event": "critic_slice_lifecycle", "phase": "after_invoke", "data_dir": "/private/tmp/drug_target_t4_out/data_dir", "timestamp": 1777667926.3719869}
+{"level": "INFO", "logger": "drug_target.lifecycle", "ts": 1777667926.373346, "event": "critic_slice_lifecycle", "phase": "after_cleanup", "data_dir": "/private/tmp/drug_target_t4_out/data_dir", "timestamp": 1777667926.373333}

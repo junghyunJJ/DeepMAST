@@ -238,9 +238,15 @@ def test_get_summarizer_subagent_uses_disk_backend_when_data_dir_given(
     assert "runnable" in result
 
 
-def test_get_summarizer_subagent_preserves_caller_backend(tmp_path: Path) -> None:
-    """When backend is explicitly passed, get_summarizer_subagent must NOT
-    overwrite it with a disk backend."""
+def test_get_summarizer_subagent_raises_when_both_backend_and_data_dir(
+    tmp_path: Path,
+) -> None:
+    """Passing both backend= and data_dir= to get_summarizer_subagent must raise
+    ValueError (propagated from create_summarizer_agent's mutual-exclusivity guard).
+
+    T0.7a changed the semantics: callers must choose one path; silently dropping
+    data_dir in favor of the explicit backend is no longer allowed.
+    """
     from deepagents.backends import FilesystemBackend
 
     caller_backend = FilesystemBackend(root_dir=str(tmp_path), virtual_mode=True)
@@ -256,12 +262,8 @@ def test_get_summarizer_subagent_preserves_caller_backend(tmp_path: Path) -> Non
             get_summarizer_subagent,
         )
 
-        get_summarizer_subagent(
-            backend=caller_backend,
-            data_dir=str(tmp_path),
-        )
-
-    call_kwargs = mock_create.call_args[1] if mock_create.call_args[1] else {}
-    assert call_kwargs.get("backend") is caller_backend, (
-        "Caller-provided backend must not be overwritten by _build_disk_backend"
-    )
+        with pytest.raises(ValueError, match="pass either"):
+            get_summarizer_subagent(
+                backend=caller_backend,
+                data_dir=str(tmp_path),
+            )

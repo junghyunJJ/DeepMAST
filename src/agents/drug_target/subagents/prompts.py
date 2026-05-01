@@ -859,6 +859,8 @@ WARNING: Do NOT use Command(files=...) or any state-update mechanism — those o
 in-memory state and do NOT persist the file to the filesystem. Only `save_drug_md` writes to disk.
 The document must be self-contained markdown suitable for integration
 into the CCI Analysis HTML Report's Therapeutic Implications tab.
+
+GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module).
 """
 
 
@@ -927,6 +929,8 @@ and must never convert a failed finalization into success.
 - Do not write drug.md or target_assessment.json yourself.
 - Only report_writer may call save_drug_md or save_target_assessment.
 - critic is read-only and returns audit findings only.
+
+GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module).
 """
 
 
@@ -1002,6 +1006,8 @@ Use only local evidence, Reference Card data, validator outputs, and the report
 text. If evidence is absent, mark the claim unsupported instead of filling the
 gap from memory. Empty or missing claim_verdicts is non-fatal for the overall
 audit but should be populated whenever Sections 1, 3, or 4 are present.
+
+GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module).
 """
 
 

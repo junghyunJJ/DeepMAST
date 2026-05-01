@@ -30,6 +30,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json as _json
+import logging
 import os
 import shutil
 import sys
@@ -64,6 +66,60 @@ _SUBAGENT_NAMES = [
     "REPORT_WRITER",
     "CRITIC",
 ]
+
+_DEFAULT_LOG_FILE = ".omb/logs/v8_run.log"
+_DIAGNOSTIC_LOGGERS = (
+    "drug_target.fs_backend",
+    "drug_target.fs_middleware",
+    "drug_target.lifecycle",
+)
+
+
+# ---------------------------------------------------------------------------
+# Logging configuration
+# ---------------------------------------------------------------------------
+
+
+class JsonlFormatter(logging.Formatter):
+    """Emit one JSON object per log record on its own line.
+
+    The actual structured payload is already inside ``record.msg`` (callers use
+    ``logger.info(json.dumps({...}))``). This formatter adds a small outer
+    envelope so consumers can grep ``"level": "INFO"`` etc.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        try:
+            payload = _json.loads(record.msg)
+        except (ValueError, TypeError):
+            payload = {"raw_msg": record.getMessage()}
+        envelope = {
+            "level": record.levelname,
+            "logger": record.name,
+            "ts": record.created,
+            **payload,
+        }
+        return _json.dumps(envelope)
+
+
+def configure_logging(level: str, log_file: str) -> None:
+    """Install JsonlFormatter on a single FileHandler for the diagnostic loggers.
+
+    Single sink to prevent AC7 grep-count duplication (CP-P1-002).
+    ``propagate=False`` prevents duplication via the root logger.
+    """
+    log_path = Path(log_file)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    handler = logging.FileHandler(str(log_path), mode="w")
+    handler.setFormatter(JsonlFormatter())
+
+    numeric_level = getattr(logging, level, logging.INFO)
+    for name in _DIAGNOSTIC_LOGGERS:
+        lg = logging.getLogger(name)
+        lg.setLevel(numeric_level)
+        lg.addHandler(handler)
+        lg.propagate = False  # prevent duplication via root logger
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +174,17 @@ def _parse_args() -> argparse.Namespace:
             "Resolve config and copy evidence without invoking the LLM. "
             "Use to verify the script wires up correctly."
         ),
+    )
+    p.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Logging level for diagnostic loggers. Default: INFO",
+    )
+    p.add_argument(
+        "--log-file",
+        default=_DEFAULT_LOG_FILE,
+        help=f"Path to the structured JSONL log file. Default: {_DEFAULT_LOG_FILE}",
     )
     return p.parse_args()
 
@@ -189,6 +256,9 @@ def _extract_disease(source_dir: Path) -> str:
 
 
 async def _run(args: argparse.Namespace) -> None:
+    # Configure diagnostic loggers before any agent construction (T3.6b).
+    configure_logging(args.log_level, args.log_file)
+
     source_dir = Path(args.evidence_source).expanduser().resolve()
     output_path = Path(args.output).expanduser().resolve()
 
@@ -273,6 +343,7 @@ async def _run(args: argparse.Namespace) -> None:
     raw_agent = create_summarizer_agent(
         model=llm,
         inner_subagents=inner_subagents,
+        data_dir=str(data_dir),
     )
     agent = wrap_summarizer_with_critic_slices(raw_agent, data_dir=str(data_dir))
 
