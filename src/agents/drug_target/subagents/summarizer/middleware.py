@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -191,7 +192,124 @@ class RepairCycleCounterMiddleware(AgentMiddleware):
         return result
 
 
+_SAVE_DRUG_MD_TOOL = "save_drug_md"
+_ANNOTATION_RE = re.compile(r"\[source:[^\]]+\]")
+_SENTENCE_END_RE = re.compile(r"[.!?]")
+_DEFAULT_ANNOTATION_THRESHOLD = 10
+
+
+def _is_prose_line(line: str) -> bool:
+    """Mirror of stage_logic._is_expand_prose: not header / table / list."""
+    stripped = line.strip()
+    if not stripped:
+        return False
+    if stripped.startswith("|") or stripped.startswith("#"):
+        return False
+    if re.match(r"[-*]\s+|^\d+\.\s+", stripped):
+        return False
+    return True
+
+
+def _count_prose_sentences(content: str) -> int:
+    """Count sentence-end punctuation occurrences across prose lines.
+
+    Mirrors the heuristic used by the UNANCHORED_SENTENCE validator: prose
+    lines are non-empty lines that are not headers, tables, or list items.
+    """
+    total = 0
+    for line in content.splitlines():
+        if not _is_prose_line(line):
+            continue
+        total += len(_SENTENCE_END_RE.findall(line))
+    return total
+
+
+class AnnotationDensityMiddleware(AgentMiddleware):
+    """Reject ``save_drug_md`` when EXPAND-region prose is under-annotated.
+
+    Prompt-only enforcement of per-sentence ``[source: <field>]`` annotations
+    proved unreliable on local LLMs (1/20 in the qwen3.5:35b run). This
+    middleware intercepts ``save_drug_md`` tool calls and counts
+    ``[source:...]`` markers in the saved content. When the document already
+    contains enough prose sentences to warrant annotation
+    (``prose_sentences >= threshold``) but the annotation count is below the
+    threshold, the call is rejected with a structured error directing the
+    writer to add annotations before retrying.
+
+    Documents shorter than ``threshold`` prose sentences pass through — the
+    UNANCHORED_SENTENCE validator already covers them at validation time, and
+    failing tiny saves here would block legitimate degenerate cases.
+    """
+
+    def __init__(self, *, threshold: int = _DEFAULT_ANNOTATION_THRESHOLD) -> None:
+        super().__init__()
+        self._threshold = threshold
+
+    def _evaluate(self, request: ToolCallRequest) -> ToolMessage | None:
+        if request.tool_call.get("name") != _SAVE_DRUG_MD_TOOL:
+            return None
+        args = request.tool_call.get("args") or {}
+        content = ""
+        if isinstance(args, dict):
+            raw = args.get("content")
+            if isinstance(raw, str):
+                content = raw
+        if not content:
+            return None
+        prose_sentences = _count_prose_sentences(content)
+        if prose_sentences < self._threshold:
+            return None
+        annotation_count = len(_ANNOTATION_RE.findall(content))
+        if annotation_count >= self._threshold:
+            return None
+        deficit = self._threshold - annotation_count
+        payload = {
+            "ok": False,
+            "error": (
+                f"Annotation density too low: found {annotation_count} "
+                f"`[source: <field>]` annotations across {prose_sentences} prose "
+                f"sentences, need >= {self._threshold}. Add `[source: <field>]` "
+                f"to at least {deficit} more EXPAND-region sentences before saving."
+            ),
+            "annotation_count": annotation_count,
+            "prose_sentences": prose_sentences,
+            "threshold": self._threshold,
+        }
+        logger.warning(
+            "AnnotationDensityMiddleware: blocking save_drug_md "
+            "(annotations=%d, prose=%d, threshold=%d)",
+            annotation_count,
+            prose_sentences,
+            self._threshold,
+        )
+        return ToolMessage(
+            content=json.dumps(payload),
+            tool_call_id=request.tool_call.get("id", ""),
+        )
+
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        rejection = self._evaluate(request)
+        if rejection is not None:
+            return rejection
+        return handler(request)
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
+    ) -> ToolMessage | Command:
+        rejection = self._evaluate(request)
+        if rejection is not None:
+            return rejection
+        return await handler(request)
+
+
 __all__ = [
+    "AnnotationDensityMiddleware",
     "BuildEvidenceSummaryGuardMiddleware",
     "RepairCycleCounterMiddleware",
 ]

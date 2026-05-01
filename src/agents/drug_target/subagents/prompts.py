@@ -820,7 +820,9 @@ Each section has its own data source. Using the wrong source causes fabrication.
 
 | Section | Data Source | If Absent |
 |---|---|---|
-| Drug Profile | Reference Card `stage3.clinical_drugs` + `preclinical_compounds` | "No known drugs identified in ChEMBL or OpenTargets" |
+| Drug Profile | Allowlist UNION of `resolved_drugs.json[*].name` (OpenTargets-sourced) + `stage3_<gene>.json[*].matched_drugs[*].name` (ChEMBL clinical) + `stage3_<gene>.json[*].preclinical_compounds[*].name`. Cite the source file per drug. | "No known drugs identified in ChEMBL or OpenTargets" — only after confirming the UNION is empty |
+
+**Drug Profile coverage rule (D3):** For each featured candidate, list every drug name from the union of `resolved_drugs.json[*].name` (entries that reference this gene), `stage3_<gene>.json[*].matched_drugs[*].name`, and `stage3_<gene>.json[*].preclinical_compounds[*].name`. Cite the source file per drug. If the union is empty, write `"No known drugs targeting this gene"`. Do NOT default to "No known drugs" just because `stage3.matched_drugs` is empty — check `resolved_drugs.json` first.
 | Biological Context | Reference Card `stage1_pairs` (STRING, Census) | "No Stage 1 biological context data available" |
 | Rubric Assessment | Reference Card `rubric` (COPY integers verbatim) | N/A — always present |
 
