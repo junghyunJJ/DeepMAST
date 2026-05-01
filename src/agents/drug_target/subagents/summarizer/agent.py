@@ -16,6 +16,7 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
     ReadOnlyToolGuardMiddleware,
 )
 from src.agents.drug_target.subagents.summarizer.middleware import (
+    AnnotationDensityMiddleware,
     BuildEvidenceSummaryGuardMiddleware,
     RepairCycleCounterMiddleware,
 )
@@ -78,6 +79,7 @@ def create_summarizer_agent(
             ),
             BuildEvidenceSummaryGuardMiddleware(),
             RepairCycleCounterMiddleware(max_cycles=2),
+            AnnotationDensityMiddleware(),
         ],
     )
 
@@ -115,8 +117,10 @@ class _CriticSliceWrapper:
         # summarizer/agent.py <- configs.py <- summarizer/__init__.py
         from src.agents.drug_target.subagents.configs import (  # noqa: PLC0415
             cleanup_critic_slices,
+            filter_hypothesis_evidence_files,
             write_critic_slices,
         )
+        filter_hypothesis_evidence_files(self._data_dir)
         write_critic_slices(self._data_dir)
         try:
             if config is not None:
@@ -129,8 +133,10 @@ class _CriticSliceWrapper:
         """Async variant: write critic slices, run the inner agent, then clean up."""
         from src.agents.drug_target.subagents.configs import (  # noqa: PLC0415
             cleanup_critic_slices,
+            filter_hypothesis_evidence_files,
             write_critic_slices,
         )
+        filter_hypothesis_evidence_files(self._data_dir)
         write_critic_slices(self._data_dir)
         try:
             if config is not None:

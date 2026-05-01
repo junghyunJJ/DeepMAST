@@ -13,6 +13,7 @@ Workflow order: evidence_assessor -> hypothesis_writer -> summarizer
 
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import Callable, Sequence
@@ -72,9 +73,130 @@ __all__ = [
     "synthesize_repair_instructions",
     "write_critic_slices",
     "cleanup_critic_slices",
+    "filter_hypothesis_evidence_files",
     "SUBAGENT_CONFIGS",
     "WORKFLOW_ORDER",
 ]
+
+
+# Keys on each hypothesis dict that may carry a list of evidence file
+# references. Different hypothesis_writer prompt revisions have used different
+# names; the filter strips nonexistent entries from each.
+_EVIDENCE_FILE_KEYS = ("evidence_files", "evidence_references")
+
+# Matches a JSON filename that may be followed by the ``_FAILED`` upstream
+# marker, possibly with surrounding bracket characters. Used to strip
+# ``_FAILED`` suffixes from prose fields and remove bracket forms whose
+# target file does not exist on disk.
+_JSON_FAILED_SUFFIX_RE = re.compile(r"(\b[\w-]+\.json)_FAILED\b")
+
+
+def _strip_failed_suffix_in_strings(node: object) -> tuple[object, int]:
+    """Walk a JSON-decoded structure and replace ``<file>.json_FAILED`` with
+    ``<file>.json`` in every string value. Returns the (possibly new) node and
+    the number of replacements performed."""
+    if isinstance(node, str):
+        new, n = _JSON_FAILED_SUFFIX_RE.subn(r"\1", node)
+        return new, n
+    if isinstance(node, list):
+        total = 0
+        out_list: list[object] = []
+        for item in node:
+            new_item, n = _strip_failed_suffix_in_strings(item)
+            out_list.append(new_item)
+            total += n
+        return out_list, total
+    if isinstance(node, dict):
+        total = 0
+        out_dict: dict[str, object] = {}
+        for k, v in node.items():
+            new_v, n = _strip_failed_suffix_in_strings(v)
+            out_dict[k] = new_v
+            total += n
+        return out_dict, total
+    return node, 0
+
+
+def filter_hypothesis_evidence_files(data_dir: str) -> int:
+    """Drop hypothesis_report.json evidence-list entries not present on disk.
+
+    The hypothesis_writer subagent occasionally emits references to files it
+    believes exist (e.g. ``known_drugs.json``) or files with the ``_FAILED``
+    upstream marker. When SUMMARIZER / report_writer faithfully echoes these
+    strings, the produced drug.md cites nonexistent files. Fixing this at the
+    consumer (closer to disk) is more reliable than asking the LLM to
+    self-check.
+
+    Two passes:
+      1. List-key pass — every list-shaped entry under any key in
+         ``_EVIDENCE_FILE_KEYS`` is filtered: entries ending with ``_FAILED``
+         and entries whose target path does not exist under
+         ``<data_dir>/evidence/`` are dropped.
+      2. Prose pass — every string value anywhere in the document has
+         ``<file>.json_FAILED`` rewritten to ``<file>.json``. The
+         ``_FAILED`` suffix is never valid in drug.md regardless of where it
+         appears, and prose-embedded references have been observed to bypass
+         the list-key filter when the LLM echoes them verbatim.
+
+    Accepts both on-disk shapes:
+      1. ``{"hypotheses": [{"evidence_files": [...]}, ...]}`` — current pipeline
+      2. ``[{"evidence_files": [...]}, ...]`` — legacy/test fixtures
+
+    The file is rewritten in place only when at least one entry is dropped or
+    one suffix is stripped.
+
+    Args:
+        data_dir: Run working directory (parent of ``evidence/``).
+
+    Returns:
+        Total number of mutations (list-entry drops + prose suffix strips).
+    """
+    evidence_dir = Path(data_dir) / "evidence"
+    hyp_path = evidence_dir / "hypothesis_report.json"
+    if not evidence_dir.exists() or not hyp_path.exists():
+        return 0
+
+    try:
+        data = json.loads(hyp_path.read_text())
+    except Exception:
+        return 0
+
+    if isinstance(data, dict):
+        hyps = data.get("hypotheses") or []
+        container = data
+    elif isinstance(data, list):
+        hyps = data
+        container = None
+    else:
+        return 0
+
+    dropped = 0
+    for hyp in hyps:
+        if not isinstance(hyp, dict):
+            continue
+        for key in _EVIDENCE_FILE_KEYS:
+            files = hyp.get(key)
+            if not isinstance(files, list):
+                continue
+            kept = [
+                f
+                for f in files
+                if isinstance(f, str)
+                and not f.endswith("_FAILED")
+                and (evidence_dir / f).exists()
+            ]
+            dropped += len(files) - len(kept)
+            hyp[key] = kept
+
+    # Pass 2: strip ``_FAILED`` suffixes from any string anywhere in the doc.
+    # Operate on the container so the rewrite covers both shapes uniformly.
+    target = container if container is not None else hyps
+    rewritten, suffix_strips = _strip_failed_suffix_in_strings(target)
+    total_mutations = dropped + suffix_strips
+
+    if total_mutations:
+        hyp_path.write_text(json.dumps(rewritten, indent=2))
+    return total_mutations
 
 
 # =============================================================================
