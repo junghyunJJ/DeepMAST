@@ -123,3 +123,55 @@ def test_no_unprotected_read_file_instruction(prompt_name: str, prompt_text: str
         f"{prompt_name} contains positive-form read_file instruction near 'evidence' "
         f"without negation: {findings!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Strengthened T8 guard: virtual-path enforcement (CP-P0-001, D6)
+# ---------------------------------------------------------------------------
+
+STRONG_GUARD_VIRTUAL = "Always use virtual paths starting with"
+STRONG_GUARD_DISK = "NEVER prepend the disk path of `data_dir`"
+
+_ALL_FIVE_PROMPTS = [
+    ("EVIDENCE_ASSESSOR_PROMPT", _prompts.EVIDENCE_ASSESSOR_PROMPT),
+    ("HYPOTHESIS_WRITER_PROMPT", _prompts.HYPOTHESIS_WRITER_PROMPT),
+    ("REPORT_WRITER_PROMPT", _prompts.REPORT_WRITER_PROMPT),
+    ("SUMMARIZER_PROMPT", _prompts.SUMMARIZER_PROMPT),
+    ("CRITIC_PROMPT", _prompts.CRITIC_PROMPT),
+]
+
+
+@pytest.mark.parametrize("prompt_name,prompt_text", _ALL_FIVE_PROMPTS)
+def test_prompt_contains_strong_guard_virtual(prompt_name: str, prompt_text: str):
+    """All 5 subagent prompts must contain the virtual-path enforcement sentence."""
+    assert STRONG_GUARD_VIRTUAL in prompt_text, (
+        f"{prompt_name} missing strengthened guard: '{STRONG_GUARD_VIRTUAL}'"
+    )
+
+
+@pytest.mark.parametrize("prompt_name,prompt_text", _ALL_FIVE_PROMPTS)
+def test_prompt_contains_strong_guard_disk(prompt_name: str, prompt_text: str):
+    """All 5 subagent prompts must contain the disk-path prohibition sentence."""
+    assert STRONG_GUARD_DISK in prompt_text, (
+        f"{prompt_name} missing strengthened guard: '{STRONG_GUARD_DISK}'"
+    )
+
+
+def test_guidance_text_is_byte_identical_across_all_subagent_prompts():
+    """All 5 subagent prompts must contain the byte-identical GUIDANCE block (CP-P2-008)."""
+    prompts_to_check = [
+        _prompts.EVIDENCE_ASSESSOR_PROMPT,
+        _prompts.HYPOTHESIS_WRITER_PROMPT,
+        _prompts.REPORT_WRITER_PROMPT,
+        _prompts.SUMMARIZER_PROMPT,
+        _prompts.CRITIC_PROMPT,
+    ]
+    guidance_blocks = []
+    for p in prompts_to_check:
+        # Take the LAST occurrence of GUIDANCE: in case the word appears earlier
+        idx = p.rindex("GUIDANCE:")
+        guidance_blocks.append(p[idx:].strip())
+    assert len(set(guidance_blocks)) == 1, (
+        f"GUIDANCE blocks differ across prompts. "
+        f"Distinct count: {len(set(guidance_blocks))}"
+    )

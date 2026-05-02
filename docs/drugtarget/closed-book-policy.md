@@ -3,7 +3,7 @@ title: Closed-Book Hallucination-Reduction Policy
 category: architecture
 status: accepted
 created: 2026-04-29
-updated: 2026-04-29
+updated: 2026-05-02
 tags: drug-target, hallucination, validation, quality-gate, adr
 relates-to: src/agents/drug_target/tools/stage_logic.py, src/agents/drug_target/subagents/configs.py, src/agents/drug_target/subagents/critic_schema.py
 depends-on: docs/drugtarget/drug_target_agent_reference.md
@@ -156,6 +156,46 @@ uv run python scripts/run_drug_target_summarizer_only.py \
   --model qwen3.5:35b \
   --keep-data-dir
 ```
+
+---
+
+## Provider Selection
+
+The drug-target pipeline supports multiple LLM providers via the `LLM_PROVIDER` env var or `--provider` CLI flag. As of 2026-05-02, the following providers are supported:
+
+| Provider | Use Case | Notes |
+|----------|----------|-------|
+| `openai` | OpenAI API (default for cloud) | Requires `OPENAI_API_KEY` |
+| `claude` | Anthropic Claude | Requires `ANTHROPIC_API_KEY` |
+| `google` | Google Gemini | Requires `GOOGLE_API_KEY` |
+| `openrouter` | OpenRouter aggregator | Requires `OPENROUTER_API_KEY` |
+| `ollama` | Local Ollama (native ChatOllama) | Default port 6000 |
+| `ollama-openai` | Local Ollama via OpenAI-compatible endpoint | Default port 11434 |
+
+### When to use `ollama-openai`
+
+Use the `ollama-openai` provider when:
+- Running `qwen3.5:35b` or similar models on Ollama with complex multi-tool schemas
+- Encountering `XML syntax error: element <function> closed by </parameter>` errors
+- The native `ollama` provider's `PARSER qwen3.5` translation layer corrupts tool-call output
+
+This provider bypasses the PARSER layer by routing through Ollama's OpenAI-compatible
+`/v1/chat/completions` endpoint (Ollama 0.20+) and uses `langchain-openai`'s `ChatOpenAI`
+to emit native JSON tool-calls.
+
+### Canonical smoke command
+
+```bash
+LLM_PROVIDER=ollama-openai \
+LLM_MODEL=qwen3.5:35b \
+OLLAMA_BASE_URL=http://localhost:5000 \
+python scripts/run_drug_target_summarizer_only.py
+```
+
+Per-prompt smoke status (PR body MUST attest):
+- AC4a SUMMARIZER schema: empirically validated per PR #14 comment #4363865471 (178s, 2 valid JSON tool-calls, 0 XML errors)
+- AC4b REPORT_WRITER schema: deferred to verification PR
+- AC4c CRITIC schema: deferred to verification PR
 
 ---
 

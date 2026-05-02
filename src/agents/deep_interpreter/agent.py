@@ -119,7 +119,7 @@ class DeepInterpreterConfig:
         - OLLAMA_MODEL (default: gpt-oss:20b)
         - ANTHROPIC_MODEL (default: claude-haiku-4-5-20251001)
     """
-    provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "openrouter"
+    provider: Literal["openai", "google", "ollama", "ollama-openai", "claude", "openrouter"] = "openrouter"
     data_dir: str = field(
         default_factory=lambda: os.getenv(
             "DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace"

@@ -109,7 +109,7 @@ class DrugTargetConfig:
         skills_dir: Optional override for the project skills directory.
     """
 
-    provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "ollama"
+    provider: Literal["openai", "google", "ollama", "ollama-openai", "claude", "openrouter"] = "ollama"
     data_dir: str = field(
         default_factory=lambda: os.getenv(
             "DRUG_TARGET_DATA_DIR",

@@ -1,6 +1,9 @@
 """model - Create Language Models for different providers"""
+import logging
 import os
-from typing import Optional
+from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -15,7 +18,7 @@ def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
     Create LLM based on provider (default: openrouter with moonshotai/kimi-k2.5)
 
     Args:
-        provider: LLM provider ('openai', 'google', 'ollama', 'claude', 'openrouter').
+        provider: LLM provider ('openai', 'google', 'ollama', 'ollama-openai', 'claude', 'openrouter').
                  If None, uses LLM_PROVIDER env var or defaults to 'openrouter'
         **kwargs: Provider-specific arguments
 
@@ -35,6 +38,8 @@ def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
     
     if provider == "ollama":
         return create_ollama_llm(**kwargs)
+    elif provider == "ollama-openai":
+        return create_ollama_openai_llm(**kwargs)
     elif provider == "google":
         return create_google_llm(**kwargs)
     elif provider == "openai":
@@ -142,6 +147,77 @@ def create_ollama_llm(**kwargs) -> ChatOllama:
     return llm
 
 
+def create_ollama_openai_llm(**kwargs: Any) -> ChatOpenAI:
+    """Ollama via OpenAI-compatible /v1/chat/completions endpoint.
+
+    Bypasses Ollama's PARSER xml->json layer, which corrupts complex
+    multi-tool schemas under qwen3.5:35b (XML syntax error: element
+    <function> closed by </parameter>). Routes through native JSON
+    tool-calls instead.
+
+    Reuses the same NUM_CTX / NUM_PREDICT / BASE_URL env keys as
+    create_ollama_llm so load_subagent_models_from_env() works
+    without modification. Ollama-specific kwargs (and the canonical
+    ChatOpenAI kwargs we explicitly forward) are POPPED from kwargs
+    before the **kwargs spread. Per CP-P2-007: each popped key is
+    removed from `kwargs` by `kwargs.pop(...)`, so the subsequent
+    `**kwargs` spread cannot re-pass any of them — there is no
+    double-pass / "got multiple values for keyword argument" risk.
+    """
+    # Pop Ollama-specific kwargs BEFORE forwarding to ChatOpenAI.
+    # ChatOpenAI raises TypeError on unknown kwargs (num_ctx, num_predict).
+    # All popped kwargs are removed from **kwargs spread; no double-pass risk.
+    base_host = kwargs.pop("base_url", None) or os.getenv(
+        "OLLAMA_BASE_URL", "http://localhost:11434"
+    )
+    # D4 (CP-P2-001 corrected): handle optional user-supplied /v1 suffix
+    # rstrip("/") drops trailing slashes; endswith("/v1") checks the literal
+    # substring (NOT rstrip("/v1") which is a character-set strip).
+    base_host = base_host.rstrip("/")
+    if base_host.endswith("/v1"):
+        base_url = base_host
+    else:
+        base_url = f"{base_host}/v1"
+
+    # D9 (iteration 3): default aligned with create_ollama_llm (model.py:115)
+    model = kwargs.pop("model", None) or os.getenv(
+        "OLLAMA_MODEL", "qwen3.5:122b"
+    )
+    num_ctx = int(kwargs.pop("num_ctx", 98304))
+    num_predict = int(kwargs.pop("num_predict", -1))
+    temperature = kwargs.pop("temperature", 0)
+
+    # CP-P2-005 (iteration 4): emit ops audit log before constructing the LLM.
+    logger.info(
+        "LLM provider=ollama-openai model=%s base_url=%s num_ctx=%s num_predict=%s",
+        model,
+        base_url,
+        num_ctx,
+        num_predict,
+    )
+
+    llm = ChatOpenAI(
+        model=model,
+        base_url=base_url,
+        api_key="ollama",  # placeholder — Ollama ignores, OpenAI SDK requires non-empty
+        temperature=temperature,
+        request_timeout=7200,  # D8: kwarg name verified — request_timeout, NOT timeout
+        streaming=False,  # D7: explicit (matches ChatOpenAI default; defends against accidental enable)
+        parallel_tool_calls=False,  # D10 / CP-P1-002: prevent uncertain Ollama OpenAI-compat parallel-call behavior
+        **kwargs,  # forward any remaining caller-supplied kwargs (e.g., max_tokens for OpenRouter parity)
+    )
+    # D2: Mirror create_ollama_llm profile setup VERBATIM.
+    # `profile` is a typed Pydantic field on BaseChatModel:
+    #   profile: ModelProfile | None  (where ModelProfile is TypedDict, total=False)
+    # Formula: copied verbatim from src/agents/model.py:137
+    effective_output = num_predict if num_predict > 0 else num_ctx // 4
+    llm.profile = {
+        "max_input_tokens": num_ctx - effective_output,
+        "max_output_tokens": effective_output,
+    }
+    return llm
+
+
 def create_openrouter_llm(**kwargs) -> ChatOpenAI:
     """
     Create OpenRouter LLM instance via OpenRouter's OpenAI-compatible API
@@ -213,7 +289,7 @@ def load_subagent_models_from_env(
         if temperature:
             kwargs["temperature"] = float(temperature)
 
-        # Ollama-specific
+        # Shared by ollama and ollama-openai (both providers reuse these env keys per D3)
         num_ctx = os.getenv(f"{env_prefix}_NUM_CTX")
         if num_ctx:
             kwargs["num_ctx"] = int(num_ctx)
