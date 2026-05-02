@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import logging
+import time
 from collections.abc import Sequence
 from typing import Any
 
@@ -11,6 +14,26 @@ from deepagents.backends.protocol import BackendFactory, BackendProtocol
 from langchain_core.language_models import BaseChatModel
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
+
+from src.agents.drug_target.subagents.summarizer.fs_backend import (
+    LoggingAndFallbackFilesystemBackend,
+)
+
+_lifecycle_logger = logging.getLogger("drug_target.lifecycle")
+
+
+def _emit_lifecycle(phase: str, data_dir: str) -> None:
+    """Emit one structured lifecycle event (CP-P1-003 compliant)."""
+    _lifecycle_logger.info(
+        json.dumps(
+            {
+                "event": "critic_slice_lifecycle",
+                "phase": phase,
+                "data_dir": data_dir,
+                "timestamp": time.time(),
+            }
+        )
+    )
 
 from src.agents.deep_interpreter.middleware.write_file_guard import (
     ReadOnlyToolGuardMiddleware,
@@ -37,13 +60,17 @@ _SUMMARIZER_BLOCKED_TOOLS = (
 
 
 def _build_disk_backend(data_dir: str) -> FilesystemBackend:
-    """Build a FilesystemBackend rooted at data_dir with virtual path mode.
+    """Build a LoggingAndFallbackFilesystemBackend rooted at data_dir with virtual path mode.
 
     Virtual mode ensures that built-in filesystem tools (ls, read_file, glob)
     resolve paths like /evidence/pair_001.json to data_dir/evidence/pair_001.json
     on real disk rather than against an in-memory StateBackend.
+
+    Returns a ``LoggingAndFallbackFilesystemBackend`` (subclass of
+    ``FilesystemBackend``) so every ls/glob call is logged as structured JSON
+    for observability (T3).
     """
-    return FilesystemBackend(root_dir=data_dir, virtual_mode=True)
+    return LoggingAndFallbackFilesystemBackend(root_dir=data_dir, virtual_mode=True)
 
 
 def create_summarizer_agent(
@@ -52,13 +79,35 @@ def create_summarizer_agent(
     backend: BackendProtocol | BackendFactory | None = None,
     inner_subagents: Sequence[dict[str, Any]] = (),
     tools: Sequence[BaseTool | Any] | None = None,
+    data_dir: str | None = None,
 ) -> Runnable:
     """Create the autonomous report-finalization DeepAgent.
 
     The summarizer supervises the write -> validate -> critic -> repair loop.
     It is intentionally not an artifact writer; only its inner report_writer
     subagent owns drug.md and target_assessment.json writes.
+
+    Args:
+        model: LLM model string or BaseChatModel instance.
+        backend: Explicit backend to use.  Mutually exclusive with ``data_dir``.
+        inner_subagents: Sequence of inner subagent config dicts.
+        tools: Override tool list.  Defaults to the standard summarizer tool set.
+        data_dir: Root directory for on-disk evidence files.  When provided the
+            factory builds a ``FilesystemBackend(root_dir=data_dir,
+            virtual_mode=True)`` automatically.  Mutually exclusive with
+            ``backend`` — pass one or the other, never both.
+
+    Raises:
+        ValueError: If both ``backend`` and ``data_dir`` are provided.
     """
+    if backend is not None and data_dir is not None:
+        raise ValueError(
+            "create_summarizer_agent: pass either `backend` or `data_dir`, not both. "
+            "When `data_dir` is provided, the factory builds the FilesystemBackend automatically."
+        )
+    if backend is None and data_dir is not None:
+        backend = _build_disk_backend(data_dir)
+
     summarizer_tools = list(tools or [
         validate_drug_md,
         validate_drug_report_finalization,
@@ -120,14 +169,19 @@ class _CriticSliceWrapper:
             filter_hypothesis_evidence_files,
             write_critic_slices,
         )
+        _emit_lifecycle("before_filter", self._data_dir)
         filter_hypothesis_evidence_files(self._data_dir)
+        _emit_lifecycle("before_write", self._data_dir)
         write_critic_slices(self._data_dir)
+        _emit_lifecycle("before_invoke", self._data_dir)
         try:
             if config is not None:
                 return self._agent.invoke(input, config, **kwargs)
             return self._agent.invoke(input, **kwargs)
         finally:
+            _emit_lifecycle("after_invoke", self._data_dir)
             cleanup_critic_slices(self._data_dir)
+            _emit_lifecycle("after_cleanup", self._data_dir)
 
     async def ainvoke(self, input: Any, config: Any = None, **kwargs: Any) -> Any:  # noqa: A002
         """Async variant: write critic slices, run the inner agent, then clean up."""
@@ -136,14 +190,19 @@ class _CriticSliceWrapper:
             filter_hypothesis_evidence_files,
             write_critic_slices,
         )
+        _emit_lifecycle("before_filter", self._data_dir)
         filter_hypothesis_evidence_files(self._data_dir)
+        _emit_lifecycle("before_write", self._data_dir)
         write_critic_slices(self._data_dir)
+        _emit_lifecycle("before_invoke", self._data_dir)
         try:
             if config is not None:
                 return await self._agent.ainvoke(input, config, **kwargs)
             return await self._agent.ainvoke(input, **kwargs)
         finally:
+            _emit_lifecycle("after_invoke", self._data_dir)
             cleanup_critic_slices(self._data_dir)
+            _emit_lifecycle("after_cleanup", self._data_dir)
 
 
 def wrap_summarizer_with_critic_slices(
@@ -180,12 +239,10 @@ def get_summarizer_subagent(
     ``evidence/_critic_slices/`` before the first critic call and removed
     afterward.
     """
-    if data_dir is not None and backend is None:
-        backend = _build_disk_backend(data_dir)
-
     agent = create_summarizer_agent(
         model=model,
         backend=backend,
+        data_dir=data_dir,
         inner_subagents=inner_subagents,
     )
 
