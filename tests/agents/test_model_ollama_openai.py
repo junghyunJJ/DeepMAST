@@ -277,10 +277,23 @@ def test_create_llm_with_llm_model_env_overrides_ollama_model(monkeypatch):
 
 
 def test_create_ollama_openai_llm_forwards_num_ctx_to_ollama_options():
-    """Codex P2 #1 fix: num_ctx/num_predict must reach Ollama server, not just llm.profile.
+    """Codex P2 #1 (partial): SDK-LEVEL forwarding only.
 
-    Ollama's OpenAI-compat endpoint accepts Ollama-specific options inside an
-    'options' dict in the request body.  We forward via extra_body={"options": {...}}.
+    This test asserts the ChatOpenAI constructor receives extra_body with the
+    expected options shape — i.e., the langchain SDK plumbing is wired
+    correctly. It does NOT (and cannot) verify Ollama actually honors the
+    forwarded options at the wire level.
+
+    Wire-level reality (verified 2026-05-03 against Ollama 0.20.6 + qwen3.5:35b
+    at port 5000): Ollama's OpenAI-compat layer IGNORES `extra_body.options.*`
+    for both num_ctx and num_predict (live test produced output_tokens=7915 in
+    every variant tried, vs ChatOllama on /api/chat which honored num_predict
+    exactly). See create_ollama_openai_llm docstring KNOWN LIMITATION block.
+
+    Until a future Ollama version honors these options at the wire level,
+    server-side context limits must be set via Ollama daemon configuration
+    (Modelfile `PARAMETER num_ctx`, daemon launch flags, etc.). The extra_body
+    line in production is kept as future-proof syntactically-correct dead code.
     """
     with patch("src.agents.model.ChatOpenAI", autospec=True) as mock_chatopenai:
         mock_chatopenai.return_value = MagicMock(spec=ChatOpenAI)

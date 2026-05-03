@@ -163,6 +163,31 @@ def create_ollama_openai_llm(**kwargs: Any) -> ChatOpenAI:
     removed from `kwargs` by `kwargs.pop(...)`, so the subsequent
     `**kwargs` spread cannot re-pass any of them — there is no
     double-pass / "got multiple values for keyword argument" risk.
+
+    KNOWN LIMITATION (verified 2026-05-03 against Ollama 0.20.6 +
+    qwen3.5:35b at port 5000): Ollama's OpenAI-compat layer at
+    /v1/chat/completions IGNORES every per-request truncation knob
+    we have tried — `max_tokens`, `extra_body={"num_predict": N}`,
+    and `extra_body={"options": {"num_predict": N, "num_ctx": N}}`.
+    Live wire-level test produced output_tokens=7915 in all 3
+    variants (versus ChatOllama on /api/chat which honored
+    num_predict=10 exactly). The `extra_body` line below is
+    therefore a current no-op — kept because the syntax is
+    syntactically correct per Ollama's OpenAI-compat docs and
+    future Ollama versions are expected to honor it. Until then,
+    server-side context limits and output truncation must be set
+    via Ollama daemon configuration (Modelfile `PARAMETER num_ctx`,
+    or `OLLAMA_NUM_PARALLEL` / `OLLAMA_KV_CACHE_TYPE` env vars at
+    daemon launch).
+
+    For our actual use case (tool-calling subagents) this is not a
+    binding constraint: the model self-terminates after emitting
+    compact JSON tool-call payloads (~50-100 tokens), well below
+    any reasonable max_tokens. The risk surface is long agent runs
+    where conversation history grows beyond Ollama's server-side
+    context window before SummarizationMiddleware fires; operators
+    must align `OLLAMA_NUM_CTX` (daemon) with `num_ctx` (this
+    factory) to avoid silent server-side context truncation.
     """
     # Pop Ollama-specific kwargs BEFORE forwarding to ChatOpenAI.
     # ChatOpenAI raises TypeError on unknown kwargs (num_ctx, num_predict).
@@ -204,7 +229,11 @@ def create_ollama_openai_llm(**kwargs: Any) -> ChatOpenAI:
         request_timeout=7200,  # D8: kwarg name verified — request_timeout, NOT timeout
         streaming=False,  # D7: explicit (matches ChatOpenAI default; defends against accidental enable)
         parallel_tool_calls=False,  # D10 / CP-P1-002: prevent uncertain Ollama OpenAI-compat parallel-call behavior
-        extra_body={"options": {"num_ctx": num_ctx, "num_predict": num_predict}},  # Codex P2 #1: forward to Ollama server
+        # Codex P2 #1: forward Ollama-native options to server. CURRENTLY A NO-OP
+        # in Ollama 0.20.6 (verified 2026-05-03 — see docstring KNOWN LIMITATION
+        # block). Kept for future-proofing; the syntax is per Ollama's OpenAI-
+        # compat docs and is harmless when ignored.
+        extra_body={"options": {"num_ctx": num_ctx, "num_predict": num_predict}},
         **kwargs,  # forward any remaining caller-supplied kwargs (e.g., max_tokens for OpenRouter parity)
     )
     # D2: Mirror create_ollama_llm profile setup VERBATIM.
