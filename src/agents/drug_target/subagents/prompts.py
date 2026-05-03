@@ -231,6 +231,8 @@ handoff signal to `hypothesis_writer`.
 - Score 0 on any criterion where the corresponding tool returned no data or errors
 - If ALL tools for a stage fail: explicitly state "No evidence collected for Stage N
   due to tool failures" and score all criteria at 0
+
+GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module). Always use virtual paths starting with `/evidence/...`. NEVER prepend the disk path of `data_dir` (such as `/private/tmp/...`) to filesystem operations.
 """
 
 # =============================================================================
@@ -538,6 +540,8 @@ save_evidence(data_dir, "hypothesis_report.json", {
 - Every claim must trace to a specific evidence file and field
 - If evidence is missing for a hypothesis, note the gap explicitly
 - Score 0 on Evidence_Coverage for hypotheses lacking file references
+
+GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module). Always use virtual paths starting with `/evidence/...`. NEVER prepend the disk path of `data_dir` (such as `/private/tmp/...`) to filesystem operations.
 """
 
 # =============================================================================
@@ -860,7 +864,7 @@ in-memory state and do NOT persist the file to the filesystem. Only `save_drug_m
 The document must be self-contained markdown suitable for integration
 into the CCI Analysis HTML Report's Therapeutic Implications tab.
 
-GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module).
+GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module). Always use virtual paths starting with `/evidence/...`. NEVER prepend the disk path of `data_dir` (such as `/private/tmp/...`) to filesystem operations.
 """
 
 
@@ -930,7 +934,7 @@ and must never convert a failed finalization into success.
 - Only report_writer may call save_drug_md or save_target_assessment.
 - critic is read-only and returns audit findings only.
 
-GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module).
+GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module). Always use virtual paths starting with `/evidence/...`. NEVER prepend the disk path of `data_dir` (such as `/private/tmp/...`) to filesystem operations.
 """
 
 
@@ -1007,7 +1011,7 @@ text. If evidence is absent, mark the claim unsupported instead of filling the
 gap from memory. Empty or missing claim_verdicts is non-fatal for the overall
 audit but should be populated whenever Sections 1, 3, or 4 are present.
 
-GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module).
+GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module). Always use virtual paths starting with `/evidence/...`. NEVER prepend the disk path of `data_dir` (such as `/private/tmp/...`) to filesystem operations.
 """
 
 
