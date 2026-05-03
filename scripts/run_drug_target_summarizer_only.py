@@ -55,8 +55,8 @@ _DEFAULT_EVIDENCE_SOURCE = (
     "tests/agents/drug_target/fixtures/baseline_hallucinated"
 )
 _DEFAULT_OUTPUT = "tests/agents/drug_target/fixtures/regenerated/drug.md"
-_DEFAULT_PROVIDER = "ollama"
-_DEFAULT_MODEL = "qwen3.5:122b"
+_DEFAULT_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama")
+_DEFAULT_MODEL = os.environ.get("LLM_MODEL") or os.environ.get("OLLAMA_MODEL", "qwen3.5:122b")
 _OLLAMA_HOST_DEFAULT = "http://localhost:6000"
 
 _SUBAGENT_NAMES = [

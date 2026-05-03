@@ -269,3 +269,46 @@ def test_create_llm_with_llm_model_env_overrides_ollama_model(monkeypatch):
         mock_chatopenai.return_value = MagicMock(spec=ChatOpenAI)
         create_llm(provider="ollama-openai")
         assert mock_chatopenai.call_args.kwargs["model"] == "qwen3.5:7b"
+
+
+# ---------------------------------------------------------------------------
+# Fix 1 — Codex P2 #1: num_ctx/num_predict forwarded to Ollama via extra_body
+# ---------------------------------------------------------------------------
+
+
+def test_create_ollama_openai_llm_forwards_num_ctx_to_ollama_options():
+    """Codex P2 #1 fix: num_ctx/num_predict must reach Ollama server, not just llm.profile.
+
+    Ollama's OpenAI-compat endpoint accepts Ollama-specific options inside an
+    'options' dict in the request body.  We forward via extra_body={"options": {...}}.
+    """
+    with patch("src.agents.model.ChatOpenAI", autospec=True) as mock_chatopenai:
+        mock_chatopenai.return_value = MagicMock(spec=ChatOpenAI)
+        _ = create_ollama_openai_llm(num_ctx=16384, num_predict=2048)
+        kwargs = mock_chatopenai.call_args.kwargs
+    # Either extra_body (preferred) OR model_kwargs.extra_body (fallback)
+    if "extra_body" in kwargs:
+        opts = kwargs["extra_body"].get("options", {})
+    else:
+        opts = kwargs.get("model_kwargs", {}).get("extra_body", {}).get("options", {})
+    assert opts.get("num_ctx") == 16384, f"num_ctx not forwarded; kwargs={kwargs}"
+    assert opts.get("num_predict") == 2048, f"num_predict not forwarded; kwargs={kwargs}"
+
+
+def test_create_ollama_openai_llm_extra_body_uses_popped_values():
+    """Fix 1 regression: extra_body.options must use the POPPED num_ctx/num_predict,
+    not any residual value from **kwargs (guards against accidental double-pass)."""
+    with patch("src.agents.model.ChatOpenAI", autospec=True) as mock_chatopenai:
+        mock_chatopenai.return_value = MagicMock(spec=ChatOpenAI)
+        _ = create_ollama_openai_llm(num_ctx=4096, num_predict=512)
+        kwargs = mock_chatopenai.call_args.kwargs
+    # num_ctx / num_predict must NOT appear at top-level kwargs (still popped)
+    assert "num_ctx" not in kwargs, "num_ctx leaked into top-level ChatOpenAI kwargs"
+    assert "num_predict" not in kwargs, "num_predict leaked into top-level ChatOpenAI kwargs"
+    # And must appear nested under extra_body.options
+    if "extra_body" in kwargs:
+        opts = kwargs["extra_body"]["options"]
+    else:
+        opts = kwargs.get("model_kwargs", {}).get("extra_body", {}).get("options", {})
+    assert opts["num_ctx"] == 4096
+    assert opts["num_predict"] == 512

@@ -63,3 +63,29 @@ def test_drug_target_config_provider_literal_still_includes_existing_providers()
             f"DrugTargetConfig.provider Literal is missing pre-existing value "
             f"'{expected}'; got {provider_args}"
         )
+
+
+def test_subagent_models_field_annotation_accepts_basechatmodel_via_ast():
+    """CP-P1-001 (type annotation correctness): DrugTargetConfig.subagent_models
+    annotation must mention BaseChatModel (not just str).
+
+    The field is populated by load_subagent_models_from_env() which returns
+    dict[str, BaseChatModel].  The annotation dict[str, str] is a type lie.
+    """
+    src = _AGENT_SRC.read_text()
+    tree = ast.parse(src)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == "DrugTargetConfig":
+            for item in node.body:
+                if (
+                    isinstance(item, ast.AnnAssign)
+                    and isinstance(item.target, ast.Name)
+                    and item.target.id == "subagent_models"
+                ):
+                    annotation_text = ast.unparse(item.annotation)
+                    assert "BaseChatModel" in annotation_text, (
+                        f"DrugTargetConfig.subagent_models annotation should mention "
+                        f"BaseChatModel; got: {annotation_text}"
+                    )
+                    return
+    raise AssertionError("DrugTargetConfig.subagent_models annotation not found")

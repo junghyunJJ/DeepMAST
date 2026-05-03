@@ -204,6 +204,7 @@ def create_ollama_openai_llm(**kwargs: Any) -> ChatOpenAI:
         request_timeout=7200,  # D8: kwarg name verified — request_timeout, NOT timeout
         streaming=False,  # D7: explicit (matches ChatOpenAI default; defends against accidental enable)
         parallel_tool_calls=False,  # D10 / CP-P1-002: prevent uncertain Ollama OpenAI-compat parallel-call behavior
+        extra_body={"options": {"num_ctx": num_ctx, "num_predict": num_predict}},  # Codex P2 #1: forward to Ollama server
         **kwargs,  # forward any remaining caller-supplied kwargs (e.g., max_tokens for OpenRouter parity)
     )
     # D2: Mirror create_ollama_llm profile setup VERBATIM.

@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Literal
 
 from deepagents import create_deep_agent
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import MemorySaver
@@ -143,7 +144,7 @@ class DrugTargetConfig:
         "chembl-database",
     )
     skills_dir: str | None = None
-    subagent_models: dict[str, str] | None = None
+    subagent_models: dict[str, BaseChatModel | str] | None = None
     # init_chat_model format per subagent, e.g.:
     # {"evidence_assessor": "openai:gpt-4.1", "report_writer": "openai:gpt-4.1-mini"}
     # If None, auto-loads from SUBAGENT_{NAME}_PROVIDER env vars.

@@ -42,6 +42,7 @@ from deepagents import create_deep_agent
 from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend
 from deepagents.backends.protocol import WriteResult
 from langchain.tools import ToolRuntime
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import MemorySaver
@@ -133,7 +134,7 @@ class DeepInterpreterConfig:
     custom_tools: Sequence[BaseTool] = field(default_factory=list)
     custom_subagents: list[dict] = field(default_factory=list)
     output_dir: str = "."
-    subagent_models: dict[str, str] | None = None
+    subagent_models: dict[str, BaseChatModel | str] | None = None
     # init_chat_model format per subagent, e.g.:
     # {"planner": "openai:gpt-4.1-mini", "interpreter": "ollama:qwen3.5:122b"}
     # If None, auto-loads from SUBAGENT_{NAME}_PROVIDER env vars.
