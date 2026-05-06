@@ -89,3 +89,13 @@ CLAUDE.md.bak
 .claude/bin/
 .claude/commands/
 .claude/statusline-omb.sh
+# local working directories
+fig/
+.agents/
+test_res/
+# deep_drugtaget — local experiment, not yet promoted
+src/agents/deep_drugtaget/
+src/agents/deep_drugtaget_codex/
+tests/agents/deep_drugtaget/
+tests/conftest.py
+scripts/run_deep_drugtaget_traced.py
