@@ -20,7 +20,7 @@ Use this skill when:
 - Stage 1-3 evidence has already been generated in `{data_dir}/evidence/`
 - `assessment_results.json.stage3_candidates` is present and non-empty
 - The goal is to produce mechanistic drug-target hypotheses for downstream reporting
-- The runtime can call `load_evidence_files(data_dir, scope="hypothesis")`, `validate_evidence_references(...)`, and `save_evidence(...)`
+- The runtime can call `load_evidence_files(data_dir, scope="hypothesis")`, `validate_evidence_references(...)`, and `save_hypothesis_report(...)`
 
 Do not use this skill when:
 - You need general scientific hypothesis ideation without drug-target evidence
@@ -35,13 +35,13 @@ Trigger: "Generate `evidence/hypothesis_report.json` from the saved Stage 1-3 ev
 Steps:
 1. Load hypothesis-scope evidence with `load_evidence_files(data_dir, scope="hypothesis")`
 2. Build retained hypotheses from the returned files and validate all cited filenames
-3. Persist the structured result through `save_evidence(data_dir, "hypothesis_report.json", hypothesis_data)`
+3. Persist the structured result through `save_hypothesis_report(data_dir, hypothesis_data)`
 Result: A runtime-aligned JSON hypothesis artifact is saved for downstream reporting
 
 Use Case: Deterministic retry after citation rejection
 Trigger: "Retry the hypothesis report after `invalid_references`" or "Recover from `failed_pair_violations` in the hypothesis payload"
 Steps:
-1. Inspect the deterministic rejection returned by `save_evidence`
+1. Inspect the deterministic rejection returned by `save_hypothesis_report`
 2. Remove or repair invalid citations, including `_FAILED` suffix handling for contrast-only failed pairs
 3. Re-run validation and save only after the payload changes
 Result: The hypothesis artifact is retried through the runtime contract instead of repeating the same rejected payload
@@ -60,7 +60,7 @@ The active runtime contract is:
 - Load evidence only through `load_evidence_files(data_dir, scope="hypothesis")`
 - Do not use `read_file`, `write_file`, or `ls` as the persistence path for hypothesis output
 - Validate all cited filenames with `validate_evidence_references(data_dir, [...])`
-- Persist only through `save_evidence(data_dir, "hypothesis_report.json", hypothesis_data)`
+- Persist through `save_hypothesis_report(data_dir, hypothesis_data)`; `save_evidence(data_dir, "hypothesis_report.json", ...)` is a compatibility wrapper over the same canonicalizer
 
 Treat `src/agents/drug_target/subagents/prompts.py` and `src/agents/drug_target/tools/evidence_loader.py` as the source of truth when this skill and repo docs disagree.
 
@@ -255,7 +255,7 @@ After ranking and filtering, ensure every gene in `assessment_results.json.stage
 Rules:
 - For every uncovered FEATURED gene, add one `[FEATURED-GAP]` hypothesis that explicitly includes that gene
 - The final retained set must contain at least `max(4, len(FEATURED))` hypotheses
-- `save_evidence` computes `topn_coverage` deterministically and rejects the payload if `topn_coverage.missing` is non-empty
+- `save_hypothesis_report` computes `topn_coverage` deterministically and rejects the payload if `topn_coverage.missing` is non-empty
 
 This gate is independent from the general orphan-evidence `[GAP]` logic.
 
@@ -266,7 +266,7 @@ This gate is independent from the general orphan-evidence `[GAP]` logic.
 Persist the output only as structured JSON:
 
 ```python
-save_evidence(data_dir, "hypothesis_report.json", hypothesis_data)
+save_hypothesis_report(data_dir, hypothesis_data)
 ```
 
 Do not use `write_file`.

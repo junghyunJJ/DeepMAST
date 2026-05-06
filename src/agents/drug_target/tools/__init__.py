@@ -14,6 +14,9 @@ from src.agents.drug_target.tools.evidence_loader import (
     check_stage1_completion,
     check_hypothesis_completion,
 )
+from src.agents.drug_target.tools.hypothesis_schema import save_hypothesis_report
+from src.agents.drug_target.tools.report_expansion_schema import save_report_expansions
+from src.agents.drug_target.tools.report_renderer import render_drug_md_from_expansions
 from src.agents.drug_target.tools.assessment_output import (
     save_target_assessment,
     save_drug_md,
@@ -76,6 +79,7 @@ __all__ = [
     "load_lr_candidates",
     "load_evidence_files",
     "save_evidence",
+    "save_hypothesis_report",
     "validate_evidence_completeness",
     "validate_evidence_references",
     "check_stage1_completion",
@@ -108,6 +112,8 @@ __all__ = [
     # Output contract
     "save_target_assessment",
     "save_drug_md",
+    "save_report_expansions",
+    "render_drug_md_from_expansions",
     # HTML report
     "generate_drug_html_report",
     # Common

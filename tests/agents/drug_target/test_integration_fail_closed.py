@@ -112,10 +112,11 @@ async def test_summarizer_pass_but_finalization_fails(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_clean_fixture_passes_finalization(tmp_path):
+async def test_clean_fixture_passes_finalization(tmp_path, monkeypatch):
     """Clean fixture passes finalization validator — success=True, drug_md populated."""
     run_dir = tmp_path / "run"
     _copy_fixture("clean", run_dir)
+    monkeypatch.setenv("DEEPMAST_ALLOW_LEGACY_DRUG_MD", "1")
 
     from src.agents.drug_target.integration import run_drug_target_assessment
 

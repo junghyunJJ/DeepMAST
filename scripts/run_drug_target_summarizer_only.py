@@ -43,6 +43,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+_ENV_DEFAULT_PROVIDER = os.environ.get("LLM_PROVIDER")
+_ENV_DEFAULT_MODEL = os.environ.get("LLM_MODEL")
+_ENV_OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL")
+
 from dotenv import load_dotenv
 
 load_dotenv(PROJECT_ROOT / ".env")
@@ -55,8 +59,8 @@ _DEFAULT_EVIDENCE_SOURCE = (
     "tests/agents/drug_target/fixtures/baseline_hallucinated"
 )
 _DEFAULT_OUTPUT = "tests/agents/drug_target/fixtures/regenerated/drug.md"
-_DEFAULT_PROVIDER = os.environ.get("LLM_PROVIDER", "ollama")
-_DEFAULT_MODEL = os.environ.get("LLM_MODEL") or os.environ.get("OLLAMA_MODEL", "qwen3.5:122b")
+_DEFAULT_PROVIDER = _ENV_DEFAULT_PROVIDER or "ollama"
+_DEFAULT_MODEL = _ENV_DEFAULT_MODEL or _ENV_OLLAMA_MODEL or "qwen3.5:122b"
 _OLLAMA_HOST_DEFAULT = "http://localhost:6000"
 
 _SUBAGENT_NAMES = [

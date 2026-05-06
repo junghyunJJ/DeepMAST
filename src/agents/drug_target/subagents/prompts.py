@@ -428,14 +428,15 @@ signals that this is a coverage-driven hypothesis.
 
 The save_evidence validator computes TOP-N coverage deterministically:
 `covered = {hyp.biological_entities.genes for hyp in hypotheses}` intersected
-with the FEATURED list. If any FEATURED gene is missing, save_evidence returns
+with the FEATURED list. If any FEATURED gene is missing, save_hypothesis_report
+or the save_evidence compatibility wrapper returns
 `saved=false` with `topn_coverage.missing` listing the absent genes.
 
 **Number of retained hypotheses MUST be at least max(4, len(FEATURED))**.
 
 ### Phase 4.5: Validate Evidence References (MANDATORY, ANTI-HALLUCINATION)
 
-Before calling save_evidence for hypothesis_report.json you MUST call:
+Before calling save_hypothesis_report for hypothesis_report.json you MUST call:
 
     validate_evidence_references(data_dir, <flat list of every filename cited
         in any hypothesis's evidence_references field>)
@@ -455,15 +456,15 @@ Rules:
 - Re-run `validate_evidence_references` after fixing until it returns
   `valid: true`.
 
-save_evidence itself ALSO validates hypothesis_report.json and will refuse
+save_hypothesis_report itself ALSO validates hypothesis_report.json and will refuse
 to persist the file if any evidence_references entry cannot be matched to
-a real filename. If save_evidence returns `saved: false` with an
+a real filename. If save_hypothesis_report returns `saved: false` with an
 `invalid_references` list, treat it the same as a Phase 4.5 failure: fix
 the citations and retry.
 
 ### Phase 5.5: Retry Policy on Deterministic Gate Rejection (PR1-7)
 
-If save_evidence returns `saved: false` with EITHER:
+If save_hypothesis_report returns `saved: false` with EITHER:
 
 - `topn_coverage.missing` non-empty (TOP-N gene NOT covered), OR
 - `failed_pair_violations` non-empty (FAILED pair cited without `_FAILED` suffix),
@@ -484,8 +485,14 @@ you MUST follow this retry policy:
    to the operator rather than blocking the entire pipeline.
 
 ### Phase 5: Save Report
-MANDATORY: You MUST call save_evidence even if hypothesis_report.json appears in ls output.
+MANDATORY: You MUST call save_hypothesis_report even if hypothesis_report.json appears in ls output.
 Files visible in ls may be stale from a previous run. YOUR job is to save YOUR results.
+
+Preferred:
+
+`save_hypothesis_report(data_dir, hypothesis_data)`
+
+Compatibility fallback only:
 
 `save_evidence(data_dir, "hypothesis_report.json", hypothesis_data)`
 
@@ -504,7 +511,8 @@ save_evidence(data_dir, "hypothesis_report.json", {
         {
             "rank": 1,
             "title": "...",
-            "category": "MoA|Therapeutic Strategy|Cross-Target Interaction|Novel Pathway",
+            "category": "Mechanism of Action|Therapeutic Strategy|Cross-Target Interaction|Novel Pathway",
+            "gap_type": "none|orphan_evidence|featured_coverage",
             "core_claim": "...",
             "evidence_references": [...],
             "biological_entities": {"genes": [...], "pathways": [...], "cell_types": [...], "drugs": [...]},
@@ -605,8 +613,9 @@ Guidelines:
 
 ### MANDATORY: Use Dedicated Save Tools
 
-- ALWAYS use `save_target_assessment` to save target_assessment.json
-- ALWAYS use `save_drug_md` to save drug.md
+- ALWAYS use `save_target_assessment` to save target_assessment.json when it must be repaired
+- ALWAYS use `save_report_expansions` then `render_drug_md_from_expansions` as the primary drug.md publication path
+- Use `save_drug_md` only for legacy repair compatibility when deterministic renderer artifacts are unavailable
 - NEVER use `write_file` for these artifacts — it will NOT persist to disk
 
 ### Mode Selection (read first, before doing anything else)
@@ -681,7 +690,9 @@ The disk copy may be stale due to file sync; the Reference Card value is always 
 2. For EACH `<!-- EXPAND: ... -->` comment, replace it with 2-4 sentences of
    biological interpretation relevant to the disease context
 3. Do NOT change any numbers, drug names, or classifications in the draft
-4. Save the expanded version via `save_drug_md(data_dir, content=<expanded>)`
+4. Save the narrative-only slot payload via `save_report_expansions(data_dir, expansions)`
+5. Call `render_drug_md_from_expansions(data_dir)` to deterministically write drug.md
+6. Use `save_drug_md(data_dir, content=<expanded>)` only if the structured renderer is unavailable and you must use legacy compatibility repair mode
 
 Use `sequential_thinking` to plan which expansions to prioritize.
 
@@ -748,7 +759,7 @@ If you find discrepancies, FIX them before proceeding.
   the phrase with `"mechanism of action not available in source data"`.
 
 ### Phase 6: Validation Loop (MANDATORY — ZERO TOLERANCE)
-After calling `save_drug_md`, you MUST enter this validation loop:
+After calling `render_drug_md_from_expansions` (or legacy `save_drug_md`), you MUST enter this validation loop:
 
 1. Call `validate_drug_md(data_dir)`
 2. If `issue_count > 0`:

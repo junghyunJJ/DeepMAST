@@ -56,17 +56,20 @@ where narrative is needed.
 ```
 Call load_evidence_files(data_dir="{data_dir}")
 ```
-Then read the draft drug.md. For each `&lt;!-- EXPAND: {instruction} --&gt;` marker,
-write 2-4 sentences following the instruction. Reference ONLY data visible
-in the SAME section of the draft.
+Then prepare a structured `report_expansions.json` payload. For each
+`&lt;!-- EXPAND: {instruction} --&gt;` marker, write 2-4 sentences following the
+instruction. Reference ONLY data visible in the SAME section of the draft and
+include source provenance for factual sentences.
 
 ### Step 3: Save and Validate
 ```
-Call save_drug_md(data_dir="{data_dir}", content="...")
+Call save_report_expansions(data_dir="{data_dir}", expansions={...})
+Call render_drug_md_from_expansions(data_dir="{data_dir}")
 Call validate_drug_md(data_dir="{data_dir}")
 ```
-If validation fails, fix the identified issues and re-save. Repeat until
-validation passes.
+If validation fails, fix the identified structured slot or source provenance
+issues and re-render. Use `save_drug_md` only for legacy repair compatibility
+when renderer artifacts are unavailable.
 
 ### Step 4: Generate HTML Report (Optional)
 ```

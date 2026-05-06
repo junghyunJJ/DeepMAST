@@ -27,6 +27,9 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
     ReadFileBlockMiddleware,
 )
 from src.agents.drug_target.subagents.summarizer import get_summarizer_subagent
+from src.agents.drug_target.subagents.summarizer.middleware import (
+    HypothesisRetryLoopMiddleware,
+)
 from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
 from src.agents.drug_target.tools import (
     # Evidence I/O tools
@@ -35,6 +38,7 @@ from src.agents.drug_target.tools import (
     load_evidence_files,
     validate_evidence_completeness,
     validate_evidence_references,
+    save_hypothesis_report,
     # Stage 2: Target Validation (runs FIRST)
     query_stage2_gene_panel,
     query_ensembl_vep_consequence,
@@ -59,6 +63,8 @@ from src.agents.drug_target.tools import (
     # Assessment output
     save_target_assessment,
     save_drug_md,
+    save_report_expansions,
+    render_drug_md_from_expansions,
     # HTML report generation
     generate_drug_html_report,
     # Common tools
@@ -257,6 +263,7 @@ SUBAGENT_CONFIGS = {
         "tools": [
             load_evidence_files,
             read_skill_file,
+            save_hypothesis_report,
             save_evidence,
             validate_evidence_references,
             # sequential_thinking removed: this subagent is template-driven (fixed Phases 1→5);
@@ -265,7 +272,9 @@ SUBAGENT_CONFIGS = {
             think_tool,
             validate_quality,
         ],
-        "middleware": [ReadFileBlockMiddleware()],  # Block read_file, force load_evidence_files
+        "middleware": [
+            ReadFileBlockMiddleware(),
+        ],  # Block read_file, force load_evidence_files
     },
     "report_writer": {
         "name": "report_writer",
@@ -289,6 +298,8 @@ SUBAGENT_CONFIGS = {
             validate_stage3_gate,
             save_target_assessment,
             save_drug_md,
+            save_report_expansions,
+            render_drug_md_from_expansions,
             read_skill_file,
             sequential_thinking,
             think_tool,
@@ -426,6 +437,13 @@ def get_subagents(
     ]
     configurable_subagents = [*subagents, *summarizer_inner_subagents]
 
+    for subagent in configurable_subagents:
+        if subagent["name"] == "hypothesis_writer":
+            subagent["middleware"] = [
+                *list(subagent.get("middleware", [])),
+                HypothesisRetryLoopMiddleware(),
+            ]
+
     # Remove Census tools when disabled (too slow for some providers)
     if not enable_census:
         _census_tool_names = {
@@ -539,8 +557,9 @@ def get_subagents(
     subagents.append(
         get_summarizer_subagent(
             model=summarizer_model,
-            backend=backend,
+            backend=None if data_dir is not None else backend,
             inner_subagents=summarizer_inner_subagents,
+            data_dir=data_dir,
         )
     )
 

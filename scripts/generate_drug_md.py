@@ -250,7 +250,10 @@ def _build_stage1_context_notes(evidence: dict) -> str:
         if "^" not in pair_key:
             continue
         ligand, receptor = pair_key.split("^", 1)
-        detail = details.get(f"stage1_{ligand}--{receptor}", {})
+        detail = details.get(f"stage1_{ligand}--{receptor}") or details.get(
+            f"stage1_{ligand}_{receptor}",
+            {},
+        )
         annotation = detail.get("stage1_annotations", {})
         if not annotation.get("microenvironment_candidate"):
             continue
