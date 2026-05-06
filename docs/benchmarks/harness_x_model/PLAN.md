@@ -2,16 +2,16 @@
 
 ## Rev 4 Delta (2026-04-13) — SEARCHER infrastructure update
 
-Incorporates the SEARCHER + `search_literature_dynamic` overhaul from commits `65b93e0`..`81ffee0` (dynamic literature search + deterministic gene/pathway fan-out + retrieval tags + SkillLoadHarness). Production retrieval is no longer LLM-compliance-bottlenecked: the tool now pre-seeds gene-singleton queries, hybrid per-pathway queries with hub genes, and BioMCP gene-alias–aware coverage matching. This changes what the harness effect actually measures and introduces a real ceiling-effect risk that the pilot MUST screen for.
+Incorporates the SEARCHER + `search_literature_dynamic` overhaul from commits `65b93e0`..`81ffee0` and later keyword-only pathway search revisions (dynamic literature search + deterministic gene/pathway fan-out + retrieval tags + SkillLoadHarness). Production retrieval is no longer LLM-compliance-bottlenecked: the tool now pre-seeds gene-singleton queries, controlled keyword-only pathway queries, and BioMCP gene-alias-aware coverage matching. This changes what the harness effect actually measures and introduces a real ceiling-effect risk that the pilot MUST screen for.
 
 ### Upstream changes (Rev 3 → Rev 4)
 
 1. **SEARCHER-mode sentinel** (`literature.py:2535-2567`). Passing `enable_lr_pair_queries=True` auto-enables `coverage_weighted_sort=True`, flips `_use_retrieval_tags=True` on both `_calculate_coverage` call sites, and bumps the internal candidate pool to `max(max_results*5, 300)` — final cap is kept at the caller's `max_results`. SEARCHER sets it at `subagents/prompts.py:261`; PLANNER/REPORTER never set it and retain byte-equivalent legacy behavior.
-2. **Deterministic gene singleton fan-out** (`literature.py:_build_deterministic_gene_queries`, ~L1319). Iter-0, **LLM-generation path only** — skipped when `query_cache` is passed. `chunk_size=1`: every input gene gets its own focused BioMCP query, closing the prior 36.7% hub-gene ceiling (root cause: `genes[:5]` × 2 LLM queries = 10 slots for 30 hub genes).
-3. **Hybrid per-pathway fan-out** (`literature.py:_build_deterministic_pathway_queries`, ~L1365). Iter-0, **runs unconditionally in both cache-replay and LLM paths** — meaning `query_cache` trials DO receive pathway fan-out. One query per pathway with top-N hub genes (from `PATHWAY_TO_GENES`) + canonical keyword, anchoring retrieval on real pathway members rather than keyword-only fuzzy matches.
-4. **`PATHWAY_KEYWORDS` + `PATHWAY_TO_GENES` expansion** (`literature.py:~1556-1587`). 13 pathways → hub genes: estrogen, tgf, mapk, pi3k, jak, egfr, nfkb, androgen, p53, hypoxia, vegf, tnfa, trail. New keyword entries: vegf, tnfa, trail, p53, hypoxia.
+2. **Deterministic gene singleton fan-out** (`literature.py:_build_deterministic_gene_queries`, ~L1319). Iter-0, **LLM-generation path only** — skipped when `query_cache` is passed. `chunk_size=1`: every input gene gets its own focused BioMCP query, closing the prior 36.7% input-gene ceiling (root cause: `genes[:5]` x 2 LLM gene queries = 10 slots for 30 genes).
+3. **Keyword-only per-pathway fan-out** (`literature.py:_build_deterministic_pathway_queries`). Iter-0, **runs unconditionally in both cache-replay and LLM paths** — meaning `query_cache` trials DO receive pathway fan-out. One query per pathway uses `genes=[]` plus 2-3 controlled vocabulary pathway terms; pathway evidence is accepted only when disease and pathway text appear in title/abstract.
+4. **Controlled pathway vocabulary** (`literature.py:PATHWAY_KEYWORDS`). Pathway query terms are canonical-first controlled labels with explicit source metadata (`canonical_label`, `query_terms`, `match_aliases`, `source_refs`). Production SEARCHER no longer carries pathway-to-gene search anchors.
 5. **BioMCP gene alias pre-warm** (`literature.py:2580-2629`). Parallel `_fetch_gene_aliases_from_biomcp` over top-30 input genes (10s/gene wait_for timeout) populates module-level `_GENE_ALIAS_CACHE`; `_generate_gene_patterns` is now alias-aware end-to-end. Diagnostic recovery: +EFNA1, +ITGB1, +RET on `res_bc_ollama`. Degrades gracefully on outage (empty cache entries).
-6. **Retrieval tag stamp** (`literature.py:509-525, 1793-1862`). Every BioMCP article now carries `matched_via_query = {genes, diseases, keywords}`. `_calculate_coverage(use_retrieval_tags=True)` does two-tier provenance: `biomcp_tag+text_confirmed` (stamp + regex agree) vs `biomcp_tag_only` (stamp alone). Genes are credited via retrieval assertion even when title/abstract regex misses them.
+6. **Retrieval tag stamp** (`literature.py:509-525, 1793-1862`). Every BioMCP article now carries `matched_via_query = {genes, diseases, keywords}`. `_calculate_coverage(use_retrieval_tags=True)` does two-tier provenance for genes. For pathways, stamps are provenance only; title/abstract pathway text is required before coverage is credited.
 7. **SkillLoadHarness in Deep Interpreter** (commit `3e2fe8d`; `agent.py:258-275`, `subagents/configs.py`). Skills are injected per-subagent via `SkillLoadHarness` middleware — no more orchestrator-level `SkillsMiddleware`. This benchmark's ON arm is **unaffected**: the single-shot flow still has no tool loop, so both Rev 3 (inline SKILL.md text) and Rev 4 require the same workaround (inline the skill content into the system prompt). The code-path change does not invalidate §3.2 — the strip list (steps 3-6) remains correct because SKILL.md itself was not modified in this work.
 
 ### How Rev 4 re-interprets existing sections
@@ -24,7 +24,7 @@ Incorporates the SEARCHER + `search_literature_dynamic` overhaul from commits `6
 | §3.4 `SearchTrialResult` | Regex-only coverage metrics | **Add** eight fields tracking tag-aware vs tag-unaware provenance, query composition, candidate-pool sizes, and alias pre-warm latency (see patch below). |
 | §4.1 GLMM primary | Coverage vs binary threshold | **Run both** a tag-aware (`use_retrieval_tags=True`, primary — matches production) and a tag-unaware (`False`, sensitivity — isolates pure prompt-quality signal without retrieval-stamp credit) analysis. If both agree in direction, the interaction claim is robust; if they diverge, report both in the paper and flag the tag credit as a mechanism. |
 | §4.6 Pilot checks | 7 mandatory checks | **Add 8th check (ceiling-effect gate)**: if both `strong_on` AND `strong_off` pilot cells hit ≥95% gene coverage OR ≥95% pathway coverage, the deterministic fan-out alone is saturating the primary endpoint → **abort full run** and either (a) switch primary endpoint to diversity/novelty (unique PMIDs, paper-count ≥ 25, tag-confirmed-only coverage) or (b) degrade to `enable_lr_pair_queries=False` to isolate LLM-driven coverage at the cost of ecological validity. Load-bearing gate — decide before 360 trials. |
-| §8 Reusable code | Pattern table | **New rows**: `_build_deterministic_gene_queries`, `_build_deterministic_pathway_queries`, `PATHWAY_TO_GENES`, `_calculate_coverage(use_retrieval_tags=...)`, SEARCHER sentinel block, alias pre-warm, plus three new test files (`tests/deep_interpreter/test_deterministic_gene_queries.py`, `test_deterministic_pathway_queries.py`, `test_evidence_manifest.py`) and two diagnostic scripts (`scripts/diagnose_searcher_coverage.py`, `scripts/rerun_searcher_only.py`). |
+| §8 Reusable code | Pattern table | **New rows**: `_build_deterministic_gene_queries`, `_build_deterministic_pathway_queries`, controlled `PATHWAY_KEYWORDS`, `_calculate_coverage(use_retrieval_tags=...)`, SEARCHER sentinel block, alias pre-warm, plus three test files (`tests/deep_interpreter/test_deterministic_gene_queries.py`, `test_deterministic_pathway_queries.py`, `test_evidence_manifest.py`) and two diagnostic scripts (`scripts/diagnose_searcher_coverage.py`, `scripts/rerun_searcher_only.py`). |
 | §10 Risks | 16 rows | **Add four Rev 4 risks**: ceiling effect from deterministic fan-out, query_cache/gene-fan-out asymmetry vs Option A, alias pre-warm latency (~10-30s/trial), and 300-paper candidate pool ballooning wall-clock. |
 
 ### Key measurement implication
@@ -287,7 +287,7 @@ Per trial:
 2. Build user prompt with enriched case evidence bundle
 3. LLM generates search plan + query objects (JSON)
 4. **Strict JSON parse** — if invalid, retry up to 2 times, then mark trial as `parse_failure` and EXCLUDE from main analysis (Codex finding #2 fix)
-5. Execute `search_literature_dynamic(**params, query_cache=query_objects, max_iterations=1, enable_lr_pair_queries=True)` — bypasses inner LLM (`literature.py:2143-2147`) AND matches production SEARCHER's sentinel (`subagents/prompts.py:261`). `max_iterations=1` prevents gap-filling iterations (1+) which would re-invoke the inner LLM via `GAP_FILLING_QUERY_PROMPT`. **Rev 4 side effects of `enable_lr_pair_queries=True`** (`literature.py:2535-2567`): (a) auto-enables `coverage_weighted_sort=True` and `_use_retrieval_tags=True` inside `_calculate_coverage`, (b) bumps internal candidate pool to `max(max_results*5, 300)` before `_greedy_coverage_sort` truncates back to `max_results`, (c) triggers iter-0 hybrid pathway fan-out unconditionally. Gene singleton fan-out is still skipped because `query_cache` short-circuits the LLM branch — pathway fan-out is applied uniformly across all 4 conditions so it acts as a baseline, not a confound. **Capture `genes_matched_by` / `pathways_matched_by` dicts from the coverage return** to populate the Rev 4 tag-provenance fields on `SearchTrialResult`.
+5. Execute `search_literature_dynamic(**params, query_cache=query_objects, max_iterations=1, enable_lr_pair_queries=True)` — bypasses inner LLM (`literature.py:2143-2147`) AND matches production SEARCHER's sentinel (`subagents/prompts.py:261`). `max_iterations=1` prevents gap-filling iterations (1+) which would re-invoke the inner LLM via `GAP_FILLING_QUERY_PROMPT`. **Rev 4 side effects of `enable_lr_pair_queries=True`** (`literature.py:2535-2567`): (a) auto-enables `coverage_weighted_sort=True` and `_use_retrieval_tags=True` inside `_calculate_coverage`, (b) bumps internal candidate pool to `max(max_results*5, 300)` before `_greedy_coverage_sort` truncates back to `max_results`, (c) triggers iter-0 keyword-only deterministic pathway fan-out unconditionally. Gene singleton fan-out is still skipped because `query_cache` short-circuits the LLM branch — pathway fan-out is applied uniformly across all 4 conditions so it acts as a baseline, not a confound. **Capture `genes_matched_by` / `pathways_matched_by` dicts from the coverage return** to populate the Rev 4 tag-provenance fields on `SearchTrialResult`. If analyzing paper-level telemetry, treat `query_type="pathway"` as deterministic pathway fan-out and `query_type="keyword"` as generic no-gene retrieval.
 6. Record coverage metrics + dependency health metadata
 
 ```python
@@ -326,7 +326,7 @@ class SearchTrialResult:
     pathways_tag_text_confirmed_pct: float = 0.0
     pathways_tag_only_pct: float = 0.0
     # Rev 4: query composition + candidate pool telemetry
-    deterministic_pathway_query_count: int = 0  # Hybrid pathway fan-out count (uniform baseline)
+    deterministic_pathway_query_count: int = 0  # Keyword-only deterministic pathway fan-out count (uniform baseline)
     llm_query_count_post_dedup: int = 0         # LLM queries retained after deterministic dedup
     candidate_pool_size: int = 0                # all_papers length pre-truncation (≤300 after sentinel)
     alias_prewarm_latency_ms: float = 0.0       # Gene alias pre-warm wall-clock (Rev 4)
@@ -582,13 +582,13 @@ Style matches `s_figure_table3_results.R`: firebrick3 for ON, gray60 for OFF, th
 | _calculate_coverage (legacy path) | `literature.py` | 1557-1636 |
 | _build_deterministic_gene_queries (Rev 4) | `literature.py` | ~1319 |
 | _build_deterministic_pathway_queries (Rev 4) | `literature.py` | ~1365 |
-| PATHWAY_TO_GENES mapping (Rev 4) | `literature.py` | ~1564 |
+| Controlled pathway vocabulary | `literature.py` | `PATHWAY_KEYWORDS` |
 | _calculate_coverage(use_retrieval_tags=True) tier gate (Rev 4) | `literature.py` | 1793-1862 |
 | matched_via_query stamping (Rev 4) | `literature.py` | 509-598 |
 | SEARCHER-mode sentinel auto-enable block (Rev 4) | `literature.py` | 2535-2567 |
 | Gene alias pre-warm (parallel top-30 + 10s timeout) (Rev 4) | `literature.py` | 2580-2629 |
 | Iter-0 gene singleton fan-out (LLM-path only) (Rev 4) | `literature.py` | 2748-2780 |
-| Iter-0 hybrid pathway fan-out (unconditional) (Rev 4) | `literature.py` | 2794-2820 |
+| Iter-0 keyword-only pathway fan-out (unconditional) | `literature.py` | `_build_deterministic_pathway_queries` call site |
 | Deterministic gene query unit tests (Rev 4) | `tests/deep_interpreter/test_deterministic_gene_queries.py` | full file |
 | Deterministic pathway query unit tests (Rev 4) | `tests/deep_interpreter/test_deterministic_pathway_queries.py` | full file |
 | Evidence manifest / retrieval tag tests (Rev 4) | `tests/deep_interpreter/test_evidence_manifest.py` | full file |

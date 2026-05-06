@@ -8,9 +8,9 @@ docs/benchmarks/harness_x_model/SESSION_SUMMARY.md lines 142-143):
 
 1. STRING-DB high-confidence interaction partners of ligand + receptor
    (species=9606 Homo sapiens, required_score >= 700, i.e. >= 0.7 confidence).
-2. KEGG pathway hub-genes from the case's ``pathway_associations`` via the
-   ``PATHWAY_TO_GENES`` table already used by the production SEARCHER
-   deterministic fan-out (``src/agents/deep_interpreter/tools/literature.py``).
+2. An archived benchmark-local pathway-gene fixture derived from the Rev 7
+   KEGG/PROGENy enrichment design. This script no longer imports production
+   literature-search pathway mappings.
 
 STRING scores are scaled 0-1000 and win ties against KEGG hub scores (fixed
 at 600) — this keeps the ranking empirical and pathway hubs as a fallback.
@@ -52,8 +52,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.agents.deep_interpreter.tools.literature import PATHWAY_TO_GENES
-
 DEFAULT_INPUT = PROJECT_ROOT / "docs/benchmarks/cci_skill_ablation/cases/cci_full_cases.json"
 DEFAULT_OUTPUT = PROJECT_ROOT / "docs/benchmarks/cci_skill_ablation/cases/cci_full_cases_enriched_v1.json"
 
@@ -63,6 +61,26 @@ SPECIES_HUMAN = 9606
 MIN_CONFIDENCE = 700  # STRING uses 0-1000; 700 = high confidence (>= 0.7)
 RATE_LIMIT_S = 0.3    # Be polite with the public API (~3 req/sec)
 KEGG_FALLBACK_SCORE = 600.0  # Below high-conf STRING, above anything else
+
+# Benchmark-local archived fixture for Rev 7 case enrichment reproducibility.
+# Do not import production literature-search pathway vocabulary here; production
+# SEARCHER no longer carries pathway-to-gene search anchors.
+BENCHMARK_PATHWAY_GENE_FIXTURE: dict[str, list[str]] = {
+    "estrogen": ["ESR1", "ESR2", "PGR"],
+    "tgf": ["TGFB1", "SMAD4", "ACVR2B"],
+    "mapk": ["MAPK1", "MAPK3", "RAF1"],
+    "pi3k": ["PIK3CA", "AKT1", "PTEN"],
+    "jak": ["JAK2", "STAT3", "STAT5A"],
+    "egfr": ["EGFR", "ERBB2", "ERBB3"],
+    "nfkb": ["RELA", "NFKB1", "IKBKB"],
+    "androgen": ["AR", "KLK3"],
+    "p53": ["TP53", "MDM2", "CDKN1A"],
+    "hypoxia": ["HIF1A", "VHL", "EPAS1"],
+    "vegf": ["VEGFA", "KDR", "FLT1"],
+    "tnfa": ["TNF", "TNFRSF1A", "TRADD"],
+    "trail": ["TNFSF10", "TNFRSF10A", "TNFRSF10B"],
+    "wnt": ["CTNNB1", "WNT3A", "LEF1"],
+}
 
 
 def fetch_string_partners(gene: str, *, limit: int = 50) -> list[dict]:
@@ -114,18 +132,19 @@ def fetch_string_version() -> str:
 def kegg_hub_genes_for_case(pathway_associations: list[str]) -> dict[str, float]:
     """Return {gene: KEGG_FALLBACK_SCORE} for pathway hubs of this case.
 
-    Match pathway_associations to PATHWAY_TO_GENES keys case-insensitively and
-    via substring containment — the same resolution heuristic used by
-    ``_build_deterministic_pathway_queries`` at ``literature.py:~1556``.
+    Match pathway_associations to the benchmark-local archived fixture
+    case-insensitively and via substring containment. This fixture is retained
+    only for Rev 7 benchmark reproducibility and is not production SEARCHER
+    behavior.
     """
     out: dict[str, float] = {}
     for pw in pathway_associations or []:
         key = str(pw).strip().lower()
         if not key:
             continue
-        genes = PATHWAY_TO_GENES.get(key)
+        genes = BENCHMARK_PATHWAY_GENE_FIXTURE.get(key)
         if not genes:
-            for tk, tg in PATHWAY_TO_GENES.items():
+            for tk, tg in BENCHMARK_PATHWAY_GENE_FIXTURE.items():
                 if tk in key or key in tk:
                     genes = tg
                     break
@@ -145,7 +164,7 @@ def enrich_case(case: dict, *, target_n: int = 15, log_prefix: str = "") -> tupl
 
     # tier 0 = mandatory anchors (always included)
     # tier 1 = STRING partners (empirical high-confidence)
-    # tier 2 = KEGG hub genes (pathway-curated fallback)
+    # tier 2 = archived benchmark pathway genes (pathway-curated fallback)
     ranked: dict[str, tuple[int, float]] = {
         ligand: (0, 10_000.0),
         receptor: (0, 10_000.0),
@@ -179,10 +198,10 @@ def enrich_case(case: dict, *, target_n: int = 15, log_prefix: str = "") -> tupl
     selected = [g for g, _ in sorted_items[:target_n]]
 
     # Fallback padding if somehow < target_n (e.g., both STRING fetches failed and
-    # no pathways): use the global union of PATHWAY_TO_GENES in deterministic order.
+    # no pathways): use the global union of the benchmark fixture in deterministic order.
     if len(selected) < target_n:
         pad_pool: list[str] = []
-        for _, genes in sorted(PATHWAY_TO_GENES.items()):
+        for _, genes in sorted(BENCHMARK_PATHWAY_GENE_FIXTURE.items()):
             for g in genes:
                 if g not in selected and g not in pad_pool:
                     pad_pool.append(g)
@@ -282,9 +301,10 @@ def main() -> int:
             "rate_limit_s": RATE_LIMIT_S,
         },
         "kegg_source": {
-            "module": "src.agents.deep_interpreter.tools.literature.PATHWAY_TO_GENES",
-            "pathways_in_map": sorted(PATHWAY_TO_GENES.keys()),
+            "module": "docs.benchmarks.harness_x_model.enrich_cases_string_kegg.BENCHMARK_PATHWAY_GENE_FIXTURE",
+            "pathways_in_map": sorted(BENCHMARK_PATHWAY_GENE_FIXTURE.keys()),
             "fallback_score": KEGG_FALLBACK_SCORE,
+            "note": "Archived benchmark-local fixture; not production SEARCHER pathway search behavior.",
         },
         "orthogonality_note": (
             "Enrichment sources (STRING + KEGG) are orthogonal to the LIANA "

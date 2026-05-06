@@ -142,7 +142,7 @@ _SEARCHER_PROMPT_KWARG_STRIPS: tuple[str, ...] = (
     (
         ",\n"
         "    enable_lr_pair_queries=True,   # SEARCHER opts in to L-R pair query injection\n"
-        "    coverage_weighted_sort=True,   # SEARCHER opts in to hub-coverage truncation (auto-enabled by sentinel, this line is documentation belt-and-suspenders)"
+        "    coverage_weighted_sort=True,   # SEARCHER opts in to coverage-aware truncation (auto-enabled by sentinel, this line is documentation belt-and-suspenders)"
     ),
     (
         "# L-R pair queries are generated ONLY when enable_lr_pair_queries=True (SEARCHER only).\n"
@@ -162,6 +162,8 @@ _SEARCHER_PROMPT_KWARG_STRIPS: tuple[str, ...] = (
         "# Iter-0 also injects deterministic singleton gene queries (one gene per query)\n"
         "# so every input gene gets its own focused BioMCP search and appears in at least\n"
         "# one query slot, regardless of LLM compliance with the prompt instruction.\n"
+        "# Iter-0 pathway fan-out is keyword-only: genes=[] plus controlled pathway\n"
+        "# labels/aliases. Pathway stamps are provenance, not evidence by themselves.\n"
     ),
 )
 
@@ -172,9 +174,9 @@ When calling `search_literature_dynamic`, set these kwargs to activate the
 full production retrieval pipeline:
 
 - `enable_lr_pair_queries=True` — activates deterministic gene fan-out (one
-  BioMCP query per input gene) and hybrid pathway query injection. Without
-  this, only LLM-generated queries are used.
-- `coverage_weighted_sort=True` — activates hub-coverage greedy truncation
+  BioMCP query per input gene) and keyword-only pathway query injection.
+  Without this, only LLM-generated queries are used.
+- `coverage_weighted_sort=True` — activates coverage-aware greedy truncation
   (selects final 30 papers to maximize gene coverage). Without this, pure
   SJR sort is used.
 

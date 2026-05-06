@@ -11,7 +11,7 @@
 
 Rev 3 → Rev 6 (v0–v3) proved that **celltype primary is stable** at +19–20 pp Δ (strong model) in the strengthened window `[+12, +22]` across 4 SKILL.md versions. **Gene dimension has been saturated at 0 pp Δ across all 192 pilot trials** — a *mathematical* ceiling (2 genes per case × 60% threshold = 2/2 = 100% trivially). Running the pre-registered 1,080-trial full campaign without fixing this would re-produce the same null on gene Δ.
 
-**Rev 7 change**: enrich each of the 30 cases to **15 genes** (STRING high-confidence PPI partners of ligand+receptor + KEGG `PATHWAY_TO_GENES` hubs), orthogonal to the LIANA spatial table. Raise `coverage_pass` gene floor 0.6 → 0.9. Rerun 3-mode pilot; confirm celltype primary stable and gene Δ becomes non-trivial.
+**Rev 7 change**: enrich each of the 30 cases to **15 genes** using STRING high-confidence PPI partners plus the benchmark-local archived pathway-gene fixture in `enrich_cases_string_kegg.py`, orthogonal to the LIANA spatial table. Production SEARCHER no longer imports a pathway-to-gene table. Raise `coverage_pass` gene floor 0.6 → 0.9. Rerun 3-mode pilot; confirm celltype primary stable and gene Δ becomes non-trivial.
 
 **Fallback**: if the dry-run gate shows gene endpoint re-saturates at the 0.9 floor, pivot to Rev 6 celltype-only narrative (paper-shippable as-is per PREREGISTRATION §5).
 

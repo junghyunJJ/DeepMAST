@@ -93,7 +93,7 @@ Only **latency_s** shows between-condition variance, and even that is confounded
 
 Expand each case's gene set from 2 to 15-30 by including:
 - L-R pair (current)
-- STRING/KEGG hub genes (orthogonal to `liana_moran_r` to avoid circular provenance — architect flag)
+- STRING plus benchmark-local pathway-gene fixture entries (orthogonal to `liana_moran_r` to avoid circular provenance — architect flag)
 - Pathway members for the L-R pair's canonical pathway
 - Marker genes for source/target celltypes
 
@@ -141,7 +141,7 @@ All other claims verified:
 
 **Additional architect insights applied to the recommendation**:
 - Option α has higher saturation risk than FINDINGS initially implied — 15 genes × aggressive alias expansion + `max_results=30` may still produce ~80% coverage. Hardening via `target_gene_coverage=0.9` threshold is needed.
-- Circular provenance leak if hub genes come from the same `liana_moran_r` table that ranked the original L-R pair. Mitigation: STRING/KEGG orthogonal source.
+- Circular provenance leak if augmented genes come from the same `liana_moran_r` table that ranked the original L-R pair. Mitigation: STRING plus benchmark-local pathway-gene fixture entries from an orthogonal source.
 - Latency analysis must exclude first-trial-after-swap or include a `post_swap` covariate in the GLMM.
 - 30-min dry-run gate is mandatory before committing ~1 day to the full augmentation pipeline.
 
