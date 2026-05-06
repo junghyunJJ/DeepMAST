@@ -6,6 +6,7 @@ No test depends on any live workspace (res_ipf_qwen* or similar).
 """
 
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from src.agents.drug_target.tools import (
     validate_drug_report_finalization,
     validate_drug_md,
 )
+import src.agents.drug_target.tools.stage_logic as stage_logic
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures"
 
@@ -34,6 +36,15 @@ def _copy_fixture(name, tmp_path):
     dst = tmp_path / name
     shutil.copytree(src, dst)
     return dst
+
+
+def _move_stage1_filter_results_to_evidence(data_dir):
+    evidence_dir = data_dir / "evidence"
+    evidence_dir.mkdir(exist_ok=True)
+    shutil.move(
+        str(data_dir / "stage1_filter_results.json"),
+        str(evidence_dir / "stage1_filter_results.json"),
+    )
 
 
 def _has_issue(result, code):
@@ -129,6 +140,17 @@ def test_missing_required_artifact(artifact, tmp_path):
     )
 
 
+def test_required_stage1_artifact_can_live_under_evidence(tmp_path):
+    """Current pipeline runs persist stage1_filter_results.json under evidence/."""
+    d = _copy_fixture("clean", tmp_path)
+    _move_stage1_filter_results_to_evidence(d)
+    result = _invoke(d)
+    assert result["valid"] is True
+    assert not _has_issue(result, "MISSING_REQUIRED_ARTIFACT"), (
+        f"Expected evidence/stage1_filter_results.json to satisfy requirement; got: {result['issues']}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # 4. VALIDATE_DRUG_MD_FAILED
 # ---------------------------------------------------------------------------
@@ -207,6 +229,16 @@ def test_markdown_table_pipe_drift(tmp_path):
     )
 
 
+def test_moa_table_parser_preserves_escaped_pipe_cell():
+    """Escaped pipes inside a MoA cell must not split the cell."""
+    markdown = """| Drug | ChEMBL ID | Mechanism of Action | Phase |
+|------|-----------|---------------------|------:|
+| **ComboDrug** | CHEMBL1 | alpha \\| beta inhibitor | 2 |"""
+
+    rows = list(stage_logic._iter_drug_profile_moa_cells(markdown))
+    assert rows == [(3, "ComboDrug", "CHEMBL1", "alpha | beta inhibitor")]
+
+
 # ---------------------------------------------------------------------------
 # 8. STAGE1_COUNT_MISMATCH
 # ---------------------------------------------------------------------------
@@ -219,6 +251,23 @@ def test_stage1_count_mismatch_fixture(tmp_path):
     result = _invoke(d)
     assert _has_issue(result, "STAGE1_COUNT_MISMATCH"), (
         f"Expected STAGE1_COUNT_MISMATCH; got issues: {result['issues']}"
+    )
+
+
+def test_stage1_count_mismatch_uses_evidence_artifact(tmp_path):
+    """Count claims must be checked against evidence/stage1_filter_results.json."""
+    d = _copy_fixture("clean", tmp_path)
+    _move_stage1_filter_results_to_evidence(d)
+    drug_md_path = d / "drug.md"
+    original = drug_md_path.read_text(encoding="utf-8")
+    drug_md_path.write_text(
+        "Analysis covers across 18 L-R pairs from the fibrotic cohort.\n\n" + original,
+        encoding="utf-8",
+    )
+
+    result = _invoke(d)
+    assert _has_issue(result, "STAGE1_COUNT_MISMATCH"), (
+        f"Expected STAGE1_COUNT_MISMATCH using evidence artifact; got issues: {result['issues']}"
     )
 
 
@@ -316,8 +365,77 @@ def test_unsupported_moa_claim_negative(tmp_path):
     )
 
 
+def test_unsupported_moa_claim_negative_from_resolved_drugs(tmp_path):
+    """A Drug Profile MoA is supported when resolved_drugs.json has the same drug-specific MoA."""
+    d = _copy_fixture("unsupported_moa_claim", tmp_path)
+    resolved_path = d / "evidence" / "resolved_drugs.json"
+    resolved_path.write_text(
+        json.dumps(
+            [
+                {
+                    "gene": "TGFB1",
+                    "resolved_name": "ruxolitinib",
+                    "chembl_id": "CHEMBL1789941",
+                    "mechanism_of_action": (
+                        "potent JAK1 selective inhibitor reducing cytokine storm in fibrosis"
+                    ),
+                    "first_approval": 2011,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = _invoke(d)
+    assert not _has_issue(result, "UNSUPPORTED_MOA_CLAIM"), (
+        f"Expected resolved_drugs.json to support MoA; got issues: {result['issues']}"
+    )
+
+
 # ---------------------------------------------------------------------------
-# 11. validate_drug_md signature dispatch
+# 11. STALE_HYPOTHESIS_REPORT
+# ---------------------------------------------------------------------------
+
+
+def test_stale_hypothesis_report_newer_than_drug_md_fails(tmp_path):
+    """If hypothesis_report.json is newer than drug.md and the report still
+    contains placeholder/unavailable hypothesis text, finalization must fail.
+    """
+    d = _copy_fixture("clean", tmp_path)
+    evidence_dir = d / "evidence"
+    hypothesis_path = evidence_dir / "hypothesis_report.json"
+    hypothesis_path.write_text(
+        json.dumps(
+            {
+                "hypotheses": [
+                    {
+                        "rank": 1,
+                        "title": "Macrophage FN1 signalling hypothesis",
+                        "core_claim": "FN1 signalling is testable in fibrosis.",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    drug_md_path = d / "drug.md"
+    drug_md_path.write_text(
+        "## 4. Hypothesis-Driven Analysis\n\n"
+        "No hypothesis_report.json content was loaded in the local evidence bundle.\n",
+        encoding="utf-8",
+    )
+
+    os.utime(drug_md_path, (1_700_000_000, 1_700_000_000))
+    os.utime(hypothesis_path, (1_700_000_100, 1_700_000_100))
+
+    result = _invoke(d)
+    assert _has_issue(result, "STALE_HYPOTHESIS_REPORT"), (
+        f"Expected STALE_HYPOTHESIS_REPORT; got issues: {result['issues']}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 12. validate_drug_md signature dispatch
 # ---------------------------------------------------------------------------
 
 

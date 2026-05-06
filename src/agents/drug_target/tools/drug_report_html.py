@@ -17,6 +17,7 @@ from jinja2 import Environment, BaseLoader
 from langchain_core.tools import tool
 
 from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir
+from src.agents.drug_target.tools.scoring_metadata import NOVELTY_OPPORTUNITY_LEGEND
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -685,6 +686,7 @@ def render_drug_md(
     stage1_filter_results: list[dict],
     hypothesis_data: dict | None = None,
     data_limitations: list[str] | None = None,
+    novelty_opportunity_legend: str = NOVELTY_OPPORTUNITY_LEGEND,
 ) -> str:
     """Render drug.md from structured data via Jinja2 template.
 
@@ -734,6 +736,7 @@ def render_drug_md(
         stage1_filter_results=formatted_filter,
         hypothesis_data=hypothesis_data or {},
         data_limitations=data_limitations or [],
+        novelty_opportunity_legend=novelty_opportunity_legend,
     )
 
 

@@ -422,6 +422,7 @@ def render_markdown(
     # Verdict
     lines.append("## Verdict")
     problems = []
+    warnings = []
     if artifacts["missing_required"] or artifacts["missing_root_files"]:
         problems.append("missing artifacts")
     if drug_md.get("hypothesis_section_empty"):
@@ -430,10 +431,19 @@ def render_markdown(
         problems.append("unexpanded drug.md placeholders")
     if refs.get("missing_reference_count", 0) > 0:
         problems.append("hallucinated evidence references")
-    if trace_stats["longest_thought_stagnation"] >= 3:
+    if (
+        trace_stats["longest_thought_stagnation"] >= 3
+        or trace_stats["thought_history_max"] > 30
+    ):
         problems.append("degenerate sequential_thinking loop")
+    if trace_stats["fixup_markers"]:
+        warnings.append("recovered fixup markers")
     if problems:
         lines.append("- **ISSUES**: " + "; ".join(problems))
+        if warnings:
+            lines.append("- **WARNINGS**: " + "; ".join(warnings))
+    elif warnings:
+        lines.append("- **WARNINGS**: " + "; ".join(warnings))
     else:
         lines.append("- Clean run — no red flags detected.")
     lines.append("")

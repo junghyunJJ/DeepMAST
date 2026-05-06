@@ -22,13 +22,13 @@ def _get_drug_target_graph() -> Runnable:
     """Drug Target Assessment graph — for LangGraph CLI.
 
     Uses environment variables:
-    - LLM_PROVIDER: LLM provider (default: "openrouter")
+    - LLM_PROVIDER: LLM provider (default: "openai")
     - DEEP_INTERPRETER_DATA_DIR: Data directory with lr_candidates.json
 
     Returns:
         Compiled Drug Target Agent runnable
     """
-    provider = os.getenv("LLM_PROVIDER", "openrouter")
+    provider = os.getenv("LLM_PROVIDER", "openai")
     data_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace")
 
     config = DrugTargetConfig(

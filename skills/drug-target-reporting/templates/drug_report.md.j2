@@ -55,7 +55,7 @@ Each gene is scored on two independent tracks reflecting different types of ther
 | GWAS | gwas_support | 0-3 | GWAS Catalog | 0 = no disease-specific GWAS evidence; 1 = proximity hits only (within 500kb); 2 = direct disease link (gene-in-trait or gene-SNP overlap); 3 = genome-wide significant overlap (p < 5e-8) | Genetic validation strength for this disease |
 | Tract. | tractability | 0-3 | OpenTargets Tractability | 0 = unknown druggability; 1 = predicted structure or druggable family; 2 = clinical precedent (advanced clinical / Phase 1); 3 = approved drug exists for this modality | How feasible it is to develop a drug against this target |
 | Bio. Plaus. | biological_plausibility | 0-5 | OpenTargets Evidence + Ensembl VEP | Count of distinct evidence types (affected_pathway, literature, animal_model, somatic_mutation) + bonus if max score >= 0.7, + VEP high-impact variant boost | Breadth and strength of biological evidence linking gene to disease |
-| Novelty | novelty_opportunity | 0-5 | OpenTargets Associations | Inverse of number of disease associations: 5 = 0 associations (completely novel, e.g. ST-only discovery); 4 = 1-2; 3 = 3-5; 2 = 6-15; 1 = 16-30; 0 = 30+ (well-established target) | Higher = less explored, greater opportunity for novel discovery |
+| Novelty | novelty_opportunity | 0-5 | OpenTargets Associations | {{ novelty_opportunity_legend }} | Higher = less explored, greater opportunity for novel discovery |
 | Expl. Total | exploratory_total | 0-16 | (computed) | Sum of GWAS + Tract. + Bio. Plaus. + Novelty | Overall exploratory potential; higher = stronger biological rationale for investigation |
 
 ##### Combined Score, Classification & Priority

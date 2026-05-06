@@ -57,10 +57,10 @@ def create_openai_llm(**kwargs) -> ChatOpenAI:
     Create OpenAI LLM instance
 
     Args:
-        model: Model name (default: gpt-4.1-mini)
+        model: Model name (default: gpt-4.5-mini)
         temperature: Temperature setting (default: 0)
     """
-    model = kwargs.get("model", os.getenv("OPENAI_MODEL", "gpt-4.1-mini"))
+    model = kwargs.get("model", os.getenv("OPENAI_MODEL", "gpt-4.5-mini"))
     # model = kwargs.get("model", os.getenv("OPENAI_MODEL", "gpt-5-nano"))
     # model = kwargs.get("model", os.getenv("OPENAI_MODEL", "gpt-5-nano"))
     # model = kwargs.get("model", os.getenv("OPENAI_MODEL", "gpt-4.1"))

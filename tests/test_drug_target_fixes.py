@@ -8,6 +8,7 @@ pipeline re-run). Integration verification is handled separately by
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import subprocess
 from pathlib import Path
@@ -22,10 +23,12 @@ from src.agents.drug_target.tools.evidence_loader import (
 )
 from src.agents.drug_target.tools.stage1_normalization import _parse_census_csv
 from src.agents.drug_target.tools.stage_logic import (
+    build_evidence_summary,
     _extract_ot_disease_score,
     _ot_safety_summary,
     _score_novelty_opportunity,
 )
+from src.agents.drug_target.tools.drug_report_html import render_drug_md
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -481,3 +484,106 @@ def test_validate_script_passes_on_clean_output(tmp_path: Path) -> None:
         text=True,
     )
     assert result.returncode == 0, f"unexpected failure: {result.stdout}{result.stderr}"
+
+
+def test_validate_script_rejects_non_finite_resolved_drugs_json(tmp_path: Path) -> None:
+    ev = tmp_path / "evidence"
+    ev.mkdir()
+    (ev / "assessment_results.json").write_text(json.dumps({"rubric_assessment": []}))
+    (tmp_path / "target_assessment.json").write_text(
+        json.dumps({"druggability_matrix": [], "featured_candidates_deep_dive": []})
+    )
+    (ev / "resolved_drugs.json").write_text(
+        '[{"gene": "FOO", "resolved_name": "Drug A", "first_approval": NaN}]',
+        encoding="utf-8",
+    )
+
+    script = REPO_ROOT / "scripts" / "validate_pipeline_output.py"
+    result = subprocess.run(
+        ["python3", str(script), str(tmp_path)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "resolved_drugs.json contains non-RFC-8259 literal 'NaN'" in result.stdout
+
+
+def test_build_evidence_summary_writes_resolved_drugs_without_non_finite_numbers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ev = tmp_path / "evidence"
+    ev.mkdir()
+    (tmp_path / "lr_candidates.json").write_text(
+        json.dumps({"pairs": [{"ligand": "LIG", "receptor": "FOO"}]}),
+        encoding="utf-8",
+    )
+    (ev / "assessment_results.json").write_text(
+        json.dumps(
+            {
+                "disease": "test disease",
+                "stage3_candidates": [{"gene": "FOO"}],
+                "rubric_assessment": [
+                    {
+                        "gene": "FOO",
+                        "classification": "validated_target",
+                        "priority": "high",
+                        "stage3_candidate": True,
+                        "combined_total": 10,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (ev / "stage3_FOO.json").write_text(
+        json.dumps(
+            {
+                "executed": True,
+                "matched_drugs": [
+                    {
+                        "chembl_id": "CHEMBL1",
+                        "drug_name": "Drug A",
+                        "max_phase": 1,
+                        "first_approval": math.nan,
+                        "mechanism_of_action": "FOO inhibitor",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "src.agents.drug_target.tools.stage_logic.enrich_drugs_in_place",
+        lambda *_args, **_kwargs: 0,
+    )
+
+    build_evidence_summary.invoke({"data_dir": str(tmp_path)})
+
+    text = (ev / "resolved_drugs.json").read_text(encoding="utf-8")
+    assert "NaN" not in text
+    assert "Infinity" not in text
+    resolved = json.loads(text)
+    assert resolved[0]["first_approval"] is None
+
+
+def test_rendered_drug_md_novelty_legend_matches_score_brackets() -> None:
+    md = render_drug_md(
+        disease="test disease",
+        stage3_genes=[],
+        featured_cards=[],
+        all_genes_matrix=[],
+        stage1_data={},
+        stage1_filter_results=[],
+    )
+
+    novelty_row = next(
+        line for line in md.splitlines()
+        if line.startswith("| Novelty | novelty_opportunity |")
+    )
+    for token in ("1000+", "300-999", "100-299", "30-99", "10-29", "0-9"):
+        assert token in novelty_row
+    for stale in ("1-2", "3-5", "6-15", "16-30"):
+        assert stale not in novelty_row
+    assert "0 = 30+" not in novelty_row

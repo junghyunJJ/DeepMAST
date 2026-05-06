@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 from datetime import datetime
 
@@ -42,6 +43,10 @@ from typing import Any
 from langchain_core.tools import tool
 from src.agents.drug_target.tools.chembl_resolver import resolve_chembl_molecule
 from src.agents.drug_target.tools.moa_enrichment import enrich_drugs_in_place
+from src.agents.drug_target.tools.scoring_metadata import (
+    NOVELTY_OPPORTUNITY_BUCKETS,
+    NOVELTY_OPPORTUNITY_LEGEND,
+)
 from src.agents.drug_target.tools.stage2_service import extract_lr_pairs
 
 logger = logging.getLogger(__name__)
@@ -103,6 +108,19 @@ def _to_float(value: Any, default: float = 0.0) -> float:
         return float(max(0.0, min(1.0, number)))
     except ValueError:
         return default
+
+
+def _sanitize_for_strict_json(value: Any) -> Any:
+    """Return a JSON-safe copy, mapping only non-finite floats to null."""
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, list):
+        return [_sanitize_for_strict_json(item) for item in value]
+    if isinstance(value, tuple):
+        return [_sanitize_for_strict_json(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _sanitize_for_strict_json(item) for key, item in value.items()}
+    return value
 
 
 def normalize_st_colocalization_score(value: Any) -> float:
@@ -1174,18 +1192,11 @@ def _score_novelty_opportunity(associations: list[dict],
         count = int(associations_total_count)
     else:
         count = len(associations) if associations else 0
-    if count >= 1000:
-        score = 0
-    elif count >= 300:
-        score = 1
-    elif count >= 100:
-        score = 2
-    elif count >= 30:
-        score = 3
-    elif count >= 10:
-        score = 4
-    else:
-        score = 5
+    score = next(
+        int(bucket["score"])
+        for bucket in NOVELTY_OPPORTUNITY_BUCKETS
+        if count >= int(bucket["min_count"])
+    )
     # When the true total is unknown and the list is truncated, at least
     # page_size (500 post-A0) associations exist → floor novelty at 1.
     # Skip this cap when the caller passed the authoritative
@@ -1999,22 +2010,28 @@ def build_evidence_summary(data_dir: str) -> str:
             stage3_data[gene] = {"drugs": [], "error": f"corrupt: {exc}"}
             continue
         drugs = []
-        # Try multiple keys: chembl_drugs (old format) or matched_drugs (new format)
-        raw_drugs = s3.get("chembl_drugs") or s3.get("matched_drugs") or []
-        # Handle nested dict format: {"executed": true, "matched_drugs": [...]}
-        if isinstance(raw_drugs, dict):
-            raw_drugs = raw_drugs.get("matched_drugs", [])
-        if not isinstance(raw_drugs, list):
-            raw_drugs = []
+        raw_drugs: list[dict] = []
+        stage3_containers = [s3]
+        if isinstance(s3.get("chembl"), dict):
+            stage3_containers.append(s3["chembl"])
+        for container in stage3_containers:
+            for key in ("chembl_drugs", "matched_drugs", "preclinical_compounds", "chembl_records"):
+                entries = container.get(key)
+                if isinstance(entries, dict):
+                    entries = entries.get("matched_drugs", [])
+                if isinstance(entries, list):
+                    raw_drugs.extend([entry for entry in entries if isinstance(entry, dict)])
         for d in raw_drugs:
-            if not isinstance(d, dict):
-                continue
+            indications = d.get("indications", [])
+            if not indications and d.get("indication"):
+                indications = [d.get("indication")]
             drugs.append({
-                "chembl_id": d.get("chembl_id", ""),
-                "drug_name": d.get("drug_name", ""),
+                "chembl_id": d.get("chembl_id") or d.get("molecule_chembl_id", ""),
+                "drug_name": d.get("drug_name") or d.get("name") or d.get("pref_name", ""),
                 "mechanism_of_action": d.get("mechanism_of_action"),
-                "indications": d.get("indications", []),
+                "indications": indications,
                 "max_phase": d.get("max_phase"),
+                "first_approval": d.get("first_approval"),
             })
         # Load clinical drugs from OpenTargets target_drugs (ot_{gene}.json)
         clinical_drugs = []
@@ -2052,8 +2069,9 @@ def build_evidence_summary(data_dir: str) -> str:
                 pass
 
         # Check for stage3 API errors
-        s3_errors = s3.get("errors", [])
-        s3_executed = s3.get("executed", False)
+        s3_chembl = s3.get("chembl") if isinstance(s3.get("chembl"), dict) else {}
+        s3_errors = s3.get("errors", []) or s3_chembl.get("errors", [])
+        s3_executed = bool(s3.get("executed", False) or s3_chembl.get("executed", False))
 
         stage3_data[gene] = {
             "clinical_drugs": clinical_drugs,
@@ -2234,6 +2252,8 @@ def build_evidence_summary(data_dir: str) -> str:
                 "resolved_name": drug.get("drug_name", ""),
                 "molecule_type": drug.get("molecule_type"),
                 "max_phase": drug.get("max_phase"),
+                "first_approval": drug.get("first_approval"),
+                "mechanism_of_action": drug.get("mechanism_of_action"),
                 "source": drug.get("source", "opentargets"),
             })
         for drug in gene_data.get("preclinical_compounds", []):
@@ -2243,11 +2263,18 @@ def build_evidence_summary(data_dir: str) -> str:
                 "resolved_name": drug.get("drug_name", ""),
                 "molecule_type": None,
                 "max_phase": drug.get("max_phase"),
+                "first_approval": drug.get("first_approval"),
+                "mechanism_of_action": drug.get("mechanism_of_action"),
                 "source": "chembl",
             })
     resolved_drugs_path = evidence_dir / "resolved_drugs.json"
     resolved_drugs_path.write_text(
-        json.dumps(resolved_drugs_audit, indent=2, ensure_ascii=False),
+        json.dumps(
+            _sanitize_for_strict_json(resolved_drugs_audit),
+            indent=2,
+            ensure_ascii=False,
+            allow_nan=False,
+        ),
         encoding="utf-8",
     )
 
@@ -2266,6 +2293,7 @@ def build_evidence_summary(data_dir: str) -> str:
         stage1_filter_results=stage1_filter_results,
         hypothesis_data=hypothesis_data,
         data_limitations=data_limitations,
+        novelty_opportunity_legend=NOVELTY_OPPORTUNITY_LEGEND,
     )
 
     reference_card = {
@@ -3104,6 +3132,34 @@ def _is_table_separator(line: str) -> bool:
     return "---" in stripped
 
 
+def _split_markdown_table_row(line: str) -> list[str]:
+    """Split a markdown table row while preserving escaped pipe characters."""
+    stripped = line.strip()
+    if stripped.startswith("|"):
+        stripped = stripped[1:]
+    if stripped.endswith("|"):
+        stripped = stripped[:-1]
+
+    cells: list[str] = []
+    current: list[str] = []
+    i = 0
+    while i < len(stripped):
+        ch = stripped[i]
+        if ch == "\\" and i + 1 < len(stripped) and stripped[i + 1] == "|":
+            current.append("|")
+            i += 2
+            continue
+        if ch == "|":
+            cells.append("".join(current).strip())
+            current = []
+            i += 1
+            continue
+        current.append(ch)
+        i += 1
+    cells.append("".join(current).strip())
+    return cells
+
+
 def _check_markdown_table_pipe_drift(drug_text: str) -> list[dict]:
     """Detect markdown tables whose data rows have an inconsistent unescaped
     pipe count vs the header/separator. Each divergent row emits a single
@@ -3169,13 +3225,29 @@ def _check_markdown_table_pipe_drift(drug_text: str) -> list[dict]:
     return issues
 
 
+def _stage1_filter_results_path(data_dir_path: Path) -> Path | None:
+    """Return the current Stage 1 filter artifact path.
+
+    Current runs persist the JSON sidecar under ``evidence/``.  Legacy fixtures
+    and older outputs kept it at the run root, so the root path remains a
+    fallback for compatibility.
+    """
+    evidence_path = data_dir_path / "evidence" / "stage1_filter_results.json"
+    if evidence_path.exists():
+        return evidence_path
+    legacy_path = data_dir_path / "stage1_filter_results.json"
+    if legacy_path.exists():
+        return legacy_path
+    return None
+
+
 def _check_stage1_count_mismatch(drug_text: str, data_dir_path: Path) -> list[dict]:
     """Compare any prose Stage 1 count claim in drug.md against the total
     pair count derived from stage1_filter_results.json. Skipped silently if
     the report makes no such claim."""
     issues: list[dict] = []
-    stage1_path = data_dir_path / "stage1_filter_results.json"
-    if not stage1_path.exists():
+    stage1_path = _stage1_filter_results_path(data_dir_path)
+    if stage1_path is None:
         return issues  # MISSING_REQUIRED_ARTIFACT path covers this case.
     try:
         stage1_payload = json.loads(stage1_path.read_text(encoding="utf-8"))
@@ -3197,7 +3269,11 @@ def _check_stage1_count_mismatch(drug_text: str, data_dir_path: Path) -> list[di
     if isinstance(stage1_payload, list):
         total = len(stage1_payload)
     elif isinstance(stage1_payload, dict):
+        if isinstance(stage1_payload.get("total"), int):
+            total = stage1_payload["total"]
         for key in ("pairs", "results", "entries", "stage1_pairs"):
+            if total is not None:
+                break
             value = stage1_payload.get(key)
             if isinstance(value, list):
                 total = len(value)
@@ -3286,12 +3362,89 @@ def _check_empty_gap_analysis(drug_text: str) -> list[dict]:
     return issues
 
 
+def _check_stale_hypothesis_report(drug_text: str, data_dir_path: Path) -> list[dict]:
+    """Detect drug.md that predates a populated hypothesis_report.json."""
+    drug_md_path = data_dir_path / "drug.md"
+    hypothesis_path = data_dir_path / "evidence" / "hypothesis_report.json"
+    if not drug_md_path.exists() or not hypothesis_path.exists():
+        return []
+
+    try:
+        if hypothesis_path.stat().st_mtime <= drug_md_path.stat().st_mtime:
+            return []
+    except OSError:
+        return []
+
+    try:
+        hypothesis_payload = json.loads(hypothesis_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [{
+            "code": "STALE_HYPOTHESIS_REPORT",
+            "severity": "high",
+            "message": f"hypothesis_report.json is newer than drug.md but is unreadable: {exc}",
+            "location": str(hypothesis_path),
+            "evidence": {},
+        }]
+
+    hypotheses = hypothesis_payload.get("hypotheses", []) if isinstance(hypothesis_payload, dict) else []
+    if not isinstance(hypotheses, list) or not hypotheses:
+        return []
+
+    placeholder_re = re.compile(
+        r"No hypothesis(?:_report\.json)?(?: analysis)?(?: content)? (?:was )?(?:loaded|available)"
+        r"|hypothesis_writer subagent may not have completed",
+        re.IGNORECASE,
+    )
+    titles = [
+        str(item.get("title", "")).strip()
+        for item in hypotheses
+        if isinstance(item, dict) and str(item.get("title", "")).strip()
+    ]
+    has_rendered_title = any(title in drug_text for title in titles)
+    has_placeholder = bool(placeholder_re.search(drug_text))
+    if has_placeholder or (titles and not has_rendered_title):
+        return [{
+            "code": "STALE_HYPOTHESIS_REPORT",
+            "severity": "high",
+            "message": (
+                "hypothesis_report.json is newer than drug.md and the report "
+                "does not render the final hypothesis content."
+            ),
+            "location": str(data_dir_path / "drug.md"),
+            "evidence": {
+                "hypothesis_report": str(hypothesis_path),
+                "hypothesis_count": len(hypotheses),
+                "sample_titles": titles[:3],
+                "placeholder_text_present": has_placeholder,
+            },
+        }]
+    return []
+
+
+def _clean_markdown_cell_text(value: str) -> str:
+    """Remove lightweight markdown decoration from a table cell."""
+    value = value.strip()
+    value = re.sub(r"^\*\*(.*?)\*\*$", r"\1", value)
+    value = re.sub(r"^`(.*?)`$", r"\1", value)
+    return value.strip()
+
+
+def _column_index(header_cells: list[str], *needles: str) -> int | None:
+    for idx, cell in enumerate(header_cells):
+        normalized = cell.strip().lower()
+        for needle in needles:
+            if needle in normalized:
+                return idx
+    return None
+
+
 def _iter_drug_profile_moa_cells(drug_text: str):
-    """Yield `(line_no, drug_name, moa_value)` tuples for each MoA cell in
+    """Yield `(line_no, drug_name, chembl_id, moa_value)` tuples for each MoA cell in
     every markdown table that exposes a MoA / Mechanism of Action column.
 
-    The drug name is taken from the first non-empty cell in the same row
-    (best-effort). `line_no` is 1-indexed and points at the data row line.
+    The drug name is taken from an explicit drug/name column when available,
+    falling back to the first non-empty cell. `line_no` is 1-indexed and points
+    at the data row line.
     """
     lines = drug_text.splitlines()
     n = len(lines)
@@ -3303,75 +3456,153 @@ def _iter_drug_profile_moa_cells(drug_text: str):
         if not is_pipe_row or i + 1 >= n or not _is_table_separator(lines[i + 1]):
             i += 1
             continue
-        # Parse header cells.
-        header_cells = [c.strip() for c in stripped.strip("|").split("|")]
-        moa_idx = None
-        for c_idx, cell in enumerate(header_cells):
-            cell_norm = cell.lower()
-            if cell_norm == "moa" or "mechanism of action" in cell_norm:
-                moa_idx = c_idx
-                break
+        header_cells = [_clean_markdown_cell_text(c) for c in _split_markdown_table_row(stripped)]
+        moa_idx = _column_index(header_cells, "mechanism of action", "moa")
         if moa_idx is None:
             i += 1
             continue
+        chembl_idx = _column_index(header_cells, "chembl")
+        drug_idx = _column_index(header_cells, "drug", "compound", "name")
         j = i + 2
         while j < n:
             row = lines[j]
             row_stripped = row.strip()
             if not (row_stripped.startswith("|") and row_stripped.endswith("|")):
                 break
-            cells = [c.strip() for c in row_stripped.strip("|").split("|")]
+            cells = [_clean_markdown_cell_text(c) for c in _split_markdown_table_row(row_stripped)]
             if moa_idx < len(cells):
                 moa_value = cells[moa_idx]
-                drug_name = cells[0] if cells else ""
-                yield (j + 1, drug_name, moa_value)
+                drug_name = ""
+                if drug_idx is not None and drug_idx < len(cells):
+                    drug_name = cells[drug_idx]
+                if not drug_name:
+                    drug_name = next((cell for cell in cells if cell), "")
+                chembl_id = ""
+                if chembl_idx is not None and chembl_idx < len(cells):
+                    chembl_id = cells[chembl_idx]
+                yield (j + 1, drug_name, chembl_id, moa_value)
             j += 1
         i = j if j > i + 1 else i + 1
 
 
-def _load_stage3_evidence_text(data_dir_path: Path) -> str:
-    """Concatenate the textual content of every `evidence/stage3_*.json`
-    file under the run directory. Returned text is lower-cased so callers
-    can run case-insensitive substring containment."""
+def _normalize_moa_support_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "").replace("\\|", "|")).strip().casefold()
+
+
+def _normalize_lookup_key(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip().casefold()
+
+
+def _iter_stage3_drug_entries(payload: Any):
+    """Yield drug-like entries from the Stage3 JSON formats used by the pipeline."""
+    if not isinstance(payload, dict):
+        return
+    containers = [payload]
+    chembl_payload = payload.get("chembl")
+    if isinstance(chembl_payload, dict):
+        containers.append(chembl_payload)
+
+    for container in containers:
+        for key in (
+            "chembl_drugs",
+            "matched_drugs",
+            "preclinical_compounds",
+            "chembl_records",
+            "drugs",
+            "clinical_drugs",
+        ):
+            entries = container.get(key)
+            if isinstance(entries, dict):
+                entries = entries.get("matched_drugs") or entries.get("rows") or []
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if isinstance(entry, dict):
+                    yield entry
+
+
+def _build_moa_support_map(data_dir_path: Path) -> dict[str, set[str]]:
+    """Build drug/ChEMBL-specific MoA support from resolved_drugs and Stage3."""
     evidence_dir = data_dir_path / "evidence"
-    if not evidence_dir.is_dir():
-        return ""
-    parts: list[str] = []
-    for stage3_path in sorted(evidence_dir.glob("stage3_*.json")):
+    support: dict[str, set[str]] = {}
+
+    def add_entry(entry: dict[str, Any]) -> None:
+        moa = _normalize_moa_support_text(entry.get("mechanism_of_action"))
+        if not moa:
+            return
+        names = [
+            entry.get("name"),
+            entry.get("resolved_name"),
+            entry.get("drug_name"),
+            entry.get("pref_name"),
+            entry.get("molecule_name"),
+        ]
+        ids = [
+            entry.get("chembl_id"),
+            entry.get("molecule_chembl_id"),
+        ]
+        for value in names + ids:
+            key = _normalize_lookup_key(value)
+            if key:
+                support.setdefault(key, set()).add(moa)
+
+    resolved_path = evidence_dir / "resolved_drugs.json"
+    if resolved_path.exists():
         try:
-            parts.append(stage3_path.read_text(encoding="utf-8"))
+            resolved_payload = json.loads(resolved_path.read_text(encoding="utf-8"))
         except Exception:
-            continue
-    return "\n".join(parts).lower()
+            resolved_payload = []
+        if isinstance(resolved_payload, list):
+            for entry in resolved_payload:
+                if isinstance(entry, dict):
+                    add_entry(entry)
+
+    if evidence_dir.is_dir():
+        for stage3_path in sorted(evidence_dir.glob("stage3_*.json")):
+            try:
+                stage3_payload = json.loads(stage3_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            for entry in _iter_stage3_drug_entries(stage3_payload):
+                add_entry(entry)
+    return support
 
 
 def _check_unsupported_moa_claim(drug_text: str, data_dir_path: Path) -> list[dict]:
     """Each Drug Profile MoA cell must be either explicitly unavailable
-    (N/A markers) or have its value appear as a substring inside any
-    `evidence/stage3_*.json` file."""
+    (N/A markers) or match MoA support for the same drug/ChEMBL ID."""
     issues: list[dict] = []
-    evidence_text = _load_stage3_evidence_text(data_dir_path)
-    for line_no, drug_name, moa_value in _iter_drug_profile_moa_cells(drug_text):
-        normalized = moa_value.strip().lower()
+    moa_support = _build_moa_support_map(data_dir_path)
+    for line_no, drug_name, chembl_id, moa_value in _iter_drug_profile_moa_cells(drug_text):
+        normalized = _normalize_moa_support_text(moa_value)
         if not normalized:
             # Empty cells are treated as unavailable (no claim made).
             continue
         if normalized in _MOA_UNAVAILABLE_MARKERS:
             continue
-        if evidence_text and normalized in evidence_text:
+        keys = [
+            _normalize_lookup_key(chembl_id),
+            _normalize_lookup_key(drug_name),
+        ]
+        supported_moas = set()
+        for key in keys:
+            if key:
+                supported_moas.update(moa_support.get(key, set()))
+        if any(normalized == moa or normalized in moa or moa in normalized for moa in supported_moas):
             continue
         issues.append({
             "code": "UNSUPPORTED_MOA_CLAIM",
             "severity": "medium",
             "message": (
                 f"Drug Profile MoA cell for {drug_name or '<unknown>'} claims "
-                f"'{moa_value}' but the value is absent from every "
-                "evidence/stage3_*.json file and is not in the unavailable-"
-                "marker set."
+                f"'{moa_value}' but the value is absent from matching "
+                "resolved_drugs.json or stage3 drug records and is not in the "
+                "unavailable-marker set."
             ),
             "location": f"drug.md:{line_no}",
             "evidence": {
                 "drug": drug_name,
+                "chembl_id": chembl_id,
                 "claimed_moa": moa_value,
             },
         })
@@ -3468,13 +3699,19 @@ def validate_drug_report_finalization(data_dir: str) -> str:
     ]
     missing: list[str] = []
     for rel in required_artifacts:
-        if not (data_dir_path / rel).exists():
+        artifact_path = data_dir_path / rel
+        if rel == "stage1_filter_results.json":
+            resolved_stage1_path = _stage1_filter_results_path(data_dir_path)
+            if resolved_stage1_path is not None:
+                continue
+            artifact_path = data_dir_path / "evidence" / rel
+        if not artifact_path.exists():
             missing.append(rel)
             issues.append({
                 "code": "MISSING_REQUIRED_ARTIFACT",
                 "severity": "critical",
                 "message": f"Required artifact not found: {rel}",
-                "location": str(data_dir_path / rel),
+                "location": str(artifact_path),
                 "evidence": {"artifact": rel},
             })
     checks["required_artifacts"]["missing"] = missing
@@ -3570,6 +3807,9 @@ def validate_drug_report_finalization(data_dir: str) -> str:
                 _check_stage1_count_mismatch(drug_text, data_dir_path)
             )
             finalization_issues.extend(_check_empty_gap_analysis(drug_text))
+            finalization_issues.extend(
+                _check_stale_hypothesis_report(drug_text, data_dir_path)
+            )
             finalization_issues.extend(
                 _check_unsupported_moa_claim(drug_text, data_dir_path)
             )
