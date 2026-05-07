@@ -1,13 +1,14 @@
-"""Wire-up regression: assert the summarizer middleware chain has exactly 6
-entries in the canonical order defined by Plan §2.1.B.
+"""Wire-up regression: assert the summarizer middleware chain has exactly 7
+entries in the canonical order defined by Plan §2.1.B (updated for sanitizer).
 
 Order:
   0  ReadOnlyToolGuardMiddleware
   1  BuildEvidenceSummaryGuardMiddleware
   2  RepairCycleCounterMiddleware
-  3  SummarizerFinalizationGuardMiddleware   ← inserted in Task #10
-  4  FrozenTemplateSpanMiddleware
-  5  AnnotationDensityMiddleware
+  3  SummarizerFinalizationGuardMiddleware
+  4  DrugMdSaveSanitizerMiddleware           ← inserted here (sanitize before frozen-span)
+  5  FrozenTemplateSpanMiddleware
+  6  AnnotationDensityMiddleware
 
 The factory (create_summarizer_agent) calls create_deep_agent at construction
 time, which requires a live model endpoint.  This test monkeypatches
@@ -26,6 +27,7 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
 from src.agents.drug_target.subagents.summarizer.middleware import (
     AnnotationDensityMiddleware,
     BuildEvidenceSummaryGuardMiddleware,
+    DrugMdSaveSanitizerMiddleware,
     FrozenTemplateSpanMiddleware,
     RepairCycleCounterMiddleware,
     SummarizerFinalizationGuardMiddleware,
@@ -37,6 +39,7 @@ _EXPECTED_ORDER = [
     BuildEvidenceSummaryGuardMiddleware,
     RepairCycleCounterMiddleware,
     SummarizerFinalizationGuardMiddleware,
+    DrugMdSaveSanitizerMiddleware,
     FrozenTemplateSpanMiddleware,
     AnnotationDensityMiddleware,
 ]
@@ -74,9 +77,9 @@ def middleware_chain() -> list:
     return _capture_middleware()
 
 
-def test_middleware_chain_has_six_entries(middleware_chain: list) -> None:
-    assert len(middleware_chain) == 6, (
-        f"Expected 6 middleware entries, got {len(middleware_chain)}: "
+def test_middleware_chain_has_seven_entries(middleware_chain: list) -> None:
+    assert len(middleware_chain) == 7, (
+        f"Expected 7 middleware entries, got {len(middleware_chain)}: "
         + ", ".join(type(m).__name__ for m in middleware_chain)
     )
 
@@ -94,6 +97,27 @@ def test_finalization_guard_is_at_index_3(middleware_chain: list) -> None:
     assert isinstance(middleware_chain[3], SummarizerFinalizationGuardMiddleware), (
         f"Index 3 should be SummarizerFinalizationGuardMiddleware, "
         f"got {type(middleware_chain[3]).__name__}"
+    )
+
+
+def test_sanitizer_is_at_index_4(middleware_chain: list) -> None:
+    assert isinstance(middleware_chain[4], DrugMdSaveSanitizerMiddleware), (
+        f"Index 4 should be DrugMdSaveSanitizerMiddleware, "
+        f"got {type(middleware_chain[4]).__name__}"
+    )
+
+
+def test_frozen_template_span_is_at_index_5(middleware_chain: list) -> None:
+    assert isinstance(middleware_chain[5], FrozenTemplateSpanMiddleware), (
+        f"Index 5 should be FrozenTemplateSpanMiddleware, "
+        f"got {type(middleware_chain[5]).__name__}"
+    )
+
+
+def test_annotation_density_is_at_index_6(middleware_chain: list) -> None:
+    assert isinstance(middleware_chain[6], AnnotationDensityMiddleware), (
+        f"Index 6 should be AnnotationDensityMiddleware, "
+        f"got {type(middleware_chain[6]).__name__}"
     )
 
 
@@ -115,19 +139,37 @@ def test_repair_cycle_counter_before_finalization_guard(middleware_chain: list) 
     )
 
 
-def test_finalization_guard_before_frozen_template_span(middleware_chain: list) -> None:
-    """Guard at index 3, FrozenTemplateSpan at index 4 — guard must precede span."""
-    guard_idx = next(
-        (i for i, m in enumerate(middleware_chain) if isinstance(m, SummarizerFinalizationGuardMiddleware)),
+def test_sanitizer_before_frozen_template_span(middleware_chain: list) -> None:
+    """Sanitizer at index 4, FrozenTemplateSpan at index 5 — sanitizer must precede span."""
+    sanitizer_idx = next(
+        (i for i, m in enumerate(middleware_chain) if isinstance(m, DrugMdSaveSanitizerMiddleware)),
         None,
     )
     span_idx = next(
         (i for i, m in enumerate(middleware_chain) if isinstance(m, FrozenTemplateSpanMiddleware)),
         None,
     )
-    assert guard_idx is not None, "SummarizerFinalizationGuardMiddleware not found in chain"
+    assert sanitizer_idx is not None, "DrugMdSaveSanitizerMiddleware not found in chain"
     assert span_idx is not None, "FrozenTemplateSpanMiddleware not found in chain"
-    assert guard_idx < span_idx, (
-        f"SummarizerFinalizationGuardMiddleware (idx={guard_idx}) must come BEFORE "
+    assert sanitizer_idx < span_idx, (
+        f"DrugMdSaveSanitizerMiddleware (idx={sanitizer_idx}) must come BEFORE "
         f"FrozenTemplateSpanMiddleware (idx={span_idx})"
+    )
+
+
+def test_finalization_guard_before_sanitizer(middleware_chain: list) -> None:
+    """Guard at index 3, sanitizer at index 4 — guard must precede sanitizer."""
+    guard_idx = next(
+        (i for i, m in enumerate(middleware_chain) if isinstance(m, SummarizerFinalizationGuardMiddleware)),
+        None,
+    )
+    sanitizer_idx = next(
+        (i for i, m in enumerate(middleware_chain) if isinstance(m, DrugMdSaveSanitizerMiddleware)),
+        None,
+    )
+    assert guard_idx is not None, "SummarizerFinalizationGuardMiddleware not found in chain"
+    assert sanitizer_idx is not None, "DrugMdSaveSanitizerMiddleware not found in chain"
+    assert guard_idx < sanitizer_idx, (
+        f"SummarizerFinalizationGuardMiddleware (idx={guard_idx}) must come BEFORE "
+        f"DrugMdSaveSanitizerMiddleware (idx={sanitizer_idx})"
     )

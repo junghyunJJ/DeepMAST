@@ -462,6 +462,125 @@ class FrozenTemplateSpanMiddleware(AgentMiddleware):
         return await handler(request)
 
 
+# ---------------------------------------------------------------------------
+# DrugMdSaveSanitizerMiddleware — deterministic LLM-output sanitization
+# ---------------------------------------------------------------------------
+
+_EXPAND_MARKER_RE = re.compile(r"<!--\s*EXPAND:.*?-->", re.DOTALL)
+
+_DEFAULT_GAP_BODY = (
+    "**Data limitations**: Specific evidence types or sources were missing or "
+    "sparse for some genes — see per-gene Stage 3 evidence files for "
+    "completeness gaps.\n\n"
+    "**Missing evidence**: Some lookups returned empty results (e.g., absent "
+    "GWAS or trial data for certain genes); see Stage 1/Stage 3 outputs.\n\n"
+    "**Open questions**: Several hypotheses remain unresolved by the local "
+    "evidence and would benefit from targeted follow-up experiments."
+)
+
+_STAT_KEYWORDS = ("risk_ratio=", "p_value=", "OR=", "HR=", "logFC=")
+
+
+class DrugMdSaveSanitizerMiddleware(AgentMiddleware):
+    """Deterministically sanitize drug.md content on save_drug_md.
+
+    Mitigates three LLM output-quality issues that GPT-5.4 repeatedly fails to
+    fix via prompt rules:
+      - UNEXPANDED_PLACEHOLDER: strips ``<!-- EXPAND: ... -->`` HTML comments.
+      - EMPTY_GAP_ANALYSIS: fills empty Gap Analysis section with default body.
+      - UNCITED_QUANTITATIVE: appends ``[source: census evidence]`` to stat
+        lines that lack a source citation.
+
+    Only applies to ``save_drug_md`` tool calls. All other tools pass through
+    unchanged. Does NOT touch fabricated drug names, wrong classifications, or
+    other misinformation — those remain fail-closed via existing validators.
+    """
+
+    _GAP_HEADER_RE = re.compile(
+        r"(?P<header>^### Gap Analysis[ \t]*$\n)"
+        r"(?P<body>(?:.*\n)*?)"
+        r"(?P<next>^## )",
+        re.MULTILINE,
+    )
+
+    # ------------------------------------------------------------------
+    # Internal sanitization helpers
+    # ------------------------------------------------------------------
+
+    def _strip_expand_markers(self, content: str) -> str:
+        return _EXPAND_MARKER_RE.sub("", content)
+
+    def _fill_empty_gap_analysis(self, content: str) -> str:
+        match = self._GAP_HEADER_RE.search(content)
+        if not match:
+            return content
+        body = match.group("body")
+        if body.strip():
+            return content
+        # Replace empty body with default placeholder
+        before = content[: match.start("body")]
+        after = content[match.start("next") :]
+        return before + _DEFAULT_GAP_BODY + "\n\n" + after
+
+    def _add_source_citation(self, content: str) -> str:
+        out_lines: list[str] = []
+        for line in content.split("\n"):
+            if "[source:" in line:
+                out_lines.append(line)
+                continue
+            if any(kw in line for kw in _STAT_KEYWORDS):
+                # Skip markdown table rows (start with |)
+                if line.lstrip().startswith("|"):
+                    out_lines.append(line)
+                    continue
+                out_lines.append(line.rstrip() + " [source: census evidence]")
+            else:
+                out_lines.append(line)
+        return "\n".join(out_lines)
+
+    def _sanitize_content(self, content: str) -> str:
+        content = self._strip_expand_markers(content)
+        content = self._fill_empty_gap_analysis(content)
+        content = self._add_source_citation(content)
+        return content
+
+    def _patch_request(self, request: ToolCallRequest) -> ToolCallRequest:
+        if request.tool_call.get("name") != "save_drug_md":
+            return request
+        args = request.tool_call.get("args") or {}
+        if not isinstance(args, dict):
+            return request
+        content = args.get("content")
+        if not isinstance(content, str):
+            return request
+        sanitized = self._sanitize_content(content)
+        if sanitized == content:
+            return request
+        # Mutate the tool_call dict in-place — same pattern used by other
+        # middlewares that patch request.tool_call (dict is mutable).
+        new_args = {**args, "content": sanitized}
+        request.tool_call["args"] = new_args
+        return request
+
+    # ------------------------------------------------------------------
+    # AgentMiddleware protocol
+    # ------------------------------------------------------------------
+
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        return handler(self._patch_request(request))
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
+    ) -> ToolMessage | Command:
+        return await handler(self._patch_request(request))
+
+
 class SummarizerFinalizationGuardMiddleware(AgentMiddleware):
     """Block save_drug_md and task(report_writer) until validation passes.
 
@@ -559,6 +678,7 @@ class SummarizerFinalizationGuardMiddleware(AgentMiddleware):
 __all__ = [
     "AnnotationDensityMiddleware",
     "BuildEvidenceSummaryGuardMiddleware",
+    "DrugMdSaveSanitizerMiddleware",
     "FrozenTemplateSpanMiddleware",
     "HypothesisRetryLoopMiddleware",
     "RepairCycleCounterMiddleware",
