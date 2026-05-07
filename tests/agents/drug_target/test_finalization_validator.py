@@ -17,6 +17,10 @@ from src.agents.drug_target.tools import (
     validate_drug_md,
 )
 import src.agents.drug_target.tools.stage_logic as stage_logic
+from src.agents.drug_target.tools.report_expansion_schema import (
+    canonical_json_hash,
+    persist_drug_report_reference_card,
+)
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures"
 
@@ -25,9 +29,20 @@ FIXTURE_ROOT = Path(__file__).parent / "fixtures"
 # ---------------------------------------------------------------------------
 
 
-def _invoke(data_dir):
+def _invoke(data_dir, *, allow_legacy: bool = True):
     """Invoke the @tool wrapper with data_dir as a string."""
-    return json.loads(validate_drug_report_finalization.invoke({"data_dir": str(data_dir)}))
+    previous = os.environ.get("DEEPMAST_ALLOW_LEGACY_DRUG_MD")
+    if allow_legacy:
+        os.environ["DEEPMAST_ALLOW_LEGACY_DRUG_MD"] = "1"
+    else:
+        os.environ.pop("DEEPMAST_ALLOW_LEGACY_DRUG_MD", None)
+    try:
+        return json.loads(validate_drug_report_finalization.invoke({"data_dir": str(data_dir)}))
+    finally:
+        if previous is None:
+            os.environ.pop("DEEPMAST_ALLOW_LEGACY_DRUG_MD", None)
+        else:
+            os.environ["DEEPMAST_ALLOW_LEGACY_DRUG_MD"] = previous
 
 
 def _copy_fixture(name, tmp_path):
@@ -49,6 +64,52 @@ def _move_stage1_filter_results_to_evidence(data_dir):
 
 def _has_issue(result, code):
     return any(issue["code"] == code for issue in result["issues"])
+
+
+def _drug_hash(data_dir: Path) -> str:
+    import hashlib
+
+    return hashlib.sha256((data_dir / "drug.md").read_bytes()).hexdigest()
+
+
+def _write_renderer_sidecars(data_dir: Path, *, bad_source_hash: bool = False, bad_drug_hash: bool = False) -> None:
+    ref = persist_drug_report_reference_card(
+        data_dir,
+        {
+            "markdown_template": (data_dir / "drug.md").read_text(encoding="utf-8"),
+            "expansion_slots": [],
+        },
+    )
+    expansions = {
+        "schema_version": "report_expansions.v1",
+        "template_id": "drug_report.md.j2",
+        "reference_card_hash": canonical_json_hash(ref),
+        "slots": [],
+    }
+    (data_dir / "report_expansions.json").write_text(
+        json.dumps(expansions, indent=2),
+        encoding="utf-8",
+    )
+    metadata = {
+        "schema_version": "drug_report_render.v1",
+        "renderer": "render_drug_md_from_expansions",
+        "mode": "renderer",
+        "source_hashes": {
+            "reference_card": "bad" if bad_source_hash else canonical_json_hash(ref),
+            "report_expansions": canonical_json_hash(expansions),
+            "hypothesis_report": None,
+            "template": "unused-in-this-unit-test",
+        },
+        "rendered_drug_md_sha256": "bad" if bad_drug_hash else _drug_hash(data_dir),
+        "required_slot_count": 0,
+        "rendered_slot_count": 0,
+        "missing_slots": [],
+        "extra_slots": [],
+    }
+    (data_dir / "drug_report_render.json").write_text(
+        json.dumps(metadata, indent=2),
+        encoding="utf-8",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +189,7 @@ def test_missing_required_artifact(artifact, tmp_path):
     MISSING_REQUIRED_ARTIFACT with the missing path mentioned in the issue."""
     d = _copy_fixture("clean", tmp_path)
     (d / artifact).unlink()
-    result = _invoke(d)
+    result = _invoke(d, allow_legacy=False)
     assert _has_issue(result, "MISSING_REQUIRED_ARTIFACT"), (
         f"Expected MISSING_REQUIRED_ARTIFACT when {artifact} is deleted; "
         f"got issues: {result['issues']}"
@@ -435,7 +496,168 @@ def test_stale_hypothesis_report_newer_than_drug_md_fails(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# 12. validate_drug_md signature dispatch
+# 12. Renderer metadata and new finalization gates
+# ---------------------------------------------------------------------------
+
+
+def test_finalization_fails_when_renderer_metadata_missing_in_renderer_mode(tmp_path):
+    d = _copy_fixture("clean", tmp_path)
+    persist_drug_report_reference_card(
+        d,
+        {
+            "markdown_template": (d / "drug.md").read_text(encoding="utf-8"),
+            "expansion_slots": [],
+        },
+    )
+    (d / "report_expansions.json").write_text(
+        json.dumps({
+            "schema_version": "report_expansions.v1",
+            "reference_card_hash": "stale",
+            "slots": [],
+        }),
+        encoding="utf-8",
+    )
+
+    result = _invoke(d)
+
+    assert _has_issue(result, "MISSING_RENDER_METADATA"), result["issues"]
+
+
+def test_markdown_only_finalization_requires_explicit_legacy_flag(tmp_path):
+    d = _copy_fixture("clean", tmp_path)
+
+    result = _invoke(d, allow_legacy=False)
+
+    assert _has_issue(result, "MISSING_RENDER_METADATA"), result["issues"]
+
+
+def test_finalization_fails_when_render_source_hash_mismatch(tmp_path):
+    d = _copy_fixture("clean", tmp_path)
+    _write_renderer_sidecars(d, bad_source_hash=True)
+
+    result = _invoke(d)
+
+    assert _has_issue(result, "RENDER_SOURCE_HASH_MISMATCH"), result["issues"]
+
+
+def test_finalization_fails_when_rendered_drug_md_hash_mismatch(tmp_path):
+    d = _copy_fixture("clean", tmp_path)
+    _write_renderer_sidecars(d, bad_drug_hash=True)
+
+    result = _invoke(d)
+
+    assert _has_issue(result, "RENDERED_DRUG_MD_HASH_MISMATCH"), result["issues"]
+
+
+def test_finalization_fails_when_renderer_source_artifacts_missing(tmp_path):
+    d = _copy_fixture("clean", tmp_path)
+    metadata = {
+        "schema_version": "drug_report_render.v1",
+        "renderer": "render_drug_md_from_expansions",
+        "mode": "renderer",
+        "source_hashes": {
+            "reference_card": "missing-reference-card-hash",
+            "report_expansions": "missing-expansions-hash",
+            "hypothesis_report": None,
+            "template": "unused-in-this-unit-test",
+        },
+        "rendered_drug_md_sha256": _drug_hash(d),
+        "required_slot_count": 0,
+        "rendered_slot_count": 0,
+        "missing_slots": [],
+        "extra_slots": [],
+    }
+    (d / "drug_report_render.json").write_text(
+        json.dumps(metadata, indent=2),
+        encoding="utf-8",
+    )
+
+    result = _invoke(d)
+
+    assert _has_issue(result, "MISSING_RENDER_SOURCE"), result["issues"]
+
+
+def test_finalization_fails_when_failed_suffix_leaks_to_drug_md(tmp_path):
+    d = _copy_fixture("clean", tmp_path)
+    drug_path = d / "drug.md"
+    drug_path.write_text(
+        drug_path.read_text(encoding="utf-8") + "\nstage1_CD4--ITGB2.json_FAILED\n",
+        encoding="utf-8",
+    )
+
+    result = _invoke(d)
+
+    assert _has_issue(result, "FAILED_SUFFIX_LEAK"), result["issues"]
+
+
+def test_finalization_reports_unverified_numeric_prediction_by_default(tmp_path):
+    d = _copy_fixture("clean", tmp_path)
+    hyp_path = d / "evidence" / "hypothesis_report.json"
+    payload = {"hypotheses": []}
+    payload["prediction_grounding_summary"] = {
+        "unverified": 1,
+        "unverified_indices": [0],
+    }
+    hyp_path.write_text(json.dumps(payload), encoding="utf-8")
+    os.utime(hyp_path, (1_700_000_000, 1_700_000_000))
+    os.utime(d / "drug.md", (1_700_000_100, 1_700_000_100))
+
+    result = _invoke(d)
+
+    assert not _has_issue(result, "UNVERIFIED_NUMERIC_PREDICTION"), result["issues"]
+    assert any(
+        "UNVERIFIED_NUMERIC_PREDICTION" in warning
+        for warning in result["checks"]["report_finalization"]["warnings"]
+    )
+
+
+def test_finalization_strict_mode_fails_unverified_numeric_prediction(
+    tmp_path, monkeypatch
+):
+    d = _copy_fixture("clean", tmp_path)
+    hyp_path = d / "evidence" / "hypothesis_report.json"
+    payload = {"hypotheses": []}
+    payload["prediction_grounding_summary"] = {
+        "unverified": 1,
+        "unverified_indices": [0],
+    }
+    hyp_path.write_text(json.dumps(payload), encoding="utf-8")
+    os.utime(hyp_path, (1_700_000_000, 1_700_000_000))
+    os.utime(d / "drug.md", (1_700_000_100, 1_700_000_100))
+    monkeypatch.setenv("DEEPMAST_STRICT_NUMERIC_PREDICTIONS", "1")
+
+    result = _invoke(d)
+
+    assert _has_issue(result, "UNVERIFIED_NUMERIC_PREDICTION"), result["issues"]
+
+
+def test_finalization_fails_legacy_mode_unless_compat_flag_set(
+    tmp_path, monkeypatch
+):
+    d = _copy_fixture("clean", tmp_path)
+    metadata = {
+        "schema_version": "drug_report_render.v1",
+        "mode": "legacy_compat",
+        "source_hashes": {},
+        "rendered_drug_md_sha256": _drug_hash(d),
+        "missing_slots": [],
+        "extra_slots": [],
+    }
+    (d / "drug_report_render.json").write_text(
+        json.dumps(metadata),
+        encoding="utf-8",
+    )
+
+    result = _invoke(d, allow_legacy=False)
+    assert _has_issue(result, "LEGACY_RENDER_MODE_NOT_ALLOWED"), result["issues"]
+
+    monkeypatch.setenv("DEEPMAST_ALLOW_LEGACY_DRUG_MD", "1")
+    result = _invoke(d)
+    assert not _has_issue(result, "LEGACY_RENDER_MODE_NOT_ALLOWED"), result["issues"]
+
+
+# ---------------------------------------------------------------------------
+# 13. validate_drug_md signature dispatch
 # ---------------------------------------------------------------------------
 
 

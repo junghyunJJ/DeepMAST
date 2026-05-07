@@ -10,6 +10,7 @@ Middlewares:
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import re
 from collections.abc import Awaitable, Callable
@@ -23,6 +24,14 @@ from langgraph.types import Command
 logger = logging.getLogger(__name__)
 
 _BUILD_EVIDENCE_TOOL = "build_evidence_summary"
+
+
+def _canonical_payload_hash(value: Any) -> str:
+    try:
+        payload = json.dumps(value, sort_keys=True, default=str, ensure_ascii=False)
+    except TypeError:
+        payload = str(value)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 class BuildEvidenceSummaryGuardMiddleware(AgentMiddleware):
@@ -308,8 +317,250 @@ class AnnotationDensityMiddleware(AgentMiddleware):
         return await handler(request)
 
 
+class HypothesisRetryLoopMiddleware(AgentMiddleware):
+    """Block unchanged retries after a deterministic hypothesis-save rejection."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._rejected_payload_hashes: set[str] = set()
+
+    def _payload_for_request(self, request: ToolCallRequest) -> Any | None:
+        tool_name = request.tool_call.get("name")
+        args = request.tool_call.get("args") or {}
+        if not isinstance(args, dict):
+            return None
+        if tool_name == "save_hypothesis_report":
+            return args.get("report")
+        if tool_name == "save_evidence" and args.get("filename") == "hypothesis_report.json":
+            return args.get("data")
+        return None
+
+    def _blocked_response(self, request: ToolCallRequest, payload_hash: str) -> ToolMessage:
+        payload = {
+            "saved": False,
+            "error": (
+                "Identical hypothesis_report payload was already rejected by a "
+                "deterministic save gate. Mutate the payload according to the "
+                "previous errors before retrying."
+            ),
+            "payload_hash": payload_hash,
+        }
+        return ToolMessage(
+            content=json.dumps(payload),
+            tool_call_id=request.tool_call.get("id", ""),
+        )
+
+    def _record_if_rejected(self, payload_hash: str, result: ToolMessage | Command) -> None:
+        if not isinstance(result, ToolMessage):
+            return
+        try:
+            parsed = json.loads(str(result.content))
+        except Exception:
+            return
+        if isinstance(parsed, dict) and parsed.get("saved") is False:
+            self._rejected_payload_hashes.add(payload_hash)
+
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        payload = self._payload_for_request(request)
+        if payload is None:
+            return handler(request)
+        payload_hash = _canonical_payload_hash(payload)
+        if payload_hash in self._rejected_payload_hashes:
+            return self._blocked_response(request, payload_hash)
+        result = handler(request)
+        self._record_if_rejected(payload_hash, result)
+        return result
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
+    ) -> ToolMessage | Command:
+        payload = self._payload_for_request(request)
+        if payload is None:
+            return await handler(request)
+        payload_hash = _canonical_payload_hash(payload)
+        if payload_hash in self._rejected_payload_hashes:
+            return self._blocked_response(request, payload_hash)
+        result = await handler(request)
+        self._record_if_rejected(payload_hash, result)
+        return result
+
+
+class FrozenTemplateSpanMiddleware(AgentMiddleware):
+    """Reject legacy save_drug_md calls that mutate non-EXPAND template spans."""
+
+    def __init__(self, *, data_dir: str | None = None) -> None:
+        super().__init__()
+        self._data_dir = data_dir
+
+    def _static_spans_preserved(self, template: str, candidate: str) -> bool:
+        spans = [span for span in re.split(r"<!--\s*EXPAND:.*?-->", template, flags=re.DOTALL) if span]
+        position = 0
+        for span in spans:
+            found = candidate.find(span, position)
+            if found == -1:
+                return False
+            position = found + len(span)
+        return True
+
+    def _evaluate(self, request: ToolCallRequest) -> ToolMessage | None:
+        if request.tool_call.get("name") != _SAVE_DRUG_MD_TOOL or not self._data_dir:
+            return None
+        args = request.tool_call.get("args") or {}
+        if not isinstance(args, dict) or not isinstance(args.get("content"), str):
+            return None
+        try:
+            from pathlib import Path
+
+            card_path = Path(self._data_dir) / "drug_report_reference_card.json"
+            if not card_path.exists():
+                return None
+            card = json.loads(card_path.read_text(encoding="utf-8"))
+            template = card.get("markdown_template")
+            if not isinstance(template, str) or not template:
+                return None
+        except Exception:
+            return None
+        if self._static_spans_preserved(template, args["content"]):
+            return None
+        payload = {
+            "saved": False,
+            "error": (
+                "save_drug_md candidate mutates frozen non-EXPAND template spans. "
+                "Use save_report_expansions followed by render_drug_md_from_expansions, "
+                "or preserve all table/headings/score spans exactly."
+            ),
+        }
+        return ToolMessage(
+            content=json.dumps(payload),
+            tool_call_id=request.tool_call.get("id", ""),
+        )
+
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        rejection = self._evaluate(request)
+        if rejection is not None:
+            return rejection
+        return handler(request)
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
+    ) -> ToolMessage | Command:
+        rejection = self._evaluate(request)
+        if rejection is not None:
+            return rejection
+        return await handler(request)
+
+
+class SummarizerFinalizationGuardMiddleware(AgentMiddleware):
+    """Block save_drug_md and task(report_writer) until validation passes.
+
+    Enforces a strict finalization gate (plan §2.1.D Option C):
+    - validate_drug_report_finalization must be called first.
+    - If the validator returned valid=false, finalization tools are blocked.
+    - Only after valid=true does save_drug_md or task(report_writer) proceed.
+    """
+
+    _GUARDED_WRITES: tuple[str, ...] = ("save_drug_md",)
+    _GUARDED_SUBAGENTS: tuple[str, ...] = ("report_writer",)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._validator_called: bool = False
+        self._last_valid: bool | None = None
+
+    def _is_validator(self, request: ToolCallRequest) -> bool:
+        return request.tool_call.get("name") == "validate_drug_report_finalization"
+
+    def _is_guarded_save(self, request: ToolCallRequest) -> bool:
+        return request.tool_call.get("name") in self._GUARDED_WRITES
+
+    def _is_guarded_task(self, request: ToolCallRequest) -> bool:
+        if request.tool_call.get("name") != "task":
+            return False
+        args = request.tool_call.get("args") or {}
+        return isinstance(args, dict) and args.get("subagent_type") in self._GUARDED_SUBAGENTS
+
+    def _capture_validator_result(self, result: ToolMessage | Command) -> None:
+        if not isinstance(result, ToolMessage):
+            return
+        try:
+            parsed = json.loads(str(result.content))
+            if isinstance(parsed, dict) and "valid" in parsed:
+                self._validator_called = True
+                self._last_valid = bool(parsed["valid"])
+        except (ValueError, TypeError) as exc:
+            logger.warning("validator JSON parse failed: %s", exc)
+
+    def _blocked(self, request: ToolCallRequest, reason: str) -> ToolMessage:
+        payload = {
+            "ok": False,
+            "error": reason,
+            "blocked_by": "SummarizerFinalizationGuard",
+        }
+        return ToolMessage(
+            content=json.dumps(payload),
+            tool_call_id=request.tool_call.get("id", ""),
+        )
+
+    def _check_gate(self, request: ToolCallRequest) -> ToolMessage | None:
+        """Return a blocked ToolMessage if the finalization gate is not satisfied."""
+        if not (self._is_guarded_save(request) or self._is_guarded_task(request)):
+            return None
+        if not self._validator_called:
+            return self._blocked(
+                request,
+                "validate_drug_report_finalization must be called first",
+            )
+        if self._last_valid is False:
+            return self._blocked(
+                request,
+                "validator returned valid=false; cannot finalize",
+            )
+        return None
+
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        blocked = self._check_gate(request)
+        if blocked is not None:
+            return blocked
+        result = handler(request)
+        if self._is_validator(request):
+            self._capture_validator_result(result)
+        return result
+
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
+    ) -> ToolMessage | Command:
+        blocked = self._check_gate(request)
+        if blocked is not None:
+            return blocked
+        result = await handler(request)
+        if self._is_validator(request):
+            self._capture_validator_result(result)
+        return result
+
+
 __all__ = [
     "AnnotationDensityMiddleware",
     "BuildEvidenceSummaryGuardMiddleware",
+    "FrozenTemplateSpanMiddleware",
+    "HypothesisRetryLoopMiddleware",
     "RepairCycleCounterMiddleware",
+    "SummarizerFinalizationGuardMiddleware",
 ]

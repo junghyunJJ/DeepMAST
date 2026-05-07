@@ -36,6 +36,9 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
     ReadFileBlockMiddleware,
     SubagentErrorGuardMiddleware,
 )
+from src.agents.deep_interpreter.middleware.think_tool_quality_gate import (
+    ThinkToolQualityGateMiddleware,
+)
 from deepagents.backends import FilesystemBackend
 from src.agents.drug_target.subagents.configs import get_subagents
 from src.agents.drug_target.tools import (
@@ -337,7 +340,8 @@ def create_drug_target_agent(
         system_prompt=system_prompt,
         backend=backend,
         middleware=[
-            WriteFileArgGuardMiddleware(),
+            WriteFileArgGuardMiddleware(backend_root=resolved_data_dir),
+            ThinkToolQualityGateMiddleware(),  # Fix R1: enforce think_tool quality gates
             ReadFileBlockMiddleware(),        # Fix 2: block read_file at orchestrator level
             SubagentErrorGuardMiddleware(),   # Fix 4: catch GraphRecursionError from subagents
         ],

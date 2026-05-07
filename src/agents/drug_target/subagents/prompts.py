@@ -26,6 +26,13 @@ For each stage, follow this cycle:
 2. **EXECUTE**: Call @tool functions directly
 3. **REFLECT** (think_tool): Assess coverage -- any genes missing? API failures? Gaps to fill?
 
+### Reflection grounding requirements (R2)
+Every think_tool reflection MUST contain all three:
+- **Source filenames**: cite the specific file(s) you consulted (e.g., `stage3_ITGB2.json`, `chembl_lookup.json`, `ranked_targets.json`)
+- **Numeric values**: include concrete numbers you observed (e.g., `score=0.85`, `7 issues found`, `10 drugs`)
+- **Next action**: state what you will do next (e.g., "will retry with refined query", "continue to Stage 1")
+Reflections lacking source citations or numeric values will be rejected and you will be asked to retry.
+
 ## Reordered 3-Stage Funnel Workflow
 
 **CRITICAL: Stage 2 runs FIRST (all genes), then gene selection, then Stage 1
@@ -260,6 +267,13 @@ Start with Phase 1 immediately. Do NOT pre-plan.
 2. **REFLECT** (think_tool, optional): Call `think_tool` briefly AFTER a phase if you need to
    double-check coverage/scoring before moving on. Do NOT use it as a planning tool.
 
+### Reflection grounding requirements (R2)
+Every think_tool reflection MUST contain all three:
+- **Source filenames**: cite the specific file(s) you consulted (e.g., `stage3_ITGB2.json`, `assessment_results.json`, `hypothesis_report.json`)
+- **Numeric values**: include concrete numbers you observed (e.g., `score=0.85`, `7 hypotheses`, `3 featured genes`)
+- **Next action**: state what you will do next (e.g., "will retry with refined scoring", "continue to Phase 3")
+Reflections lacking source citations or numeric values will be rejected and you will be asked to retry.
+
 ## Workflow (5 Phases)
 
 Read the full skill guide first (do not skip):
@@ -428,14 +442,15 @@ signals that this is a coverage-driven hypothesis.
 
 The save_evidence validator computes TOP-N coverage deterministically:
 `covered = {hyp.biological_entities.genes for hyp in hypotheses}` intersected
-with the FEATURED list. If any FEATURED gene is missing, save_evidence returns
+with the FEATURED list. If any FEATURED gene is missing, save_hypothesis_report
+or the save_evidence compatibility wrapper returns
 `saved=false` with `topn_coverage.missing` listing the absent genes.
 
 **Number of retained hypotheses MUST be at least max(4, len(FEATURED))**.
 
 ### Phase 4.5: Validate Evidence References (MANDATORY, ANTI-HALLUCINATION)
 
-Before calling save_evidence for hypothesis_report.json you MUST call:
+Before calling save_hypothesis_report for hypothesis_report.json you MUST call:
 
     validate_evidence_references(data_dir, <flat list of every filename cited
         in any hypothesis's evidence_references field>)
@@ -455,15 +470,15 @@ Rules:
 - Re-run `validate_evidence_references` after fixing until it returns
   `valid: true`.
 
-save_evidence itself ALSO validates hypothesis_report.json and will refuse
+save_hypothesis_report itself ALSO validates hypothesis_report.json and will refuse
 to persist the file if any evidence_references entry cannot be matched to
-a real filename. If save_evidence returns `saved: false` with an
+a real filename. If save_hypothesis_report returns `saved: false` with an
 `invalid_references` list, treat it the same as a Phase 4.5 failure: fix
 the citations and retry.
 
 ### Phase 5.5: Retry Policy on Deterministic Gate Rejection (PR1-7)
 
-If save_evidence returns `saved: false` with EITHER:
+If save_hypothesis_report returns `saved: false` with EITHER:
 
 - `topn_coverage.missing` non-empty (TOP-N gene NOT covered), OR
 - `failed_pair_violations` non-empty (FAILED pair cited without `_FAILED` suffix),
@@ -484,8 +499,14 @@ you MUST follow this retry policy:
    to the operator rather than blocking the entire pipeline.
 
 ### Phase 5: Save Report
-MANDATORY: You MUST call save_evidence even if hypothesis_report.json appears in ls output.
+MANDATORY: You MUST call save_hypothesis_report even if hypothesis_report.json appears in ls output.
 Files visible in ls may be stale from a previous run. YOUR job is to save YOUR results.
+
+Preferred:
+
+`save_hypothesis_report(data_dir, hypothesis_data)`
+
+Compatibility fallback only:
 
 `save_evidence(data_dir, "hypothesis_report.json", hypothesis_data)`
 
@@ -504,7 +525,8 @@ save_evidence(data_dir, "hypothesis_report.json", {
         {
             "rank": 1,
             "title": "...",
-            "category": "MoA|Therapeutic Strategy|Cross-Target Interaction|Novel Pathway",
+            "category": "Mechanism of Action|Therapeutic Strategy|Cross-Target Interaction|Novel Pathway",
+            "gap_type": "none|orphan_evidence|featured_coverage",
             "core_claim": "...",
             "evidence_references": [...],
             "biological_entities": {"genes": [...], "pathways": [...], "cell_types": [...], "drugs": [...]},
@@ -590,6 +612,13 @@ Guidelines:
 2. **EXECUTE**: Write drug.md sections
 3. **REFLECT** (think_tool): Check quality -- comprehensive? Clear? Are featured candidates properly highlighted?
 
+### Reflection grounding requirements (R2)
+Every think_tool reflection MUST contain all three:
+- **Source filenames**: cite the specific file(s) you consulted (e.g., `stage3_ITGB2.json`, `ranked_targets.json`, `resolved_drugs.json`)
+- **Numeric values**: include concrete numbers you observed (e.g., `score=0.85`, `10 drugs listed`, `4 sections expanded`)
+- **Next action**: state what you will do next (e.g., "will fix discrepancy in section 3", "continue to Phase 5")
+Reflections lacking source citations or numeric values will be rejected and you will be asked to retry.
+
 ## IMPORTANT: Evidence Access & Reference Card
 - ALWAYS call `build_evidence_summary(data_dir=...)` FIRST — this generates the
   **Reference Card**, a structured JSON with ALL authoritative values
@@ -605,8 +634,9 @@ Guidelines:
 
 ### MANDATORY: Use Dedicated Save Tools
 
-- ALWAYS use `save_target_assessment` to save target_assessment.json
-- ALWAYS use `save_drug_md` to save drug.md
+- ALWAYS use `save_target_assessment` to save target_assessment.json when it must be repaired
+- ALWAYS use `save_report_expansions` then `render_drug_md_from_expansions` as the primary drug.md publication path
+- Use `save_drug_md` only for legacy repair compatibility when deterministic renderer artifacts are unavailable
 - NEVER use `write_file` for these artifacts — it will NOT persist to disk
 
 ### Mode Selection (read first, before doing anything else)
@@ -643,6 +673,19 @@ prior drug.md exists.
 6. DO NOT regenerate the EXECUTIVE SUMMARY, DRUGGABILITY MATRIX, or other
    pre-filled tables — they already exist in the loaded drug.md.
 7. After applying repairs, STOP. Do not proceed to Phase 1 or Phase 2.
+
+### Clinical Compounds source rule
+
+**Clinical Compounds tables MUST source rows from `ot_<gene>.json` (OpenTargets)
+and from `resolved_drugs.json` entries where `source` equals `opentargets`.**
+
+- Approved drugs (max_phase >= 3) for the gene MUST appear in Clinical Compounds
+  even if not present in Stage 3 preclinical evidence — Stage 3 evidence is
+  restricted to Preclinical / computational sections only, NOT to Clinical Compounds.
+- If a Clinical Compounds row is genuinely absent from all sources, use the marker
+  `"data not available"` (lowercase) so validators recognize it.
+- Do NOT remove an OpenTargets-sourced clinical drug during a repair iteration
+  unless `ot_<gene>.json` itself is empty for that gene.
 
 ### Phase 1: Load Data + Build Reference Card + Save JSON Contract (Initial Write)
 0. Read the report writing skill guide for anti-hallucination rules (do not skip):
@@ -681,7 +724,9 @@ The disk copy may be stale due to file sync; the Reference Card value is always 
 2. For EACH `<!-- EXPAND: ... -->` comment, replace it with 2-4 sentences of
    biological interpretation relevant to the disease context
 3. Do NOT change any numbers, drug names, or classifications in the draft
-4. Save the expanded version via `save_drug_md(data_dir, content=<expanded>)`
+4. Save the narrative-only slot payload via `save_report_expansions(data_dir, expansions)`
+5. Call `render_drug_md_from_expansions(data_dir)` to deterministically write drug.md
+6. Use `save_drug_md(data_dir, content=<expanded>)` only if the structured renderer is unavailable and you must use legacy compatibility repair mode
 
 Use `sequential_thinking` to plan which expansions to prioritize.
 
@@ -707,6 +752,23 @@ The document has these sections (all pre-built in the draft):
 5. Summary & Recommendations
 
 Target length: **200-250 lines, 10,000-15,000 characters** after expansion.
+
+### Gap Analysis section (mandatory body)
+
+The `### Gap Analysis` section MUST contain a non-empty body of at least 50 words.
+Empty Gap Analysis sections fail the local finalization validator (`EMPTY_GAP_ANALYSIS`
+check requires ≥ 20 non-whitespace characters).
+
+Required sub-content — cover at least two of these three:
+- **Data limitations**: which evidence types or sources were missing or sparse for
+  which genes (e.g., empty `stage3_HLA-DMA.json`, missing GWAS hits, no Census data).
+- **Missing evidence**: specific lookups that returned empty results (e.g., empty
+  `stage3_AGTRAP.json`, absent trial data, no ChEMBL matches for a featured gene).
+- **Open questions**: hypotheses the local evidence cannot resolve — biological
+  mechanisms requiring in-vitro or in-vivo validation.
+
+Cite specific evidence files (e.g., `stage3_HLA-DMA.json`, `ot_AGTRAP.json`) and
+gene names. Do NOT leave this section blank or with only whitespace.
 
 ### Phase 5: Reflection (MANDATORY before saving)
 Use `think_tool` to verify the drug.md content against the Reference Card:
@@ -748,7 +810,7 @@ If you find discrepancies, FIX them before proceeding.
   the phrase with `"mechanism of action not available in source data"`.
 
 ### Phase 6: Validation Loop (MANDATORY — ZERO TOLERANCE)
-After calling `save_drug_md`, you MUST enter this validation loop:
+After calling `render_drug_md_from_expansions` (or legacy `save_drug_md`), you MUST enter this validation loop:
 
 1. Call `validate_drug_md(data_dir)`
 2. If `issue_count > 0`:

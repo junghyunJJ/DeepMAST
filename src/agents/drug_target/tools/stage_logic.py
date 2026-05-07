@@ -2223,6 +2223,15 @@ def build_evidence_summary(data_dir: str) -> str:
                 ]
             },
         }
+        _s3_path = evidence_dir / f"stage3_{gene}.json"
+        if _s3_path.exists():
+            try:
+                _s3_raw = json.loads(_s3_path.read_text())
+                card.setdefault("stage3", {})["matched_drugs"] = _s3_raw.get("chembl", {}).get("matched_drugs", [])
+            except (json.JSONDecodeError, OSError):
+                card.setdefault("stage3", {})["matched_drugs"] = []
+        else:
+            card.setdefault("stage3", {})["matched_drugs"] = []
         featured_cards.append(card)
 
     # --- Fix 5: Detect stage3 API failures and build data_limitations ---
@@ -2317,6 +2326,18 @@ def build_evidence_summary(data_dir: str) -> str:
         "markdown_template": md_template,
     }
 
+    try:
+        from src.agents.drug_target.tools.report_expansion_schema import (
+            persist_drug_report_reference_card,
+        )
+
+        reference_card = persist_drug_report_reference_card(
+            data_dir_path,
+            reference_card,
+        )
+    except Exception as exc:
+        logger.warning("Failed to persist drug_report_reference_card.json: %s", exc)
+
     # Write the template directly to drug.md as a draft
     draft_path = data_dir_path / "drug.md"
     draft_path.write_text(md_template + "\n", encoding="utf-8")
@@ -2383,6 +2404,10 @@ _DRUG_NAME_STOPLIST: frozenset[str] = frozenset({
     # Report section / template markup words
     "FEATURED", "Featured", "Validated", "Recommended", "Prioritized",
     "Top", "Key", "Main", "Primary", "Secondary",
+    # Pipeline stage labels — never drug names (Fix F-E)
+    # The regex captures multi-word tokens like "Stage 1" as a single match.
+    "Stage", "Stage1", "Stage2", "Stage3",
+    "Stage 1", "Stage 2", "Stage 3",
 })
 
 _BRACKET_FILE_RE = re.compile(r"\[from\s+([\w\-\.]+\.json(?:_FAILED)?)\s*\]")
@@ -2473,6 +2498,19 @@ def _build_drug_allowlist(
             name = (entry.get("name") or "").strip().casefold()
             if name:
                 allowlist.add(name)
+    # Load all gene symbols from gene_manifest.json so they are not mistaken
+    # for fabricated drug names when appearing in prose. (Fix F-E)
+    gene_manifest_path = evidence_dir / "gene_manifest.json"
+    if gene_manifest_path.exists():
+        try:
+            manifest = json.loads(gene_manifest_path.read_text())
+            if isinstance(manifest, list):
+                for entry in manifest:
+                    symbol = (entry.get("symbol") or "").strip().casefold()
+                    if symbol:
+                        allowlist.add(symbol)
+        except Exception:
+            pass
     return frozenset(allowlist)
 
 
@@ -2777,8 +2815,23 @@ def validate_drug_md(data_dir: str | Path) -> str:
             for match in pattern.finditer(drug_text):
                 if found_wrong:
                     break
-                chunk = drug_text[match.end():match.end() + 500]
-                if "validated_target" in chunk.lower() and true_class != "validated_target":
+                # Determine the line containing this gene match.
+                line_start = drug_text.rfind('\n', 0, match.start()) + 1
+                line_end = drug_text.find('\n', match.end())
+                if line_end == -1:
+                    line_end = len(drug_text)
+                line_text = drug_text[line_start:line_end]
+                # Fix F-D: when the gene is on a Markdown table row (line starts
+                # with '|'), only inspect that row's text.  A 500-char window leaks
+                # into adjacent rows and finds the next gene's classification, causing
+                # false WRONG_CLASSIFICATION.  Non-table lines (prose, headers) still
+                # use the 500-char window because the classification can appear on a
+                # following line within the same section.
+                if line_text.lstrip().startswith("|"):
+                    chunk = line_text.lower()
+                else:
+                    chunk = drug_text[match.end():match.end() + 500].lower()
+                if "validated_target" in chunk and true_class != "validated_target":
                     issues.append({
                         "type": "WRONG_CLASSIFICATION",
                         "severity": "high",
@@ -2787,7 +2840,7 @@ def validate_drug_md(data_dir: str | Path) -> str:
                         "actual": true_class,
                     })
                     found_wrong = True
-                elif "novel_candidate" in chunk.lower() and true_class != "novel_candidate":
+                elif "novel_candidate" in chunk and true_class != "novel_candidate":
                     issues.append({
                         "type": "WRONG_CLASSIFICATION",
                         "severity": "high",
@@ -2798,8 +2851,14 @@ def validate_drug_md(data_dir: str | Path) -> str:
                     found_wrong = True
 
     # 3. Decimal rubric score detection (should be integers)
+    # Use an explicit underscore-delimited allowlist so bare "combined score 0.999"
+    # phrases (e.g. STRING PPI confidence values) are not matched.  The old pattern
+    # r'(?:validated|exploratory|combined)[_ ](?:total|track|score)' matched space-
+    # separated variants like "combined score 0.999" which is a PPI DB confidence
+    # value, not a rubric field.  Fix-A: require underscore separator.
     decimal_scores = re.findall(
-        r'(?:validated|exploratory|combined)[_ ](?:total|track|score)[:\s]*(\d+\.\d+)',
+        r'\b(?:validated_total|exploratory_total|combined_total'
+        r'|validated_track|exploratory_track|combined_track)[:\s]*(\d+\.\d+)',
         drug_text, re.IGNORECASE
     )
     if decimal_scores:
@@ -3100,6 +3159,7 @@ _MOA_UNAVAILABLE_MARKERS = frozenset({
     "mechanism not available",
     "unknown",
     "not available",
+    "data not available",  # Fix-B: placeholder seen in res_ipf_openai2 trace (drug.md:233)
     "not characterized",
 })
 
@@ -3609,6 +3669,220 @@ def _check_unsupported_moa_claim(drug_text: str, data_dir_path: Path) -> list[di
     return issues
 
 
+def _sha256_text(text: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _check_failed_suffix_leak(drug_text: str, data_dir_path: Path) -> list[dict]:
+    if "_FAILED" not in drug_text:
+        return []
+    return [{
+        "code": "FAILED_SUFFIX_LEAK",
+        "severity": "high",
+        "message": "_FAILED contrast marker leaked into final drug.md.",
+        "location": str(data_dir_path / "drug.md"),
+        "evidence": {"occurrences": drug_text.count("_FAILED")},
+    }]
+
+
+def _check_unverified_numeric_predictions(
+    data_dir_path: Path,
+    *,
+    strict: bool,
+) -> tuple[list[dict], list[dict]]:
+    """Return (issues, warnings) for hypothesis prediction grounding."""
+    hypothesis_path = data_dir_path / "evidence" / "hypothesis_report.json"
+    if not hypothesis_path.exists():
+        return [], []
+    try:
+        payload = json.loads(hypothesis_path.read_text(encoding="utf-8"))
+    except Exception:
+        return [], []
+    summary = payload.get("prediction_grounding_summary")
+    if not isinstance(summary, dict) or int(summary.get("unverified", 0) or 0) <= 0:
+        return [], []
+    item = {
+        "code": "UNVERIFIED_NUMERIC_PREDICTION",
+        "severity": "high" if strict else "warning",
+        "message": "hypothesis_report.json contains unverified numeric predictions.",
+        "location": str(hypothesis_path),
+        "evidence": summary,
+    }
+    return ([item], []) if strict else ([], [item])
+
+
+def _check_renderer_metadata(data_dir_path: Path, drug_text: str) -> list[dict]:
+    """Validate renderer sidecars when renderer mode is active or required."""
+    import os
+
+    issues: list[dict] = []
+    metadata_path = data_dir_path / "drug_report_render.json"
+    reference_path = data_dir_path / "drug_report_reference_card.json"
+    expansions_path = data_dir_path / "report_expansions.json"
+    sidecars_present = any(p.exists() for p in (metadata_path, reference_path, expansions_path))
+    require_renderer = os.getenv("DEEPMAST_REQUIRE_RENDERER") == "1"
+    if not sidecars_present and not require_renderer:
+        if os.getenv("DEEPMAST_ALLOW_LEGACY_DRUG_MD") == "1":
+            return issues
+        return [{
+            "code": "MISSING_RENDER_METADATA",
+            "severity": "critical",
+            "message": (
+                "drug_report_render.json is required for markdown publication; "
+                "set DEEPMAST_ALLOW_LEGACY_DRUG_MD=1 only for explicit legacy compatibility."
+            ),
+            "location": str(metadata_path),
+            "evidence": {"legacy_compat_allowed": False},
+        }]
+    if not metadata_path.exists():
+        # DEEPMAST_ALLOW_LEGACY_DRUG_MD=1 skips this check for the legacy save_drug_md flow
+        # which does not produce drug_report_render.json. Renderer pipeline path is unaffected:
+        # when report_expansions.json is present the renderer is active and the check must fire.
+        # See plan R7 / D10.
+        if os.getenv("DEEPMAST_ALLOW_LEGACY_DRUG_MD") == "1" and not expansions_path.exists():
+            return issues  # legacy save_drug_md flow — skip render-metadata check
+        return [{
+            "code": "MISSING_RENDER_METADATA",
+            "severity": "critical",
+            "message": "drug_report_render.json is required when renderer sidecars exist.",
+            "location": str(metadata_path),
+            "evidence": {},
+        }]
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [{
+            "code": "RENDER_METADATA_INVALID",
+            "severity": "critical",
+            "message": f"drug_report_render.json is unreadable: {exc}",
+            "location": str(metadata_path),
+            "evidence": {},
+        }]
+    if metadata.get("schema_version") != "drug_report_render.v1":
+        issues.append({
+            "code": "RENDER_METADATA_INVALID",
+            "severity": "critical",
+            "message": "drug_report_render.json has an invalid schema_version.",
+            "location": str(metadata_path),
+            "evidence": {"schema_version": metadata.get("schema_version")},
+        })
+    if (
+        metadata.get("mode") == "legacy_compat"
+        and os.getenv("DEEPMAST_ALLOW_LEGACY_DRUG_MD") != "1"
+    ):
+        issues.append({
+            "code": "LEGACY_RENDER_MODE_NOT_ALLOWED",
+            "severity": "critical",
+            "message": "legacy render mode requires DEEPMAST_ALLOW_LEGACY_DRUG_MD=1.",
+            "location": str(metadata_path),
+            "evidence": {"mode": metadata.get("mode")},
+        })
+    source_hashes = metadata.get("source_hashes")
+    if not isinstance(source_hashes, dict):
+        source_hashes = {}
+    if (
+        metadata.get("mode") == "renderer"
+        or metadata.get("renderer") == "render_drug_md_from_expansions"
+    ):
+        for source_path, artifact, hash_key in (
+            (
+                reference_path,
+                "drug_report_reference_card.json",
+                "reference_card",
+            ),
+            (
+                expansions_path,
+                "report_expansions.json",
+                "report_expansions",
+            ),
+        ):
+            if not source_path.exists():
+                issues.append({
+                    "code": "MISSING_RENDER_SOURCE",
+                    "severity": "critical",
+                    "message": f"{artifact} is required by renderer metadata.",
+                    "location": str(source_path),
+                    "evidence": {
+                        "artifact": artifact,
+                        "expected_hash": source_hashes.get(hash_key),
+                    },
+                })
+    try:
+        from src.agents.drug_target.tools.report_expansion_schema import (
+            canonical_json_hash,
+            validate_report_expansions,
+        )
+
+        if reference_path.exists():
+            actual = canonical_json_hash(json.loads(reference_path.read_text(encoding="utf-8")))
+            if source_hashes.get("reference_card") != actual:
+                issues.append({
+                    "code": "RENDER_SOURCE_HASH_MISMATCH",
+                    "severity": "critical",
+                    "message": "reference card hash differs from renderer metadata.",
+                    "location": str(reference_path),
+                    "evidence": {
+                        "expected": source_hashes.get("reference_card"),
+                        "actual": actual,
+                    },
+                })
+        if expansions_path.exists():
+            expansions = json.loads(expansions_path.read_text(encoding="utf-8"))
+            actual = canonical_json_hash(expansions)
+            if source_hashes.get("report_expansions") != actual:
+                issues.append({
+                    "code": "RENDER_SOURCE_HASH_MISMATCH",
+                    "severity": "critical",
+                    "message": "report_expansions hash differs from renderer metadata.",
+                    "location": str(expansions_path),
+                    "evidence": {
+                        "expected": source_hashes.get("report_expansions"),
+                        "actual": actual,
+                    },
+                })
+            _, expansion_errors = validate_report_expansions(data_dir_path, expansions)
+            for error in expansion_errors:
+                issues.append({
+                    "code": error.get("code", "REPORT_EXPANSIONS_INVALID"),
+                    "severity": "critical",
+                    "message": error.get("message", "report expansions invalid"),
+                    "location": str(expansions_path),
+                    "evidence": error,
+                })
+    except Exception as exc:
+        issues.append({
+            "code": "RENDER_METADATA_INVALID",
+            "severity": "critical",
+            "message": f"Failed to validate renderer source hashes: {exc}",
+            "location": str(metadata_path),
+            "evidence": {},
+        })
+    rendered_hash = metadata.get("rendered_drug_md_sha256")
+    actual_rendered_hash = _sha256_text(drug_text)
+    if rendered_hash and rendered_hash != actual_rendered_hash:
+        issues.append({
+            "code": "RENDERED_DRUG_MD_HASH_MISMATCH",
+            "severity": "critical",
+            "message": "drug.md hash differs from renderer metadata.",
+            "location": str(data_dir_path / "drug.md"),
+            "evidence": {"expected": rendered_hash, "actual": actual_rendered_hash},
+        })
+    if metadata.get("missing_slots") or metadata.get("extra_slots"):
+        issues.append({
+            "code": "REPORT_EXPANSIONS_INVALID",
+            "severity": "critical",
+            "message": "renderer metadata reports missing or extra expansion slots.",
+            "location": str(metadata_path),
+            "evidence": {
+                "missing_slots": metadata.get("missing_slots"),
+                "extra_slots": metadata.get("extra_slots"),
+            },
+        })
+    return issues
+
+
 @tool
 def validate_drug_report_finalization(data_dir: str) -> str:
     """Deterministic fail-closed finalization validator for drug.md.
@@ -3630,7 +3904,7 @@ def validate_drug_report_finalization(data_dir: str) -> str:
         "required_artifacts": {"status": "fail", "missing": []},
         "validate_drug_md": {"status": "fail", "raw": {}},
         "target_assessment": {"status": "fail", "issues": []},
-        "report_finalization": {"status": "fail", "issues": []},
+        "report_finalization": {"status": "fail", "issues": [], "warnings": []},
     }
 
     # ------------------------------------------------------------------
@@ -3788,6 +4062,7 @@ def validate_drug_report_finalization(data_dir: str) -> str:
     # 5. Report finalization checks (markdown structure + content).
     # ------------------------------------------------------------------
     finalization_issues: list[dict] = []
+    numeric_warnings: list[dict] = []
     if drug_md_present:
         try:
             drug_text = (data_dir_path / "drug.md").read_text(encoding="utf-8")
@@ -3813,10 +4088,25 @@ def validate_drug_report_finalization(data_dir: str) -> str:
             finalization_issues.extend(
                 _check_unsupported_moa_claim(drug_text, data_dir_path)
             )
+            finalization_issues.extend(_check_failed_suffix_leak(drug_text, data_dir_path))
+            finalization_issues.extend(
+                _check_renderer_metadata(drug_text=drug_text, data_dir_path=data_dir_path)
+            )
+            import os
+
+            numeric_issues, numeric_warnings = _check_unverified_numeric_predictions(
+                data_dir_path,
+                strict=os.getenv("DEEPMAST_STRICT_NUMERIC_PREDICTIONS") == "1",
+            )
+            finalization_issues.extend(numeric_issues)
 
     checks["report_finalization"]["issues"] = [
         f"{i['code']} @ {i.get('location', '')}: {i.get('message', '')}"
         for i in finalization_issues
+    ]
+    checks["report_finalization"]["warnings"] = [
+        f"{i['code']} @ {i.get('location', '')}: {i.get('message', '')}"
+        for i in numeric_warnings
     ]
     checks["report_finalization"]["status"] = "pass" if not finalization_issues else "fail"
     issues.extend(finalization_issues)

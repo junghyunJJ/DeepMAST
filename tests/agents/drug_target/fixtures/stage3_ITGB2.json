@@ -1,0 +1,76 @@
+{
+  "chembl": {
+    "matched_drugs": [
+      {
+        "chembl_id": "CHEMBL12001",
+        "drug_name": "AlphaBlockib",
+        "target_gene": "ITGB2",
+        "mechanism_of_action": "Integrin beta-2 antagonist",
+        "indications": ["Inflammatory bowel disease"]
+      },
+      {
+        "chembl_id": "CHEMBL12002",
+        "drug_name": "BetaIntegrinib",
+        "target_gene": "ITGB2",
+        "mechanism_of_action": "Integrin beta-2 blocker",
+        "indications": ["Crohn's disease"]
+      },
+      {
+        "chembl_id": "CHEMBL12003",
+        "drug_name": "GammaLeukocide",
+        "target_gene": "ITGB2",
+        "mechanism_of_action": "CD18 inhibitor",
+        "indications": ["Ulcerative colitis"]
+      },
+      {
+        "chembl_id": "CHEMBL12004",
+        "drug_name": "DeltaAdhesib",
+        "target_gene": "ITGB2",
+        "mechanism_of_action": "Leukocyte adhesion inhibitor",
+        "indications": ["Rheumatoid arthritis"]
+      },
+      {
+        "chembl_id": "CHEMBL12005",
+        "drug_name": "EpsilonMigratib",
+        "target_gene": "ITGB2",
+        "mechanism_of_action": "LFA-1 antagonist",
+        "indications": ["Multiple sclerosis"]
+      },
+      {
+        "chembl_id": "CHEMBL12006",
+        "drug_name": "ZetaNeutrophilab",
+        "target_gene": "ITGB2",
+        "mechanism_of_action": "Mac-1 inhibitor",
+        "indications": ["Psoriasis"]
+      },
+      {
+        "chembl_id": "CHEMBL12007",
+        "drug_name": "EtaFibronib",
+        "target_gene": "ITGB2",
+        "mechanism_of_action": "Fibronectin binding inhibitor",
+        "indications": ["Asthma"]
+      },
+      {
+        "chembl_id": "CHEMBL12008",
+        "drug_name": "ThetaMigrastib",
+        "target_gene": "ITGB2",
+        "mechanism_of_action": "T-cell migration inhibitor",
+        "indications": ["Transplant rejection"]
+      },
+      {
+        "chembl_id": "CHEMBL12009",
+        "drug_name": "IotaImmunib",
+        "target_gene": "ITGB2",
+        "mechanism_of_action": "Immune cell tethering inhibitor",
+        "indications": ["Lupus"]
+      },
+      {
+        "chembl_id": "CHEMBL12010",
+        "drug_name": "KappaRecruib",
+        "target_gene": "ITGB2",
+        "mechanism_of_action": "Leukocyte recruitment blocker",
+        "indications": ["Sepsis"]
+      }
+    ]
+  }
+}

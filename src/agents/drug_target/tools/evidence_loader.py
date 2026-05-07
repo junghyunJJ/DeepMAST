@@ -1009,86 +1009,16 @@ def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) ->
     # against real files before writing. Prevents hallucinated filenames
     # from polluting the hypothesis output.
     if filename == "hypothesis_report.json" and isinstance(parsed, dict):
-        ref_errors = _validate_hypothesis_report_references(parsed, evidence_dir)
-        if ref_errors:
-            real = sorted(_list_real_evidence_filenames(evidence_dir))
-            result["saved"] = False
-            result["errors"].append(
-                "hypothesis_report.json blocked: evidence_references contain "
-                "filenames that do not exist in the evidence/ directory. "
-                "Rewrite each hypothesis's evidence_references using ONLY "
-                "filenames from available_files. The Stage 1 filename "
-                "convention is `stage1_<LIGAND>--<RECEPTOR>.json` with TWO "
-                "hyphens, NOT a single underscore. If you cannot support a "
-                "claim with a real file, remove the citation."
-            )
-            result["invalid_references"] = ref_errors
-            result["available_files"] = real
-            return json.dumps(result, indent=2)
-
-        # Deterministic TOP-N coverage + evidence_coverage_pct + FAILED-pair gate.
-        diag = _validate_hypothesis_report_topn_and_failed_pairs(parsed, evidence_dir)
-        # Always overwrite LLM-supplied evidence_coverage_pct with deterministic value.
-        llm_pct = parsed.get("evidence_coverage_pct")
-        parsed["evidence_coverage_pct"] = diag["evidence_coverage_pct"]
-        parsed["topn_coverage"] = diag["topn_coverage"]
-        if llm_pct is not None and abs(float(llm_pct) - diag["evidence_coverage_pct"]) > 5.0:
-            logger.warning(
-                "evidence_coverage_pct mismatch: LLM=%.2f, computed=%.2f (drift>5pp)",
-                float(llm_pct), diag["evidence_coverage_pct"],
-            )
-        if diag["reject_reason"]:
-            logger.error(
-                "hypothesis_report rejected: topn_missing=%s, failed_pair_violations=%d",
-                diag["topn_coverage"]["missing"], len(diag["failed_pair_violations"]),
-            )
-            result["saved"] = False
-            result["errors"].append(
-                "hypothesis_report.json blocked by deterministic TOP-N/FAILED-pair gate. "
-                + diag["reject_reason"]
-            )
-            result["topn_coverage"] = diag["topn_coverage"]
-            result["failed_pair_violations"] = diag["failed_pair_violations"]
-            result["recommendation"] = (
-                "1) For each missing TOP-N gene in topn_coverage.missing, generate one "
-                "[FEATURED-GAP] hypothesis with biological_entities.genes including that gene. "
-                "2) For each failed_pair_violations entry, either remove the citation OR "
-                "append the '_FAILED' suffix marker (e.g., 'stage1_TGFB1--P4HB.json_FAILED') "
-                "to flag it as contrast evidence. "
-                "3) DO NOT retry the same payload — the deterministic gate will reject identically."
-            )
-            return json.dumps(result, indent=2)
-
-        # Strip invalid `_FAILED` suffixes from gap_analysis.orphan_files.
-        # The suffix is a citation convention for evidence_references only;
-        # orphan_files must list filesystem-grounded names.
-        n_stripped = _sanitize_gap_analysis(parsed, evidence_dir)
-        if n_stripped:
-            logger.info(
-                "hypothesis_report: stripped %d orphan_files '_FAILED' suffix(es) "
-                "to match filesystem filenames",
-                n_stripped,
-            )
-
-        # Soft tag: annotate each hypothesis with prediction_grounding so the
-        # downstream report can surface ungrounded round-number effect sizes
-        # without blocking save. (Hard block lives in the topn/FAILED gate
-        # above.)
-        grounding_summary = _tag_hypothesis_prediction_grounding(
-            parsed, evidence_dir=evidence_dir
+        from src.agents.drug_target.tools.hypothesis_schema import (
+            persist_hypothesis_report,
         )
-        parsed["prediction_grounding_summary"] = grounding_summary
-        if grounding_summary.get("unverified", 0) > 0:
-            logger.warning(
-                "hypothesis_report: %d of %d predictions tagged 'unverified' "
-                "(ungrounded round-number effect sizes). Indices: %s",
-                grounding_summary["unverified"],
-                sum(
-                    grounding_summary.get(k, 0)
-                    for k in ("grounded_verified", "grounded", "qualitative", "unverified")
-                ),
-                grounding_summary.get("unverified_indices", []),
-            )
+
+        canonical_result = persist_hypothesis_report(base, parsed)
+        if canonical_result.get("saved"):
+            return json.dumps(canonical_result, indent=2)
+        real = sorted(_list_real_evidence_filenames(evidence_dir))
+        canonical_result.setdefault("available_files", real)
+        return json.dumps(canonical_result, indent=2)
 
     try:
         with open(file_path, "w") as f:

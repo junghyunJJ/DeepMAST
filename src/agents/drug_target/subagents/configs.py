@@ -27,6 +27,9 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
     ReadFileBlockMiddleware,
 )
 from src.agents.drug_target.subagents.summarizer import get_summarizer_subagent
+from src.agents.drug_target.subagents.summarizer.middleware import (
+    HypothesisRetryLoopMiddleware,
+)
 from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
 from src.agents.drug_target.tools import (
     # Evidence I/O tools
@@ -35,6 +38,7 @@ from src.agents.drug_target.tools import (
     load_evidence_files,
     validate_evidence_completeness,
     validate_evidence_references,
+    save_hypothesis_report,
     # Stage 2: Target Validation (runs FIRST)
     query_stage2_gene_panel,
     query_ensembl_vep_consequence,
@@ -59,6 +63,8 @@ from src.agents.drug_target.tools import (
     # Assessment output
     save_target_assessment,
     save_drug_md,
+    save_report_expansions,
+    render_drug_md_from_expansions,
     # HTML report generation
     generate_drug_html_report,
     # Common tools
@@ -89,6 +95,23 @@ _EVIDENCE_FILE_KEYS = ("evidence_files", "evidence_references")
 # ``_FAILED`` suffixes from prose fields and remove bracket forms whose
 # target file does not exist on disk.
 _JSON_FAILED_SUFFIX_RE = re.compile(r"(\b[\w-]+\.json)_FAILED\b")
+
+# Pattern that matches the first newline, carriage-return, or tab character.
+# Everything from that character onward is truncated so injected text cannot
+# masquerade as a new Markdown heading or instruction block inside a prompt.
+_PROMPT_CONTROL_RE = re.compile(r"[\n\r\t].*", re.DOTALL)
+
+
+def _sanitize_data_dir(value: str | None) -> str:
+    """Truncate *value* at the first control character before prompt injection.
+
+    Returns an empty string when *value* is ``None``.  Removes everything
+    from the first ``\\n``, ``\\r``, or ``\\t`` onward to prevent prompt
+    injection via newline splitting (CP-P2-002).
+    """
+    if value is None:
+        return ""
+    return _PROMPT_CONTROL_RE.sub("", value)
 
 
 def _strip_failed_suffix_in_strings(node: object) -> tuple[object, int]:
@@ -257,6 +280,7 @@ SUBAGENT_CONFIGS = {
         "tools": [
             load_evidence_files,
             read_skill_file,
+            save_hypothesis_report,
             save_evidence,
             validate_evidence_references,
             # sequential_thinking removed: this subagent is template-driven (fixed Phases 1→5);
@@ -265,7 +289,9 @@ SUBAGENT_CONFIGS = {
             think_tool,
             validate_quality,
         ],
-        "middleware": [ReadFileBlockMiddleware()],  # Block read_file, force load_evidence_files
+        "middleware": [
+            ReadFileBlockMiddleware(),
+        ],  # Block read_file, force load_evidence_files
     },
     "report_writer": {
         "name": "report_writer",
@@ -289,6 +315,8 @@ SUBAGENT_CONFIGS = {
             validate_stage3_gate,
             save_target_assessment,
             save_drug_md,
+            save_report_expansions,
+            render_drug_md_from_expansions,
             read_skill_file,
             sequential_thinking,
             think_tool,
@@ -426,6 +454,13 @@ def get_subagents(
     ]
     configurable_subagents = [*subagents, *summarizer_inner_subagents]
 
+    for subagent in configurable_subagents:
+        if subagent["name"] == "hypothesis_writer":
+            subagent["middleware"] = [
+                *list(subagent.get("middleware", [])),
+                HypothesisRetryLoopMiddleware(),
+            ]
+
     # Remove Census tools when disabled (too slow for some providers)
     if not enable_census:
         _census_tool_names = {
@@ -466,9 +501,10 @@ def get_subagents(
                 f"Pass `disease=\"{disease}\"` to `load_lr_candidates` so the CLI disease "
                 f"context takes priority over lr_candidates.json.\n"
             )
+        safe_data_dir = _sanitize_data_dir(data_dir)
         data_dir_note = (
             f"\n\n## Data Directory\n"
-            f"The data directory for this session is: `{data_dir}`\n"
+            f"The data directory for this session is: `{safe_data_dir}`\n"
             f"Pass this exact path as `data_dir` to all tool calls "
             f"(load_lr_candidates, load_evidence_files, save_evidence).\n"
             f"{disease_line}"
@@ -488,7 +524,7 @@ def get_subagents(
     # Guard write_file tool calls against non-string content emitted by some models.
     for subagent in configurable_subagents:
         mw = list(subagent.get("middleware", []))
-        mw.insert(0, WriteFileArgGuardMiddleware())
+        mw.insert(0, WriteFileArgGuardMiddleware(backend_root=data_dir))
         subagent["middleware"] = mw
 
     # Primary subagents use allow-listed shared SkillsMiddleware + SkillActivator.
@@ -539,8 +575,9 @@ def get_subagents(
     subagents.append(
         get_summarizer_subagent(
             model=summarizer_model,
-            backend=backend,
+            backend=None if data_dir is not None else backend,
             inner_subagents=summarizer_inner_subagents,
+            data_dir=data_dir,
         )
     )
 
