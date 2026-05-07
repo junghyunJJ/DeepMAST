@@ -2404,6 +2404,10 @@ _DRUG_NAME_STOPLIST: frozenset[str] = frozenset({
     # Report section / template markup words
     "FEATURED", "Featured", "Validated", "Recommended", "Prioritized",
     "Top", "Key", "Main", "Primary", "Secondary",
+    # Pipeline stage labels — never drug names (Fix F-E)
+    # The regex captures multi-word tokens like "Stage 1" as a single match.
+    "Stage", "Stage1", "Stage2", "Stage3",
+    "Stage 1", "Stage 2", "Stage 3",
 })
 
 _BRACKET_FILE_RE = re.compile(r"\[from\s+([\w\-\.]+\.json(?:_FAILED)?)\s*\]")
@@ -2494,6 +2498,19 @@ def _build_drug_allowlist(
             name = (entry.get("name") or "").strip().casefold()
             if name:
                 allowlist.add(name)
+    # Load all gene symbols from gene_manifest.json so they are not mistaken
+    # for fabricated drug names when appearing in prose. (Fix F-E)
+    gene_manifest_path = evidence_dir / "gene_manifest.json"
+    if gene_manifest_path.exists():
+        try:
+            manifest = json.loads(gene_manifest_path.read_text())
+            if isinstance(manifest, list):
+                for entry in manifest:
+                    symbol = (entry.get("symbol") or "").strip().casefold()
+                    if symbol:
+                        allowlist.add(symbol)
+        except Exception:
+            pass
     return frozenset(allowlist)
 
 
@@ -2798,8 +2815,23 @@ def validate_drug_md(data_dir: str | Path) -> str:
             for match in pattern.finditer(drug_text):
                 if found_wrong:
                     break
-                chunk = drug_text[match.end():match.end() + 500]
-                if "validated_target" in chunk.lower() and true_class != "validated_target":
+                # Determine the line containing this gene match.
+                line_start = drug_text.rfind('\n', 0, match.start()) + 1
+                line_end = drug_text.find('\n', match.end())
+                if line_end == -1:
+                    line_end = len(drug_text)
+                line_text = drug_text[line_start:line_end]
+                # Fix F-D: when the gene is on a Markdown table row (line starts
+                # with '|'), only inspect that row's text.  A 500-char window leaks
+                # into adjacent rows and finds the next gene's classification, causing
+                # false WRONG_CLASSIFICATION.  Non-table lines (prose, headers) still
+                # use the 500-char window because the classification can appear on a
+                # following line within the same section.
+                if line_text.lstrip().startswith("|"):
+                    chunk = line_text.lower()
+                else:
+                    chunk = drug_text[match.end():match.end() + 500].lower()
+                if "validated_target" in chunk and true_class != "validated_target":
                     issues.append({
                         "type": "WRONG_CLASSIFICATION",
                         "severity": "high",
@@ -2808,7 +2840,7 @@ def validate_drug_md(data_dir: str | Path) -> str:
                         "actual": true_class,
                     })
                     found_wrong = True
-                elif "novel_candidate" in chunk.lower() and true_class != "novel_candidate":
+                elif "novel_candidate" in chunk and true_class != "novel_candidate":
                     issues.append({
                         "type": "WRONG_CLASSIFICATION",
                         "severity": "high",

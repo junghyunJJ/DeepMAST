@@ -753,6 +753,23 @@ The document has these sections (all pre-built in the draft):
 
 Target length: **200-250 lines, 10,000-15,000 characters** after expansion.
 
+### Gap Analysis section (mandatory body)
+
+The `### Gap Analysis` section MUST contain a non-empty body of at least 50 words.
+Empty Gap Analysis sections fail the local finalization validator (`EMPTY_GAP_ANALYSIS`
+check requires ≥ 20 non-whitespace characters).
+
+Required sub-content — cover at least two of these three:
+- **Data limitations**: which evidence types or sources were missing or sparse for
+  which genes (e.g., empty `stage3_HLA-DMA.json`, missing GWAS hits, no Census data).
+- **Missing evidence**: specific lookups that returned empty results (e.g., empty
+  `stage3_AGTRAP.json`, absent trial data, no ChEMBL matches for a featured gene).
+- **Open questions**: hypotheses the local evidence cannot resolve — biological
+  mechanisms requiring in-vitro or in-vivo validation.
+
+Cite specific evidence files (e.g., `stage3_HLA-DMA.json`, `ot_AGTRAP.json`) and
+gene names. Do NOT leave this section blank or with only whitespace.
+
 ### Phase 5: Reflection (MANDATORY before saving)
 Use `think_tool` to verify the drug.md content against the Reference Card:
 - Every rubric score is an INTEGER matching the Reference Card (not decimal)
