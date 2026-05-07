@@ -2223,6 +2223,15 @@ def build_evidence_summary(data_dir: str) -> str:
                 ]
             },
         }
+        _s3_path = evidence_dir / f"stage3_{gene}.json"
+        if _s3_path.exists():
+            try:
+                _s3_raw = json.loads(_s3_path.read_text())
+                card.setdefault("stage3", {})["matched_drugs"] = _s3_raw.get("chembl", {}).get("matched_drugs", [])
+            except (json.JSONDecodeError, OSError):
+                card.setdefault("stage3", {})["matched_drugs"] = []
+        else:
+            card.setdefault("stage3", {})["matched_drugs"] = []
         featured_cards.append(card)
 
     # --- Fix 5: Detect stage3 API failures and build data_limitations ---
@@ -3689,6 +3698,12 @@ def _check_renderer_metadata(data_dir_path: Path, drug_text: str) -> list[dict]:
             "evidence": {"legacy_compat_allowed": False},
         }]
     if not metadata_path.exists():
+        # DEEPMAST_ALLOW_LEGACY_DRUG_MD=1 skips this check for the legacy save_drug_md flow
+        # which does not produce drug_report_render.json. Renderer pipeline path is unaffected:
+        # when report_expansions.json is present the renderer is active and the check must fire.
+        # See plan R7 / D10.
+        if os.getenv("DEEPMAST_ALLOW_LEGACY_DRUG_MD") == "1" and not expansions_path.exists():
+            return issues  # legacy save_drug_md flow — skip render-metadata check
         return [{
             "code": "MISSING_RENDER_METADATA",
             "severity": "critical",

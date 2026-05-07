@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import json
 import logging
+import unicodedata
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import Any
 
 from langchain.agents.middleware import AgentMiddleware
@@ -22,6 +24,18 @@ from langchain_core.messages import ToolMessage
 from langgraph.types import Command
 
 logger = logging.getLogger(__name__)
+
+
+def _redact_path(path: str) -> str:
+    """Return a redacted version of a filesystem path for use in error messages.
+
+    Replaces all path components except the final filename with '<redacted>'
+    so full filesystem paths are never exposed in agent-visible error text.
+    """
+    p = Path(path)
+    if len(p.parts) <= 1:
+        return path
+    return str(Path("<redacted>") / p.name)
 
 
 # Output artifacts that MUST NOT be written via write_file.
@@ -87,6 +101,10 @@ class ReadOnlyToolGuardMiddleware(AgentMiddleware):
 class WriteFileArgGuardMiddleware(AgentMiddleware):
     """Coerce write_file(content=...) arguments to string and block output artifacts."""
 
+    def __init__(self, *, backend_root: str | None = None) -> None:
+        super().__init__()
+        self._backend_root = backend_root
+
     @staticmethod
     def _coerce_content(value: Any) -> str:
         if isinstance(value, str):
@@ -137,6 +155,63 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
         patched_call = {**tool_call, "args": patched_args}
         return request.override(tool_call=patched_call)
 
+    def _blocked(self, args: dict, reason: str) -> ToolMessage:
+        """Return a BLOCKED ToolMessage with JSON content {ok: false, error: reason}."""
+        raw = args.get("file_path") or args.get("path") or ""
+        redacted = _redact_path(str(raw)) if raw else "<empty>"
+        return ToolMessage(
+            content=json.dumps(
+                {
+                    "ok": False,
+                    "error": f"write_file blocked: {reason}",
+                    "path": redacted,
+                }
+            ),
+            tool_call_id="",
+        )
+
+    def _normalize_path(
+        self, args: dict, backend_root: str | None
+    ) -> dict | ToolMessage:
+        """Normalize the file_path in args, returning updated args or a BLOCKED ToolMessage.
+
+        Checks performed (in order):
+        1. Empty or non-string path  → BLOCKED
+        2. '..' component in path    → BLOCKED (traversal prevention)
+        3. backend_root is None      → pass through (only checks above apply)
+        4. Absolute path inside root → rewrite to relative
+        5. Absolute path outside root→ BLOCKED
+        6. Relative path             → pass through unchanged
+        """
+        raw = args.get("file_path") or args.get("path") or ""
+        if not raw or not isinstance(raw, str):
+            return self._blocked(args, "empty or non-string path")
+
+        # NFC-normalize to handle macOS HFS+ NFC/NFD variation
+        raw = unicodedata.normalize("NFC", raw)
+        p = Path(raw)
+
+        if ".." in p.parts:
+            return self._blocked(args, "path contains '..' traversal")
+
+        if backend_root is None:
+            return {**args, "file_path": str(p)}
+
+        root = Path(unicodedata.normalize("NFC", backend_root)).resolve(strict=False)
+
+        if p.is_absolute():
+            resolved = Path(unicodedata.normalize("NFC", str(p))).resolve(strict=False)
+            try:
+                relative = resolved.relative_to(root)
+                return {**args, "file_path": str(relative)}
+            except ValueError:
+                return self._blocked(
+                    args,
+                    f"absolute path outside backend root: {_redact_path(str(p))}",
+                )
+
+        return {**args, "file_path": str(p)}
+
     def wrap_tool_call(
         self,
         request: ToolCallRequest,
@@ -144,7 +219,16 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
     ) -> ToolMessage | Command:
         if self._is_blocked_artifact(request):
             return self._blocked_response(request)
-        return handler(self._patched_request(request))
+        patched = self._patched_request(request)
+        if patched.tool_call.get("name") == "write_file":
+            args = patched.tool_call.get("args") or {}
+            if isinstance(args, dict):
+                normalized = self._normalize_path(args, self._backend_root)
+                if isinstance(normalized, ToolMessage):
+                    return normalized
+                new_call = {**patched.tool_call, "args": normalized}
+                patched = patched.override(tool_call=new_call)
+        return handler(patched)
 
     async def awrap_tool_call(
         self,
@@ -153,7 +237,16 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
     ) -> ToolMessage | Command:
         if self._is_blocked_artifact(request):
             return self._blocked_response(request)
-        return await handler(self._patched_request(request))
+        patched = self._patched_request(request)
+        if patched.tool_call.get("name") == "write_file":
+            args = patched.tool_call.get("args") or {}
+            if isinstance(args, dict):
+                normalized = self._normalize_path(args, self._backend_root)
+                if isinstance(normalized, ToolMessage):
+                    return normalized
+                new_call = {**patched.tool_call, "args": normalized}
+                patched = patched.override(tool_call=new_call)
+        return await handler(patched)
 
 
 # ---------------------------------------------------------------------------

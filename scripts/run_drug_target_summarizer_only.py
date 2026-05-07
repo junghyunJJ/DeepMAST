@@ -5,6 +5,10 @@ Skips evidence_assessor and hypothesis_writer entirely — uses frozen evidence.
 Writes evidence/_critic_slices/ before the summarizer runs (T17 wire-up) and
 removes them afterward unless OMB_CRITIC_SLICES_KEEP=1.
 
+Load order: .env values are loaded before argparse defaults so LLM_PROVIDER,
+LLM_MODEL, and OLLAMA_MODEL from .env are honored when not shell-exported.
+Shell exports still override .env (override=False semantics).
+
 Example invocations:
 
     # Default: regenerate drug.md from frozen baseline
@@ -43,13 +47,13 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-_ENV_DEFAULT_PROVIDER = os.environ.get("LLM_PROVIDER")
-_ENV_DEFAULT_MODEL = os.environ.get("LLM_MODEL")
-_ENV_OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL")
-
 from dotenv import load_dotenv
 
 load_dotenv(PROJECT_ROOT / ".env")
+
+_ENV_DEFAULT_PROVIDER = os.environ.get("LLM_PROVIDER")
+_ENV_DEFAULT_MODEL = os.environ.get("LLM_MODEL")
+_ENV_OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL")
 
 # ---------------------------------------------------------------------------
 # Constants

@@ -26,6 +26,13 @@ For each stage, follow this cycle:
 2. **EXECUTE**: Call @tool functions directly
 3. **REFLECT** (think_tool): Assess coverage -- any genes missing? API failures? Gaps to fill?
 
+### Reflection grounding requirements (R2)
+Every think_tool reflection MUST contain all three:
+- **Source filenames**: cite the specific file(s) you consulted (e.g., `stage3_ITGB2.json`, `chembl_lookup.json`, `ranked_targets.json`)
+- **Numeric values**: include concrete numbers you observed (e.g., `score=0.85`, `7 issues found`, `10 drugs`)
+- **Next action**: state what you will do next (e.g., "will retry with refined query", "continue to Stage 1")
+Reflections lacking source citations or numeric values will be rejected and you will be asked to retry.
+
 ## Reordered 3-Stage Funnel Workflow
 
 **CRITICAL: Stage 2 runs FIRST (all genes), then gene selection, then Stage 1
@@ -259,6 +266,13 @@ Start with Phase 1 immediately. Do NOT pre-plan.
 1. **EXECUTE**: Follow Phases 1 → 5 in order. Generate hypotheses across 4 thematic categories.
 2. **REFLECT** (think_tool, optional): Call `think_tool` briefly AFTER a phase if you need to
    double-check coverage/scoring before moving on. Do NOT use it as a planning tool.
+
+### Reflection grounding requirements (R2)
+Every think_tool reflection MUST contain all three:
+- **Source filenames**: cite the specific file(s) you consulted (e.g., `stage3_ITGB2.json`, `assessment_results.json`, `hypothesis_report.json`)
+- **Numeric values**: include concrete numbers you observed (e.g., `score=0.85`, `7 hypotheses`, `3 featured genes`)
+- **Next action**: state what you will do next (e.g., "will retry with refined scoring", "continue to Phase 3")
+Reflections lacking source citations or numeric values will be rejected and you will be asked to retry.
 
 ## Workflow (5 Phases)
 
@@ -597,6 +611,13 @@ Guidelines:
 1. **PLAN** (sequential_thinking): Plan document structure, identify key findings to highlight
 2. **EXECUTE**: Write drug.md sections
 3. **REFLECT** (think_tool): Check quality -- comprehensive? Clear? Are featured candidates properly highlighted?
+
+### Reflection grounding requirements (R2)
+Every think_tool reflection MUST contain all three:
+- **Source filenames**: cite the specific file(s) you consulted (e.g., `stage3_ITGB2.json`, `ranked_targets.json`, `resolved_drugs.json`)
+- **Numeric values**: include concrete numbers you observed (e.g., `score=0.85`, `10 drugs listed`, `4 sections expanded`)
+- **Next action**: state what you will do next (e.g., "will fix discrepancy in section 3", "continue to Phase 5")
+Reflections lacking source citations or numeric values will be rejected and you will be asked to retry.
 
 ## IMPORTANT: Evidence Access & Reference Card
 - ALWAYS call `build_evidence_summary(data_dir=...)` FIRST — this generates the

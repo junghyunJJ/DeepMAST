@@ -43,6 +43,7 @@ from src.agents.drug_target.subagents.summarizer.middleware import (
     BuildEvidenceSummaryGuardMiddleware,
     FrozenTemplateSpanMiddleware,
     RepairCycleCounterMiddleware,
+    SummarizerFinalizationGuardMiddleware,
 )
 from src.agents.drug_target.subagents.prompts import SUMMARIZER_PROMPT
 from src.agents.drug_target.tools import (
@@ -129,6 +130,7 @@ def create_summarizer_agent(
             ),
             BuildEvidenceSummaryGuardMiddleware(),
             RepairCycleCounterMiddleware(max_cycles=2),
+            SummarizerFinalizationGuardMiddleware(),
             FrozenTemplateSpanMiddleware(data_dir=data_dir),
             AnnotationDensityMiddleware(),
         ],

@@ -167,6 +167,7 @@ def get_subagents(
     model_overrides: dict[str, BaseChatModel | str] | None = None,
     skills_sources: list[str] | None = None,
     skill_registry: dict[str, str] | None = None,
+    data_dir: str | None = None,
 ) -> list[dict]:
     """Get the subagent configurations for Deep Interpreter.
 
@@ -211,7 +212,7 @@ def get_subagents(
     # Guard write_file tool calls against non-string content emitted by some models.
     for subagent in subagents:
         middleware = list(subagent.get("middleware", []))
-        middleware.insert(0, WriteFileArgGuardMiddleware())
+        middleware.insert(0, WriteFileArgGuardMiddleware(backend_root=data_dir))
         subagent["middleware"] = middleware
 
     # Apply skills AFTER WriteFileArgGuardMiddleware (harness appended at end)

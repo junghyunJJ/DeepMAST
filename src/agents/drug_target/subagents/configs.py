@@ -96,6 +96,23 @@ _EVIDENCE_FILE_KEYS = ("evidence_files", "evidence_references")
 # target file does not exist on disk.
 _JSON_FAILED_SUFFIX_RE = re.compile(r"(\b[\w-]+\.json)_FAILED\b")
 
+# Pattern that matches the first newline, carriage-return, or tab character.
+# Everything from that character onward is truncated so injected text cannot
+# masquerade as a new Markdown heading or instruction block inside a prompt.
+_PROMPT_CONTROL_RE = re.compile(r"[\n\r\t].*", re.DOTALL)
+
+
+def _sanitize_data_dir(value: str | None) -> str:
+    """Truncate *value* at the first control character before prompt injection.
+
+    Returns an empty string when *value* is ``None``.  Removes everything
+    from the first ``\\n``, ``\\r``, or ``\\t`` onward to prevent prompt
+    injection via newline splitting (CP-P2-002).
+    """
+    if value is None:
+        return ""
+    return _PROMPT_CONTROL_RE.sub("", value)
+
 
 def _strip_failed_suffix_in_strings(node: object) -> tuple[object, int]:
     """Walk a JSON-decoded structure and replace ``<file>.json_FAILED`` with
@@ -484,9 +501,10 @@ def get_subagents(
                 f"Pass `disease=\"{disease}\"` to `load_lr_candidates` so the CLI disease "
                 f"context takes priority over lr_candidates.json.\n"
             )
+        safe_data_dir = _sanitize_data_dir(data_dir)
         data_dir_note = (
             f"\n\n## Data Directory\n"
-            f"The data directory for this session is: `{data_dir}`\n"
+            f"The data directory for this session is: `{safe_data_dir}`\n"
             f"Pass this exact path as `data_dir` to all tool calls "
             f"(load_lr_candidates, load_evidence_files, save_evidence).\n"
             f"{disease_line}"
@@ -506,7 +524,7 @@ def get_subagents(
     # Guard write_file tool calls against non-string content emitted by some models.
     for subagent in configurable_subagents:
         mw = list(subagent.get("middleware", []))
-        mw.insert(0, WriteFileArgGuardMiddleware())
+        mw.insert(0, WriteFileArgGuardMiddleware(backend_root=data_dir))
         subagent["middleware"] = mw
 
     # Primary subagents use allow-listed shared SkillsMiddleware + SkillActivator.
