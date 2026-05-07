@@ -41,6 +41,7 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
 from src.agents.drug_target.subagents.summarizer.middleware import (
     AnnotationDensityMiddleware,
     BuildEvidenceSummaryGuardMiddleware,
+    DrugMdSaveSanitizerMiddleware,
     FrozenTemplateSpanMiddleware,
     RepairCycleCounterMiddleware,
     SummarizerFinalizationGuardMiddleware,
@@ -131,6 +132,7 @@ def create_summarizer_agent(
             BuildEvidenceSummaryGuardMiddleware(),
             RepairCycleCounterMiddleware(max_cycles=2),
             SummarizerFinalizationGuardMiddleware(),
+            DrugMdSaveSanitizerMiddleware(),   # sanitize before frozen-span check
             FrozenTemplateSpanMiddleware(data_dir=data_dir),
             AnnotationDensityMiddleware(),
         ],
