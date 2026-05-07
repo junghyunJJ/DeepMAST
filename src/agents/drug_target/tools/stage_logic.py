@@ -2819,8 +2819,14 @@ def validate_drug_md(data_dir: str | Path) -> str:
                     found_wrong = True
 
     # 3. Decimal rubric score detection (should be integers)
+    # Use an explicit underscore-delimited allowlist so bare "combined score 0.999"
+    # phrases (e.g. STRING PPI confidence values) are not matched.  The old pattern
+    # r'(?:validated|exploratory|combined)[_ ](?:total|track|score)' matched space-
+    # separated variants like "combined score 0.999" which is a PPI DB confidence
+    # value, not a rubric field.  Fix-A: require underscore separator.
     decimal_scores = re.findall(
-        r'(?:validated|exploratory|combined)[_ ](?:total|track|score)[:\s]*(\d+\.\d+)',
+        r'\b(?:validated_total|exploratory_total|combined_total'
+        r'|validated_track|exploratory_track|combined_track)[:\s]*(\d+\.\d+)',
         drug_text, re.IGNORECASE
     )
     if decimal_scores:
@@ -3121,6 +3127,7 @@ _MOA_UNAVAILABLE_MARKERS = frozenset({
     "mechanism not available",
     "unknown",
     "not available",
+    "data not available",  # Fix-B: placeholder seen in res_ipf_openai2 trace (drug.md:233)
     "not characterized",
 })
 

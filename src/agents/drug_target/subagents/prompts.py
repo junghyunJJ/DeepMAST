@@ -674,6 +674,19 @@ prior drug.md exists.
    pre-filled tables — they already exist in the loaded drug.md.
 7. After applying repairs, STOP. Do not proceed to Phase 1 or Phase 2.
 
+### Clinical Compounds source rule
+
+**Clinical Compounds tables MUST source rows from `ot_<gene>.json` (OpenTargets)
+and from `resolved_drugs.json` entries where `source` equals `opentargets`.**
+
+- Approved drugs (max_phase >= 3) for the gene MUST appear in Clinical Compounds
+  even if not present in Stage 3 preclinical evidence — Stage 3 evidence is
+  restricted to Preclinical / computational sections only, NOT to Clinical Compounds.
+- If a Clinical Compounds row is genuinely absent from all sources, use the marker
+  `"data not available"` (lowercase) so validators recognize it.
+- Do NOT remove an OpenTargets-sourced clinical drug during a repair iteration
+  unless `ot_<gene>.json` itself is empty for that gene.
+
 ### Phase 1: Load Data + Build Reference Card + Save JSON Contract (Initial Write)
 0. Read the report writing skill guide for anti-hallucination rules (do not skip):
    - `read_skill_file("skills/drug-target-reporting/SKILL.md")`
