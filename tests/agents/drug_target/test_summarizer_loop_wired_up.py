@@ -136,12 +136,12 @@ def test_blocked_message_includes_critic_findings() -> None:
 
 
 # ---------------------------------------------------------------------------
-# T10d: middleware wired into create_summarizer_agent
+# T10d: host loop owns repair count in deterministic summarizer
 # ---------------------------------------------------------------------------
 
 
-def test_create_summarizer_agent_includes_repair_cycle_middleware() -> None:
-    """create_summarizer_agent must pass RepairCycleCounterMiddleware to create_deep_agent."""
+def test_create_summarizer_agent_uses_deterministic_repair_limit() -> None:
+    """create_summarizer_agent must return the deterministic host loop with max_repairs=2."""
     with patch(
         "src.agents.drug_target.subagents.summarizer.agent.create_deep_agent",
     ) as mock_create:
@@ -150,20 +150,14 @@ def test_create_summarizer_agent_includes_repair_cycle_middleware() -> None:
         mock_create.return_value = stub
 
         from src.agents.drug_target.subagents.summarizer.agent import (
+            DeterministicSummarizerRunnable,
             create_summarizer_agent,
         )
-        from src.agents.drug_target.subagents.summarizer.middleware import (
-            RepairCycleCounterMiddleware,
-        )
 
-        create_summarizer_agent()
+        agent = create_summarizer_agent()
 
-    call_kwargs = mock_create.call_args[1] if mock_create.call_args[1] else {}
-    middleware_list = call_kwargs.get("middleware", [])
-    types = [type(m) for m in middleware_list]
-    assert RepairCycleCounterMiddleware in types, (
-        f"RepairCycleCounterMiddleware must be in middleware list; got {types}"
-    )
+    assert isinstance(agent, DeterministicSummarizerRunnable)
+    assert agent.max_repairs == 2
 
 
 # ---------------------------------------------------------------------------

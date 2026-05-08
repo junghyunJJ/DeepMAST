@@ -1951,6 +1951,44 @@ def _prebuild_target_assessment(
     )
 
 
+def _stage1_evidence_disease(stage1_payload: dict[str, Any]) -> str:
+    for key in ("census_cross_validation", "census_validation"):
+        census = stage1_payload.get(key)
+        if isinstance(census, dict):
+            disease = str(census.get("disease") or "").strip()
+            if disease:
+                return disease
+    return ""
+
+
+def _build_disease_scope(
+    requested_disease: object,
+    evidence_diseases: set[str],
+) -> dict[str, object]:
+    requested = str(requested_disease or "").strip()
+    evidence = sorted(d for d in evidence_diseases if d)
+    requested_norm = requested.casefold()
+    requires_proxy_note = any(
+        disease.casefold() == "pulmonary fibrosis"
+        and requested_norm == "idiopathic pulmonary fibrosis"
+        for disease in evidence
+    )
+    proxy_note = ""
+    if requires_proxy_note:
+        proxy_note = (
+            "Scope note: Stage 1 Census evidence for these hypotheses is labeled "
+            "pulmonary fibrosis and is used here as a proxy for idiopathic pulmonary "
+            "fibrosis; Section 4 statements should be read as IPF-oriented hypotheses "
+            "rather than direct disease-specific proof. [source: disease_scope]"
+        )
+    return {
+        "requested_disease": requested,
+        "evidence_diseases": evidence,
+        "requires_proxy_note": requires_proxy_note,
+        "proxy_note": proxy_note,
+    }
+
+
 @tool
 def build_evidence_summary(data_dir: str) -> str:
     """Build a Reference Card with exact values from all evidence files.
@@ -2101,6 +2139,7 @@ def build_evidence_summary(data_dir: str) -> str:
 
     # 3. Load stage1_*.json → per-pair biological context
     stage1_data: dict[str, dict] = {}
+    stage1_evidence_diseases: set[str] = set()
     for s1_path in sorted(evidence_dir.glob("stage1_*.json")):
         if s1_path.name in _STAGE1_NON_PAIR_ARTIFACTS:
             continue
@@ -2125,10 +2164,14 @@ def build_evidence_summary(data_dir: str) -> str:
         kegg = s1.get("kegg_pathways", {})
         reactome = s1.get("reactome_pathways", {})
         census = s1.get("census_cross_validation", s1.get("census_validation", {}))
+        evidence_disease = _stage1_evidence_disease(s1)
+        if evidence_disease:
+            stage1_evidence_diseases.add(evidence_disease)
 
         stage1_data[pair_key] = {
             "ligand": ligand,
             "receptor": receptor,
+            "evidence_disease": evidence_disease,
             "string_ppi": {
                 "interaction_found": string_ppi.get("interaction_found", False),
                 "max_combined_score": string_ppi.get("max_combined_score", 0),
@@ -2201,12 +2244,28 @@ def build_evidence_summary(data_dir: str) -> str:
             for row in _csv.DictReader(_f):
                 stage1_filter_results.append(row)
 
-    # 7. Load hypothesis_report.json (if hypothesis_writer completed)
+    # 7. Load hypothesis_report.json (if hypothesis_writer completed).
+    # The summarizer may create a sanitized copy that removes impossible file
+    # references while preserving the original hypothesis_writer artifact.
     hypothesis_data = {}
-    hypothesis_path = evidence_dir / "hypothesis_report.json"
+    sanitized_hypothesis_path = evidence_dir / "hypothesis_report.summarizer_sanitized.json"
+    hypothesis_path = (
+        sanitized_hypothesis_path
+        if sanitized_hypothesis_path.exists()
+        else evidence_dir / "hypothesis_report.json"
+    )
+    hypothesis_source: dict[str, object] | None = None
     if hypothesis_path.exists():
         with open(hypothesis_path, encoding="utf-8") as _f:
             hypothesis_data = json.load(_f)
+        from src.agents.drug_target.tools.report_expansion_schema import (
+            canonical_json_hash,
+        )
+
+        hypothesis_source = {
+            "path": str(hypothesis_path.relative_to(data_dir_path)),
+            "canonical_sha256": canonical_json_hash(hypothesis_data),
+        }
 
     # Assemble Reference Card
     featured_cards = []
@@ -2289,6 +2348,7 @@ def build_evidence_summary(data_dir: str) -> str:
 
     # Build pre-formatted markdown template
     disease_name = assessment.get("disease", "unknown")
+    disease_scope = _build_disease_scope(disease_name, stage1_evidence_diseases)
     # Lazy import to avoid circular dependency:
     # stage_logic → drug_report_html → evidence_loader → stage_logic
     from src.agents.drug_target.tools.drug_report_html import render_drug_md
@@ -2316,11 +2376,13 @@ def build_evidence_summary(data_dir: str) -> str:
             "ADD narrative around the pre-filled data to create a comprehensive report."
         ),
         "disease": disease_name,
+        "disease_scope": disease_scope,
         "stage3_candidates": stage3_genes,
         "featured_genes": featured_cards,
         "all_genes_druggability": all_genes_matrix,
         "stage1_filter_results": stage1_filter_results,
         "hypothesis_data": hypothesis_data,
+        "hypothesis_source": hypothesis_source,
         "known_drugs_disease_level": known_drugs[:20] if isinstance(known_drugs, list) else known_drugs,
         "data_limitations": data_limitations,
         "markdown_template": md_template,
@@ -2338,9 +2400,8 @@ def build_evidence_summary(data_dir: str) -> str:
     except Exception as exc:
         logger.warning("Failed to persist drug_report_reference_card.json: %s", exc)
 
-    # Write the template directly to drug.md as a draft
-    draft_path = data_dir_path / "drug.md"
-    draft_path.write_text(md_template + "\n", encoding="utf-8")
+    template_path = data_dir_path / "drug_report_template.md"
+    template_path.write_text(md_template + "\n", encoding="utf-8")
 
     # === Pre-build target_assessment.json ===
     _prebuild_target_assessment(
@@ -2388,27 +2449,60 @@ _DRUG_NAME_STOPLIST: frozenset[str] = frozenset({
     "AML", "CML", "EMA", "TBD", "OR", "AND", "NOT", "IF", "THEN",
     "Yes", "No", "None", "WT", "MT", "ENA", "OS", "PFS", "ORR",
     "Trial", "Drug", "Targets", "Indications", "Mechanism", "Action",
+    "Across", "Taken", "Together", "Their", "Its", "Overall", "Because", "Use",
+    "Test", "Profile", "Model", "Quantify", "Blocking", "Criteria", "ALL",
     # Common sentence-initial English words (Title-case at line start)
-    "This", "The", "These", "Those", "Both", "All", "Some", "Each",
+    "This", "The", "These", "Those", "Both", "All", "Any", "Some", "Each",
+    "That", "Next", "Pairs", "Approved", "When", "Where",
+    "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
     "Current", "Previous", "Further", "Additional", "Several", "Multiple",
     "Analysis", "Evidence", "Data", "Summary", "Report", "Results",
-    "Spatial", "Clinical", "Biological", "Therapeutic", "Genetic",
+    "Spatial", "Clinical", "Biological", "Therapeutic", "Therapeutically", "Genetic",
     "Biomarker", "Biomarkers", "Pathway", "Pathways", "Receptor", "Receptors",
     "Compound", "Compounds", "Target", "Gene", "Genes", "Protein", "Proteins",
     # Disease / pathway acronyms that are not drug names
     "IPF", "GWAS", "ERK", "AKT", "TGF", "SMAD", "SMAD2", "SMAD3",
     "ATP", "GTP", "mRNA", "RNA", "DNA", "PCR", "IFN", "TNF", "IL",
     "VEGF", "MAPK", "PI3K", "NF", "NFkB", "HER", "KRAS", "BRAF",
+    "SRC", "MHC", "Ras", "RAS", "JAK", "STAT", "WNT", "Notch",
     "NSCLC", "DLBCL", "CLL", "NHL", "MDS", "MF", "ET", "PV",
     "COPD", "ILD", "CVD", "CHF", "CKD", "T2D", "T1D", "MS",
     # Report section / template markup words
-    "FEATURED", "Featured", "Validated", "Recommended", "Prioritized",
+    "FEATURED", "Featured", "Validated", "Exploratory", "Recommended", "Prioritized",
     "Top", "Key", "Main", "Primary", "Secondary",
     # Pipeline stage labels — never drug names (Fix F-E)
     # The regex captures multi-word tokens like "Stage 1" as a single match.
     "Stage", "Stage1", "Stage2", "Stage3",
     "Stage 1", "Stage 2", "Stage 3",
+    "Stage 1 Filter", "Stage 3 ChEMBL",
+    # Report labels and data-source labels
+    "CCI", "Census", "STRING", "KEGG", "Reactome", "OpenTargets", "ChEMBL", "ChEMBL Bioactivity",
+    "Risk Ratio", "Drug Profile", "Clinical Compounds",
+    "Preclinical Compounds", "Biological Context", "Rubric Assessment",
+    "Validated Track", "Exploratory Track", "Core Claim",
+    "Evidence References", "Biological Entities", "Falsifiable Prediction",
+    "Validation Approach", "Category", "Therapeutic Strategy",
+    "Cross-Target Interaction", "Novel Pathway",
+    # Disease/biology proper nouns frequently appearing in indication/pathway text
+    "HIV-1", "Sezary", "Hodgkins", "Crohn", "MHC-II", "APC-T",
 })
+
+_DRUG_LIKE_SUFFIXES: tuple[str, ...] = (
+    "mab",
+    "nib",
+    "tinib",
+    "statin",
+    "cillin",
+    "cycline",
+    "azole",
+    "vir",
+    "xaban",
+    "parin",
+    "platin",
+    "taxel",
+    "mycin",
+    "ol",
+)
 
 _BRACKET_FILE_RE = re.compile(r"\[from\s+([\w\-\.]+\.json(?:_FAILED)?)\s*\]")
 _BARE_FILE_RE = re.compile(r"\b(stage[0-9][\w\-]*\.json(?:_FAILED)?)\b")
@@ -2428,7 +2522,8 @@ _MOA_VERB_RE = re.compile(
     re.IGNORECASE,
 )
 
-_ANNOTATION_RE = re.compile(r"\[source:\s*([a-z_][a-z0-9_]*)\]", re.IGNORECASE)
+_ANNOTATION_RE = re.compile(r"\[source:\s*([^\]]+)\]", re.IGNORECASE)
+_ANNOTATION_FIELD_RE = re.compile(r"^[a-z_][a-z0-9_]*$", re.IGNORECASE)
 
 _EVIDENCE_SECTION_RE = re.compile(
     r"(?:evidence\s+references?|gap\s+analysis|uncovered\s+evidence\s+files?)",
@@ -2459,6 +2554,16 @@ def _is_expand_prose(line: str) -> bool:
     if stripped.startswith("#"):
         return False
     if re.match(r"[-*]\s+|^\d+\.\s+", stripped):
+        return False
+    if re.match(r"^\*\*[^*]+:?\*\*", stripped):
+        return False
+    if stripped.startswith(
+        (
+            "This report presents a comprehensive therapeutic target assessment",
+            "Each gene is scored on two independent tracks",
+            "Evidence coverage:",
+        )
+    ):
         return False
     return True
 
@@ -2498,6 +2603,32 @@ def _build_drug_allowlist(
             name = (entry.get("name") or "").strip().casefold()
             if name:
                 allowlist.add(name)
+    for stage1_path in evidence_dir.glob("stage1_*.json"):
+        if not _is_stage1_pair_artifact(stage1_path):
+            continue
+        pair_text = stage1_path.stem.removeprefix("stage1_")
+        pair_parts = pair_text.split("--", 1)
+        if len(pair_parts) == 2:
+            ligand, receptor = (part.strip() for part in pair_parts)
+            if ligand and receptor:
+                allowlist.add(ligand.casefold())
+                allowlist.add(receptor.casefold())
+                allowlist.add(f"{ligand}-{receptor}".casefold())
+                allowlist.add(f"{ligand}–{receptor}".casefold())
+                allowlist.add(f"{ligand}—{receptor}".casefold())
+        try:
+            stage1 = json.loads(stage1_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if isinstance(stage1, dict):
+            ligand = str(stage1.get("ligand") or "").strip()
+            receptor = str(stage1.get("receptor") or "").strip()
+            if ligand and receptor:
+                allowlist.add(ligand.casefold())
+                allowlist.add(receptor.casefold())
+                allowlist.add(f"{ligand}-{receptor}".casefold())
+                allowlist.add(f"{ligand}–{receptor}".casefold())
+                allowlist.add(f"{ligand}—{receptor}".casefold())
     # Load all gene symbols from gene_manifest.json so they are not mistaken
     # for fabricated drug names when appearing in prose. (Fix F-E)
     gene_manifest_path = evidence_dir / "gene_manifest.json"
@@ -2532,6 +2663,12 @@ def _build_moa_map(resolved_drugs: list[dict]) -> dict[str, str]:
 def _build_evidence_field_set(evidence_dir: "Path") -> frozenset[str]:
     """Build set of known evidence JSON field names from all evidence files."""
     fields: set[str] = set(_BASE_EVIDENCE_FIELDS)
+
+    def add_field(value: object) -> None:
+        field = str(value or "").strip()
+        if field:
+            fields.add(field.casefold())
+
     for json_path in evidence_dir.glob("*.json"):
         try:
             data = json.loads(json_path.read_text())
@@ -2543,6 +2680,39 @@ def _build_evidence_field_set(evidence_dir: "Path") -> frozenset[str]:
                     fields.update(k.casefold() for k in item.keys())
         elif isinstance(data, dict):
             fields.update(k.casefold() for k in data.keys())
+    data_dir = evidence_dir.parent
+    expansions_path = data_dir / "report_expansions.json"
+    if expansions_path.exists():
+        try:
+            expansions = json.loads(expansions_path.read_text(encoding="utf-8"))
+        except Exception:
+            expansions = {}
+        slots = expansions.get("slots", []) if isinstance(expansions, dict) else []
+        for slot in slots:
+            if not isinstance(slot, dict):
+                continue
+            for sentence in slot.get("sentences", []) or []:
+                if not isinstance(sentence, dict):
+                    continue
+                provenance = sentence.get("source_provenance")
+                if isinstance(provenance, dict):
+                    add_field(provenance.get("source_field"))
+                for field in sentence.get("source_fields", []) or []:
+                    add_field(str(field).rsplit(".", 1)[-1])
+    reference_path = data_dir / "drug_report_reference_card.json"
+    if reference_path.exists():
+        try:
+            reference = json.loads(reference_path.read_text(encoding="utf-8"))
+        except Exception:
+            reference = {}
+        provenance_index = (
+            reference.get("provenance_index", {})
+            if isinstance(reference, dict)
+            else {}
+        )
+        for provenance in provenance_index.values():
+            if isinstance(provenance, dict):
+                add_field(provenance.get("source_field"))
     return frozenset(fields)
 
 
@@ -2557,7 +2727,22 @@ def _check_fabricated_drug_name(
     findings: list[dict] = []
     for match in _DRUG_NAME_RE.finditer(line):
         candidate = match.group(1)
+        candidate_words = candidate.split()
         if candidate in _DRUG_NAME_STOPLIST:
+            continue
+        if candidate_words and candidate_words[0] in _DRUG_NAME_STOPLIST:
+            continue
+        if candidate_words and all(word in _DRUG_NAME_STOPLIST for word in candidate_words):
+            continue
+        first_nonspace = len(line) - len(line.lstrip())
+        if (
+            match.start(1) == first_nonspace
+            and len(candidate_words) == 1
+            and candidate.istitle()
+            and "-" not in candidate
+            and not any(char.isdigit() for char in candidate)
+            and not candidate.casefold().endswith(_DRUG_LIKE_SUFFIXES)
+        ):
             continue
         if candidate.casefold() not in drug_allowlist:
             findings.append({
@@ -2735,7 +2920,12 @@ def _check_unanchored_sentence(
     if not _EXPAND_SENTENCE_END_RE.search(line.strip()):
         return []
     findings: list[dict] = []
-    annotations = _ANNOTATION_RE.findall(line)
+    annotations = [
+        field.strip()
+        for annotation in _ANNOTATION_RE.findall(line)
+        for field in annotation.split(",")
+        if field.strip()
+    ]
     if not annotations:
         findings.append({
             "type": "UNANCHORED_SENTENCE",
@@ -2747,7 +2937,10 @@ def _check_unanchored_sentence(
         })
     else:
         for field in annotations:
-            if field.casefold() not in evidence_field_set:
+            if (
+                not _ANNOTATION_FIELD_RE.match(field)
+                or field.casefold() not in evidence_field_set
+            ):
                 findings.append({
                     "type": "UNANCHORED_SENTENCE",
                     "line": line_no,
@@ -2920,6 +3113,29 @@ def validate_drug_md(data_dir: str | Path) -> str:
                 })
 
         # 6. Clinical vs Preclinical classification check
+        def _is_preclinical_phase(value: object) -> bool:
+            if value is None:
+                return True
+            if isinstance(value, (int, float)):
+                return value == 0
+            text = str(value).strip().casefold()
+            return text in {"", "0", "none", "null", "n/a", "na", "preclinical"}
+
+        def _is_clinical_phase(value: object) -> bool:
+            if isinstance(value, (int, float)):
+                return value >= 1
+            text = str(value).strip().casefold()
+            if not text or text in {"0", "none", "null", "n/a", "na", "preclinical"}:
+                return False
+            phase_match = re.search(r"\b([1-4])\b", text)
+            return bool(phase_match or "approved" in text)
+
+        clinically_supported_names = {
+            (entry.get("resolved_name") or "").strip().casefold()
+            for entry in resolved
+            if (entry.get("resolved_name") or "").strip()
+            and _is_clinical_phase(entry.get("max_phase"))
+        }
         for d in resolved:
             source = d.get("source", "")
             max_phase = d.get("max_phase")
@@ -2927,11 +3143,15 @@ def validate_drug_md(data_dir: str | Path) -> str:
             if not drug_name or len(drug_name) < 3:
                 continue
             # Only check preclinical compounds from ChEMBL
-            if source == "chembl" and max_phase in (None, "Preclinical", 0, "0"):
+            if (
+                source == "chembl"
+                and _is_preclinical_phase(max_phase)
+                and drug_name.casefold() not in clinically_supported_names
+            ):
                 drug_name_esc = re.escape(drug_name)
                 pattern = re.compile(
-                    drug_name_esc + r'.{0,200}(?:(?:FDA\s+)?approved|Phase\s+[1-4])',
-                    re.IGNORECASE | re.DOTALL,
+                    drug_name_esc + r'[^\n]{0,200}(?:(?:FDA\s+)?approved|Phase\s+[1-4])',
+                    re.IGNORECASE,
                 )
                 if pattern.search(drug_text):
                     issues.append({
@@ -3883,8 +4103,173 @@ def _check_renderer_metadata(data_dir_path: Path, drug_text: str) -> list[dict]:
     return issues
 
 
+_BLOCKING_VALIDATE_DRUG_MD_FINDINGS: frozenset[str] = frozenset({
+    "FABRICATED_DRUG_NAME",
+    "FABRICATED_FILE_REFERENCE",
+    "WRONG_APPROVAL_YEAR",
+    "PRECLINICAL_CALLED_APPROVED",
+    "UNSUPPORTED_CLINICAL_STATUS",
+    "UNGROUNDED_MECHANISM",
+    "UNANCHORED_SENTENCE",
+    "SOURCE_PROVENANCE_MISSING",
+    "SOURCE_PROVENANCE_MISMATCH",
+})
+
+_RENDERER_SCOPED_PROSE_FINDINGS: frozenset[str] = frozenset({
+    "FABRICATED_DRUG_NAME",
+    "UNGROUNDED_MECHANISM",
+    "UNANCHORED_SENTENCE",
+})
+
+
+def _normalized_text_fragment(value: object) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip().casefold()
+
+
+def _load_renderer_expansion_texts(data_dir_path: Path) -> tuple[str, ...]:
+    expansions_path = data_dir_path / "report_expansions.json"
+    if not expansions_path.exists():
+        return ()
+    try:
+        payload = json.loads(expansions_path.read_text(encoding="utf-8"))
+    except Exception:
+        return ()
+    texts: list[str] = []
+    slots = payload.get("slots", []) if isinstance(payload, dict) else []
+    for slot in slots:
+        if not isinstance(slot, dict):
+            continue
+        for sentence in slot.get("sentences", []) or []:
+            if not isinstance(sentence, dict):
+                continue
+            text = _normalized_text_fragment(sentence.get("text"))
+            if text:
+                texts.append(text)
+    return tuple(texts)
+
+
+def _finding_matches_renderer_expansion(
+    finding: dict,
+    expansion_texts: tuple[str, ...],
+) -> bool:
+    snippet = _normalized_text_fragment(finding.get("snippet"))
+    if not snippet:
+        return False
+    return any(snippet in text or text in snippet for text in expansion_texts)
+
+
+def _check_disease_scope_note(drug_text: str, data_dir_path: Path) -> list[dict]:
+    reference_path = data_dir_path / "drug_report_reference_card.json"
+    if not reference_path.exists():
+        return []
+    try:
+        reference = json.loads(reference_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [{
+            "code": "DISEASE_SCOPE_METADATA_INVALID",
+            "severity": "critical",
+            "message": f"Failed to parse drug_report_reference_card.json: {exc}",
+            "location": str(reference_path),
+            "evidence": {},
+        }]
+    scope = reference.get("disease_scope") if isinstance(reference, dict) else None
+    if not isinstance(scope, dict) or scope.get("requires_proxy_note") is not True:
+        return []
+    note = str(scope.get("proxy_note") or "").strip()
+    if not note or _normalized_text_fragment(note) not in _normalized_text_fragment(drug_text):
+        return [{
+            "code": "MISSING_DISEASE_SCOPE_NOTE",
+            "severity": "critical",
+            "message": (
+                "Section 4 requires an explicit disease proxy/scope note because "
+                "the evidence disease scope differs from the requested report disease."
+            ),
+            "location": str(data_dir_path / "drug.md"),
+            "evidence": {
+                "requested_disease": scope.get("requested_disease"),
+                "evidence_diseases": scope.get("evidence_diseases"),
+                "expected_note": note,
+            },
+        }]
+    return []
+
+
+def _critic_finalization_issues(data_dir_path: Path) -> tuple[dict, list[dict]]:
+    """Return critic check details and blocking issues for require_critic=True."""
+    critic_path = data_dir_path / "evidence" / "critic_report.json"
+    check: dict[str, object] = {
+        "status": "fail",
+        "path": str(critic_path),
+        "raw": {},
+    }
+    issues: list[dict] = []
+    if not critic_path.exists():
+        issues.append({
+            "code": "MISSING_CRITIC_REPORT",
+            "severity": "critical",
+            "message": "require_critic=True but evidence/critic_report.json is missing.",
+            "location": str(critic_path),
+            "evidence": {},
+        })
+        return check, issues
+    try:
+        raw = json.loads(critic_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        issues.append({
+            "code": "CRITIC_REPORT_INVALID",
+            "severity": "critical",
+            "message": f"critic_report.json is not parseable JSON: {exc}",
+            "location": str(critic_path),
+            "evidence": {},
+        })
+        return check, issues
+    if not isinstance(raw, dict):
+        issues.append({
+            "code": "CRITIC_REPORT_INVALID",
+            "severity": "critical",
+            "message": "critic_report.json must be a JSON object.",
+            "location": str(critic_path),
+            "evidence": {"type": type(raw).__name__},
+        })
+        return check, issues
+
+    check["raw"] = raw
+    if raw.get("passed") is not True:
+        issues.append({
+            "code": "CRITIC_REPORT_FAILED",
+            "severity": "critical",
+            "message": "Critic report did not pass.",
+            "location": str(critic_path),
+            "evidence": {"passed": raw.get("passed")},
+        })
+
+    for finding in raw.get("findings", []) or []:
+        if isinstance(finding, dict) and finding.get("severity") in {"P0", "P1"}:
+            issues.append({
+                "code": "CRITIC_BLOCKING_FINDING",
+                "severity": "critical",
+                "message": "Critic report contains a P0/P1 finding.",
+                "location": str(critic_path),
+                "evidence": finding,
+            })
+
+    for verdict in raw.get("claim_verdicts", []) or []:
+        if isinstance(verdict, dict) and verdict.get("verdict") == "FAIL":
+            issues.append({
+                "code": "CRITIC_CLAIM_VERDICT_FAILED",
+                "severity": "critical",
+                "message": "Critic report contains a failed claim verdict.",
+                "location": str(critic_path),
+                "evidence": verdict,
+            })
+
+    if not issues:
+        check["status"] = "pass"
+    return check, issues
+
+
 @tool
-def validate_drug_report_finalization(data_dir: str) -> str:
+def validate_drug_report_finalization(data_dir: str, require_critic: bool = False) -> str:
     """Deterministic fail-closed finalization validator for drug.md.
 
     Composes the existing `validate_drug_md` and `validate_target_assessment_file`
@@ -3905,6 +4290,7 @@ def validate_drug_report_finalization(data_dir: str) -> str:
         "validate_drug_md": {"status": "fail", "raw": {}},
         "target_assessment": {"status": "fail", "issues": []},
         "report_finalization": {"status": "fail", "issues": [], "warnings": []},
+        "critic": {"status": "skipped", "path": "", "raw": {}},
     }
 
     # ------------------------------------------------------------------
@@ -4021,6 +4407,49 @@ def validate_drug_report_finalization(data_dir: str) -> str:
                     "error": raw.get("error"),
                 },
             })
+        import os
+
+        renderer_mode_active = any(
+            (data_dir_path / rel).exists()
+            for rel in (
+                "drug_report_render.json",
+                "drug_report_reference_card.json",
+                "report_expansions.json",
+            )
+        )
+        renderer_expansion_texts = (
+            _load_renderer_expansion_texts(data_dir_path)
+            if renderer_mode_active
+            else ()
+        )
+        block_findings = (
+            require_critic
+            or renderer_mode_active
+            or os.getenv("DEEPMAST_ALLOW_LEGACY_DRUG_MD") != "1"
+        )
+        if block_findings:
+            for finding in raw.get("findings", []) or []:
+                if not isinstance(finding, dict):
+                    continue
+                finding_type = str(finding.get("type") or "")
+                if finding_type not in _BLOCKING_VALIDATE_DRUG_MD_FINDINGS:
+                    continue
+                if (
+                    renderer_mode_active
+                    and finding_type in _RENDERER_SCOPED_PROSE_FINDINGS
+                    and not _finding_matches_renderer_expansion(
+                        finding,
+                        renderer_expansion_texts,
+                    )
+                ):
+                    continue
+                issues.append({
+                    "code": "VALIDATE_DRUG_MD_BLOCKING_FINDING",
+                    "severity": "critical",
+                    "message": f"validate_drug_md reported blocking finding: {finding_type}",
+                    "location": str(data_dir_path / "drug.md"),
+                    "evidence": finding,
+                })
 
     # ------------------------------------------------------------------
     # 4. target_assessment.json contract.
@@ -4089,6 +4518,7 @@ def validate_drug_report_finalization(data_dir: str) -> str:
                 _check_unsupported_moa_claim(drug_text, data_dir_path)
             )
             finalization_issues.extend(_check_failed_suffix_leak(drug_text, data_dir_path))
+            finalization_issues.extend(_check_disease_scope_note(drug_text, data_dir_path))
             finalization_issues.extend(
                 _check_renderer_metadata(drug_text=drug_text, data_dir_path=data_dir_path)
             )
@@ -4110,6 +4540,11 @@ def validate_drug_report_finalization(data_dir: str) -> str:
     ]
     checks["report_finalization"]["status"] = "pass" if not finalization_issues else "fail"
     issues.extend(finalization_issues)
+
+    if require_critic:
+        critic_check, critic_issues = _critic_finalization_issues(data_dir_path)
+        checks["critic"] = critic_check
+        issues.extend(critic_issues)
 
     # ------------------------------------------------------------------
     # 6. Final verdict.

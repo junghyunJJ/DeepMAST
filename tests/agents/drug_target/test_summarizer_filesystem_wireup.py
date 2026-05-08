@@ -90,9 +90,8 @@ def _make_ls_fake_model() -> Any:
 # ---------------------------------------------------------------------------
 
 
-def test_filesystem_backend_ls_returns_disk_files(tmp_path: Path) -> None:
-    """When create_summarizer_agent receives FilesystemBackend(root_dir=tmp_path),
-    the ls tool_call output must include the seeded file names from evidence/."""
+def test_filesystem_backend_is_forwarded_to_child_runnables(tmp_path: Path) -> None:
+    """create_summarizer_agent forwards an explicit backend to writer and critic."""
     _seed_evidence(tmp_path)
 
     from deepagents.backends import FilesystemBackend
@@ -104,24 +103,8 @@ def test_filesystem_backend_ls_returns_disk_files(tmp_path: Path) -> None:
     with patch(
         "src.agents.drug_target.subagents.summarizer.agent.create_deep_agent",
     ) as mock_create:
-        # Return a fake agent that simulates one ls call result
-        from langchain_core.messages import AIMessage, ToolMessage
-
         fake_agent = MagicMock()
         fake_agent.with_config.return_value = fake_agent
-
-        def _fake_invoke(input_msg: Any, **kwargs: Any) -> dict:  # noqa: ARG001
-            # Simulate the backend returning a file listing containing pair_001.json
-            ls_result = "pair_001.json\npair_002.json\ndisease_context.json"
-            return {
-                "messages": [
-                    AIMessage(content="", tool_calls=[{"id": "c1", "name": "ls", "args": {"path": "/evidence/"}}]),
-                    ToolMessage(content=ls_result, tool_call_id="c1"),
-                    AIMessage(content="Done listing evidence directory."),
-                ]
-            }
-
-        fake_agent.invoke.side_effect = _fake_invoke
         mock_create.return_value = fake_agent
 
         from src.agents.drug_target.subagents.summarizer.agent import (
@@ -133,22 +116,19 @@ def test_filesystem_backend_ls_returns_disk_files(tmp_path: Path) -> None:
 
     # Assert the backend was passed through to create_deep_agent
     assert mock_create.called, "create_deep_agent must be called"
-    call_kwargs = mock_create.call_args[1] if mock_create.call_args[1] else {}
-    call_args = mock_create.call_args[0] if mock_create.call_args[0] else ()
-    # backend should be passed as keyword argument
-    assert "backend" in call_kwargs, (
-        "create_deep_agent must receive backend= keyword arg; "
-        f"got kwargs={list(call_kwargs.keys())}"
-    )
-    assert call_kwargs["backend"] is backend, (
-        "The FilesystemBackend instance must be forwarded unchanged"
-    )
+    assert mock_create.call_count == 2
+    for call in mock_create.call_args_list:
+        call_kwargs = call.kwargs
+        assert "backend" in call_kwargs, (
+            "create_deep_agent must receive backend= keyword arg; "
+            f"got kwargs={list(call_kwargs.keys())}"
+        )
+        assert call_kwargs["backend"] is backend, (
+            "The FilesystemBackend instance must be forwarded unchanged"
+        )
 
-    # Assert tool messages contain pair_001.json
-    tool_messages = [m for m in result["messages"] if hasattr(m, "tool_call_id")]
-    assert any("pair_001.json" in str(m.content) for m in tool_messages), (
-        f"Expected tool message to contain 'pair_001.json'. Messages: {result['messages']}"
-    )
+    assert result["messages"][-1].content.startswith("SUMMARIZER_STATUS: FAIL")
+    assert "requires data_dir" in result["messages"][-1].content
 
 
 # ---------------------------------------------------------------------------

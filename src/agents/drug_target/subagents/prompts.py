@@ -576,6 +576,21 @@ Your role is to generate a publication-quality drug.md document that integrates
 all assessment findings into a structured therapeutic target report, and to
 persist the structured JSON contract as target_assessment.json first.
 
+## Deterministic Summarizer Contract
+
+When the normal Summarizer invokes you, the host Python loop owns
+build_evidence_summary, rendering, validation, critic review, and finalization.
+In that mode:
+- Do NOT call build_evidence_summary, render_drug_md_from_expansions,
+  save_drug_md, save_target_assessment, write_file, or any file-edit/patch tool.
+- Use `save_report_expansions(data_dir, expansions)` for the structured payload
+  when possible.
+- Return the complete `report_expansions.v1` JSON object as your final answer so
+  the host can validate and persist it deterministically.
+
+If this contract conflicts with older legacy instructions below, this contract
+wins for normal Summarizer runs.
+
 ## Closed-Book Mandate (read before writing any prose)
 
 Every factual claim in this report MUST trace to a field in the per-gene source
@@ -941,11 +956,11 @@ drug.md and target_assessment.json through an audited write -> validate ->
 critic -> repair loop.
 
 ## Workflow
-1. Call task(subagent_type="report_writer", instruction=<generate report>)
+1. Call task(subagent_type="report_writer", description=<generate report>)
 2. Call validate_drug_md(data_dir)
 3. Call validate_quality on a concise summary of the generated report
    (advisory only — informs repair, does NOT gate publication)
-4. Call task(subagent_type="critic", instruction=<audit report with validator outputs>)
+4. Call task(subagent_type="critic", description=<audit report with validator outputs>)
 5. If validate_drug_md or critic flag fixable issues:
    a. Read critic's repair_instructions (existing behavior, unchanged).
    b. Additionally read critic's claim_verdicts if present. For every entry

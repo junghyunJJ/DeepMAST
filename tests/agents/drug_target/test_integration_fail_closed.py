@@ -336,25 +336,12 @@ def _make_finalization_guard_fake_model(
 async def test_finalization_guard_middleware_blocks_save_when_validator_invalid(
     tmp_path: Path,
 ) -> None:
-    """E2E: SummarizerFinalizationGuardMiddleware blocks task(report_writer) after
-    validate_drug_report_finalization returns valid=false.
-
-    Drives the actual create_summarizer_agent factory (real middleware stack,
-    no patching of create_deep_agent). The FakeChatModel emits:
-      1. validate_drug_report_finalization (patched to return valid=false)
-      2. task(subagent_type="report_writer") — blocked by SummarizerFinalizationGuard
-      3. Final response with "Pipeline incomplete"
-
-    The summarizer is a read-only supervisor so direct save_drug_md calls are
-    blocked by ReadOnlyToolGuardMiddleware (index 0). The realistic E2E scenario
-    uses task(report_writer), which SummarizerFinalizationGuardMiddleware (index 3)
-    also guards per its _GUARDED_SUBAGENTS tuple.
+    """E2E: deterministic Summarizer fails closed before any direct drug.md save.
 
     Asserts:
       A. drug.md file is NOT written to disk (no backend.write() for drug.md).
-      B. The BLOCKED ToolMessage (blocked_by='SummarizerFinalizationGuard')
-         appears in the messages the LLM receives on the next turn.
-      C. The final agent response contains "Pipeline incomplete".
+      B. No legacy guard ToolMessage is required because the host loop owns gating.
+      C. The final agent response starts with SUMMARIZER_STATUS: FAIL.
     """
     # ---- Arrange -------------------------------------------------------
     # Minimal workspace so FilesystemBackend and tools don't choke
@@ -404,10 +391,10 @@ async def test_finalization_guard_middleware_blocks_save_when_validator_invalid(
             create_summarizer_agent,
         )
 
-        # Real factory — SummarizerFinalizationGuardMiddleware is wired here
+        # Real factory — deterministic host loop is wired here.
         agent = create_summarizer_agent(
             model=fake_model,
-            backend=backend,
+            data_dir=str(tmp_path),
         )
 
         result = await agent.ainvoke(
@@ -440,36 +427,11 @@ async def test_finalization_guard_middleware_blocks_save_when_validator_invalid(
         f"got {drug_md_write_calls}"
     )
 
-    # ---- Assert B: BLOCKED ToolMessage must reach the LLM ----------------
-    # received_messages contains all messages the fake LLM observed.
-    # After the guard intercepts save_drug_md, it returns a BLOCKED ToolMessage
-    # which deepagents feeds back into the LLM on the next turn.
-    blocked_tool_messages = [
-        m for m in received_messages
-        if isinstance(m, ToolMessage)
-        and "SummarizerFinalizationGuard" in str(m.content)
-    ]
-    assert len(blocked_tool_messages) >= 1, (
-        "The BLOCKED ToolMessage from SummarizerFinalizationGuard must be "
-        "visible in the messages the LLM receives. "
-        f"Received messages (types): {[type(m).__name__ for m in received_messages]}\n"
-        f"ToolMessage contents: {[m.content for m in received_messages if isinstance(m, ToolMessage)]}"
-    )
-    # Verify blocked_by field
-    blocked_payload = json.loads(blocked_tool_messages[0].content)
-    assert blocked_payload.get("blocked_by") == "SummarizerFinalizationGuard", (
-        f"blocked_by field mismatch: {blocked_payload}"
-    )
-    assert blocked_payload.get("ok") is False, (
-        f"ok field must be False in BLOCKED response: {blocked_payload}"
-    )
+    # ---- Assert B: legacy middleware guard is no longer the runtime path ----
+    assert received_messages == []
 
-    # ---- Assert C: final response contains "Pipeline incomplete" ----------
+    # ---- Assert C: final response is fail-closed --------------------------
     final_messages = result.get("messages", [])
     assert final_messages, "Agent must return at least one message"
     last_message = final_messages[-1]
-    assert "Pipeline incomplete" in str(last_message.content), (
-        f"Orchestrator final response must contain 'Pipeline incomplete' "
-        f"sentinel when finalization guard blocks; "
-        f"got: {last_message.content!r}"
-    )
+    assert str(last_message.content).startswith("SUMMARIZER_STATUS: FAIL")

@@ -29,7 +29,7 @@ FIXTURE_ROOT = Path(__file__).parent / "fixtures"
 # ---------------------------------------------------------------------------
 
 
-def _invoke(data_dir, *, allow_legacy: bool = True):
+def _invoke(data_dir, *, allow_legacy: bool = True, require_critic: bool = False):
     """Invoke the @tool wrapper with data_dir as a string."""
     previous = os.environ.get("DEEPMAST_ALLOW_LEGACY_DRUG_MD")
     if allow_legacy:
@@ -37,7 +37,11 @@ def _invoke(data_dir, *, allow_legacy: bool = True):
     else:
         os.environ.pop("DEEPMAST_ALLOW_LEGACY_DRUG_MD", None)
     try:
-        return json.loads(validate_drug_report_finalization.invoke({"data_dir": str(data_dir)}))
+        return json.loads(
+            validate_drug_report_finalization.invoke(
+                {"data_dir": str(data_dir), "require_critic": require_critic}
+            )
+        )
     finally:
         if previous is None:
             os.environ.pop("DEEPMAST_ALLOW_LEGACY_DRUG_MD", None)
@@ -72,19 +76,36 @@ def _drug_hash(data_dir: Path) -> str:
     return hashlib.sha256((data_dir / "drug.md").read_bytes()).hexdigest()
 
 
-def _write_renderer_sidecars(data_dir: Path, *, bad_source_hash: bool = False, bad_drug_hash: bool = False) -> None:
-    ref = persist_drug_report_reference_card(
-        data_dir,
-        {
-            "markdown_template": (data_dir / "drug.md").read_text(encoding="utf-8"),
-            "expansion_slots": [],
-        },
-    )
+def _write_renderer_sidecars(
+    data_dir: Path,
+    *,
+    bad_source_hash: bool = False,
+    bad_drug_hash: bool = False,
+    expansion_sentences: list[str] | None = None,
+    reference_extra: dict | None = None,
+) -> None:
+    expansion_slots = []
+    expansion_payload_slots = []
+    if expansion_sentences:
+        expansion_slots = [{"slot_id": "section:executive_summary|slot:test"}]
+        expansion_payload_slots = [
+            {
+                "slot_id": "section:executive_summary|slot:test",
+                "sentences": [{"text": text} for text in expansion_sentences],
+            }
+        ]
+    reference_card = {
+        "markdown_template": (data_dir / "drug.md").read_text(encoding="utf-8"),
+        "expansion_slots": expansion_slots,
+    }
+    if reference_extra:
+        reference_card.update(reference_extra)
+    ref = persist_drug_report_reference_card(data_dir, reference_card)
     expansions = {
         "schema_version": "report_expansions.v1",
         "template_id": "drug_report.md.j2",
         "reference_card_hash": canonical_json_hash(ref),
-        "slots": [],
+        "slots": expansion_payload_slots,
     }
     (data_dir / "report_expansions.json").write_text(
         json.dumps(expansions, indent=2),
@@ -124,6 +145,40 @@ def test_clean_fixture_passes(tmp_path):
     assert result["valid"] is True
     assert result["issue_count"] == 0
     assert result["issues"] == []
+
+
+def test_required_disease_scope_note_missing_fails_finalization(tmp_path):
+    d = _copy_fixture("clean", tmp_path)
+    disease_scope = {
+        "requested_disease": "idiopathic pulmonary fibrosis",
+        "evidence_diseases": ["pulmonary fibrosis"],
+        "requires_proxy_note": True,
+        "proxy_note": (
+            "Scope note: Stage 1 Census evidence for these hypotheses is labeled "
+            "pulmonary fibrosis and is used here as a proxy for idiopathic pulmonary "
+            "fibrosis; Section 4 statements should be read as IPF-oriented hypotheses "
+            "rather than direct disease-specific proof. [source: disease_scope]"
+        ),
+    }
+    _write_renderer_sidecars(
+        d,
+        reference_extra={
+            "disease_scope": disease_scope,
+            "provenance_index": {
+                "drug_report_reference_card.json::disease_scope": {
+                    "source_file": "drug_report_reference_card.json",
+                    "source_field": "disease_scope",
+                    "source_class": "reference_card",
+                    "source_value": disease_scope,
+                }
+            },
+        },
+    )
+
+    result = _invoke(d)
+
+    assert result["valid"] is False
+    assert _has_issue(result, "MISSING_DISEASE_SCOPE_NOTE")
 
 
 # ---------------------------------------------------------------------------
@@ -577,6 +632,47 @@ def test_finalization_fails_when_renderer_source_artifacts_missing(tmp_path):
     assert _has_issue(result, "MISSING_RENDER_SOURCE"), result["issues"]
 
 
+def test_renderer_finalization_does_not_block_prefilled_template_prose_findings(tmp_path):
+    d = _copy_fixture("clean", tmp_path)
+    drug_path = d / "drug.md"
+    drug_path.write_text(
+        drug_path.read_text(encoding="utf-8")
+        + "\nThis report is based on source data.\n",
+        encoding="utf-8",
+    )
+    _write_renderer_sidecars(d)
+
+    result = _invoke(d)
+
+    assert result["valid"] is True, result["issues"]
+    blocking = [
+        issue
+        for issue in result["issues"]
+        if issue["code"] == "VALIDATE_DRUG_MD_BLOCKING_FINDING"
+    ]
+    assert blocking == []
+
+
+def test_renderer_finalization_blocks_fabricated_drug_in_expansion_sentence(tmp_path):
+    d = _copy_fixture("clean", tmp_path)
+    drug_path = d / "drug.md"
+    sentence = "Unknownol improves fibrosis."
+    drug_path.write_text(
+        drug_path.read_text(encoding="utf-8") + f"\n{sentence}\n",
+        encoding="utf-8",
+    )
+    _write_renderer_sidecars(d, expansion_sentences=[sentence])
+
+    result = _invoke(d)
+
+    assert result["valid"] is False
+    assert any(
+        issue["code"] == "VALIDATE_DRUG_MD_BLOCKING_FINDING"
+        and issue.get("evidence", {}).get("type") == "FABRICATED_DRUG_NAME"
+        for issue in result["issues"]
+    ), result["issues"]
+
+
 def test_finalization_fails_when_failed_suffix_leaks_to_drug_md(tmp_path):
     d = _copy_fixture("clean", tmp_path)
     drug_path = d / "drug.md"
@@ -588,6 +684,72 @@ def test_finalization_fails_when_failed_suffix_leaks_to_drug_md(tmp_path):
     result = _invoke(d)
 
     assert _has_issue(result, "FAILED_SUFFIX_LEAK"), result["issues"]
+
+
+def test_require_critic_fails_closed_when_report_missing(tmp_path):
+    d = _copy_fixture("clean", tmp_path)
+
+    result = _invoke(d, require_critic=True)
+
+    assert result["valid"] is False
+    assert _has_issue(result, "MISSING_CRITIC_REPORT"), result["issues"]
+
+
+def test_require_critic_fails_closed_when_report_unparseable(tmp_path):
+    d = _copy_fixture("clean", tmp_path)
+    (d / "evidence" / "critic_report.json").write_text("not-json", encoding="utf-8")
+
+    result = _invoke(d, require_critic=True)
+
+    assert result["valid"] is False
+    assert _has_issue(result, "CRITIC_REPORT_INVALID"), result["issues"]
+
+
+@pytest.mark.parametrize(
+    ("critic_payload", "expected_code"),
+    [
+        ({"passed": False, "findings": [], "claim_verdicts": []}, "CRITIC_REPORT_FAILED"),
+        (
+            {
+                "passed": True,
+                "findings": [{"severity": "P1", "issue": "bad", "evidence": "", "repair": ""}],
+                "claim_verdicts": [],
+            },
+            "CRITIC_BLOCKING_FINDING",
+        ),
+        (
+            {
+                "passed": True,
+                "findings": [],
+                "claim_verdicts": [
+                    {
+                        "section": "section_1",
+                        "claim_text": "unsupported",
+                        "verdict": "FAIL",
+                        "source_field": None,
+                        "reason": "missing",
+                    }
+                ],
+            },
+            "CRITIC_CLAIM_VERDICT_FAILED",
+        ),
+    ],
+)
+def test_require_critic_blocks_failed_or_blocking_critic_report(
+    tmp_path,
+    critic_payload,
+    expected_code,
+):
+    d = _copy_fixture("clean", tmp_path)
+    (d / "evidence" / "critic_report.json").write_text(
+        json.dumps(critic_payload),
+        encoding="utf-8",
+    )
+
+    result = _invoke(d, require_critic=True)
+
+    assert result["valid"] is False
+    assert _has_issue(result, expected_code), result["issues"]
 
 
 def test_finalization_reports_unverified_numeric_prediction_by_default(tmp_path):

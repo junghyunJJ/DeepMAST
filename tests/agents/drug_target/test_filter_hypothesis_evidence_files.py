@@ -1,13 +1,14 @@
-"""T1 RED: filter_hypothesis_evidence_files drops nonexistent evidence_files entries.
+"""filter_hypothesis_evidence_files writes a summarizer-only sanitized source.
 
 The hypothesis_writer occasionally emits `evidence_files` entries that reference
 files that do not exist on disk (e.g. `known_drugs.json`). Before SUMMARIZER
-consumes hypothesis_report.json, a pipeline-level filter must rewrite the file
-in place, dropping any entry whose target path does not exist under
+consumes hypothesis_report.json, a pipeline-level filter writes
+``hypothesis_report.summarizer_sanitized.json`` without mutating the source,
+dropping any entry whose target path does not exist under
 `<data_dir>/evidence/`.
 
 Tests cover:
-- Mixed existent/nonexistent entries -> nonexistent dropped, file rewritten.
+- Mixed existent/nonexistent entries -> nonexistent dropped in sanitized copy.
 - All entries exist -> file untouched, return value 0.
 - Missing hypothesis_report.json -> no-op, return value 0.
 - Both legacy list shape and current dict shape ({"hypotheses": [...]}).
@@ -34,6 +35,14 @@ def _write_evidence(
         (evidence_dir / fname).write_text("{}")
     (evidence_dir / "hypothesis_report.json").write_text(json.dumps(hyp_payload))
     return str(tmp_path)
+
+
+def _hypothesis_path(data_dir: str) -> Path:
+    return Path(data_dir) / "evidence" / "hypothesis_report.json"
+
+
+def _sanitized_path(data_dir: str) -> Path:
+    return Path(data_dir) / "evidence" / "hypothesis_report.summarizer_sanitized.json"
 
 
 def test_drops_nonexistent_entries_dict_shape(tmp_path: Path) -> None:
@@ -71,9 +80,8 @@ def test_drops_nonexistent_entries_dict_shape(tmp_path: Path) -> None:
 
     assert dropped == 2
 
-    rewritten = json.loads(
-        (Path(data_dir) / "evidence" / "hypothesis_report.json").read_text()
-    )
+    assert json.loads(_hypothesis_path(data_dir).read_text()) == payload
+    rewritten = json.loads(_sanitized_path(data_dir).read_text())
     hyps = rewritten["hypotheses"]
     assert hyps[0]["evidence_files"] == [
         "stage3_TGFB1.json",
@@ -102,9 +110,8 @@ def test_drops_nonexistent_entries_list_shape(tmp_path: Path) -> None:
     dropped = filter_hypothesis_evidence_files(data_dir)
 
     assert dropped == 1
-    rewritten = json.loads(
-        (Path(data_dir) / "evidence" / "hypothesis_report.json").read_text()
-    )
+    assert json.loads(_hypothesis_path(data_dir).read_text()) == payload
+    rewritten = json.loads(_sanitized_path(data_dir).read_text())
     assert rewritten[0]["evidence_files"] == ["stage3_TGFB1.json"]
 
 
@@ -119,7 +126,7 @@ def test_no_drop_when_all_exist_does_not_rewrite(tmp_path: Path) -> None:
         existing_files=["stage3_TGFB1.json"],
         hyp_payload=payload,
     )
-    hyp_path = Path(data_dir) / "evidence" / "hypothesis_report.json"
+    hyp_path = _hypothesis_path(data_dir)
     mtime_before = hyp_path.stat().st_mtime_ns
 
     dropped = filter_hypothesis_evidence_files(data_dir)
@@ -127,6 +134,7 @@ def test_no_drop_when_all_exist_does_not_rewrite(tmp_path: Path) -> None:
     assert dropped == 0
     # When nothing was dropped the file must not be rewritten.
     assert hyp_path.stat().st_mtime_ns == mtime_before
+    assert not _sanitized_path(data_dir).exists()
 
 
 def test_missing_hypothesis_report_is_noop(tmp_path: Path) -> None:
@@ -173,9 +181,8 @@ def test_drops_nonexistent_entries_from_evidence_references_key(
     dropped = filter_hypothesis_evidence_files(data_dir)
 
     assert dropped == 2
-    rewritten = json.loads(
-        (Path(data_dir) / "evidence" / "hypothesis_report.json").read_text()
-    )
+    assert json.loads(_hypothesis_path(data_dir).read_text()) == payload
+    rewritten = json.loads(_sanitized_path(data_dir).read_text())
     assert rewritten["hypotheses"][0]["evidence_references"] == [
         "stage3_ITGB2.json"
     ]
@@ -210,9 +217,8 @@ def test_drops_failed_suffix_entries(tmp_path: Path) -> None:
     dropped = filter_hypothesis_evidence_files(data_dir)
 
     assert dropped == 2
-    rewritten = json.loads(
-        (Path(data_dir) / "evidence" / "hypothesis_report.json").read_text()
-    )
+    assert json.loads(_hypothesis_path(data_dir).read_text()) == payload
+    rewritten = json.loads(_sanitized_path(data_dir).read_text())
     assert rewritten["hypotheses"][0]["evidence_references"] == [
         "stage3_CD4.json"
     ]
@@ -246,9 +252,8 @@ def test_strips_failed_suffix_inside_prose_fields(tmp_path: Path) -> None:
     # 3 prose suffix strips (hypothesis + falsifiable_prediction +
     # validation_approach); list-key did not need to drop anything.
     assert mutations == 3
-    rewritten = json.loads(
-        (Path(data_dir) / "evidence" / "hypothesis_report.json").read_text()
-    )
+    assert json.loads(_hypothesis_path(data_dir).read_text()) == payload
+    rewritten = json.loads(_sanitized_path(data_dir).read_text())
     h = rewritten["hypotheses"][0]
     assert "_FAILED" not in h["hypothesis"]
     assert "_FAILED" not in h["falsifiable_prediction"]
@@ -278,9 +283,8 @@ def test_filters_both_keys_in_same_hypothesis(tmp_path: Path) -> None:
     dropped = filter_hypothesis_evidence_files(data_dir)
 
     assert dropped == 2
-    rewritten = json.loads(
-        (Path(data_dir) / "evidence" / "hypothesis_report.json").read_text()
-    )
+    assert json.loads(_hypothesis_path(data_dir).read_text()) == payload
+    rewritten = json.loads(_sanitized_path(data_dir).read_text())
     h = rewritten["hypotheses"][0]
     assert h["evidence_files"] == ["stage3_TGFB1.json"]
     assert h["evidence_references"] == ["stage3_TGFB1.json"]
@@ -289,10 +293,7 @@ def test_filters_both_keys_in_same_hypothesis(tmp_path: Path) -> None:
 def test_critic_slice_wrapper_invokes_filter_before_inner_agent(
     tmp_path: Path,
 ) -> None:
-    """T3 wireup: _CriticSliceWrapper.invoke must filter hypothesis_report.json
-    BEFORE invoking the inner agent (so the filtered file is what downstream
-    code consumes). The inner agent stub records the on-disk content at
-    invoke-time."""
+    """Legacy wrapper writes sanitized hypothesis source before invoking."""
     from unittest.mock import MagicMock
 
     from src.agents.drug_target.subagents.summarizer.agent import (
@@ -324,9 +325,7 @@ def test_critic_slice_wrapper_invokes_filter_before_inner_agent(
     stub.with_config.return_value = stub
 
     def _capture(*_args: object, **_kwargs: object) -> dict[str, list]:
-        rewritten = json.loads(
-            (Path(data_dir) / "evidence" / "hypothesis_report.json").read_text()
-        )
+        rewritten = json.loads(_sanitized_path(data_dir).read_text())
         seen_files_during_invoke.append(
             rewritten["hypotheses"][0]["evidence_files"]
         )
@@ -340,3 +339,4 @@ def test_critic_slice_wrapper_invokes_filter_before_inner_agent(
         "Filter must run before inner agent invoke; "
         f"observed evidence_files at invoke-time: {seen_files_during_invoke}"
     )
+    assert json.loads(_hypothesis_path(data_dir).read_text()) == payload

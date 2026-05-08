@@ -15,6 +15,7 @@ import json
 import os
 import re
 import shutil
+import copy
 from pathlib import Path
 from typing import Callable, Sequence
 
@@ -141,7 +142,7 @@ def _strip_failed_suffix_in_strings(node: object) -> tuple[object, int]:
 
 
 def filter_hypothesis_evidence_files(data_dir: str) -> int:
-    """Drop hypothesis_report.json evidence-list entries not present on disk.
+    """Write a sanitized hypothesis_report copy for summarizer consumption.
 
     The hypothesis_writer subagent occasionally emits references to files it
     believes exist (e.g. ``known_drugs.json``) or files with the ``_FAILED``
@@ -165,8 +166,9 @@ def filter_hypothesis_evidence_files(data_dir: str) -> int:
       1. ``{"hypotheses": [{"evidence_files": [...]}, ...]}`` — current pipeline
       2. ``[{"evidence_files": [...]}, ...]`` — legacy/test fixtures
 
-    The file is rewritten in place only when at least one entry is dropped or
-    one suffix is stripped.
+    The original ``hypothesis_report.json`` is never rewritten. When a mutation
+    is needed this writes
+    ``hypothesis_report.summarizer_sanitized.json`` beside the source.
 
     Args:
         data_dir: Run working directory (parent of ``evidence/``).
@@ -176,6 +178,7 @@ def filter_hypothesis_evidence_files(data_dir: str) -> int:
     """
     evidence_dir = Path(data_dir) / "evidence"
     hyp_path = evidence_dir / "hypothesis_report.json"
+    sanitized_path = evidence_dir / "hypothesis_report.summarizer_sanitized.json"
     if not evidence_dir.exists() or not hyp_path.exists():
         return 0
 
@@ -184,11 +187,12 @@ def filter_hypothesis_evidence_files(data_dir: str) -> int:
     except Exception:
         return 0
 
-    if isinstance(data, dict):
-        hyps = data.get("hypotheses") or []
-        container = data
-    elif isinstance(data, list):
-        hyps = data
+    sanitized = copy.deepcopy(data)
+    if isinstance(sanitized, dict):
+        hyps = sanitized.get("hypotheses") or []
+        container = sanitized
+    elif isinstance(sanitized, list):
+        hyps = sanitized
         container = None
     else:
         return 0
@@ -218,7 +222,9 @@ def filter_hypothesis_evidence_files(data_dir: str) -> int:
     total_mutations = dropped + suffix_strips
 
     if total_mutations:
-        hyp_path.write_text(json.dumps(rewritten, indent=2))
+        sanitized_path.write_text(json.dumps(rewritten, indent=2))
+    elif sanitized_path.exists():
+        sanitized_path.unlink()
     return total_mutations
 
 
@@ -309,19 +315,9 @@ SUBAGENT_CONFIGS = {
         "tools": [
             load_lr_candidates,
             load_evidence_files,
-            validate_evidence_completeness,
-            build_evidence_summary,
-            validate_drug_md,
-            validate_stage3_gate,
-            save_target_assessment,
-            save_drug_md,
             save_report_expansions,
-            render_drug_md_from_expansions,
             read_skill_file,
-            sequential_thinking,
             think_tool,
-            validate_quality,
-            generate_drug_html_report,
         ],
     },
     "critic": {
@@ -337,7 +333,6 @@ SUBAGENT_CONFIGS = {
             load_lr_candidates,
             load_evidence_files,
             validate_evidence_completeness,
-            build_evidence_summary,
             validate_drug_md,
             validate_stage3_gate,
             read_skill_file,
@@ -663,7 +658,8 @@ def write_critic_slices(data_dir: str) -> None:
     #   2. [{"entities": [...]}, ...]
     #      — legacy/test-fixture shape preserved in unit tests.
     # Accept both.
-    hyp_path = evidence_dir / "hypothesis_report.json"
+    sanitized_hyp_path = evidence_dir / "hypothesis_report.summarizer_sanitized.json"
+    hyp_path = sanitized_hyp_path if sanitized_hyp_path.exists() else evidence_dir / "hypothesis_report.json"
     hyp_raw: object = []
     if hyp_path.exists():
         try:
@@ -671,8 +667,14 @@ def write_critic_slices(data_dir: str) -> None:
         except Exception:
             hyp_raw = []
 
+    hypothesis_metadata: dict[str, object] = {}
     if isinstance(hyp_raw, dict):
         hyp_data = hyp_raw.get("hypotheses") or []
+        hypothesis_metadata = {
+            key: value
+            for key, value in hyp_raw.items()
+            if key != "hypotheses"
+        }
     elif isinstance(hyp_raw, list):
         hyp_data = hyp_raw
     else:
@@ -695,6 +697,8 @@ def write_critic_slices(data_dir: str) -> None:
     ]
     hypothesis_slice = {
         "hypothesis_report": hyp_data,
+        "hypothesis_metadata": hypothesis_metadata,
+        "hypothesis_report_raw": hyp_raw,
         "genes": sorted(hyp_genes),
         "reference_cards": hyp_ref_cards,
     }

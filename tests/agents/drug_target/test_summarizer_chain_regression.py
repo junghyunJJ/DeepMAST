@@ -1,9 +1,8 @@
-"""Regression tests: 5 original summarizer middlewares still work correctly
-after SummarizerFinalizationGuardMiddleware was inserted at index 3.
+"""Legacy middleware regression tests.
 
-Plan §1.4 acceptance criterion (5th bullet):
-  기존 5개 summarizer middleware가 신규 SummarizerFinalizationGuard 추가 후에도
-  모두 정상 동작 (회귀 테스트)
+The normal Summarizer no longer wires this middleware chain; it is now a
+deterministic Runnable. These tests keep the legacy middleware classes covered
+for standalone compatibility paths.
 
 Scenarios (one per original middleware):
   1. ReadOnlyToolGuardMiddleware  — still blocks write calls in the 6-entry chain.
@@ -16,8 +15,6 @@ Scenarios (one per original middleware):
   5. AnnotationDensityMiddleware — density check applied after FrozenTemplate
        passes; AnnotationDensity blocks sparse-annotation content.
 
-Each scenario uses the same chain-construction pattern as
-test_summarizer_middleware_chain_order.py (monkeypatching create_deep_agent).
 All 5 tests are independent — no shared mutable state between them.
 """
 
@@ -27,7 +24,7 @@ import json
 import tempfile
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from langchain_core.messages import ToolMessage
@@ -102,30 +99,17 @@ def _validator_handler_factory(valid: bool) -> Any:
 
 
 def _build_full_chain(*, data_dir: str | None = None) -> list[Any]:
-    """Capture the 6-entry middleware list produced by create_summarizer_agent.
-
-    Monkeypatches create_deep_agent so no LLM is invoked.
-    Returns the captured middleware list in canonical order.
-    """
-    captured: list[Any] = []
-
-    fake_agent = MagicMock(spec=["with_config", "invoke", "ainvoke", "stream", "astream"])
-    fake_agent.with_config.return_value = fake_agent
-
-    def _fake_create_deep_agent(**kwargs: Any) -> Any:
-        captured.extend(kwargs.get("middleware", []))
-        return fake_agent
-
-    import src.agents.drug_target.subagents.summarizer.agent as agent_module
-
-    with patch.object(agent_module, "create_deep_agent", side_effect=_fake_create_deep_agent):
-        from src.agents.drug_target.subagents.summarizer.agent import (
-            create_summarizer_agent,
-        )
-
-        create_summarizer_agent(data_dir=data_dir)
-
-    return captured
+    """Build the legacy middleware chain explicitly."""
+    return [
+        ReadOnlyToolGuardMiddleware(
+            blocked_tool_names=("save_drug_md", "save_target_assessment", "save_evidence")
+        ),
+        BuildEvidenceSummaryGuardMiddleware(),
+        RepairCycleCounterMiddleware(max_cycles=2),
+        SummarizerFinalizationGuardMiddleware(),
+        FrozenTemplateSpanMiddleware(data_dir=data_dir),
+        AnnotationDensityMiddleware(),
+    ]
 
 
 # ---------------------------------------------------------------------------

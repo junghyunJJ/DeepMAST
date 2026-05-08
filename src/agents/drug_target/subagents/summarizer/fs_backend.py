@@ -21,9 +21,9 @@ from __future__ import annotations
 import json
 import logging
 import time
+from typing import Any
 
 from deepagents.backends import FilesystemBackend
-from deepagents.backends.protocol import GlobResult, LsResult
 
 logger = logging.getLogger("drug_target.fs_backend")
 
@@ -75,7 +75,7 @@ class LoggingAndFallbackFilesystemBackend(FilesystemBackend):
         except (OSError, RuntimeError):
             return path, False
 
-    def ls(self, path: str) -> LsResult:
+    def ls(self, path: str) -> Any:
         normalized, was_normalized = self._normalize_virtual_path(path)
         result = super().ls(normalized)
         entries_count = len(result.entries) if result.entries else 0
@@ -92,7 +92,7 @@ class LoggingAndFallbackFilesystemBackend(FilesystemBackend):
         logger.info(json.dumps(log_entry))
         return result
 
-    def glob(self, pattern: str, path: str = "/") -> GlobResult:
+    def glob(self, pattern: str, path: str = "/") -> Any:
         normalized, was_normalized = self._normalize_virtual_path(path)
         result = super().glob(pattern, path=normalized)
         matches_count = len(result.matches) if result.matches else 0
@@ -109,3 +109,11 @@ class LoggingAndFallbackFilesystemBackend(FilesystemBackend):
             log_entry["original_path"] = _sanitize_for_log(path)
         logger.info(json.dumps(log_entry))
         return result
+
+    def read(self, file_path: str, offset: int = 0, limit: int = 2000) -> Any:
+        normalized, _ = self._normalize_virtual_path(file_path)
+        return super().read(normalized, offset=offset, limit=limit)
+
+    async def aread(self, file_path: str, offset: int = 0, limit: int = 2000) -> Any:
+        normalized, _ = self._normalize_virtual_path(file_path)
+        return await super().aread(normalized, offset=offset, limit=limit)

@@ -64,6 +64,16 @@ def test_glob_with_absolute_root_path_returns_matches(populated_root: Path) -> N
     assert result.matches is not None and len(result.matches) >= 3
 
 
+def test_read_with_absolute_subpath_returns_content(populated_root: Path) -> None:
+    """read(absolute_file) must return content when file lives inside root_dir."""
+    b = LoggingAndFallbackFilesystemBackend(
+        root_dir=str(populated_root), virtual_mode=True
+    )
+    result = b.read(str(populated_root / "foo.txt"))
+    assert result.error is None
+    assert result.file_data == {"content": "hello", "encoding": "utf-8"}
+
+
 # ---------------------------------------------------------------------------
 # Regression guard — root-relative paths must still work (GREEN before/after)
 # ---------------------------------------------------------------------------

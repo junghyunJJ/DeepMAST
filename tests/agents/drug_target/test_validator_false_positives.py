@@ -48,6 +48,13 @@ def _issues_of_type(drug_text: str, tmp_path: Path, issue_type: str) -> list[dic
     return [i for i in result.get("issues", []) if i.get("type") == issue_type]
 
 
+def _findings_of_type(drug_text: str, tmp_path: Path, issue_type: str) -> list[dict]:
+    _minimal_drug_md(tmp_path, drug_text)
+    impl = getattr(validate_drug_md, "func", None) or validate_drug_md
+    result = json.loads(impl(tmp_path))
+    return [i for i in result.get("findings", []) if i.get("type") == issue_type]
+
+
 # ---------------------------------------------------------------------------
 # F-A: DECIMAL_RUBRIC_SCORES
 # ---------------------------------------------------------------------------
@@ -153,3 +160,216 @@ class TestMoaUnavailableMarkers:
             "UNSUPPORTED_MOA_CLAIM was raised for 'Data not available' MoA cell; "
             "this placeholder must be in _MOA_UNAVAILABLE_MARKERS."
         )
+
+
+# ---------------------------------------------------------------------------
+# F-C: PRECLINICAL_CALLED_APPROVED line crossing / duplicate names
+# ---------------------------------------------------------------------------
+
+
+class TestPreclinicalCalledApprovedFalsePositives:
+    """Preclinical status checks must stay scoped to the cited drug claim."""
+
+    def test_preclinical_check_does_not_cross_into_next_line_phase_claim(
+        self, tmp_path: Path
+    ) -> None:
+        """A preclinical bullet followed by an unrelated Phase 4 line is valid.
+
+        The live res_ipf_openai run exposed a regex over-match where the
+        preclinical drug name matched on one bullet, then ``Phase 4`` from the
+        next clinical bullet was consumed through DOTALL matching.
+        """
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "resolved_drugs.json").write_text(
+            json.dumps(
+                [
+                    {
+                        "resolved_name": "Example Preclinical Compound",
+                        "source": "chembl",
+                        "max_phase": None,
+                    }
+                ]
+            ),
+            encoding="utf-8",
+        )
+        drug_text = (
+            "- **Example Preclinical Compound** (ChEMBL: CHEMBL1) — "
+            "mechanism not available, Max Phase: Preclinical\n"
+            "- **Example Clinical Compound** (ChEMBL: CHEMBL2) — "
+            "mechanism not available, Phase 4 clinical evidence\n"
+        )
+
+        issues = _issues_of_type(
+            drug_text, tmp_path, "PRECLINICAL_CALLED_APPROVED"
+        )
+
+        assert issues == []
+
+    def test_preclinical_duplicate_name_with_clinical_source_is_not_flagged(
+        self, tmp_path: Path
+    ) -> None:
+        """Clinical evidence for the same name overrides a ChEMBL preclinical duplicate."""
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "resolved_drugs.json").write_text(
+            json.dumps(
+                [
+                    {
+                        "resolved_name": "LIFITEGRAST",
+                        "source": "chembl",
+                        "max_phase": None,
+                    },
+                    {
+                        "resolved_name": "LIFITEGRAST",
+                        "source": "opentargets",
+                        "max_phase": 4,
+                    },
+                ]
+            ),
+            encoding="utf-8",
+        )
+        drug_text = (
+            "- **LIFITEGRAST** (ChEMBL: CHEMBL3137314) — "
+            "mechanism not available, Phase 4 clinical evidence\n"
+        )
+
+        issues = _issues_of_type(
+            drug_text, tmp_path, "PRECLINICAL_CALLED_APPROVED"
+        )
+
+        assert issues == []
+
+    def test_preclinical_same_line_approved_claim_still_fires(
+        self, tmp_path: Path
+    ) -> None:
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "resolved_drugs.json").write_text(
+            json.dumps(
+                [
+                    {
+                        "resolved_name": "Example Preclinical Compound",
+                        "source": "chembl",
+                        "max_phase": None,
+                    }
+                ]
+            ),
+            encoding="utf-8",
+        )
+        drug_text = "Example Preclinical Compound is FDA approved for IPF.\n"
+
+        issues = _issues_of_type(
+            drug_text, tmp_path, "PRECLINICAL_CALLED_APPROVED"
+        )
+
+        assert len(issues) == 1
+
+
+class TestMultiFieldSourceAnnotations:
+    def test_multifield_source_annotation_counts_as_anchored(
+        self, tmp_path: Path
+    ) -> None:
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "annotation_fields.json").write_text(
+            json.dumps({"classification": "validated_target", "priority": "high"}),
+            encoding="utf-8",
+        )
+        drug_text = (
+            "MUC1 and FN1 remain high-priority candidates. "
+            "[source: classification, priority]\n"
+        )
+
+        issues = _findings_of_type(drug_text, tmp_path, "UNANCHORED_SENTENCE")
+
+        assert issues == []
+
+    def test_source_database_terms_and_sentence_starters_are_not_drugs(
+        self, tmp_path: Path
+    ) -> None:
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "annotation_fields.json").write_text(
+            json.dumps(
+                {
+                    "stage1_filter_results": [],
+                    "kegg_pathways": [],
+                    "reactome_pathways": [],
+                    "clinical_drugs": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        drug_text = (
+            "The passed pairs are characterized by strong STRING support. "
+            "[source: stage1_filter_results]\n"
+            "The absence of listed KEGG or Reactome pathway annotations is "
+            "reported in the source data. [source: kegg_pathways, reactome_pathways]\n"
+            "Because MUC1 already has multiple clinical-stage agents listed, "
+            "the profile is tractable. [source: clinical_drugs]\n"
+        )
+
+        fabricated = _findings_of_type(drug_text, tmp_path, "FABRICATED_DRUG_NAME")
+
+        assert fabricated == []
+
+    def test_common_sentence_initial_words_not_flagged_as_drugs(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        drug_text = (
+            "Pairs that pass the filter provide a stronger foundation for target selection. "
+            "[source: stage1_filter_results]\n"
+            "Approved indications should be stated exactly as provided and not extended to IPF. "
+            "[source: clinical_drugs]\n"
+            "Any summary of CD4 drugs should stay strictly within the source-listed products. "
+            "[source: clinical_drugs]\n"
+            "That context supports mechanistic relevance without implying direct efficacy. "
+            "[source: stage1_filter_results]\n"
+            "Next steps should prioritize closing evidence gaps around the top candidates. "
+            "[source: stage3_candidates]\n"
+            "Six stage3 candidates were retained across the top combined_total scores. "
+            "[source: stage3_candidates]\n"
+            "MUC1 is linked to NF-kappa-B, ERK/SRC signaling, and adhesion programs. "
+            "[source: stage1_filter_results]\n"
+            "MUC1 is linked to Ras/MAPK pathway modulation in the source context. "
+            "[source: stage1_filter_results]\n"
+            "CD4 is contextualized by MHC class II antigen presentation. "
+            "[source: stage1_filter_results]\n"
+            "Therapeutically, this favors perturbation experiments over efficacy claims. "
+            "[source: hypothesis_data]\n"
+            "Lower-scoring genes remain useful as background context. "
+            "[source: combined_total]\n"
+            "Where evidence is incomplete, the recommendation is continued validation. "
+            "[source: clinical_drugs]\n"
+            "When Stage 1 validation is present, the pair is spatially compatible. "
+            "[source: stage1_filter_results]\n"
+            "Approval year details should be omitted unless the source supplies them. "
+            "[source: clinical_drugs]\n"
+        )
+
+        fabricated = _findings_of_type(drug_text, tmp_path, "FABRICATED_DRUG_NAME")
+        false_words = {
+            "Pairs",
+            "Approved",
+            "Any",
+            "That",
+            "Next",
+            "Six",
+            "SRC",
+            "Ras",
+            "MHC",
+            "Therapeutically",
+            "Lower",
+            "Where",
+            "When",
+            "Approval",
+        }
+        false_hits = [
+            finding
+            for finding in fabricated
+            if any(word in finding.get("actual", "") for word in false_words)
+        ]
+
+        assert false_hits == []

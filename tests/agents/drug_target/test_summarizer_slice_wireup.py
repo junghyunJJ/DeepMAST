@@ -21,6 +21,7 @@ import pytest
 from src.agents.drug_target.subagents.summarizer.agent import (
     wrap_summarizer_with_critic_slices,
 )
+from src.agents.drug_target.subagents.configs import write_critic_slices
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +106,35 @@ def test_slices_written_before_invoke(tmp_path: Path) -> None:
     assert written_during_invoke.get("hypothesis"), (
         "evidence/_critic_slices/_hypothesis.json must exist before inner agent invoke"
     )
+
+
+def test_hypothesis_slice_preserves_top_level_report_metadata(tmp_path: Path) -> None:
+    data_dir = _make_evidence_dir(tmp_path)
+    evidence_dir = Path(data_dir) / "evidence"
+    (evidence_dir / "hypothesis_report.json").write_text(
+        json.dumps(
+            {
+                "evidence_coverage_pct": 65.22,
+                "hypotheses_retained": 6,
+                "hypotheses_generated": 6,
+                "hypotheses": [
+                    {
+                        "core_claim": "TGFB1 drives fibrosis.",
+                        "biological_entities": {"genes": ["TGFB1"]},
+                    }
+                ],
+            }
+        )
+    )
+
+    write_critic_slices(data_dir)
+
+    payload = json.loads(
+        (evidence_dir / "_critic_slices" / "_hypothesis.json").read_text()
+    )
+    assert payload["hypothesis_metadata"]["evidence_coverage_pct"] == 65.22
+    assert payload["hypothesis_metadata"]["hypotheses_retained"] == 6
+    assert payload["hypothesis_report"][0]["core_claim"] == "TGFB1 drives fibrosis."
 
 
 def test_slices_cleaned_up_after_invoke(tmp_path: Path) -> None:

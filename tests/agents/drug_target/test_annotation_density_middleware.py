@@ -170,11 +170,7 @@ async def test_awrap_tool_call_blocks_sparse_save() -> None:
 
 
 def test_register_in_create_summarizer_agent_middleware_list() -> None:
-    """T7 wireup: AnnotationDensityMiddleware must be in the summarizer's
-    middleware stack so it actually intercepts save_drug_md at runtime."""
-    from src.agents.drug_target.subagents.summarizer.agent import (
-        _SUMMARIZER_BLOCKED_TOOLS,  # noqa: F401  (sanity import)
-    )
+    """Normal deterministic summarizer must not wire legacy save_drug_md middleware."""
     from src.agents.drug_target.subagents.summarizer.middleware import (
         AnnotationDensityMiddleware,
     )
@@ -203,6 +199,6 @@ def test_register_in_create_summarizer_agent_middleware_list() -> None:
         create_summarizer_agent()
 
     types_in_stack = [type(m).__name__ for m in captured["middleware"]]
-    assert "AnnotationDensityMiddleware" in types_in_stack, (
-        f"AnnotationDensityMiddleware must be registered; got {types_in_stack}"
+    assert "AnnotationDensityMiddleware" not in types_in_stack, (
+        f"AnnotationDensityMiddleware is legacy-only and must not be registered; got {types_in_stack}"
     )
