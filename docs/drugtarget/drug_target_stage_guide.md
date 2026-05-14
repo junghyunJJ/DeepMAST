@@ -7,7 +7,7 @@
 
 ## 1. Overview
 
-### Architecture: 2-Subagent + 3-Stage Funnel
+### Architecture: 3-Subagent + 3-Stage Funnel
 
 The Drug Target Assessment Agent evaluates therapeutic potential of ligand-receptor (L-R) pairs
 identified from spatial transcriptomics cell-cell interaction (CCI) analysis.
@@ -15,10 +15,14 @@ identified from spatial transcriptomics cell-cell interaction (CCI) analysis.
 ```
 Orchestrator (agent.py)
   ├── evidence_assessor   ← 3-Stage Funnel + Inline Rubric
-  └── report_writer       ← target_assessment.json + drug.md
+  ├── hypothesis_writer   ← UCB-scored mechanistic hypothesis generation
+  └── summarizer          ← drug.md authoring + validation + HTML render
+                            (flat dict subagent, 6-step tool sequence)
 ```
 
-Each subagent follows a **Plan -> Execute -> Reflect** cognitive cycle per stage.
+`evidence_assessor` and `hypothesis_writer` follow a **Plan -> Execute -> Reflect**
+cognitive cycle per stage. `summarizer` is a single tool-calling LLM loop that
+executes a fixed 6-step sequence (see §6).
 
 ### Input / Output
 
@@ -34,7 +38,7 @@ Each subagent follows a **Plan -> Execute -> Reflect** cognitive cycle per stage
 ### Workflow Order
 
 ```
-load_lr_candidates → evidence_assessor → report_writer
+load_lr_candidates → evidence_assessor → hypothesis_writer → summarizer
 ```
 
 ---
@@ -271,11 +275,39 @@ Query template: `"{target_name}"[tiab] AND "Clinical Trial"[pt] AND "adverse eve
 
 ---
 
-## 6. Report Writer
+## 6. Summarizer (post-2026-05-13)
+
+The summarizer authors `drug.md` and renders the HTML report. It is a flat
+dict subagent (no inner subagents, no Python repair loop) and executes a
+fixed 6-step tool sequence under a single tool-calling LLM:
+
+1. `build_evidence_summary(data_dir)` — pre-fills the deterministic evidence
+   summary skeleton. Called exactly once at the start.
+2. `load_evidence_files(data_dir, ...)` — load per-gene evidence JSON.
+3. `save_report_expansions(data_dir, expansions)` — author schema-validated
+   per-section Markdown expansions.
+4. `render_drug_md_from_expansions(data_dir)` — deterministic assembly of
+   `drug.md` from the saved expansions. The LLM never hand-writes drug.md.
+5. `validate_drug_md(data_dir)` — MANDATORY semantic quality gate. Returns
+   `{"valid": bool, "errors": [...]}`. On `valid=false`, re-call
+   `save_report_expansions` for the failing sections, re-render, and
+   re-validate. Max 2 retries (prompt-budgeted).
+6. `generate_drug_html_report(data_dir)` — final HTML render. Mechanically
+   blocked by `SummarizerFinalizationGuardMiddleware` unless the most recent
+   `validate_drug_md` returned `valid=true`. Called exactly once after the
+   validator passes.
+
+After step 6 the summarizer emits `SUMMARIZER_STATUS: PASS` on its own line
+(or `SUMMARIZER_STATUS: FAIL` if the 2-retry budget is exhausted). The
+orchestrator parses this literal line to decide pipeline completion.
+
+`target_assessment.json` is produced earlier in the funnel by
+`finalize_stage1_artifacts` / `save_target_assessment`; the summarizer is
+responsible only for `drug.md` and the rendered HTML.
 
 ### 6.1 `target_assessment.json` Contract
 
-The report_writer first saves `target_assessment.json` via `save_target_assessment()`:
+The schema contract written upstream by `save_target_assessment()`:
 
 ```json
 {

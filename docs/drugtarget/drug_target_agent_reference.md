@@ -63,12 +63,22 @@ Wrapper Pipeline (Step 9.5)
 
 ### 2.3 Subagent Configuration
 
-**Workflow order**: `["evidence_assessor", "report_writer"]` (strict sequential)
+**Workflow order**: `["evidence_assessor", "hypothesis_writer", "summarizer"]` (strict sequential)
 
-| Subagent | Tools | Role |
-|----------|-------|------|
-| `evidence_assessor` | 20 tools | 3-stage funnel: biological context -> validation & scoring -> deep dive + inline rubric |
-| `report_writer` | 5 tools + `write_file` (framework) | Generate `target_assessment.json` + `drug.md` |
+| Subagent | Spec shape | Tools | Role |
+|----------|------------|-------|------|
+| `evidence_assessor` | flat dict | ~20 tools | 3-stage funnel: biological context -> validation & scoring -> deep dive + inline rubric |
+| `hypothesis_writer` | flat dict | 7 tools | UCB-scored mechanistic hypothesis generation from Stage 1-3 evidence |
+| `summarizer` | flat dict (post-2026-05-13) | 7 tools + `SummarizerFinalizationGuardMiddleware` | Author drug.md via 6-step tool sequence; finalize HTML report. Fail-closed on `validate_drug_md`. |
+
+Post-2026-05-13 the summarizer is a flat `SubAgent` dict (no inner subagents,
+no CompiledSubAgent shell, no Python repair loop). Its seven tools are
+`build_evidence_summary`, `load_evidence_files`, `save_report_expansions`,
+`render_drug_md_from_expansions`, `validate_drug_md`,
+`generate_drug_html_report`, and `think_tool`.
+`SummarizerFinalizationGuardMiddleware` blocks
+`generate_drug_html_report` unless the most recent `validate_drug_md`
+returned `valid=true`.
 
 ### 2.4 DrugTargetConfig Options
 
@@ -176,12 +186,28 @@ For each selected candidate:
 
 ### 3.7 Report Generation
 
-The `report_writer` subagent:
+The `summarizer` subagent (flat dict spec, 7 tools) executes the fixed 6-step
+sequence:
 
-1. `load_evidence_files()` -> loads all `evidence/*.json`
-2. `save_target_assessment()` -> writes `target_assessment.json` (schema-validated via `_validate_contract()`)
-3. `write_file()` (DeepAgents framework tool) -> writes `drug.md`
-4. `validate_quality()` -> threshold >= 0.7
+1. `build_evidence_summary(data_dir)` — pre-fills the deterministic evidence
+   summary skeleton (call EXACTLY ONCE).
+2. `load_evidence_files(data_dir, ...)` — load per-gene evidence JSON.
+3. `save_report_expansions(data_dir, expansions)` — author schema-validated
+   per-section Markdown expansions.
+4. `render_drug_md_from_expansions(data_dir)` — deterministically assemble
+   `drug.md` from the saved expansions (the LLM never hand-writes drug.md).
+5. `validate_drug_md(data_dir)` — MANDATORY quality gate (semantic).
+   - On `valid=false`: re-call `save_report_expansions` to fix the offending
+     sections, re-render, re-validate. Max 2 retries (prompt-budgeted).
+6. `generate_drug_html_report(data_dir)` — call EXACTLY ONCE after
+   `validate_drug_md` returns `valid=true`. This call is mechanically blocked
+   by `SummarizerFinalizationGuardMiddleware` until the validator passes.
+7. Emit `SUMMARIZER_STATUS: PASS` on its own line (or `SUMMARIZER_STATUS: FAIL`
+   on retry budget exhaustion).
+
+The orchestrator parses the literal `SUMMARIZER_STATUS:` line to decide
+pipeline completion. `target_assessment.json` is no longer written by the
+summarizer surface (it is produced earlier in the funnel).
 
 ---
 
@@ -239,16 +265,21 @@ The `report_writer` subagent:
 | `think_tool` | Reflection and assessment (Reflect phase) |
 | `validate_quality` | Quality score check (threshold >= 0.7) |
 
-### 4.2 Report Writer Tools (5 + framework)
+### 4.2 Summarizer Tools (7) — post-2026-05-13 simplification
 
 | Tool | Purpose |
 |------|---------|
-| `load_evidence_files` | Load all evidence/*.json |
-| `save_target_assessment` | Write target_assessment.json with schema validation |
-| `sequential_thinking` | Planning |
-| `think_tool` | Reflection |
-| `validate_quality` | Quality check |
-| `write_file` (framework) | Write drug.md (DeepAgents `FilesystemMiddleware`) |
+| `build_evidence_summary` | Pre-fills the deterministic evidence summary skeleton (called once at start) |
+| `load_evidence_files` | Load all `evidence/*.json` |
+| `save_report_expansions` | Schema-validated per-section Markdown expansion writes |
+| `render_drug_md_from_expansions` | Deterministic Markdown assembly of `drug.md` from saved expansions |
+| `validate_drug_md` | MANDATORY semantic quality gate (returns `{valid: bool, errors: [...]}`) |
+| `generate_drug_html_report` | Final HTML render (mechanically blocked unless `validate_drug_md` returned `valid=true`) |
+| `think_tool` | Reflection / scratchpad |
+
+The summarizer carries one middleware:
+`SummarizerFinalizationGuardMiddleware`, which observes `validate_drug_md`
+results and blocks `generate_drug_html_report` until `valid=true`.
 
 ---
 
