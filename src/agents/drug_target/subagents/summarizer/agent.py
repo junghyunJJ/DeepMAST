@@ -32,6 +32,7 @@ from src.agents.drug_target.tools import (
     build_evidence_summary,
     generate_drug_html_report,
     load_evidence_files,
+    lookup_provenance_value,
     render_drug_md_from_expansions,
     save_report_expansions,
     think_tool,
@@ -53,8 +54,8 @@ def get_summarizer_subagent() -> dict[str, Any]:
         "name": "summarizer",
         "description": (
             "Authors and finalizes drug.md for the analyzed gene set. "
-            "Executes the 6-step tool sequence: build_evidence_summary, "
-            "load_evidence_files, save_report_expansions, "
+            "Tool surface: build_evidence_summary, load_evidence_files, "
+            "lookup_provenance_value, save_report_expansions, "
             "render_drug_md_from_expansions, validate_drug_md (mandatory "
             "quality gate), then generate_drug_html_report. Emits "
             "SUMMARIZER_STATUS: PASS or SUMMARIZER_STATUS: FAIL on its own "
@@ -64,6 +65,7 @@ def get_summarizer_subagent() -> dict[str, Any]:
         "tools": [
             build_evidence_summary,
             load_evidence_files,
+            lookup_provenance_value,
             save_report_expansions,
             render_drug_md_from_expansions,
             validate_drug_md,

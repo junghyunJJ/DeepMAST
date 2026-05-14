@@ -208,6 +208,7 @@ class TestSubagentConfigs:
         assert tool_names == {
             "build_evidence_summary",
             "load_evidence_files",
+            "lookup_provenance_value",
             "save_report_expansions",
             "render_drug_md_from_expansions",
             "validate_drug_md",

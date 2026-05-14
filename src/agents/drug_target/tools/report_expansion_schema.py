@@ -605,3 +605,100 @@ def save_report_expansions(
     )
     result["saved"] = True
     return json.dumps(result, indent=2)
+
+
+@tool
+def lookup_provenance_value(
+    data_dir: str,
+    source_file: str,
+    source_field: str,
+) -> str:
+    """Look up the canonical source_value for a (source_file, source_field) pair.
+
+    Reads ``<data_dir>/drug_report_reference_card.json`` and returns the
+    matching entry from the ``provenance_index``. Use this tool when
+    authoring sentences for ``save_report_expansions`` so that the
+    ``source_provenance.source_value`` field is anchored to the exact
+    value indexed on disk — the validator requires byte-equality (for
+    ``direct_value`` claims) or length-equality (for ``count`` claims),
+    and live-smoke evidence (PR #19 round 5) showed gpt-5.4 cannot
+    reliably transcribe nested object values from the offloaded
+    reference card. Always call this tool for each citation BEFORE
+    composing the sentence; copy the returned ``source_value`` verbatim
+    into your ``source_provenance.source_value`` field.
+
+    Args:
+        data_dir: Run working directory containing
+            ``drug_report_reference_card.json``.
+        source_file: Evidence file path, e.g. ``"evidence/ot_TGFB1.json"``.
+        source_field: JSON field within that file, e.g.
+            ``"clinical_drugs"``. The (source_file, source_field) pair
+            must appear in ``valid_provenance_keys`` from
+            ``expansion_schema_spec.json``.
+
+    Returns:
+        JSON string. On hit:
+            ``{"ok": true, "source_file": ..., "source_field": ...,
+               "source_class": ..., "source_value": <verbatim>}``
+        On miss the ``valid_provenance_keys`` list is included so the
+        caller can recover:
+            ``{"ok": false, "error": "...", "valid_provenance_keys": [...]}``
+    """
+    base = Path(data_dir).expanduser().resolve()
+    ref_path = base / "drug_report_reference_card.json"
+    if not ref_path.exists():
+        return json.dumps(
+            {
+                "ok": False,
+                "error": (
+                    "drug_report_reference_card.json not found at "
+                    f"{ref_path} — call build_evidence_summary first."
+                ),
+            },
+            indent=2,
+        )
+    try:
+        card = json.loads(ref_path.read_text(encoding="utf-8"))
+    except (ValueError, OSError) as exc:
+        return json.dumps(
+            {"ok": False, "error": f"failed to load reference card: {exc}"},
+            indent=2,
+        )
+
+    index = card.get("provenance_index")
+    if not isinstance(index, dict):
+        return json.dumps(
+            {
+                "ok": False,
+                "error": "reference card has no provenance_index",
+            },
+            indent=2,
+        )
+
+    key = f"{source_file}::{source_field}"
+    entry = index.get(key)
+    if not isinstance(entry, dict):
+        return json.dumps(
+            {
+                "ok": False,
+                "error": (
+                    f"({source_file}, {source_field}) not in "
+                    "provenance_index — pick a key from "
+                    "valid_provenance_keys."
+                ),
+                "valid_provenance_keys": sorted(index.keys()),
+            },
+            indent=2,
+        )
+
+    return json.dumps(
+        {
+            "ok": True,
+            "source_file": str(entry.get("source_file") or source_file),
+            "source_field": str(entry.get("source_field") or source_field),
+            "source_class": str(entry.get("source_class") or ""),
+            "source_value": entry.get("source_value"),
+        },
+        indent=2,
+        ensure_ascii=False,
+    )

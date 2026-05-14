@@ -960,9 +960,10 @@ single tool-calling LLM — there are no inner subagents.
 ## Workflow
 Step 1. Call `build_evidence_summary` exactly once.
 Step 2. Call `load_evidence_files` for the active gene set.
-Step 3. BEFORE calling `save_report_expansions`, discover the run-specific
-        slot inventory and provenance keys: call
-        `read_file("/expansion_schema_spec.json")`.
+Step 3. BEFORE calling `save_report_expansions`:
+
+        3a. Discover the run-specific slot inventory and provenance keys
+            by calling `read_file("/expansion_schema_spec.json")`.
         The path is a VIRTUAL path (starts with `/`, no `<data_dir>`
         prefix, no `/private/tmp/...` prefix) — virtual_mode is enabled
         and the FilesystemBackend will resolve it under the run directory.
@@ -977,16 +978,29 @@ Step 3. BEFORE calling `save_report_expansions`, discover the run-specific
             pair you may cite — do NOT invent files or fields outside
             this list.
 
-        Then call `save_report_expansions(data_dir, expansions)`. The
-        `expansions` payload follows the Pydantic schema advertised in
-        the tool's args_schema (top-level: schema_version + slots; each
-        slot: slot_id + non-empty sentences list; each sentence: text +
-        source_fields + source_provenance). Author at least ONE sentence
-        per required_slot_id — every required_slot_id MUST appear in
-        the `slots` list, or the validator rejects with
-        `missing required slot_id: ...`.
-        OMIT `reference_card_hash` — the tool auto-derives it from the
-        on-disk reference card. Do NOT invent a SHA256 hash.
+        3b. For EVERY sentence you plan to author, BEFORE filling its
+            `source_provenance.source_value`, call
+            `lookup_provenance_value(data_dir, source_file, source_field)`.
+            Copy the returned `source_value` VERBATIM into your
+            `source_provenance.source_value` field — do NOT transcribe
+            it by hand. The validator checks byte-equality for
+            `direct_value` claims and length-equality for `count`
+            claims; transcription errors against the offloaded reference
+            card are the dominant failure mode without this lookup.
+            For `absence` claims, the tool will return an empty value
+            (`null`, `[]`, `""`, or `{}`) — only emit an absence claim
+            when the lookup confirms emptiness.
+
+        3c. Call `save_report_expansions(data_dir, expansions)`. The
+            `expansions` payload follows the Pydantic schema advertised
+            in the tool's args_schema (top-level: schema_version +
+            slots; each slot: slot_id + non-empty sentences list; each
+            sentence: text + source_fields + source_provenance). Author
+            at least ONE sentence per required_slot_id — every
+            required_slot_id MUST appear in the `slots` list, or the
+            validator rejects with `missing required slot_id: ...`.
+            OMIT `reference_card_hash` — the tool auto-derives it from
+            the on-disk reference card. Do NOT invent a SHA256 hash.
 Step 4. Call `render_drug_md_from_expansions`.
 Step 5. Call `validate_drug_md`.
         - If `valid=true`: go to Step 6.

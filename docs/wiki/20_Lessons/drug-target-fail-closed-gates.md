@@ -315,6 +315,51 @@ The 17 legacy summarizer-middleware tests (plus four additional consumer tests) 
 - TS-07: `save_report_expansions` auto-derives `reference_card_hash` when the caller omits it
 - TS-08: `save_report_expansions` still rejects an explicit mismatched hash with `expected`/`supplied` in the error payload
 
+### Live-smoke follow-up — round 5 (2026-05-14)
+
+After commit `ee46263` wired `SkillsMiddleware` + `SkillActivator` into
+the standalone smoke script (round 4 had been running a strictly weaker
+configuration than the production pipeline), the live smoke surfaced a
+deeper failure mode: `save_report_expansions` rejected every retry with
+`SOURCE_PROVENANCE_MISMATCH` because the LLM could not reliably
+transcribe nested object values from the offloaded reference card into
+the `source_provenance.source_value` field. gpt-5.4 oscillated between
+`direct_value`, `absence`, and `count` claim_types trying to match the
+validator's byte-equality / length-equality / emptiness checks; none of
+the manual transcriptions stuck.
+
+This is the decisive evidence that the 2026-05-13 plan's R01 (b')
+accepted regression — "delete the critic+repair loop and rely on
+prompt + skill + validate_drug_md" — actually does impose a real cost.
+The original critic+repair loop hid this cost by iterating against the
+schema until something matched; without that loop, the LLM has no
+realistic path to converge on the exact-value match the validator
+expects.
+
+**Remediation (option iii from the architect review):** add a single
+helper tool — `lookup_provenance_value(data_dir, source_file,
+source_field)` — that reads `drug_report_reference_card.json` and
+returns the exact indexed `source_value` for a given (source_file,
+source_field) pair. The LLM calls this tool before composing each
+sentence and copies the returned `source_value` VERBATIM into its
+`source_provenance.source_value` field. The validator's byte-equality
+check still runs (anti-hallucination intent preserved) but the LLM
+no longer has to transcribe nested data structures by hand.
+
+The summarizer tool surface grows from 7 to 8 tools. The 7-tool
+invariant from the original plan is recorded as superseded; the
+TS-02 test is renamed and updated accordingly.
+
+`SUMMARIZER_PROMPT` Step 3 is restructured into substeps:
+  3a. read `/expansion_schema_spec.json` (existing virtual-path
+      discovery)
+  3b. for every sentence, call `lookup_provenance_value` BEFORE
+      composing the `source_provenance` block; copy the returned value
+      verbatim
+  3c. call `save_report_expansions` with the full slots list
+
+Live smoke verification: TBD after this commit.
+
 ### Live-smoke follow-up — round 3 (2026-05-14)
 
 Round 3 live smoke (gpt-5.4) after schema-discovery fix (commit `072a2bc`)

@@ -28,6 +28,15 @@ These tests replace the 17-test legacy summarizer suite. They cover:
   TS-10: save_report_expansions args_schema advertises the Pydantic
          ReportExpansionsPayload (structural shape) so LangChain @tool
          auto-description is no longer opaque.
+  TS-11: lookup_provenance_value returns the exact (source_value,
+         source_class) tuple for a valid (source_file, source_field)
+         pair, and returns a discoverable error payload (with
+         valid_provenance_keys) for an invalid pair. The tool exists
+         specifically so the LLM does NOT transcribe nested object
+         values from the offloaded reference card by hand — live-smoke
+         regression #3 (PR #19 round 5) showed gpt-5.4 oscillating on
+         SOURCE_PROVENANCE_MISMATCH because transcription is unreliable
+         under deepagents' large-result offload.
 
 TS-04/TS-05 unit-test the mechanical fail-closed gate directly at the
 middleware layer — sufficient under the (b') decision to retain and adapt
@@ -56,6 +65,7 @@ from src.agents.drug_target.tools.report_expansion_schema import (
     ReportExpansionsPayload,
     build_expansion_schema_spec,
     canonical_json_hash,
+    lookup_provenance_value,
     persist_drug_report_reference_card,
     save_report_expansions,
 )
@@ -69,6 +79,7 @@ _REQUIRED_TOOL_NAMES: frozenset[str] = frozenset(
     {
         "build_evidence_summary",
         "load_evidence_files",
+        "lookup_provenance_value",
         "save_report_expansions",
         "render_drug_md_from_expansions",
         "validate_drug_md",
@@ -104,11 +115,11 @@ def test_summarizer_returns_dict_spec_with_required_keys() -> None:
 # TS-02
 # ---------------------------------------------------------------------------
 
-def test_summarizer_tools_are_exactly_the_seven_required() -> None:
+def test_summarizer_tools_are_exactly_the_eight_required() -> None:
     spec = get_summarizer_subagent()
     tool_names = {tool.name for tool in spec["tools"]}
     assert tool_names == _REQUIRED_TOOL_NAMES
-    assert len(spec["tools"]) == 7
+    assert len(spec["tools"]) == 8
     # Middleware: only the adapted fail-closed gate is attached by the factory.
     mw_types = {type(m) for m in spec["middleware"]}
     assert SummarizerFinalizationGuardMiddleware in mw_types
@@ -453,3 +464,81 @@ def test_save_report_expansions_args_schema_advertises_pydantic_payload() -> Non
         raise AssertionError(
             "ReportExpansionsPayload must reject empty `sentences` list"
         )
+
+
+# ---------------------------------------------------------------------------
+# TS-11 — lookup_provenance_value returns indexed value or a recoverable error
+# ---------------------------------------------------------------------------
+
+
+def test_lookup_provenance_value_returns_indexed_entry_for_valid_key(
+    tmp_path: Path,
+) -> None:
+    """For a (source_file, source_field) pair that exists in the reference
+    card's provenance_index, the tool must return the indexed source_value
+    VERBATIM so the LLM does not have to transcribe nested objects."""
+    reference_card = {
+        "reference_card_version": "2.0",
+        "stage3_candidates": ["TGFB1"],
+        "featured_genes": [
+            {
+                "gene": "TGFB1",
+                "stage3": {
+                    "clinical_drugs": [
+                        {"name": "DrugA", "phase": 3},
+                        {"name": "DrugB", "phase": 2},
+                    ],
+                    "preclinical_compounds": [],
+                },
+            }
+        ],
+        "markdown_template": "# Report\n",
+        "hypothesis_data": {"hypotheses": []},
+    }
+    card = persist_drug_report_reference_card(tmp_path, reference_card)
+
+    raw = lookup_provenance_value.invoke(
+        {
+            "data_dir": str(tmp_path),
+            "source_file": "evidence/ot_TGFB1.json",
+            "source_field": "clinical_drugs",
+        }
+    )
+    result = json.loads(raw)
+    assert result["ok"] is True
+    assert result["source_class"] == "opentargets_clinical"
+    # source_value is returned verbatim from the index — same nested list
+    assert result["source_value"] == card["provenance_index"][
+        "evidence/ot_TGFB1.json::clinical_drugs"
+    ]["source_value"]
+
+
+def test_lookup_provenance_value_surfaces_valid_keys_on_miss(tmp_path: Path) -> None:
+    """An invalid (source_file, source_field) pair must return ok=False
+    with the full valid_provenance_keys list so the LLM can self-correct
+    in one turn instead of guessing."""
+    reference_card = {
+        "reference_card_version": "2.0",
+        "stage3_candidates": ["TGFB1"],
+        "featured_genes": [
+            {
+                "gene": "TGFB1",
+                "stage3": {"clinical_drugs": [], "preclinical_compounds": []},
+            }
+        ],
+        "markdown_template": "# Report\n",
+        "hypothesis_data": {"hypotheses": []},
+    }
+    persist_drug_report_reference_card(tmp_path, reference_card)
+
+    raw = lookup_provenance_value.invoke(
+        {
+            "data_dir": str(tmp_path),
+            "source_file": "evidence/does_not_exist.json",
+            "source_field": "nope",
+        }
+    )
+    result = json.loads(raw)
+    assert result["ok"] is False
+    assert "not in" in result["error"]
+    assert "evidence/ot_TGFB1.json::clinical_drugs" in result["valid_provenance_keys"]
