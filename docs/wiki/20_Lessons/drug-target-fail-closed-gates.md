@@ -315,6 +315,50 @@ The 17 legacy summarizer-middleware tests (plus four additional consumer tests) 
 - TS-07: `save_report_expansions` auto-derives `reference_card_hash` when the caller omits it
 - TS-08: `save_report_expansions` still rejects an explicit mismatched hash with `expected`/`supplied` in the error payload
 
+### Live-smoke follow-up — round 7 + merge + 6-way verification (2026-05-14)
+
+PR #19 merged into `main` as squash commit `1b3e824` at 21:43 UTC after a final 6-way live-smoke pass. The round-6 producer/validator contract bug surfaced by `UNCITED_QUANTITATIVE` on template-baked Census lines is closed by a template-side citation fix and locked by a deterministic round-trip regression test.
+
+**Round 7 changes (commit `6a31d68` on the feat branch, squashed into `1b3e824`):**
+
+- **P0-1 template-side citation** — `_preformat_cards` in `src/agents/drug_target/tools/drug_report_html.py:794-815` emits a `pair_file` field (`f"stage1_{ligand}--{receptor}.json"`) and `skills/drug-target-reporting/templates/drug_report.md.j2:137` now ends Census lines with `[from {{ p.pair_file }}]`. The producer becomes validator-compliant by construction — `validate_drug_md`'s UNCITED_QUANTITATIVE regex (`.json|\[from\s+[^\]]+\]|stage[123]_…`) is satisfied at template render time.
+
+- **P0-2 round-trip regression test** — new `tests/agents/drug_target/test_summarizer_round_trip.py` exercises `build_evidence_summary → save_report_expansions → render_drug_md_from_expansions → validate_drug_md` with a minimal deterministic expansions payload built from `expansion_schema_spec.json` (no LLM in the loop). Two assertions: (a) `validate_drug_md` returns `valid: true` on the rendered output, (b) every Census line carries the inline `[from stage1_<LIG>--<REC>.json]` citation. Both verified to FAIL on `83b8c0f` (round-6 state) and PASS after P0-1.
+
+- **P1-1 UNCITED_QUANTITATIVE bracketing pair** — `tests/agents/drug_target/test_drug_md_new_flags.py::TestUncitedQuantitativeBracketing` adds a positive case (`OR=2.1` in EXPAND prose fires) and a negative case (Census line + new citation does NOT fire) so producer-side drift in either direction surfaces as a targeted failure.
+
+- **P1-2 path-traversal guard (DS-1)** — new `_validate_data_dir` helper in `src/agents/drug_target/tools/report_expansion_schema.py` resolves the path and confirms it falls under an allowed workspace root (defaults: `tempfile.gettempdir()`, env-configured `DRUG_TARGET_DATA_DIR` / `DEEP_INTERPRETER_DATA_DIR`, optional `DRUG_TARGET_ALLOWED_DATA_DIRS` override, `/tmp/deep_interpreter_workspace` fallback). Wired into both `save_report_expansions` (before `base.mkdir(...)`) and `lookup_provenance_value` (before any disk probe). Out-of-bounds paths return a structured `DATA_DIR_OUT_OF_BOUNDS` error envelope.
+
+- **P1-3 prompt rubric correction** — `SUMMARIZER_PROMPT` Step 5 retry sub-rubric distinguishes EXPAND-region prose (LLM can repair the citation) from template-baked Census/filter lines (LLM has no authoring surface; emit `SUMMARIZER_STATUS: FAIL` and stop). Closes the unreachable-retry loop that wasted budget in rounds 1-6.
+
+**Live-smoke verification — 6-way comparison.** The R7 fix was verified against six model configurations using `scripts/run_drug_target_summarizer_only.py`:
+
+| Model | Status | Time | save retries | HTML generated | Final `SUMMARIZER_STATUS` |
+|---|---|---|---|---|---|
+| `gpt-5.4` | PASS | ~7 min | 1 (1-shot) | yes | `PASS` |
+| `gpt-5.4-mini` | FAIL | 2.1 min | 2 (both fail) | no | `FAIL` |
+| `qwen3.5:35b` @ shared ollama (model swap) | INCOMPLETE | 6.4 min | 4 (3 fail+1) | yes | (token missing) |
+| `qwen3.5:35b` @ dedicated ollama (no swap) | PASS | 5.7 min | 2 (1 fail+1) | yes | `PASS` |
+| `qwen3.6:35b` @ dedicated ollama | INCOMPLETE | 27.6 min | 2 (1 fail+1) | no | (virtual-path trap on validator result) |
+| `qwen3.5:122b` @ dedicated ollama | PASS | 29.3 min | 4 (3 fail+1) | yes | `PASS` |
+
+**Decisive evidence.** Both production-grade models (gpt-5.4, qwen3.5:122b) pass cleanly with no further code changes. Every model that reached `validate_drug_md` got `valid=true` and was allowed past the mechanically-gated `generate_drug_html_report`. `UNCITED_QUANTITATIVE` was not observed in any run — the producer/validator contract is repaired across the full model spectrum tested.
+
+**The smaller-model failure modes are out of round-7 scope and are not regressions introduced by PR #19.** They are the R01 (b') accepted regression ("prompt-only enforcement may not converge for non-compliant LLMs") materializing on weaker instruction-following targets:
+
+- `gpt-5.4-mini` fabricated provenance keys (`evidence/assessment_results.json::combined_total`) — bypassed the mandatory `lookup_provenance_value` call.
+- `qwen3.5:35b` was nondeterministic across runs — same model, same fixture, two different terminal outcomes (one PASS, one INCOMPLETE with HTML generated but the final `SUMMARIZER_STATUS:` token omitted).
+- `qwen3.6:35b` hit the documented virtual-path trap (`deepagents-virtual-mode-ls-glob-empty.md`) when reading the offloaded validator result via `read_file('/private/var/folders/.../drug.md')` instead of the virtual path; main's PR #17 `auto-normalize absolute paths in virtual_mode FilesystemBackend` is the backend-level fix for this, and it shipped on `main` independently.
+
+**Content-quality observation (deferred to a follow-up PR).** Both PASS-state `drug.md` artifacts (gpt-5.4 and qwen3.5:122b) carry two non-validator-detectable issues:
+
+- **EXPAND prose boilerplate**: each model repeats one identical sentence verbatim across 8 EXPAND slots. The boilerplate content differs by model (gpt-5.4 cites the static report template, qwen3.5:122b lists the specific drug names and gap analysis), but the 8x repetition pattern is identical.
+- **External medical knowledge inject**: both models add ungrounded medical prose (e.g. *"T-cell mediated inflammation and fibrotic remodeling"*, *"clearance of proteases and regulation of TGF-beta signaling"*, *"epithelial injury and inflammatory adhesion biology"*) that is not anchored in any evidence file.
+
+This is the explicit R01 (b') accepted regression — *prose-quality cost from removing the critic+repair loop*. R7's scope was producer/validator contract correctness, which is met. Prose-quality work is tracked separately and will land in a follow-up PR.
+
+**Merge integration commit (`23f5501`, squashed into `1b3e824`).** Main had advanced independently with three PRs on 2026-05-07 (PR #16 fail-closed gates, PR #17 virtual-path normalize, PR #18 `DrugMdSaveSanitizerMiddleware`) that took a parallel design direction (middleware fortification) while feat developed the R01 (b') simplification on 2026-05-14. The merge keeps PR #19 as the source of truth for the summarizer design while admitting main's additive validator hardening that is layer-compatible — specifically five non-conflicting blocks in `stage_logic.py` (stoplist expansion, Stage 1 ligand/receptor allowlist for FABRICATED_DRUG_NAME, `_BLOCKING_VALIDATE_DRUG_MD_FINDINGS` allowlist, renderer-scoped finding suppression, disease scope note). Six middleware-targeted test files admitted from main (`test_drug_md_save_sanitizer.py`, `test_summarizer_finalization_gate.py`, `test_summarizer_middleware_runtime_state.py`, `test_summarizer_chain_regression.py`, `test_summarizer_middleware_chain_order.py`, `test_fs_backend_virtual_mode_fallback.py`) were removed because the middleware classes and `fs_backend` module they exercise were deleted by R01 (b'). One unrelated `req` file was dropped as out-of-scope. Final test count after merge: 410 passed (was 407 pre-merge + 3 admitted from compatible main tests), 3 pre-existing deselects, 4 xfailed. `ruff check` clean across all changed files.
+
 ### Live-smoke follow-up — round 6 + deepwork consensus (2026-05-14)
 
 Round 6 live smoke (gpt-5.4) after `lookup_provenance_value` landed (commit `83b8c0f`) finally got past every LLM-side failure mode of rounds 1-5. The trace shows the LLM successfully:
