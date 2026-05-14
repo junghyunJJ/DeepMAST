@@ -315,6 +315,57 @@ The 17 legacy summarizer-middleware tests (plus four additional consumer tests) 
 - TS-07: `save_report_expansions` auto-derives `reference_card_hash` when the caller omits it
 - TS-08: `save_report_expansions` still rejects an explicit mismatched hash with `expected`/`supplied` in the error payload
 
+### Live-smoke follow-up — round 6 + deepwork consensus (2026-05-14)
+
+Round 6 live smoke (gpt-5.4) after `lookup_provenance_value` landed (commit `83b8c0f`) finally got past every LLM-side failure mode of rounds 1-5. The trace shows the LLM successfully:
+
+1. Called `lookup_provenance_value` 7 times — all returned `ok: true` with exact source_values
+2. Submitted `save_report_expansions` — **saved: true, errors: []** on first try
+3. Rendered `drug.md` via `render_drug_md_from_expansions`
+4. Called `validate_drug_md` — returned `valid: false, issue_count: 1, type: UNCITED_QUANTITATIVE`
+5. Retry — identical failure
+
+Final status: `SUMMARIZER_STATUS: FAIL` on 10 Census lines like `- Census: risk_ratio=0.0523, p_value=0.0` that the validator flagged as uncited.
+
+**Crucially: this failure is qualitatively different from rounds 1-5.** Those were all LLM↔tool contract gaps that prompt/tool design could close. Round 6 is the **first server-side contract bug** — two Python modules disagree:
+
+- Producer: `skills/drug-target-reporting/templates/drug_report.md.j2:136-138` emits the Census line with NO source annotation.
+- Consumer: `src/agents/drug_target/tools/stage_logic.py:3001-3068` `UNCITED_QUANTITATIVE` regex requires `\.json|\[from\s+[^\]]+\]|stage[123]_…`. None of those appear in template output.
+- LLM authoring surface (`save_report_expansions`, EXPAND markers) cannot touch template body. The retry budget is structurally unspendable.
+
+**Git archaeology**: `UNCITED_QUANTITATIVE` was introduced in commit `a61f8f8` on `main` (pre-PR-19). The template was never modified on PR #19 either. The conflict was LATENT on `main` — masked by the now-deleted critic+repair loop in `567dcb1`, which had a `save_drug_md` + REPAIR MODE prompt branch granting the LLM line-level template patching. The simplification removed the masking layer but did not remove the underlying contract bug.
+
+### Deepwork dual review (architect + code-reviewer) — consensus
+
+Both reviewers identify the same root cause at the same file:line and recommend the same remediation:
+
+**Cross-stance agreement clusters (CRITICAL):**
+- **CAC-1**: validator-template contract violation. Fix template-side — extend `drug_report.md.j2:137` to emit `[from stage1_{{ p.pair_file }}.json]` inline; add `pair_file` field to `_preformat_cards` at `drug_report_html.py:794-803`. ~10 lines. Producer becomes validator-compliant by construction.
+- **CAC-2** (HIGH): no LLM-free round-trip test exists that exercises `build_evidence_summary → save_report_expansions → render_drug_md_from_expansions → validate_drug_md` end-to-end. This admitted the round-6 class of bug into CI. Add `tests/agents/drug_target/test_summarizer_round_trip.py` — must fail on `83b8c0f`, pass after CAC-1.
+
+**Rejected alternatives (both reviewers):**
+- (a) Validator scope narrowing — MEDIUM rejection: requires byte-offset region tracking, weakens a paranoid check that catches real LLM hallucinations elsewhere.
+- (c) Re-add line-level authoring tool — HIGH rejection: contradicts simplification intent ("LLM as NARRATIVE EXPANDER only"), re-opens hallucination surface.
+
+**Strategic verdict (both): (i) Ship PR #19 with the targeted fix.** The convergence pattern (R1-R5 LLM↔tool, R6 server-side contract) supports shipping. (ii) Python composer, (iii) Revert, (iv) Critic tool — all rejected.
+
+**Additional findings from code-reviewer (defensive stance):**
+- **DS-1 (HIGH)**: path-traversal surface in `lookup_provenance_value` and `save_report_expansions` — `data_dir` accepted without allowlist; `mkdir` runs before validation. Production agent serves arbitrary upstream messages.
+- **DS-2 (HIGH)**: no UNCITED_QUANTITATIVE bracketing tests (no positive-fires + negative-passes pair).
+- **DS-3 (HIGH, off-topic)**: `coexpression_detected` boolean bug at `stage_logic.py:2371` conflates "no signal" with "significant depletion."
+- **DS-4 (HIGH)**: `validate_report_expansions` mutates caller input — foot-gun for non-LLM callers passing Pydantic instances.
+- Several MEDIUM/LOW items (claim_type loose typing, count claim shadowing, regex drift, smoke script legibility).
+
+### Action plan — Round 7
+
+Recorded in `.omb/plans/2026-05-14-pr19-round7-template-citation.md`:
+
+- **P0**: CAC-1 (template fix) + CAC-2 (round-trip regression test)
+- **P1 (same PR if scope allows)**: DS-2 (bracketing tests), DS-1 (path-traversal guard), drop unreachable retry sub-rubric from `SUMMARIZER_PROMPT`
+- **Deferred (follow-up issues)**: DS-3, DS-4, MEDIUM/LOW items
+
+This is expected to be the last round before merge. Round-7 risk is LOW because the remaining failure modes after CAC-1 land are LLM EXPAND-region hallucinations — exactly what the current validator + `lookup_provenance_value` are aligned against.
+
 ### Live-smoke follow-up — round 5 (2026-05-14)
 
 After commit `ee46263` wired `SkillsMiddleware` + `SkillActivator` into
