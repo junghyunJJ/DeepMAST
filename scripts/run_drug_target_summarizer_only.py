@@ -370,7 +370,10 @@ async def _run(args: argparse.Namespace) -> None:
         WriteFileArgGuardMiddleware,
     )
     from src.agents.drug_target.subagents.summarizer import get_summarizer_subagent
+    from src.agents.drug_target.tools import read_skill_file
     from src.agents.model import create_llm
+    from src.agents.shared.skill_activator import SkillActivator
+    from src.agents.shared.skills_middleware import SkillsMiddleware
 
     # ------------------------------------------------------------------
     # Build standalone summarizer DeepAgent
@@ -383,13 +386,28 @@ async def _run(args: argparse.Namespace) -> None:
         virtual_mode=True,
     )
 
-    # The standalone agent uses the same tool surface, system prompt, and
-    # fail-closed guard as the full pipeline summarizer. We additionally
-    # prepend WriteFileArgGuardMiddleware so any incidental write_file call
-    # is shaped correctly (mirroring the parent agent's middleware stack).
+    # ------------------------------------------------------------------
+    # Wire the drug-target-reporting skill the same way the full
+    # `create_drug_target_agent` pipeline does (see
+    # `src/agents/drug_target/subagents/configs.py:get_subagents` —
+    # SkillsMiddleware injects the skill metadata into the system
+    # prompt; SkillActivator + `read_skill_file` lets the LLM pull the
+    # full SKILL.md body on demand). Without this wiring the standalone
+    # smoke runs in a *weaker* environment than production, which is
+    # how round 1-3 live-smoke failures (UNCITED_QUANTITATIVE,
+    # FABRICATED_DRUG_NAME, retry-replace-not-patch confusion) survived
+    # — the skill content covers exactly those concerns. The seven-tool
+    # invariant is preserved on `get_summarizer_subagent()`; the smoke
+    # adds `read_skill_file` because it is the agreed mechanism for the
+    # LLM to consume the skill body on demand.
+    # ------------------------------------------------------------------
+    skill_name = "drug-target-reporting"
+    skills_dir = PROJECT_ROOT / "skills"
+    skill_registry = {skill_name: str(skills_dir / skill_name)}
+
     agent = create_deep_agent(
         model=llm,
-        tools=list(spec["tools"]),
+        tools=[*spec["tools"], read_skill_file],
         system_prompt=spec["system_prompt"],
         backend=backend,
         # Pass subagents=[] explicitly so deepagents does NOT auto-attach
@@ -401,9 +419,15 @@ async def _run(args: argparse.Namespace) -> None:
         middleware=[
             WriteFileArgGuardMiddleware(backend_root=str(data_dir)),
             *spec["middleware"],
+            SkillsMiddleware(
+                skills_dir=str(skills_dir),
+                allowed_skill_names=(skill_name,),
+            ),
+            SkillActivator(skill_registry=skill_registry),
         ],
     )
     agent = agent.with_config({"recursion_limit": args.recursion_limit})
+    print(f"  Skill wired:      {skill_name} (from {skills_dir / skill_name})")
 
     initial_message = (
         f"Finalize the drug target assessment report.\n\n"
