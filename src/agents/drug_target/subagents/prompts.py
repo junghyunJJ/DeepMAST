@@ -961,28 +961,58 @@ single tool-calling LLM — there are no inner subagents.
 Step 1. Call `build_evidence_summary` exactly once.
 Step 2. Call `load_evidence_files` for the active gene set.
 Step 3. BEFORE calling `save_report_expansions`, discover the run-specific
-        slot inventory and provenance keys: call `read_file` on
-        `<data_dir>/expansion_schema_spec.json`. It contains:
+        slot inventory and provenance keys: call
+        `read_file("/expansion_schema_spec.json")`.
+        The path is a VIRTUAL path (starts with `/`, no `<data_dir>`
+        prefix, no `/private/tmp/...` prefix) — virtual_mode is enabled
+        and the FilesystemBackend will resolve it under the run directory.
+        Reading the data_dir disk path will fail with "File not found"
+        even though the file exists on disk.
+
+        The spec contains:
           - `required_slot_ids`: every slot_id you must author
           - `example_sentence`: the exact sentence + source_provenance shape
             to mirror (copy this, then edit text + values for your slot)
           - `valid_provenance_keys`: every "source_file::source_field"
             pair you may cite — do NOT invent files or fields outside
             this list.
+
         Then call `save_report_expansions(data_dir, expansions)`. The
         `expansions` payload follows the Pydantic schema advertised in
         the tool's args_schema (top-level: schema_version + slots; each
         slot: slot_id + non-empty sentences list; each sentence: text +
         source_fields + source_provenance). Author at least ONE sentence
-        per required_slot_id.
+        per required_slot_id — every required_slot_id MUST appear in
+        the `slots` list, or the validator rejects with
+        `missing required slot_id: ...`.
         OMIT `reference_card_hash` — the tool auto-derives it from the
         on-disk reference card. Do NOT invent a SHA256 hash.
 Step 4. Call `render_drug_md_from_expansions`.
 Step 5. Call `validate_drug_md`.
         - If `valid=true`: go to Step 6.
-        - If `valid=false`: inspect `errors`, re-call `save_report_expansions`
-          to fix only the offending sections, then re-render and re-validate.
-          REPEAT AT MOST 2 TIMES (3 total `validate_drug_md` calls).
+        - If `valid=false`: REPEAT AT MOST 2 TIMES (3 total `validate_drug_md`
+          calls). Each retry follows this exact sequence:
+            a. Inspect the `issues` array. If the validator result is
+               offloaded as a large tool result, use
+               `read_file("/large_tool_results/<call_id>")` to read it
+               (VIRTUAL path — never use a disk-prefix path).
+            b. Identify which slots produced the offending sentences.
+               Common issues:
+                 * `UNCITED_QUANTITATIVE` — a numeric claim has no
+                   `[source: <field>]` annotation. Fix by either adding
+                   the annotation or removing the quantitative claim.
+                 * `UNANCHORED_SENTENCE` — a factual sentence has no
+                   `source_provenance` entry from valid_provenance_keys.
+                 * `FABRICATED_DRUG_NAME` — drug name not present in the
+                   reference card. Fix by removing or replacing it with
+                   a drug name actually present in the run evidence.
+            c. Rebuild the FULL `expansions` payload — `save_report_expansions`
+               REPLACES the prior payload, so every required_slot_id from
+               Step 3 MUST appear in the new `slots` list. Do NOT submit
+               only the changed slots; include the unchanged ones verbatim.
+            d. Call `save_report_expansions(data_dir, expansions)` with the
+               full payload, then `render_drug_md_from_expansions`, then
+               `validate_drug_md` again.
         - If still `valid=false` after the 2nd retry, emit exactly:
             SUMMARIZER_STATUS: FAIL
           followed by a concise summary of `errors`, and STOP.

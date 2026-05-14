@@ -315,6 +315,54 @@ The 17 legacy summarizer-middleware tests (plus four additional consumer tests) 
 - TS-07: `save_report_expansions` auto-derives `reference_card_hash` when the caller omits it
 - TS-08: `save_report_expansions` still rejects an explicit mismatched hash with `expected`/`supplied` in the error payload
 
+### Live-smoke follow-up — round 3 (2026-05-14)
+
+Round 3 live smoke (gpt-5.4) after schema-discovery fix (commit `072a2bc`)
+exposed two further prompt defects and one residual content-quality risk:
+
+- **P0 — `SUMMARIZER_PROMPT` Step 3 instructed the LLM to read
+  `<data_dir>/expansion_schema_spec.json`**, a disk-prefix path. Under
+  `FilesystemBackend(virtual_mode=True)` the absolute path is reinterpreted
+  as a virtual path relative to the backend root, producing
+  `File not found` (the same gotcha documented in
+  `deepagents-virtual-mode-ls-glob-empty.md`). The bottom-of-prompt
+  GUIDANCE clause already warned against this antipattern; my Step 3
+  wording contradicted it. Fix: Step 3 now says
+  `read_file("/expansion_schema_spec.json")` (virtual path).
+
+- **P1 — `save_report_expansions` retry semantics were ambiguous.**
+  The LLM read the first validation issue (a single
+  `UNCITED_QUANTITATIVE` finding), attempted a patch by submitting a
+  payload that only included the modified slot, and the validator
+  rejected with `missing required slot_id: ...`. The tool's contract is
+  REPLACE, not PATCH — every required slot must appear in every payload.
+  Step 5 now expands the retry rubric: read offloaded validator results
+  via the virtual `/large_tool_results/...` path, identify offending
+  slots, then rebuild the FULL payload (all required_slot_ids) before
+  re-saving.
+
+- **P2 — `subagents=[]` does NOT suppress
+  `SubAgentMiddleware`/`task`**. deepagents auto-attaches the
+  middleware with a default general-purpose subagent regardless of the
+  `subagents` argument's emptiness. In round 3 the LLM dispatched the
+  `task` tool once (msg 13-14) and used it productively for schema
+  extraction, so the residual `task` tool was net positive for that
+  run. Suppression is left out of scope until live-smoke evidence shows
+  net negative impact.
+
+**Residual content-quality risk (acknowledged):** the round 3 run
+reached `validate_drug_md` and saw a single `UNCITED_QUANTITATIVE`
+finding. The LLM's repair attempt broke slot inventory (P1 above) and
+the run gave up. After the prompt fixes ship, the next live smoke
+should at minimum reach validate cleanly. But the *content* itself
+(uncited quantitative claims, unanchored sentences, fabricated drug
+names) is a generation-quality problem the 2026-05-13 simplification
+deliberately accepted as regression when it removed the critic→repair
+loop. If round 4 fails on the same validator findings, the next
+remediation tier is either (iii) Python-level deterministic prose
+composition or (iv) a single critic tool (not a subagent) that returns
+structured findings the LLM can fix per-sentence.
+
 ### Live-smoke follow-up (2026-05-14)
 
 Live smoke against `openai gpt-5.4` surfaced a pre-existing tool-design issue
