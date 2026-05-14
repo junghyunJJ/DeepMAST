@@ -6,13 +6,129 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from langchain_core.tools import tool
+from pydantic import BaseModel, Field
 
 REFERENCE_CARD_VERSION = "drug_report_reference_card.v1"
 REPORT_EXPANSIONS_VERSION = "report_expansions.v1"
+EXPANSION_SCHEMA_SPEC_FILE = "expansion_schema_spec.json"
 _EXPAND_RE = re.compile(r"<!--\s*EXPAND(?:_SLOT)?:\s*(.*?)\s*-->", re.DOTALL)
+
+
+# =============================================================================
+# Pydantic schema for `save_report_expansions(expansions=...)` (2026-05-14)
+# =============================================================================
+#
+# The previous tool signature `expansions: dict` was opaque to LangChain's
+# @tool auto-schema — LLMs received no advertised structure and had to
+# reverse-engineer the deeply-nested payload from the offloaded reference
+# card. Live-smoke runs against gpt-5.4 surfaced this as the dominant
+# failure mode (sentences-empty, RENDER_SOURCE_HASH_MISMATCH oscillation).
+#
+# These Pydantic models advertise the *structural* shape via the tool
+# description. Instance-specific valid values (concrete slot_ids and
+# provenance keys for the active gene set) come from the companion
+# discovery file ``expansion_schema_spec.json`` written by
+# ``persist_drug_report_reference_card``.
+
+
+class SourceProvenance(BaseModel):
+    """Anchor for one factual sentence in the on-disk evidence."""
+
+    source_file: str = Field(
+        description=(
+            "Evidence file path (e.g. 'evidence/ot_TGFB1.json'). Must be a "
+            "key prefix from expansion_schema_spec.valid_provenance_keys."
+        )
+    )
+    source_field: str = Field(
+        description=(
+            "JSON field within the source file (e.g. 'clinical_drugs'). "
+            "The (source_file, source_field) pair must appear in "
+            "expansion_schema_spec.valid_provenance_keys."
+        )
+    )
+    source_class: str = Field(
+        description=(
+            "Provenance class, e.g. 'opentargets_clinical' or "
+            "'chembl_preclinical'. Read this verbatim from the "
+            "provenance_index entry — do not invent."
+        )
+    )
+    claim_type: str = Field(
+        default="direct_value",
+        description=(
+            "How the claim relates to the source value: 'direct_value' "
+            "(value must equal the source), 'count' (value is len of the "
+            "source), or 'absence' (source must be empty)."
+        ),
+    )
+    source_value: Any = Field(
+        default=None,
+        description=(
+            "The actual value pulled from the reference-card provenance "
+            "index. For 'direct_value' it must match the index entry."
+        ),
+    )
+
+
+class SentenceItem(BaseModel):
+    """One factual sentence of narrative interpretation."""
+
+    text: str = Field(description="One complete sentence.")
+    source_fields: list[str] = Field(
+        description=(
+            "Field names this sentence cites. Use the same field name(s) "
+            "you put in source_provenance.source_field."
+        )
+    )
+    source_provenance: SourceProvenance = Field(
+        description="Anchor to the reference-card provenance index."
+    )
+
+
+class SlotItem(BaseModel):
+    """One expansion slot (a specific section/gene/rank location)."""
+
+    slot_id: str = Field(
+        description=(
+            "Exactly one entry from "
+            "expansion_schema_spec.required_slot_ids."
+        )
+    )
+    sentences: list[SentenceItem] = Field(
+        min_length=1,
+        description=(
+            "At least one SentenceItem. The full sentence schema is the "
+            "shape advertised here and mirrored by "
+            "expansion_schema_spec.example_sentence."
+        ),
+    )
+
+
+class ReportExpansionsPayload(BaseModel):
+    """Schema-validated payload for ``save_report_expansions``."""
+
+    schema_version: Literal["report_expansions.v1"] = Field(
+        default="report_expansions.v1",
+        description="MUST be exactly 'report_expansions.v1'.",
+    )
+    reference_card_hash: str | None = Field(
+        default=None,
+        description=(
+            "OPTIONAL — leave it unset. The tool auto-derives the hash "
+            "from drug_report_reference_card.json on disk. Do NOT attempt "
+            "to compute canonical-JSON SHA256 manually."
+        ),
+    )
+    slots: list[SlotItem] = Field(
+        description=(
+            "One entry per required_slot_id from "
+            "expansion_schema_spec.required_slot_ids."
+        ),
+    )
 
 
 def canonical_json_dumps(value: Any) -> str:
@@ -149,8 +265,81 @@ def _build_provenance_index(reference_card: dict) -> dict:
     return index
 
 
+def build_expansion_schema_spec(reference_card: dict) -> dict:
+    """Build a compact schema-discovery payload from the reference card.
+
+    The summarizer LLM reads this file (separate from the large reference
+    card) to learn the run-specific slot IDs and one concrete sentence
+    example pinned to a real provenance entry. Keeping the spec in its own
+    small file ensures it stays inside the deepagents FilesystemMiddleware
+    inline-result window and never gets offloaded.
+    """
+    expansion_slots = reference_card.get("expansion_slots", []) or []
+    provenance_index = reference_card.get("provenance_index", {}) or {}
+
+    required_slot_ids = [
+        str(slot["slot_id"])
+        for slot in expansion_slots
+        if isinstance(slot, dict) and slot.get("slot_id")
+    ]
+    valid_provenance_keys = sorted(provenance_index.keys())
+
+    # Anchor the example sentence to a real provenance entry when available
+    # so the LLM has a copy-paste-ready template that already validates.
+    if valid_provenance_keys:
+        first_key = valid_provenance_keys[0]
+        entry = provenance_index.get(first_key, {}) if isinstance(
+            provenance_index.get(first_key), dict
+        ) else {}
+        example_source_file = str(entry.get("source_file") or "")
+        example_source_field = str(entry.get("source_field") or "")
+        example_source_class = str(entry.get("source_class") or "")
+        example_source_value = entry.get("source_value")
+    else:
+        example_source_file = "evidence/<file>.json"
+        example_source_field = "<field>"
+        example_source_class = "<source_class>"
+        example_source_value = None
+
+    example_sentence = {
+        "text": (
+            f"Replace this with one factual sentence interpreting "
+            f"{example_source_field} from {example_source_file}."
+        ),
+        "source_fields": [example_source_field],
+        "source_provenance": {
+            "source_file": example_source_file,
+            "source_field": example_source_field,
+            "source_class": example_source_class,
+            "claim_type": "direct_value",
+            "source_value": example_source_value,
+        },
+    }
+
+    return {
+        "schema_version": REPORT_EXPANSIONS_VERSION,
+        "instruction": (
+            "Author one SlotItem per required_slot_id. Each SlotItem has a "
+            "non-empty sentences list. Each sentence has the shape shown in "
+            "example_sentence, with source_provenance keyed on a valid "
+            "(source_file, source_field) pair from valid_provenance_keys. "
+            "Do not invent source_file or source_field values that are not "
+            "in this list. Omit reference_card_hash from your payload — "
+            "save_report_expansions auto-derives it from disk."
+        ),
+        "required_slot_ids": required_slot_ids,
+        "example_sentence": example_sentence,
+        "valid_provenance_keys": valid_provenance_keys,
+    }
+
+
 def persist_drug_report_reference_card(data_dir: str | Path, reference_card: dict) -> dict:
-    """Persist the canonical Reference Card used by report rendering."""
+    """Persist the canonical Reference Card used by report rendering.
+
+    Also writes the compact ``expansion_schema_spec.json`` next to the
+    reference card so the summarizer LLM can discover run-specific slot
+    IDs and the provenance shape without parsing the large reference card.
+    """
     base = Path(data_dir).expanduser().resolve()
     base.mkdir(parents=True, exist_ok=True)
     card = dict(reference_card)
@@ -160,6 +349,10 @@ def persist_drug_report_reference_card(data_dir: str | Path, reference_card: dic
         card["provenance_index"] = _build_provenance_index(card)
     path = base / "drug_report_reference_card.json"
     path.write_text(json.dumps(card, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    spec = build_expansion_schema_spec(card)
+    spec_path = base / EXPANSION_SCHEMA_SPEC_FILE
+    spec_path.write_text(json.dumps(spec, indent=2, ensure_ascii=False), encoding="utf-8")
     return card
 
 
@@ -312,7 +505,13 @@ def validate_report_expansions(data_dir: str | Path, expansions: dict) -> tuple[
         if not isinstance(sentences, list) or not sentences:
             errors.append({
                 "code": "REPORT_EXPANSIONS_INVALID",
-                "message": f"{slot_id} must include at least one sentence",
+                "message": (
+                    f"{slot_id} must include at least one sentence — each "
+                    "sentence is {text: str, source_fields: list[str], "
+                    "source_provenance: {source_file, source_field, "
+                    "source_class, claim_type, source_value}}. See "
+                    f"{EXPANSION_SCHEMA_SPEC_FILE}.example_sentence."
+                ),
             })
             continue
         for sentence in sentences:
@@ -351,11 +550,48 @@ def validate_report_expansions(data_dir: str | Path, expansions: dict) -> tuple[
 
 
 @tool
-def save_report_expansions(data_dir: str, expansions: dict) -> str:
-    """Validate and persist report_expansions.json."""
+def save_report_expansions(
+    data_dir: str,
+    expansions: ReportExpansionsPayload,
+) -> str:
+    """Validate and persist ``report_expansions.json``.
+
+    Authors per-section Markdown expansions for the drug-target report.
+    The ``expansions`` payload is structurally validated by Pydantic
+    against the model advertised in this tool's args_schema; instance-
+    specific values (legal slot_ids, legal provenance keys) come from
+    ``<data_dir>/expansion_schema_spec.json`` (created by
+    ``build_evidence_summary``).
+
+    Args:
+        data_dir: Run working directory.
+        expansions: ReportExpansionsPayload with schema_version, optional
+            reference_card_hash (auto-derived if omitted), and a slots
+            list. Each slot has a slot_id (from
+            expansion_schema_spec.required_slot_ids) and a non-empty
+            sentences list. Each sentence has text + source_fields +
+            source_provenance (source_file, source_field, source_class,
+            claim_type, source_value) — pin every provenance to a key in
+            expansion_schema_spec.valid_provenance_keys.
+
+    Returns:
+        JSON string with shape
+        ``{"saved": bool, "path": "...", "errors": [...]}``. When
+        ``saved`` is True the file at ``path`` mirrors the validated
+        payload (with the auto-derived reference_card_hash filled in).
+    """
     base = Path(data_dir).expanduser().resolve()
     base.mkdir(parents=True, exist_ok=True)
-    _, errors = validate_report_expansions(base, expansions)
+    # ``expansions`` may arrive as a Pydantic instance (LangChain tool
+    # invocation) or as a raw dict (direct .invoke({"expansions": {...}})
+    # call from tests / scripts). Normalize to a mutable dict so the
+    # existing in-place hash auto-derive in validate_report_expansions
+    # carries through to the persisted JSON.
+    if isinstance(expansions, BaseModel):
+        expansions_dict = expansions.model_dump()
+    else:
+        expansions_dict = dict(expansions)
+    _, errors = validate_report_expansions(base, expansions_dict)
     result = {
         "saved": False,
         "path": str(base / "report_expansions.json"),
@@ -364,7 +600,7 @@ def save_report_expansions(data_dir: str, expansions: dict) -> str:
     if errors:
         return json.dumps(result, indent=2)
     (base / "report_expansions.json").write_text(
-        json.dumps(expansions, indent=2, ensure_ascii=False),
+        json.dumps(expansions_dict, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
     result["saved"] = True

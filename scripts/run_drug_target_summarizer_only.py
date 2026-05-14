@@ -392,6 +392,12 @@ async def _run(args: argparse.Namespace) -> None:
         tools=list(spec["tools"]),
         system_prompt=spec["system_prompt"],
         backend=backend,
+        # Pass subagents=[] explicitly so deepagents does NOT auto-attach
+        # SubAgentMiddleware with a default general-purpose subagent. The
+        # standalone summarizer is intentionally one-loop / fixed-tool;
+        # `task` dispatch was empirically a source of fruitless schema-
+        # inference detours in live-LLM runs (see commit history).
+        subagents=[],
         middleware=[
             WriteFileArgGuardMiddleware(backend_root=str(data_dir)),
             *spec["middleware"],

@@ -14,13 +14,13 @@ This report presents a comprehensive therapeutic target assessment for **pulmona
 - **LRP1** — Classification: validated_target, Priority: high, Exploratory Total: 4, Combined Total: 10
 - **ICAM1** — Classification: validated_target, Priority: high, Exploratory Total: 3, Combined Total: 10
 
-The seven featured candidates represent validated therapeutic targets with strong clinical trial activity and high tractability scores, suggesting multiple mechanistic approaches for pulmonary fibrosis intervention. [source: interpretation] Each target demonstrates combined_total scores ranging from 10 to 15, indicating substantial evidence supporting their prioritization for preclinical development. [source: combined_total] The diversity of biological mechanisms—from immune modulation (CD4, CD47) to ECM remodeling (FN1, LRP1) and cell adhesion (ICAM1, ITGB2, MUC1)—provides multiple therapeutic entry points for fibrosis intervention. [source: interpretation]
+<!-- EXPAND: Add 2-3 sentences summarizing key therapeutic opportunities -->
 
 ## 2. Gene & L-R Pair Prioritization
 
 ### 2.1. Druggability Matrix
 
-The druggability matrix reveals that all seven featured candidates achieve validated_target classification with high priority status, reflecting strong clinical evidence and biological plausibility. [source: interpretation] Each featured gene demonstrates clinical_trial_activity scores of 5, indicating active drug development pipelines across multiple therapeutic indications. [source: clinical_trial_activity] The validated_total scores range from 6 to 10, with existing_drug_evidence contributing 1-5 points and safety_profile consistently at 0, suggesting favorable safety profiles for further development. [source: validated_total] Exploratory_total scores of 3-5 reflect moderate genetic support and tractability, with biological_plausibility scores of 1-2 supporting the mechanistic rationale for each target. [source: exploratory_total]
+<!-- EXPAND: Add 2-3 sentences interpreting the overall scoring landscape -->
 
 | Gene | Drug Ev. | Trial | Safety | Val. Total | GWAS | Tract. | Bio. Plaus. | Novelty | Expl. Total | Combined | Classification | Priority | Stage3 |
 |------|--------:|------:|-------:|-----------:|-----:|-------:|------------:|--------:|------------:|---------:|----------------|----------|--------|
@@ -86,7 +86,7 @@ Each gene is scored on two independent tracks reflecting different types of ther
 | GWAS | gwas_support | 0-3 | GWAS Catalog | 0 = no disease-specific GWAS evidence; 1 = proximity hits only (within 500kb); 2 = direct disease link (gene-in-trait or gene-SNP overlap); 3 = genome-wide significant overlap (p < 5e-8) | Genetic validation strength for this disease |
 | Tract. | tractability | 0-3 | OpenTargets Tractability | 0 = unknown druggability; 1 = predicted structure or druggable family; 2 = clinical precedent (advanced clinical / Phase 1); 3 = approved drug exists for this modality | How feasible it is to develop a drug against this target |
 | Bio. Plaus. | biological_plausibility | 0-5 | OpenTargets Evidence + Ensembl VEP | Count of distinct evidence types (affected_pathway, literature, animal_model, somatic_mutation) + bonus if max score >= 0.7, + VEP high-impact variant boost | Breadth and strength of biological evidence linking gene to disease |
-| Novelty | novelty_opportunity | 0-5 | OpenTargets Associations | Inverse of number of disease associations: 5 = 0 associations (completely novel, e.g. ST-only discovery); 4 = 1-2; 3 = 3-5; 2 = 6-15; 1 = 16-30; 0 = 30+ (well-established target) | Higher = less explored, greater opportunity for novel discovery |
+| Novelty | novelty_opportunity | 0-5 | OpenTargets Associations | Inverse of number of disease associations: 0 = 1000+ associations (well-studied target); 1 = 300-999 associations (moderately studied target); 2 = 100-299 associations (emerging target); 3 = 30-99 associations (less explored target); 4 = 10-29 associations (sparsely explored target); 5 = 0-9 associations (ST-only discovery or brand-new target) | Higher = less explored, greater opportunity for novel discovery |
 | Expl. Total | exploratory_total | 0-16 | (computed) | Sum of GWAS + Tract. + Bio. Plaus. + Novelty | Overall exploratory potential; higher = stronger biological rationale for investigation |
 
 ##### Combined Score, Classification & Priority
@@ -100,7 +100,7 @@ Each gene is scored on two independent tracks reflecting different types of ther
 
 ### 2.2. Biological Interaction Filter Results
 
-The biological interaction filter evaluates protein-protein interaction strength and cell-type-specific coexpression to validate the functional relevance of each ligand-receptor pair. [source: interpretation] STRING PPI scores for all featured candidate pairs range from 0.697 to 0.999, indicating strong protein-protein interaction confidence across the biological network. [source: string_ppi] Census coexpression analysis reveals significant p-values (p=0.0) for multiple pairs, suggesting cell-type-specific expression patterns consistent with functional relevance in pulmonary fibrosis pathology. [source: census_pvalue] The risk_ratio values vary from 0.0523 to 17.863, reflecting differential enrichment patterns across cell populations that may inform target cell-type selection for therapeutic intervention. [source: risk_ratio]
+<!-- EXPAND: Add 2-3 sentences interpreting which L-R pairs passed biological validation and the implications for target selection -->
 
 *No Stage 1 filter results available.*
 
@@ -123,19 +123,29 @@ The biological interaction filter evaluates protein-protein interaction strength
 
 **A. Drug Profile**
 
-- No known drugs targeting this gene
+**Preclinical Compounds (ChEMBL Bioactivity):**
+- **N1-(4-((4-(1-ethyl-4-fluoro-2-methyl-1H-benzo[d]imidazol-6-yl)-5-fluoropyrimidin-2-yl)amino)benzyl)-N8-hydroxyoctanediamide** (CHEMBL5589596) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **Chloropeptin I analogue** (CHEMBL3143464) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **13-Cyclohexylmethoxy-6-methylene-4,8-di(p-toluenesulfonyl)-4,8,15-triazabicyclo[9.3.1]pentadeca-1(15),11,13-triene Hydrochloride** (CHEMBL4747494) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **ISOCOMPLESTATIN** (CHEMBL506605) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **CHLOROPEPTIN** (CHEMBL525803) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **9-benzyl-3-methylene-1,5-bis(p-tolylsulfonyl)-1,5,9-triazacyclododecane** (CHEMBL1852155) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **4,8-Di[(p-dimethylamino)benzenesulfonyl]-13-ethyl-6-methylene-4,8,15-triazabicyclo[9.3.1]pentadeca-1(15),11,13-triene Hydrochloride** (CHEMBL4791666) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **CYCLOTRIAZADISULFONAMIDE HYDROCHLORIDE** (CHEMBL1819181) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **13-Benzyloxy-6-methylene-4,8-di(p-toluenesulfonyl)-4,8,15-triazabicyclo[9.3.1]pentadeca-1(15),11,13-triene Hydrochloride** (CHEMBL4746252) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **13-Butyl-6-methylene-4,8-di(p-toluenesulfonyl)-4,8,15-triazabicyclo[9.3.1]pentadeca-1(15),11,13-triene Hydrochloride** (CHEMBL4750983) — mechanism not available, Phase: Preclinical, Indications: N/A
 
-CD4-targeting therapeutics have been developed for HIV infection and autoimmune indications, though no drugs are currently listed in ChEMBL or OpenTargets for pulmonary fibrosis. [source: clinical_drugs] The absence of pulmonary fibrosis-specific drug development suggests an opportunity for repurposing existing CD4-targeting antibodies or developing novel therapeutics for this indication. [source: interpretation]
+<!-- EXPAND: Describe what drugs exist and their approved indications. Do NOT speculate about repurposing potential or therapeutic opportunities for the study disease. State only what is known from the listed data. -->
 
 **B. Biological Context (Stage 1)**
 
 - **HLA-DPA1–CD4**: STRING PPI score=0.977, interaction=confirmed
 - **HLA-DPB1–CD4**: STRING PPI score=0.96, interaction=confirmed
-- **HLA-DQB1–CD4**: STRING PPI score=0.951, interaction=confirmed [from stage1_HLA-DQB1--CD4.json]
-  - Census: risk_ratio=0.0523, p_value=0.0 [from stage1_HLA-DQB1--CD4.json]
+- **HLA-DQB1–CD4**: STRING PPI score=0.951, interaction=confirmed
+  - Census: risk_ratio=0.0523, p_value=0.0
 - **HLA-DRB1–CD4**: STRING PPI score=0.994, interaction=confirmed
 
-The CD4 gene forms high-confidence protein-protein interactions with multiple HLA class II molecules, suggesting a central role in antigen presentation and T cell activation. [source: string_ppi] The strong STRING PPI scores (0.951-0.994) indicate robust physical interactions between CD4 and HLA class II complexes, consistent with established immunological function. [source: interpretation] Census coexpression analysis reveals significant p-values (p=0.0) for HLA-DQB1-CD4 interactions, suggesting cell-type-specific expression patterns that may be relevant to adaptive immune responses in pulmonary fibrosis. [source: census_pvalue]
+<!-- EXPAND: Interpret biological context and pathway relevance -->
 
 **C. Rubric Assessment**
 
@@ -143,7 +153,7 @@ The CD4 gene forms high-confidence protein-protein interactions with multiple HL
 - Exploratory Track: gwas_support=0, tractability=3, biological_plausibility=2, novelty_opportunity=0 → **exploratory_total=5**
 - **Combined Total: 15** | Classification: validated_target | Priority: high
 
-CD4 represents a high-priority validated target with substantial clinical evidence supporting drug development, warranting prioritization for preclinical/clinical development pipeline. [source: rubric_assessment] The maximum tractability score of 3 indicates established druggability with clinical precedent, while the safety_profile of 0 suggests no major safety concerns. [source: interpretation] Given the combined_total of 15 and validated_target classification, CD4 should be considered for immediate development track with focus on pulmonary fibrosis-specific indications. [source: interpretation]
+<!-- EXPAND: Add therapeutic recommendation based on evidence -->
 
 ---
 
@@ -153,14 +163,14 @@ CD4 represents a high-priority validated target with substantial clinical eviden
 
 - No known drugs targeting this gene
 
-MUC1 is a transmembrane mucin that has been explored as a therapeutic target in oncology and inflammatory conditions, though no drugs are currently listed for pulmonary fibrosis. [source: clinical_drugs] The absence of MUC1-targeting therapeutics in the pulmonary fibrosis space represents a potential gap for novel drug development. [source: interpretation]
+<!-- EXPAND: Describe what drugs exist and their approved indications. Do NOT speculate about repurposing potential or therapeutic opportunities for the study disease. State only what is known from the listed data. -->
 
 **B. Biological Context (Stage 1)**
 
-- **ICAM1–MUC1**: STRING PPI score=0.993, interaction=confirmed [from stage1_ICAM1--MUC1.json]
-  - Census: risk_ratio=17.863, p_value=0.0 [from stage1_ICAM1--MUC1.json]
+- **ICAM1–MUC1**: STRING PPI score=0.993, interaction=confirmed
+  - Census: risk_ratio=17.863, p_value=0.0
 
-The ICAM1-MUC1 interaction demonstrates the highest STRING PPI score (0.993) among all featured candidate pairs, indicating exceptional protein-protein interaction confidence. [source: string_ppi] The elevated risk_ratio of 17.863 suggests strong enrichment of this interaction in specific cell populations, potentially indicating a key role in epithelial-immune cell crosstalk. [source: risk_ratio] Census coexpression analysis with p=0.0 supports cell-type-specific expression patterns consistent with functional relevance in pulmonary fibrosis pathology. [source: census_pvalue]
+<!-- EXPAND: Interpret biological context and pathway relevance -->
 
 **C. Rubric Assessment**
 
@@ -168,7 +178,7 @@ The ICAM1-MUC1 interaction demonstrates the highest STRING PPI score (0.993) amo
 - Exploratory Track: gwas_support=0, tractability=2, biological_plausibility=2, novelty_opportunity=1 → **exploratory_total=5**
 - **Combined Total: 15** | Classification: validated_target | Priority: high
 
-MUC1 represents a high-priority validated target with strong clinical trial activity and moderate biological plausibility, supporting prioritization for preclinical/clinical development pipeline. [source: rubric_assessment] The tractability score of 2 indicates clinical precedent with advanced clinical programs, while the biological_plausibility of 2 suggests substantial evidence linking MUC1 to disease pathology. [source: interpretation] Given the combined_total of 15 and validated_target classification, MUC1 should be considered for immediate development track with focus on pulmonary fibrosis-specific mechanisms. [source: interpretation]
+<!-- EXPAND: Add therapeutic recommendation based on evidence -->
 
 ---
 
@@ -178,16 +188,16 @@ MUC1 represents a high-priority validated target with strong clinical trial acti
 
 - No known drugs targeting this gene
 
-FN1 (fibronectin) is an extracellular matrix protein that has been explored as a therapeutic target in fibrotic diseases, though no drugs are currently listed for pulmonary fibrosis. [source: clinical_drugs] The absence of FN1-targeting therapeutics in the pulmonary fibrosis space represents a potential opportunity for novel drug development targeting ECM remodeling. [source: interpretation]
+<!-- EXPAND: Describe what drugs exist and their approved indications. Do NOT speculate about repurposing potential or therapeutic opportunities for the study disease. State only what is known from the listed data. -->
 
 **B. Biological Context (Stage 1)**
 
-- **FN1–PLAUR**: STRING PPI score=0.697, interaction=confirmed [from stage1_FN1--PLAUR.json]
-  - Census: risk_ratio=0.1557, p_value=0.0 [from stage1_FN1--PLAUR.json]
-- **FN1–SDC2**: STRING PPI score=0.959, interaction=confirmed [from stage1_FN1--SDC2.json]
-  - Census: risk_ratio=0.2258, p_value=0.0 [from stage1_FN1--SDC2.json]
+- **FN1–PLAUR**: STRING PPI score=0.697, interaction=confirmed
+  - Census: risk_ratio=0.1557, p_value=0.0
+- **FN1–SDC2**: STRING PPI score=0.959, interaction=confirmed
+  - Census: risk_ratio=0.2258, p_value=0.0
 
-FN1 forms protein-protein interactions with both PLAUR and SDC2, with the FN1-SDC2 pair showing particularly strong STRING PPI confidence (0.959). [source: string_ppi] The risk_ratio values of 0.1557 and 0.2258 suggest enrichment in specific cell populations, potentially indicating roles in fibroblast-ECM adhesion and migration. [source: risk_ratio] Census coexpression analysis with p=0.0 for both pairs supports cell-type-specific expression patterns consistent with functional relevance in fibrotic ECM remodeling. [source: census_pvalue]
+<!-- EXPAND: Interpret biological context and pathway relevance -->
 
 **C. Rubric Assessment**
 
@@ -195,7 +205,7 @@ FN1 forms protein-protein interactions with both PLAUR and SDC2, with the FN1-SD
 - Exploratory Track: gwas_support=0, tractability=3, biological_plausibility=1, novelty_opportunity=1 → **exploratory_total=5**
 - **Combined Total: 15** | Classification: validated_target | Priority: high
 
-FN1 represents a high-priority validated target with maximum tractability score and strong clinical trial activity, supporting prioritization for preclinical/clinical development pipeline. [source: rubric_assessment] The tractability score of 3 indicates established druggability with clinical precedent, while the biological_plausibility of 1 suggests moderate evidence linking FN1 to disease pathology. [source: interpretation] Given the combined_total of 15 and validated_target classification, FN1 should be considered for immediate development track with focus on ECM remodeling mechanisms in pulmonary fibrosis. [source: interpretation]
+<!-- EXPAND: Add therapeutic recommendation based on evidence -->
 
 ---
 
@@ -203,16 +213,26 @@ FN1 represents a high-priority validated target with maximum tractability score 
 
 **A. Drug Profile**
 
-- No known drugs targeting this gene
+**Preclinical Compounds (ChEMBL Bioactivity):**
+- **4-(2-(Carboxymethyl)-4-oxoazetidine-1-carboxamidomethyl)-benzenaminium Trifluoroacetate** (CHEMBL4794300) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **(2S)-1-[(2S)-2-[[(2S)-3-carboxy-2-[[(2S)-4-methyl-2-[[2-[4-(o-tolylcarbamoylamino)phenyl]acetyl]amino]pentanoyl]amino]propanoyl]amino]-3-methyl-butanoyl]pyrrolidine-2-carboxylic acid** (CHEMBL88478) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **[(3R,7S,8S,8aR)-8-[2-[(4R,6R)-3-[(4-hydroxy-3-methoxy-phenyl)methyl]-4-[2-(methylamino)-2-oxo-ethyl]-2-oxo-1,3-oxazinan-6-yl]ethyl]-3,7-dimethyl-1,2,3,7,8,8a-hexahydronaphthalen-1-yl] (2S)-2-methylbutanoate** (CHEMBL4634420) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **[(1S,3R,7S,8S,8aR)-8-[2-[(4R)-4-hydroxy-1-[[5-(hydroxymethyl)-6-methoxy-2-naphthyl]methyl]-6-oxo-2-piperidyl]ethyl]-3,7-dimethyl-1,2,3,7,8,8a-hexahydronaphthalen-1-yl] (2S)-2-methylbutanoate** (CHEMBL4647684) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **2-(4-Oxoazetidin-2-yl)acetic Acid** (CHEMBL4461771) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **LOVASTATIN** (CHEMBL503) — HMG-CoA reductase inhibitor, Phase: Preclinical, Indications: Hypercholesterolemia, atherosclerosis, cardiovascular disease, coronary artery disease, coronary atherosclerosis, Disorder of lipid metabolism, Myocardial Ischemia, heart disease, intermittent vascular claudication, peripheral vascular disease, Cerebral arteriovenous malformation, Cognitive impairment, HIV infection, Parkinson disease, Rett syndrome, breast cancer, cerebral atherosclerosis, cerebrotendinous xanthomatosis, cerebrovascular disorder, chronic obstructive pulmonary disease, fragile X syndrome, internal carotid artery stenosis, learning disability, melanoma, neurofibromatosis type 1, ovarian cancer, prostate cancer, rheumatoid arthritis, acute myeloid leukemia, asthma, metabolic disease, porokeratosis, stroke, inflammation
+- **2-(1-(4-(aminomethyl)phenylcarbamoyl)-4-oxoazetidin-2-yl)acetic acid 2,2,2-trifluoroacetic acid** (CHEMBL3289604) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **(4-(2-(2-(carboxymethylamino)-2-oxoethyl)-4-oxoazetidine-1-carboxamido)phenyl)methanaminium 2,2,2-trifluoroacetate** (CHEMBL3289605) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **(2S)-1-[[4-(aminomethyl)phenyl]carbamoyl]-4-oxo-azetidine-2-carboxylic acid;2,2,2-trifluoroacetic acid** (CHEMBL3289606) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **(2S)-1-(o-tolylcarbamoyl)-4-oxo-azetidine-2-carboxylic acid** (CHEMBL4461668) — mechanism not available, Phase: Preclinical, Indications: N/A
 
-ITGB2 (integrin beta-2) has been explored as a therapeutic target in inflammatory and immune-mediated conditions, though no drugs are currently listed for pulmonary fibrosis. [source: clinical_drugs] The absence of ITGB2-targeting therapeutics in the pulmonary fibrosis space represents a potential opportunity for repurposing existing integrin inhibitors. [source: interpretation]
+<!-- EXPAND: Describe what drugs exist and their approved indications. Do NOT speculate about repurposing potential or therapeutic opportunities for the study disease. State only what is known from the listed data. -->
 
 **B. Biological Context (Stage 1)**
 
-- **ICAM1–ITGB2**: STRING PPI score=0.999, interaction=confirmed [from stage1_ICAM1--ITGB2.json]
-  - Census: risk_ratio=0.4222, p_value=0.0 [from stage1_ICAM1--ITGB2.json]
+- **ICAM1–ITGB2**: STRING PPI score=0.999, interaction=confirmed
+  - Census: risk_ratio=0.4222, p_value=0.0
 
-The ICAM1-ITGB2 interaction demonstrates the maximum possible STRING PPI score (0.999), indicating exceptional protein-protein interaction confidence. [source: string_ppi] The risk_ratio of 0.4222 suggests moderate enrichment in specific cell populations, potentially indicating a role in immune cell-fibroblast adhesion. [source: risk_ratio] Census coexpression analysis with p=0.0 supports cell-type-specific expression patterns consistent with functional relevance in inflammatory fibrotic responses. [source: census_pvalue]
+<!-- EXPAND: Interpret biological context and pathway relevance -->
 
 **C. Rubric Assessment**
 
@@ -220,7 +240,7 @@ The ICAM1-ITGB2 interaction demonstrates the maximum possible STRING PPI score (
 - Exploratory Track: gwas_support=0, tractability=3, biological_plausibility=1, novelty_opportunity=1 → **exploratory_total=5**
 - **Combined Total: 11** | Classification: validated_target | Priority: high
 
-ITGB2 represents a high-priority validated target with strong clinical trial activity and maximum tractability, supporting prioritization for preclinical/clinical development pipeline. [source: rubric_assessment] The tractability score of 3 indicates established druggability with clinical precedent, while the existing_drug_evidence of 1 suggests limited but existing drug development experience. [source: interpretation] Given the combined_total of 11 and validated_target classification, ITGB2 should be considered for immediate development track with focus on integrin-mediated fibroblast activation mechanisms. [source: interpretation]
+<!-- EXPAND: Add therapeutic recommendation based on evidence -->
 
 ---
 
@@ -230,14 +250,14 @@ ITGB2 represents a high-priority validated target with strong clinical trial act
 
 - No known drugs targeting this gene
 
-CD47 has emerged as a therapeutic target in oncology and fibrotic diseases, with multiple antibody therapeutics in development, though none are currently listed for pulmonary fibrosis. [source: clinical_drugs] The absence of CD47-targeting therapeutics in the pulmonary fibrosis space represents a potential opportunity for repurposing existing CD47 inhibitors. [source: interpretation]
+<!-- EXPAND: Describe what drugs exist and their approved indications. Do NOT speculate about repurposing potential or therapeutic opportunities for the study disease. State only what is known from the listed data. -->
 
 **B. Biological Context (Stage 1)**
 
-- **THBS1–CD47**: STRING PPI score=0.999, interaction=confirmed [from stage1_THBS1--CD47.json]
-  - Census: risk_ratio=0.3542, p_value=0.0 [from stage1_THBS1--CD47.json]
+- **THBS1–CD47**: STRING PPI score=0.999, interaction=confirmed
+  - Census: risk_ratio=0.3542, p_value=0.0
 
-The THBS1-CD47 interaction demonstrates the maximum possible STRING PPI score (0.999), indicating exceptional protein-protein interaction confidence. [source: string_ppi] The risk_ratio of 0.3542 suggests moderate enrichment in specific cell populations, potentially indicating a role in macrophage-fibroblast crosstalk and immune checkpoint regulation. [source: risk_ratio] Census coexpression analysis with p=0.0 supports cell-type-specific expression patterns consistent with functional relevance in immune-mediated fibrotic responses. [source: census_pvalue]
+<!-- EXPAND: Interpret biological context and pathway relevance -->
 
 **C. Rubric Assessment**
 
@@ -245,7 +265,7 @@ The THBS1-CD47 interaction demonstrates the maximum possible STRING PPI score (0
 - Exploratory Track: gwas_support=0, tractability=2, biological_plausibility=1, novelty_opportunity=1 → **exploratory_total=4**
 - **Combined Total: 11** | Classification: validated_target | Priority: high
 
-CD47 represents a high-priority validated target with strong clinical trial activity and established druggability, supporting prioritization for preclinical/clinical development pipeline. [source: rubric_assessment] The tractability score of 2 indicates clinical precedent with advanced clinical programs, while the existing_drug_evidence of 2 suggests moderate drug development experience. [source: interpretation] Given the combined_total of 11 and validated_target classification, CD47 should be considered for immediate development track with focus on immune checkpoint mechanisms in pulmonary fibrosis. [source: interpretation]
+<!-- EXPAND: Add therapeutic recommendation based on evidence -->
 
 ---
 
@@ -255,16 +275,16 @@ CD47 represents a high-priority validated target with strong clinical trial acti
 
 - No known drugs targeting this gene
 
-LRP1 (LDL receptor-related protein 1) has been explored as a therapeutic target in metabolic and neurodegenerative diseases, though no drugs are currently listed for pulmonary fibrosis. [source: clinical_drugs] The absence of LRP1-targeting therapeutics in the pulmonary fibrosis space represents a potential opportunity for novel drug development targeting ECM clearance mechanisms. [source: interpretation]
+<!-- EXPAND: Describe what drugs exist and their approved indications. Do NOT speculate about repurposing potential or therapeutic opportunities for the study disease. State only what is known from the listed data. -->
 
 **B. Biological Context (Stage 1)**
 
-- **APOE–LRP1**: STRING PPI score=0.999, interaction=confirmed [from stage1_APOE--LRP1.json]
-  - Census: risk_ratio=0.0653, p_value=0.0 [from stage1_APOE--LRP1.json]
-- **CALR–LRP1**: STRING PPI score=0.998, interaction=confirmed [from stage1_CALR--LRP1.json]
-  - Census: risk_ratio=0.2501, p_value=0.0 [from stage1_CALR--LRP1.json]
+- **APOE–LRP1**: STRING PPI score=0.999, interaction=confirmed
+  - Census: risk_ratio=0.0653, p_value=0.0
+- **CALR–LRP1**: STRING PPI score=0.998, interaction=confirmed
+  - Census: risk_ratio=0.2501, p_value=0.0
 
-LRP1 forms high-confidence protein-protein interactions with both APOE (0.999) and CALR (0.998), indicating exceptional interaction confidence. [source: string_ppi] The risk_ratio values of 0.0653 and 0.2501 suggest enrichment in specific cell populations, potentially indicating roles in ECM clearance and receptor-mediated endocytosis. [source: risk_ratio] Census coexpression analysis with p=0.0 for both pairs supports cell-type-specific expression patterns consistent with functional relevance in pulmonary fibrosis ECM metabolism. [source: census_pvalue]
+<!-- EXPAND: Interpret biological context and pathway relevance -->
 
 **C. Rubric Assessment**
 
@@ -272,7 +292,7 @@ LRP1 forms high-confidence protein-protein interactions with both APOE (0.999) a
 - Exploratory Track: gwas_support=0, tractability=2, biological_plausibility=1, novelty_opportunity=1 → **exploratory_total=4**
 - **Combined Total: 10** | Classification: validated_target | Priority: high
 
-LRP1 represents a high-priority validated target with strong clinical trial activity and established druggability, supporting prioritization for preclinical/clinical development pipeline. [source: rubric_assessment] The tractability score of 2 indicates clinical precedent with advanced clinical programs, while the biological_plausibility of 1 suggests moderate evidence linking LRP1 to disease pathology. [source: interpretation] Given the combined_total of 10 and validated_target classification, LRP1 should be considered for immediate development track with focus on ECM clearance mechanisms in pulmonary fibrosis. [source: interpretation]
+<!-- EXPAND: Add therapeutic recommendation based on evidence -->
 
 ---
 
@@ -280,22 +300,32 @@ LRP1 represents a high-priority validated target with strong clinical trial acti
 
 **A. Drug Profile**
 
-- No known drugs targeting this gene
+**Preclinical Compounds (ChEMBL Bioactivity):**
+- **4-(4-Trifluoromethyl-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid methylamide** (CHEMBL119501) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **4-[4-(Tetrahydro-pyran-2-yloxymethyl)-phenoxy]-thieno[2,3-c]pyridine-2-carboxylic acid amide** (CHEMBL118113) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **4-(4-Cyano-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid amide** (CHEMBL117198) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **4-{4-[2-(2-Methoxy-ethoxy)-ethoxymethyl]-phenoxy}-thieno[2,3-c]pyridine-2-carboxylic acid methylamide** (CHEMBL117279) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **4-(4-Vinyl-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid amide** (CHEMBL119733) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **LIFITEGRAST** (CHEMBL2048028) — Integrin alpha-L/beta-2 (LFA-1) antagonist, Phase: Preclinical, Indications: dry eye syndrome, eye disease, allergic conjunctivitis, graft versus host disease
+- **4-(4-Bromo-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid amide** (CHEMBL116070) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **4-(4-Cyano-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid methylamide** (CHEMBL119335) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **4-(4-Iodo-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid amide** (CHEMBL116152) — mechanism not available, Phase: Preclinical, Indications: N/A
+- **4-{4-[2-(2-Methoxy-ethoxy)-ethoxymethyl]-phenoxy}-thieno[2,3-c]pyridine-2-carboxylic acid amide** (CHEMBL117746) — mechanism not available, Phase: Preclinical, Indications: N/A
 
-ICAM1 (intercellular adhesion molecule 1) has been explored as a therapeutic target in inflammatory and autoimmune conditions, though no drugs are currently listed for pulmonary fibrosis. [source: clinical_drugs] The absence of ICAM1-targeting therapeutics in the pulmonary fibrosis space represents a potential opportunity for repurposing existing ICAM1 inhibitors. [source: interpretation]
+<!-- EXPAND: Describe what drugs exist and their approved indications. Do NOT speculate about repurposing potential or therapeutic opportunities for the study disease. State only what is known from the listed data. -->
 
 **B. Biological Context (Stage 1)**
 
-- **ICAM1–EZR**: STRING PPI score=0.998, interaction=confirmed [from stage1_ICAM1--EZR.json]
-  - Census: risk_ratio=4.4977, p_value=0.0 [from stage1_ICAM1--EZR.json]
-- **ICAM1–ITGB2**: STRING PPI score=0.999, interaction=confirmed [from stage1_ICAM1--ITGB2.json]
-  - Census: risk_ratio=0.4222, p_value=0.0 [from stage1_ICAM1--ITGB2.json]
-- **ICAM1–MUC1**: STRING PPI score=0.993, interaction=confirmed [from stage1_ICAM1--MUC1.json]
-  - Census: risk_ratio=17.863, p_value=0.0 [from stage1_ICAM1--MUC1.json]
-- **ICAM1–PECAM1**: STRING PPI score=0.873, interaction=confirmed [from stage1_ICAM1--PECAM1.json]
-  - Census: risk_ratio=0.7387, p_value=3.450783285785519e-07 [from stage1_ICAM1--PECAM1.json]
+- **ICAM1–EZR**: STRING PPI score=0.998, interaction=confirmed
+  - Census: risk_ratio=4.4977, p_value=0.0
+- **ICAM1–ITGB2**: STRING PPI score=0.999, interaction=confirmed
+  - Census: risk_ratio=0.4222, p_value=0.0
+- **ICAM1–MUC1**: STRING PPI score=0.993, interaction=confirmed
+  - Census: risk_ratio=17.863, p_value=0.0
+- **ICAM1–PECAM1**: STRING PPI score=0.873, interaction=confirmed
+  - Census: risk_ratio=0.7387, p_value=3.450783285785519e-07
 
-ICAM1 forms high-confidence protein-protein interactions with four partners, with ICAM1-ITGB2 showing the maximum STRING PPI score (0.999). [source: string_ppi] The ICAM1-MUC1 pair demonstrates the highest risk_ratio (17.863), suggesting strong enrichment in specific cell populations and potential key role in epithelial-immune cell crosstalk. [source: risk_ratio] Census coexpression analysis with p=0.0 for all pairs supports cell-type-specific expression patterns consistent with functional relevance in inflammatory fibrotic responses. [source: census_pvalue]
+<!-- EXPAND: Interpret biological context and pathway relevance -->
 
 **C. Rubric Assessment**
 
@@ -303,7 +333,7 @@ ICAM1 forms high-confidence protein-protein interactions with four partners, wit
 - Exploratory Track: gwas_support=0, tractability=2, biological_plausibility=1, novelty_opportunity=0 → **exploratory_total=3**
 - **Combined Total: 10** | Classification: validated_target | Priority: high
 
-ICAM1 represents a high-priority validated target with strong clinical trial activity and established druggability, supporting prioritization for preclinical/clinical development pipeline. [source: rubric_assessment] The tractability score of 2 indicates clinical precedent with advanced clinical programs, while the existing_drug_evidence of 2 suggests moderate drug development experience. [source: interpretation] Given the combined_total of 10 and validated_target classification, ICAM1 should be considered for immediate development track with focus on cell adhesion and inflammatory signaling mechanisms in pulmonary fibrosis. [source: interpretation]
+<!-- EXPAND: Add therapeutic recommendation based on evidence -->
 
 ---
 
@@ -311,7 +341,7 @@ ICAM1 represents a high-priority validated target with strong clinical trial act
 
 Evidence coverage: 53.85% (7 hypotheses retained from 7 generated)
 
-The hypothesis generation approach identified 7 mechanistic hypotheses covering immune modulation, drug repurposing, cross-target interactions, and novel pathways, with 100% coverage of featured candidates. [source: hypothesis_data] Key themes include ICAM1-ITGB2 axis-driven fibroblast activation, ITGB2-mediated cholesterol-integrin crosstalk, FN1-SDC2 ECM remodeling, CD47 immune checkpoint regulation, MUC1-ICAM1 epithelial-inflammatory signaling, LRP1-mediated ECM clearance dysfunction, and CD4+ T cell-HLA class II adaptive immune responses. [source: interpretation] These hypotheses provide testable predictions for therapeutic intervention strategies in pulmonary fibrosis, with validation approaches ranging from primary fibroblast cultures to lung explant models. [source: hypothesis_validation]
+<!-- EXPAND: Add 2-3 sentences summarizing the hypothesis generation approach and key themes -->
 
 ### 4.1. ICAM1-ITGB2 Axis Drives Fibroblast Activation and ECM Deposition in IPF [MoA - Immune Modulation]
 
@@ -322,7 +352,9 @@ The hypothesis generation approach identified 7 mechanistic hypotheses covering 
 **Evidence References:**
 - stage1_ICAM1--ITGB2.json
 - stage3_ICAM1.json
+- ot_ICAM1.json
 - stage3_ITGB2.json
+- ot_ITGB2.json
 
 **Biological Entities:**
 - Genes: ICAM1, ITGB2
@@ -334,7 +366,7 @@ The hypothesis generation approach identified 7 mechanistic hypotheses covering 
 
 **Validation Approach:** Primary IPF fibroblast cultures treated with Lifitegrast (ICAM1 antagonist) vs vehicle control. Readouts: α-SMA immunofluorescence, collagen I ELISA, TGF-β1-induced FMT markers. Controls: normal lung fibroblasts, TGF-β1 positive induction control.
 
-The ICAM1-ITGB2 hypothesis suggests that targeting this adhesion axis could interrupt the fibroblast activation feedback loop, representing a promising therapeutic strategy for pulmonary fibrosis intervention. [source: hypothesis_implications]
+<!-- EXPAND: Add 1-2 sentences on therapeutic implications of this hypothesis -->
 
 ---
 
@@ -346,6 +378,8 @@ The ICAM1-ITGB2 hypothesis suggests that targeting this adhesion axis could inte
 
 **Evidence References:**
 - stage3_ITGB2.json
+- ot_ITGB2.json
+- known_drugs.json
 
 **Biological Entities:**
 - Genes: ITGB2
@@ -357,7 +391,7 @@ The ICAM1-ITGB2 hypothesis suggests that targeting this adhesion axis could inte
 
 **Validation Approach:** IPF fibroblast scratch wound assay with lovastatin dose-response (0.1-100 μM). Readouts: wound closure rate, β-catenin nuclear translocation, RhoA/ROCK pathway activation. Controls: simvastatin (positive control), vehicle, mevalonate rescue.
 
-The lovastatin repurposing hypothesis suggests that existing statin therapies could be rapidly translated to pulmonary fibrosis treatment, leveraging established safety profiles and clinical experience. [source: hypothesis_implications]
+<!-- EXPAND: Add 1-2 sentences on therapeutic implications of this hypothesis -->
 
 ---
 
@@ -370,6 +404,8 @@ The lovastatin repurposing hypothesis suggests that existing statin therapies co
 **Evidence References:**
 - stage1_FN1--SDC2.json
 - stage3_FN1.json
+- ot_FN1.json
+- ot_SDC2.json
 
 **Biological Entities:**
 - Genes: FN1, SDC2
@@ -380,7 +416,7 @@ The lovastatin repurposing hypothesis suggests that existing statin therapies co
 
 **Validation Approach:** siRNA-mediated SDC2 knockdown in IPF fibroblasts + transwell migration assay. Parallel: SDC2-blocking antibody treatment of co-cultures. Readouts: migration distance, EMT markers by Western, collagen gel contraction. Controls: scrambled siRNA, isotype antibody.
 
-The FN1-SDC2 hypothesis suggests that targeting ECM-ECM receptor interactions could reduce fibroblast recruitment and EMT, representing a novel therapeutic approach for pulmonary fibrosis. [source: hypothesis_implications]
+<!-- EXPAND: Add 1-2 sentences on therapeutic implications of this hypothesis -->
 
 ---
 
@@ -393,6 +429,8 @@ The FN1-SDC2 hypothesis suggests that targeting ECM-ECM receptor interactions co
 **Evidence References:**
 - stage1_THBS1--CD47.json
 - stage3_CD47.json
+- ot_CD47.json
+- ot_THBS1.json
 
 **Biological Entities:**
 - Genes: CD47, THBS1, SIRPA
@@ -403,7 +441,7 @@ The FN1-SDC2 hypothesis suggests that targeting ECM-ECM receptor interactions co
 
 **Validation Approach:** Co-culture of IPF fibroblasts with M2-polarized macrophages ± anti-CD47 antibody. Readouts: fibroblast phagocytosis (flow cytometry), macrophage cytokine secretion (ELISA), fibroblast apoptosis. Controls: IgG isotype, THBS1-blocking antibody.
 
-The CD47 immune checkpoint hypothesis suggests that targeting this pathway could restore macrophage-mediated fibroblast clearance and shift the immune microenvironment toward anti-fibrotic polarization. [source: hypothesis_implications]
+<!-- EXPAND: Add 1-2 sentences on therapeutic implications of this hypothesis -->
 
 ---
 
@@ -416,6 +454,7 @@ The CD47 immune checkpoint hypothesis suggests that targeting this pathway could
 **Evidence References:**
 - stage1_ICAM1--MUC1.json
 - stage3_MUC1.json
+- ot_MUC1.json
 - stage3_ICAM1.json
 
 **Biological Entities:**
@@ -427,7 +466,7 @@ The CD47 immune checkpoint hypothesis suggests that targeting this pathway could
 
 **Validation Approach:** IPF-derived alveolar epithelial cells co-cultured with fibroblasts ± MUC1-C inhibitor (GO-203). Readouts: cytokine panel (IL-6, IL-8, TGF-β1), NF-κB p65 nuclear localization, epithelial barrier function (TEER). Controls: DMSO vehicle, TNF-α positive control.
 
-The MUC1-ICAM1 hypothesis suggests that interrupting epithelial-immune cell crosstalk could reduce inflammatory cytokine production and break the feed-forward loop of epithelial injury in pulmonary fibrosis. [source: hypothesis_implications]
+<!-- EXPAND: Add 1-2 sentences on therapeutic implications of this hypothesis -->
 
 ---
 
@@ -439,7 +478,9 @@ The MUC1-ICAM1 hypothesis suggests that interrupting epithelial-immune cell cros
 
 **Evidence References:**
 - stage3_LRP1.json
+- ot_LRP1.json
 - stage1_APOE--LRP1.json
+- ot_APOE.json
 
 **Biological Entities:**
 - Genes: LRP1, APOE
@@ -450,7 +491,7 @@ The MUC1-ICAM1 hypothesis suggests that interrupting epithelial-immune cell cros
 
 **Validation Approach:** Lentiviral LRP1 overexpression in IPF fibroblasts + fluorescent fibrinogen uptake assay. Parallel: LRP1 knockdown in normal fibroblasts. Readouts: fibrinogen clearance rate, latent TGF-β1 activation, ECM protein accumulation. Controls: empty vector, scrambled shRNA.
 
-The LRP1 clearance hypothesis suggests that enhancing ECM clearance mechanisms could reduce fibrotic ECM accumulation and restore normal tissue homeostasis in pulmonary fibrosis. [source: hypothesis_implications]
+<!-- EXPAND: Add 1-2 sentences on therapeutic implications of this hypothesis -->
 
 ---
 
@@ -461,22 +502,30 @@ The LRP1 clearance hypothesis suggests that enhancing ECM clearance mechanisms c
 **Core Claim:** Multiple HLA class II genes (HLA-DPA1, HLA-DPB1, HLA-DQB1, HLA-DRB1) form functional complexes with CD4+ T cells in IPF lung tissue, driving sustained adaptive immune responses that perpetuate fibroblast activation. This represents an underappreciated adaptive immune component in IPF pathogenesis.
 
 **Evidence References:**
+- stage1_HLA-DPA1--CD4.json_FAILED
+- stage1_HLA-DPB1--CD4.json_FAILED
 - stage3_CD4.json
+- ot_CD4.json
+- ot_HLA-DPA1.json
+- ot_HLA-DPB1.json
 
 **Biological Entities:**
 - Genes: CD4, HLA-DPA1, HLA-DPB1, HLA-DQB1, HLA-DRB1
 - Pathways: antigen presentation, T cell activation, adaptive immunity
 - Cell Types: CD4+ T cells, antigen-presenting cells, fibroblasts
 
-**Falsifiable Prediction:** From stage1_HLA-DPA1--CD4.json, CD4+ T cell depletion in IPF lung explant cultures will reduce fibroblast proliferation and collagen secretion by a measurable amount compared to untreated explants.
+**Falsifiable Prediction:** From stage1_HLA-DPA1--CD4.json_FAILED, CD4+ T cell depletion in IPF lung explant cultures will reduce fibroblast proliferation and collagen secretion by a measurable amount compared to untreated explants.
 
 **Validation Approach:** IPF lung explant culture ± anti-CD4 depletion antibody. Readouts: fibroblast outgrowth, collagen I deposition (Sirius Red), T cell infiltration (CD3/CD4 IHC). Controls: IgG isotype, CD8+ T cell depletion control.
 
-The CD4+ T cell-HLA hypothesis suggests that targeting adaptive immune responses could reduce fibroblast activation and collagen deposition, representing a novel therapeutic approach for pulmonary fibrosis. [source: hypothesis_implications]
+<!-- EXPAND: Add 1-2 sentences on therapeutic implications of this hypothesis -->
 
 ---
 
+
 ### Gap Analysis
+
+
 
 **Uncovered evidence files:**
 - stage1_FN1--PLAUR.json
@@ -491,7 +540,7 @@ The CD4+ T cell-HLA hypothesis suggests that targeting adaptive immune responses
 - stage1_HLA-DQB1--CD4.json
 - stage1_HLA-DRB1--CD4.json
 
----
+
 
 ## 5. Pipeline Execution Summary & Recommendations
 
@@ -499,4 +548,4 @@ The CD4+ T cell-HLA hypothesis suggests that targeting adaptive immune responses
 - Featured candidates (Stage 3): 7
 - Featured genes: CD4, MUC1, FN1, ITGB2, CD47, LRP1, ICAM1
 
-All seven featured candidates achieve validated_target classification with high priority status, reflecting strong clinical evidence and biological plausibility for pulmonary fibrosis intervention. [source: interpretation] CD4, MUC1, and FN1 represent the highest-priority targets with combined_total scores of 15, warranting immediate preclinical development. [source: combined_total] ITGB2, CD47, LRP1, and ICAM1 achieve combined_total scores of 10-11, representing strong validated targets for secondary development tracks. [source: combined_total] The hypothesis-driven analysis identifies 7 mechanistic pathways with therapeutic implications, including Lifitegrast and Lovastatin repurposing opportunities. [source: interpretation]
+<!-- EXPAND: Add recommendations for validated targets, exploratory targets, and next steps -->

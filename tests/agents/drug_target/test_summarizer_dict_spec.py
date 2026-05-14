@@ -18,6 +18,16 @@ These tests replace the 17-test legacy summarizer suite. They cover:
   TS-08: save_report_expansions still rejects an explicit hash that does
          not match the on-disk reference card, with expected/supplied in
          the error payload for one-turn self-correction.
+  TS-09: persist_drug_report_reference_card writes the small
+         expansion_schema_spec.json companion file with required_slot_ids,
+         example_sentence, and valid_provenance_keys so the LLM can
+         discover the run-specific schema without parsing the large
+         offloaded reference card (live-smoke regression #2 — gpt-5.4
+         could not reverse-engineer the nested sentence/provenance shape
+         from the opaque @tool signature).
+  TS-10: save_report_expansions args_schema advertises the Pydantic
+         ReportExpansionsPayload (structural shape) so LangChain @tool
+         auto-description is no longer opaque.
 
 TS-04/TS-05 unit-test the mechanical fail-closed gate directly at the
 middleware layer — sufficient under the (b') decision to retain and adapt
@@ -42,7 +52,11 @@ from src.agents.drug_target.subagents.summarizer.middleware import (
     SummarizerFinalizationGuardMiddleware,
 )
 from src.agents.drug_target.tools.report_expansion_schema import (
+    EXPANSION_SCHEMA_SPEC_FILE,
+    ReportExpansionsPayload,
+    build_expansion_schema_spec,
     canonical_json_hash,
+    persist_drug_report_reference_card,
     save_report_expansions,
 )
 
@@ -325,3 +339,117 @@ def test_save_report_expansions_rejects_wrong_hash(tmp_path: Path) -> None:
     err = hash_errors[0]
     assert err["supplied"] == bogus_hash
     assert err["expected"] == canonical_json_hash(card)
+
+
+# ---------------------------------------------------------------------------
+# TS-09 — schema-discovery file is written alongside the reference card
+# ---------------------------------------------------------------------------
+
+def test_persist_reference_card_also_writes_expansion_schema_spec(
+    tmp_path: Path,
+) -> None:
+    """``persist_drug_report_reference_card`` must write the compact
+    ``expansion_schema_spec.json`` companion file. The summarizer LLM
+    relies on this small (non-offloaded) file to discover run-specific
+    slot IDs and the sentence/provenance shape — recorded as the
+    remediation for the second live-smoke failure mode."""
+    # A minimal reference card the summarizer would consume — featured_genes
+    # populated so _build_provenance_index produces real entries.
+    reference_card = {
+        "reference_card_version": "2.0",
+        "stage3_candidates": ["TGFB1"],
+        "featured_genes": [
+            {
+                "gene": "TGFB1",
+                "stage3": {
+                    "clinical_drugs": [{"name": "DrugA"}],
+                    "preclinical_compounds": [],
+                },
+            }
+        ],
+        "markdown_template": (
+            "# Report\n\n## Executive Summary\n"
+            "<!-- EXPAND: Therapeutic Opportunities -->\n"
+        ),
+        "hypothesis_data": {"hypotheses": []},
+    }
+    persist_drug_report_reference_card(tmp_path, reference_card)
+
+    spec_path = tmp_path / EXPANSION_SCHEMA_SPEC_FILE
+    assert spec_path.exists(), (
+        f"persist_drug_report_reference_card must write {EXPANSION_SCHEMA_SPEC_FILE}"
+    )
+
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    assert spec["schema_version"] == "report_expansions.v1"
+    # Required slot IDs derived from expansion_slots
+    assert isinstance(spec["required_slot_ids"], list)
+    assert len(spec["required_slot_ids"]) >= 1
+    # Example sentence has the full nested shape
+    example = spec["example_sentence"]
+    assert set(example.keys()) == {"text", "source_fields", "source_provenance"}
+    assert set(example["source_provenance"].keys()) == {
+        "source_file",
+        "source_field",
+        "source_class",
+        "claim_type",
+        "source_value",
+    }
+    # Valid provenance keys are present and anchored to real evidence files
+    assert isinstance(spec["valid_provenance_keys"], list)
+    assert any("evidence/ot_TGFB1.json::clinical_drugs" == k
+               for k in spec["valid_provenance_keys"])
+
+
+# ---------------------------------------------------------------------------
+# TS-10 — Pydantic args_schema advertises the nested expansions shape
+# ---------------------------------------------------------------------------
+
+def test_save_report_expansions_args_schema_advertises_pydantic_payload() -> None:
+    """LangChain @tool must surface the ReportExpansionsPayload structural
+    shape on the args_schema so LLMs no longer face an opaque `dict`
+    parameter. Verified by:
+      (a) `args_schema.model_fields["expansions"]` resolves to the
+          Pydantic payload model (or a JSON-schema reference to it)
+      (b) the tool description (auto-generated from the @tool docstring)
+          mentions both `slot_id` and `source_provenance` so the LLM gets
+          schema hints in its tool catalogue.
+    """
+    args_schema = save_report_expansions.args_schema
+    schema_json = args_schema.model_json_schema()
+    # The Pydantic payload sub-models must be reachable through the args
+    # schema — either by name in $defs or inlined under properties.
+    schema_text = json.dumps(schema_json)
+    for marker in (
+        "ReportExpansionsPayload",
+        "SlotItem",
+        "SentenceItem",
+        "SourceProvenance",
+    ):
+        assert marker in schema_text, (
+            f"args_schema must advertise {marker} sub-model (LLM "
+            f"schema discovery depends on it)"
+        )
+
+    # The tool description must reference the key concepts so the LLM's
+    # tool catalogue is informative even before reading the docstring in
+    # full.
+    description = save_report_expansions.description
+    assert "slot_id" in description
+    assert "source_provenance" in description
+
+    # And the Pydantic model rejects structurally-invalid payloads at the
+    # boundary (before reaching validate_report_expansions). Empty
+    # sentences list MUST be rejected by the model.
+    try:
+        ReportExpansionsPayload(
+            schema_version="report_expansions.v1",
+            slots=[{"slot_id": "test_slot", "sentences": []}],
+        )
+    except Exception as exc:  # pydantic.ValidationError
+        msg = str(exc).lower()
+        assert "sentences" in msg
+    else:
+        raise AssertionError(
+            "ReportExpansionsPayload must reject empty `sentences` list"
+        )

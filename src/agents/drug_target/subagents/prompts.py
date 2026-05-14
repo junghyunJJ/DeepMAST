@@ -960,9 +960,23 @@ single tool-calling LLM — there are no inner subagents.
 ## Workflow
 Step 1. Call `build_evidence_summary` exactly once.
 Step 2. Call `load_evidence_files` for the active gene set.
-Step 3. Call `save_report_expansions` to author the per-section content.
-        OMIT `reference_card_hash` from the `expansions` payload — the tool
-        derives it from the on-disk reference card. Do NOT invent a hash.
+Step 3. BEFORE calling `save_report_expansions`, discover the run-specific
+        slot inventory and provenance keys: call `read_file` on
+        `<data_dir>/expansion_schema_spec.json`. It contains:
+          - `required_slot_ids`: every slot_id you must author
+          - `example_sentence`: the exact sentence + source_provenance shape
+            to mirror (copy this, then edit text + values for your slot)
+          - `valid_provenance_keys`: every "source_file::source_field"
+            pair you may cite — do NOT invent files or fields outside
+            this list.
+        Then call `save_report_expansions(data_dir, expansions)`. The
+        `expansions` payload follows the Pydantic schema advertised in
+        the tool's args_schema (top-level: schema_version + slots; each
+        slot: slot_id + non-empty sentences list; each sentence: text +
+        source_fields + source_provenance). Author at least ONE sentence
+        per required_slot_id.
+        OMIT `reference_card_hash` — the tool auto-derives it from the
+        on-disk reference card. Do NOT invent a SHA256 hash.
 Step 4. Call `render_drug_md_from_expansions`.
 Step 5. Call `validate_drug_md`.
         - If `valid=true`: go to Step 6.
