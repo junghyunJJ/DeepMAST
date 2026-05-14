@@ -19,6 +19,10 @@ Load order: .env values are loaded before argparse defaults so LLM_PROVIDER,
 LLM_MODEL, and OLLAMA_MODEL from .env are honored when not shell-exported.
 Shell exports still override .env (override=False semantics).
 
+Load order: .env values are loaded before argparse defaults so LLM_PROVIDER,
+LLM_MODEL, and OLLAMA_MODEL from .env are honored when not shell-exported.
+Shell exports still override .env (override=False semantics).
+
 Example invocations:
 
     # Default: regenerate drug.md from frozen baseline
@@ -75,7 +79,7 @@ _DEFAULT_EVIDENCE_SOURCE = (
 )
 _DEFAULT_OUTPUT = "tests/agents/drug_target/fixtures/regenerated/drug.md"
 _DEFAULT_PROVIDER = _ENV_DEFAULT_PROVIDER or "ollama"
-_DEFAULT_MODEL = _ENV_DEFAULT_MODEL or _ENV_OLLAMA_MODEL or "qwen3:30b"
+_DEFAULT_MODEL = _ENV_DEFAULT_MODEL or _ENV_OLLAMA_MODEL or "qwen3.5:122b"
 _OLLAMA_HOST_DEFAULT = "http://localhost:6000"
 
 _DEFAULT_LOG_FILE = ".omb/logs/summarizer_only.log"
