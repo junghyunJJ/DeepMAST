@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import tempfile
 from pathlib import Path
 from typing import Any, Literal
 
@@ -15,6 +17,128 @@ REFERENCE_CARD_VERSION = "drug_report_reference_card.v1"
 REPORT_EXPANSIONS_VERSION = "report_expansions.v1"
 EXPANSION_SCHEMA_SPEC_FILE = "expansion_schema_spec.json"
 _EXPAND_RE = re.compile(r"<!--\s*EXPAND(?:_SLOT)?:\s*(.*?)\s*-->", re.DOTALL)
+
+
+# ---------------------------------------------------------------------------
+# Path-traversal guard for tool ``data_dir`` arguments (PR #19 round 7 — DS-1)
+#
+# ``save_report_expansions`` and ``lookup_provenance_value`` accept a
+# ``data_dir`` value that originates in LLM-controlled tool arguments. The
+# round-7 code review (DS-1, HIGH) flagged this as a path-traversal surface
+# because:
+#   - ``save_report_expansions`` calls ``base.mkdir(parents=True,
+#     exist_ok=True)`` and then writes ``report_expansions.json`` — an
+#     attacker-controlled LLM message could place files outside the run
+#     workspace.
+#   - ``lookup_provenance_value`` reads ``drug_report_reference_card.json``
+#     under the supplied path — a probing path can leak file existence
+#     elsewhere on the host.
+#
+# The guard validates the resolved path against an allowlist of runtime
+# workspace roots. By default it accepts paths under the OS temp directory
+# (covers pytest's ``tmp_path`` fixture and the production
+# ``/tmp/deep_interpreter_workspace`` fallback) plus any environment-
+# configured workspace roots (``DRUG_TARGET_DATA_DIR``,
+# ``DEEP_INTERPRETER_DATA_DIR``, or the colon-separated explicit override
+# ``DRUG_TARGET_ALLOWED_DATA_DIRS``). Out-of-bounds paths produce a
+# structured error envelope; ``base.mkdir(...)`` runs only after validation
+# succeeds.
+# ---------------------------------------------------------------------------
+
+_PRODUCTION_WORKSPACE_FALLBACK = "/tmp/deep_interpreter_workspace"
+
+
+def _default_allowed_data_roots() -> list[Path]:
+    """Build the default allowed_roots list for ``_validate_data_dir``.
+
+    Order is irrelevant for the membership check but the assembled list is
+    surfaced in error payloads to help debug rejected paths.
+    """
+    roots: list[Path] = []
+    # OS-level temp dir — covers pytest ``tmp_path`` on macOS and Linux.
+    try:
+        roots.append(Path(tempfile.gettempdir()).resolve())
+    except (OSError, RuntimeError):
+        pass
+    for env_key in ("DRUG_TARGET_DATA_DIR", "DEEP_INTERPRETER_DATA_DIR"):
+        val = os.getenv(env_key)
+        if not val:
+            continue
+        try:
+            roots.append(Path(val).expanduser().resolve())
+        except (OSError, RuntimeError):
+            continue
+    override = os.getenv("DRUG_TARGET_ALLOWED_DATA_DIRS")
+    if override:
+        for part in override.split(os.pathsep):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                roots.append(Path(part).expanduser().resolve())
+            except (OSError, RuntimeError):
+                continue
+    try:
+        roots.append(Path(_PRODUCTION_WORKSPACE_FALLBACK).resolve())
+    except (OSError, RuntimeError):
+        pass
+    return roots
+
+
+def _validate_data_dir(
+    data_dir: str | Path,
+    allowed_roots: list[str | Path] | None = None,
+) -> tuple[Path | None, dict | None]:
+    """Resolve ``data_dir`` and confirm it falls under an allowed root.
+
+    Returns ``(resolved_path, None)`` on success and ``(None, error_dict)``
+    on rejection. Callers must NOT create directories before calling this
+    function — out-of-bounds ``mkdir`` is the defect we are closing.
+    """
+    if allowed_roots is None:
+        roots = _default_allowed_data_roots()
+    else:
+        roots = []
+        for raw in allowed_roots:
+            try:
+                roots.append(Path(raw).expanduser().resolve())
+            except (OSError, RuntimeError):
+                continue
+    if not roots:
+        return None, {
+            "code": "DATA_DIR_NO_ALLOWED_ROOTS",
+            "message": (
+                "no allowed workspace roots are configured; set "
+                "DRUG_TARGET_DATA_DIR, DEEP_INTERPRETER_DATA_DIR, or "
+                "DRUG_TARGET_ALLOWED_DATA_DIRS"
+            ),
+        }
+    try:
+        resolved = Path(data_dir).expanduser().resolve()
+    except (OSError, RuntimeError, ValueError) as exc:
+        return None, {
+            "code": "DATA_DIR_INVALID",
+            "message": f"data_dir could not be resolved: {exc}",
+            "data_dir": str(data_dir),
+        }
+    for root in roots:
+        try:
+            resolved.relative_to(root)
+            return resolved, None
+        except ValueError:
+            continue
+    return None, {
+        "code": "DATA_DIR_OUT_OF_BOUNDS",
+        "message": (
+            "data_dir is not under any allowed workspace root. Set "
+            "DRUG_TARGET_DATA_DIR / DEEP_INTERPRETER_DATA_DIR to the run "
+            "directory, or pass a path under the OS temp dir or "
+            f"{_PRODUCTION_WORKSPACE_FALLBACK}."
+        ),
+        "data_dir": str(data_dir),
+        "resolved": str(resolved),
+        "allowed_roots": [str(r) for r in roots],
+    }
 
 
 # =============================================================================
@@ -580,7 +704,18 @@ def save_report_expansions(
         ``saved`` is True the file at ``path`` mirrors the validated
         payload (with the auto-derived reference_card_hash filled in).
     """
-    base = Path(data_dir).expanduser().resolve()
+    # Path-traversal guard (DS-1). MUST run BEFORE ``base.mkdir(...)`` —
+    # the defect we are closing is "mkdir on an LLM-controlled path".
+    base, guard_error = _validate_data_dir(data_dir)
+    if guard_error is not None or base is None:
+        return json.dumps(
+            {
+                "saved": False,
+                "path": None,
+                "errors": [guard_error] if guard_error else [],
+            },
+            indent=2,
+        )
     base.mkdir(parents=True, exist_ok=True)
     # ``expansions`` may arrive as a Pydantic instance (LangChain tool
     # invocation) or as a raw dict (direct .invoke({"expansions": {...}})
@@ -644,7 +779,16 @@ def lookup_provenance_value(
         caller can recover:
             ``{"ok": false, "error": "...", "valid_provenance_keys": [...]}``
     """
-    base = Path(data_dir).expanduser().resolve()
+    # Path-traversal guard (DS-1). Reject probing paths before any disk
+    # access so an attacker-controlled value cannot leak file-existence
+    # information from outside the runtime workspace.
+    base, guard_error = _validate_data_dir(data_dir)
+    if guard_error is not None or base is None:
+        payload: dict[str, Any] = {"ok": False}
+        if guard_error:
+            payload.update(guard_error)
+            payload.setdefault("error", guard_error.get("message", "invalid data_dir"))
+        return json.dumps(payload, indent=2)
     ref_path = base / "drug_report_reference_card.json"
     if not ref_path.exists():
         return json.dumps(

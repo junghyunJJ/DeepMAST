@@ -1013,8 +1013,17 @@ Step 5. Call `validate_drug_md`.
             b. Identify which slots produced the offending sentences.
                Common issues:
                  * `UNCITED_QUANTITATIVE` — a numeric claim has no
-                   `[source: <field>]` annotation. Fix by either adding
-                   the annotation or removing the quantitative claim.
+                   citation pattern (`<file>.json`, `[from <file>]`, or
+                   `stage[123]_<gene>.json`) on the same line. If the
+                   `sample_lines` come from EXPAND-region prose you
+                   authored, fix the citation in that sentence. If the
+                   `sample_lines` come from a template-baked Census/filter
+                   line (your `expansions` did not author them), this is
+                   a producer/template bug outside your authoring
+                   surface — STOP retrying, emit `SUMMARIZER_STATUS: FAIL`
+                   with the line list, and do not spend further retry
+                   budget. The template body cannot be patched through
+                   `save_report_expansions`.
                  * `UNANCHORED_SENTENCE` — a factual sentence has no
                    `source_provenance` entry from valid_provenance_keys.
                  * `FABRICATED_DRUG_NAME` — drug name not present in the
