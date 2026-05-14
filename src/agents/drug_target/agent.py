@@ -1,11 +1,17 @@
 """Drug Target Assessment Agent using DeepAgents framework.
 
-3-Subagent Architecture with Audited Finalization:
-1. EVIDENCE_ASSESSOR: 2-stage funnel (Stage 2: validation & scoring ->
-   Stage 1: biological context) with inline rubric assessment
-2. HYPOTHESIS_WRITER: Hypothesis generation with UCB scoring from all evidence
-3. SUMMARIZER: CompiledSubAgent that runs report_writer -> validators ->
-   critic -> bounded repair loop before final status
+3-Subagent Architecture (2026-05-13 simplification):
+1. EVIDENCE_ASSESSOR: 3-stage funnel (Stage 2: validation & scoring ->
+   Stage 1: biological context -> Stage 3: ChEMBL drug profiles)
+   with inline rubric assessment.
+2. HYPOTHESIS_WRITER: Hypothesis generation with UCB scoring from all evidence.
+3. SUMMARIZER: Flat dict subagent owning the drug.md authoring + validation +
+   HTML rendering workflow via a fixed 6-step tool sequence
+   (build_evidence_summary -> load_evidence_files -> save_report_expansions
+   -> render_drug_md_from_expansions -> validate_drug_md
+   -> generate_drug_html_report). Quality gating is enforced by
+   ``validate_drug_md`` (semantic) plus ``SummarizerFinalizationGuardMiddleware``
+   (mechanical: blocks HTML generation until the validator passes).
 
 All database queries are wrapped as @tool functions that run on the host process.
 Docker backend is OPTIONAL — set docker_image in DrugTargetConfig to enable
@@ -109,7 +115,7 @@ class DrugTargetConfig:
         agent_skill_names: Legacy fallback skill tuple retained for registry helpers.
         evidence_assessor_skill_names: Skills exposed to evidence_assessor.
         hypothesis_writer_skill_names: Skills exposed to hypothesis_writer.
-        report_writer_skill_names: Skills exposed to inner report_writer.
+        summarizer_skill_names: Skills exposed to the summarizer subagent.
         skills_dir: Optional override for the project skills directory.
     """
 
@@ -140,16 +146,13 @@ class DrugTargetConfig:
         "gwas-database",
         "chembl-database",
     )
-    report_writer_skill_names: tuple[str, ...] = (
+    summarizer_skill_names: tuple[str, ...] = (
         "drug-target-reporting",
-        "opentargets-database",
-        "gwas-database",
-        "chembl-database",
     )
     skills_dir: str | None = None
     subagent_models: dict[str, BaseChatModel | str] | None = None
     # init_chat_model format per subagent, e.g.:
-    # {"evidence_assessor": "openai:gpt-4.1", "report_writer": "openai:gpt-4.1-mini"}
+    # {"evidence_assessor": "openai:gpt-4.1", "summarizer": "openai:gpt-4.1-mini"}
     # If None, auto-loads from SUBAGENT_{NAME}_PROVIDER env vars.
 
     def __post_init__(self):
@@ -159,8 +162,6 @@ class DrugTargetConfig:
                     "evidence_assessor",
                     "hypothesis_writer",
                     "summarizer",
-                    "report_writer",
-                    "critic",
                 ]
             )
 
@@ -236,7 +237,7 @@ def _build_subagent_skill_name_map(
             enable_census=enable_census,
         ),
         "hypothesis_writer": tuple(config.hypothesis_writer_skill_names),
-        "report_writer": tuple(config.report_writer_skill_names),
+        "summarizer": tuple(config.summarizer_skill_names),
     }
 
 
@@ -247,7 +248,9 @@ def create_drug_target_agent(
 
     Creates a fully configured agent with:
     - 3 top-level subagents (evidence_assessor, hypothesis_writer, summarizer)
-    - summarizer is a CompiledSubAgent with inner report_writer + critic
+    - summarizer is a flat dict subagent (2026-05-13 simplification);
+      ``SummarizerFinalizationGuardMiddleware`` blocks HTML generation until
+      ``validate_drug_md`` returns ``valid=true``
     - All database queries via @tool wrappers (host-side by default)
     - Optional DockerBackend when docker_image is set in config
 
@@ -350,10 +353,13 @@ def create_drug_target_agent(
     agent = create_deep_agent(**create_kwargs)
     # evidence_assessor alone can consume 500-800 steps for large gene panels
     # (41 genes × ~10 steps/gene for Stage 2, plus Stage 1 batch + rubric + gates).
-    # All 3 top-level subagents share this budget. Conservative estimate:
+    # All 3 top-level subagents share this budget. With the 2026-05-13 summarizer
+    # simplification the summarizer runs as a single dict subagent (no inner
+    # report_writer/critic graph), so its share drops sharply. Conservative
+    # estimate after simplification:
     #   evidence_assessor: ~1500, hypothesis_writer: ~300,
-    #   summarizer/report loop: ~1200, orchestrator: ~200 = ~3200 typical,
-    #   10000 for margin.
+    #   summarizer (single LLM loop, max 2 validator retries): ~300,
+    #   orchestrator: ~200 = ~2300 typical, 10000 for margin.
     agent = agent.with_config({"recursion_limit": 10000})
 
     return agent, backend

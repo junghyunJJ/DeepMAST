@@ -2400,8 +2400,9 @@ def build_evidence_summary(data_dir: str) -> str:
     except Exception as exc:
         logger.warning("Failed to persist drug_report_reference_card.json: %s", exc)
 
-    template_path = data_dir_path / "drug_report_template.md"
-    template_path.write_text(md_template + "\n", encoding="utf-8")
+    # Write the template directly to drug.md as a draft
+    draft_path = data_dir_path / "drug.md"
+    draft_path.write_text(md_template + "\n", encoding="utf-8")
 
     # === Pre-build target_assessment.json ===
     _prebuild_target_assessment(

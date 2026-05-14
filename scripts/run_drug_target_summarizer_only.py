@@ -1,9 +1,23 @@
 #!/usr/bin/env python3
 """Run ONLY the summarizer subagent on pre-collected evidence files.
 
-Skips evidence_assessor and hypothesis_writer entirely — uses frozen evidence.
-Writes evidence/_critic_slices/ before the summarizer runs (T17 wire-up) and
-removes them afterward unless OMB_CRITIC_SLICES_KEEP=1.
+Builds a standalone DeepAgent from the dict summarizer spec returned by
+``get_summarizer_subagent()`` (post-2026-05-13 simplification) and dispatches
+it directly — no evidence_assessor, no hypothesis_writer, no orchestrator.
+
+Verification artifacts after a successful run:
+  - ``<data_dir>/drug.md``                     — assembled by render_drug_md_from_expansions
+  - ``<data_dir>/drug_report.html``            — assembled by generate_drug_html_report
+  - Final assistant message contains the literal line ``SUMMARIZER_STATUS: PASS``
+
+Negative paths to verify:
+  - On ``validate_drug_md`` returning ``valid=false`` for 3 consecutive cycles,
+    the summarizer must emit ``SUMMARIZER_STATUS: FAIL`` and ``drug_report.html``
+    must NOT exist (mechanical gate via SummarizerFinalizationGuardMiddleware).
+
+Load order: .env values are loaded before argparse defaults so LLM_PROVIDER,
+LLM_MODEL, and OLLAMA_MODEL from .env are honored when not shell-exported.
+Shell exports still override .env (override=False semantics).
 
 Load order: .env values are loaded before argparse defaults so LLM_PROVIDER,
 LLM_MODEL, and OLLAMA_MODEL from .env are honored when not shell-exported.
@@ -27,7 +41,7 @@ Example invocations:
 
     # Explicit provider/model:
     uv run python scripts/run_drug_target_summarizer_only.py \\
-        --provider ollama --model qwen3.5:122b
+        --provider ollama --model qwen3:30b
 """
 
 from __future__ import annotations
@@ -37,6 +51,7 @@ import asyncio
 import json as _json
 import logging
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -67,20 +82,7 @@ _DEFAULT_PROVIDER = _ENV_DEFAULT_PROVIDER or "ollama"
 _DEFAULT_MODEL = _ENV_DEFAULT_MODEL or _ENV_OLLAMA_MODEL or "qwen3.5:122b"
 _OLLAMA_HOST_DEFAULT = "http://localhost:6000"
 
-_SUBAGENT_NAMES = [
-    "EVIDENCE_ASSESSOR",
-    "HYPOTHESIS_WRITER",
-    "SUMMARIZER",
-    "REPORT_WRITER",
-    "CRITIC",
-]
-
-_DEFAULT_LOG_FILE = ".omb/logs/v8_run.log"
-_DIAGNOSTIC_LOGGERS = (
-    "drug_target.fs_backend",
-    "drug_target.fs_middleware",
-    "drug_target.lifecycle",
-)
+_DEFAULT_LOG_FILE = ".omb/logs/summarizer_only.log"
 
 
 # ---------------------------------------------------------------------------
@@ -89,12 +91,7 @@ _DIAGNOSTIC_LOGGERS = (
 
 
 class JsonlFormatter(logging.Formatter):
-    """Emit one JSON object per log record on its own line.
-
-    The actual structured payload is already inside ``record.msg`` (callers use
-    ``logger.info(json.dumps({...}))``). This formatter adds a small outer
-    envelope so consumers can grep ``"level": "INFO"`` etc.
-    """
+    """Emit one JSON object per log record on its own line."""
 
     def format(self, record: logging.LogRecord) -> str:
         try:
@@ -111,11 +108,7 @@ class JsonlFormatter(logging.Formatter):
 
 
 def configure_logging(level: str, log_file: str) -> None:
-    """Install JsonlFormatter on a single FileHandler for the diagnostic loggers.
-
-    Single sink to prevent AC7 grep-count duplication (CP-P1-002).
-    ``propagate=False`` prevents duplication via the root logger.
-    """
+    """Install a JSONL FileHandler on the drug_target logger root."""
     log_path = Path(log_file)
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -123,11 +116,10 @@ def configure_logging(level: str, log_file: str) -> None:
     handler.setFormatter(JsonlFormatter())
 
     numeric_level = getattr(logging, level, logging.INFO)
-    for name in _DIAGNOSTIC_LOGGERS:
-        lg = logging.getLogger(name)
-        lg.setLevel(numeric_level)
-        lg.addHandler(handler)
-        lg.propagate = False  # prevent duplication via root logger
+    lg = logging.getLogger("drug_target")
+    lg.setLevel(numeric_level)
+    lg.addHandler(handler)
+    lg.propagate = False
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +176,16 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--recursion-limit",
+        type=int,
+        default=300,
+        help=(
+            "LangGraph recursion limit for the standalone summarizer agent. "
+            "The new dict subagent runs a single tool-calling loop with at most "
+            "2 validator retries, so 300 is generous. Default: 300"
+        ),
+    )
+    p.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -202,13 +204,10 @@ def _parse_args() -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 
 
-def _set_subagent_env(provider: str, model: str) -> None:
-    """Set SUBAGENT_<NAME>_PROVIDER / SUBAGENT_<NAME>_MODEL for all subagents."""
-    for name in _SUBAGENT_NAMES:
-        os.environ[f"SUBAGENT_{name}_PROVIDER"] = provider
-        os.environ[f"SUBAGENT_{name}_MODEL"] = model
-
-    # Ensure OLLAMA_HOST is set when using ollama
+def _set_provider_env(provider: str, model: str) -> None:
+    """Set LLM_PROVIDER / LLM_MODEL and OLLAMA_HOST defaults."""
+    os.environ.setdefault("LLM_PROVIDER", provider)
+    os.environ.setdefault("LLM_MODEL", model)
     if provider == "ollama" and "OLLAMA_HOST" not in os.environ:
         os.environ["OLLAMA_HOST"] = _OLLAMA_HOST_DEFAULT
 
@@ -219,10 +218,7 @@ def _set_subagent_env(provider: str, model: str) -> None:
 
 
 def _copy_evidence(source_dir: Path, data_dir: Path) -> int:
-    """Copy evidence/ tree from source_dir into data_dir/evidence/.
-
-    Returns the count of files copied.
-    """
+    """Copy evidence/ tree from source_dir into data_dir/evidence/."""
     src_evidence = source_dir / "evidence"
     if not src_evidence.is_dir():
         print(f"ERROR: evidence/ not found under {source_dir}", file=sys.stderr)
@@ -236,7 +232,6 @@ def _copy_evidence(source_dir: Path, data_dir: Path) -> int:
         if src_file.is_file():
             shutil.copy2(src_file, dst_evidence / src_file.name)
             count += 1
-
     return count
 
 
@@ -253,164 +248,47 @@ def _extract_disease(source_dir: Path) -> str:
     for line in drug_md.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
         if stripped.startswith("# "):
-            # H1 often contains disease context, e.g. "# IPF Drug Targets"
             return stripped[2:].strip()
     return ""
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Result inspection
 # ---------------------------------------------------------------------------
 
 
-async def _run(args: argparse.Namespace) -> None:
-    # Configure diagnostic loggers before any agent construction (T3.6b).
-    configure_logging(args.log_level, args.log_file)
+_STATUS_LINE_RE = re.compile(
+    r"^\s*SUMMARIZER_STATUS:\s*(PASS|FAIL)\b", re.MULTILINE
+)
 
-    source_dir = Path(args.evidence_source).expanduser().resolve()
-    output_path = Path(args.output).expanduser().resolve()
 
-    # ------------------------------------------------------------------
-    # Resolve working directory
-    # ------------------------------------------------------------------
-    owns_data_dir = False
-    if args.data_dir:
-        data_dir = Path(args.data_dir).expanduser().resolve()
-        data_dir.mkdir(parents=True, exist_ok=True)
-    else:
-        data_dir = Path(tempfile.mkdtemp(prefix="drug_target_summarizer_"))
-        owns_data_dir = True
+def _scan_for_status(messages: list) -> str | None:
+    """Return 'PASS' or 'FAIL' if the final assistant message contains the
+    literal SUMMARIZER_STATUS line, else None."""
+    for msg in reversed(messages):
+        content = getattr(msg, "content", None)
+        text = ""
+        if isinstance(content, str):
+            text = content
+        elif isinstance(content, list):
+            text = "\n".join(
+                p.get("text", "") if isinstance(p, dict) else str(p)
+                for p in content
+            )
+        match = _STATUS_LINE_RE.search(text)
+        if match:
+            return match.group(1)
+    return None
 
-    print("=" * 70)
-    print("Summarizer-Only Runner (T17)")
-    print("=" * 70)
-    print(f"  Provider:        {args.provider}")
-    print(f"  Model:           {args.model}")
-    print(f"  Evidence source: {source_dir}")
-    print(f"  Data dir:        {data_dir}")
-    print(f"  Output:          {output_path}")
-    print(f"  Dry-run:         {args.dry_run}")
-    print()
 
-    # ------------------------------------------------------------------
-    # Set env vars for all subagents
-    # ------------------------------------------------------------------
-    _set_subagent_env(provider=args.provider, model=args.model)
-
-    # ------------------------------------------------------------------
-    # Copy evidence
-    # ------------------------------------------------------------------
-    n_copied = _copy_evidence(source_dir, data_dir)
-    print(f"  Copied {n_copied} evidence files -> {data_dir}/evidence/")
-
-    # ------------------------------------------------------------------
-    # Resolve disease
-    # ------------------------------------------------------------------
-    disease = _extract_disease(source_dir)
-    print(f"  Disease context: {disease or '(not found in drug.md)'}")
-
-    if args.dry_run:
-        print()
-        print("DRY-RUN: skipping LLM invocation. Config verified OK.")
-        print(f"  data_dir:  {data_dir}")
-        print(f"  evidence files: {n_copied}")
-        print(f"  provider:  {args.provider}")
-        print(f"  model:     {args.model}")
-        return
-
-    # ------------------------------------------------------------------
-    # Imports (deferred so --dry-run never touches heavy LangChain stack)
-    # ------------------------------------------------------------------
-    from src.agents.model import create_llm
-    from src.agents.drug_target.subagents.configs import (
-        SUBAGENT_CONFIGS,
-        _SUMMARIZER_INNER_SUBAGENTS,  # noqa: PLC2701
-    )
-    from src.agents.drug_target.subagents.summarizer import (
-        create_summarizer_agent,
-        wrap_summarizer_with_critic_slices,
-    )
-
-    # ------------------------------------------------------------------
-    # Build model
-    # ------------------------------------------------------------------
-    llm = create_llm(provider=args.provider, model=args.model)
-
-    # ------------------------------------------------------------------
-    # Build summarizer inner subagents (report_writer + critic)
-    # Mirrors the pattern in get_subagents() in configs.py.
-    # ------------------------------------------------------------------
-    inner_subagents = [
-        {**SUBAGENT_CONFIGS[name], "tools": list(SUBAGENT_CONFIGS[name]["tools"])}
-        for name in _SUMMARIZER_INNER_SUBAGENTS
-    ]
-
-    # ------------------------------------------------------------------
-    # Build summarizer agent wrapped with critic-slice lifecycle
-    # ------------------------------------------------------------------
-    raw_agent = create_summarizer_agent(
-        model=llm,
-        inner_subagents=inner_subagents,
-        data_dir=str(data_dir),
-    )
-    agent = wrap_summarizer_with_critic_slices(raw_agent, data_dir=str(data_dir))
-
-    # ------------------------------------------------------------------
-    # Build initial prompt
-    # ------------------------------------------------------------------
-    initial_message = (
-        f"Finalize the drug target assessment report.\n\n"
-        f"Data directory: {data_dir}\n"
-        f"Disease context: {disease or 'see evidence files'}\n\n"
-        f"The evidence directory already contains all Stage 1, 2, and 3 files.\n"
-        f"Steps:\n"
-        f"1. Invoke report_writer to build the report skeleton and fill EXPAND markers.\n"
-        f"2. Run validate_drug_md to check for P0 findings.\n"
-        f"3. Run critic (via task tool) on per-gene slices in "
-        f"evidence/_critic_slices/.\n"
-        f"4. Self-revise via repair loop (max 2 cycles).\n"
-        f"5. Confirm 0 P0 findings, then report DONE.\n"
-        f"\nThe final drug.md must be saved to: {data_dir}/drug.md\n"
-    )
-
-    # ------------------------------------------------------------------
-    # Invoke
-    # ------------------------------------------------------------------
-    t0 = time.time()
-    print("\nInvoking summarizer agent...")
-    print("-" * 70)
-
-    result = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": initial_message}]},
-        config={"configurable": {"thread_id": str(uuid.uuid4())}},
-    )
-
-    elapsed = time.time() - t0
-    print("-" * 70)
-    print(f"\nCompleted in {elapsed / 60:.1f} minutes")
-
-    # ------------------------------------------------------------------
-    # Copy output
-    # ------------------------------------------------------------------
-    drug_md_src = data_dir / "drug.md"
-    if drug_md_src.exists():
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(drug_md_src, output_path)
-        content = drug_md_src.read_text(encoding="utf-8")
-        print(f"\ndrug.md generated ({len(content)} chars, {content.count(chr(10))} lines)")
-        print(f"  Saved to: {output_path}")
-    else:
-        print("\nWARNING: drug.md was not generated in data_dir", file=sys.stderr)
-
-    # ------------------------------------------------------------------
-    # Summary
-    # ------------------------------------------------------------------
-    messages = result.get("messages", [])
-    print(f"\n  Total messages in final state: {len(messages)}")
-    # Dump all messages for diagnosis
+def _dump_messages(messages: list) -> None:
     print("\n--- MESSAGE DUMP ---")
     for i, msg in enumerate(messages):
-        role = getattr(msg, "type", None) or getattr(msg, "role", None) or type(msg).__name__
+        role = (
+            getattr(msg, "type", None)
+            or getattr(msg, "role", None)
+            or type(msg).__name__
+        )
         content = getattr(msg, "content", None)
         tool_calls = getattr(msg, "tool_calls", None) or []
         name = getattr(msg, "name", "") or ""
@@ -431,12 +309,199 @@ async def _run(args: argparse.Namespace) -> None:
             for line in text_short.splitlines()[:8]:
                 print(f"    {line}")
     print("--- END MESSAGE DUMP ---\n")
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+
+async def _run(args: argparse.Namespace) -> None:
+    configure_logging(args.log_level, args.log_file)
+
+    source_dir = Path(args.evidence_source).expanduser().resolve()
+    output_path = Path(args.output).expanduser().resolve()
+
+    owns_data_dir = False
+    if args.data_dir:
+        data_dir = Path(args.data_dir).expanduser().resolve()
+        data_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        data_dir = Path(tempfile.mkdtemp(prefix="drug_target_summarizer_"))
+        owns_data_dir = True
+
     print("=" * 70)
-    print("DONE")
+    print("Summarizer-Only Runner (post-2026-05-13 dict spec)")
+    print("=" * 70)
+    print(f"  Provider:        {args.provider}")
+    print(f"  Model:           {args.model}")
+    print(f"  Evidence source: {source_dir}")
+    print(f"  Data dir:        {data_dir}")
+    print(f"  Output:          {output_path}")
+    print(f"  Recursion limit: {args.recursion_limit}")
+    print(f"  Dry-run:         {args.dry_run}")
+    print()
+
+    _set_provider_env(provider=args.provider, model=args.model)
+    n_copied = _copy_evidence(source_dir, data_dir)
+    print(f"  Copied {n_copied} evidence files -> {data_dir}/evidence/")
+
+    disease = _extract_disease(source_dir)
+    print(f"  Disease context: {disease or '(not found in drug.md)'}")
+
+    if args.dry_run:
+        print()
+        print("DRY-RUN: skipping LLM invocation. Verifying summarizer dict spec only.")
+        from src.agents.drug_target.subagents.summarizer import get_summarizer_subagent
+
+        spec = get_summarizer_subagent()
+        tool_names = [t.name for t in spec["tools"]]
+        mw_names = [type(m).__name__ for m in spec["middleware"]]
+        print(f"  Summarizer keys:  {sorted(spec.keys())}")
+        print(f"  Tools ({len(tool_names)}):  {tool_names}")
+        print(f"  Middleware:       {mw_names}")
+        print(f"  data_dir:         {data_dir}")
+        print(f"  evidence files:   {n_copied}")
+        return
 
     # ------------------------------------------------------------------
-    # Cleanup working directory
+    # Imports (deferred so --dry-run never touches heavy LangChain stack)
     # ------------------------------------------------------------------
+    from deepagents import create_deep_agent
+    from deepagents.backends import FilesystemBackend
+
+    from src.agents.deep_interpreter.middleware.write_file_guard import (
+        WriteFileArgGuardMiddleware,
+    )
+    from src.agents.drug_target.subagents.summarizer import get_summarizer_subagent
+    from src.agents.drug_target.tools import read_skill_file
+    from src.agents.model import create_llm
+    from src.agents.shared.skill_activator import SkillActivator
+    from src.agents.shared.skills_middleware import SkillsMiddleware
+
+    # ------------------------------------------------------------------
+    # Build standalone summarizer DeepAgent
+    # ------------------------------------------------------------------
+    llm = create_llm(provider=args.provider, model=args.model)
+
+    spec = get_summarizer_subagent()
+    backend = FilesystemBackend(
+        root_dir=str(data_dir),
+        virtual_mode=True,
+    )
+
+    # ------------------------------------------------------------------
+    # Wire the drug-target-reporting skill the same way the full
+    # `create_drug_target_agent` pipeline does (see
+    # `src/agents/drug_target/subagents/configs.py:get_subagents` —
+    # SkillsMiddleware injects the skill metadata into the system
+    # prompt; SkillActivator + `read_skill_file` lets the LLM pull the
+    # full SKILL.md body on demand). Without this wiring the standalone
+    # smoke runs in a *weaker* environment than production, which is
+    # how round 1-3 live-smoke failures (UNCITED_QUANTITATIVE,
+    # FABRICATED_DRUG_NAME, retry-replace-not-patch confusion) survived
+    # — the skill content covers exactly those concerns. The seven-tool
+    # invariant is preserved on `get_summarizer_subagent()`; the smoke
+    # adds `read_skill_file` because it is the agreed mechanism for the
+    # LLM to consume the skill body on demand.
+    # ------------------------------------------------------------------
+    skill_name = "drug-target-reporting"
+    skills_dir = PROJECT_ROOT / "skills"
+    skill_registry = {skill_name: str(skills_dir / skill_name)}
+
+    agent = create_deep_agent(
+        model=llm,
+        tools=[*spec["tools"], read_skill_file],
+        system_prompt=spec["system_prompt"],
+        backend=backend,
+        # Pass subagents=[] explicitly so deepagents does NOT auto-attach
+        # SubAgentMiddleware with a default general-purpose subagent. The
+        # standalone summarizer is intentionally one-loop / fixed-tool;
+        # `task` dispatch was empirically a source of fruitless schema-
+        # inference detours in live-LLM runs (see commit history).
+        subagents=[],
+        middleware=[
+            WriteFileArgGuardMiddleware(backend_root=str(data_dir)),
+            *spec["middleware"],
+            SkillsMiddleware(
+                skills_dir=str(skills_dir),
+                allowed_skill_names=(skill_name,),
+            ),
+            SkillActivator(skill_registry=skill_registry),
+        ],
+    )
+    agent = agent.with_config({"recursion_limit": args.recursion_limit})
+    print(f"  Skill wired:      {skill_name} (from {skills_dir / skill_name})")
+
+    initial_message = (
+        f"Finalize the drug target assessment report.\n\n"
+        f"Data directory: {data_dir}\n"
+        f"Disease context: {disease or 'see evidence files'}\n\n"
+        f"The evidence directory already contains all Stage 1, 2, and 3 files.\n"
+        f"Follow the 6-step tool sequence in your system prompt:\n"
+        f"  1) build_evidence_summary (exactly once)\n"
+        f"  2) load_evidence_files\n"
+        f"  3) save_report_expansions (per gene/section)\n"
+        f"  4) render_drug_md_from_expansions\n"
+        f"  5) validate_drug_md  -- MANDATORY quality gate\n"
+        f"  6) generate_drug_html_report (exactly once after valid=true)\n"
+        f"Then emit `SUMMARIZER_STATUS: PASS` on its own line.\n"
+        f"Pass `data_dir=\"{data_dir}\"` to every tool call.\n"
+    )
+
+    t0 = time.time()
+    print("\nInvoking summarizer agent...")
+    print("-" * 70)
+
+    result = await agent.ainvoke(
+        {"messages": [{"role": "user", "content": initial_message}]},
+        config={"configurable": {"thread_id": str(uuid.uuid4())}},
+    )
+
+    elapsed = time.time() - t0
+    print("-" * 70)
+    print(f"\nCompleted in {elapsed / 60:.1f} minutes")
+
+    # ------------------------------------------------------------------
+    # Validate artifacts
+    # ------------------------------------------------------------------
+    drug_md_src = data_dir / "drug.md"
+    drug_html_src = data_dir / "drug_report.html"
+    md_ok = drug_md_src.exists()
+    html_ok = drug_html_src.exists()
+    print()
+    print(f"  drug.md exists:           {md_ok} ({drug_md_src})")
+    print(f"  drug_report.html exists:  {html_ok} ({drug_html_src})")
+
+    if md_ok:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(drug_md_src, output_path)
+        content = drug_md_src.read_text(encoding="utf-8")
+        print(
+            f"  drug.md saved:            {len(content)} chars, "
+            f"{content.count(chr(10))} lines -> {output_path}"
+        )
+
+    messages = result.get("messages", [])
+    status = _scan_for_status(messages)
+    print(f"  SUMMARIZER_STATUS:        {status or '(NOT FOUND)'}")
+    print(f"  Total messages:           {len(messages)}")
+
+    # Quality-gate cross-check: status PASS requires HTML to exist.
+    if status == "PASS" and not html_ok:
+        print(
+            "  WARNING: SUMMARIZER_STATUS: PASS but drug_report.html missing — "
+            "the literal-line contract was emitted without the finalization "
+            "tool actually running. The fail-closed middleware should have "
+            "blocked this; investigate.",
+            file=sys.stderr,
+        )
+
+    _dump_messages(messages)
+
+    print("=" * 70)
+    print("DONE" if status == "PASS" and md_ok and html_ok else "INCOMPLETE")
+
     if owns_data_dir and not args.keep_data_dir:
         shutil.rmtree(data_dir, ignore_errors=True)
         print(f"  Cleaned up temp data dir: {data_dir}")

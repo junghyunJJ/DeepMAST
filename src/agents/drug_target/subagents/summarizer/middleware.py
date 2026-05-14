@@ -1,18 +1,37 @@
-"""Summarizer-specific AgentMiddleware implementations.
+"""Middleware retained after the summarizer simplification (2026-05-13).
 
-Middlewares:
-1. BuildEvidenceSummaryGuardMiddleware: Allow build_evidence_summary exactly
-   once per agent run; block subsequent calls with a structured error.
-2. RepairCycleCounterMiddleware: Block the third task(subagent_type="report_writer")
-   after 2 non-converging critic cycles.
+Surviving classes:
+
+1. ``SummarizerFinalizationGuardMiddleware`` — adapted fail-closed gate.
+   Captures the result of ``validate_drug_md`` and blocks
+   ``generate_drug_html_report`` unless the most recent ``validate_drug_md``
+   call returned ``valid=true``. This is the single mechanical protection
+   that prevents the summarizer LLM from declaring ``SUMMARIZER_STATUS: PASS``
+   without a real validator pass when the LLM is later instructed to render
+   the HTML.
+
+2. ``HypothesisRetryLoopMiddleware`` — out of scope for the summarizer
+   simplification; used by the ``hypothesis_writer`` subagent to suppress
+   identical-payload retries against the deterministic save gate.
+
+Removed in the 2026-05-13 simplification:
+
+- ``BuildEvidenceSummaryGuardMiddleware`` (duplicate-call protection moved to
+  prompt-level guidance).
+- ``RepairCycleCounterMiddleware`` (retry budget moved to prompt-level
+  guidance: max 2 ``save_report_expansions`` retries).
+- ``AnnotationDensityMiddleware`` (no ``save_drug_md`` tool to guard;
+  ``validate_drug_md`` already covers annotation density at validation time).
+- ``FrozenTemplateSpanMiddleware`` (deterministic template assembly is now
+  the job of ``render_drug_md_from_expansions``; the LLM never writes
+  ``drug.md`` directly).
 """
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import logging
-import re
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -23,8 +42,6 @@ from langgraph.types import Command
 
 logger = logging.getLogger(__name__)
 
-_BUILD_EVIDENCE_TOOL = "build_evidence_summary"
-
 
 def _canonical_payload_hash(value: Any) -> str:
     try:
@@ -34,291 +51,12 @@ def _canonical_payload_hash(value: Any) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-class BuildEvidenceSummaryGuardMiddleware(AgentMiddleware):
-    """Allow build_evidence_summary exactly once per agent run.
-
-    On the second invocation within the same middleware instance, returns a
-    blocked ToolMessage directing the agent to follow REPAIR MODE without
-    rebuilding the evidence summary skeleton.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._call_count: int = 0
-
-    def _is_build_evidence(self, request: ToolCallRequest) -> bool:
-        return request.tool_call.get("name") == _BUILD_EVIDENCE_TOOL
-
-    def _blocked_response(self, request: ToolCallRequest) -> ToolMessage:
-        payload = {
-            "already_invoked": True,
-            "error": (
-                "build_evidence_summary has already been called once in this agent run. "
-                "The drug.md skeleton already exists on disk. "
-                "STOP — do NOT call build_evidence_summary again. "
-                "Follow REPAIR MODE: load_evidence_files('drug.md') then patch in-place."
-            ),
-        }
-        return ToolMessage(
-            content=json.dumps(payload),
-            tool_call_id=request.tool_call.get("id", ""),
-        )
-
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command],
-    ) -> ToolMessage | Command:
-        if self._is_build_evidence(request):
-            if self._call_count >= 1:
-                logger.warning(
-                    "BuildEvidenceSummaryGuardMiddleware: blocking duplicate "
-                    "build_evidence_summary call (count=%d)",
-                    self._call_count,
-                )
-                return self._blocked_response(request)
-            self._call_count += 1
-        return handler(request)
-
-    async def awrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
-    ) -> ToolMessage | Command:
-        if self._is_build_evidence(request):
-            if self._call_count >= 1:
-                logger.warning(
-                    "BuildEvidenceSummaryGuardMiddleware: blocking duplicate "
-                    "build_evidence_summary call (count=%d)",
-                    self._call_count,
-                )
-                return self._blocked_response(request)
-            self._call_count += 1
-        return await handler(request)
-
-
-_REPORT_WRITER_SUBAGENT = "report_writer"
-_MAX_REPAIR_CYCLES_DEFAULT = 2
-
-
-class RepairCycleCounterMiddleware(AgentMiddleware):
-    """Block the third task(subagent_type="report_writer") after max_cycles.
-
-    Inner subagents (critic, report_writer) are dispatched via the deepagents
-    built-in `task` tool. This middleware tracks how many times the
-    report_writer subagent has been invoked and blocks the (max_cycles+1)th
-    call, returning a BLOCKED ToolMessage with the last known critic findings.
-    """
-
-    def __init__(self, *, max_cycles: int = _MAX_REPAIR_CYCLES_DEFAULT) -> None:
-        super().__init__()
-        self._max_cycles = max_cycles
-        self._report_writer_count: int = 0
-        self._last_critic_findings: str = ""
-
-    def _subagent_type(self, request: ToolCallRequest) -> str | None:
-        if request.tool_call.get("name") != "task":
-            return None
-        args = request.tool_call.get("args") or {}
-        if isinstance(args, dict):
-            return args.get("subagent_type")
-        return None
-
-    def _blocked_response(self, request: ToolCallRequest) -> ToolMessage:
-        payload = {
-            "status": "BLOCKED",
-            "reason": (
-                f"report_writer has been invoked {self._report_writer_count} time(s). "
-                f"Max repair cycles ({self._max_cycles}) reached. "
-                "The report has not converged after the allowed repair attempts. "
-                "Terminate this run and surface the critic findings below."
-            ),
-            "critic_findings": self._last_critic_findings or "No findings recorded.",
-        }
-        return ToolMessage(
-            content=json.dumps(payload),
-            tool_call_id=request.tool_call.get("id", ""),
-        )
-
-    def _handle_critic_result(self, result: ToolMessage | Command) -> None:
-        """Extract critic findings from tool result for use in BLOCKED message."""
-        if isinstance(result, ToolMessage):
-            self._last_critic_findings = str(result.content)
-        elif isinstance(result, Command):
-            # Command may wrap a ToolMessage in its update
-            update = getattr(result, "update", None)
-            if isinstance(update, dict):
-                msgs = update.get("messages", [])
-                if msgs:
-                    last = msgs[-1]
-                    if isinstance(last, ToolMessage):
-                        self._last_critic_findings = str(last.content)
-
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command],
-    ) -> ToolMessage | Command:
-        subagent = self._subagent_type(request)
-        if subagent == _REPORT_WRITER_SUBAGENT:
-            if self._report_writer_count >= self._max_cycles:
-                logger.warning(
-                    "RepairCycleCounterMiddleware: blocking report_writer "
-                    "(count=%d, max=%d)",
-                    self._report_writer_count,
-                    self._max_cycles,
-                )
-                return self._blocked_response(request)
-            self._report_writer_count += 1
-            result = handler(request)
-            return result
-        result = handler(request)
-        if subagent == "critic":
-            self._handle_critic_result(result)
-        return result
-
-    async def awrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
-    ) -> ToolMessage | Command:
-        subagent = self._subagent_type(request)
-        if subagent == _REPORT_WRITER_SUBAGENT:
-            if self._report_writer_count >= self._max_cycles:
-                logger.warning(
-                    "RepairCycleCounterMiddleware: blocking report_writer "
-                    "(count=%d, max=%d)",
-                    self._report_writer_count,
-                    self._max_cycles,
-                )
-                return self._blocked_response(request)
-            self._report_writer_count += 1
-            result = await handler(request)
-            return result
-        result = await handler(request)
-        if subagent == "critic":
-            self._handle_critic_result(result)
-        return result
-
-
-_SAVE_DRUG_MD_TOOL = "save_drug_md"
-_ANNOTATION_RE = re.compile(r"\[source:[^\]]+\]")
-_SENTENCE_END_RE = re.compile(r"[.!?]")
-_DEFAULT_ANNOTATION_THRESHOLD = 10
-
-
-def _is_prose_line(line: str) -> bool:
-    """Mirror of stage_logic._is_expand_prose: not header / table / list."""
-    stripped = line.strip()
-    if not stripped:
-        return False
-    if stripped.startswith("|") or stripped.startswith("#"):
-        return False
-    if re.match(r"[-*]\s+|^\d+\.\s+", stripped):
-        return False
-    return True
-
-
-def _count_prose_sentences(content: str) -> int:
-    """Count sentence-end punctuation occurrences across prose lines.
-
-    Mirrors the heuristic used by the UNANCHORED_SENTENCE validator: prose
-    lines are non-empty lines that are not headers, tables, or list items.
-    """
-    total = 0
-    for line in content.splitlines():
-        if not _is_prose_line(line):
-            continue
-        total += len(_SENTENCE_END_RE.findall(line))
-    return total
-
-
-class AnnotationDensityMiddleware(AgentMiddleware):
-    """Reject ``save_drug_md`` when EXPAND-region prose is under-annotated.
-
-    Prompt-only enforcement of per-sentence ``[source: <field>]`` annotations
-    proved unreliable on local LLMs (1/20 in the qwen3.5:35b run). This
-    middleware intercepts ``save_drug_md`` tool calls and counts
-    ``[source:...]`` markers in the saved content. When the document already
-    contains enough prose sentences to warrant annotation
-    (``prose_sentences >= threshold``) but the annotation count is below the
-    threshold, the call is rejected with a structured error directing the
-    writer to add annotations before retrying.
-
-    Documents shorter than ``threshold`` prose sentences pass through — the
-    UNANCHORED_SENTENCE validator already covers them at validation time, and
-    failing tiny saves here would block legitimate degenerate cases.
-    """
-
-    def __init__(self, *, threshold: int = _DEFAULT_ANNOTATION_THRESHOLD) -> None:
-        super().__init__()
-        self._threshold = threshold
-
-    def _evaluate(self, request: ToolCallRequest) -> ToolMessage | None:
-        if request.tool_call.get("name") != _SAVE_DRUG_MD_TOOL:
-            return None
-        args = request.tool_call.get("args") or {}
-        content = ""
-        if isinstance(args, dict):
-            raw = args.get("content")
-            if isinstance(raw, str):
-                content = raw
-        if not content:
-            return None
-        prose_sentences = _count_prose_sentences(content)
-        if prose_sentences < self._threshold:
-            return None
-        annotation_count = len(_ANNOTATION_RE.findall(content))
-        if annotation_count >= self._threshold:
-            return None
-        deficit = self._threshold - annotation_count
-        payload = {
-            "ok": False,
-            "error": (
-                f"Annotation density too low: found {annotation_count} "
-                f"`[source: <field>]` annotations across {prose_sentences} prose "
-                f"sentences, need >= {self._threshold}. Add `[source: <field>]` "
-                f"to at least {deficit} more EXPAND-region sentences before saving."
-            ),
-            "annotation_count": annotation_count,
-            "prose_sentences": prose_sentences,
-            "threshold": self._threshold,
-        }
-        logger.warning(
-            "AnnotationDensityMiddleware: blocking save_drug_md "
-            "(annotations=%d, prose=%d, threshold=%d)",
-            annotation_count,
-            prose_sentences,
-            self._threshold,
-        )
-        return ToolMessage(
-            content=json.dumps(payload),
-            tool_call_id=request.tool_call.get("id", ""),
-        )
-
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command],
-    ) -> ToolMessage | Command:
-        rejection = self._evaluate(request)
-        if rejection is not None:
-            return rejection
-        return handler(request)
-
-    async def awrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
-    ) -> ToolMessage | Command:
-        rejection = self._evaluate(request)
-        if rejection is not None:
-            return rejection
-        return await handler(request)
-
-
 class HypothesisRetryLoopMiddleware(AgentMiddleware):
-    """Block unchanged retries after a deterministic hypothesis-save rejection."""
+    """Block unchanged retries after a deterministic hypothesis-save rejection.
+
+    Used by the ``hypothesis_writer`` subagent. Out of scope for the
+    2026-05-13 summarizer simplification.
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -391,207 +129,27 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
         return result
 
 
-class FrozenTemplateSpanMiddleware(AgentMiddleware):
-    """Reject legacy save_drug_md calls that mutate non-EXPAND template spans."""
-
-    def __init__(self, *, data_dir: str | None = None) -> None:
-        super().__init__()
-        self._data_dir = data_dir
-
-    def _static_spans_preserved(self, template: str, candidate: str) -> bool:
-        spans = [span for span in re.split(r"<!--\s*EXPAND:.*?-->", template, flags=re.DOTALL) if span]
-        position = 0
-        for span in spans:
-            found = candidate.find(span, position)
-            if found == -1:
-                return False
-            position = found + len(span)
-        return True
-
-    def _evaluate(self, request: ToolCallRequest) -> ToolMessage | None:
-        if request.tool_call.get("name") != _SAVE_DRUG_MD_TOOL or not self._data_dir:
-            return None
-        args = request.tool_call.get("args") or {}
-        if not isinstance(args, dict) or not isinstance(args.get("content"), str):
-            return None
-        try:
-            from pathlib import Path
-
-            card_path = Path(self._data_dir) / "drug_report_reference_card.json"
-            if not card_path.exists():
-                return None
-            card = json.loads(card_path.read_text(encoding="utf-8"))
-            template = card.get("markdown_template")
-            if not isinstance(template, str) or not template:
-                return None
-        except Exception:
-            return None
-        if self._static_spans_preserved(template, args["content"]):
-            return None
-        payload = {
-            "saved": False,
-            "error": (
-                "save_drug_md candidate mutates frozen non-EXPAND template spans. "
-                "Use save_report_expansions followed by render_drug_md_from_expansions, "
-                "or preserve all table/headings/score spans exactly."
-            ),
-        }
-        return ToolMessage(
-            content=json.dumps(payload),
-            tool_call_id=request.tool_call.get("id", ""),
-        )
-
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command],
-    ) -> ToolMessage | Command:
-        rejection = self._evaluate(request)
-        if rejection is not None:
-            return rejection
-        return handler(request)
-
-    async def awrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
-    ) -> ToolMessage | Command:
-        rejection = self._evaluate(request)
-        if rejection is not None:
-            return rejection
-        return await handler(request)
-
-
-# ---------------------------------------------------------------------------
-# DrugMdSaveSanitizerMiddleware — deterministic LLM-output sanitization
-# ---------------------------------------------------------------------------
-
-_EXPAND_MARKER_RE = re.compile(r"<!--\s*EXPAND:.*?-->", re.DOTALL)
-
-_DEFAULT_GAP_BODY = (
-    "**Data limitations**: Specific evidence types or sources were missing or "
-    "sparse for some genes — see per-gene Stage 3 evidence files for "
-    "completeness gaps.\n\n"
-    "**Missing evidence**: Some lookups returned empty results (e.g., absent "
-    "GWAS or trial data for certain genes); see Stage 1/Stage 3 outputs.\n\n"
-    "**Open questions**: Several hypotheses remain unresolved by the local "
-    "evidence and would benefit from targeted follow-up experiments."
-)
-
-_STAT_KEYWORDS = ("risk_ratio=", "p_value=", "OR=", "HR=", "logFC=")
-
-
-class DrugMdSaveSanitizerMiddleware(AgentMiddleware):
-    """Deterministically sanitize drug.md content on save_drug_md.
-
-    Mitigates three LLM output-quality issues that GPT-5.4 repeatedly fails to
-    fix via prompt rules:
-      - UNEXPANDED_PLACEHOLDER: strips ``<!-- EXPAND: ... -->`` HTML comments.
-      - EMPTY_GAP_ANALYSIS: fills empty Gap Analysis section with default body.
-      - UNCITED_QUANTITATIVE: appends ``[source: census evidence]`` to stat
-        lines that lack a source citation.
-
-    Only applies to ``save_drug_md`` tool calls. All other tools pass through
-    unchanged. Does NOT touch fabricated drug names, wrong classifications, or
-    other misinformation — those remain fail-closed via existing validators.
-    """
-
-    _GAP_HEADER_RE = re.compile(
-        r"(?P<header>^### Gap Analysis[ \t]*$\n)"
-        r"(?P<body>(?:.*\n)*?)"
-        r"(?P<next>^## )",
-        re.MULTILINE,
-    )
-
-    # ------------------------------------------------------------------
-    # Internal sanitization helpers
-    # ------------------------------------------------------------------
-
-    def _strip_expand_markers(self, content: str) -> str:
-        return _EXPAND_MARKER_RE.sub("", content)
-
-    def _fill_empty_gap_analysis(self, content: str) -> str:
-        match = self._GAP_HEADER_RE.search(content)
-        if not match:
-            return content
-        body = match.group("body")
-        if body.strip():
-            return content
-        # Replace empty body with default placeholder
-        before = content[: match.start("body")]
-        after = content[match.start("next") :]
-        return before + _DEFAULT_GAP_BODY + "\n\n" + after
-
-    def _add_source_citation(self, content: str) -> str:
-        out_lines: list[str] = []
-        for line in content.split("\n"):
-            if "[source:" in line:
-                out_lines.append(line)
-                continue
-            if any(kw in line for kw in _STAT_KEYWORDS):
-                # Skip markdown table rows (start with |)
-                if line.lstrip().startswith("|"):
-                    out_lines.append(line)
-                    continue
-                out_lines.append(line.rstrip() + " [source: census evidence]")
-            else:
-                out_lines.append(line)
-        return "\n".join(out_lines)
-
-    def _sanitize_content(self, content: str) -> str:
-        content = self._strip_expand_markers(content)
-        content = self._fill_empty_gap_analysis(content)
-        content = self._add_source_citation(content)
-        return content
-
-    def _patch_request(self, request: ToolCallRequest) -> ToolCallRequest:
-        if request.tool_call.get("name") != "save_drug_md":
-            return request
-        args = request.tool_call.get("args") or {}
-        if not isinstance(args, dict):
-            return request
-        content = args.get("content")
-        if not isinstance(content, str):
-            return request
-        sanitized = self._sanitize_content(content)
-        if sanitized == content:
-            return request
-        # Mutate the tool_call dict in-place — same pattern used by other
-        # middlewares that patch request.tool_call (dict is mutable).
-        new_args = {**args, "content": sanitized}
-        request.tool_call["args"] = new_args
-        return request
-
-    # ------------------------------------------------------------------
-    # AgentMiddleware protocol
-    # ------------------------------------------------------------------
-
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command],
-    ) -> ToolMessage | Command:
-        return handler(self._patch_request(request))
-
-    async def awrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
-    ) -> ToolMessage | Command:
-        return await handler(self._patch_request(request))
+_VALIDATOR_TOOL = "validate_drug_md"
+_GUARDED_FINALIZATION_TOOL = "generate_drug_html_report"
 
 
 class SummarizerFinalizationGuardMiddleware(AgentMiddleware):
-    """Block save_drug_md and task(report_writer) until validation passes.
+    """Block ``generate_drug_html_report`` until ``validate_drug_md`` passes.
 
-    Enforces a strict finalization gate (plan §2.1.D Option C):
-    - validate_drug_report_finalization must be called first.
-    - If the validator returned valid=false, finalization tools are blocked.
-    - Only after valid=true does save_drug_md or task(report_writer) proceed.
+    Mechanical fail-closed gate retained from the pre-simplification
+    architecture and adapted to the new tool surface (2026-05-13):
+
+    - Captures the result of every ``validate_drug_md`` call and records
+      whether the most recent call returned ``valid=true``.
+    - Blocks ``generate_drug_html_report`` when:
+        (a) ``validate_drug_md`` has never been called in this run, OR
+        (b) the most recent ``validate_drug_md`` returned ``valid=false``,
+            ambiguous, or malformed output.
+    - Allows the call through only after a clean ``valid=true``.
+
+    The summarizer LLM is also instructed via the system prompt to follow the
+    same contract; this middleware is the mechanical backstop.
     """
-
-    _GUARDED_WRITES: tuple[str, ...] = ("save_drug_md",)
-    _GUARDED_SUBAGENTS: tuple[str, ...] = ("report_writer",)
 
     def __init__(self) -> None:
         super().__init__()
@@ -599,27 +157,31 @@ class SummarizerFinalizationGuardMiddleware(AgentMiddleware):
         self._last_valid: bool | None = None
 
     def _is_validator(self, request: ToolCallRequest) -> bool:
-        return request.tool_call.get("name") == "validate_drug_report_finalization"
+        return request.tool_call.get("name") == _VALIDATOR_TOOL
 
-    def _is_guarded_save(self, request: ToolCallRequest) -> bool:
-        return request.tool_call.get("name") in self._GUARDED_WRITES
-
-    def _is_guarded_task(self, request: ToolCallRequest) -> bool:
-        if request.tool_call.get("name") != "task":
-            return False
-        args = request.tool_call.get("args") or {}
-        return isinstance(args, dict) and args.get("subagent_type") in self._GUARDED_SUBAGENTS
+    def _is_guarded_finalization(self, request: ToolCallRequest) -> bool:
+        return request.tool_call.get("name") == _GUARDED_FINALIZATION_TOOL
 
     def _capture_validator_result(self, result: ToolMessage | Command) -> None:
+        """Read ``valid`` from the validator's JSON ToolMessage content."""
         if not isinstance(result, ToolMessage):
             return
         try:
             parsed = json.loads(str(result.content))
-            if isinstance(parsed, dict) and "valid" in parsed:
-                self._validator_called = True
-                self._last_valid = bool(parsed["valid"])
         except (ValueError, TypeError) as exc:
-            logger.warning("validator JSON parse failed: %s", exc)
+            logger.warning("validate_drug_md JSON parse failed: %s", exc)
+            self._validator_called = True
+            self._last_valid = False
+            return
+        if isinstance(parsed, dict) and "valid" in parsed:
+            self._validator_called = True
+            self._last_valid = bool(parsed["valid"])
+        else:
+            logger.warning(
+                "validate_drug_md result missing 'valid' key; treating as invalid"
+            )
+            self._validator_called = True
+            self._last_valid = False
 
     def _blocked(self, request: ToolCallRequest, reason: str) -> ToolMessage:
         payload = {
@@ -633,18 +195,20 @@ class SummarizerFinalizationGuardMiddleware(AgentMiddleware):
         )
 
     def _check_gate(self, request: ToolCallRequest) -> ToolMessage | None:
-        """Return a blocked ToolMessage if the finalization gate is not satisfied."""
-        if not (self._is_guarded_save(request) or self._is_guarded_task(request)):
+        if not self._is_guarded_finalization(request):
             return None
         if not self._validator_called:
             return self._blocked(
                 request,
-                "validate_drug_report_finalization must be called first",
+                "validate_drug_md must be called and return valid=true "
+                "before generate_drug_html_report.",
             )
-        if self._last_valid is False:
+        if self._last_valid is not True:
             return self._blocked(
                 request,
-                "validator returned valid=false; cannot finalize",
+                "validate_drug_md returned valid=false; cannot finalize. "
+                "Fix the offending sections via save_report_expansions and "
+                "re-validate before retrying.",
             )
         return None
 
@@ -676,11 +240,6 @@ class SummarizerFinalizationGuardMiddleware(AgentMiddleware):
 
 
 __all__ = [
-    "AnnotationDensityMiddleware",
-    "BuildEvidenceSummaryGuardMiddleware",
-    "DrugMdSaveSanitizerMiddleware",
-    "FrozenTemplateSpanMiddleware",
     "HypothesisRetryLoopMiddleware",
-    "RepairCycleCounterMiddleware",
     "SummarizerFinalizationGuardMiddleware",
 ]

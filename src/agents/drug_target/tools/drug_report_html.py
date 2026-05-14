@@ -791,9 +791,16 @@ def _preformat_cards(featured_cards: list[dict]) -> list[dict]:
                     reactome_parts.append({"role": role, "pathways": "; ".join(str(p) for p in pws[:3])})
 
             census = pair_data.get("census", {})
+            ligand = pair_data.get("ligand", "")
+            receptor = pair_data.get("receptor", "")
             pairs_fmt.append({
-                "ligand": pair_data.get("ligand", ""),
-                "receptor": pair_data.get("receptor", ""),
+                "ligand": ligand,
+                "receptor": receptor,
+                # Inline source-file citation so template-baked quantitative
+                # lines pass the UNCITED_QUANTITATIVE check in validate_drug_md
+                # (regex requires `.json|[from ...]|stage[123]_...` on the same
+                # line as any p_value=/risk_ratio= emission).
+                "pair_file": f"stage1_{ligand}--{receptor}.json",
                 "score": ppi.get("max_combined_score", "N/A"),
                 "interaction": "confirmed" if ppi.get("interaction_found", False) else "not found",
                 "kegg": kegg_parts,

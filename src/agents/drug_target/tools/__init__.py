@@ -15,7 +15,10 @@ from src.agents.drug_target.tools.evidence_loader import (
     check_hypothesis_completion,
 )
 from src.agents.drug_target.tools.hypothesis_schema import save_hypothesis_report
-from src.agents.drug_target.tools.report_expansion_schema import save_report_expansions
+from src.agents.drug_target.tools.report_expansion_schema import (
+    lookup_provenance_value,
+    save_report_expansions,
+)
 from src.agents.drug_target.tools.report_renderer import render_drug_md_from_expansions
 from src.agents.drug_target.tools.assessment_output import (
     save_target_assessment,
@@ -113,6 +116,7 @@ __all__ = [
     "save_target_assessment",
     "save_drug_md",
     "save_report_expansions",
+    "lookup_provenance_value",
     "render_drug_md_from_expansions",
     # HTML report
     "generate_drug_html_report",

@@ -364,3 +364,74 @@ class TestUniversalCarveouts:
                 f"Flag {f['type']} fired on a code-block line in fixture '{fixture_name}': "
                 f"{f.get('snippet')!r}"
             )
+
+
+# ---------------------------------------------------------------------------
+# UNCITED_QUANTITATIVE bracketing pair (PR #19 round 7 — P1 / DS-2)
+#
+# The producer/consumer regression of round 6 (Census line emitted without
+# citation, validator rejecting it) is now covered end-to-end by
+# ``test_summarizer_round_trip``. These two tests bracket the validator
+# rule itself directly: one POSITIVE case where the regex MUST fire and
+# one NEGATIVE case where the new ``[from stage1_<LIG>--<REC>.json]``
+# annotation MUST be accepted. Encoding both halves prevents future
+# tightening from regressing the producer fix.
+# ---------------------------------------------------------------------------
+
+
+def _write_drug_md(tmp_path: Path, body: str) -> Path:
+    drug_md_path = tmp_path / "drug.md"
+    drug_md_path.write_text(body, encoding="utf-8")
+    return tmp_path
+
+
+class TestUncitedQuantitativeBracketing:
+    """Direct unit-level brackets around the ``UNCITED_QUANTITATIVE`` flag."""
+
+    def test_fires_on_uncited_or_in_prose(self, tmp_path: Path) -> None:
+        """A bare ``OR=2.1`` quantitative claim in EXPAND prose with NO
+        citation pattern (``.json``, ``[from ...]``, or ``stage[123]_...``)
+        on the same line MUST trigger ``UNCITED_QUANTITATIVE``."""
+        body = (
+            "# Report\n\n"
+            "## Findings\n\n"
+            "The signal was strongest in cluster A, with OR=2.1 driving the result.\n"
+        )
+        data_dir = _write_drug_md(tmp_path, body)
+        findings = _findings(data_dir)
+        flagged = [f for f in findings if f["type"] == "UNCITED_QUANTITATIVE"]
+        assert flagged, (
+            "Expected UNCITED_QUANTITATIVE to fire on uncited 'OR=2.1' in "
+            f"prose; got types: {_flag_types(findings)}"
+        )
+        sample_lines = [
+            ln for f in flagged for ln in f.get("sample_lines", [])
+        ]
+        assert any("OR=2.1" in ln for ln in sample_lines), (
+            f"Expected 'OR=2.1' in UNCITED_QUANTITATIVE sample_lines; "
+            f"got: {sample_lines}"
+        )
+
+    def test_does_not_fire_on_census_with_inline_pair_file_citation(
+        self, tmp_path: Path,
+    ) -> None:
+        """The template-baked Census line with the new inline
+        ``[from stage1_<LIG>--<REC>.json]`` citation MUST NOT trigger
+        ``UNCITED_QUANTITATIVE``. This is the exact line shape produced by
+        ``drug_report.md.j2:137`` after the round 7 fix; failing this test
+        means the producer/validator contract drifted apart again."""
+        body = (
+            "# Report\n\n"
+            "**B. Biological Context (Stage 1)**\n\n"
+            "- **APOE-LRP1**: STRING PPI score=0.99, interaction=confirmed\n"
+            "  - Census: risk_ratio=0.0523, p_value=0.0 [from stage1_APOE--LRP1.json]\n"
+        )
+        data_dir = _write_drug_md(tmp_path, body)
+        findings = _findings(data_dir)
+        flagged = [f for f in findings if f["type"] == "UNCITED_QUANTITATIVE"]
+        for f in flagged:
+            for ln in f.get("sample_lines", []):
+                assert "[from stage1_APOE--LRP1.json]" not in ln, (
+                    "UNCITED_QUANTITATIVE fired on a Census line that "
+                    f"already carries an inline citation: {ln!r}"
+                )
