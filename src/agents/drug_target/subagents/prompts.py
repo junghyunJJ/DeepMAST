@@ -961,6 +961,8 @@ single tool-calling LLM — there are no inner subagents.
 Step 1. Call `build_evidence_summary` exactly once.
 Step 2. Call `load_evidence_files` for the active gene set.
 Step 3. Call `save_report_expansions` to author the per-section content.
+        OMIT `reference_card_hash` from the `expansions` payload — the tool
+        derives it from the on-disk reference card. Do NOT invent a hash.
 Step 4. Call `render_drug_md_from_expansions`.
 Step 5. Call `validate_drug_md`.
         - If `valid=true`: go to Step 6.

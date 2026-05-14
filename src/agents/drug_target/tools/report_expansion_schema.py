@@ -271,11 +271,24 @@ def validate_report_expansions(data_dir: str | Path, expansions: dict) -> tuple[
             "code": "REPORT_EXPANSIONS_INVALID",
             "message": "schema_version must be report_expansions.v1",
         })
+    # `reference_card_hash` is OPTIONAL on the input payload. When the LLM
+    # omits it (the recommended path — the post-2026-05-13 SUMMARIZER_PROMPT
+    # tells callers not to invent a SHA256), auto-derive it from the on-disk
+    # reference card. When the caller does supply a hash, validate the
+    # match strictly and surface both values for one-turn self-correction.
+    # Mutating ``expansions`` in place is intentional: the caller persists
+    # the result to ``report_expansions.json`` so the on-disk payload stays
+    # self-describing.
     expected_hash = canonical_json_hash(reference_card)
-    if expansions.get("reference_card_hash") != expected_hash:
+    supplied_hash = expansions.get("reference_card_hash")
+    if supplied_hash is None:
+        expansions["reference_card_hash"] = expected_hash
+    elif supplied_hash != expected_hash:
         errors.append({
             "code": "RENDER_SOURCE_HASH_MISMATCH",
             "message": "reference_card_hash does not match drug_report_reference_card.json",
+            "expected": expected_hash,
+            "supplied": supplied_hash,
         })
 
     slots = expansions.get("slots")

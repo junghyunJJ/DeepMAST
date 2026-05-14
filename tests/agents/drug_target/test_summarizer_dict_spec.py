@@ -1,6 +1,6 @@
 """Tests for the simplified summarizer subagent (2026-05-13 simplification).
 
-These six tests replace the 17-test legacy summarizer suite. They cover:
+These tests replace the 17-test legacy summarizer suite. They cover:
 
   TS-01: dict spec shape and required keys
   TS-02: exact 7-tool inventory
@@ -12,6 +12,12 @@ These six tests replace the 17-test legacy summarizer suite. They cover:
           or never called)
   TS-06: orchestrator contract — ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE still
          references SUMMARIZER_STATUS and dispatches summarizer by name.
+  TS-07: save_report_expansions auto-derives reference_card_hash when the
+         caller omits it (live-smoke regression — gpt-5.4 cannot compute
+         canonical-JSON SHA256 from a partially-readable offloaded card).
+  TS-08: save_report_expansions still rejects an explicit hash that does
+         not match the on-disk reference card, with expected/supplied in
+         the error payload for one-turn self-correction.
 
 TS-04/TS-05 unit-test the mechanical fail-closed gate directly at the
 middleware layer — sufficient under the (b') decision to retain and adapt
@@ -21,6 +27,7 @@ middleware layer — sufficient under the (b') decision to retain and adapt
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from langchain_core.messages import ToolMessage
@@ -33,6 +40,10 @@ from src.agents.drug_target.agent import (
 from src.agents.drug_target.subagents.summarizer import get_summarizer_subagent
 from src.agents.drug_target.subagents.summarizer.middleware import (
     SummarizerFinalizationGuardMiddleware,
+)
+from src.agents.drug_target.tools.report_expansion_schema import (
+    canonical_json_hash,
+    save_report_expansions,
 )
 
 
@@ -200,3 +211,117 @@ def test_orchestrator_contract_unchanged() -> None:
     # No lingering reference to the removed inner-subagent dispatch.
     assert 'subagent_type="report_writer"' not in ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
     assert 'subagent_type="critic"' not in ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
+
+
+# ---------------------------------------------------------------------------
+# Helpers for TS-07 / TS-08 — minimal reference card + expansions fixtures
+# ---------------------------------------------------------------------------
+
+
+def _write_minimal_reference_card(data_dir: Path) -> dict:
+    """Write the smallest reference card that ``validate_report_expansions``
+    will accept, plus a matching ``provenance_index`` entry. Returns the
+    in-memory dict so tests can compute the expected canonical-JSON hash."""
+    card = {
+        "expansion_slots": [{"slot_id": "test_slot"}],
+        "provenance_index": {
+            "evidence/test.json::status": {
+                "source_value": "ok",
+                "source_class": "ot_target",
+            },
+        },
+    }
+    (data_dir / "drug_report_reference_card.json").write_text(
+        json.dumps(card, indent=2), encoding="utf-8"
+    )
+    return card
+
+
+def _minimal_expansions_payload() -> dict:
+    """Single-slot, single-sentence payload that passes schema +
+    provenance checks against ``_write_minimal_reference_card``."""
+    return {
+        "schema_version": "report_expansions.v1",
+        "slots": [
+            {
+                "slot_id": "test_slot",
+                "sentences": [
+                    {
+                        "text": "Status is ok.",
+                        "source_fields": ["status"],
+                        "source_provenance": {
+                            "source_file": "evidence/test.json",
+                            "source_field": "status",
+                            "source_class": "ot_target",
+                            "claim_type": "direct_value",
+                            "source_value": "ok",
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# TS-07 — hash auto-derive (live-smoke regression)
+# ---------------------------------------------------------------------------
+
+def test_save_report_expansions_auto_derives_hash(tmp_path: Path) -> None:
+    """``save_report_expansions`` must accept payloads that OMIT
+    ``reference_card_hash`` and auto-derive the hash from the on-disk
+    reference card. The persisted ``report_expansions.json`` then carries
+    the derived hash, making the payload self-describing.
+
+    Live-smoke regression: gpt-5.4 cannot compute canonical-JSON SHA256
+    of a 3000-line offloaded reference card. The previous strict-required
+    contract made the simplified summarizer unrunnable end-to-end.
+    """
+    card = _write_minimal_reference_card(tmp_path)
+    expansions = _minimal_expansions_payload()
+    # NOTE: no reference_card_hash key at all.
+    assert "reference_card_hash" not in expansions
+
+    raw = save_report_expansions.invoke(
+        {"data_dir": str(tmp_path), "expansions": expansions}
+    )
+    result = json.loads(raw)
+
+    assert result["saved"] is True, result
+    assert result["errors"] == []
+
+    expected_hash = canonical_json_hash(card)
+    persisted = json.loads(
+        (tmp_path / "report_expansions.json").read_text(encoding="utf-8")
+    )
+    assert persisted["reference_card_hash"] == expected_hash
+
+
+# ---------------------------------------------------------------------------
+# TS-08 — explicit-wrong-hash still rejected
+# ---------------------------------------------------------------------------
+
+def test_save_report_expansions_rejects_wrong_hash(tmp_path: Path) -> None:
+    """When the caller DOES supply ``reference_card_hash`` and it does not
+    match the on-disk reference card, ``save_report_expansions`` must reject
+    with ``RENDER_SOURCE_HASH_MISMATCH`` and surface both ``expected`` and
+    ``supplied`` so a misbehaving LLM can self-correct in one turn."""
+    card = _write_minimal_reference_card(tmp_path)
+    expansions = _minimal_expansions_payload()
+    bogus_hash = "0" * 64
+    expansions["reference_card_hash"] = bogus_hash
+
+    raw = save_report_expansions.invoke(
+        {"data_dir": str(tmp_path), "expansions": expansions}
+    )
+    result = json.loads(raw)
+
+    assert result["saved"] is False
+    hash_errors = [
+        e for e in result["errors"]
+        if e.get("code") == "RENDER_SOURCE_HASH_MISMATCH"
+    ]
+    assert len(hash_errors) == 1
+    err = hash_errors[0]
+    assert err["supplied"] == bogus_hash
+    assert err["expected"] == canonical_json_hash(card)
