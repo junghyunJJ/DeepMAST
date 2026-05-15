@@ -172,6 +172,27 @@ def test_parse_args_model_dot_env_only_yields_dot_env_value(monkeypatch):
     )
 
 
+def test_parse_args_openai_provider_does_not_use_dot_env_ollama_model(monkeypatch):
+    """LLM_PROVIDER=openai with only OLLAMA_MODEL set must leave --model unset."""
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+
+    def fake_load_dotenv(path=None, **kwargs):
+        import os as _os
+        _os.environ.setdefault("LLM_PROVIDER", "openai")
+        _os.environ.setdefault("OLLAMA_MODEL", "qwen3.5:122b")
+
+    with patch("dotenv.load_dotenv", side_effect=fake_load_dotenv):
+        mod = _reload_module_without_env_vars(
+            "LLM_PROVIDER", "LLM_MODEL", "OLLAMA_MODEL", monkeypatch=monkeypatch
+        )
+        args = mod._parse_args()
+
+    assert args.provider == "openai"
+    assert args.model is None
+
+
 # ---------------------------------------------------------------------------
 # Scenario (c): OLLAMA_MODEL in .env only — argparse should use "llama3.2:1b"
 # ---------------------------------------------------------------------------

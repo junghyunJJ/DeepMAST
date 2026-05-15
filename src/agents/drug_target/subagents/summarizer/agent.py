@@ -3,7 +3,7 @@
 The 2026-05-13 simplification replaced the CompiledSubAgent + inner
 ``report_writer``/``critic`` + 6 middleware classes + Python repair loop
 with a single dict-style subagent that owns the full report-finalization
-workflow. The seven tools execute the 6-step contract described in
+workflow. The nine tools execute the core 6-step contract described in
 ``SUMMARIZER_PROMPT``:
 
     build_evidence_summary -> load_evidence_files -> save_report_expansions
@@ -34,6 +34,7 @@ from src.agents.drug_target.tools import (
     load_evidence_files,
     lookup_provenance_value,
     render_drug_md_from_expansions,
+    read_skill_file,
     save_report_expansions,
     think_tool,
     validate_drug_md,
@@ -68,6 +69,7 @@ def get_summarizer_subagent() -> dict[str, Any]:
             lookup_provenance_value,
             save_report_expansions,
             render_drug_md_from_expansions,
+            read_skill_file,
             validate_drug_md,
             generate_drug_html_report,
             think_tool,

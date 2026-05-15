@@ -211,6 +211,7 @@ class TestSubagentConfigs:
             "lookup_provenance_value",
             "save_report_expansions",
             "render_drug_md_from_expansions",
+            "read_skill_file",
             "validate_drug_md",
             "generate_drug_html_report",
             "think_tool",

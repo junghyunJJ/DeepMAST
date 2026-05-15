@@ -3,7 +3,7 @@
 These tests replace the 17-test legacy summarizer suite. They cover:
 
   TS-01: dict spec shape and required keys
-  TS-02: exact 7-tool inventory
+  TS-02: exact 9-tool inventory
   TS-03: skill-name wiring under DrugTargetConfig
   TS-04: SummarizerFinalizationGuardMiddleware PASS path
          (generate_drug_html_report proceeds after validate_drug_md=valid)
@@ -82,6 +82,7 @@ _REQUIRED_TOOL_NAMES: frozenset[str] = frozenset(
         "lookup_provenance_value",
         "save_report_expansions",
         "render_drug_md_from_expansions",
+        "read_skill_file",
         "validate_drug_md",
         "generate_drug_html_report",
         "think_tool",
@@ -115,11 +116,11 @@ def test_summarizer_returns_dict_spec_with_required_keys() -> None:
 # TS-02
 # ---------------------------------------------------------------------------
 
-def test_summarizer_tools_are_exactly_the_eight_required() -> None:
+def test_summarizer_tools_are_exactly_the_nine_required() -> None:
     spec = get_summarizer_subagent()
     tool_names = {tool.name for tool in spec["tools"]}
     assert tool_names == _REQUIRED_TOOL_NAMES
-    assert len(spec["tools"]) == 8
+    assert len(spec["tools"]) == 9
     # Middleware: only the adapted fail-closed gate is attached by the factory.
     mw_types = {type(m) for m in spec["middleware"]}
     assert SummarizerFinalizationGuardMiddleware in mw_types

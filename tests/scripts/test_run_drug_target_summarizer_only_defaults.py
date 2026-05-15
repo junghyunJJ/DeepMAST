@@ -10,6 +10,7 @@ import importlib
 import os
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -51,7 +52,8 @@ def test_default_model_honors_llm_model_env(monkeypatch):
 
 
 def test_default_model_falls_back_to_ollama_model_env(monkeypatch):
-    """Codex P2 #2: _DEFAULT_MODEL falls back to OLLAMA_MODEL when LLM_MODEL is unset."""
+    """Codex P2 #2: Ollama providers may fall back to OLLAMA_MODEL."""
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
     monkeypatch.delenv("LLM_MODEL", raising=False)
     monkeypatch.setenv("OLLAMA_MODEL", "qwen3.5:122b-custom")
     mod = _reload_module()
@@ -60,12 +62,22 @@ def test_default_model_falls_back_to_ollama_model_env(monkeypatch):
     )
 
 
+def test_openai_default_model_does_not_fall_back_to_ollama_model_env(monkeypatch):
+    """OpenAI provider must not inherit OLLAMA_MODEL as its default model."""
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.setenv("OLLAMA_MODEL", "qwen3.5:122b-custom")
+    mod = _reload_module()
+    assert mod._DEFAULT_MODEL is None
+
+
 def test_default_provider_falls_back_to_ollama_when_no_env(monkeypatch):
     """Codex P2 #2: without LLM_PROVIDER env, _DEFAULT_PROVIDER remains 'ollama'."""
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
     monkeypatch.delenv("OLLAMA_MODEL", raising=False)
-    mod = _reload_module()
+    with patch("dotenv.load_dotenv", return_value=False):
+        mod = _reload_module()
     assert mod._DEFAULT_PROVIDER == "ollama", (
         f"_DEFAULT_PROVIDER fallback should be 'ollama'; got {mod._DEFAULT_PROVIDER!r}"
     )
