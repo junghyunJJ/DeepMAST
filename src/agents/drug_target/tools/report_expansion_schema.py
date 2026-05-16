@@ -388,30 +388,102 @@ def build_expansion_slots(reference_card: dict) -> list[dict]:
     return slots
 
 
+# Rubric fields admitted as first-class provenance citations (Issue #22).
+# These match the keys built by ``rubric_by_gene`` in
+# ``stage_logic.py:2014-2030``. Each (gene, rubric_field) pair becomes its
+# own index key ``evidence/assessment_results.json::<GENE>::<field>`` with
+# a scalar ``source_value``. The per-gene key shape (gene embedded in
+# ``source_field``) preserves byte-equality of ``direct_value`` claims and
+# blocks wrong-gene hallucinations at the key level.
+RUBRIC_FIELDS: tuple[str, ...] = (
+    "classification",
+    "priority",
+    "validated_total",
+    "exploratory_total",
+    "combined_total",
+    "existing_drug_evidence",
+    "clinical_trial_activity",
+    "safety_profile",
+    "gwas_support",
+    "tractability",
+    "biological_plausibility",
+    "novelty_opportunity",
+    "stage3_candidate",
+)
+RUBRIC_SOURCE_FILE = "evidence/assessment_results.json"
+RUBRIC_SOURCE_CLASS = "deepmast_rubric"
+
+
 def _build_provenance_index(reference_card: dict) -> dict:
+    """Build the provenance index used by ``_provenance_error``.
+
+    Two passes:
+      1. Per-gene drug-evidence entries (existing shape, unchanged):
+         ``evidence/ot_<GENE>.json::clinical_drugs`` and
+         ``evidence/stage3_<GENE>.json::preclinical_compounds``.
+      2. Per-gene rubric entries — each ``(gene, rubric_field)`` pair gets
+         its own key ``evidence/assessment_results.json::<GENE>::<field>``
+         with a scalar ``source_value``. This satisfies the validator's
+         byte-equality check (``_provenance_error`` ~line 567) without
+         modifying validator code, and each gene's score is gated by its
+         own key — fabricated gene segments produce ``None`` at lookup.
+    """
     index: dict[str, dict] = {}
     for card in reference_card.get("featured_genes", []) or []:
         if not isinstance(card, dict):
             continue
         gene = str(card.get("gene") or "").upper()
-        stage3 = card.get("stage3")
-        if not gene or not isinstance(stage3, dict):
+        if not gene:
             continue
-        for field, source_file, source_class in (
-            ("clinical_drugs", f"evidence/ot_{gene}.json", "opentargets_clinical"),
-            (
-                "preclinical_compounds",
-                f"evidence/stage3_{gene}.json",
-                "chembl_preclinical",
-            ),
-        ):
-            index[f"{source_file}::{field}"] = {
-                "source_file": source_file,
-                "source_field": field,
-                "source_class": source_class,
-                "source_value": stage3.get(field, []),
+
+        # Pass 1: drug-evidence entries (shape unchanged).
+        stage3 = card.get("stage3")
+        if isinstance(stage3, dict):
+            for field, source_file, source_class in (
+                ("clinical_drugs", f"evidence/ot_{gene}.json", "opentargets_clinical"),
+                (
+                    "preclinical_compounds",
+                    f"evidence/stage3_{gene}.json",
+                    "chembl_preclinical",
+                ),
+            ):
+                index[f"{source_file}::{field}"] = {
+                    "source_file": source_file,
+                    "source_field": field,
+                    "source_class": source_class,
+                    "source_value": stage3.get(field, []),
+                }
+
+        # Pass 2: rubric entries — per-gene, per-field, scalar value.
+        rubric = card.get("rubric")
+        if not isinstance(rubric, dict):
+            continue
+        for field in RUBRIC_FIELDS:
+            if field not in rubric:
+                continue
+            source_field = f"{gene}::{field}"
+            index[f"{RUBRIC_SOURCE_FILE}::{source_field}"] = {
+                "source_file": RUBRIC_SOURCE_FILE,
+                "source_field": source_field,
+                "source_class": RUBRIC_SOURCE_CLASS,
+                "source_value": rubric[field],
             }
     return index
+
+
+def _pick_example_key(keys: list[str]) -> str | None:
+    """Pick the example_sentence anchor for ``build_expansion_schema_spec``.
+
+    Prefer a drug-evidence key (``evidence/ot_*`` or ``evidence/stage3_*``)
+    over a rubric key so the example sentence preserves the existing
+    drug-citation behavioral anchor for all models. Rubric keys sort
+    alphabetically BEFORE drug keys, so plain ``sorted()[0]`` would shift
+    the anchor; this helper restores the original ordering bias.
+    """
+    for key in keys:
+        if key.startswith("evidence/ot_") or key.startswith("evidence/stage3_"):
+            return key
+    return keys[0] if keys else None
 
 
 def build_expansion_schema_spec(reference_card: dict) -> dict:
@@ -436,7 +508,7 @@ def build_expansion_schema_spec(reference_card: dict) -> dict:
     # Anchor the example sentence to a real provenance entry when available
     # so the LLM has a copy-paste-ready template that already validates.
     if valid_provenance_keys:
-        first_key = valid_provenance_keys[0]
+        first_key = _pick_example_key(valid_provenance_keys)
         entry = provenance_index.get(first_key, {}) if isinstance(
             provenance_index.get(first_key), dict
         ) else {}
