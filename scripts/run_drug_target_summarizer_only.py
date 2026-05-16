@@ -359,7 +359,21 @@ def _dump_messages(messages: list) -> None:
 
 def _build_summarizer_spec(data_dir: Path, disease: str) -> dict:
     """Return the production summarizer spec with production middleware wiring."""
+    from src.agents.drug_target.agent import _critic_enabled_default_from_env
     from src.agents.drug_target.subagents.configs import get_subagents
+    from src.agents.model import load_subagent_models_from_env
+
+    # Honor the same env contract DrugTargetConfig uses, since this standalone
+    # runner bypasses DrugTargetConfig entirely. Without this, DRUG_TARGET_CRITIC_*
+    # and SUBAGENT_CRITIC_* env vars would be silently ignored.
+    critic_enabled = _critic_enabled_default_from_env()
+    subagent_models = (
+        load_subagent_models_from_env(
+            ["evidence_assessor", "hypothesis_writer", "summarizer", "critic"]
+        )
+        if critic_enabled
+        else None
+    )
 
     skills_dir = PROJECT_ROOT / "skills"
     skill_registry = {
@@ -379,6 +393,8 @@ def _build_summarizer_spec(data_dir: Path, disease: str) -> dict:
             "hypothesis_writer": {},
             "summarizer": skill_registry,
         },
+        critic_enabled=critic_enabled,
+        model_overrides=subagent_models,
     )
     return next(s for s in subagents if s["name"] == "summarizer")
 
