@@ -67,18 +67,16 @@ def _build_full_expansions(spec_path: Path) -> dict:
     """
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
     example_sentence = spec["example_sentence"]
-    # ``required_slot_ids`` can contain duplicate entries when two EXPAND
-    # markers in the template share a category-detection phrase (e.g. an
-    # instruction that mentions "therapeutic opportunities" as a *negative*
-    # constraint). ``validate_report_expansions`` enforces one slot per
-    # unique id (any extra submission is flagged ``duplicate slot_id``),
-    # so we dedupe while preserving first-seen order via ``dict.fromkeys``.
-    unique_slot_ids = list(dict.fromkeys(spec["required_slot_ids"]))
+    # Issue #21 fix: ``build_expansion_slots`` now raises on duplicate
+    # slot_id construction, so ``required_slot_ids`` is guaranteed
+    # unique by the producer. The historical ``dict.fromkeys`` dedupe
+    # workaround documented the silent-producer-loss bug; with the
+    # producer fixed the workaround is no longer needed.
     return {
         "schema_version": "report_expansions.v1",
         "slots": [
             {"slot_id": slot_id, "sentences": [example_sentence]}
-            for slot_id in unique_slot_ids
+            for slot_id in spec["required_slot_ids"]
         ],
     }
 
