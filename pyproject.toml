@@ -32,6 +32,7 @@ dependencies = [
 [tool.pytest.ini_options]
 markers = [
     "api: live external API connectivity tests (may be slow, requires network)",
+    "llm: tests that require a live LLM call (excluded from deterministic CI)",
 ]
 
 [tool.ruff]

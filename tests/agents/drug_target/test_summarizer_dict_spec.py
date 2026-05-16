@@ -101,7 +101,7 @@ def _build_tool_request(name: str, args: dict | None = None, tool_id: str = "t_1
 # ---------------------------------------------------------------------------
 
 def test_summarizer_returns_dict_spec_with_required_keys() -> None:
-    spec = get_summarizer_subagent()
+    spec = get_summarizer_subagent(critic_enabled=False)
     assert isinstance(spec, dict)
     assert frozenset(spec.keys()) == _REQUIRED_KEYS, (
         f"unexpected keys: {sorted(spec.keys())}"
@@ -117,7 +117,7 @@ def test_summarizer_returns_dict_spec_with_required_keys() -> None:
 # ---------------------------------------------------------------------------
 
 def test_summarizer_tools_are_exactly_the_nine_required() -> None:
-    spec = get_summarizer_subagent()
+    spec = get_summarizer_subagent(critic_enabled=False)
     tool_names = {tool.name for tool in spec["tools"]}
     assert tool_names == _REQUIRED_TOOL_NAMES
     assert len(spec["tools"]) == 9

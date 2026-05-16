@@ -76,17 +76,27 @@ _EVIDENCE_FILE_KEYS = ("evidence_files", "evidence_references")
 # marker, possibly with surrounding bracket characters.
 _JSON_FAILED_SUFFIX_RE = re.compile(r"(\b[\w-]+\.json)_FAILED\b")
 
-# Pattern that matches the first newline, carriage-return, or tab character.
-# Everything from that character onward is truncated so injected text cannot
-# masquerade as a new Markdown heading or instruction block inside a prompt.
-_PROMPT_CONTROL_RE = re.compile(r"[\n\r\t].*", re.DOTALL)
+# Pattern that matches the first ASCII control character (includes \n, \r, \t,
+# null bytes, BEL, and all other \x00-\x1f characters).  Everything from that
+# character onward is truncated so injected text cannot masquerade as a new
+# Markdown heading or instruction block inside a prompt.
+_PROMPT_CONTROL_RE = re.compile(r"[\x00-\x1f].*", re.DOTALL)
 
 
-def _sanitize_data_dir(value: str | None) -> str:
-    """Truncate *value* at the first control character before prompt injection."""
+def _sanitize_prompt_value(value: str | None) -> str:
+    """Truncate *value* at the first control character before prompt injection.
+
+    Strips everything from the first ASCII control character (\\x00-\\x1f,
+    which includes \\n, \\r, \\t, null bytes, and BEL) onward, then strips
+    leading/trailing whitespace.  Returns an empty string for None input.
+    """
     if value is None:
         return ""
-    return _PROMPT_CONTROL_RE.sub("", value)
+    return _PROMPT_CONTROL_RE.sub("", value).strip()
+
+
+# Backwards-compatible alias so existing callers and tests continue to work.
+_sanitize_data_dir = _sanitize_prompt_value
 
 
 def _strip_failed_suffix_in_strings(node: object) -> tuple[object, int]:
@@ -309,8 +319,9 @@ def get_subagents(
     disease: str | None = None,
     model_overrides: dict[str, BaseChatModel | str] | None = None,
     default_model: BaseChatModel | str | None = None,
-    backend: object | None = None,  # noqa: ARG001 — kept for caller API compatibility
+    backend: object | None = None,
     enable_census: bool = True,
+    critic_enabled: bool = True,
     skills_sources: list[str] | None = None,
     skill_registry: dict[str, str] | None = None,
     skills_dir: str | None = None,
@@ -336,8 +347,10 @@ def get_subagents(
             ``summarizer``).
         default_model: Reserved for forward-compat; the new dict summarizer
             inherits the parent agent's model when no override is provided.
-        backend: Reserved for forward-compat; the dict summarizer does not
-            own a backend — it inherits the parent's.
+        backend: Passed into get_summarizer_subagent for future SubAgentMiddleware
+            wiring (task #4). Currently accepted and forwarded unchanged.
+        critic_enabled: When False the critic gate is disabled inside the
+            summarizer. Forwarded unchanged to get_summarizer_subagent.
         enable_census: When False, strips Census tools from evidence_assessor
             and appends a disabled-notice to its prompt.
         skills_sources: Legacy deepagents-native skill source paths.
@@ -349,13 +362,26 @@ def get_subagents(
     Returns:
         List of three subagent configuration dictionaries.
     """
-    del default_model  # reserved for forward-compat
+    # Resolve critic_model: critic override > summarizer override > default_model.
+    overrides = model_overrides or {}
+    critic_model: BaseChatModel | str | None = (
+        overrides.get("critic")
+        or overrides.get("summarizer")
+        or default_model
+    )
 
     subagents = [
         {**SUBAGENT_CONFIGS[name], "tools": list(SUBAGENT_CONFIGS[name]["tools"])}
         for name in _TOP_LEVEL_SUBAGENTS
     ]
-    subagents.append(get_summarizer_subagent())
+    subagents.append(
+        get_summarizer_subagent(
+            backend=backend,
+            default_model=default_model,
+            critic_model=critic_model,
+            critic_enabled=critic_enabled,
+        )
+    )
 
     for subagent in subagents:
         if subagent["name"] == "hypothesis_writer":
@@ -399,12 +425,13 @@ def get_subagents(
     if data_dir:
         disease_line = ""
         if disease:
+            safe_disease = _sanitize_prompt_value(disease)
             disease_line = (
-                f"- **Disease context**: `{disease}`\n"
-                f"Pass `disease=\"{disease}\"` to `load_lr_candidates` so the CLI disease "
+                f"- **Disease context**: `{safe_disease}`\n"
+                f"Pass `disease=\"{safe_disease}\"` to `load_lr_candidates` so the CLI disease "
                 f"context takes priority over lr_candidates.json.\n"
             )
-        safe_data_dir = _sanitize_data_dir(data_dir)
+        safe_data_dir = _sanitize_prompt_value(data_dir)
         data_dir_note = (
             f"\n\n## Data Directory\n"
             f"The data directory for this session is: `{safe_data_dir}`\n"

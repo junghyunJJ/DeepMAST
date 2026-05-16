@@ -4,7 +4,7 @@ description: "Why deterministic middleware-level gates replace LLM self-judgment
 type: lesson
 tags: [middleware, fail-closed, langchain, deepagents, drug_target, wrap_tool_call, quality-gate, deterministic]
 created: 2026-05-06
-updated: 2026-05-13
+updated: 2026-05-15
 sources:
   - src/agents/deep_interpreter/middleware/think_tool_quality_gate.py
   - src/agents/deep_interpreter/middleware/write_file_guard.py
@@ -550,3 +550,120 @@ supplied if it could compute SHA256.
   inside the `feat/drug-target-agent-quality-gates` worktree.)
 - Plan: `.omb/plans/2026-05-13-drug-target-summarizer-simplification.md` — the simplification
   plan and option comparison that produced the 2026-05-13 update above.
+
+---
+
+## 2026-05-15 — Summarizer-local critic subagent + CriticGateMiddleware
+
+### Decision
+
+Replaced the previously-planned heuristic `src/agents/drug_target/tools/critic.py` tool file
+with a summarizer-local critic subagent (`subagents/critic/agent.py`) and a new
+`CriticGateMiddleware` in `subagents/summarizer/middleware.py`. The critic is an inner subagent
+installed by `SubAgentMiddleware` inside the summarizer; it is never added to the top-level
+`WORKFLOW_ORDER` and is never returned by `get_subagents()`.
+
+### Why
+
+A heuristic tool-based critic would require maintaining morphology/synonym/medical-vocabulary
+rules for every assertion type. That maintenance burden is unsustainable as the report schema
+evolves. A critic LLM can judge whether a cited source passage actually supports a sentence
+without requiring rule maintenance — and it is explicitly forbidden from judging whether the
+medical claim is generally true (that would reintroduce LLM self-judgment as a gate). The
+boundary is: **does the cited provenance_context text support this sentence?** Only that.
+
+### What it enforces (mechanical, not LLM-trust-based)
+
+`CriticGateMiddleware` enforces four deterministic conditions before allowing
+`save_report_expansions` to proceed. If any condition fails, the save is blocked:
+
+1. **Critic was called** — `critic_called` must be `True`; no-call → block.
+2. **Critic JSON parsed** — malformed or wrong-schema critic response → block.
+3. **Critic approved** — critic must have returned `valid=True` with no blocker findings; else → block.
+4. **Hash match** — the canonical payload hash submitted to `save_report_expansions` must equal
+   the hash of the payload the critic reviewed. Hash computed **before** `handler(request)` runs
+   (because `save_report_expansions` mutates `reference_card_hash` during its own validation pass).
+   Mutation → block.
+
+Both `CriticGateMiddleware` and `SummarizerFinalizationGuardMiddleware` reset all state on
+`before_agent`/`abefore_agent`, so each summarizer run starts with a clean slate.
+
+### Defense-in-depth hardenings (verify-loop additions, 2026-05-15)
+
+After the implementation pass, a multi-agent verification (`/omb:verify`) surfaced four
+additional hardenings; all are now wired into production code:
+
+1. **Cited-only `provenance_context` is actively enforced.** `validate_cited_only_provenance`
+   is no longer just defined — it is invoked from `CriticGateMiddleware._capture_critic_result`
+   after each envelope parse, with violations recorded as a blocker finding so the save is
+   blocked.
+
+2. **Critic findings re-injection is bounded.** When the gate blocks a save with an "invalid"
+   message, the critic's `findings` array is now passed through `_safe_findings_for_message`:
+   - capped at 5 entries (with an `... N-5 more findings omitted` marker),
+   - string fields truncated at 500 characters,
+   - ASCII control characters (`\x00-\x1f` except `\n\r\t`) stripped.
+   This prevents a compromised or jailbroken critic LLM from injecting arbitrary prompt text
+   back into the summarizer's context via the ToolMessage body.
+
+3. **`disease` is sanitized before system-prompt injection.** `_sanitize_data_dir` was
+   generalized to `_sanitize_prompt_value` and now applies to both `data_dir` and `disease` in
+   the three subagent system prompts (`evidence_assessor`, `hypothesis_writer`, `summarizer`).
+   The sanitizer truncates at the first `\x00-\x1f` byte, blocking newline-based instruction
+   injection. The orchestrator system prompt in `agent.py` is a separate path and remains a
+   follow-up.
+
+4. **`REPORT_WRITER_PROMPT` retention is now auditable.** Five live test readers still import
+   it, so deletion remains a separate migration PR. An inline retention-decision comment block
+   above the constant (and cross-reference comments at `SUBAGENT_PROMPTS["report_writer"]` and
+   `__all__`) names the five readers and points at the `xfail(strict=True)` test
+   (`test_report_writer_prompt_dead_code_removed`) that gates the cleanup. A new
+   `test_report_writer_prompt_retention_is_documented` enforces that the comment block exists
+   in CI.
+
+### What the critic LLM is forbidden to do
+
+The critic subagent has `tools=[]` — it cannot call any tool or write any file. Its system
+prompt (Appendix A, read-only) explicitly forbids judging whether a medical claim is generally
+true. The only permitted judgment: does the text in `provenance_context` (cited source passages
+only) support the sentence being reviewed? `CriticGateMiddleware` is the enforcement layer;
+the critic LLM is the signal source, not the authority.
+
+### Canonical hash consolidation
+
+`_canonical_payload_hash` was deleted from `summarizer/middleware.py`. Both
+`HypothesisRetryLoopMiddleware` and `CriticGateMiddleware` now use `canonical_json_hash` from
+`tools/report_expansion_schema.py`. `normalize_expansions_for_hash` strips `reference_card_hash`
+before hashing on both the critic-envelope side and the save side, so omitted/auto-derived cases
+produce identical hashes.
+
+### Kill switch
+
+`DRUG_TARGET_CRITIC_ENABLED=false` (also `0`, `no`, `off`, case-insensitive) disables both
+`SubAgentMiddleware(critic)` and `CriticGateMiddleware` in the summarizer. The default is
+**fail-closed** — an empty, unset, or misspelled value leaves the critic enabled. An explicit
+constructor argument `DrugTargetConfig(critic_enabled=False)` wins over the env var.
+
+### SummarizerFinalizationGuardMiddleware state-reset fix
+
+The existing HTML gate gained `before_agent`/`abefore_agent` that reset `_validator_called=False`
+and `_last_valid=None`. This closes a previously-known state leak where a prior run's validator
+result could persist into the next run's gate check. Behavior is otherwise unchanged.
+
+### Boundary: legacy persisted-report path
+
+`validate_drug_report_finalization(require_critic=True)` remains importable and functional. It
+produces `evidence/critic_report.json` for external callers and scripts. It is **not** called
+by the new pre-save critic flow and has **no effect** on whether `save_report_expansions`
+proceeds during a live agent run.
+
+### Known follow-ups (not blockers for this PR)
+
+- `REPORT_WRITER_PROMPT` deletion is blocked by 5 live test readers
+  (`test_prompts_gap_analysis_rule.py`, `test_prompts_clinical_compounds_rule.py`,
+  `test_prompts_reflection_guidance.py`, `test_drug_profile_coverage.py`,
+  `tests/test_drug_target.py`). `test_report_writer_prompt_dead_code_removed` is marked
+  `xfail(strict=True)` until those readers are migrated.
+- `pyright` is not installed in this worktree's venv — flag as env gap for reviewer.
+- 2 pre-existing failures in `test_drug_md_new_flags.py` (`TestWrongApprovalYearExtension`,
+  `TestUngroundedMechanism`) predate this branch and are not introduced here.
