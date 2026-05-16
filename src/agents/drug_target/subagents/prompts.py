@@ -1010,6 +1010,46 @@ Step 3. BEFORE calling `save_report_expansions`:
             (`null`, `[]`, `""`, or `{}`) — only emit an absence claim
             when the lookup confirms emptiness.
 
+        3b-rubric. Rubric-Score Citations (REQUIRED for any sentence
+            citing a rubric score, tier classification, or stage
+            progression flag):
+
+            ALWAYS call `lookup_provenance_value(data_dir,
+            "evidence/assessment_results.json", "<GENE>::<field>")`
+            BEFORE composing the sentence. Copy the returned scalar
+            VERBATIM into `source_provenance.source_value`. NEVER set
+            `source_value` by reading from loaded evidence files — always
+            copy the scalar returned by `lookup_provenance_value`.
+
+            `source_provenance` shape for rubric citations:
+              source_file:  "evidence/assessment_results.json"
+              source_field: "<GENE>::<field>"  (gene-prefixed; e.g.,
+                            "CD4::combined_total")
+              source_class: "deepmast_rubric"
+              claim_type:   "direct_value"
+              source_value: <scalar returned by lookup_provenance_value>
+
+            Valid <field> values (13): classification, priority,
+            validated_total, exploratory_total, combined_total,
+            existing_drug_evidence, clinical_trial_activity,
+            safety_profile, gwas_support, tractability,
+            biological_plausibility, novelty_opportunity,
+            stage3_candidate.
+
+            Worked example for a CD4 combined-score sentence:
+              source_provenance = {
+                "source_file":  "evidence/assessment_results.json",
+                "source_field": "CD4::combined_total",
+                "source_class": "deepmast_rubric",
+                "claim_type":   "direct_value",
+                "source_value": 15
+              }
+
+            Do NOT cite "gene" as a rubric field — it is encoded in the
+            <GENE> KEY segment, not a citable score. Do NOT invent
+            <GENE>::<field> pairs that are absent from
+            `valid_provenance_keys`.
+
         3c. Call `save_report_expansions(data_dir, expansions)`. The
             `expansions` payload follows the Pydantic schema advertised
             in the tool's args_schema (top-level: schema_version +
