@@ -318,6 +318,7 @@ def build_expansion_slots(reference_card: dict) -> list[dict]:
     ]
     counters = {"drug": 0, "bio": 0, "rubric": 0, "hyp": 0}
     slots: list[dict] = []
+    seen_slot_ids: set[str] = set()
     for marker in markers:
         instruction = str(marker.get("instruction", ""))
         low = instruction.lower()
@@ -325,13 +326,13 @@ def build_expansion_slots(reference_card: dict) -> list[dict]:
         slot = "add_summary"
         gene = None
         rank = None
-        if "therapeutic opportunities" in low:
-            slot = "therapeutic_opportunities"
-        elif "overall scoring landscape" in low:
-            section, slot = "druggability_matrix", "scoring_landscape"
-        elif "l-r pairs passed" in low or "biological validation" in low:
-            section, slot = "stage1_filter", "filter_interpretation"
-        elif "what drugs exist" in low:
+        # Issue #21: test specific per-card / per-hypothesis phrases BEFORE
+        # broader section-level phrases. The drug-profile marker's
+        # instruction text contains "therapeutic opportunities" as a
+        # *negative* constraint ("Do NOT speculate about ... therapeutic
+        # opportunities ..."), so the broad executive-summary branch must
+        # come last among the substring tests it could otherwise absorb.
+        if "what drugs exist" in low:
             section, slot = "featured_candidate", "drug_profile"
             gene = genes[counters["drug"]] if counters["drug"] < len(genes) else None
             counters["drug"] += 1
@@ -343,16 +344,40 @@ def build_expansion_slots(reference_card: dict) -> list[dict]:
             section, slot = "featured_candidate", "rubric_recommendation"
             gene = genes[counters["rubric"]] if counters["rubric"] < len(genes) else None
             counters["rubric"] += 1
-        elif "hypothesis generation" in low or "key themes" in low:
-            section, slot = "hypothesis_summary", "themes"
         elif "therapeutic implications" in low:
             section, slot = "hypothesis", "therapeutic_implications"
             rank = ranks[counters["hyp"]] if counters["hyp"] < len(ranks) else counters["hyp"] + 1
             counters["hyp"] += 1
+        elif "therapeutic opportunities" in low:
+            slot = "therapeutic_opportunities"
+        elif "overall scoring landscape" in low:
+            section, slot = "druggability_matrix", "scoring_landscape"
+        elif "l-r pairs passed" in low or "biological validation" in low:
+            section, slot = "stage1_filter", "filter_interpretation"
+        elif "hypothesis generation" in low or "key themes" in low:
+            section, slot = "hypothesis_summary", "themes"
         elif "recommendations" in low or "next steps" in low:
             section, slot = "summary", "recommendations"
+        slot_id = _slot_id(section, slot, gene=gene, rank=rank)
+        # Fail loud on duplicate construction (issue #21, fix option 3).
+        # A duplicate at this point means either (a) the substring chain
+        # mapped two semantically distinct markers to the same category,
+        # or (b) the template contains literally repeated EXPAND markers.
+        # Either way the silent producer-loss class of bug — where
+        # ``validate_report_expansions`` only checks for duplicates in
+        # the *submitted* payload, not the *required* list — must surface
+        # at construction time, not after the live LLM has dropped prose.
+        if slot_id in seen_slot_ids:
+            raise ValueError(
+                f"build_expansion_slots produced duplicate slot_id: "
+                f"{slot_id!r}. Inspect the EXPAND marker classification "
+                f"chain — a more-specific phrase match must precede the "
+                f"broader one that absorbed this marker. Triggering "
+                f"instruction: {instruction!r}"
+            )
+        seen_slot_ids.add(slot_id)
         slots.append({
-            "slot_id": _slot_id(section, slot, gene=gene, rank=rank),
+            "slot_id": slot_id,
             "section": section,
             "slot": slot,
             "gene": gene,
