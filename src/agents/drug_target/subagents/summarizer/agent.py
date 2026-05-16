@@ -24,8 +24,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.agents.drug_target.subagents.prompts import SUMMARIZER_PROMPT
+from deepagents import SubAgentMiddleware
+
+from src.agents.drug_target.subagents.critic import get_critic_subagent
+from src.agents.drug_target.subagents.prompts import (
+    CRITIC_REVIEW_STEP_FRAGMENT,
+    SUMMARIZER_PROMPT_CORE,
+)
 from src.agents.drug_target.subagents.summarizer.middleware import (
+    CriticGateMiddleware,
     SummarizerFinalizationGuardMiddleware,
 )
 from src.agents.drug_target.tools import (
@@ -41,16 +48,57 @@ from src.agents.drug_target.tools import (
 )
 
 
-def get_summarizer_subagent() -> dict[str, Any]:
+def get_summarizer_subagent(
+    backend: object | None = None,
+    default_model: object | None = None,  # noqa: ARG001 — reserved for future model routing
+    critic_model: object | None = None,
+    critic_enabled: bool = True,
+) -> dict[str, Any]:
     """Return the summarizer DeepAgents dict spec.
 
     The dict contains the five canonical fields used by DeepAgents'
     ``SubAgent`` TypedDict: ``name``, ``description``, ``system_prompt``,
     ``tools``, and ``middleware``.
 
+    Args:
+        backend: Backend passed to ``SubAgentMiddleware`` when critic is
+            enabled. Required when ``critic_enabled=True``.
+        default_model: Reserved for task #10 (prompt assembly).
+        critic_model: Resolved critic model forwarded to
+            ``get_critic_subagent(model=...)``. Required when
+            ``critic_enabled=True``.
+        critic_enabled: When ``True``, installs a nested
+            ``SubAgentMiddleware`` with the critic spec so the summarizer
+            can invoke the critic via the ``task`` tool. When ``False``,
+            no ``SubAgentMiddleware`` is installed and the summarizer
+            functions exactly as before task #4.
+
     Returns:
         A subagent spec consumable by ``create_deep_agent(subagents=[...])``.
     """
+    middlewares: list[object] = [
+        SummarizerFinalizationGuardMiddleware(),
+    ]
+
+    if critic_enabled and critic_model is None:
+        raise ValueError(
+            "critic_enabled=True requires a resolved critic_model; "
+            "set SUBAGENT_CRITIC_PROVIDER + SUBAGENT_CRITIC_MODEL env vars, "
+            "or pass critic_model explicitly to get_summarizer_subagent()."
+        )
+
+    if critic_enabled:
+        critic_spec = get_critic_subagent(model=critic_model)
+        middlewares.append(CriticGateMiddleware())
+        middlewares.append(
+            SubAgentMiddleware(backend=backend, subagents=[critic_spec])
+        )
+
+    if critic_enabled:
+        system_prompt = SUMMARIZER_PROMPT_CORE + "\n\n" + CRITIC_REVIEW_STEP_FRAGMENT
+    else:
+        system_prompt = SUMMARIZER_PROMPT_CORE
+
     return {
         "name": "summarizer",
         "description": (
@@ -62,7 +110,7 @@ def get_summarizer_subagent() -> dict[str, Any]:
             "SUMMARIZER_STATUS: PASS or SUMMARIZER_STATUS: FAIL on its own "
             "line at the end of the run."
         ),
-        "system_prompt": SUMMARIZER_PROMPT,
+        "system_prompt": system_prompt,
         "tools": [
             build_evidence_summary,
             load_evidence_files,
@@ -74,9 +122,7 @@ def get_summarizer_subagent() -> dict[str, Any]:
             generate_drug_html_report,
             think_tool,
         ],
-        "middleware": [
-            SummarizerFinalizationGuardMiddleware(),
-        ],
+        "middleware": middlewares,
     }
 
 

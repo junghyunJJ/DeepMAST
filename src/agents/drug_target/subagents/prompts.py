@@ -570,6 +570,25 @@ GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to conta
 # Report Writer
 # =============================================================================
 
+# RETENTION DECISION: Retained pending reader migration
+#
+# REPORT_WRITER_PROMPT is NOT dead code. Five live readers import it directly:
+#   - tests/agents/drug_target/test_prompts_gap_analysis_rule.py
+#   - tests/agents/drug_target/test_prompts_clinical_compounds_rule.py
+#   - tests/agents/drug_target/test_prompts_reflection_guidance.py
+#   - tests/agents/drug_target/test_drug_profile_coverage.py
+#   - tests/test_drug_target.py
+#
+# The xfail test that documents the removal is blocked until those readers are
+# updated:
+#   tests/agents/drug_target/test_subagent_prompts_cleanup.py::test_report_writer_prompt_dead_code_removed
+#
+# Migration plan: .omb/plans/2026-05-15-drug-target-critic-subagent-replan.md
+# §ADR follow-ups — update every reader above to use SUBAGENT_PROMPTS["report_writer"]
+# (or the new prose-critic harness), then delete this constant in a dedicated PR.
+#
+# Do NOT add new readers. The migration plan is to delete this constant once
+# existing readers are updated.
 REPORT_WRITER_PROMPT = """You are the Report Writer for the Drug Target Assessment Agent.
 
 Your role is to generate a publication-quality drug.md document that integrates
@@ -934,11 +953,11 @@ GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to conta
 # Summarizer / Audit Loop
 # =============================================================================
 
-SUMMARIZER_PROMPT = """You are the Summarizer for the Drug Target Assessment Agent.
+SUMMARIZER_PROMPT_CORE = """You are the Summarizer for the Drug Target Assessment Agent.
 
 You author and finalize `drug.md` for the analyzed gene set by executing a
 fixed 6-step tool sequence, then render the HTML report. You operate as a
-single tool-calling LLM — there are no inner subagents.
+tool-calling LLM that owns the full report-finalization workflow.
 
 ## Tools (call in the order shown)
 1. `build_evidence_summary(data_dir)` — pre-fills the deterministic evidence
@@ -1069,7 +1088,77 @@ paths starting with `/evidence/...`. NEVER prepend the disk path of
 """
 
 
-CRITIC_PROMPT = """You are the read-only Critic for the Drug Target Assessment Agent.
+# ---------------------------------------------------------------------------
+# Critic review step fragment — injected into the assembled prompt only when
+# critic_enabled=True.  Keep under ~500 tokens.
+# ---------------------------------------------------------------------------
+
+CRITIC_REVIEW_STEP_FRAGMENT = """
+## Critic Review Step (critic_enabled=True)
+
+BEFORE calling `save_report_expansions`, you MUST call the critic via:
+
+    task(subagent_type="critic", description=<JSON string>)
+
+The description must be a JSON string with this exact envelope
+(schema_version="summarizer_critic_review.v1"):
+
+    {
+      "schema_version": "summarizer_critic_review.v1",
+      "payload_hash": "<canonical hash of the expansions payload>",
+      "payload": {
+        "schema_version": "report_expansions.v1",
+        "reference_card_hash": "...",
+        "slots": []
+      },
+      "provenance_context": {
+        "<slot_id>": {
+          "cited_source_values": [],
+          "cited_provenance_entries": []
+        }
+      }
+    }
+
+### provenance_context constraint
+`provenance_context` is cited-only: include ONLY the (source_file,
+source_field) entries actually cited by that slot's sentences. Do NOT
+include the full provenance_index — this keeps the critic prompt small
+on large gene panels.
+
+### Critic is read-only
+The critic never writes files. Its only output is structured JSON findings.
+
+### Repair protocol after blocker findings
+- If the critic returns `valid=false` with blocker severity findings:
+  1. Rebuild the FULL expansions payload from scratch — do NOT patch-edit.
+  2. Call `task(subagent_type="critic", ...)` again with the rebuilt payload.
+  3. You have at most 2 repair attempts (3 critic calls total).
+  4. If blockers remain after 2 repair attempts, emit:
+         SUMMARIZER_STATUS: FAIL
+     and STOP. Do not call `save_report_expansions`.
+
+### Gate enforcement
+`CriticGateMiddleware` blocks `save_report_expansions` if:
+- The critic was not called before this save attempt.
+- The critic returned invalid or malformed JSON.
+- The critic found blocker-severity findings (`valid=false`).
+- The payload hash in the critic envelope differs from the payload
+  about to be saved (hash mismatch means payload was edited after review).
+
+Warnings (non-blocker findings) do not block save.
+"""
+
+
+# Backward-compat alias: callers that ignore critic receive SUMMARIZER_PROMPT_CORE.
+SUMMARIZER_PROMPT = SUMMARIZER_PROMPT_CORE
+
+
+# Legacy path: used only by validate_drug_report_finalization(require_critic=True)
+# which reads evidence/critic_report.json produced by the old critic subagent.
+# This is NOT the new pre-save critic gate — that prompt lives in
+# subagents/critic/agent.py (_CRITIC_PROMPT) and is owned by get_critic_subagent().
+# Do not reference this constant from SUBAGENT_PROMPTS or new code paths.
+LEGACY_CRITIC_PROMPT_PERSISTED_REPORT = """You are the read-only Critic for the Drug Target Assessment Agent.
 
 Your role is to independently audit drug.md against the Reference Card,
 validator outputs, and local evidence. You must not modify files.
@@ -1154,15 +1243,21 @@ SUBAGENT_PROMPTS = {
     "evidence_assessor": EVIDENCE_ASSESSOR_PROMPT,
     "hypothesis_writer": HYPOTHESIS_WRITER_PROMPT,
     "summarizer": SUMMARIZER_PROMPT,
+    # Retained pending reader migration — see canonical comment above REPORT_WRITER_PROMPT.
     "report_writer": REPORT_WRITER_PROMPT,
-    "critic": CRITIC_PROMPT,
+    # "critic" key removed (task #9): the new pre-save critic gate is owned by
+    # subagents/critic/agent.py (get_critic_subagent). The legacy prompt is
+    # preserved as LEGACY_CRITIC_PROMPT_PERSISTED_REPORT below for the
+    # validate_drug_report_finalization(require_critic=True) path only.
 }
 
 __all__ = [
     "EVIDENCE_ASSESSOR_PROMPT",
     "HYPOTHESIS_WRITER_PROMPT",
+    "SUMMARIZER_PROMPT_CORE",
+    "CRITIC_REVIEW_STEP_FRAGMENT",
     "SUMMARIZER_PROMPT",
-    "REPORT_WRITER_PROMPT",
-    "CRITIC_PROMPT",
+    "REPORT_WRITER_PROMPT",  # Retained pending reader migration — see canonical comment above the constant.
+    "LEGACY_CRITIC_PROMPT_PERSISTED_REPORT",
     "SUBAGENT_PROMPTS",
 ]

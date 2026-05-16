@@ -61,6 +61,33 @@ from src.agents.drug_target.tools import (
 
 logger = logging.getLogger(__name__)
 
+
+_CRITIC_DISABLE_TOKENS: frozenset[str] = frozenset({"false", "0", "no", "off"})
+_CRITIC_KNOWN_TOKENS: frozenset[str] = frozenset({"false", "0", "no", "off", "true", "1", "yes", "on"})
+
+
+def _critic_enabled_default_from_env() -> bool:
+    """Read DRUG_TARGET_CRITIC_ENABLED and return the critic-enabled flag.
+
+    Returns:
+        False only when the env var is set to one of: false, 0, no, off
+        (case-insensitive, stripped). Returns True for unset, empty, or any
+        other value — fail-closed means the critic stays ENABLED unless the
+        operator explicitly opts out.
+    """
+    raw = os.environ.get("DRUG_TARGET_CRITIC_ENABLED", "")
+    normalized = raw.strip().lower()
+    if normalized in _CRITIC_DISABLE_TOKENS:
+        return False
+    if normalized and normalized not in _CRITIC_KNOWN_TOKENS:
+        logger.warning(
+            "DRUG_TARGET_CRITIC_ENABLED=%r is not a recognized value "
+            "(known: true/1/yes/on/false/0/no/off). Treating as enabled (fail-closed).",
+            raw,
+        )
+    return True
+
+
 # =============================================================================
 # Orchestrator System Prompt
 # =============================================================================
@@ -154,6 +181,12 @@ class DrugTargetConfig:
     # init_chat_model format per subagent, e.g.:
     # {"evidence_assessor": "openai:gpt-4.1", "summarizer": "openai:gpt-4.1-mini"}
     # If None, auto-loads from SUBAGENT_{NAME}_PROVIDER env vars.
+    critic_enabled: bool = field(default_factory=_critic_enabled_default_from_env)
+    # Reads DRUG_TARGET_CRITIC_ENABLED env var. Returns False only for
+    # explicit disable tokens (false/0/no/off). Any other value (including
+    # unset) returns True — fail-closed means critic stays ENABLED unless
+    # explicitly disabled. Explicit caller-provided values always win because
+    # default_factory only runs when the argument is omitted.
 
     def __post_init__(self):
         if self.subagent_models is None:
@@ -162,6 +195,7 @@ class DrugTargetConfig:
                     "evidence_assessor",
                     "hypothesis_writer",
                     "summarizer",
+                    "critic",
                 ]
             )
 
@@ -320,6 +354,7 @@ def create_drug_target_agent(
         default_model=llm,
         backend=backend,
         enable_census=config.enable_census,
+        critic_enabled=config.critic_enabled,
         skills_dir=skills_dir,
         subagent_skill_names=subagent_skill_names,
         subagent_skill_registries=subagent_skill_registries,

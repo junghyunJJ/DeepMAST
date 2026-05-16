@@ -1,14 +1,14 @@
 # Drug Target Assessment Agent -- Comprehensive Reference
 
 > **Source of truth**: `src/agents/drug_target/` codebase
-> **Last verified**: 2026-03-13 (94% doc-code consistency)
+> **Last verified**: 2026-05-15 (updated for critic subagent + CriticGateMiddleware)
 > **Related**: `drug_target_stage_guide.md` (stage-level detail), `output_schema.json` (JSON contract)
 
 ---
 
 ## 1. Overview
 
-The Drug Target Assessment Agent evaluates therapeutic potential of ligand-receptor (L-R) pairs identified from spatial transcriptomics (ST) cell-cell interaction (CCI) analysis. It uses a **2-subagent architecture** with a **3-stage funnel** to systematically gather multi-database evidence, score targets against a structured rubric, and generate a publication-quality report.
+The Drug Target Assessment Agent evaluates therapeutic potential of ligand-receptor (L-R) pairs identified from spatial transcriptomics (ST) cell-cell interaction (CCI) analysis. It uses a **3-subagent architecture** with a **3-stage funnel** to systematically gather multi-database evidence, score targets against a structured rubric, and generate a publication-quality report.
 
 ### Key Design Principles
 
@@ -40,16 +40,22 @@ Wrapper Pipeline (Step 9.5)
     -> DrugTargetConfig                                [agent.py]
     -> create_drug_target_agent(config)                [agent.py]
       -> DeepAgents framework (LangGraph Runnable)
-      -> 2 subagents + 7 orchestrator tools + SkillsMiddleware
+      -> 3 subagents + 7 orchestrator tools + SkillsMiddleware
+         -> summarizer (flat dict subagent)
+              -> SubAgentMiddleware([critic])           [when critic_enabled=True]
+                   -> critic (inner subagent, tools=[])
 ```
 
 ### 2.2 Source File Map
 
 | File | Role |
 |------|------|
-| `agent.py` | Orchestrator factory: `DrugTargetConfig`, `create_drug_target_agent()`, system prompt |
+| `agent.py` | Orchestrator factory: `DrugTargetConfig`, `create_drug_target_agent()`, system prompt, `_critic_enabled_default_from_env()` |
 | `subagents/configs.py` | Tool registry per subagent: `SUBAGENT_CONFIGS`, `WORKFLOW_ORDER`, `get_subagents()` |
-| `subagents/prompts.py` | Subagent system prompts: `EVIDENCE_ASSESSOR_PROMPT`, `REPORT_WRITER_PROMPT` |
+| `subagents/prompts.py` | Subagent system prompts: `EVIDENCE_ASSESSOR_PROMPT`, `SUMMARIZER_PROMPT_CORE`, `CRITIC_REVIEW_STEP_FRAGMENT`; `SUMMARIZER_PROMPT` is a backward-compat alias for `SUMMARIZER_PROMPT_CORE` |
+| `subagents/critic/agent.py` | Critic inner-subagent factory: `get_critic_subagent(model, *, response_format_pydantic_compatible)` |
+| `subagents/summarizer/agent.py` | Summarizer subagent factory: `get_summarizer_subagent(backend, default_model, critic_model, critic_enabled)` |
+| `subagents/summarizer/middleware.py` | `SummarizerFinalizationGuardMiddleware`, `CriticGateMiddleware`, `HypothesisRetryLoopMiddleware`; envelope parsing helpers |
 | `tools/__init__.py` | Tool re-exports (21 tools in `__all__`) with lazy imports for circular-dep breaking |
 | `tools/stage_domain_tools.py` | Stage 1-3 domain tools (12): CELLxGENE, KEGG, Reactome, STRING, VEP, OT, GWAS, DrugBank/ChEMBL, PubMed |
 | `tools/stage2_service.py` | Stage 2 batch orchestration: `build_stage2_gene_panel()`, parquet/API routing, workspace caching |
@@ -57,6 +63,7 @@ Wrapper Pipeline (Step 9.5)
 | `tools/evidence_loader.py` | I/O helpers: `load_lr_candidates`, `load_evidence_files`, `save_evidence` |
 | `tools/assessment_output.py` | Output contract: `save_target_assessment()`, `_validate_contract()` |
 | `tools/census_lr_validation_tools.py` | Census cross-validation: `run_compare_census_lr_pair()`, fuzzy matching |
+| `tools/report_expansion_schema.py` | `canonical_json_hash`, `normalize_expansions_for_hash` — shared hash helpers used by both `CriticGateMiddleware` and `HypothesisRetryLoopMiddleware` |
 | `tools/skill_reader.py` | Progressive disclosure: `read_skill_file()` |
 | `tools/common.py` | Cognitive tools: `sequential_thinking`, `think_tool`, `validate_quality` |
 | `integration.py` | Reporter bridge: `run_drug_target_assessment()` async tool for deep_interpreter Step 9.5 |
@@ -65,20 +72,24 @@ Wrapper Pipeline (Step 9.5)
 
 **Workflow order**: `["evidence_assessor", "hypothesis_writer", "summarizer"]` (strict sequential)
 
+The critic subagent is **NOT** in `WORKFLOW_ORDER` and is **NOT** returned by `get_subagents()`. It exists only as an inner subagent installed inside the summarizer via `SubAgentMiddleware`.
+
 | Subagent | Spec shape | Tools | Role |
 |----------|------------|-------|------|
 | `evidence_assessor` | flat dict | ~20 tools | 3-stage funnel: biological context -> validation & scoring -> deep dive + inline rubric |
 | `hypothesis_writer` | flat dict | 7 tools | UCB-scored mechanistic hypothesis generation from Stage 1-3 evidence |
-| `summarizer` | flat dict (post-2026-05-13) | 7 tools + `SummarizerFinalizationGuardMiddleware` | Author drug.md via 6-step tool sequence; finalize HTML report. Fail-closed on `validate_drug_md`. |
+| `summarizer` | flat dict | 7 tools + 3 middleware | Author drug.md via 6-step tool sequence; finalize HTML report. Fail-closed on `validate_drug_md` and (when `critic_enabled=True`) on critic review before `save_report_expansions`. |
+| `critic` (inner) | flat dict, `tools=[]` | none | Grounding reviewer: verifies cited-source support for each sentence in the expansion payload. Never calls external tools. Installed by `SubAgentMiddleware` inside the summarizer only. |
 
-Post-2026-05-13 the summarizer is a flat `SubAgent` dict (no inner subagents,
-no CompiledSubAgent shell, no Python repair loop). Its seven tools are
-`build_evidence_summary`, `load_evidence_files`, `save_report_expansions`,
-`render_drug_md_from_expansions`, `validate_drug_md`,
-`generate_drug_html_report`, and `think_tool`.
-`SummarizerFinalizationGuardMiddleware` blocks
-`generate_drug_html_report` unless the most recent `validate_drug_md`
-returned `valid=true`.
+The summarizer carries three middleware classes (when `critic_enabled=True`):
+
+| Middleware | Order | What it enforces |
+|---|---|---|
+| `SummarizerFinalizationGuardMiddleware` | first | Blocks `generate_drug_html_report` until `validate_drug_md` returned `valid=true`. Reset via `before_agent`/`abefore_agent`. |
+| `CriticGateMiddleware` | second | Blocks `save_report_expansions` unless the critic was called, returned `valid=True`, no blocker findings, and the payload hash submitted to save matches the hash reviewed by the critic. Reset via `before_agent`/`abefore_agent`. |
+| `SubAgentMiddleware([critic])` | third | Installs the inner critic subagent so the summarizer can call `task(subagent_type="critic", ...)`. |
+
+When `critic_enabled=False`, `CriticGateMiddleware` and `SubAgentMiddleware(critic)` are absent; only `SummarizerFinalizationGuardMiddleware` remains.
 
 ### 2.4 DrugTargetConfig Options
 
@@ -94,6 +105,92 @@ returned `valid=true`.
 | `agent_skill_names` | tuple | `("opentargets-database", "gwas-database", "chembl-database")` | Skills exposed to agent |
 | `skills_dir` | str\|None | `None` | Override project skills directory |
 | `subagent_models` | dict\|None | `None` | Per-subagent model overrides (init_chat_model format) |
+| `critic_enabled` | bool | env `DRUG_TARGET_CRITIC_ENABLED` (fail-closed: default `True`) | Enable the summarizer-local critic subagent + `CriticGateMiddleware`. See [Section 2.5](#25-critic-kill-switch-critic_enabled). |
+
+### 2.5 Critic Kill Switch (`critic_enabled`)
+
+`DrugTargetConfig.critic_enabled` is a `bool` field backed by the `DRUG_TARGET_CRITIC_ENABLED`
+environment variable. The default is **fail-closed** — the critic is active unless explicitly
+disabled.
+
+**Env values that disable the critic** (case-insensitive after strip):
+
+```
+DRUG_TARGET_CRITIC_ENABLED=false
+DRUG_TARGET_CRITIC_ENABLED=0
+DRUG_TARGET_CRITIC_ENABLED=no
+DRUG_TARGET_CRITIC_ENABLED=off
+```
+
+Any other value — including empty, unset, or a typo — leaves the critic enabled.
+
+**Precedence**: an explicit constructor argument `DrugTargetConfig(critic_enabled=False)` wins
+over the env var. The `default_factory` only runs when the argument is omitted at construction.
+
+**Critic model resolution** (when `critic_enabled=True`):
+
+```
+critic_model = model_overrides.get("critic")
+           or model_overrides.get("summarizer")
+           or default_model
+```
+
+Set `SUBAGENT_CRITIC_PROVIDER` / `SUBAGENT_CRITIC_MODEL` (loaded via
+`load_subagent_models_from_env(["evidence_assessor","hypothesis_writer","summarizer","critic"])`)
+to give the critic a dedicated model.
+
+### 2.6 Critic Task Envelope (canonical schema)
+
+When `critic_enabled=True` the summarizer must call
+`task(subagent_type="critic", description=<envelope JSON>)` before calling
+`save_report_expansions`. `CriticGateMiddleware` parses and validates the envelope;
+an unparseable or wrong-version envelope causes the save to be blocked.
+
+**Envelope JSON shape** (`schema_version="summarizer_critic_review.v1"`):
+
+```json
+{
+  "schema_version": "summarizer_critic_review.v1",
+  "payload": {
+    "schema_version": "report_expansions.v1",
+    "slots": [ ... ]
+  },
+  "payload_hash": "<sha256 hex — LLM-supplied; NOT used for gate logic>",
+  "provenance_context": {
+    "<slot_id>": "<verbatim text from the cited source file only>"
+  }
+}
+```
+
+Key constraints enforced by `CriticGateMiddleware`:
+
+- `schema_version` must be exactly `"summarizer_critic_review.v1"`.
+- `payload.schema_version` must be `"report_expansions.v1"`.
+- `provenance_context` must contain only text cited from source evidence files — no external
+  medical knowledge.
+- The **canonical payload hash** is computed by `CriticGateMiddleware` itself (via
+  `canonical_json_hash(normalize_expansions_for_hash(envelope.payload))`), stripping
+  `reference_card_hash` before hashing. The LLM-supplied `payload_hash` field in the envelope
+  is ignored for gate logic.
+- At save time the hash of the payload submitted to `save_report_expansions` is computed
+  **before** `handler(request)` runs (because `save_report_expansions` mutates
+  `reference_card_hash` during its own validation pass). If this hash does not match the hash
+  the critic reviewed, the save is blocked.
+
+**Critic is reviewer, NOT author.** The critic subagent has `tools=[]` — it cannot call any
+tool, write any file, or modify any state. It returns structured JSON only. `CriticGateMiddleware`
+is the enforcement layer; the critic LLM is forbidden from judging whether a medical claim is
+generally true. Its only mandate is to judge whether the cited `provenance_context` text
+supports each sentence.
+
+### 2.7 Legacy Persisted-Report Critic Path
+
+`validate_drug_report_finalization(require_critic=True)` (importable from
+`src/agents/drug_target/tools/`) is a **legacy compatibility path** that produces
+`evidence/critic_report.json`. It is **not** part of the new pre-save critic gate and is
+**not called** by the new summarizer-local critic flow. It may be used by external callers or
+scripts that need a persisted critic audit artifact, but it has no bearing on whether
+`save_report_expansions` is allowed to proceed during a live agent run.
 
 ---
 
@@ -186,19 +283,31 @@ For each selected candidate:
 
 ### 3.7 Report Generation
 
-The `summarizer` subagent (flat dict spec, 7 tools) executes the fixed 6-step
-sequence:
+The `summarizer` subagent (flat dict spec, 7 tools) executes the following
+sequence. When `critic_enabled=True` a critic review step is inserted between
+expansion authoring and save (step 3b below).
 
 1. `build_evidence_summary(data_dir)` — pre-fills the deterministic evidence
    summary skeleton (call EXACTLY ONCE).
 2. `load_evidence_files(data_dir, ...)` — load per-gene evidence JSON.
-3. `save_report_expansions(data_dir, expansions)` — author schema-validated
-   per-section Markdown expansions.
+3. Author expansion payload (per-section Markdown via `save_report_expansions`
+   schema). When `critic_enabled=True`:
+   - **3a.** Call `task(subagent_type="critic", description=<envelope JSON>)`
+     with the full expansion payload + `schema_version="summarizer_critic_review.v1"`
+     + cited-only `provenance_context`. Cap repair attempts at 2; rebuild full
+     payload (not patch) on blocker findings.
+   - **3b.** Call `save_report_expansions(data_dir, expansions)` — this call is
+     mechanically blocked by `CriticGateMiddleware` if: critic was never called,
+     critic JSON was malformed, critic returned `valid=False` or blocker findings,
+     or the payload hash submitted to save differs from the hash the critic reviewed.
+   When `critic_enabled=False`, step 3a is skipped and `save_report_expansions`
+   is not gated by the critic.
 4. `render_drug_md_from_expansions(data_dir)` — deterministically assemble
    `drug.md` from the saved expansions (the LLM never hand-writes drug.md).
 5. `validate_drug_md(data_dir)` — MANDATORY quality gate (semantic).
-   - On `valid=false`: re-call `save_report_expansions` to fix the offending
-     sections, re-render, re-validate. Max 2 retries (prompt-budgeted).
+   - On `valid=false`: re-call `save_report_expansions` (and re-run critic if
+     enabled) to fix the offending sections, re-render, re-validate. Max 2
+     retries (prompt-budgeted).
 6. `generate_drug_html_report(data_dir)` — call EXACTLY ONCE after
    `validate_drug_md` returns `valid=true`. This call is mechanically blocked
    by `SummarizerFinalizationGuardMiddleware` until the validator passes.
@@ -265,21 +374,21 @@ summarizer surface (it is produced earlier in the funnel).
 | `think_tool` | Reflection and assessment (Reflect phase) |
 | `validate_quality` | Quality score check (threshold >= 0.7) |
 
-### 4.2 Summarizer Tools (7) — post-2026-05-13 simplification
+### 4.2 Summarizer Tools (7)
 
 | Tool | Purpose |
 |------|---------|
 | `build_evidence_summary` | Pre-fills the deterministic evidence summary skeleton (called once at start) |
 | `load_evidence_files` | Load all `evidence/*.json` |
-| `save_report_expansions` | Schema-validated per-section Markdown expansion writes |
+| `save_report_expansions` | Schema-validated per-section Markdown expansion writes. Gated by `CriticGateMiddleware` when `critic_enabled=True`. |
 | `render_drug_md_from_expansions` | Deterministic Markdown assembly of `drug.md` from saved expansions |
 | `validate_drug_md` | MANDATORY semantic quality gate (returns `{valid: bool, errors: [...]}`) |
-| `generate_drug_html_report` | Final HTML render (mechanically blocked unless `validate_drug_md` returned `valid=true`) |
+| `generate_drug_html_report` | Final HTML render (mechanically blocked by `SummarizerFinalizationGuardMiddleware` unless `validate_drug_md` returned `valid=true`) |
 | `think_tool` | Reflection / scratchpad |
 
-The summarizer carries one middleware:
-`SummarizerFinalizationGuardMiddleware`, which observes `validate_drug_md`
-results and blocks `generate_drug_html_report` until `valid=true`.
+The summarizer's middleware stack (when `critic_enabled=True`):
+`SummarizerFinalizationGuardMiddleware` → `CriticGateMiddleware` → `SubAgentMiddleware([critic])`.
+See [Section 2.3](#23-subagent-configuration) for the full gate description.
 
 ---
 
