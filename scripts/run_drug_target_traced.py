@@ -26,6 +26,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 import tempfile
 import time
@@ -224,6 +225,64 @@ def _capture_drug_md_from_update(node_data: dict, holder: dict) -> None:
                 and ("featured candidate" in content.lower() or "druggability" in content.lower())
             ):
                 holder["content"] = content
+
+
+_VALIDATE_TOOL_RE = re.compile(
+    r"""(?:name=["']validate_drug_md["']|tool_calls=\[[^\]]*\bvalidate_drug_md\b[^\]]*\])"""
+)
+_VALIDATE_PASS_RE = re.compile(r"""["']valid["']\s*:\s*(?:true|True)""")
+
+
+def _inspect_report_outputs(data_dir: Path, trace_log_path: Path) -> dict:
+    """Inspect whether the traced run produced a fully finalized report."""
+    evidence_dir = data_dir / "evidence"
+    drug_md_path = data_dir / "drug.md"
+    drug_html_path = data_dir / "drug_report.html"
+    trace_text = trace_log_path.read_text(encoding="utf-8") if trace_log_path.exists() else ""
+
+    drug_md_content = (
+        drug_md_path.read_text(encoding="utf-8") if drug_md_path.exists() else ""
+    )
+    expand_marker_count = drug_md_content.count("EXPAND")
+    validate_passed = (
+        _VALIDATE_TOOL_RE.search(trace_text) is not None
+        and _VALIDATE_PASS_RE.search(trace_text) is not None
+    )
+    summarizer_passed = "SUMMARIZER_STATUS: PASS" in trace_text
+
+    status = {
+        "evidence_count": len(list(evidence_dir.glob("*.json"))) if evidence_dir.exists() else 0,
+        "assessment_exists": (evidence_dir / "assessment_results.json").exists()
+        if evidence_dir.exists()
+        else False,
+        "target_assessment_exists": (data_dir / "target_assessment.json").exists(),
+        "drug_md_exists": drug_md_path.exists(),
+        "drug_html_exists": drug_html_path.exists(),
+        "expand_marker_count": expand_marker_count,
+        "validate_drug_md_passed": validate_passed,
+        "summarizer_status_passed": summarizer_passed,
+        "missing_requirements": [],
+    }
+
+    if status["evidence_count"] <= 0:
+        status["missing_requirements"].append("evidence files present")
+    if not status["assessment_exists"]:
+        status["missing_requirements"].append("assessment_results.json present")
+    if not status["target_assessment_exists"]:
+        status["missing_requirements"].append("target_assessment.json present")
+    if not status["drug_md_exists"]:
+        status["missing_requirements"].append("drug.md present")
+    if not status["drug_html_exists"]:
+        status["missing_requirements"].append("drug_report.html present")
+    if expand_marker_count:
+        status["missing_requirements"].append("no EXPAND markers")
+    if not validate_passed:
+        status["missing_requirements"].append("validate_drug_md valid=true observed")
+    if not summarizer_passed:
+        status["missing_requirements"].append("SUMMARIZER_STATUS: PASS observed")
+
+    status["finalized"] = not status["missing_requirements"]
+    return status
 
 
 async def run_traced(args: argparse.Namespace) -> int:
@@ -602,16 +661,35 @@ async def run_traced(args: argparse.Namespace) -> int:
     print(f"TRACE COMPLETE — {elapsed:.1f}s ({node_counter} node transitions)")
     print(f"{'=' * 70}\n")
 
-    evidence_dir = data_dir / "evidence"
-    evidence_count = len(list(evidence_dir.glob("*.json"))) if evidence_dir.exists() else 0
-    assessment_exists = (evidence_dir / "assessment_results.json").exists() if evidence_dir.exists() else False
-    drug_md_exists = (data_dir / "drug.md").exists()
-    target_json_exists = (data_dir / "target_assessment.json").exists()
+    report_status = _inspect_report_outputs(data_dir, trace_log_path)
+    evidence_count = report_status["evidence_count"]
 
     print(f"  Evidence files:      {evidence_count}")
-    print(f"  assessment_results:  {'YES' if assessment_exists else 'NO'}")
-    print(f"  target_assessment:   {'YES' if target_json_exists else 'NO'}")
-    print(f"  drug.md:             {'YES' if drug_md_exists else 'NO'}")
+    print(f"  assessment_results:  {'YES' if report_status['assessment_exists'] else 'NO'}")
+    print(
+        f"  target_assessment:   "
+        f"{'YES' if report_status['target_assessment_exists'] else 'NO'}"
+    )
+    print(f"  drug.md:             {'YES' if report_status['drug_md_exists'] else 'NO'}")
+    print(
+        f"  drug_report.html:    "
+        f"{'YES' if report_status['drug_html_exists'] else 'NO'}"
+    )
+    print(f"  EXPAND markers:      {report_status['expand_marker_count']}")
+    print(
+        f"  validate_drug_md:    "
+        f"{'PASS' if report_status['validate_drug_md_passed'] else 'NO PASS'}"
+    )
+    print(
+        f"  SUMMARIZER_STATUS:   "
+        f"{'PASS' if report_status['summarizer_status_passed'] else 'NO PASS'}"
+    )
+    print(f"  report_finalized:    {'YES' if report_status['finalized'] else 'NO'}")
+    if report_status["missing_requirements"]:
+        print(
+            "  missing_finalization: "
+            + "; ".join(report_status["missing_requirements"])
+        )
     print(f"  Trace log:           {trace_log_path}")
     print(f"  Workspace:           {data_dir}")
     print(f"  Runtime:             {elapsed:.1f}s")
@@ -622,12 +700,38 @@ async def run_traced(args: argparse.Namespace) -> int:
         fp.write(f"TRACE COMPLETE — {elapsed:.1f}s ({node_counter} node transitions)\n")
         fp.write(f"{'=' * 62}\n")
         fp.write(f"  Evidence files:      {evidence_count}\n")
-        fp.write(f"  assessment_results:  {'YES' if assessment_exists else 'NO'}\n")
-        fp.write(f"  target_assessment:   {'YES' if target_json_exists else 'NO'}\n")
-        fp.write(f"  drug.md:             {'YES' if drug_md_exists else 'NO'}\n")
+        fp.write(
+            f"  assessment_results:  "
+            f"{'YES' if report_status['assessment_exists'] else 'NO'}\n"
+        )
+        fp.write(
+            f"  target_assessment:   "
+            f"{'YES' if report_status['target_assessment_exists'] else 'NO'}\n"
+        )
+        fp.write(f"  drug.md:             {'YES' if report_status['drug_md_exists'] else 'NO'}\n")
+        fp.write(
+            f"  drug_report.html:    "
+            f"{'YES' if report_status['drug_html_exists'] else 'NO'}\n"
+        )
+        fp.write(f"  EXPAND markers:      {report_status['expand_marker_count']}\n")
+        fp.write(
+            f"  validate_drug_md:    "
+            f"{'PASS' if report_status['validate_drug_md_passed'] else 'NO PASS'}\n"
+        )
+        fp.write(
+            f"  SUMMARIZER_STATUS:   "
+            f"{'PASS' if report_status['summarizer_status_passed'] else 'NO PASS'}\n"
+        )
+        fp.write(f"  report_finalized:    {'YES' if report_status['finalized'] else 'NO'}\n")
+        if report_status["missing_requirements"]:
+            fp.write(
+                "  missing_finalization: "
+                + "; ".join(report_status["missing_requirements"])
+                + "\n"
+            )
         fp.write(f"  Runtime:             {elapsed:.1f}s\n")
 
-    if drug_md_exists:
+    if report_status["drug_md_exists"]:
         content = (data_dir / "drug.md").read_text()
         print(f"\n  drug.md: {len(content):,} chars")
 
@@ -636,7 +740,7 @@ async def run_traced(args: argparse.Namespace) -> int:
     token_tracker.save_report(token_usage_path)
     print(f"  Token usage report: {token_usage_path}")
 
-    success = drug_md_exists and evidence_count > 0
+    success = report_status["finalized"]
     print(f"\n  {'SUCCESS' if success else 'PARTIAL'}")
     return 0 if success else 1
 

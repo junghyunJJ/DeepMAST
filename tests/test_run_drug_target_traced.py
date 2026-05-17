@@ -52,3 +52,67 @@ def test_configure_ollama_port_override_noops_without_port(monkeypatch):
     assert base_url is None
     assert traced.os.environ["OLLAMA_BASE_URL"] == "http://localhost:7000"
     assert traced.os.environ["OLLAMA_HOST"] == "http://localhost:7000"
+
+
+def test_inspect_report_outputs_rejects_unexpanded_drug_md(tmp_path):
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "assessment_results.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "target_assessment.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "drug_report.html").write_text("<html></html>", encoding="utf-8")
+    (tmp_path / "drug.md").write_text("intro\n<!-- EXPAND: unfinished -->\n", encoding="utf-8")
+    trace_log = tmp_path / "trace.log"
+    trace_log.write_text(
+        "content='{\"valid\": true}' name='validate_drug_md'\n"
+        "AIMessage(content='SUMMARIZER_STATUS: PASS')\n",
+        encoding="utf-8",
+    )
+
+    status = traced._inspect_report_outputs(tmp_path, trace_log)
+
+    assert status["finalized"] is False
+    assert status["drug_md_exists"] is True
+    assert status["expand_marker_count"] == 1
+    assert "no EXPAND markers" in status["missing_requirements"]
+
+
+def test_inspect_report_outputs_accepts_validated_final_report(tmp_path):
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "assessment_results.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "target_assessment.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "drug.md").write_text("# Complete report\nNo placeholders.\n", encoding="utf-8")
+    (tmp_path / "drug_report.html").write_text("<html></html>", encoding="utf-8")
+    trace_log = tmp_path / "trace.log"
+    trace_log.write_text(
+        "content='{\"valid\": true}' name='validate_drug_md'\n"
+        "AIMessage(content='SUMMARIZER_STATUS: PASS')\n",
+        encoding="utf-8",
+    )
+
+    status = traced._inspect_report_outputs(tmp_path, trace_log)
+
+    assert status["finalized"] is True
+    assert status["missing_requirements"] == []
+
+
+def test_inspect_report_outputs_accepts_structured_validate_tool_marker(tmp_path):
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "assessment_results.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "target_assessment.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "drug.md").write_text("# Complete report\nNo placeholders.\n", encoding="utf-8")
+    (tmp_path / "drug_report.html").write_text("<html></html>", encoding="utf-8")
+    trace_log = tmp_path / "trace.log"
+    trace_log.write_text(
+        "tool_calls=[validate_drug_md]\n"
+        'tool: {"valid": true, "issues": []}...\n'
+        "AIMessage(content='SUMMARIZER_STATUS: PASS')\n",
+        encoding="utf-8",
+    )
+
+    status = traced._inspect_report_outputs(tmp_path, trace_log)
+
+    assert status["validate_drug_md_passed"] is True
+    assert status["finalized"] is True
+    assert status["missing_requirements"] == []

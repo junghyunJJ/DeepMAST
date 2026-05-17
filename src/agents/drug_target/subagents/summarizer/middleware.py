@@ -33,7 +33,7 @@ import copy
 import json
 import logging
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -83,22 +83,46 @@ class CriticEnvelope:
 # ---------------------------------------------------------------------------
 
 
-def parse_critic_envelope(description: str) -> CriticEnvelope:
+def _load_critic_envelope_raw(description: Any) -> dict[str, Any]:
+    """Load the raw critic envelope from JSON text or provider-decoded objects."""
+    if isinstance(description, str):
+        try:
+            raw = json.loads(description)
+        except (json.JSONDecodeError, ValueError) as exc:
+            raise EnvelopeParseError(f"envelope is not valid JSON: {exc}") from exc
+    elif isinstance(description, Mapping):
+        raw = dict(description)
+    else:
+        raise EnvelopeParseError(
+            "envelope description must be a JSON string or object; "
+            f"got {type(description).__name__}"
+        )
+
+    if not isinstance(raw, dict):
+        raise EnvelopeParseError("envelope must be a JSON object")
+    return raw
+
+
+def canonical_critic_description(description: Any) -> str:
+    """Return the JSON string form required by DeepAgents' task(description=...)."""
+    raw = _load_critic_envelope_raw(description)
+    try:
+        return json.dumps(raw, ensure_ascii=False, sort_keys=True)
+    except TypeError as exc:
+        raise EnvelopeParseError(f"envelope is not JSON serializable: {exc}") from exc
+
+
+def parse_critic_envelope(description: Any) -> CriticEnvelope:
     """Parse the JSON envelope from the summarizer's task(subagent_type="critic", description=...) call.
 
     Returns a typed CriticEnvelope or raises EnvelopeParseError with a
     human-readable reason.
 
-    Rejects: non-JSON, wrong schema_version, missing fields, payload that
-    does not carry a report_expansions.v1 schema_version.
+    Accepts a JSON string or an already-decoded mapping. Rejects: non-JSON,
+    wrong schema_version, missing fields, payload that does not carry a
+    report_expansions.v1 schema_version.
     """
-    try:
-        raw = json.loads(description)
-    except (json.JSONDecodeError, ValueError) as exc:
-        raise EnvelopeParseError(f"envelope is not valid JSON: {exc}") from exc
-
-    if not isinstance(raw, dict):
-        raise EnvelopeParseError("envelope must be a JSON object")
+    raw = _load_critic_envelope_raw(description)
 
     schema_version = raw.get("schema_version")
     if schema_version is None:
@@ -475,6 +499,29 @@ class CriticGateMiddleware(AgentMiddleware):
             tool_call_id=request.tool_call.get("id", ""),
         )
 
+    def _mark_invalid_critic_envelope(self, exc: EnvelopeParseError) -> None:
+        self._critic_called = True
+        self._last_valid = False
+        self._last_findings = [{"reason": str(exc)}]
+        self._last_payload_hash = None
+
+    def _invalid_critic_envelope_response(
+        self, request: ToolCallRequest, exc: EnvelopeParseError
+    ) -> ToolMessage:
+        return self._blocked_response(
+            request,
+            f"CRITIC_GATE: invalid critic envelope description — {exc}. "
+            "Rebuild the critic envelope as JSON and re-run task(critic).",
+        )
+
+    def _prepare_critic_envelope(
+        self, request: ToolCallRequest
+    ) -> tuple[CriticEnvelope, str]:
+        args = request.tool_call.get("args") or {}
+        description = args.get("description") or ""
+        envelope = parse_critic_envelope(description)
+        return envelope, canonical_critic_description(description)
+
     # ------------------------------------------------------------------
     # Findings sanitization for ToolMessage re-injection
     # ------------------------------------------------------------------
@@ -573,17 +620,13 @@ class CriticGateMiddleware(AgentMiddleware):
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
         if self._is_critic_task(request):
-            args = request.tool_call.get("args") or {}
-            description = args.get("description") or ""
             try:
-                envelope = parse_critic_envelope(description)
+                envelope, normalized_description = self._prepare_critic_envelope(request)
             except EnvelopeParseError as exc:
                 logger.warning("CriticGateMiddleware: envelope parse failed: %s", exc)
-                self._critic_called = True
-                self._last_valid = False
-                self._last_findings = [{"reason": str(exc)}]
-                self._last_payload_hash = None
-                return handler(request)
+                self._mark_invalid_critic_envelope(exc)
+                return self._invalid_critic_envelope_response(request, exc)
+            request.tool_call["args"]["description"] = normalized_description
             result = handler(request)
             self._capture_critic_result(envelope, result)
             return result
@@ -606,17 +649,13 @@ class CriticGateMiddleware(AgentMiddleware):
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
         if self._is_critic_task(request):
-            args = request.tool_call.get("args") or {}
-            description = args.get("description") or ""
             try:
-                envelope = parse_critic_envelope(description)
+                envelope, normalized_description = self._prepare_critic_envelope(request)
             except EnvelopeParseError as exc:
                 logger.warning("CriticGateMiddleware: envelope parse failed (async): %s", exc)
-                self._critic_called = True
-                self._last_valid = False
-                self._last_findings = [{"reason": str(exc)}]
-                self._last_payload_hash = None
-                return await handler(request)
+                self._mark_invalid_critic_envelope(exc)
+                return self._invalid_critic_envelope_response(request, exc)
+            request.tool_call["args"]["description"] = normalized_description
             result = await handler(request)
             self._capture_critic_result(envelope, result)
             return result

@@ -69,7 +69,7 @@ def _make_save_request(expansions: dict) -> Any:
     return req
 
 
-def _make_task_request(description: str) -> Any:
+def _make_task_request(description: Any) -> Any:
     """Build a minimal ToolCallRequest-like mock for task(subagent_type='critic')."""
     req = MagicMock()
     req.tool_call = {
@@ -78,6 +78,18 @@ def _make_task_request(description: str) -> Any:
         "args": {"subagent_type": "critic", "description": description},
     }
     return req
+
+
+def _make_critic_envelope_dict(
+    payload: dict, payload_hash: str = "sha256:dummy"
+) -> dict:
+    """Build a valid critic envelope as an already-decoded object."""
+    return {
+        "schema_version": _SCHEMA_VERSION,
+        "payload_hash": payload_hash,
+        "payload": payload,
+        "provenance_context": {},
+    }
 
 
 def _critic_json(valid: bool, findings: list[dict] | None = None, payload_hash: str = "sha256:llm") -> str:
@@ -265,6 +277,69 @@ def test_critic_gate_captures_real_task_command_update_messages() -> None:
 
     save_handler.assert_called_once_with(save_req)
     assert result is expected_save_result
+
+
+# ---------------------------------------------------------------------------
+# CG-06b: async critic task normalizes dict description before handler
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_critic_gate_async_normalizes_dict_description_for_task_handler() -> None:
+    """Provider object args must be normalized before DeepAgents sees them."""
+    mw = CriticGateMiddleware()
+    expansions = _make_expansions_payload()
+    task_req = _make_task_request(_make_critic_envelope_dict(expansions))
+    command_result = _make_command_result(_critic_json(valid=True))
+
+    async def task_handler(req: Any) -> Command:
+        description = req.tool_call["args"]["description"]
+        assert isinstance(description, str)
+        assert json.loads(description)["payload"] == expansions
+        return command_result
+
+    await mw.awrap_tool_call(task_req, task_handler)
+
+    save_req = _make_save_request(expansions)
+    expected_save_result = ToolMessage(content='{"saved": true}', tool_call_id="save-001")
+
+    async def save_handler(req: Any) -> ToolMessage:
+        return expected_save_result
+
+    result = await mw.awrap_tool_call(save_req, save_handler)
+
+    assert result is expected_save_result
+
+
+# ---------------------------------------------------------------------------
+# CG-06c: malformed non-string description fails closed in async path
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_critic_gate_async_blocks_save_after_non_string_description() -> None:
+    """Invalid raw description types must not crash or reach the task handler."""
+    mw = CriticGateMiddleware()
+    task_req = _make_task_request(123)
+
+    async def task_handler(req: Any) -> ToolMessage:
+        raise AssertionError("invalid critic envelope should not call task handler")
+
+    result = await mw.awrap_tool_call(task_req, task_handler)
+
+    assert isinstance(result, ToolMessage)
+    assert "CRITIC_GATE" in result.content
+    assert "description" in result.content
+
+    save_req = _make_save_request(_make_expansions_payload())
+
+    async def save_handler(req: Any) -> ToolMessage:
+        raise AssertionError("save should stay blocked after invalid critic envelope")
+
+    blocked = await mw.awrap_tool_call(save_req, save_handler)
+
+    assert isinstance(blocked, ToolMessage)
+    assert "CRITIC_GATE: invalid" in blocked.content
 
 
 # ---------------------------------------------------------------------------
