@@ -722,7 +722,7 @@ def render_drug_md(
     )
 
     # Pre-format complex nested data for template consumption
-    preformatted_cards = _preformat_cards(featured_cards)
+    preformatted_cards = _preformat_cards(featured_cards, stage1_filter_results)
     formatted_filter = _format_filter_results(stage1_filter_results)
 
     return tmpl.render(
@@ -740,12 +740,25 @@ def render_drug_md(
     )
 
 
-def _preformat_cards(featured_cards: list[dict]) -> list[dict]:
+def _preformat_cards(
+    featured_cards: list[dict],
+    stage1_filter_results: list[dict] | None = None,
+) -> list[dict]:
     """Pre-format featured cards for template rendering.
 
     Resolves drug indications (isinstance checks), pathway joins, and census
     data so the Jinja2 template only handles simple iteration.
+
+    When ``stage1_filter_results`` is supplied, each formatted pair gets a
+    ``_passed`` boolean keyed on the (ligand, receptor) tuple (uppercased for
+    case-insensitive matching). Pairs absent from ``stage1_filter_results``
+    (and all pairs when the argument is ``None`` or empty) omit the key so the
+    template can render the legacy unlabeled output.
     """
+    filter_lookup = {
+        (row["ligand"].upper(), row["receptor"].upper()): row
+        for row in (stage1_filter_results or [])
+    }
     result = []
     for card in featured_cards:
         s3 = card.get("stage3", {})
@@ -793,7 +806,7 @@ def _preformat_cards(featured_cards: list[dict]) -> list[dict]:
             census = pair_data.get("census", {})
             ligand = pair_data.get("ligand", "")
             receptor = pair_data.get("receptor", "")
-            pairs_fmt.append({
+            pair_entry: dict[str, Any] = {
                 "ligand": ligand,
                 "receptor": receptor,
                 # Inline source-file citation so template-baked quantitative
@@ -807,7 +820,18 @@ def _preformat_cards(featured_cards: list[dict]) -> list[dict]:
                 "reactome": reactome_parts,
                 "census_rr": census.get("risk_ratio"),
                 "census_p": census.get("p_value", "N/A"),
-            })
+            }
+            flt = filter_lookup.get((ligand.upper(), receptor.upper()))
+            if flt is not None:
+                # Mirror _format_filter_results normalization: production rows
+                # come from CSV DictReader so `passed` is the string "true" or
+                # "false" -- a naive bool(...) would label both truthy.
+                raw_passed = flt.get("passed")
+                if isinstance(raw_passed, str):
+                    pair_entry["_passed"] = raw_passed.lower() == "true"
+                else:
+                    pair_entry["_passed"] = bool(raw_passed)
+            pairs_fmt.append(pair_entry)
 
         result.append({
             **card,

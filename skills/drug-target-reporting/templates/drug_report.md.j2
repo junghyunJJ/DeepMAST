@@ -126,7 +126,7 @@ Each gene is scored on two independent tracks reflecting different types of ther
 
 {% if card._pairs %}
 {% for p in card._pairs %}
-- **{{ p.ligand }}–{{ p.receptor }}**: STRING PPI score={{ p.score }}, interaction={{ p.interaction }}
+- **{{ p.ligand }}–{{ p.receptor }}**{% if '_passed' in p %} **[Stage 1: {{ "PASS" if p._passed else "FAIL" }}]**{% endif %}: STRING PPI score={{ p.score }}, interaction={{ p.interaction }}
 {% for kp in p.kegg %}
   - KEGG ({{ kp.role }}): {{ kp.pathways }}
 {% endfor %}
@@ -194,11 +194,11 @@ Evidence coverage: {{ hypothesis_data.evidence_coverage_pct }}% ({{ hypothesis_d
 {% if hypothesis_data.gap_analysis %}
 ### Gap Analysis
 
-{{ hypothesis_data.gap_analysis.coverage_details }}
+Evidence coverage: {{ hypothesis_data.gap_analysis.referenced_files | default(0) }} of {{ hypothesis_data.gap_analysis.total_evidence_files | default(0) }} evidence files referenced.
 
-{% if hypothesis_data.gap_analysis.orphan_files %}
+{% if hypothesis_data.gap_analysis.orphan_files | default([]) %}
 **Uncovered evidence files:**
-{% for f in hypothesis_data.gap_analysis.orphan_files %}
+{% for f in hypothesis_data.gap_analysis.orphan_files | default([]) %}
 - {{ f }}
 {% endfor %}
 {% endif %}
