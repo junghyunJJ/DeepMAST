@@ -42,7 +42,7 @@ Use Case: Deterministic retry after citation rejection
 Trigger: "Retry the hypothesis report after `invalid_references`" or "Recover from `failed_pair_violations` in the hypothesis payload"
 Steps:
 1. Inspect the deterministic rejection returned by `save_hypothesis_report`
-2. Remove or repair invalid citations, including `_FAILED` suffix handling for contrast-only failed pairs
+2. Remove or repair invalid citations; failed-pair rejections require removing or rebuilding that hypothesis from passed evidence
 3. Re-run validation and save only after the payload changes
 Result: The hypothesis artifact is retried through the runtime contract instead of repeating the same rejected payload
 
@@ -89,7 +89,7 @@ Required files for normal hypothesis execution:
 | `assessment_results.json` | Yes | Canonical disease context and `stage3_candidates` list |
 | `stage2_evidence.json` | Yes | OpenTargets evidence summary |
 | `stage1_filter_results.json` | Yes | Binary pass/fail data for Stage 1 pair validation |
-| `stage1_{LIGAND}--{RECEPTOR}.json` | Usually | Per-pair biological context; PASSED pairs load fully, FAILED pairs may be slim stubs |
+| `stage1_{LIGAND}--{RECEPTOR}.json` | Usually | Per-pair biological context; only pairs with `passed=true` load in hypothesis scope |
 | `stage3_{GENE}.json` | Usually | Per-featured-gene deep dives |
 | `ot_{GENE}.json` | Optional | Additional OpenTargets detail for featured genes |
 | `known_drugs.json` | Optional | Disease-level drug landscape |
@@ -117,7 +117,7 @@ Derive tiers from runtime evidence, not from a parent markdown report:
 
 For each FEATURED gene, collect:
 - classification, priority, and evidence available in `assessment_results.json`
-- related `stage1_*.json` pairs
+- related eligible `stage1_*.json` pairs returned by hypothesis scope
 - Stage 3 drug and publication evidence from `stage3_{GENE}.json`
 - tractability and function summaries from `stage2_evidence.json` or `ot_{GENE}.json`
 
@@ -138,7 +138,7 @@ Look for:
 
 Record these entities because they become the building blocks of the final hypotheses.
 
-### Phase 1.5: FAILED-pair Citation Gate (DETERMINISTIC)
+### Phase 1.5: Stage 1 Eligibility Gate (DETERMINISTIC)
 
 Before using any Stage 1 pair as evidence, check its pass/fail status in `stage1_filter_results.json`.
 
@@ -149,12 +149,10 @@ The strict Stage 1 pass condition uses all of the following:
 - gene B p-value below 0.05
 
 Rules:
-- A FAILED pair cannot support the core mechanism claim of a hypothesis.
-- A FAILED pair may be cited only as contrast evidence.
-- Contrast citations must append the literal `_FAILED` suffix, for example `stage1_TGFB1--P4HB.json_FAILED`.
-- If a FAILED pair is cited without `_FAILED`, `save_evidence` rejects the payload with `failed_pair_violations`.
-
-When a pair is cited with `_FAILED`, do not describe it as validated support.
+- Only `passed=true` Stage 1 pairs may be used as hypothesis evidence.
+- A `passed=false` pair cannot be cited, cannot support a core mechanism claim, and cannot be used as an L-R axis in the title, core claim, or prediction.
+- If a failed pair appears in citations or as a primary pair claim, `save_hypothesis_report` rejects the payload with `failed_pair_violations`.
+- Fix failed-pair rejections by removing that evidence or rebuilding the hypothesis around a passed pair or gene-level Stage 3 evidence.
 
 ---
 
@@ -188,13 +186,13 @@ Generation guidance:
 
 ### Phase 3: Gap Detection
 
-Build a coverage matrix over the real Stage 1 and Stage 3 evidence files.
+Build a coverage matrix over eligible hypothesis evidence: passed Stage 1 pair files and current Stage 3 candidate files.
 
 **Step 3.1: Mark referenced evidence**
 - Map each evidence file to the hypotheses that cite it
 
 **Step 3.2: Identify orphan evidence**
-- Stage 1 pairs not cited anywhere
+- Passed Stage 1 pairs not cited anywhere
 - FEATURED genes whose Stage 3 evidence is absent from retained hypotheses
 - pathway clusters never mentioned
 
@@ -203,7 +201,7 @@ Build a coverage matrix over the real Stage 1 and Stage 3 evidence files.
 - Reserve `[FEATURED-GAP]` for the mandatory FEATURED-gene coverage rule in Phase 4.75
 
 **Step 3.4: Coverage target**
-- Aim to cover at least 80 percent of the real Stage 1 and Stage 3 evidence files
+- Aim to cover at least 80 percent of eligible hypothesis evidence files
 - The runtime recomputes `evidence_coverage_pct` during save; do not rely on manual percentages as the source of truth
 
 ---
@@ -286,7 +284,7 @@ Required top-level payload fields include:
 If `save_evidence` returns `saved: false`:
 - For `invalid_references`, remove or replace invalid filenames and validate again
 - For `topn_coverage.missing`, add one `[FEATURED-GAP]` hypothesis per missing FEATURED gene
-- For `failed_pair_violations`, remove the citation or append `_FAILED` if it is truly contrast evidence
+- For `failed_pair_violations`, remove the failed pair citation/claim or rebuild the hypothesis from passed pair or Stage 3 gene evidence
 
 Do not retry the same payload after a deterministic rejection. Change the payload first, then retry.
 
@@ -321,7 +319,7 @@ Why this works:
 - the artifact is JSON, not markdown
 - runtime fills the final deterministic coverage metadata during save
 
-### Example 2: FAILED-pair rejection and recovery
+### Example 2: Failed-pair rejection and recovery
 
 ```python
 validate_evidence_references(data_dir, [
@@ -334,8 +332,8 @@ save_evidence(...)
 ```
 
 Correct recovery:
-- if `stage1_TGFB1--P4HB.json` is contrast evidence only, change the citation to `stage1_TGFB1--P4HB.json_FAILED`
-- if it was being used as primary support, rebuild the hypothesis around a PASSED pair instead
+- remove `stage1_TGFB1--P4HB.json` from citations and from the primary mechanism
+- rebuild the hypothesis around a passed pair or Stage 3 gene evidence
 - then validate again and retry with a changed payload
 
 ---
@@ -348,7 +346,7 @@ Every generated hypothesis report must meet these standards:
 - The retained set covers the required FEATURED genes
 - All dimension scores have short justifications
 - No fabricated literature, drug names, or filenames
-- FAILED pairs are never presented as validated primary evidence
+- Failed pairs are never used as hypothesis evidence or primary mechanism claims
 
 ---
 
@@ -368,7 +366,7 @@ One or more FEATURED genes are uncovered. Add a `[FEATURED-GAP]` hypothesis for 
 
 ### `save_evidence` returns `failed_pair_violations`
 
-You cited a FAILED Stage 1 pair without `_FAILED`, or used it as primary support. Fix the citation or rebuild the hypothesis.
+You cited a failed Stage 1 pair or made it the primary mechanism. Remove the failed pair evidence or rebuild the hypothesis from passed evidence.
 
 ### `load_evidence_files` did not return a pair as full content
 

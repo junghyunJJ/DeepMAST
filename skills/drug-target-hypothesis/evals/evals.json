@@ -18,6 +18,12 @@
       "prompt": "Brainstorm novel fibrosis drug targets from first principles and recent literature, without relying on an existing data_dir evidence bundle.",
       "expected_output": "Skill does not trigger because the request is general ideation without a completed Stage 1-3 evidence bundle.",
       "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "A saved Stage 1 filter marks FN1--PLAUR as passed=false, but stage3_FN1.json exists. Retry the hypothesis report without inventing filenames or using failed pair evidence.",
+      "expected_output": "Skill uses load_evidence_files(..., scope=\"hypothesis\"), excludes the failed FN1--PLAUR pair from hypothesis evidence, rejects any failed-pair citation or primary FN1-PLAUR axis claim, and rebuilds from passed Stage 1 pairs or Stage 3 gene evidence before save_hypothesis_report.",
+      "files": []
     }
   ]
 }

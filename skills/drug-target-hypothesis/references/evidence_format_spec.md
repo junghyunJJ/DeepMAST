@@ -115,7 +115,7 @@ Stage 1 deterministic pass/fail sidecar used by the hypothesis writer. This file
 
 Interpretation:
 - `passed = true` means the pair cleared the strict Stage 1 gate
-- `passed = false` means the pair may be cited only as contrast evidence with the `_FAILED` suffix
+- `passed = false` means the pair is audit/filter data only for hypothesis_writer and is not a valid hypothesis citation or primary claim source
 
 The strict pass rule requires:
 - STRING combined score above 0.8
@@ -183,6 +183,8 @@ Per L-R pair biological context validation. The exact file may contain additiona
 ```
 
 **Key interpretation guidelines:**
+- In `load_evidence_files(data_dir, scope="hypothesis")`, only Stage 1 pair files with `passed=true` are returned as usable hypothesis evidence.
+- Failed Stage 1 pair files are excluded from hypothesis scope. If Stage 1 pair files exist but `stage1_filter_results.json` or `.csv` is missing or unparseable, hypothesis scope returns a hard error with empty `files`.
 - `census_validation.target_vs_rest.coexpression.risk_ratio` above 5.0 indicates strong disease-specific coexpression
 - `census_validation.target_vs_rest.coexpression.p_value` below 1e-10 indicates statistically significant coexpression
 - `string_ppi.max_combined_score` above 0.9 indicates high-confidence physical interaction
@@ -272,7 +274,7 @@ The following files are not valid hypothesis citations in hypothesis scope:
 `load_evidence_files(data_dir, scope="hypothesis")` may also stub or exclude:
 - stale prior-run `stage3_*.json`
 - non-featured `ot_*.json`
-- FAILED Stage 1 pair files, which may appear only as slim contrast stubs
+- failed Stage 1 pair files, which are excluded from hypothesis scope
 
 ## Drug Report Markdown
 

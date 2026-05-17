@@ -683,7 +683,7 @@ class TestHypothesisScopeLoader:
         assert stub.get("_note", "").startswith("stale prior-run stage3 file")
         assert "targets" not in stub
 
-    def test_hypothesis_scope_slims_failed_pair_stage1(self, tmp_path):
+    def test_hypothesis_scope_excludes_failed_pair_stage1(self, tmp_path):
         from src.agents.drug_target.tools.evidence_loader import load_evidence_files
         ev = self._make_dir(tmp_path)
         self._seed_assessment(ev, ["CD4"])
@@ -699,13 +699,10 @@ class TestHypothesisScopeLoader:
         passed_payload = result["files"]["stage1_FN1--ITGB2.json"]
         assert "string_ppi" in passed_payload
         assert "census_validation" in passed_payload
-        # FAILED: slim stub — only ligand/receptor/stage1_filter
-        failed_stub = result["files"]["stage1_TGFB1--P4HB.json"]
-        assert failed_stub["ligand"] == "TGFB1"
-        assert failed_stub["receptor"] == "P4HB"
-        assert failed_stub["stage1_filter"]["passed"] is False
-        assert "string_ppi" not in failed_stub
-        assert "census_validation" not in failed_stub
+        # FAILED: excluded entirely from hypothesis inputs
+        assert "stage1_TGFB1--P4HB.json" not in result["files"]
+        excluded = {entry["name"]: entry["reason"] for entry in result["excluded_files"]}
+        assert "failed Stage 1 pair" in excluded["stage1_TGFB1--P4HB.json"]
 
     def test_hypothesis_scope_falls_back_to_csv(self, tmp_path):
         """Codex F1: JSON missing → CSV fallback."""
@@ -727,11 +724,10 @@ class TestHypothesisScopeLoader:
         # CSV-driven classification still applies
         passed_payload = result["files"]["stage1_FN1--ITGB2.json"]
         assert "string_ppi" in passed_payload  # full content
-        failed_stub = result["files"]["stage1_TGFB1--P4HB.json"]
-        assert "string_ppi" not in failed_stub  # stub
+        assert "stage1_TGFB1--P4HB.json" not in result["files"]
 
-    def test_hypothesis_scope_fails_open_when_filter_missing(self, tmp_path):
-        """Codex F1: no JSON AND no CSV → fail-open to full content, log warning."""
+    def test_hypothesis_scope_fails_closed_when_filter_missing(self, tmp_path):
+        """No JSON and no CSV means no Stage 1 pair files are exposed."""
         from src.agents.drug_target.tools.evidence_loader import load_evidence_files
         ev = self._make_dir(tmp_path)
         self._seed_assessment(ev, ["CD4"])
@@ -740,11 +736,21 @@ class TestHypothesisScopeLoader:
         self._seed_pair_file(ev, "TGFB1", "P4HB", passed=False)
         raw = load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "hypothesis"})
         result = json.loads(raw)
-        # Both pairs get FULL content (never silent-strip)
-        assert "string_ppi" in result["files"]["stage1_FN1--ITGB2.json"]
-        assert "string_ppi" in result["files"]["stage1_TGFB1--P4HB.json"]
-        # Warning surfaced in errors
-        assert any("filter results missing" in e for e in result["errors"])
+        assert result["files"] == {}
+        assert any("hypothesis scope aborted" in e for e in result["errors"])
+        assert any("Stage 1 pair files are hidden" in e for e in result["errors"])
+
+    def test_hypothesis_scope_fails_closed_when_filter_unparseable(self, tmp_path):
+        """Unparseable filter results also hide Stage 1 pair content."""
+        from src.agents.drug_target.tools.evidence_loader import load_evidence_files
+        ev = self._make_dir(tmp_path)
+        self._seed_assessment(ev, ["CD4"])
+        (ev / "stage1_filter_results.json").write_text("{not-json")
+        self._seed_pair_file(ev, "FN1", "ITGB2", passed=True)
+        raw = load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "hypothesis"})
+        result = json.loads(raw)
+        assert result["files"] == {}
+        assert any("Failed to parse stage1_filter_results.json" in e for e in result["errors"])
 
     def test_hypothesis_scope_excludes_legacy_and_prior_output(self, tmp_path):
         """Codex F3: legacy aggregates + prior-run outputs excluded from files dict."""
@@ -845,6 +851,9 @@ class TestHypothesisScopeLoader:
         ev.mkdir()
         (ev / "hypothesis_report.json").write_text("{}")
         (ev / "stage1_FN1--ITGB2.json").write_text("{}")
+        (ev / "stage1_filter_results.json").write_text(json.dumps([
+            {"ligand": "FN1", "receptor": "ITGB2", "passed": True}
+        ]))
         raw = validate_evidence_references.invoke({
             "data_dir": str(tmp_path),
             "references": ["hypothesis_report.json", "stage1_FN1--ITGB2.json"],
@@ -3830,7 +3839,7 @@ class TestPR1HypothesisReportValidator:
         saved = json.loads((evidence / "hypothesis_report.json").read_text())
         assert saved["topn_coverage"]["coverage_pct"] == 100.0
         assert saved["topn_coverage"]["missing"] == []
-        assert saved["evidence_coverage_pct"] == 50.0
+        assert saved["evidence_coverage_pct"] == 66.67
 
     def test_deterministic_evidence_coverage_pct_overwrites_llm(self, tmp_path):
         """PR1-5: LLM-supplied evidence_coverage_pct is replaced by deterministic value."""
@@ -3850,10 +3859,10 @@ class TestPR1HypothesisReportValidator:
         }))
         assert result["saved"] is True
         saved = json.loads((evidence / "hypothesis_report.json").read_text())
-        assert saved["evidence_coverage_pct"] == 25.0  # 1 of 4 stage1/3 files
+        assert saved["evidence_coverage_pct"] == 33.33  # 1 of 3 eligible stage1/3 files
 
-    def test_failed_pair_block_rejects_unmarked_citation(self, tmp_path):
-        """PR1-6: citing a FAILED pair without _FAILED suffix → reject (deterministic)."""
+    def test_failed_pair_block_rejects_failed_citation(self, tmp_path):
+        """Citing a failed pair is rejected regardless of suffix markers."""
         from src.agents.drug_target.tools.evidence_loader import save_evidence
         self._setup(tmp_path)
         report = {
@@ -3871,8 +3880,8 @@ class TestPR1HypothesisReportValidator:
         assert result["saved"] is False
         assert any("F1--F2" in v for v in result.get("failed_pair_violations", []))
 
-    def test_failed_pair_block_accepts_explicit_suffix(self, tmp_path):
-        """PR1-6: FAILED pair WITH _FAILED suffix marker is accepted (contrast evidence)."""
+    def test_failed_pair_block_rejects_explicit_suffix(self, tmp_path):
+        """New hypothesis writes reject failed pair citations even with legacy suffixes."""
         from src.agents.drug_target.tools.evidence_loader import save_evidence
         self._setup(tmp_path)
         report = {
@@ -3890,7 +3899,8 @@ class TestPR1HypothesisReportValidator:
             "filename": "hypothesis_report.json",
             "data": json.dumps(report),
         }))
-        assert result["saved"] is True
+        assert result["saved"] is False
+        assert any("F1--F2" in v for v in result.get("failed_pair_violations", []))
 
 
 class TestPR2Stage1Filter:

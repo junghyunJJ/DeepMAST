@@ -238,29 +238,6 @@ def _load_featured_set(evidence_dir: Path) -> tuple[set[str], str | None]:
     return featured, None
 
 
-def _stage1_slim_stub(data: dict) -> dict:
-    """Extract the minimum fields a FAILED stage1 pair needs for contrast citation."""
-    stage1_filter = {}
-    raw_filter = data.get("stage1_filter", {}) if isinstance(data, dict) else {}
-    if isinstance(raw_filter, dict):
-        for k in (
-            "passed",
-            "string_combined",
-            "string_status",
-            "census_coexpr_pvalue",
-            "census_gene_a_pvalue",
-            "census_gene_b_pvalue",
-        ):
-            if k in raw_filter:
-                stage1_filter[k] = raw_filter[k]
-    return {
-        "ligand": data.get("ligand") if isinstance(data, dict) else None,
-        "receptor": data.get("receptor") if isinstance(data, dict) else None,
-        "stage1_filter": stage1_filter,
-        "_note": "slim stub: FAILED stage1 pair; cite with '_FAILED' suffix as contrast evidence.",
-    }
-
-
 _STAGE3_NAME_RE = re.compile(r"^stage3_([A-Za-z0-9-]+)\.json$")
 _OT_NAME_RE = re.compile(r"^ot_([A-Za-z0-9-]+)\.json$")
 _STAGE1_PAIR_NAME_RE = re.compile(r"^stage1_([A-Za-z0-9-]+)--([A-Za-z0-9-]+)\.json$")
@@ -271,7 +248,6 @@ def _classify_hypothesis_scope_file(
     *,
     featured: set[str],
     filter_map: dict[str, bool],
-    filter_missing: bool,
 ) -> tuple[str, str | None]:
     """Return (action, reason) for a given filename under hypothesis scope.
 
@@ -279,7 +255,6 @@ def _classify_hypothesis_scope_file(
       - "full"      : load full JSON content
       - "stub_stale_stage3"
       - "stub_nonfeatured_ot"
-      - "stub_failed_pair"
       - "excluded"  : omit from files dict (record in excluded_files)
       - "fallback"  : defer to scope=all size-based logic
     """
@@ -305,16 +280,12 @@ def _classify_hypothesis_scope_file(
     mp = _STAGE1_PAIR_NAME_RE.match(name)
     if mp:
         pair_key = f"{mp.group(1).upper()}--{mp.group(2).upper()}"
-        if filter_missing:
-            # Codex F1 fail-open: no filter source → full content, never silent strip.
-            return "full", None
         passed = filter_map.get(pair_key)
         if passed is True:
             return "full", None
         if passed is False:
-            return "stub_failed_pair", "FAILED stage1 pair; slimmed to filter summary only"
-        # Pair not in filter_map even though sources exist → fail-open per F1 rationale.
-        return "full", None
+            return "excluded", "failed Stage 1 pair; not valid hypothesis input"
+        return "excluded", "Stage 1 pair missing from filter results; not valid hypothesis input"
 
     return "fallback", None
 
@@ -335,22 +306,23 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
     Args:
         data_dir: Directory containing evidence/ subdirectory
         scope: "all" (default) preserves the legacy load-everything
-            behavior. "hypothesis" restricts the payload to what
-            hypothesis_writer actually needs:
+            behavior. "hypothesis" restricts the payload to evidence that
+            passed the evidence_assessor gates and is eligible for
+            hypothesis_writer:
               * OpenTargets full content only for genes in stage3_candidates.
               * stage3_<GENE>.json full content only for current featured set
                 (stale prior-run files are stubbed).
-              * stage1_<L>--<R>.json full content only for PASSED pairs;
-                FAILED pairs are slim-stubbed (ligand/receptor + filter summary
-                so the _FAILED contrast-citation suffix still works).
+              * stage1_<L>--<R>.json full content only for PASSED pairs.
+                FAILED pairs and unclassified pairs are excluded from ``files``.
               * Legacy aggregates (stage1_audit/confidence/evidence) and
                 prior-run outputs (hypothesis_report, target_assessment) are
                 excluded entirely (not in ``files``, listed under
                 ``excluded_files``). The ``save_evidence`` citation gate
                 additionally rejects them as references.
-              * Fail-open: if stage1_filter_results.{json,csv} is missing or
-                unparseable, every per-pair stage1 file returns full content
-                (never silently strip a PASSED pair).
+              * Fail-closed: if stage1_filter_results.{json,csv} is missing or
+                unparseable while per-pair Stage 1 files exist, hypothesis
+                scope aborts with empty ``files`` instead of exposing
+                unchecked Stage 1 content.
 
     Returns:
         JSON with ``files`` (filename -> full content or stub), ``excluded_files``
@@ -379,7 +351,6 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
     hypothesis_scope = (scope or "all").lower() == "hypothesis"
     featured: set[str] = set()
     filter_map: dict[str, bool] = {}
-    filter_missing = False
 
     if hypothesis_scope:
         featured, feat_err = _load_featured_set(evidence_dir)
@@ -389,21 +360,20 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
                 "Fall back to scope='all' if the featured set cannot be resolved."
             )
             return json.dumps(result, indent=2)
-        filter_map = _load_stage1_filter_results(evidence_dir)
-        # Detect whether any stage1 per-pair file exists to decide fail-open behavior.
+        filter_map, filter_err = _load_stage1_filter_results_status(evidence_dir)
         any_pair_file = any(
             _STAGE1_PAIR_NAME_RE.match(p.name) for p in evidence_dir.glob("stage1_*.json")
         )
-        if not filter_map and any_pair_file:
-            filter_missing = True
+        if filter_err and any_pair_file:
             logger.warning(
-                "hypothesis scope: stage1_filter_results.{json,csv} missing or unparseable; "
-                "falling back to full content for every stage1 pair file."
+                "hypothesis scope: stage1_filter_results.{json,csv} unavailable; "
+                "aborting rather than exposing unchecked Stage 1 pair content."
             )
             result["errors"].append(
-                "filter results missing — falling back to full content for all stage1 pair files "
-                "(fail-open to avoid silently stripping PASSED pairs)."
+                f"hypothesis scope aborted: {filter_err}. "
+                "Stage 1 pair files are hidden until pass/fail eligibility is available."
             )
+            return json.dumps(result, indent=2)
 
     for path in sorted(evidence_dir.glob("*.json")):
         name = path.name
@@ -418,7 +388,6 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
                 name,
                 featured=featured,
                 filter_map=filter_map,
-                filter_missing=filter_missing,
             )
             if action == "excluded":
                 result["excluded_files"].append({"name": name, "reason": reason or ""})
@@ -441,8 +410,6 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
             if isinstance(data, dict):
                 stub["top_keys"] = list(data.keys())[:5]
             result["files"][name] = stub
-        elif action == "stub_failed_pair":
-            result["files"][name] = _stage1_slim_stub(data if isinstance(data, dict) else {})
         else:  # "fallback" — size-based behavior (preserves scope=all logic)
             if size_bytes <= CONTENT_SIZE_LIMIT:
                 result["files"][name] = data
@@ -481,6 +448,7 @@ def _validate_hypothesis_report_references(
     if not isinstance(hypotheses, list):
         return []
     real = _list_real_evidence_filenames(evidence_dir)
+    filter_results, filter_err = _load_stage1_filter_results_status(evidence_dir)
     errors: list[str] = []
     for idx, hyp in enumerate(hypotheses):
         if not isinstance(hyp, dict):
@@ -491,10 +459,14 @@ def _validate_hypothesis_report_references(
         for ref in refs:
             if not isinstance(ref, str) or not ref:
                 continue
-            # PR1-6: strip the optional `_FAILED` suffix marker before lookup.
-            # The marker is a deterministic opt-in for citing a stage1-FAILED pair
-            # as contrast evidence; the underlying file still must exist.
-            ref_stripped = ref.replace(".json_FAILED", ".json")
+            if ".json_FAILED" in ref:
+                errors.append(
+                    f"hypotheses[{idx}].evidence_references cites '{ref}'. "
+                    "The _FAILED suffix is not valid for new hypothesis reports; "
+                    "failed Stage 1 pairs must be removed from hypothesis evidence."
+                )
+                continue
+            ref_stripped = ref
             # evidence_references entries may include a qualifier such as
             # "stage1_FN1--ITGB2.json (passed filter)". Extract the leading
             # token ending in .json for comparison.
@@ -509,6 +481,22 @@ def _validate_hypothesis_report_references(
                     "as hypothesis input."
                 )
                 continue
+            m = _STAGE1_PAIR_NAME_RE.match(token)
+            if m:
+                pair_key = f"{m.group(1).upper()}--{m.group(2).upper()}"
+                if filter_results.get(pair_key) is not True:
+                    reason = (
+                        f"no passing Stage 1 filter entry found for '{pair_key}'"
+                        if not filter_err
+                        else filter_err
+                    )
+                    errors.append(
+                        f"hypotheses[{idx}].evidence_references cites Stage 1 "
+                        f"pair '{pair_key}' without proven passed=true status "
+                        f"({reason}). Stage 1 pair citations must be eligible "
+                        "hypothesis evidence."
+                    )
+                    continue
             if token not in real:
                 errors.append(
                     f"hypotheses[{idx}].evidence_references cites '{token}' "
@@ -522,23 +510,28 @@ def _validate_hypothesis_report_references(
 # ---------------------------------------------------------------------------
 
 
-def _load_stage1_filter_results(evidence_dir: Path) -> dict[str, bool]:
-    """Return {"<LIGAND>--<RECEPTOR>": passed_bool} from stage1_filter_results.json.
+def _stage1_filter_rows_to_map(rows: object) -> dict[str, bool]:
+    """Return {"<LIGAND>--<RECEPTOR>": passed_bool} from filter rows."""
+    if not isinstance(rows, list):
+        return {}
+    return {
+        f"{(r.get('ligand') or '').upper()}--{(r.get('receptor') or '').upper()}": bool(r.get("passed"))
+        for r in rows
+        if isinstance(r, dict) and (r.get("ligand") or r.get("receptor"))
+    }
 
-    Falls back to the CSV if JSON sidecar is absent (back-compat with pre-PR-1 runs).
-    Returns empty dict if neither file exists (no filter results yet).
-    """
+
+def _load_stage1_filter_results_status(evidence_dir: Path) -> tuple[dict[str, bool], str | None]:
+    """Return Stage 1 pass/fail map plus a parse/presence error, if any."""
     json_path = evidence_dir / "stage1_filter_results.json"
     if json_path.exists():
         try:
             rows = json.loads(json_path.read_text(encoding="utf-8"))
-            return {
-                f"{(r.get('ligand') or '').upper()}--{(r.get('receptor') or '').upper()}": bool(r.get("passed"))
-                for r in rows
-                if isinstance(r, dict)
-            }
-        except Exception:
-            pass
+            if not isinstance(rows, list):
+                return {}, "stage1_filter_results.json is not a list"
+            return _stage1_filter_rows_to_map(rows), None
+        except Exception as exc:
+            return {}, f"Failed to parse stage1_filter_results.json: {exc}"
     csv_path = evidence_dir / "stage1_filter_results.csv"
     if csv_path.exists():
         import csv as _csv
@@ -548,10 +541,163 @@ def _load_stage1_filter_results(evidence_dir: Path) -> dict[str, bool]:
                     f"{(r.get('ligand') or '').upper()}--{(r.get('receptor') or '').upper()}":
                         str(r.get('passed', '')).lower() in ("true", "1", "yes")
                     for r in _csv.DictReader(_f)
-                }
-        except Exception:
-            pass
-    return {}
+                    if (r.get("ligand") or r.get("receptor"))
+                }, None
+        except Exception as exc:
+            return {}, f"Failed to parse stage1_filter_results.csv: {exc}"
+    return {}, "stage1_filter_results.json or stage1_filter_results.csv not found"
+
+
+def _load_stage1_filter_results(evidence_dir: Path) -> dict[str, bool]:
+    """Return {"<LIGAND>--<RECEPTOR>": passed_bool} from Stage 1 filter results.
+
+    Falls back to the CSV if JSON sidecar is absent (back-compat with pre-PR-1 runs).
+    Returns empty dict if neither file exists or parsing fails.
+    """
+    filter_map, _ = _load_stage1_filter_results_status(evidence_dir)
+    return filter_map
+
+
+def _split_stage1_pair_key(pair_key: str) -> tuple[str, str] | None:
+    if "--" not in pair_key:
+        return None
+    ligand, receptor = pair_key.split("--", 1)
+    ligand = ligand.strip().upper()
+    receptor = receptor.strip().upper()
+    if not ligand or not receptor:
+        return None
+    return ligand, receptor
+
+
+def _stage1_filename_for_pair(pair_key: str) -> str | None:
+    parts = _split_stage1_pair_key(pair_key)
+    if not parts:
+        return None
+    return f"stage1_{parts[0]}--{parts[1]}.json"
+
+
+def _eligible_hypothesis_stage_files(
+    evidence_dir: Path,
+    featured_genes: list[str],
+    filter_results: dict[str, bool],
+) -> set[str]:
+    """Return real stage1/stage3 filenames eligible for hypothesis coverage."""
+    real = _list_real_evidence_filenames(evidence_dir)
+    eligible: set[str] = set()
+    for gene in featured_genes:
+        name = f"stage3_{gene.strip().upper()}.json"
+        if name in real:
+            eligible.add(name)
+    for pair_key, passed in filter_results.items():
+        if passed is not True:
+            continue
+        name = _stage1_filename_for_pair(pair_key)
+        if name and name in real:
+            eligible.add(name)
+    return eligible
+
+
+_PAIR_INTERACTION_CUE_RE = re.compile(
+    r"\b("
+    r"axis|axes|interact(?:ion|s|ing)?|pair|pairs|ppi|string|census|"
+    r"co-?express(?:ion|ed)?|ligand[-\s]?receptor|l-r|binding|binds|"
+    r"coupl(?:e|es|ing)|complex"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _failed_pair_text_pattern(ligand: str, receptor: str) -> re.Pattern[str]:
+    sep = r"(?:\s*(?:--|[-/–—])\s*|\s+)"
+    return re.compile(
+        rf"(?<![A-Za-z0-9]){re.escape(ligand)}{sep}{re.escape(receptor)}(?![A-Za-z0-9])",
+        re.IGNORECASE,
+    )
+
+
+def _hypothesis_text_for_pair_check(hyp: dict) -> str:
+    fields = (
+        hyp.get("title", ""),
+        hyp.get("core_claim", ""),
+        hyp.get("falsifiable_prediction", ""),
+    )
+    return "\n".join(str(f) for f in fields if f)
+
+
+def _validate_failed_pair_claims(
+    hypotheses: list,
+    filter_results: dict[str, bool],
+) -> list[str]:
+    """Reject failed Stage 1 pair citations and primary semantic pair claims."""
+    errors: list[str] = []
+    failed_pairs = [
+        (pair_key, parts[0], parts[1])
+        for pair_key, passed in filter_results.items()
+        if passed is False and (parts := _split_stage1_pair_key(pair_key)) is not None
+    ]
+    if not failed_pairs or not isinstance(hypotheses, list):
+        return errors
+
+    for idx, hyp in enumerate(hypotheses):
+        if not isinstance(hyp, dict):
+            continue
+
+        refs = hyp.get("evidence_references", [])
+        if not isinstance(refs, list):
+            refs = []
+        for ref in refs:
+            if not isinstance(ref, str):
+                continue
+            m = re.match(
+                r"^(?:.*?)(stage1_([A-Za-z0-9-]+)--([A-Za-z0-9-]+)\.json)(?:_FAILED)?",
+                ref,
+            )
+            if not m:
+                continue
+            pair_key = f"{m.group(2).upper()}--{m.group(3).upper()}"
+            if filter_results.get(pair_key) is False:
+                errors.append(
+                    f"hypotheses[{idx}] cites failed Stage 1 pair '{pair_key}'. "
+                    "Failed pairs are excluded from hypothesis generation; remove the "
+                    "reference and rebuild the hypothesis from passed evidence."
+                )
+
+        text = _hypothesis_text_for_pair_check(hyp)
+        upper_text = text.upper()
+        entities = hyp.get("biological_entities", {}) or {}
+        raw_genes = entities.get("genes", []) if isinstance(entities, dict) else []
+        entity_genes = {
+            str(g).strip().upper()
+            for g in raw_genes
+            if isinstance(g, str) and str(g).strip()
+        }
+        text_clauses = [
+            clause
+            for clause in re.split(r"[\n.;:]+", text)
+            if clause.strip()
+        ]
+        for pair_key, ligand, receptor in failed_pairs:
+            direct_pattern = _failed_pair_text_pattern(ligand, receptor)
+            reverse_pattern = _failed_pair_text_pattern(receptor, ligand)
+            if direct_pattern.search(upper_text) or reverse_pattern.search(upper_text):
+                errors.append(
+                    f"hypotheses[{idx}] makes a primary claim about failed Stage 1 "
+                    f"pair '{pair_key}' in title/core_claim/falsifiable_prediction."
+                )
+                continue
+            related_clause = any(
+                ligand in clause.upper()
+                and receptor in clause.upper()
+                and _PAIR_INTERACTION_CUE_RE.search(clause)
+                for clause in text_clauses
+            )
+            if ligand in entity_genes and receptor in entity_genes and related_clause:
+                errors.append(
+                    f"hypotheses[{idx}] lists both genes from failed Stage 1 pair "
+                    f"'{pair_key}' while using pair/axis/interaction language. "
+                    "Remove the failed pair claim or rebuild from passed evidence."
+                )
+    return errors
 
 
 def _validate_hypothesis_report_topn_and_failed_pairs(
@@ -563,7 +709,7 @@ def _validate_hypothesis_report_topn_and_failed_pairs(
     Returns a diagnostic dict with keys:
       - topn_coverage: {covered, missing, coverage_pct}
       - evidence_coverage_pct: deterministic float (0..100)
-      - failed_pair_violations: [strings] -- hypotheses citing FAILED pairs without _FAILED suffix
+      - failed_pair_violations: [strings] -- hypotheses citing or claiming failed Stage 1 pairs
       - reject_reason: str | None  (non-None means save_evidence MUST refuse)
     """
     diag: dict = {
@@ -618,12 +764,15 @@ def _validate_hypothesis_report_topn_and_failed_pairs(
                 f"Do NOT retry the same payload."
             )
 
-    # 3. Deterministic evidence_coverage_pct = (cited stage1_*/stage3_* files) / (total in evidence/).
-    real = _list_real_evidence_filenames(evidence_dir)
-    stage_files = {n for n in real if n.startswith(("stage1_", "stage3_"))
-                   and n not in {"stage1_evidence.json", "stage1_audit.json",
-                                 "stage1_filter.json", "stage1_filter_results.json",
-                                 "stage1_filter_results.csv", "stage1_confidence.json"}}
+    filter_results, filter_err = _load_stage1_filter_results_status(evidence_dir)
+
+    # 3. Deterministic evidence_coverage_pct over eligible hypothesis evidence only:
+    #    current stage3 candidate files plus Stage 1 pair files that passed the filter.
+    stage_files = _eligible_hypothesis_stage_files(
+        evidence_dir,
+        featured_genes,
+        filter_results,
+    )
     cited_files: set[str] = set()
     if isinstance(hypotheses, list):
         for hyp in hypotheses:
@@ -639,33 +788,16 @@ def _validate_hypothesis_report_topn_and_failed_pairs(
     if stage_files:
         diag["evidence_coverage_pct"] = round(100.0 * len(cited_stage) / len(stage_files), 2)
 
-    # 4. FAILED-pair block (deterministic via _FAILED suffix marker).
-    filter_results = _load_stage1_filter_results(evidence_dir)
+    # 4. Failed Stage 1 pair block. This is semantic as well as citation-based:
+    #    failed pairs must not be primary hypotheses even if no failed file is cited.
     if filter_results and isinstance(hypotheses, list):
-        for idx, hyp in enumerate(hypotheses):
-            if not isinstance(hyp, dict):
-                continue
-            for ref in hyp.get("evidence_references", []) or []:
-                if not isinstance(ref, str):
-                    continue
-                # Match stage1_<L>--<R>.json (with or without _FAILED suffix).
-                m = re.match(r"^(stage1_([A-Za-z0-9-]+)--([A-Za-z0-9-]+)\.json)(_FAILED)?", ref)
-                if not m:
-                    continue
-                ligand, receptor = m.group(2).upper(), m.group(3).upper()
-                pair_key = f"{ligand}--{receptor}"
-                passed = filter_results.get(pair_key)
-                if passed is False and not m.group(4):  # FAILED pair without _FAILED suffix
-                    diag["failed_pair_violations"].append(
-                        f"hypotheses[{idx}] cites FAILED pair '{pair_key}' without "
-                        f"the explicit '_FAILED' suffix marker. Either remove the citation "
-                        f"or append '_FAILED' (e.g., 'stage1_{pair_key}.json_FAILED') "
-                        f"to flag it as contrast evidence."
-                    )
+        diag["failed_pair_violations"].extend(
+            _validate_failed_pair_claims(hypotheses, filter_results)
+        )
         if diag["failed_pair_violations"] and not diag["reject_reason"]:
             diag["reject_reason"] = (
-                f"{len(diag['failed_pair_violations'])} FAILED-pair citation(s) lack "
-                f"the '_FAILED' suffix marker. See failed_pair_violations for details."
+                f"{len(diag['failed_pair_violations'])} failed Stage 1 pair "
+                "claim/reference violation(s). See failed_pair_violations for details."
             )
 
     return diag
@@ -810,11 +942,9 @@ def _sanitize_gap_analysis(parsed: dict, evidence_dir: Path) -> int:
     """Strip `_FAILED` suffix from ``gap_analysis.orphan_files`` entries when
     the unsuffixed file actually exists on disk.
 
-    The ``_FAILED`` marker is a CITATION convention for
-    ``evidence_references`` (contrast-only evidence for FAILED stage1 pairs).
-    It does NOT belong on filesystem-grounded lists like ``orphan_files``,
-    where every entry must correspond to a real file. Returns the number
-    of entries sanitized.
+    Historical hypothesis reports may contain the legacy suffix. It does not
+    belong on filesystem-grounded lists like ``orphan_files``, where every entry
+    must correspond to a real file. Returns the number of entries sanitized.
     """
     if not isinstance(parsed, dict):
         return 0
@@ -1044,20 +1174,22 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
         references: Flat list of filename strings from all hypotheses'
             evidence_references fields. Each entry may include a qualifier
             (e.g. "stage1_FN1--ITGB2.json (passed filter)") — only the
-            leading ``*.json`` token is checked.
+            leading ``*.json`` token is checked. The ``_FAILED`` suffix is
+            invalid for new hypothesis reports.
 
     Returns:
         JSON with:
           - valid: bool (all references resolved)
           - invalid_references: list of citations that do not match any file
           - available_files: sorted list of every real file in evidence/
-          - stage1_pair_files: subset of available_files matching
-            ``stage1_*--*.json`` (the canonical Stage 1 filename convention)
+          - stage1_pair_files / eligible_stage1_pair_files: real Stage 1 pair
+            files with ``passed=true`` in the Stage 1 filter results
           - naming_convention: human-readable note about the `--` separator
     """
     base = _resolve_data_dir(data_dir)
     evidence_dir = base / "evidence"
     real = _list_real_evidence_filenames(evidence_dir)
+    filter_results, filter_err = _load_stage1_filter_results_status(evidence_dir)
 
     invalid: list[str] = []
     denied: list[dict] = []
@@ -1065,10 +1197,19 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
     for ref in references or []:
         if not isinstance(ref, str) or not ref:
             continue
-        # Strip _FAILED suffix marker before comparison (suffix is a citation
-        # qualifier, not a different filename).
-        ref_stripped = ref.replace(".json_FAILED", ".json")
-        token_match = re.search(r"([A-Za-z0-9_.\-]+\.json)", ref_stripped)
+        if ".json_FAILED" in ref:
+            invalid.append(ref)
+            denied.append({
+                "reference": ref,
+                "token": ref,
+                "reason": (
+                    "_FAILED suffixes are not valid for hypothesis_writer. "
+                    "Failed Stage 1 pairs are excluded from hypothesis evidence; "
+                    "remove the citation and rebuild from passed evidence."
+                ),
+            })
+            continue
+        token_match = re.search(r"([A-Za-z0-9_.\-]+\.json)", ref)
         if not token_match:
             invalid.append(ref)
             continue
@@ -1085,11 +1226,34 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
                 ),
             })
             continue
+        m = _STAGE1_PAIR_NAME_RE.match(token)
+        if m:
+            pair_key = f"{m.group(1).upper()}--{m.group(2).upper()}"
+            if filter_results.get(pair_key) is not True:
+                reason = (
+                    f"no passing Stage 1 filter entry found for {pair_key}"
+                    if not filter_err
+                    else filter_err
+                )
+                invalid.append(ref)
+                denied.append({
+                    "reference": ref,
+                    "token": token,
+                    "reason": (
+                        f"Stage 1 pair {pair_key} is not proven passed=true "
+                        f"({reason}); exclude it from hypothesis generation."
+                    ),
+                })
+                continue
         if token not in real:
             invalid.append(ref)
 
     stage1_pair_files = sorted(
-        f for f in real if f.startswith("stage1_") and "--" in f and f.endswith(".json")
+        f for f in real
+        if f.startswith("stage1_")
+        and "--" in f
+        and f.endswith(".json")
+        and filter_results.get(f[len("stage1_"):-len(".json")].upper()) is True
     )
 
     return json.dumps({
@@ -1099,12 +1263,15 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
         "denied_citations": denied,
         "available_files": sorted(real),
         "stage1_pair_files": stage1_pair_files,
+        "eligible_stage1_pair_files": stage1_pair_files,
         "naming_convention": (
             "Stage 1 L-R pair evidence files use the convention "
             "`stage1_<LIGAND>--<RECEPTOR>.json` with TWO HYPHENS "
             "between the ligand and receptor symbols. Single-underscore "
             "variants like `stage1_CD4_ITGB2.json` are NOT written by the "
-            "pipeline and will be rejected by save_evidence."
+            "pipeline and will be rejected by save_evidence. Only pairs with "
+            "`passed=true` in stage1_filter_results.json are eligible hypothesis "
+            "citations."
         ),
     }, indent=2)
 

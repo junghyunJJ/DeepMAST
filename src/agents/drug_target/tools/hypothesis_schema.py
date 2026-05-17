@@ -261,14 +261,17 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
         _validate_hypothesis_report_topn_and_failed_pairs,
     )
 
-    ref_errors = _validate_hypothesis_report_references(canonical, evidence_dir)
-    if ref_errors:
-        result["errors"].extend(ref_errors)
-        return result
-
     diag = _validate_hypothesis_report_topn_and_failed_pairs(canonical, evidence_dir)
     canonical["evidence_coverage_pct"] = diag["evidence_coverage_pct"]
     canonical["topn_coverage"] = diag["topn_coverage"]
+
+    ref_errors = _validate_hypothesis_report_references(canonical, evidence_dir)
+    if ref_errors:
+        result["errors"].extend(ref_errors)
+        result["topn_coverage"] = diag["topn_coverage"]
+        result["failed_pair_violations"] = diag["failed_pair_violations"]
+        return result
+
     if diag["reject_reason"]:
         result["errors"].append(diag["reject_reason"])
         result["topn_coverage"] = diag["topn_coverage"]

@@ -287,8 +287,10 @@ Read the full skill guide first (do not skip):
      `stage3_candidates` receive full OpenTargets content).
    - Stale prior-run `stage3_*.json` (genes no longer in the current featured set) are
      stubbed; rely on the `stage3_*.json` entries returned with full content.
-   - FAILED stage1 pairs return a slim `{ligand, receptor, stage1_filter}` stub —
-     sufficient for `_FAILED` contrast citations.
+   - Stage 1 pair files are returned only when `stage1_filter_results.json`
+     marks the pair as `passed=true`; failed pairs are excluded from `files`.
+   - If Stage 1 pair files exist but pass/fail results are missing or unparseable,
+     hypothesis scope aborts with empty `files` instead of exposing unchecked pairs.
    - Legacy aggregates (`stage1_audit.json`, `stage1_confidence.json`, `stage1_evidence.json`)
      and prior-run outputs (`hypothesis_report.json`, `target_assessment.json`) are
      **not returned at all**; they also cannot be cited (`save_evidence` rejects them).
@@ -296,14 +298,14 @@ Read the full skill guide first (do not skip):
    entry from `excluded_files`.**
 2. Identify required files (all located in `{data_dir}/evidence/`):
    `rubric_scores.csv`, `assessment_results.json`, `stage2_evidence.json`,
-   **`stage1_filter.json`** (CRITICAL — contains pass/fail status for each L-R pair)
+   **`stage1_filter_results.json`** (CRITICAL — contains pass/fail status for each L-R pair)
    **NEVER use `read_file` directly — always use `load_evidence_files(data_dir, scope="hypothesis")`.**
 3. Categorize targets into FEATURED / NOVEL / OTHER based on rubric scores
 4. Build evidence inventory per gene (rubric scores, Stage 1 pairs, Stage 3 data)
-5. **Check `stage1_filter.json` for each L-R pair's filter status (passed/failed)**
+5. **Use only Stage 1 L-R pair files returned in `files`; these are the passed pairs**
 6. Extract key biological entities: convergent pathways, hub genes, tractable targets
 
-### CRITICAL: Stage 1 Filter Awareness (PR1-7 hard rules)
+### CRITICAL: Stage 1 Eligibility Gate (hard rules)
 
 Before referencing ANY stage1 L-R pair in a hypothesis, you MUST check its status
 in `stage1_filter_results.json` (binary pass/fail data; preferred over the older
@@ -313,28 +315,24 @@ in `stage1_filter_results.json` (binary pass/fail data; preferred over the older
 - Census gene A (ligand) p-value < 0.05
 - Census gene B (receptor) p-value < 0.05
 
-**Phase 1.5 — FAILED-pair citation hard rule (DETERMINISTIC GATE)**:
+**Phase 1.5 — Stage 1 eligibility hard rule (DETERMINISTIC GATE)**:
 
-Building a hypothesis's *core_claim* on any L-R pair where
-`stage1_filter_results.json[<L>--<R>].passed == False` is FORBIDDEN.
+Building a hypothesis's title, *core_claim*, biological_entities, or prediction
+around any L-R pair where `stage1_filter_results.json[<L>--<R>].passed == False`
+is FORBIDDEN.
 
-If you nonetheless need to cite a FAILED pair as **contrast evidence**, you MUST
-append the literal suffix `_FAILED` to the citation string in `evidence_references`,
-e.g., `"stage1_TGFB1--P4HB.json_FAILED"` instead of `"stage1_TGFB1--P4HB.json"`.
-
-The save_evidence validator runs a deterministic file-path cross-reference against
-`stage1_filter_results.json`. If a hypothesis cites a FAILED pair WITHOUT the
-`_FAILED` suffix marker, save_evidence will return `saved=false` with
-`failed_pair_violations` listing the offending citations. **No natural-language
-parsing is performed** — the gate is purely on the citation string suffix.
+The save_hypothesis_report validator checks both citations and hypothesis text.
+It rejects failed pair references and failed pair primary claims even if the
+failed pair file is not cited directly.
 
 Rules:
-- PASSED pair: reference normally as validated evidence (no suffix needed).
-- FAILED pair as contrast evidence: append `_FAILED` suffix to the filename.
-- FAILED pair as primary mechanism support: NOT ALLOWED. Drop the hypothesis or
-  rebuild it on a PASSED pair.
-- Do NOT claim "STRING and Census support" for any pair with the `_FAILED` suffix.
-- Weight PASSED pairs significantly higher than FAILED pairs in specificity scoring.
+- PASSED pair: reference normally as validated evidence when its file appears in `files`.
+- FAILED pair: NOT ALLOWED as hypothesis evidence. Drop the hypothesis or rebuild it
+  on a PASSED pair or gene-level Stage 3 evidence.
+- Do NOT cite failed pair files, do not add suffix markers, and do not describe a
+  failed pair as STRING/Census support.
+- A single gene from a failed pair may still be used when supported by passed pair
+  evidence or Stage 3 gene evidence; do not make the failed L-R axis the mechanism.
 
 ### Phase 2: Hypothesis Generation
 
@@ -406,8 +404,8 @@ deterministic gate sees through filler grounding; reviewers will see every
 
 ### Phase 3: Gap Detection
 
-1. Build coverage matrix: which evidence files are referenced by hypotheses
-2. Identify orphan evidence (unreferenced stage1/stage3 files)
+1. Build coverage matrix: which eligible hypothesis evidence files are referenced
+2. Identify orphan evidence (unreferenced passed stage1/current stage3 files)
 3. Generate gap-filling hypotheses tagged with `[GAP]` prefix
 4. Target >= 80% evidence file coverage
 
@@ -463,6 +461,9 @@ Rules:
     (a) replacing it with a real filename from `available_files`, or
     (b) removing the citation entirely if no real file supports the claim.
 - NEVER invent filenames. NEVER cite a file that is not in `available_files`.
+- For Stage 1 pair citations, use only filenames returned in
+  `eligible_stage1_pair_files` (or equivalently the full-content Stage 1 files
+  from `load_evidence_files(..., scope="hypothesis")`).
 - Stage 1 L-R pair files use the convention `stage1_<LIG>--<REC>.json` with
   TWO HYPHENS between the ligand and receptor. A single-underscore form
   such as `stage1_CD4_ITGB2.json` is NOT produced by the pipeline and will
@@ -481,7 +482,7 @@ the citations and retry.
 If save_hypothesis_report returns `saved: false` with EITHER:
 
 - `topn_coverage.missing` non-empty (TOP-N gene NOT covered), OR
-- `failed_pair_violations` non-empty (FAILED pair cited without `_FAILED` suffix),
+- `failed_pair_violations` non-empty (failed Stage 1 pair cited or claimed),
 
 you MUST follow this retry policy:
 
@@ -489,14 +490,13 @@ you MUST follow this retry policy:
 2. For each gene in `topn_coverage.missing`: generate one new `[FEATURED-GAP]` hypothesis
    whose `biological_entities.genes` includes that gene. Use the gene's `stage3_*.json`
    and `ot_*.json` evidence as references. Do NOT remove other hypotheses.
-3. For each entry in `failed_pair_violations`: either (a) remove the citation entirely, or
-   (b) append the literal `_FAILED` suffix to the citation string (e.g., transform
-   `"stage1_FN1--PLAUR.json"` into `"stage1_FN1--PLAUR.json_FAILED"`).
-4. **Hard cap: 3 retries total.** If save_evidence still returns `saved: false` after the
-   third retry, append a `## Warnings` markdown section to your hypothesis_report payload
-   listing the remaining unaddressed missing genes / FAILED-pair violations, then call
-   save_evidence one final time. The persist-with-warnings approach surfaces the failure
-   to the operator rather than blocking the entire pipeline.
+3. For each entry in `failed_pair_violations`: remove the failed pair citation or
+   failed pair claim, then rebuild the hypothesis from passed pair evidence or
+   gene-level Stage 3 evidence.
+4. **Hard cap: 3 retries total.** If save_hypothesis_report still returns `saved: false`
+   after the third retry, stop hypothesis generation and report the deterministic
+   blocker. Do not attempt to persist a warning-only payload that still contains
+   missing FEATURED genes or failed-pair violations.
 
 ### Phase 5: Save Report
 MANDATORY: You MUST call save_hypothesis_report even if hypothesis_report.json appears in ls output.

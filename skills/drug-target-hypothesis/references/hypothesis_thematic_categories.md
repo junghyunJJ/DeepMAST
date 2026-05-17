@@ -15,7 +15,7 @@ Four mandatory categories ensure comprehensive coverage of drug target assessmen
 - Specify disease-relevant cell type(s) and proposed cellular process
 - Falsifiable prediction linking mechanism to measurable outcome
 
-**Primary evidence sources**: Stage 1 JSONs (pathways, PPI, Census), OT function descriptions, rubric biological_plausibility score
+**Primary evidence sources**: passed/eligible Stage 1 JSONs (pathways, PPI, Census), OT function descriptions, rubric biological_plausibility score
 
 **Example (IPF)**:
 > **"ICAM1-MUC1 Interaction Drives Epithelial Barrier Dysfunction in IPF Alveolar Type 2 Cells via NF-kB-Mediated Mucin Dysregulation"**
@@ -63,7 +63,7 @@ Four mandatory categories ensure comprehensive coverage of drug target assessmen
 - Propose synergistic or epistatic mechanism
 - Falsifiable prediction comparing dual vs. single-target intervention
 
-**Primary evidence sources**: Stage 1 JSONs (shared pathways between pairs), STRING PPI, rubric scores for multiple genes, stage2_evidence.json (pathway overlap)
+**Primary evidence sources**: passed/eligible Stage 1 JSONs (shared pathways between pairs), STRING PPI, rubric scores for multiple genes, stage2_evidence.json (pathway overlap)
 
 **Example (IPF)**:
 > **"ICAM1-ITGB2 and ICAM1-PECAM1 Axes Converge on Leukocyte Transendothelial Migration as a Dual-Targetable Pro-Fibrotic Gateway"**
