@@ -156,6 +156,10 @@ Each gene is scored on two independent tracks reflecting different types of ther
 {% endfor %}
 ## 4. Hypothesis-Driven Analysis
 
+{% if disease_scope and disease_scope.requires_proxy_note %}
+{{ disease_scope.proxy_note }}
+
+{% endif %}
 {% if hypothesis_data and hypothesis_data.hypotheses %}
 Evidence coverage: {{ hypothesis_data.evidence_coverage_pct }}% ({{ hypothesis_data.hypotheses_retained }} hypotheses retained from {{ hypothesis_data.hypotheses_generated }} generated)
 

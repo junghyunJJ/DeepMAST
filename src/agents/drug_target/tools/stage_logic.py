@@ -2361,6 +2361,7 @@ def build_evidence_summary(data_dir: str) -> str:
         stage1_data=stage1_data,
         stage1_filter_results=stage1_filter_results,
         hypothesis_data=hypothesis_data,
+        disease_scope=disease_scope,
         data_limitations=data_limitations,
         novelty_opportunity_legend=NOVELTY_OPPORTUNITY_LEGEND,
     )
