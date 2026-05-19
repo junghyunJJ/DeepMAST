@@ -323,3 +323,40 @@ def test_save_evidence_legacy_wrapper_writes_v2_projection(tmp_path: Path) -> No
     assert hyp["evidence_references"] == [
         detail["display_reference"] for detail in hyp["evidence_reference_details"]
     ]
+
+
+def test_save_hypothesis_report_keeps_contrast_details_out_of_primary_refs(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    report = _clone_report()
+    hyp = report["hypotheses"][0]
+    hyp["evidence_references"] = ["stage3_FN1.json", "stage3_CD4.json"]
+    hyp["evidence_reference_details"] = [
+        {"filename": "stage3_FN1.json", "usage": "primary"},
+        {"filename": "stage3_CD4.json", "usage": "supporting"},
+        {"filename": "stage1_FN1--PLAUR.json", "usage": "contrast"},
+    ]
+    hyp["negative_contrast_context"] = (
+        "stage1_FN1--PLAUR.json failed Stage 1 and is retained only as "
+        "negative contrast metadata."
+    )
+    hyp["biological_entities"]["genes"] = ["FN1", "CD4"]
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is True, result
+    saved = json.loads((data_dir / "evidence" / "hypothesis_report.json").read_text())
+    saved_hyp = saved["hypotheses"][0]
+    assert saved_hyp["evidence_references"] == ["stage3_FN1.json", "stage3_CD4.json"]
+    assert saved_hyp["contrast_references"] == ["stage1_FN1--PLAUR.json"]
+    contrast_detail = saved_hyp["evidence_reference_details"][2]
+    assert contrast_detail == {
+        "filename": "stage1_FN1--PLAUR.json",
+        "usage": "contrast",
+        "stage1_pair_status": "failed",
+        "display_reference": "stage1_FN1--PLAUR.json",
+    }
+    assert "_FAILED" not in json.dumps(saved_hyp)

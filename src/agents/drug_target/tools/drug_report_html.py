@@ -685,6 +685,7 @@ def render_drug_md(
     stage1_data: dict[str, dict],
     stage1_filter_results: list[dict],
     hypothesis_data: dict | None = None,
+    disease_scope: dict | None = None,
     data_limitations: list[str] | None = None,
     novelty_opportunity_legend: str = NOVELTY_OPPORTUNITY_LEGEND,
 ) -> str:
@@ -735,6 +736,7 @@ def render_drug_md(
         other_rows=other_rows,
         stage1_filter_results=formatted_filter,
         hypothesis_data=hypothesis_data or {},
+        disease_scope=disease_scope or {},
         data_limitations=data_limitations or [],
         novelty_opportunity_legend=novelty_opportunity_legend,
     )

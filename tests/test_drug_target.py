@@ -1127,6 +1127,76 @@ class TestStage2Service:
         assert bundle_calls == [("ENSG000001", "EFO_0001", 0.1)]
         assert result["target_info"]["approvedSymbol"] == "EGFR"
 
+    def test_query_opentargets_known_drugs_separates_disease_landscape_and_target_rows(self):
+        from src.agents.drug_target.tools.stage2_service import query_opentargets_known_drugs_data
+
+        class FakeOpenTargetsModule:
+            def get_known_drugs_for_disease(self, efo_id):
+                assert efo_id == "EFO_0001"
+                return {
+                    "count": 2,
+                    "rows": [
+                        {
+                            "id": "indication-1",
+                            "maxClinicalStage": 4,
+                            "drug": {"id": "CHEMBL1", "name": "Drug A"},
+                        },
+                        {
+                            "id": "indication-2",
+                            "maxClinicalStage": 3,
+                            "drug": {"id": "CHEMBL2", "name": "Drug B"},
+                        },
+                    ],
+                }
+
+        stage2_evidence = {
+            "EGFR": {
+                "opentargets": {
+                    "ensembl_id": "ENSG000001",
+                    "target_info": {"approvedSymbol": "EGFR"},
+                    "target_drugs": {
+                        "rows": [
+                            {
+                                "maxClinicalStage": 4,
+                                "drug": {"id": "CHEMBL1", "name": "Drug A"},
+                                "diseases": [
+                                    {
+                                        "diseaseFromSource": "Lung cancer",
+                                        "disease": {"id": "EFO_0001", "name": "lung cancer"},
+                                    }
+                                ],
+                            },
+                            {
+                                "maxClinicalStage": 2,
+                                "drug": {"id": "CHEMBL9", "name": "Other Drug"},
+                                "diseases": [
+                                    {
+                                        "diseaseFromSource": "Melanoma",
+                                        "disease": {"id": "EFO_0002", "name": "melanoma"},
+                                    }
+                                ],
+                            },
+                        ]
+                    },
+                }
+            }
+        }
+
+        result = query_opentargets_known_drugs_data(
+            "lung cancer",
+            mod=FakeOpenTargetsModule(),
+            disease_context={"efo_id": "EFO_0001"},
+            stage2_evidence=stage2_evidence,
+        )
+
+        assert result["executed"] is True
+        assert result["disease_landscape"]["count"] == 2
+        assert result["drugs"]["uniqueDrugs"] == 1
+        assert result["drugs"]["uniqueTargets"] == 1
+        assert result["drugs"]["rows"] == result["target_linked_rows"]
+        assert result["drugs"]["rows"][0]["target"]["approvedSymbol"] == "EGFR"
+        assert result["drugs"]["rows"][0]["drug"]["id"] == "CHEMBL1"
+
     def test_build_stage2_gene_panel_reuses_gwas_disease_context_once(self):
         import src.agents.drug_target.tools.stage2_service as mod
 

@@ -253,6 +253,7 @@ def _classify_hypothesis_scope_file(
 
     Actions:
       - "full"      : load full JSON content
+      - "contrast"  : expose slim negative metadata outside support files
       - "stub_stale_stage3"
       - "stub_nonfeatured_ot"
       - "excluded"  : omit from files dict (record in excluded_files)
@@ -284,10 +285,46 @@ def _classify_hypothesis_scope_file(
         if passed is True:
             return "full", None
         if passed is False:
-            return "excluded", "failed Stage 1 pair; not valid hypothesis input"
+            return "contrast", "failed Stage 1 pair; negative contrast metadata only"
         return "excluded", "Stage 1 pair missing from filter results; not valid hypothesis input"
 
     return "fallback", None
+
+
+def _stage1_failed_contrast_metadata(
+    filename: str,
+    data: object,
+    filter_metadata: dict[str, dict],
+) -> dict:
+    match = _STAGE1_PAIR_NAME_RE.match(filename)
+    ligand = match.group(1).upper() if match else ""
+    receptor = match.group(2).upper() if match else ""
+    pair_key = f"{ligand}--{receptor}" if ligand and receptor else ""
+    row = filter_metadata.get(pair_key, {})
+    source = row if row else data if isinstance(data, dict) else {}
+    failed_criteria = source.get("failed_criteria", [])
+    if not isinstance(failed_criteria, list):
+        failed_criteria = [str(failed_criteria)] if failed_criteria else []
+    reason = (
+        source.get("reason")
+        or source.get("failure_reason")
+        or source.get("failed_reason")
+        or "failed Stage 1 filter"
+    )
+    return {
+        "filename": filename,
+        "role": "negative_contrast",
+        "eligible_as_support": False,
+        "ligand": ligand,
+        "receptor": receptor,
+        "pair_key": pair_key,
+        "passed": False,
+        "failed_criteria": failed_criteria,
+        "reason": str(reason),
+        "citation_policy": (
+            "metadata-only negative contrast; do not cite as primary/support evidence"
+        ),
+    }
 
 
 @tool
@@ -313,7 +350,9 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
               * stage3_<GENE>.json full content only for current featured set
                 (stale prior-run files are stubbed).
               * stage1_<L>--<R>.json full content only for PASSED pairs.
-                FAILED pairs and unclassified pairs are excluded from ``files``.
+                FAILED pairs are excluded from ``files`` and exposed only as
+                slim ``contrast_evidence`` metadata; unclassified pairs are
+                excluded.
               * Legacy aggregates (stage1_audit/confidence/evidence) and
                 prior-run outputs (hypothesis_report, target_assessment) are
                 excluded entirely (not in ``files``, listed under
@@ -338,8 +377,10 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
         "evidence_dir": str(evidence_dir),
         "scope": scope,
         "files": {},
+        "contrast_evidence": {},
         "excluded_files": [],
         "file_count": 0,
+        "contrast_count": 0,
         "total_size_bytes": 0,
         "errors": [],
     }
@@ -351,6 +392,7 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
     hypothesis_scope = (scope or "all").lower() == "hypothesis"
     featured: set[str] = set()
     filter_map: dict[str, bool] = {}
+    filter_metadata: dict[str, dict] = {}
 
     if hypothesis_scope:
         featured, feat_err = _load_featured_set(evidence_dir)
@@ -374,6 +416,7 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
                 "Stage 1 pair files are hidden until pass/fail eligibility is available."
             )
             return json.dumps(result, indent=2)
+        filter_metadata = _load_stage1_filter_results_metadata(evidence_dir)
 
     for path in sorted(evidence_dir.glob("*.json")):
         name = path.name
@@ -403,7 +446,15 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
             result["errors"].append(f"Failed to load {name}: {e}")
             continue
 
-        if action == "full":
+        if action == "contrast":
+            result["contrast_evidence"][name] = _stage1_failed_contrast_metadata(
+                name,
+                data,
+                filter_metadata,
+            )
+            result["excluded_files"].append({"name": name, "reason": reason or ""})
+            result["contrast_count"] += 1
+        elif action == "full":
             result["files"][name] = data
         elif action == "stub_stale_stage3" or action == "stub_nonfeatured_ot":
             stub: dict = {"size_bytes": size_bytes, "_note": reason or ""}
@@ -416,8 +467,9 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
             else:
                 result["files"][name] = _size_metadata_summary(data, size_bytes, CONTENT_SIZE_LIMIT)
 
-        result["file_count"] += 1
-        result["total_size_bytes"] += size_bytes
+        if action != "contrast":
+            result["file_count"] += 1
+            result["total_size_bytes"] += size_bytes
 
     return json.dumps(result, indent=2)
 
@@ -521,6 +573,22 @@ def _stage1_filter_rows_to_map(rows: object) -> dict[str, bool]:
     }
 
 
+def _stage1_filter_rows_to_metadata(rows: object) -> dict[str, dict]:
+    """Return normalized Stage 1 row metadata keyed by ``<LIGAND>--<RECEPTOR>``."""
+    if not isinstance(rows, list):
+        return {}
+    out: dict[str, dict] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        ligand = str(row.get("ligand") or "").strip().upper()
+        receptor = str(row.get("receptor") or "").strip().upper()
+        if not ligand or not receptor:
+            continue
+        out[f"{ligand}--{receptor}"] = row
+    return out
+
+
 def _load_stage1_filter_results_status(evidence_dir: Path) -> tuple[dict[str, bool], str | None]:
     """Return Stage 1 pass/fail map plus a parse/presence error, if any."""
     json_path = evidence_dir / "stage1_filter_results.json"
@@ -546,6 +614,27 @@ def _load_stage1_filter_results_status(evidence_dir: Path) -> tuple[dict[str, bo
         except Exception as exc:
             return {}, f"Failed to parse stage1_filter_results.csv: {exc}"
     return {}, "stage1_filter_results.json or stage1_filter_results.csv not found"
+
+
+def _load_stage1_filter_results_metadata(evidence_dir: Path) -> dict[str, dict]:
+    """Return raw Stage 1 filter rows keyed by pair, best-effort."""
+    json_path = evidence_dir / "stage1_filter_results.json"
+    if json_path.exists():
+        try:
+            return _stage1_filter_rows_to_metadata(
+                json.loads(json_path.read_text(encoding="utf-8"))
+            )
+        except Exception:
+            return {}
+    csv_path = evidence_dir / "stage1_filter_results.csv"
+    if csv_path.exists():
+        import csv as _csv
+        try:
+            with open(csv_path, encoding="utf-8") as _f:
+                return _stage1_filter_rows_to_metadata(list(_csv.DictReader(_f)))
+        except Exception:
+            return {}
+    return {}
 
 
 def _load_stage1_filter_results(evidence_dir: Path) -> dict[str, bool]:
@@ -1436,8 +1525,8 @@ def check_hypothesis_completion(data_dir: str) -> str:
             "hypothesis_complete": False,
             "recommendation": (
                 "hypothesis_report.json not found. hypothesis_writer may have failed. "
-                "Proceed to summarizer — it will generate the report without hypotheses. "
-                "Section 4 will note that hypothesis generation was not completed."
+                "Do not proceed to summarizer for production output; retry hypothesis_writer "
+                "or fail the hypothesis stage so Section 4 is not silently skipped."
             ),
         }, indent=2)
 
@@ -1452,5 +1541,8 @@ def check_hypothesis_completion(data_dir: str) -> str:
     except Exception as e:
         return json.dumps({
             "hypothesis_complete": False,
-            "recommendation": f"hypothesis_report.json exists but is invalid: {e}",
+            "recommendation": (
+                f"hypothesis_report.json exists but is invalid: {e}. "
+                "Retry hypothesis_writer or fail the hypothesis stage before summarizer."
+            ),
         }, indent=2)

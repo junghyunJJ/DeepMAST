@@ -59,7 +59,11 @@ Call load_evidence_files(data_dir="{data_dir}")
 Then prepare a structured `report_expansions.json` payload. For each
 `&lt;!-- EXPAND: {instruction} --&gt;` marker, write 2-4 sentences following the
 instruction. Reference ONLY data visible in the SAME section of the draft and
-include source provenance for factual sentences.
+include source provenance for factual sentences. Source annotations must be
+class-qualified for ambiguous drug fields, e.g.
+`[source: opentargets_clinical:clinical_drugs]` or
+`[source: chembl_preclinical:preclinical_compounds]`, not the generic
+`[source: clinical_drugs]`.
 
 ### Step 3: Save and Validate
 ```

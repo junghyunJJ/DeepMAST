@@ -1690,6 +1690,110 @@ def _resolve_chembl_drug(chembl_id: str) -> dict:
     return result
 
 
+def _indication_dedup_key(indication: Any) -> str:
+    if isinstance(indication, dict):
+        for key in (
+            "efo_term",
+            "mesh_heading",
+            "disease",
+            "disease_name",
+            "indication",
+            "label",
+            "name",
+        ):
+            value = indication.get(key)
+            if value:
+                return re.sub(r"\s+", " ", str(value).strip().casefold())
+        return json.dumps(indication, sort_keys=True, default=str).casefold()
+    return re.sub(r"\s+", " ", str(indication or "").strip().casefold())
+
+
+def _dedupe_indications(indications: list[Any] | Any) -> list[Any]:
+    """Drop blank/duplicate indications while preserving first spelling/order."""
+    if indications is None:
+        return []
+    if not isinstance(indications, list):
+        indications = [indications]
+    result: list[Any] = []
+    seen: set[str] = set()
+    for indication in indications:
+        if isinstance(indication, str):
+            cleaned: Any = re.sub(r"\s+", " ", indication.strip())
+        else:
+            cleaned = indication
+        key = _indication_dedup_key(cleaned)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        result.append(cleaned)
+    return result
+
+
+def _stage1_row_pair_key(row: dict[str, Any]) -> str:
+    ligand = str(row.get("ligand", "")).strip().upper()
+    receptor = str(row.get("receptor", "")).strip().upper()
+    return f"{ligand}^{receptor}" if ligand and receptor else ""
+
+
+def _stage1_row_passed(row: dict[str, Any], stage1_passed: dict[str, bool]) -> bool:
+    key = _stage1_row_pair_key(row)
+    if not key:
+        return False
+    ligand, receptor = key.split("^", 1)
+    return stage1_passed.get(key, stage1_passed.get(f"{receptor}^{ligand}", False))
+
+
+def _stage1_row_pathway_for_gene(row: dict[str, Any], gene: str) -> str:
+    gene_upper = gene.upper()
+    ligand = str(row.get("ligand", "")).strip().upper()
+    receptor = str(row.get("receptor", "")).strip().upper()
+    kegg = row.get("kegg_pathways", {})
+    if not isinstance(kegg, dict):
+        return ""
+    preferred_keys = (
+        ("receptor_pathways", "ligand_pathways")
+        if gene_upper == receptor
+        else ("ligand_pathways", "receptor_pathways")
+        if gene_upper == ligand
+        else ("receptor_pathways", "ligand_pathways")
+    )
+    for key in preferred_keys:
+        pathways = kegg.get(key, [])
+        if pathways:
+            return pathways[0] if isinstance(pathways[0], str) else str(pathways[0])
+    return ""
+
+
+def _select_stage1_representative_context(
+    gene: str,
+    stage1_data: dict[str, dict],
+    stage1_passed: dict[str, bool],
+) -> dict[str, Any]:
+    """Pick one representative Stage 1 row, preferring PASSED evidence."""
+    gene_upper = gene.upper()
+    candidates: list[tuple[bool, float, dict[str, Any]]] = []
+    for s1_val in stage1_data.values():
+        if not isinstance(s1_val, dict):
+            continue
+        s1_lig = str(s1_val.get("ligand", "")).strip().upper()
+        s1_rec = str(s1_val.get("receptor", "")).strip().upper()
+        if gene_upper not in (s1_lig, s1_rec):
+            continue
+        ppi = s1_val.get("string_ppi", {})
+        score = 0.0
+        if isinstance(ppi, dict):
+            score = _to_float(ppi.get("max_combined_score", 0.0), 0.0)
+        candidates.append((_stage1_row_passed(s1_val, stage1_passed), score, s1_val))
+    if not candidates:
+        return {"string_ppi_score": 0.0, "primary_kegg_pathway": "No pathway data"}
+    passed, score, row = max(candidates, key=lambda item: (item[0], item[1]))
+    del passed
+    return {
+        "string_ppi_score": score,
+        "primary_kegg_pathway": _stage1_row_pathway_for_gene(row, gene) or "No pathway data",
+    }
+
+
 def _prebuild_target_assessment(
     data_dir_path: Path,
     evidence_dir: Path,
@@ -1897,22 +2001,11 @@ def _prebuild_target_assessment(
     for gene in candidate_genes:
 
         s3 = stage3_data.get(gene, {})
-        # Find stage1 context for this gene
-        string_score = 0.0
-        kegg_pathway = ""
-        for s1_val in stage1_data.values():
-            if not isinstance(s1_val, dict):
-                continue
-            s1_lig = str(s1_val.get("ligand", "")).strip().upper()
-            s1_rec = str(s1_val.get("receptor", "")).strip().upper()
-            if gene.upper() not in (s1_lig, s1_rec):
-                continue
-            ppi = s1_val.get("string_ppi", {})
-            string_score = max(string_score, ppi.get("max_combined_score", 0.0))
-            kegg = s1_val.get("kegg_pathways", {})
-            rec_pws = kegg.get("receptor_pathways", [])
-            if rec_pws and not kegg_pathway:
-                kegg_pathway = rec_pws[0] if isinstance(rec_pws[0], str) else str(rec_pws[0])
+        stage1_context = _select_stage1_representative_context(
+            gene,
+            stage1_data,
+            stage1_passed,
+        )
 
         featured_deep_dive.append({
             "target_gene": gene,
@@ -1929,8 +2022,8 @@ def _prebuild_target_assessment(
                 ),
             },
             "stage1_biological_context": {
-                "string_ppi_score": string_score,
-                "primary_kegg_pathway": kegg_pathway or "No pathway data",
+                "string_ppi_score": stage1_context["string_ppi_score"],
+                "primary_kegg_pathway": stage1_context["primary_kegg_pathway"],
             },
         })
 
@@ -2063,6 +2156,7 @@ def build_evidence_summary(data_dir: str) -> str:
             indications = d.get("indications", [])
             if not indications and d.get("indication"):
                 indications = [d.get("indication")]
+            indications = _dedupe_indications(indications)
             drugs.append({
                 "chembl_id": d.get("chembl_id") or d.get("molecule_chembl_id", ""),
                 "drug_name": d.get("drug_name") or d.get("name") or d.get("pref_name", ""),
@@ -2093,6 +2187,7 @@ def build_evidence_summary(data_dir: str) -> str:
                         dname = dis.get("disease", {}).get("name", "")
                         if dname:
                             indications.append(dname)
+                    indications = _dedupe_indications(indications)
                     clinical_drugs.append({
                         "chembl_id": chembl_id,
                         "drug_name": resolved["name"],
@@ -2361,6 +2456,7 @@ def build_evidence_summary(data_dir: str) -> str:
         stage1_data=stage1_data,
         stage1_filter_results=stage1_filter_results,
         hypothesis_data=hypothesis_data,
+        disease_scope=disease_scope,
         data_limitations=data_limitations,
         novelty_opportunity_legend=NOVELTY_OPPORTUNITY_LEGEND,
     )
@@ -2803,6 +2899,8 @@ def _check_wrong_approval_year_extended(
     resolved_drugs: list[dict],
 ) -> list[dict]:
     """T5: Extended WRONG_APPROVAL_YEAR — also fires when drug absent or first_approval null."""
+    if "first_approval" in line.casefold() and "[source:" in line.casefold():
+        return []
     findings: list[dict] = []
     resolved_lookup: dict[str, dict] = {
         (d.get("name") or "").strip().casefold(): d
@@ -2850,14 +2948,25 @@ def _check_ungrounded_mechanism(
     if not _EXPAND_SENTENCE_END_RE.search(line.strip()):
         return []
     # Carve-out: sentence has explicit [source: mechanism_of_action] annotation
-    if "[source: mechanism_of_action]" in line.casefold():
+    if re.search(r"\[source:[^\]]*(?:^|[:,\s])mechanism_of_action(?:\]|[,\s])", line.casefold()):
         return []
     findings: list[dict] = []
     tokens = re.findall(r"\b\w[\w-]*\b", line)
+
+    def is_drug_token(token: str) -> bool:
+        folded = token.casefold()
+        return (
+            folded in moa_map
+            or (
+                folded not in drug_allowlist
+                and re.fullmatch(r"DRUG_[A-Z0-9]+", token) is not None
+            )
+        )
+
     drug_positions: list[tuple[int, str]] = [
         (i, tok.casefold())
         for i, tok in enumerate(tokens)
-        if tok.casefold() in drug_allowlist and tok.casefold() in moa_map
+        if is_drug_token(tok)
     ]
     if not drug_positions:
         return []
@@ -2922,7 +3031,7 @@ def _check_unanchored_sentence(
         return []
     findings: list[dict] = []
     annotations = [
-        field.strip()
+        field.strip().rsplit(":", 1)[-1].strip()
         for annotation in _ANNOTATION_RE.findall(line)
         for field in annotation.split(",")
         if field.strip()

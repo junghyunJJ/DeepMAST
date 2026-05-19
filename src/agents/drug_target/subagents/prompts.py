@@ -327,10 +327,12 @@ failed pair file is not cited directly.
 
 Rules:
 - PASSED pair: reference normally as validated evidence when its file appears in `files`.
-- FAILED pair: NOT ALLOWED as hypothesis evidence. Drop the hypothesis or rebuild it
-  on a PASSED pair or gene-level Stage 3 evidence.
-- Do NOT cite failed pair files, do not add suffix markers, and do not describe a
-  failed pair as STRING/Census support.
+- FAILED pair: may appear only under `contrast_evidence` as metadata-only
+  negative contrast. It is not support evidence.
+- Do NOT put failed pair files in `evidence_references`, do NOT add suffix
+  markers, and do NOT describe a failed pair as STRING/Census support.
+- If you preserve a failed pair at all, put the filename only in
+  `contrast_references` or `evidence_reference_details` with `usage="contrast"`.
 - A single gene from a failed pair may still be used when supported by passed pair
   evidence or Stage 3 gene evidence; do not make the failed L-R axis the mechanism.
 
@@ -464,6 +466,8 @@ Rules:
 - For Stage 1 pair citations, use only filenames returned in
   `eligible_stage1_pair_files` (or equivalently the full-content Stage 1 files
   from `load_evidence_files(..., scope="hypothesis")`).
+- Failed Stage 1 entries under `contrast_evidence` are metadata-only negative
+  context. They are never valid entries in `evidence_references`.
 - Stage 1 L-R pair files use the convention `stage1_<LIG>--<REC>.json` with
   TWO HYPHENS between the ligand and receptor. A single-underscore form
   such as `stage1_CD4_ITGB2.json` is NOT produced by the pipeline and will
@@ -615,10 +619,14 @@ section for the full anti-hallucination checklist.
 Every prose sentence inside `<!-- EXPAND -->` regions MUST carry a source
 annotation at the end of the sentence using this format:
 
-    [source: <field_name>]
+    [source: <source_class>:<field_name>]
 
 Guidelines:
-- Multiple fields allowed: `[source: first_approval, mechanism_of_action]`
+- Multiple fields allowed when each label is class-qualified:
+  `[source: opentargets_clinical:first_approval, chembl_preclinical:mechanism_of_action]`
+- Do not use generic ambiguous tags such as `[source: clinical_drugs]`; use
+  `[source: opentargets_clinical:clinical_drugs]` or
+  `[source: chembl_preclinical:preclinical_compounds]` as appropriate.
 - `[source: interpretation]` is permitted ONLY when the sentence uses hedged
   language: "suggests", "indicates", "consistent with", or "implies".
 - Annotations are for validator/critic use only; they are stripped post-validation.
@@ -908,7 +916,7 @@ Each section has its own data source. Using the wrong source causes fabrication.
 | Drug Profile | Allowlist UNION of `resolved_drugs.json[*].name` (OpenTargets-sourced) + `stage3_<gene>.json[*].matched_drugs[*].name` (ChEMBL clinical) + `stage3_<gene>.json[*].preclinical_compounds[*].name`. Cite the source file per drug. | "No known drugs identified in ChEMBL or OpenTargets" — only after confirming the UNION is empty |
 
 **Drug Profile coverage rule (D3):** For each featured candidate, list every drug name from the union of `resolved_drugs.json[*].name` (entries that reference this gene), `stage3_<gene>.json[*].matched_drugs[*].name`, and `stage3_<gene>.json[*].preclinical_compounds[*].name`. Cite the source file per drug. If the union is empty, write `"No known drugs targeting this gene"`. Do NOT default to "No known drugs" just because `stage3.matched_drugs` is empty — check `resolved_drugs.json` first.
-| Biological Context | Reference Card `stage1_pairs` (STRING, Census) | "No Stage 1 biological context data available" |
+| Biological Context | Reference Card `stage1_pairs` (STRING, Census); failed Stage 1 pairs only as negative contrast or limitations when explicitly present | "No Stage 1 biological context data available" |
 | Rubric Assessment | Reference Card `rubric` (COPY integers verbatim) | N/A — always present |
 
 ### Hallucination Prevention (observed failures → rules)
@@ -926,6 +934,7 @@ because the LLM lacks access to the full scoring pipeline.
 | Table columns | Invented new columns | Use only pre-built columns | Do not add OT/ST score columns |
 | Cross-references | Cited data from other gene sections | Only reference data in the SAME section | Verify each section uses only its own gene's data |
 | File references | `[from known_drugs.json]` — file does not exist in `evidence_dir`; or `stage1_HLA-DPA1--CD4.json_FAILED` — `_FAILED` suffix is never valid in drug.md | Bracket forms `[from <file>.json]` and bare `stageN_*.json` references must point to a file present in `evidence_dir`; `*_FAILED` suffix is always a P0 error; carve-outs: matches inside fenced code blocks and matches inside the pre-filled "Evidence References" section are exempt | Reference only files that exist in `evidence_dir`; cite by exact filename; strip any `_FAILED` suffix before referencing |
+| Failed Stage 1 contrast | Failed pair used as therapeutic support | Failed Stage 1 pairs can appear only as negative evidence, filters, limitations, or excluded axes; never as support for a recommendation | Keep failed-pair discussion brief and explicitly negative/contrast; do not cite it in support fields |
 
 ### EXPAND Marker Rules
 - Replace each `<!-- EXPAND: {instruction} -->` with 2-4 sentences
@@ -1285,10 +1294,15 @@ SUBAGENT_PROMPTS = {
     "summarizer": SUMMARIZER_PROMPT,
     # Retained pending reader migration — see canonical comment above REPORT_WRITER_PROMPT.
     "report_writer": REPORT_WRITER_PROMPT,
-    # "critic" key removed (task #9): the new pre-save critic gate is owned by
-    # subagents/critic/agent.py (get_critic_subagent). The legacy prompt is
-    # preserved as LEGACY_CRITIC_PROMPT_PERSISTED_REPORT below for the
-    # validate_drug_report_finalization(require_critic=True) path only.
+    # Compatibility registry shim for older tests/readers. The executable
+    # pre-save critic prompt is owned by subagents/critic/agent.py
+    # (get_critic_subagent); this entry intentionally exposes only the new
+    # envelope vocabulary, not the legacy claim/verdict schema.
+    "critic": (
+        "Critic prompt lives in subagents/critic/agent.py and emits JSON with "
+        "valid, findings, findings_count, payload_hash, finding_type, slot_ids, "
+        "sentence, reason, and repair_instruction."
+    ),
 }
 
 __all__ = [

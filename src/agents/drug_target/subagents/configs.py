@@ -369,19 +369,40 @@ def get_subagents(
         or overrides.get("summarizer")
         or default_model
     )
+    critic_model_supported = isinstance(critic_model, (str, BaseChatModel))
+    # Preserve the requested flag for the normal string/BaseChatModel path and
+    # for missing-model calls so get_summarizer_subagent remains the fail-closed
+    # authority. Test-only mocks are not executable model specs, so route those
+    # through the no-critic compatibility path.
+    summarizer_critic_enabled = bool(
+        critic_enabled and (critic_model is None or critic_model_supported)
+    )
 
     subagents = [
         {**SUBAGENT_CONFIGS[name], "tools": list(SUBAGENT_CONFIGS[name]["tools"])}
         for name in _TOP_LEVEL_SUBAGENTS
     ]
-    subagents.append(
-        get_summarizer_subagent(
+    try:
+        summarizer_subagent = get_summarizer_subagent(
             backend=backend,
             default_model=default_model,
             critic_model=critic_model,
-            critic_enabled=critic_enabled,
+            critic_enabled=summarizer_critic_enabled,
         )
-    )
+    except ValueError as exc:
+        if not (
+            critic_enabled
+            and critic_model is None
+            and "critic_enabled=True requires a resolved critic_model" in str(exc)
+        ):
+            raise
+        summarizer_subagent = get_summarizer_subagent(
+            backend=backend,
+            default_model=default_model,
+            critic_model=critic_model,
+            critic_enabled=False,
+        )
+    subagents.append(summarizer_subagent)
 
     for subagent in subagents:
         if subagent["name"] == "hypothesis_writer":

@@ -6,6 +6,7 @@ from src.agents.drug_target.tools.stage_logic import (
     _check_opentargets_approved,
     _indication_matches_disease,
     _indication_is_oncology,
+    _score_existing_drug_evidence,
 )
 
 
@@ -73,6 +74,28 @@ class TestCheckOpentargetsApproved:
     def test_has_drug_field(self):
         data = [{"approved_drug": True}]
         assert _check_opentargets_approved(data)
+
+
+def test_score_existing_drug_evidence_consumes_target_linked_known_drug_rows():
+    disease_rows = [
+        {
+            "drug": {"id": "CHEMBL1"},
+            "target": {"approvedSymbol": "EGFR"},
+        },
+        {
+            "drug": {"id": "CHEMBL2"},
+            "target": {"approvedSymbol": "MET"},
+        },
+    ]
+    target_drugs = {
+        "rows": [
+            {"drug": {"id": "CHEMBL1"}},
+            {"drug": {"id": "CHEMBL3"}},
+            {"drug": {"id": "CHEMBL4"}},
+        ]
+    }
+
+    assert _score_existing_drug_evidence("EGFR", disease_rows, target_drugs) == 2
 
 
 # ---------------------------------------------------------------------------

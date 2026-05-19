@@ -100,7 +100,12 @@ def _canonical_entities(raw: Any) -> dict[str, list[str]]:
     return out
 
 
-def _canonical_reference_detail(ref: Any, evidence_dir: Path) -> dict | None:
+def _canonical_reference_detail(
+    ref: Any,
+    evidence_dir: Path,
+    *,
+    allow_failed_marker_contrast: bool,
+) -> dict | None:
     if isinstance(ref, dict):
         display = str(ref.get("display_reference") or ref.get("filename") or "").strip()
         usage = ref.get("usage")
@@ -116,14 +121,26 @@ def _canonical_reference_detail(ref: Any, evidence_dir: Path) -> dict | None:
     failed_marker = ".json_FAILED" in display
     status = _stage1_status(filename, evidence_dir)
     if usage not in {"primary", "supporting", "contrast"}:
-        usage = "contrast" if failed_marker else "primary"
-    detail_display = f"{filename}_FAILED" if usage == "contrast" and status == "failed" else filename
+        usage = "contrast" if failed_marker and allow_failed_marker_contrast else "primary"
+    display_reference = filename
+    if failed_marker and usage != "contrast":
+        display_reference = f"{filename}_FAILED"
     return {
         "filename": filename,
         "usage": usage,
         "stage1_pair_status": status,
-        "display_reference": detail_display,
+        "display_reference": display_reference,
     }
+
+
+def _clean_contrast_reference(ref: Any) -> str | None:
+    display = str(ref).strip()
+    if not display:
+        return None
+    match = _JSON_REF_RE.search(display)
+    if not match:
+        return None
+    return match.group(1)
 
 
 def _validate_scores(hyp: dict, *, strict: bool, errors: list[str], index: int) -> dict:
@@ -192,26 +209,42 @@ def canonicalize_hypothesis_report(
 
         hyp["biological_entities"] = _canonical_entities(hyp.get("biological_entities"))
         hyp["scores"] = _validate_scores(hyp, strict=not legacy_compat, errors=errors, index=idx)
-        hyp.setdefault("contrast_references", [])
+        existing_contrast = [
+            cleaned
+            for ref in hyp.get("contrast_references", [])
+            if (cleaned := _clean_contrast_reference(ref)) is not None
+        ]
 
         raw_details = hyp.get("evidence_reference_details")
-        if not isinstance(raw_details, list):
+        allow_failed_marker_contrast = isinstance(raw_details, list)
+        if not allow_failed_marker_contrast:
             raw_details = hyp.get("evidence_references", [])
         if not isinstance(raw_details, list):
             raw_details = []
         details = [
             detail
             for ref in raw_details
-            if (detail := _canonical_reference_detail(ref, evidence_dir)) is not None
+            if (
+                detail := _canonical_reference_detail(
+                    ref,
+                    evidence_dir,
+                    allow_failed_marker_contrast=allow_failed_marker_contrast,
+                )
+            )
+            is not None
         ]
         hyp["evidence_reference_details"] = details
-        hyp["evidence_references"] = [d["display_reference"] for d in details]
+        hyp["evidence_references"] = [
+            d["display_reference"]
+            for d in details
+            if d["usage"] != "contrast"
+        ]
         contrast = [
             d["display_reference"]
             for d in details
-            if d["usage"] == "contrast" and d["display_reference"] not in hyp["contrast_references"]
+            if d["usage"] == "contrast" and d["display_reference"] not in existing_contrast
         ]
-        hyp["contrast_references"] = list(hyp["contrast_references"]) + contrast
+        hyp["contrast_references"] = existing_contrast + contrast
 
     gap_analysis = canonical.get("gap_analysis")
     if not isinstance(gap_analysis, dict):

@@ -23,6 +23,7 @@ import pytest
 from src.agents.drug_target.subagents.configs import (
     filter_hypothesis_evidence_files,
 )
+from src.agents.drug_target.tools import load_evidence_files
 
 
 def _write_evidence(
@@ -284,3 +285,67 @@ def test_filters_both_keys_in_same_hypothesis(tmp_path: Path) -> None:
     h = rewritten["hypotheses"][0]
     assert h["evidence_files"] == ["stage3_TGFB1.json"]
     assert h["evidence_references"] == ["stage3_TGFB1.json"]
+
+
+def test_load_hypothesis_scope_exposes_failed_stage1_as_contrast_only(
+    tmp_path: Path,
+) -> None:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps({"stage3_candidates": [{"gene": "FN1"}, {"gene": "CD4"}]}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage1_filter_results.json").write_text(
+        json.dumps(
+            [
+                {"ligand": "FN1", "receptor": "CD4", "passed": True},
+                {
+                    "ligand": "FN1",
+                    "receptor": "PLAUR",
+                    "passed": False,
+                    "failed_criteria": ["census_coexpression_p_value"],
+                    "reason": "insufficient coexpression",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage1_FN1--CD4.json").write_text(
+        json.dumps({"payload": "full passed support evidence"}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage1_FN1--PLAUR.json").write_text(
+        json.dumps(
+            {
+                "payload": "must not be exposed",
+                "ligand": "FN1",
+                "receptor": "PLAUR",
+                "passed": False,
+                "failed_criteria": ["census_coexpression_p_value"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage3_FN1.json").write_text("{}", encoding="utf-8")
+    (evidence_dir / "stage3_CD4.json").write_text("{}", encoding="utf-8")
+
+    result = json.loads(
+        load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "hypothesis"})
+    )
+
+    assert "stage1_FN1--CD4.json" in result["files"]
+    assert "stage1_FN1--PLAUR.json" not in result["files"]
+    assert result["contrast_evidence"]["stage1_FN1--PLAUR.json"] == {
+        "filename": "stage1_FN1--PLAUR.json",
+        "role": "negative_contrast",
+        "eligible_as_support": False,
+        "ligand": "FN1",
+        "receptor": "PLAUR",
+        "pair_key": "FN1--PLAUR",
+        "passed": False,
+        "failed_criteria": ["census_coexpression_p_value"],
+        "reason": "insufficient coexpression",
+        "citation_policy": "metadata-only negative contrast; do not cite as primary/support evidence",
+    }
+    assert "_FAILED" not in json.dumps(result["contrast_evidence"])

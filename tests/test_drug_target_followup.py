@@ -79,6 +79,38 @@ def test_a1_graphql_count_parsed_dict_shape() -> None:
     assert out == {"associations": [], "api_total_count": None}
 
 
+def test_known_drugs_disease_query_uses_current_drug_candidates_schema() -> None:
+    qot = _load_qot()
+    captured = {}
+
+    def fake_execute(query, variables):
+        captured["query"] = query
+        captured["variables"] = variables
+        return {
+            "disease": {
+                "drugAndClinicalCandidates": {
+                    "count": 1,
+                    "rows": [
+                        {
+                            "id": "candidate-1",
+                            "maxClinicalStage": 4,
+                            "drug": {"id": "CHEMBL1", "name": "Drug A"},
+                        }
+                    ],
+                }
+            }
+        }
+
+    qot.execute_query = fake_execute
+
+    out = qot.get_known_drugs_for_disease("EFO_0001")
+
+    assert captured["variables"] == {"efoId": "EFO_0001"}
+    assert "knownDrugs" not in captured["query"]
+    assert "drugAndClinicalCandidates" in captured["query"]
+    assert out["rows"][0]["drug"]["id"] == "CHEMBL1"
+
+
 # ---------------------------------------------------------------------------
 # Commit A2 — parquet pre_head_len recorded + head cap 500
 # ---------------------------------------------------------------------------
@@ -277,6 +309,50 @@ def test_b6_schema_null_types_and_persistence(tmp_path: Path) -> None:
     assert sv["valid"] is True
     assert sv["issues_count"] == 0
     assert "source" in sv
+
+
+def test_stage1_representative_context_prefers_passed_pair_over_higher_failed_score() -> None:
+    from src.agents.drug_target.tools.stage_logic import _select_stage1_representative_context
+
+    context = _select_stage1_representative_context(
+        "CD4",
+        {
+            "failed": {
+                "ligand": "HLA-DPA1",
+                "receptor": "CD4",
+                "string_ppi": {"max_combined_score": 0.99},
+                "kegg_pathways": {"receptor_pathways": ["Failed pathway"]},
+            },
+            "passed": {
+                "ligand": "CD4",
+                "receptor": "CXCR4",
+                "string_ppi": {"max_combined_score": 0.61},
+                "kegg_pathways": {"receptor_pathways": ["Passed pathway"]},
+            },
+        },
+        {"HLA-DPA1^CD4": False, "CD4^CXCR4": True},
+    )
+
+    assert context["string_ppi_score"] == 0.61
+    assert context["primary_kegg_pathway"] == "Passed pathway"
+
+
+def test_indication_dedup_preserves_first_spelling_and_structured_records() -> None:
+    from src.agents.drug_target.tools.stage_logic import _dedupe_indications
+
+    indications = _dedupe_indications([
+        " lung cancer ",
+        "Lung Cancer",
+        {"efo_term": "Idiopathic pulmonary fibrosis", "max_phase_for_indication": 4},
+        {"efo_term": "idiopathic pulmonary fibrosis", "max_phase_for_indication": 3},
+        "",
+        None,
+    ])
+
+    assert indications == [
+        "lung cancer",
+        {"efo_term": "Idiopathic pulmonary fibrosis", "max_phase_for_indication": 4},
+    ]
 
 
 # ---------------------------------------------------------------------------

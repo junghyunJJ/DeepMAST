@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import json
+import shutil
+from pathlib import Path
 
 import pytest
 
@@ -54,6 +57,261 @@ def test_configure_ollama_port_override_noops_without_port(monkeypatch):
     assert traced.os.environ["OLLAMA_HOST"] == "http://localhost:7000"
 
 
+def test_summarizer_stream_budget_only_applies_after_summarizer_starts():
+    assert traced._is_summarizer_stream_node("report_writer > summarizer", "tools")
+    assert traced._is_summarizer_stream_node("report_writer", "summarizer")
+    assert not traced._is_summarizer_stream_node("evidence_assessor", "tools")
+
+    assert not traced._summarizer_budget_exceeded(None, 200.0, 60)
+    assert not traced._summarizer_budget_exceeded(100.0, 159.9, 60)
+    assert traced._summarizer_budget_exceeded(100.0, 160.0, 60)
+
+
+def test_hypothesis_stream_budget_only_applies_after_hypothesis_writer_starts():
+    assert traced._is_hypothesis_writer_stream_node(
+        "tools > task > hypothesis_writer",
+        "model",
+    )
+    assert traced._is_hypothesis_writer_stream_node("tools > task", "hypothesis_writer")
+    assert not traced._is_hypothesis_writer_stream_node("report_writer", "summarizer")
+
+
+def test_evidence_ready_for_hypothesis_requires_stage3_candidates_and_files(tmp_path):
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps({"stage3_candidates": [{"gene": "MUC1"}, {"gene": "FN1"}]}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage1_filter_results.json").write_text("[]", encoding="utf-8")
+    (evidence_dir / "stage3_MUC1.json").write_text("{}", encoding="utf-8")
+
+    assert traced._evidence_ready_for_hypothesis(tmp_path) is False
+
+    (evidence_dir / "stage3_FN1.json").write_text("{}", encoding="utf-8")
+
+    assert traced._evidence_ready_for_hypothesis(tmp_path) is True
+
+
+def test_artifact_predates_run_when_mtime_is_older(tmp_path):
+    artifact = tmp_path / "artifact.json"
+    artifact.write_text("{}", encoding="utf-8")
+
+    assert traced._artifact_predates_run(artifact, artifact.stat().st_mtime + 1)
+    assert not traced._artifact_predates_run(artifact, artifact.stat().st_mtime - 1)
+    assert traced._artifact_predates_run(tmp_path / "missing.json", 0)
+
+
+def test_host_hypothesis_fallback_rewrites_failed_suffix_fixture(tmp_path):
+    fixture_evidence = (
+        Path(__file__).resolve().parent
+        / "agents"
+        / "drug_target"
+        / "fixtures"
+        / "baseline_hallucinated"
+        / "evidence"
+    )
+    shutil.copytree(fixture_evidence, tmp_path / "evidence")
+    stale = (tmp_path / "evidence" / "hypothesis_report.json").read_text(
+        encoding="utf-8"
+    )
+    assert "_FAILED" in stale
+    trace_log = tmp_path / "trace.log"
+    trace_log.write_text("", encoding="utf-8")
+
+    result = traced._run_host_hypothesis_fallback(
+        tmp_path,
+        "idiopathic pulmonary fibrosis",
+        trace_log,
+    )
+
+    assert result["saved"] is True, result
+    saved = json.loads((tmp_path / "evidence" / "hypothesis_report.json").read_text())
+    assert saved["host_finalized"] is True
+    assert saved["fallback_quality"] == "degraded"
+    assert "_FAILED" not in json.dumps(saved)
+
+    candidates = {
+        row["gene"].upper()
+        for row in json.loads(
+            (tmp_path / "evidence" / "assessment_results.json").read_text()
+        )["stage3_candidates"]
+    }
+    covered = {
+        gene.upper()
+        for hyp in saved["hypotheses"]
+        for gene in hyp["biological_entities"]["genes"]
+    }
+    assert candidates <= covered
+
+    pass_map = {
+        f"{row['ligand'].upper()}--{row['receptor'].upper()}": bool(row["passed"])
+        for row in json.loads(
+            (tmp_path / "evidence" / "stage1_filter_results.json").read_text()
+        )
+    }
+    for hyp in saved["hypotheses"]:
+        for detail in hyp["evidence_reference_details"]:
+            filename = detail["filename"]
+            if not filename.startswith("stage1_"):
+                continue
+            pair = filename.removeprefix("stage1_").removesuffix(".json")
+            if detail["usage"] in {"primary", "supporting"}:
+                assert pass_map[pair] is True
+
+
+def test_host_hypothesis_fallback_disabled_by_default(monkeypatch):
+    monkeypatch.delenv("DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK", raising=False)
+
+    assert traced._host_hypothesis_fallback_enabled() is False
+
+
+def test_hypothesis_retry_message_invokes_hypothesis_writer_only(tmp_path):
+    message = traced._build_hypothesis_retry_message(
+        tmp_path,
+        "idiopathic pulmonary fibrosis",
+    )
+
+    assert 'task(subagent_type="hypothesis_writer"' in message
+    assert 'task(subagent_type="report_writer"' not in message
+    assert 'task(subagent_type="summarizer"' not in message
+
+
+def test_early_retry_message_runs_hypothesis_writer_before_summarizer(tmp_path):
+    message = traced._build_early_retry_message(
+        tmp_path,
+        "idiopathic pulmonary fibrosis",
+    )
+
+    evidence_idx = message.index('task(subagent_type="evidence_assessor"')
+    hypothesis_idx = message.index('task(subagent_type="hypothesis_writer"')
+    summarizer_idx = message.index('task(subagent_type="summarizer"')
+    assert evidence_idx < hypothesis_idx < summarizer_idx
+    assert 'task(subagent_type="report_writer"' not in message
+
+
+def test_runner_orders_hypothesis_retry_before_host_fallback():
+    source = Path(traced.__file__).read_text(encoding="utf-8")
+
+    assert source.index("# ── Hypothesis writer fixup") < source.index(
+        "# ── Host hypothesis fixup"
+    )
+
+
+def test_check_hypothesis_completion_requires_retry_not_summarizer(tmp_path):
+    from src.agents.drug_target.tools.evidence_loader import check_hypothesis_completion
+
+    (tmp_path / "evidence").mkdir()
+    result = json.loads(check_hypothesis_completion.invoke({"data_dir": str(tmp_path)}))
+
+    assert result["hypothesis_complete"] is False
+    assert "retry hypothesis_writer" in result["recommendation"]
+    assert "Proceed to summarizer" not in result["recommendation"]
+
+
+def test_template_expansion_fallback_uses_slot_specific_provenance(tmp_path):
+    spec = {
+        "schema_version": "report_expansions.v1",
+        "required_slot_ids": [
+            "section:preclinical|slot:screening",
+            "section:clinical|slot:approved_drugs",
+        ],
+        "example_sentence": {
+            "source_provenance": {
+                "source_file": "evidence/ot_CD4.json",
+                "source_field": "clinical_drugs",
+                "source_class": "opentargets_clinical",
+                "claim_type": "direct_value",
+                "source_value": ["ibalizumab"],
+            }
+        },
+        "valid_provenance_keys": [
+            "evidence/ot_CD4.json::clinical_drugs",
+            "evidence/stage3_CD4.json::preclinical_compounds",
+        ],
+    }
+    (tmp_path / "drug_report_reference_card.json").write_text(
+        json.dumps(
+            {
+                "provenance_index": {
+                    "evidence/ot_CD4.json::clinical_drugs": {
+                        "source_file": "evidence/ot_CD4.json",
+                        "source_field": "clinical_drugs",
+                        "source_class": "opentargets_clinical",
+                        "source_value": ["ibalizumab"],
+                    },
+                    "evidence/stage3_CD4.json::preclinical_compounds": {
+                        "source_file": "evidence/stage3_CD4.json",
+                        "source_field": "preclinical_compounds",
+                        "source_class": "chembl_preclinical",
+                        "source_value": ["CHEMBL123"],
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    spec_path = tmp_path / "expansion_schema_spec.json"
+    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+
+    payload = traced._build_template_expansions(spec_path)
+    sentences = [slot["sentences"][0] for slot in payload["slots"]]
+
+    assert {
+        sentence["source_provenance"]["source_file"] for sentence in sentences
+    } == {"evidence/ot_CD4.json", "evidence/stage3_CD4.json"}
+    assert "[source: chembl_preclinical:preclinical_compounds]" in sentences[0]["text"]
+    assert "[source: opentargets_clinical:clinical_drugs]" in sentences[1]["text"]
+    assert all("fallback_quality" not in sentence for sentence in sentences)
+
+
+def test_template_expansion_fallback_marks_degraded_without_slot_match(tmp_path):
+    spec = {
+        "schema_version": "report_expansions.v1",
+        "required_slot_ids": ["section:hypothesis|slot:therapeutic_implications"],
+        "example_sentence": {
+            "source_provenance": {
+                "source_file": "evidence/ot_CD4.json",
+                "source_field": "clinical_drugs",
+                "source_class": "opentargets_clinical",
+                "claim_type": "direct_value",
+                "source_value": ["ibalizumab"],
+            }
+        },
+        "valid_provenance_keys": ["evidence/ot_CD4.json::clinical_drugs"],
+    }
+    (tmp_path / "drug_report_reference_card.json").write_text(
+        json.dumps(
+            {
+                "expansion_slots": [
+                    {
+                        "slot_id": "section:hypothesis|slot:therapeutic_implications",
+                        "section": "hypothesis",
+                        "slot": "therapeutic_implications",
+                    }
+                ],
+                "provenance_index": {
+                    "evidence/ot_CD4.json::clinical_drugs": {
+                        "source_file": "evidence/ot_CD4.json",
+                        "source_field": "clinical_drugs",
+                        "source_class": "opentargets_clinical",
+                        "source_value": ["ibalizumab"],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    spec_path = tmp_path / "expansion_schema_spec.json"
+    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+
+    payload = traced._build_template_expansions(spec_path)
+    sentence = payload["slots"][0]["sentences"][0]
+
+    assert sentence["fallback_quality"] == "degraded"
+    assert sentence["fallback_reason"] == "no_slot_specific_provenance_match"
+
+
 def test_inspect_report_outputs_rejects_unexpanded_drug_md(tmp_path):
     evidence_dir = tmp_path / "evidence"
     evidence_dir.mkdir()
@@ -76,7 +334,7 @@ def test_inspect_report_outputs_rejects_unexpanded_drug_md(tmp_path):
     assert "no EXPAND markers" in status["missing_requirements"]
 
 
-def test_inspect_report_outputs_accepts_validated_final_report(tmp_path):
+def test_inspect_report_outputs_accepts_validated_final_report(tmp_path, monkeypatch):
     evidence_dir = tmp_path / "evidence"
     evidence_dir.mkdir()
     (evidence_dir / "assessment_results.json").write_text("{}", encoding="utf-8")
@@ -85,18 +343,28 @@ def test_inspect_report_outputs_accepts_validated_final_report(tmp_path):
     (tmp_path / "drug_report.html").write_text("<html></html>", encoding="utf-8")
     trace_log = tmp_path / "trace.log"
     trace_log.write_text(
-        "content='{\"valid\": true}' name='validate_drug_md'\n"
-        "AIMessage(content='SUMMARIZER_STATUS: PASS')\n",
+        "AIMessage(content='SUMMARIZER_STATUS: FAIL')\n",
         encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        traced,
+        "_validate_report_finalization",
+        lambda data_dir: {"valid": True, "issue_count": 0, "issues": []},
+        raising=False,
     )
 
     status = traced._inspect_report_outputs(tmp_path, trace_log)
 
     assert status["finalized"] is True
+    assert status["report_finalization_valid"] is True
+    assert status["summarizer_status_passed"] is False
     assert status["missing_requirements"] == []
 
 
-def test_inspect_report_outputs_accepts_structured_validate_tool_marker(tmp_path):
+def test_inspect_report_outputs_rejects_trace_pass_without_host_finalization(
+    tmp_path,
+    monkeypatch,
+):
     evidence_dir = tmp_path / "evidence"
     evidence_dir.mkdir()
     (evidence_dir / "assessment_results.json").write_text("{}", encoding="utf-8")
@@ -110,9 +378,76 @@ def test_inspect_report_outputs_accepts_structured_validate_tool_marker(tmp_path
         "AIMessage(content='SUMMARIZER_STATUS: PASS')\n",
         encoding="utf-8",
     )
+    monkeypatch.setattr(
+        traced,
+        "_validate_report_finalization",
+        lambda data_dir: {
+            "valid": False,
+            "issue_count": 1,
+            "issues": [{"code": "HOST_VALIDATOR_FAILED"}],
+        },
+        raising=False,
+    )
 
     status = traced._inspect_report_outputs(tmp_path, trace_log)
 
-    assert status["validate_drug_md_passed"] is True
-    assert status["finalized"] is True
-    assert status["missing_requirements"] == []
+    assert status["validate_drug_md_passed"] is False
+    assert status["report_finalization_valid"] is False
+    assert status["finalized"] is False
+    assert "validate_drug_report_finalization valid=true" in status["missing_requirements"]
+
+
+def test_host_template_finalization_writes_valid_report_artifacts(tmp_path):
+    fixture_evidence = (
+        Path(__file__).resolve().parent
+        / "agents"
+        / "drug_target"
+        / "fixtures"
+        / "baseline_hallucinated"
+        / "evidence"
+    )
+    shutil.copytree(fixture_evidence, tmp_path / "evidence")
+    (tmp_path / "evidence" / "known_drugs.json").write_text("[]", encoding="utf-8")
+    assessment_path = tmp_path / "evidence" / "assessment_results.json"
+    assessment = json.loads(assessment_path.read_text(encoding="utf-8"))
+    assessment["disease"] = "idiopathic pulmonary fibrosis"
+    assessment_path.write_text(json.dumps(assessment, indent=2), encoding="utf-8")
+    hypothesis_path = tmp_path / "evidence" / "hypothesis_report.json"
+    hypothesis = json.loads(hypothesis_path.read_text(encoding="utf-8"))
+    hypothesis["hypotheses"] = [
+        hyp
+        for hyp in hypothesis.get("hypotheses", [])
+        if "_FAILED" not in json.dumps(hyp)
+    ]
+    hypothesis_path.write_text(json.dumps(hypothesis, indent=2), encoding="utf-8")
+    (tmp_path / "lr_candidates.json").write_text(
+        json.dumps(
+            {
+                "disease": "idiopathic pulmonary fibrosis",
+                "pairs": [
+                    {"ligand": "FN1", "receptor": "SDC2"},
+                    {"ligand": "HLA-DQB1", "receptor": "CD4"},
+                    {"ligand": "ICAM1", "receptor": "EZR"},
+                    {"ligand": "ICAM1", "receptor": "ITGB2"},
+                    {"ligand": "ICAM1", "receptor": "MUC1"},
+                    {"ligand": "THBS1", "receptor": "CD47"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    trace_log = tmp_path / "trace.log"
+    trace_log.write_text("", encoding="utf-8")
+
+    result = traced._run_host_template_finalization(tmp_path, trace_log)
+
+    assert result["finalized"] is True, result
+    assert (tmp_path / "drug.md").exists()
+    assert (tmp_path / "drug_report.html").exists()
+    assert (tmp_path / "target_assessment.json").exists()
+    drug_md = (tmp_path / "drug.md").read_text(encoding="utf-8")
+    assert "<!-- EXPAND:" not in drug_md
+    assert "Scope note: Stage 1 Census evidence for these hypotheses is labeled pulmonary fibrosis" in drug_md
+
+    status = traced._inspect_report_outputs(tmp_path, trace_log)
+    assert status["finalized"] is True, status
