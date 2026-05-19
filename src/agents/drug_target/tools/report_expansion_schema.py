@@ -17,6 +17,13 @@ REFERENCE_CARD_VERSION = "drug_report_reference_card.v1"
 REPORT_EXPANSIONS_VERSION = "report_expansions.v1"
 EXPANSION_SCHEMA_SPEC_FILE = "expansion_schema_spec.json"
 _EXPAND_RE = re.compile(r"<!--\s*EXPAND(?:_SLOT)?:\s*(.*?)\s*-->", re.DOTALL)
+_SOURCE_TAG_RE = re.compile(r"\[source:\s*([^\]]+)\]", re.IGNORECASE)
+_AMBIGUOUS_SOURCE_TAG_FIELDS = {
+    "clinical_drugs",
+    "preclinical_compounds",
+    "matched_drugs",
+    "indications",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +217,18 @@ class SentenceItem(BaseModel):
     )
     source_provenance: SourceProvenance = Field(
         description="Anchor to the reference-card provenance index."
+    )
+    fallback_quality: str | None = Field(
+        default=None,
+        description=(
+            "Optional host-recovery marker. Set to 'degraded' only when a "
+            "deterministic recovery path could not match the sentence to a "
+            "slot-specific provenance entry."
+        ),
+    )
+    fallback_reason: str | None = Field(
+        default=None,
+        description="Optional reason for fallback_quality='degraded'.",
     )
 
 
@@ -581,6 +600,73 @@ def _is_empty_source_value(value: Any) -> bool:
     return value is None or value == "" or value == [] or value == {}
 
 
+def _source_tag_error(sentence: dict) -> dict | None:
+    text = str(sentence.get("text") or "")
+    tags = _SOURCE_TAG_RE.findall(text)
+    if not tags:
+        return None
+    prov = sentence.get("source_provenance")
+    if not isinstance(prov, dict):
+        return None
+    source_field = str(prov.get("source_field") or "")
+    field_leaf = source_field.rsplit("::", 1)[-1].rsplit(".", 1)[-1].casefold()
+    source_class = str(prov.get("source_class") or "").casefold()
+    if not source_class:
+        return None
+    matched_expected = False
+    for tag in tags:
+        labels = [part.strip() for part in tag.split(",")]
+        for label in labels:
+            if not label:
+                continue
+            label_cf = label.casefold()
+            if ":" in label_cf:
+                tag_source_class, tag_source_field = label_cf.split(":", 1)
+            else:
+                tag_source_class, tag_source_field = "", label_cf
+            tag_field_leaf = tag_source_field.rsplit("::", 1)[-1].rsplit(".", 1)[-1]
+            is_ambiguous_tag = tag_field_leaf in _AMBIGUOUS_SOURCE_TAG_FIELDS
+            is_ambiguous_source = field_leaf in _AMBIGUOUS_SOURCE_TAG_FIELDS
+            if not is_ambiguous_tag and not is_ambiguous_source:
+                continue
+            if not tag_source_class:
+                return {
+                    "code": "SOURCE_TAG_TOO_GENERIC",
+                    "message": (
+                        "source tag for ambiguous drug evidence must include source_class "
+                        "to distinguish OpenTargets clinical from ChEMBL preclinical fields"
+                    ),
+                    "source_field": source_field,
+                    "source_class": prov.get("source_class"),
+                    "submitted_tag": label,
+                    "expected": f"{prov.get('source_class')}:{field_leaf}",
+                }
+            if tag_source_class != source_class or tag_field_leaf != field_leaf:
+                return {
+                    "code": "SOURCE_TAG_PROVENANCE_MISMATCH",
+                    "message": (
+                        "source tag class/field does not match sentence source_provenance"
+                    ),
+                    "source_field": source_field,
+                    "source_class": prov.get("source_class"),
+                    "submitted_tag": label,
+                    "expected": f"{prov.get('source_class')}:{field_leaf}",
+                }
+            matched_expected = True
+    if field_leaf in _AMBIGUOUS_SOURCE_TAG_FIELDS and not matched_expected:
+        return {
+            "code": "SOURCE_TAG_PROVENANCE_MISMATCH",
+            "message": (
+                "ambiguous drug evidence source tag must cite the same "
+                "source_class and source_field as source_provenance"
+            ),
+            "source_field": source_field,
+            "source_class": prov.get("source_class"),
+            "expected": f"{prov.get('source_class')}:{field_leaf}",
+        }
+    return None
+
+
 def _provenance_error(sentence: dict, provenance_index: dict | None = None) -> dict | None:
     prov = sentence.get("source_provenance")
     if not isinstance(prov, dict):
@@ -753,6 +839,9 @@ def validate_report_expansions(data_dir: str | Path, expansions: dict) -> tuple[
             )
             if prov_error:
                 errors.append(prov_error)
+            tag_error = _source_tag_error(sentence)
+            if tag_error:
+                errors.append(tag_error)
 
     missing = sorted(set(required_slots) - set(seen))
     extra_duplicates = sorted(slot_id for slot_id, count in seen.items() if count > 1)

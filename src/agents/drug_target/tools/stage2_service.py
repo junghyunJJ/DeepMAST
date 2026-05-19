@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -385,11 +386,122 @@ def query_opentargets_target_data(
     return result
 
 
+def _normalize_disease_name(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "").strip().casefold())
+
+
+def _target_drug_row_matches_disease(
+    row: dict[str, Any],
+    *,
+    efo_id: str | None,
+    disease: str,
+) -> dict[str, Any] | None:
+    """Return the matching disease entry for a target drug row, if any."""
+    wanted_name = _normalize_disease_name(disease)
+    for entry in row.get("diseases", []) or []:
+        if not isinstance(entry, dict):
+            continue
+        disease_obj = entry.get("disease") if isinstance(entry.get("disease"), dict) else {}
+        entry_id = str(disease_obj.get("id") or "")
+        names = [
+            disease_obj.get("name"),
+            entry.get("diseaseFromSource"),
+        ]
+        if efo_id and entry_id == efo_id:
+            return entry
+        if wanted_name and any(_normalize_disease_name(name) == wanted_name for name in names):
+            return entry
+    return None
+
+
+def _derive_target_linked_known_drug_rows(
+    stage2_evidence: dict[str, Any] | None,
+    *,
+    efo_id: str | None,
+    disease: str,
+) -> list[dict[str, Any]]:
+    """Normalize target-level clinical candidates into legacy known-drug rows.
+
+    Disease.drugAndClinicalCandidates is disease-wide landscape metadata and
+    does not carry target identity. The legacy scoring contract needs rows with
+    ``target.approvedSymbol``, so derive those rows from each gene's
+    target.drugAndClinicalCandidates entries filtered to the current disease.
+    """
+    if not isinstance(stage2_evidence, dict):
+        return []
+
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for gene, payload in stage2_evidence.items():
+        if not isinstance(payload, dict):
+            continue
+        ot = payload.get("opentargets", {})
+        if not isinstance(ot, dict):
+            continue
+        target_drugs = ot.get("target_drugs", {})
+        target_rows = target_drugs.get("rows", []) if isinstance(target_drugs, dict) else []
+        if not isinstance(target_rows, list):
+            continue
+        target_info = ot.get("target_info", {}) if isinstance(ot.get("target_info"), dict) else {}
+        symbol = str(target_info.get("approvedSymbol") or gene).strip().upper()
+        target_id = str(target_info.get("id") or ot.get("ensembl_id") or "")
+        for row in target_rows:
+            if not isinstance(row, dict):
+                continue
+            disease_entry = _target_drug_row_matches_disease(
+                row,
+                efo_id=efo_id,
+                disease=disease,
+            )
+            if disease_entry is None:
+                continue
+            drug = row.get("drug") if isinstance(row.get("drug"), dict) else {}
+            drug_id = str(drug.get("id") or drug.get("name") or "")
+            phase = row.get("maxClinicalStage", drug.get("maximumClinicalStage"))
+            dedupe_key = (symbol, drug_id, str(phase))
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            rows.append({
+                "drug": drug,
+                "target": {
+                    "id": target_id,
+                    "approvedSymbol": symbol,
+                },
+                "phase": phase,
+                "maxClinicalStage": phase,
+                "status": None,
+                "mechanismOfAction": row.get("mechanismOfAction"),
+                "disease": disease_entry,
+                "source": "target.drugAndClinicalCandidates",
+            })
+    return rows
+
+
+def _legacy_known_drugs_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    unique_drugs = {
+        str((row.get("drug") or {}).get("id") or (row.get("drug") or {}).get("name") or "")
+        for row in rows
+    }
+    unique_targets = {
+        str((row.get("target") or {}).get("approvedSymbol") or "")
+        for row in rows
+    }
+    unique_drugs.discard("")
+    unique_targets.discard("")
+    return {
+        "uniqueDrugs": len(unique_drugs),
+        "uniqueTargets": len(unique_targets),
+        "rows": rows,
+    }
+
+
 def query_opentargets_known_drugs_data(
     disease: str,
     *,
     mod: Any | None = None,
     disease_context: dict[str, Any] | None = None,
+    stage2_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return the canonical known-drugs payload for one disease."""
     result = {
@@ -397,6 +509,8 @@ def query_opentargets_known_drugs_data(
         "executed": False,
         "efo_id": None,
         "drugs": {},
+        "disease_landscape": {},
+        "target_linked_rows": [],
         "errors": [],
     }
 
@@ -409,15 +523,40 @@ def query_opentargets_known_drugs_data(
             return result
 
         result["efo_id"] = efo_id
-        result["drugs"] = mod.get_known_drugs_for_disease(efo_id)
+        disease_landscape = mod.get_known_drugs_for_disease(efo_id)
+        result["disease_landscape"] = disease_landscape
+
+        target_linked_rows = _derive_target_linked_known_drug_rows(
+            stage2_evidence,
+            efo_id=efo_id,
+            disease=disease,
+        )
+        result["target_linked_rows"] = target_linked_rows
+        if target_linked_rows:
+            result["drugs"] = _legacy_known_drugs_payload(target_linked_rows)
+        elif (
+            isinstance(disease_landscape, dict)
+            and isinstance(disease_landscape.get("rows"), list)
+            and any(
+                isinstance(row, dict) and isinstance(row.get("target"), dict)
+                for row in disease_landscape.get("rows", [])
+            )
+        ):
+            # Parquet/local helpers may still return the legacy target-linked
+            # shape. Preserve it for compatibility, while the GraphQL helper's
+            # disease-wide rows remain in disease_landscape only.
+            result["drugs"] = disease_landscape
+            result["target_linked_rows"] = list(disease_landscape.get("rows", []))
+        else:
+            result["drugs"] = _legacy_known_drugs_payload([])
 
         # Truncate large drug lists to prevent token bloat
         drugs = result["drugs"]
         if isinstance(drugs, dict):
-            for target, drug_list in drugs.items():
-                if isinstance(drug_list, list) and len(drug_list) > 10:
-                    drugs[target] = drug_list[:10]
-            result["drugs_truncated"] = True
+            if isinstance(drugs.get("rows"), list) and len(drugs["rows"]) > 50:
+                drugs["rows"] = drugs["rows"][:50]
+                result["target_linked_rows"] = result["target_linked_rows"][:50]
+                result["drugs_truncated"] = True
 
         result["executed"] = True
     except Exception as exc:
@@ -776,6 +915,7 @@ def build_stage2_gene_panel(
                 disease,
                 mod=ot_mod,
                 disease_context=ot_disease_context,
+                stage2_evidence=stage2_evidence,
             )
             if ot_error is None
             else _unavailable_known_drugs_result(disease, ot_error)
@@ -815,7 +955,9 @@ def summarize_stage2_bundle(result_bundle: dict[str, Any]) -> dict[str, Any]:
 
     known_drugs = result_bundle.get("known_drugs", {})
     drugs_payload = known_drugs.get("drugs", {})
-    if isinstance(drugs_payload, dict):
+    if isinstance(drugs_payload, dict) and isinstance(drugs_payload.get("rows"), list):
+        n_drugs = len(drugs_payload["rows"])
+    elif isinstance(drugs_payload, dict):
         n_drugs = sum(len(v) if isinstance(v, list) else 1 for v in drugs_payload.values())
     elif isinstance(drugs_payload, list):
         n_drugs = len(drugs_payload)

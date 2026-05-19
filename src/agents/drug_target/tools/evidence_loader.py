@@ -1525,8 +1525,8 @@ def check_hypothesis_completion(data_dir: str) -> str:
             "hypothesis_complete": False,
             "recommendation": (
                 "hypothesis_report.json not found. hypothesis_writer may have failed. "
-                "Proceed to summarizer — it will generate the report without hypotheses. "
-                "Section 4 will note that hypothesis generation was not completed."
+                "Do not proceed to summarizer for production output; retry hypothesis_writer "
+                "or fail the hypothesis stage so Section 4 is not silently skipped."
             ),
         }, indent=2)
 
@@ -1541,5 +1541,8 @@ def check_hypothesis_completion(data_dir: str) -> str:
     except Exception as e:
         return json.dumps({
             "hypothesis_complete": False,
-            "recommendation": f"hypothesis_report.json exists but is invalid: {e}",
+            "recommendation": (
+                f"hypothesis_report.json exists but is invalid: {e}. "
+                "Retry hypothesis_writer or fail the hypothesis stage before summarizer."
+            ),
         }, indent=2)

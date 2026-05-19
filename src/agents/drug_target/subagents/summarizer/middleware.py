@@ -198,9 +198,21 @@ def normalize_expansions_for_hash(payload: Any) -> dict:
             f"normalize_expansions_for_hash: unsupported payload type {type(payload).__name__}"
         )
 
-    # Strip the derived/optional field so both sides hash identically
+    def _strip_absent_fallback_markers(value: Any) -> Any:
+        if isinstance(value, dict):
+            cleaned = {
+                key: _strip_absent_fallback_markers(val)
+                for key, val in value.items()
+                if not (key in {"fallback_quality", "fallback_reason"} and val is None)
+            }
+            return cleaned
+        if isinstance(value, list):
+            return [_strip_absent_fallback_markers(item) for item in value]
+        return value
+
+    # Strip the derived/optional field so both sides hash identically.
     as_dict.pop("reference_card_hash", None)
-    return as_dict
+    return _strip_absent_fallback_markers(as_dict)
 
 
 # ---------------------------------------------------------------------------

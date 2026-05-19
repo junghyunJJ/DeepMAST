@@ -133,6 +133,61 @@ def test_source_class_conflation_is_rejected(tmp_path: Path) -> None:
     assert any(err["code"] == "SOURCE_PROVENANCE_MISMATCH" for err in result["errors"])
 
 
+def test_generic_clinical_drugs_source_tag_is_rejected(tmp_path: Path) -> None:
+    reference_hash = _persist_reference(tmp_path)
+    sentence = {
+        "text": "The OpenTargets clinical compounds include ibalizumab. [source: clinical_drugs]",
+        "source_fields": ["clinical_drugs"],
+        "source_provenance": {
+            "source_file": "evidence/ot_CD4.json",
+            "source_field": "clinical_drugs",
+            "source_class": "opentargets_clinical",
+            "source_value": ["ibalizumab"],
+            "claim_type": "direct_value",
+        },
+        "interpretation": False,
+        "hedging_verbs_present": False,
+    }
+
+    result = json.loads(
+        save_report_expansions.invoke(
+            {"data_dir": str(tmp_path), "expansions": _base_expansion(reference_hash, sentence)}
+        )
+    )
+
+    assert result["saved"] is False
+    assert any(err["code"] == "SOURCE_TAG_TOO_GENERIC" for err in result["errors"])
+
+
+def test_wrong_class_qualified_source_tag_is_rejected(tmp_path: Path) -> None:
+    reference_hash = _persist_reference(tmp_path)
+    sentence = {
+        "text": (
+            "The OpenTargets clinical compounds include ibalizumab. "
+            "[source: chembl_preclinical:clinical_drugs]"
+        ),
+        "source_fields": ["clinical_drugs"],
+        "source_provenance": {
+            "source_file": "evidence/ot_CD4.json",
+            "source_field": "clinical_drugs",
+            "source_class": "opentargets_clinical",
+            "source_value": ["ibalizumab"],
+            "claim_type": "direct_value",
+        },
+        "interpretation": False,
+        "hedging_verbs_present": False,
+    }
+
+    result = json.loads(
+        save_report_expansions.invoke(
+            {"data_dir": str(tmp_path), "expansions": _base_expansion(reference_hash, sentence)}
+        )
+    )
+
+    assert result["saved"] is False
+    assert any(err["code"] == "SOURCE_TAG_PROVENANCE_MISMATCH" for err in result["errors"])
+
+
 def test_false_absence_uses_reference_card_provenance_index(tmp_path: Path) -> None:
     reference_hash = _persist_reference_with_index(tmp_path)
     sentence = {

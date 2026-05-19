@@ -304,6 +304,85 @@ def _annotation_field(source_field: object) -> str:
     return field if re.match(r"^[a-z_][a-z0-9_]*$", field, re.IGNORECASE) else "interpretation"
 
 
+def _slot_meta_from_id(slot_id: str) -> dict:
+    meta: dict[str, object] = {"slot_id": slot_id}
+    for part in str(slot_id).split("|"):
+        if ":" not in part:
+            continue
+        key, value = part.split(":", 1)
+        meta[key] = value
+    return meta
+
+
+def _provenance_gene(entry: dict) -> str:
+    source_field = str(entry.get("source_field") or "")
+    if "::" in source_field:
+        return source_field.split("::", 1)[0].strip().upper()
+    source_file = str(entry.get("source_file") or "")
+    match = re.search(r"(?:ot|stage3)_([A-Za-z0-9_-]+)\.json$", source_file)
+    return match.group(1).upper() if match else ""
+
+
+def _slot_provenance_score(entry: dict, slot: dict) -> int:
+    source_class = str(entry.get("source_class") or "").casefold()
+    source_field = str(entry.get("source_field") or "")
+    field = _annotation_field(source_field).casefold()
+    slot_gene = str(slot.get("gene") or "").strip().upper()
+    slot_text = " ".join(
+        str(slot.get(key) or "")
+        for key in ("section", "slot", "instruction", "slot_id")
+    ).casefold()
+    score = 0
+    if slot_gene and _provenance_gene(entry) == slot_gene:
+        score += 100
+    if "preclinical" in slot_text:
+        if source_class == "chembl_preclinical" or field == "preclinical_compounds":
+            score += 40
+        elif field == "clinical_drugs":
+            score -= 10
+    elif "clinical" in slot_text or "approved" in slot_text:
+        if source_class == "opentargets_clinical" or field == "clinical_drugs":
+            score += 40
+        elif field == "preclinical_compounds":
+            score -= 10
+    elif "drug_profile" in slot_text or "what drugs exist" in slot_text:
+        if field in {"clinical_drugs", "preclinical_compounds"}:
+            score += 25
+        if source_class == "opentargets_clinical":
+            score += 5
+    if any(token in slot_text for token in ("rubric", "scoring", "recommendation", "biological_context", "stage1")):
+        if source_class == "deepmast_rubric":
+            score += 30
+    if "hypothesis" in slot_text and source_class == "deepmast_rubric":
+        score += 10
+    return score
+
+
+def _select_template_provenance(
+    slot_id: str,
+    slot_metadata: dict,
+    provenance_entries: list[dict],
+    fallback_provenance: dict,
+    index: int,
+) -> tuple[dict, str | None]:
+    slot = slot_metadata.get(slot_id)
+    if not isinstance(slot, dict):
+        slot = _slot_meta_from_id(slot_id)
+    if not provenance_entries:
+        return dict(fallback_provenance), "provenance_index_missing"
+    scored = [
+        (_slot_provenance_score(entry, slot), position, entry)
+        for position, entry in enumerate(provenance_entries)
+    ]
+    best_score, _, best_entry = max(scored, key=lambda item: (item[0], -item[1]))
+    if best_score > 0:
+        return dict(best_entry), None
+    return (
+        dict(provenance_entries[index % len(provenance_entries)]),
+        "no_slot_specific_provenance_match",
+    )
+
+
 def _load_json_or_default(path: Path, default: object) -> object:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -316,6 +395,65 @@ def _artifact_predates_run(path: Path, run_started_at: float) -> bool:
         return not path.exists() or path.stat().st_mtime < run_started_at
     except OSError:
         return True
+
+
+def _host_hypothesis_fallback_enabled() -> bool:
+    value = os.environ.get("DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK", "")
+    return value.strip().casefold() in {"1", "true", "yes", "on", "smoke", "recovery"}
+
+
+def _build_hypothesis_retry_message(data_dir: Path, disease: str) -> str:
+    return (
+        "The previous run completed Stage 1-3 evidence collection "
+        "but hypothesis_report.json was NOT saved or is stale. You MUST now "
+        "invoke ONLY the hypothesis_writer subagent to recover "
+        "hypothesis generation. Do not re-run evidence_assessor "
+        "or deep_diver. Do not re-run report_writer or summarizer. Emit exactly "
+        "one tool call:\n\n"
+        f"  task(subagent_type=\"hypothesis_writer\", instruction=\""
+        f"Recovery run for {disease}: load_evidence_files(data_dir='{data_dir}', "
+        f"scope='hypothesis'), generate 4-6 mechanistic hypotheses across MoA / "
+        f"Therapeutic / Cross-Target / Novel Pathway categories, "
+        f"call validate_evidence_references with every filename you "
+        f"plan to cite, then immediately call "
+        f"save_evidence(data_dir='{data_dir}', "
+        f"filename='hypothesis_report.json', data=<the JSON "
+        f"payload>). Do NOT call sequential_thinking more than 6 "
+        f"times. If sequential_thinking returns an error about a "
+        f"degenerate loop, STOP thinking and call save_evidence "
+        f"immediately with your best draft.\")\n\n"
+        "After the hypothesis_writer task returns, emit the "
+        "message 'Hypothesis fixup complete.' and stop."
+    )
+
+
+def _build_early_retry_message(data_dir: Path, disease: str) -> str:
+    return (
+        "You MUST execute the full pipeline using the `task` tool. "
+        "Do NOT stop until evidence_assessor, hypothesis_writer, and summarizer complete.\n"
+        f"Step 1: Call load_lr_candidates(data_dir=\"{data_dir}\", disease=\"{disease}\")\n"
+        f"Step 2: IMMEDIATELY call task(subagent_type=\"evidence_assessor\", "
+        f"instruction=\"Run full 3-stage evidence assessment for {disease}. "
+        f"Data dir: {data_dir}.\")\n"
+        f"Step 3: After evidence_assessor completes, call "
+        f"task(subagent_type=\"hypothesis_writer\", instruction=\"Generate "
+        f"hypothesis_report.json for {disease}. Data dir: {data_dir}.\")\n"
+        f"Step 4: After hypothesis_writer saves hypothesis_report.json, call "
+        f"task(subagent_type=\"summarizer\", instruction=\"Generate drug.md "
+        f"and final report artifacts for {disease}. Data dir: {data_dir}.\")"
+    )
+
+
+def _hypothesis_report_ready_for_finalization(path: Path, run_started_at: float) -> bool:
+    if _artifact_predates_run(path, run_started_at):
+        return False
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    if payload.get("host_finalized") and payload.get("fallback_quality") == "degraded":
+        return _host_hypothesis_fallback_enabled()
+    return True
 
 
 def _evidence_ready_for_hypothesis(data_dir: Path) -> bool:
@@ -472,6 +610,7 @@ def _build_host_hypothesis_report(data_dir: Path, disease: str) -> dict:
             "orphan_files": sorted(eligible - referenced),
         },
         "host_finalized": True,
+        "fallback_quality": "degraded",
         "host_finalization_reason": "deterministic fallback after traced hypothesis phase",
     }
 
@@ -523,27 +662,66 @@ def _run_host_hypothesis_fallback(
 
 def _build_template_expansions(spec_path: Path) -> dict:
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
-    provenance = dict(spec["example_sentence"]["source_provenance"])
-    source_field = str(provenance.get("source_field") or "interpretation")
-    field = _annotation_field(source_field)
-    sentence = {
-        "text": (
-            "This section is limited to evidence fields captured by the run. "
-            f"[source: {field}]"
-        ),
-        "source_fields": [source_field, field] if source_field != field else [field],
-        "source_provenance": provenance,
-        "interpretation": False,
-        "hedging_verbs_present": False,
+    fallback_provenance = dict(spec["example_sentence"]["source_provenance"])
+    reference_card = _load_json_or_default(spec_path.with_name("drug_report_reference_card.json"), {})
+    provenance_index = (
+        reference_card.get("provenance_index", {})
+        if isinstance(reference_card, dict)
+        else {}
+    )
+    slot_metadata = {
+        str(slot.get("slot_id")): slot
+        for slot in (
+            reference_card.get("expansion_slots", [])
+            if isinstance(reference_card, dict)
+            else []
+        )
+        if isinstance(slot, dict) and slot.get("slot_id")
     }
+    provenance_entries = [
+        dict(entry)
+        for _, entry in sorted(provenance_index.items())
+        if isinstance(entry, dict)
+    ]
+    required_slots = list(spec["required_slot_ids"])
+
+    def sentence_for_slot(slot_id: str, index: int) -> dict:
+        provenance, degraded_reason = _select_template_provenance(
+            slot_id,
+            slot_metadata,
+            provenance_entries,
+            fallback_provenance,
+            index,
+        )
+        source_field = str(provenance.get("source_field") or "interpretation")
+        field = _annotation_field(source_field)
+        source_class = str(provenance.get("source_class") or "interpretation")
+        provenance.setdefault("claim_type", "direct_value")
+        if "source_value" not in provenance:
+            provenance["source_value"] = None
+        sentence = {
+            "text": (
+                "This section is limited to evidence fields captured by the run "
+                f"for {slot_id}. [source: {source_class}:{field}]"
+            ),
+            "source_fields": [source_field, field] if source_field != field else [field],
+            "source_provenance": provenance,
+            "interpretation": False,
+            "hedging_verbs_present": False,
+        }
+        if degraded_reason:
+            sentence["fallback_quality"] = "degraded"
+            sentence["fallback_reason"] = degraded_reason
+        return sentence
+
     return {
         "schema_version": "report_expansions.v1",
         "slots": [
             {
                 "slot_id": slot_id,
-                "sentences": [json.loads(json.dumps(sentence))],
+                "sentences": [sentence_for_slot(slot_id, index)],
             }
-            for slot_id in spec["required_slot_ids"]
+            for index, slot_id in enumerate(required_slots)
         ],
     }
 
@@ -828,8 +1006,8 @@ async def run_traced(args: argparse.Namespace) -> int:
                     message = (
                         "[HYPOTHESIS-BUDGET] evidence has been ready for "
                         f"{hypothesis_budget_seconds}s but no fresh "
-                        "hypothesis_report.json was saved; switching to host "
-                        "hypothesis fixup."
+                        "hypothesis_report.json was saved; switching to "
+                        "hypothesis_writer retry before any host fallback."
                     )
                     print(f"\n{message}")
                     trace_log_fp.write(f"\n{message}\n")
@@ -882,7 +1060,8 @@ async def run_traced(args: argparse.Namespace) -> int:
                     message = (
                         "[HYPOTHESIS-BUDGET] hypothesis_writer stream exceeded "
                         f"{hypothesis_budget_seconds}s after deterministic evidence "
-                        "artifacts were written; switching to host hypothesis fixup."
+                        "artifacts were written; retrying hypothesis_writer before "
+                        "any host fallback."
                     )
                     print(f"\n{message}")
                     trace_log_fp.write(f"\n{message}\n")
@@ -995,8 +1174,9 @@ async def run_traced(args: argparse.Namespace) -> int:
             import traceback
             traceback.print_exc()
 
-    # ── Host hypothesis fixup: deterministic recovery if the LLM hypothesis
-    # writer looped, skipped saving, or left a stale prior-run report.
+    # ── Hypothesis writer fixup: auto-retry if hypothesis_report.json missing
+    # or stale after evidence assessment. This must run before host fallback so
+    # deterministic degraded output cannot mask a missing writer artifact.
     hypothesis_path = evidence_dir / "hypothesis_report.json"
     hypothesis_stale = False
     if hypothesis_path.exists():
@@ -1007,37 +1187,6 @@ async def run_traced(args: argparse.Namespace) -> int:
     if assessment_path.exists() and (
         hypothesis_budget_aborted or not hypothesis_path.exists() or hypothesis_stale
     ):
-        reasons = []
-        if hypothesis_budget_aborted:
-            reasons.append("hypothesis_writer budget exceeded")
-        if not hypothesis_path.exists():
-            reasons.append("hypothesis_report.json missing")
-        if hypothesis_stale:
-            reasons.append("hypothesis_report.json predates this run")
-        print(
-            "\n[HOST-HYPOTHESIS-FIXUP] "
-            + "; ".join(reasons)
-            + "; writing deterministic hypothesis_report.json."
-        )
-        fixup_result = _run_host_hypothesis_fallback(
-            data_dir,
-            args.disease,
-            trace_log_path,
-        )
-        if fixup_result.get("saved"):
-            print("[HOST-HYPOTHESIS-FIXUP] SUCCESS — hypothesis_report.json saved")
-        else:
-            print(
-                "[HOST-HYPOTHESIS-FIXUP] FAILED — "
-                + "; ".join(fixup_result.get("errors", [])[:5])
-            )
-
-    # ── Hypothesis writer fixup: auto-retry if hypothesis_report.json missing
-    # This handles the qwen1-style degenerate-loop failure where
-    # hypothesis_writer exits without saving despite having stage3_candidates.
-    # With the new sequential_thinking guard the degenerate loop should be
-    # bounded, but a narrow re-invocation is still the last line of defense.
-    if assessment_path.exists() and not hypothesis_path.exists():
         try:
             assessment = json.loads(assessment_path.read_text())
             stage3_candidates = assessment.get("stage3_candidates", [])
@@ -1053,31 +1202,10 @@ async def run_traced(args: argparse.Namespace) -> int:
             with open(trace_log_path, "a") as fp:
                 fp.write(
                     f"\n[HYPOTHESIS-FIXUP] {len(stage3_candidates)} candidates, "
-                    f"hypothesis_report.json missing — retrying narrowly\n"
+                    f"hypothesis_report.json missing/stale — retrying narrowly\n"
                 )
 
-            hyp_retry_message = (
-                "The previous run completed Stage 1-3 evidence collection "
-                "but hypothesis_report.json was NOT saved. You MUST now "
-                "invoke ONLY the hypothesis_writer subagent to recover "
-                "hypothesis generation. Do not re-run evidence_assessor "
-                "or deep_diver. Do not re-run report_writer. Emit exactly "
-                "one tool call:\n\n"
-                f"  task(subagent_type=\"hypothesis_writer\", instruction=\""
-                f"Recovery run: load_evidence_files(data_dir='{data_dir}'), "
-                f"generate 4-6 mechanistic hypotheses across MoA / "
-                f"Therapeutic / Cross-Target / Novel Pathway categories, "
-                f"call validate_evidence_references with every filename you "
-                f"plan to cite, then immediately call "
-                f"save_evidence(data_dir='{data_dir}', "
-                f"filename='hypothesis_report.json', data=<the JSON "
-                f"payload>). Do NOT call sequential_thinking more than 6 "
-                f"times. If sequential_thinking returns an error about a "
-                f"degenerate loop, STOP thinking and call save_evidence "
-                f"immediately with your best draft.\")\n\n"
-                "After the hypothesis_writer task returns, emit the "
-                "message 'Hypothesis fixup complete.' and stop."
-            )
+            hyp_retry_message = _build_hypothesis_retry_message(data_dir, args.disease)
             hyp_retry_thread_id = str(uuid.uuid4())
             hyp_retry_start = time.time()
             trace_log_fp = open(trace_log_path, "a")
@@ -1140,6 +1268,57 @@ async def run_traced(args: argparse.Namespace) -> int:
             else:
                 print("[HYPOTHESIS-FIXUP] FAILED — hypothesis_report.json still missing")
 
+    # ── Host hypothesis fixup: deterministic degraded recovery. This is
+    # disabled for normal production runs unless explicitly enabled for smoke
+    # or recovery runs via DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK.
+    hypothesis_stale = False
+    if hypothesis_path.exists():
+        try:
+            hypothesis_stale = hypothesis_path.stat().st_mtime < start
+        except OSError:
+            hypothesis_stale = False
+    if assessment_path.exists() and (
+        hypothesis_budget_aborted or not hypothesis_path.exists() or hypothesis_stale
+    ):
+        reasons = []
+        if hypothesis_budget_aborted:
+            reasons.append("hypothesis_writer budget exceeded")
+        if not hypothesis_path.exists():
+            reasons.append("hypothesis_report.json missing")
+        if hypothesis_stale:
+            reasons.append("hypothesis_report.json predates this run")
+        if not _host_hypothesis_fallback_enabled():
+            print(
+                "\n[HOST-HYPOTHESIS-FIXUP] SKIPPED — "
+                + "; ".join(reasons)
+                + "; set DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK=1 "
+                "only for smoke/recovery runs."
+            )
+            with open(trace_log_path, "a") as fp:
+                fp.write(
+                    "\n[HOST-HYPOTHESIS-FIXUP] skipped because fallback is disabled; "
+                    + "; ".join(reasons)
+                    + "\n"
+                )
+        else:
+            print(
+                "\n[HOST-HYPOTHESIS-FIXUP] "
+                + "; ".join(reasons)
+                + "; writing degraded deterministic hypothesis_report.json."
+            )
+            fixup_result = _run_host_hypothesis_fallback(
+                data_dir,
+                args.disease,
+                trace_log_path,
+            )
+            if fixup_result.get("saved"):
+                print("[HOST-HYPOTHESIS-FIXUP] SUCCESS — degraded hypothesis_report.json saved")
+            else:
+                print(
+                    "[HOST-HYPOTHESIS-FIXUP] FAILED — "
+                    + "; ".join(fixup_result.get("errors", [])[:5])
+                )
+
     # ── Retry on early termination ───────────────────────────────
     evidence_count = len(list(evidence_dir.glob("*.json"))) if evidence_dir.exists() else 0
     if evidence_count == 0 and elapsed < 300:
@@ -1148,17 +1327,7 @@ async def run_traced(args: argparse.Namespace) -> int:
         with open(trace_log_path, "a") as fp:
             fp.write(f"\n[RETRY] Early termination detected at {elapsed:.1f}s — retrying\n")
 
-        retry_message = (
-            f"You MUST execute the full pipeline using the `task` tool. "
-            f"Do NOT stop until both subagents complete.\n"
-            f"Step 1: Call load_lr_candidates(data_dir=\"{data_dir}\", disease=\"{args.disease}\")\n"
-            f"Step 2: IMMEDIATELY call task(subagent_type=\"evidence_assessor\", "
-            f"instruction=\"Run full 3-stage evidence assessment for {args.disease}. "
-            f"Data dir: {data_dir}.\")\n"
-            f"Step 3: After evidence_assessor completes, call "
-            f"task(subagent_type=\"report_writer\", instruction=\"Generate drug.md. "
-            f"Data dir: {data_dir}.\")"
-        )
+        retry_message = _build_early_retry_message(data_dir, args.disease)
         retry_thread_id = str(uuid.uuid4())
         retry_start = time.time()
         trace_log_fp = open(trace_log_path, "a")
@@ -1205,7 +1374,7 @@ async def run_traced(args: argparse.Namespace) -> int:
             elapsed = time.time() - start
             print(
                 f"\n[RETRY CANCELLED at {elapsed:.1f}s] Retry graph task cancelled — "
-                f"falling through to fallback write."
+                f"falling through to downstream completion checks."
             )
             trace_log_fp.write(
                 f"\n[RETRY CANCELLED] at {elapsed:.1f}s — graceful shutdown, not re-raised\n"
@@ -1235,7 +1404,7 @@ async def run_traced(args: argparse.Namespace) -> int:
     if (
         not pre_fixup_status["finalized"]
         and assessment_path.exists()
-        and hypothesis_path.exists()
+        and _hypothesis_report_ready_for_finalization(hypothesis_path, start)
     ):
         print(
             "\n[HOST-FINALIZATION-FIXUP] report not finalized after agent stream; "

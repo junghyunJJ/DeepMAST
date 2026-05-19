@@ -270,34 +270,31 @@ def get_target_disease_evidence(ensembl_id: str, efo_id: str,
 
 def get_known_drugs_for_disease(efo_id: str) -> Dict[str, Any]:
     """
-    Get drugs known to be used for a disease.
+    Get disease-level clinical drug candidates for a disease.
 
     Args:
         efo_id: EFO disease identifier
 
     Returns:
-        Dictionary with drug information including phase, targets, and status
+        Dictionary with disease-level drug candidates. Current OpenTargets
+        Disease rows do not carry target identity; callers that need
+        target-linked disease rows must derive them from target-level
+        drugAndClinicalCandidates.
     """
     query = """
-      query knownDrugs($efoId: String!) {
+      query diseaseClinicalCandidates($efoId: String!) {
         disease(efoId: $efoId) {
-          knownDrugs {
-            uniqueDrugs
-            uniqueTargets
+          drugAndClinicalCandidates {
+            count
             rows {
+              id
+              maxClinicalStage
               drug {
                 id
                 name
                 drugType
-                maximumClinicalTrialPhase
+                maximumClinicalStage
               }
-              target {
-                id
-                approvedSymbol
-              }
-              phase
-              status
-              mechanismOfAction
             }
           }
         }
@@ -305,7 +302,7 @@ def get_known_drugs_for_disease(efo_id: str) -> Dict[str, Any]:
     """
 
     result = execute_query(query, {"efoId": efo_id})
-    return result.get("disease", {}).get("knownDrugs", {})
+    return result.get("disease", {}).get("drugAndClinicalCandidates", {})
 
 
 def get_drugs_for_target(ensembl_id: str) -> Dict[str, Any]:

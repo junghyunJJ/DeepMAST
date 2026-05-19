@@ -619,10 +619,14 @@ section for the full anti-hallucination checklist.
 Every prose sentence inside `<!-- EXPAND -->` regions MUST carry a source
 annotation at the end of the sentence using this format:
 
-    [source: <field_name>]
+    [source: <source_class>:<field_name>]
 
 Guidelines:
-- Multiple fields allowed: `[source: first_approval, mechanism_of_action]`
+- Multiple fields allowed when each label is class-qualified:
+  `[source: opentargets_clinical:first_approval, chembl_preclinical:mechanism_of_action]`
+- Do not use generic ambiguous tags such as `[source: clinical_drugs]`; use
+  `[source: opentargets_clinical:clinical_drugs]` or
+  `[source: chembl_preclinical:preclinical_compounds]` as appropriate.
 - `[source: interpretation]` is permitted ONLY when the sentence uses hedged
   language: "suggests", "indicates", "consistent with", or "implies".
 - Annotations are for validator/critic use only; they are stripped post-validation.
@@ -1290,10 +1294,15 @@ SUBAGENT_PROMPTS = {
     "summarizer": SUMMARIZER_PROMPT,
     # Retained pending reader migration — see canonical comment above REPORT_WRITER_PROMPT.
     "report_writer": REPORT_WRITER_PROMPT,
-    # "critic" key removed (task #9): the new pre-save critic gate is owned by
-    # subagents/critic/agent.py (get_critic_subagent). The legacy prompt is
-    # preserved as LEGACY_CRITIC_PROMPT_PERSISTED_REPORT below for the
-    # validate_drug_report_finalization(require_critic=True) path only.
+    # Compatibility registry shim for older tests/readers. The executable
+    # pre-save critic prompt is owned by subagents/critic/agent.py
+    # (get_critic_subagent); this entry intentionally exposes only the new
+    # envelope vocabulary, not the legacy claim/verdict schema.
+    "critic": (
+        "Critic prompt lives in subagents/critic/agent.py and emits JSON with "
+        "valid, findings, findings_count, payload_hash, finding_type, slot_ids, "
+        "sentence, reason, and repair_instruction."
+    ),
 }
 
 __all__ = [

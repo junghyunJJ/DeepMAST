@@ -127,6 +127,8 @@ def test_host_hypothesis_fallback_rewrites_failed_suffix_fixture(tmp_path):
 
     assert result["saved"] is True, result
     saved = json.loads((tmp_path / "evidence" / "hypothesis_report.json").read_text())
+    assert saved["host_finalized"] is True
+    assert saved["fallback_quality"] == "degraded"
     assert "_FAILED" not in json.dumps(saved)
 
     candidates = {
@@ -156,6 +158,158 @@ def test_host_hypothesis_fallback_rewrites_failed_suffix_fixture(tmp_path):
             pair = filename.removeprefix("stage1_").removesuffix(".json")
             if detail["usage"] in {"primary", "supporting"}:
                 assert pass_map[pair] is True
+
+
+def test_host_hypothesis_fallback_disabled_by_default(monkeypatch):
+    monkeypatch.delenv("DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK", raising=False)
+
+    assert traced._host_hypothesis_fallback_enabled() is False
+
+
+def test_hypothesis_retry_message_invokes_hypothesis_writer_only(tmp_path):
+    message = traced._build_hypothesis_retry_message(
+        tmp_path,
+        "idiopathic pulmonary fibrosis",
+    )
+
+    assert 'task(subagent_type="hypothesis_writer"' in message
+    assert 'task(subagent_type="report_writer"' not in message
+    assert 'task(subagent_type="summarizer"' not in message
+
+
+def test_early_retry_message_runs_hypothesis_writer_before_summarizer(tmp_path):
+    message = traced._build_early_retry_message(
+        tmp_path,
+        "idiopathic pulmonary fibrosis",
+    )
+
+    evidence_idx = message.index('task(subagent_type="evidence_assessor"')
+    hypothesis_idx = message.index('task(subagent_type="hypothesis_writer"')
+    summarizer_idx = message.index('task(subagent_type="summarizer"')
+    assert evidence_idx < hypothesis_idx < summarizer_idx
+    assert 'task(subagent_type="report_writer"' not in message
+
+
+def test_runner_orders_hypothesis_retry_before_host_fallback():
+    source = Path(traced.__file__).read_text(encoding="utf-8")
+
+    assert source.index("# ── Hypothesis writer fixup") < source.index(
+        "# ── Host hypothesis fixup"
+    )
+
+
+def test_check_hypothesis_completion_requires_retry_not_summarizer(tmp_path):
+    from src.agents.drug_target.tools.evidence_loader import check_hypothesis_completion
+
+    (tmp_path / "evidence").mkdir()
+    result = json.loads(check_hypothesis_completion.invoke({"data_dir": str(tmp_path)}))
+
+    assert result["hypothesis_complete"] is False
+    assert "retry hypothesis_writer" in result["recommendation"]
+    assert "Proceed to summarizer" not in result["recommendation"]
+
+
+def test_template_expansion_fallback_uses_slot_specific_provenance(tmp_path):
+    spec = {
+        "schema_version": "report_expansions.v1",
+        "required_slot_ids": [
+            "section:preclinical|slot:screening",
+            "section:clinical|slot:approved_drugs",
+        ],
+        "example_sentence": {
+            "source_provenance": {
+                "source_file": "evidence/ot_CD4.json",
+                "source_field": "clinical_drugs",
+                "source_class": "opentargets_clinical",
+                "claim_type": "direct_value",
+                "source_value": ["ibalizumab"],
+            }
+        },
+        "valid_provenance_keys": [
+            "evidence/ot_CD4.json::clinical_drugs",
+            "evidence/stage3_CD4.json::preclinical_compounds",
+        ],
+    }
+    (tmp_path / "drug_report_reference_card.json").write_text(
+        json.dumps(
+            {
+                "provenance_index": {
+                    "evidence/ot_CD4.json::clinical_drugs": {
+                        "source_file": "evidence/ot_CD4.json",
+                        "source_field": "clinical_drugs",
+                        "source_class": "opentargets_clinical",
+                        "source_value": ["ibalizumab"],
+                    },
+                    "evidence/stage3_CD4.json::preclinical_compounds": {
+                        "source_file": "evidence/stage3_CD4.json",
+                        "source_field": "preclinical_compounds",
+                        "source_class": "chembl_preclinical",
+                        "source_value": ["CHEMBL123"],
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    spec_path = tmp_path / "expansion_schema_spec.json"
+    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+
+    payload = traced._build_template_expansions(spec_path)
+    sentences = [slot["sentences"][0] for slot in payload["slots"]]
+
+    assert {
+        sentence["source_provenance"]["source_file"] for sentence in sentences
+    } == {"evidence/ot_CD4.json", "evidence/stage3_CD4.json"}
+    assert "[source: chembl_preclinical:preclinical_compounds]" in sentences[0]["text"]
+    assert "[source: opentargets_clinical:clinical_drugs]" in sentences[1]["text"]
+    assert all("fallback_quality" not in sentence for sentence in sentences)
+
+
+def test_template_expansion_fallback_marks_degraded_without_slot_match(tmp_path):
+    spec = {
+        "schema_version": "report_expansions.v1",
+        "required_slot_ids": ["section:hypothesis|slot:therapeutic_implications"],
+        "example_sentence": {
+            "source_provenance": {
+                "source_file": "evidence/ot_CD4.json",
+                "source_field": "clinical_drugs",
+                "source_class": "opentargets_clinical",
+                "claim_type": "direct_value",
+                "source_value": ["ibalizumab"],
+            }
+        },
+        "valid_provenance_keys": ["evidence/ot_CD4.json::clinical_drugs"],
+    }
+    (tmp_path / "drug_report_reference_card.json").write_text(
+        json.dumps(
+            {
+                "expansion_slots": [
+                    {
+                        "slot_id": "section:hypothesis|slot:therapeutic_implications",
+                        "section": "hypothesis",
+                        "slot": "therapeutic_implications",
+                    }
+                ],
+                "provenance_index": {
+                    "evidence/ot_CD4.json::clinical_drugs": {
+                        "source_file": "evidence/ot_CD4.json",
+                        "source_field": "clinical_drugs",
+                        "source_class": "opentargets_clinical",
+                        "source_value": ["ibalizumab"],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    spec_path = tmp_path / "expansion_schema_spec.json"
+    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+
+    payload = traced._build_template_expansions(spec_path)
+    sentence = payload["slots"][0]["sentences"][0]
+
+    assert sentence["fallback_quality"] == "degraded"
+    assert sentence["fallback_reason"] == "no_slot_specific_provenance_match"
 
 
 def test_inspect_report_outputs_rejects_unexpanded_drug_md(tmp_path):
