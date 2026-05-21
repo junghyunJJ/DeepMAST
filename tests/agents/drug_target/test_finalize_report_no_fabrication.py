@@ -179,27 +179,24 @@ async def test_known_drug_names_appear_in_evidence_files(tmp_path: Path) -> None
 
         result = await finalize_report(state, config)  # type: ignore[arg-type]
 
-    # If finalization succeeded, target_assessment.json should exist
-    ta_path = tmp_path / "target_assessment.json"
+    # On success, drug.md is the rendered output. (target_assessment.json is
+    # written by build_evidence_summary in the structured shape, not by
+    # finalize_report — see test_render_outputs_preserves_structured_target_assessment.)
+    drug_md_path = tmp_path / "drug.md"
     if result.get("report_finalization_error") is None:
-        assert ta_path.exists(), (
-            "target_assessment.json was not written despite successful finalization"
+        assert drug_md_path.exists(), (
+            "drug.md was not written despite successful finalization"
         )
-        ta_data: dict[str, Any] = json.loads(ta_path.read_text(encoding="utf-8"))
+        drug_md_text = drug_md_path.read_text(encoding="utf-8")
 
-        # Collect all drug name candidates from the assessment
-        drug_names_in_assessment: list[str] = []
-        ta_text = json.dumps(ta_data)
-
-        # Check known drug names that appeared in the payload
-        for drug_name in [KNOWN_DRUG_A, KNOWN_DRUG_B]:
-            if drug_name in ta_text:
-                drug_names_in_assessment.append(drug_name)
-
-        # Assert every drug name found in target_assessment.json is in evidence
-        for drug_name in drug_names_in_assessment:
+        # Every known drug name that appears in the rendered report must come
+        # from evidence (no fabrication).
+        drug_names_in_output = [
+            name for name in (KNOWN_DRUG_A, KNOWN_DRUG_B) if name in drug_md_text
+        ]
+        for drug_name in drug_names_in_output:
             assert drug_name in combined_evidence, (
-                f"Drug name {drug_name!r} found in target_assessment.json "
+                f"Drug name {drug_name!r} found in drug.md "
                 f"but NOT in any evidence file — potential fabrication. "
                 f"Evidence files searched: {[str(f) for f in (tmp_path / 'evidence').glob('*.json')]}"
             )
@@ -213,11 +210,21 @@ async def test_known_drug_names_appear_in_evidence_files(tmp_path: Path) -> None
 
 
 @pytest.mark.asyncio
-async def test_target_assessment_contains_payload_schema_version(tmp_path: Path) -> None:
-    """target_assessment.json must have schema_version field (from payload.model_dump())."""
+async def test_render_outputs_preserves_structured_target_assessment(tmp_path: Path) -> None:
+    """_render_outputs must NOT overwrite target_assessment.json with the
+    report-expansions payload (schema_version/slots). build_evidence_summary
+    writes the structured contract shape (druggability_matrix with is_featured
+    rows) that wrapper_agent's featured-pair extraction reads; finalize_report
+    must leave it intact (Codex PR #32 P1). The payload is persisted to
+    report_expansions.json instead."""
     _build_workspace(tmp_path)
 
     valid_payload = _build_valid_payload()
+    structured_ta = {
+        "project_meta": {"disease": "IPF"},
+        "druggability_matrix": [{"gene": "TGFB1", "is_featured": True}],
+        "featured_candidates_deep_dive": [],
+    }
 
     mock_model2 = MagicMock()
     mock_model2.bind = MagicMock(return_value=mock_model2)
@@ -232,8 +239,15 @@ async def test_target_assessment_contains_payload_schema_version(tmp_path: Path)
             "src.agents.drug_target.finalize_report._call_tool"
         ) as mock_call_tool,
     ):
+        ta_path = tmp_path / "target_assessment.json"
+
         def _side_effect(tool, **kwargs):
             tool_name = getattr(tool, "name", str(tool))
+            if "build_evidence_summary" in tool_name:
+                # Simulate the structured target_assessment.json that
+                # build_evidence_summary writes deterministically.
+                ta_path.write_text(json.dumps(structured_ta), encoding="utf-8")
+                return json.dumps({"ok": True})
             if "load_evidence_files" in tool_name:
                 return json.dumps({"TGFB1": {"clinical_drugs": [KNOWN_DRUG_A]}})
             if "save_report_expansions" in tool_name:
@@ -265,15 +279,16 @@ async def test_target_assessment_contains_payload_schema_version(tmp_path: Path)
 
         result = await finalize_report(state, {})  # type: ignore[arg-type]
 
-    ta_path = tmp_path / "target_assessment.json"
-    if result.get("report_finalization_error") is None:
-        assert ta_path.exists()
-        ta_data = json.loads(ta_path.read_text(encoding="utf-8"))
-        # Phase 3a design: target_assessment.json is payload.model_dump() directly
-        assert "schema_version" in ta_data, (
-            "target_assessment.json must contain schema_version (from payload.model_dump()). "
-            f"Actual top-level keys: {list(ta_data.keys())}"
-        )
-        assert ta_data["schema_version"] == "report_expansions.v1"
-    else:
+    if result.get("report_finalization_error") is not None:
         pytest.skip(f"finalize_report error: {result.get('report_finalization_error')}")
+
+    ta_data = json.loads(ta_path.read_text(encoding="utf-8"))
+    # Structured shape preserved — NOT overwritten with payload.model_dump().
+    assert "druggability_matrix" in ta_data, (
+        "target_assessment.json must keep the structured druggability_matrix shape "
+        f"that wrapper_agent reads. Actual top-level keys: {list(ta_data.keys())}"
+    )
+    assert "slots" not in ta_data, (
+        "target_assessment.json was overwritten with the report-expansions payload "
+        "(slots) — this breaks wrapper_agent featured-pair extraction."
+    )

@@ -2,7 +2,7 @@
 
 Deterministic 6-step post-processing node that runs after the DeepAgents
 run_deep_agent node completes. Exactly 1 LLM call (structured output).
-All file writes are atomic (tmp + os.replace).
+Artifact writes are delegated to the existing tools, which write atomically.
 """
 
 from __future__ import annotations
@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import tempfile
 from pathlib import Path
 from typing import cast
 
@@ -82,9 +81,9 @@ async def finalize_report(state: dict, config: RunnableConfig) -> dict:
     data_dir: str = state["data_dir"]
     disease: str = state["disease"]
     _ok: dict = {"report_finalization_error": None, "evidence_truncated": False}
-    if (Path(data_dir) / "drug.md").exists():  # Decision 12: idempotency
-        logger.info("finalize_report: drug.md exists — skipping (idempotent).")
-        return _ok
+    # Always regenerate from current evidence. A prior-run drug.md must NOT
+    # short-circuit finalization: on a reused workspace with different input
+    # that would silently return stale results (and skip validation).
     evidence, spec, reference_card = _load_expansion_inputs(data_dir, disease)
     token_estimate = len(json.dumps(evidence)) // 4
     if token_estimate > _TOKEN_BUDGET:
@@ -278,11 +277,16 @@ def _post_fill_source_values_from_reference(
 
 
 def _render_outputs(data_dir: str, payload: ReportExpansionsPayload) -> None:  # noqa: ARG001
-    """Step 4: render drug.md, HTML report, and target_assessment.json.
+    """Step 4: render drug.md and the HTML report.
 
-    All writes are atomic (tmp + os.replace). The drug.md and HTML are
-    produced by existing tools; target_assessment.json is written from
-    the payload dict.
+    Both writes are atomic (the tools write internally). target_assessment.json
+    is intentionally NOT written here: build_evidence_summary already produces
+    it deterministically in the structured contract shape
+    ({project_meta, druggability_matrix (with is_featured rows),
+    featured_candidates_deep_dive}) that wrapper_agent's featured-pair
+    extraction depends on. Overwriting it with payload.model_dump() (the
+    report_expansions schema) would break that consumer; the expansions
+    payload is persisted to report_expansions.json instead.
     """
     base = Path(data_dir).expanduser().resolve()
 
@@ -291,20 +295,6 @@ def _render_outputs(data_dir: str, payload: ReportExpansionsPayload) -> None:  #
 
     # HTML report — tool writes it internally
     _call_tool(_generate_drug_html_st, data_dir=str(base))
-
-    # target_assessment.json — atomic write from payload dict
-    assessment = payload.model_dump()
-    dest = base / "target_assessment.json"
-    with tempfile.NamedTemporaryFile(
-        mode="w",
-        suffix=".json",
-        dir=base,
-        delete=False,
-        encoding="utf-8",
-    ) as tmp_fh:
-        json.dump(assessment, tmp_fh, ensure_ascii=False, indent=2)
-        tmp_path = tmp_fh.name
-    os.replace(tmp_path, dest)
 
 
 def _finalize_workspace(data_dir: str) -> list[dict]:

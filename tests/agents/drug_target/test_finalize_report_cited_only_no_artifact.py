@@ -226,31 +226,7 @@ async def test_cited_only_violation_blocks_all_four_disk_artifacts(
         )
 
 
-@pytest.mark.asyncio
-async def test_idempotency_skips_finalization_when_drug_md_exists(
-    tmp_path: Path,
-) -> None:
-    """If drug.md already exists, finalize_report returns success without re-running."""
-    _build_workspace(tmp_path)
-
-    # Pre-write drug.md to trigger idempotency guard (Decision 12)
-    (tmp_path / "drug.md").write_text("# Pre-existing drug.md", encoding="utf-8")
-
-    from src.agents.drug_target.finalize_report import finalize_report
-
-    state = {
-        "data_dir": str(tmp_path),
-        "disease": "IPF",
-        "messages": [],
-        "featured_lr_pairs": None,
-        "report_finalization_error": None,
-        "evidence_truncated": False,
-    }
-
-    result = await finalize_report(state, {})  # type: ignore[arg-type]
-
-    # Idempotency guard means no error
-    assert result.get("report_finalization_error") is None, (
-        f"Expected None error when drug.md pre-exists, got: {result.get('report_finalization_error')}"
-    )
-    assert result.get("evidence_truncated") is False
+# NOTE: the idempotency short-circuit (Decision 12) was removed (Codex PR #32 P1)
+# so finalize_report always regenerates. The "no short-circuit" regression guard
+# lives in test_report_expansion_provenance.py::
+# test_finalize_report_regenerates_when_drug_md_exists.

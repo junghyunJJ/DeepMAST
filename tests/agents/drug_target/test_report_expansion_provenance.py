@@ -764,18 +764,19 @@ async def test_finalize_report_evidence_budget_exceeded_no_llm_call(tmp_path: Pa
 
 
 # ---------------------------------------------------------------------------
-# Test 7 — Resume-skip / idempotency
+# Test 7 — No short-circuit: regenerate even when drug.md exists
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_finalize_report_idempotent_when_drug_md_exists(tmp_path: Path) -> None:
-    """When drug.md already exists, finalize_report returns success immediately
-    without calling the LLM or rendering any new artifacts."""
+async def test_finalize_report_regenerates_when_drug_md_exists(tmp_path: Path) -> None:
+    """A prior-run drug.md must NOT short-circuit finalization. finalize_report
+    always proceeds to the LLM call so a reused workspace with different input
+    cannot silently return stale results (Codex PR #32 P1)."""
     _write_minimal_workspace(tmp_path)
     _make_reference_card(tmp_path)
-    # Pre-create drug.md to simulate a previous successful run
-    (tmp_path / "drug.md").write_text("# Pre-existing report\n", encoding="utf-8")
+    # Pre-create drug.md to simulate a previous run with DIFFERENT input
+    (tmp_path / "drug.md").write_text("# Stale prior-run report\n", encoding="utf-8")
 
     with patch("src.agents.model.create_llm") as mock_llm:
         mock_model = MagicMock()
@@ -784,11 +785,7 @@ async def test_finalize_report_idempotent_when_drug_md_exists(tmp_path: Path) ->
 
         from src.agents.drug_target.finalize_report import finalize_report
 
-        result = await finalize_report(_make_state(tmp_path), config={})
+        await finalize_report(_make_state(tmp_path), config={})
 
-    assert result["report_finalization_error"] is None
-    assert result["evidence_truncated"] is False
-    # LLM must NOT have been called
-    mock_model.with_structured_output.assert_not_called()
-    # Pre-existing drug.md is still there (not overwritten)
-    assert (tmp_path / "drug.md").read_text(encoding="utf-8") == "# Pre-existing report\n"
+    # The guard is gone: the LLM step is reached even though drug.md pre-exists.
+    mock_model.with_structured_output.assert_called()
