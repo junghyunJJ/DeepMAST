@@ -135,6 +135,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Enable Census API tools (query_cellxgene_lr_context, run_compare_census_lr_pair). "
              "Disabled by default due to slow API response times.",
     )
+    p.add_argument(
+        "--skip-evidence-assessor",
+        action="store_true",
+        default=False,
+        help="Skip the evidence_assessor subagent (resume mode). Assumes evidence/*.json "
+             "files are already on disk from a prior partial run. Orchestrator runs only "
+             "hypothesis_writer, then the finalize_report node. Sets env var "
+             "DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR=1 before agent construction.",
+    )
     args = p.parse_args(argv)
     if args.port is not None and args.provider.lower() != "ollama":
         p.error("--port can only be used with --provider ollama")
@@ -262,11 +271,6 @@ def _json_tool_result(raw: object) -> dict:
     return {"result": raw}
 
 
-def _is_summarizer_stream_node(node_path: str, node_name: str) -> bool:
-    path_parts = [part.strip().casefold() for part in node_path.split(">")]
-    return node_name.casefold() == "summarizer" or "summarizer" in path_parts
-
-
 def _is_hypothesis_writer_stream_node(node_path: str, node_name: str) -> bool:
     path_parts = [part.strip().casefold() for part in node_path.split(">")]
     return (
@@ -275,20 +279,12 @@ def _is_hypothesis_writer_stream_node(node_path: str, node_name: str) -> bool:
     )
 
 
-def _summarizer_budget_exceeded(
+def _hypothesis_budget_exceeded(
     started_at: float | None,
     now: float,
     budget_seconds: int,
 ) -> bool:
     return started_at is not None and now - started_at >= budget_seconds
-
-
-def _summarizer_stream_budget_seconds() -> int:
-    raw = os.environ.get("DRUG_TARGET_SUMMARIZER_STREAM_BUDGET_SECONDS", "120")
-    try:
-        return max(1, int(raw))
-    except ValueError:
-        return 120
 
 
 def _hypothesis_stream_budget_seconds() -> int:
@@ -726,109 +722,11 @@ def _build_template_expansions(spec_path: Path) -> dict:
     }
 
 
-def _run_host_template_finalization(data_dir: Path, trace_log_path: Path) -> dict:
-    """Finalize report artifacts through deterministic host-side tooling.
-
-    This is a recovery path for traced smoke runs where the LLM summarizer
-    fails its authoring loop after evidence and hypotheses already exist.
-    It uses the same producer/renderer contract covered by the summarizer
-    round-trip tests: build the reference card, save one source-anchored
-    expansion per required slot, render drug.md, validate, then write HTML.
-    """
-    result: dict = {"finalized": False, "steps": [], "errors": []}
-
-    def record(message: str) -> None:
-        result["steps"].append(message)
-        with open(trace_log_path, "a", encoding="utf-8") as fp:
-            fp.write(f"\n[HOST-FINALIZATION-FIXUP] {message}\n")
-
-    try:
-        evidence_dir = data_dir / "evidence"
-        if not (evidence_dir / "assessment_results.json").exists():
-            result["errors"].append("assessment_results.json missing")
-            return result
-
-        from src.agents.drug_target.tools import validate_drug_md
-        from src.agents.drug_target.tools.drug_report_html import (
-            generate_drug_html_report,
-        )
-        from src.agents.drug_target.tools.report_expansion_schema import (
-            EXPANSION_SCHEMA_SPEC_FILE,
-            save_report_expansions,
-        )
-        from src.agents.drug_target.tools.report_renderer import (
-            render_drug_md_from_expansions,
-        )
-        from src.agents.drug_target.tools.stage_logic import build_evidence_summary
-
-        build_impl = getattr(build_evidence_summary, "func", None) or build_evidence_summary
-        build_result = _json_tool_result(build_impl(str(data_dir)))
-        if build_result.get("error"):
-            result["errors"].append(str(build_result["error"]))
-            return result
-        record("build_evidence_summary completed")
-
-        spec_path = data_dir / EXPANSION_SCHEMA_SPEC_FILE
-        if not spec_path.exists():
-            result["errors"].append(f"{EXPANSION_SCHEMA_SPEC_FILE} missing")
-            return result
-
-        expansions = _build_template_expansions(spec_path)
-        save_result = _json_tool_result(
-            save_report_expansions.invoke(
-                {"data_dir": str(data_dir), "expansions": expansions}
-            )
-        )
-        if not save_result.get("saved"):
-            result["errors"].append(f"save_report_expansions failed: {save_result}")
-            return result
-        record("save_report_expansions completed with source-anchored expansions")
-
-        render_result = _json_tool_result(
-            render_drug_md_from_expansions.invoke({"data_dir": str(data_dir)})
-        )
-        if not render_result.get("rendered"):
-            result["errors"].append(f"render_drug_md_from_expansions failed: {render_result}")
-            return result
-        record("render_drug_md_from_expansions completed")
-
-        validate_impl = getattr(validate_drug_md, "func", None) or validate_drug_md
-        validate_result = _json_tool_result(validate_impl(str(data_dir)))
-        if not validate_result.get("valid"):
-            result["errors"].append(f"validate_drug_md failed: {validate_result}")
-            return result
-        record("validate_drug_md valid=true")
-
-        html_result = _json_tool_result(
-            generate_drug_html_report.invoke({"data_dir": str(data_dir)})
-        )
-        if not html_result.get("generated"):
-            result["errors"].append(f"generate_drug_html_report failed: {html_result}")
-            return result
-        record("generate_drug_html_report completed")
-
-        finalization = _validate_report_finalization(data_dir)
-        result["finalization"] = finalization
-        result["finalized"] = bool(finalization.get("valid"))
-        if result["finalized"]:
-            record("validate_drug_report_finalization valid=true")
-        else:
-            result["errors"].append(
-                f"validate_drug_report_finalization failed: {finalization}"
-            )
-        return result
-    except Exception as exc:
-        result["errors"].append(f"{type(exc).__name__}: {exc}")
-        return result
-
-
 def _inspect_report_outputs(data_dir: Path, trace_log_path: Path) -> dict:
     """Inspect whether the traced run produced a fully finalized report."""
     evidence_dir = data_dir / "evidence"
     drug_md_path = data_dir / "drug.md"
     drug_html_path = data_dir / "drug_report.html"
-    trace_text = trace_log_path.read_text(encoding="utf-8") if trace_log_path.exists() else ""
-
     drug_md_content = (
         drug_md_path.read_text(encoding="utf-8") if drug_md_path.exists() else ""
     )
@@ -841,7 +739,6 @@ def _inspect_report_outputs(data_dir: Path, trace_log_path: Path) -> dict:
         if validate_check
         else report_finalization_valid
     )
-    summarizer_passed = "SUMMARIZER_STATUS: PASS" in trace_text
 
     status = {
         "evidence_count": len(list(evidence_dir.glob("*.json"))) if evidence_dir.exists() else 0,
@@ -856,7 +753,6 @@ def _inspect_report_outputs(data_dir: Path, trace_log_path: Path) -> dict:
         "report_finalization_valid": report_finalization_valid,
         "report_finalization_issue_count": finalization_result.get("issue_count"),
         "report_finalization_issues": finalization_result.get("issues", []),
-        "summarizer_status_passed": summarizer_passed,
         "missing_requirements": [],
     }
 
@@ -922,6 +818,12 @@ async def run_traced(args: argparse.Namespace) -> int:
     token_tracker = TokenUsageTracker()
     token_usage_path = data_dir / f"token_usage_{timestamp}.json"
 
+    # ── Resume mode env-var (must be set BEFORE agent construction) ──
+    if args.skip_evidence_assessor:
+        os.environ["DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR"] = "1"
+        print("[CONFIG] RESUME mode — evidence_assessor will be skipped "
+              "(env DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR=1)")
+
     # ── Create agent ──────────────────────────────────────────────────
     from src.agents.drug_target.agent import (
         DrugTargetConfig,
@@ -955,15 +857,15 @@ async def run_traced(args: argparse.Namespace) -> int:
     start = time.time()
     node_counter = 0
     timeout_seconds = args.timeout * 60
-    summarizer_budget_seconds = _summarizer_stream_budget_seconds()
     hypothesis_budget_seconds = _hypothesis_stream_budget_seconds()
-    summarizer_started_at: float | None = None
     hypothesis_started_at: float | None = None
     evidence_ready_started_at: float | None = None
-    finalization_ready_started_at: float | None = None
     hypothesis_budget_aborted = False
-    finalization_budget_aborted = False
     captured_drug_md_holder = {"content": None}  # Fallback: capture drug.md from Command(files=...)
+    # Capture finalize_report state fields from stream updates
+    captured_finalization_state: dict = {"report_finalization_error": None, "evidence_truncated": False}
+    # Record whether drug.md existed before this run (for idempotency SOP message)
+    pre_run_drug_md_exists = (data_dir / "drug.md").exists()
 
     try:
         async for chunk in agent.astream(
@@ -982,9 +884,7 @@ async def run_traced(args: argparse.Namespace) -> int:
 
             namespace, update = chunk
             node_path = " > ".join(namespace) if namespace else "orchestrator"
-            abort_for_summarizer_budget = False
             abort_for_hypothesis_budget = False
-            abort_for_finalization_budget = False
 
             for node_name, node_data in update.items():
                 now = time.time()
@@ -996,7 +896,7 @@ async def run_traced(args: argparse.Namespace) -> int:
                 ):
                     evidence_ready_started_at = now
                 if (
-                    _summarizer_budget_exceeded(
+                    _hypothesis_budget_exceeded(
                         evidence_ready_started_at,
                         now,
                         hypothesis_budget_seconds,
@@ -1017,39 +917,12 @@ async def run_traced(args: argparse.Namespace) -> int:
                     break
 
                 if (
-                    finalization_ready_started_at is None
-                    and hypothesis_path.exists()
-                    and not _artifact_predates_run(hypothesis_path, start)
-                ):
-                    finalization_ready_started_at = now
-                if (
-                    _summarizer_budget_exceeded(
-                        finalization_ready_started_at,
-                        now,
-                        summarizer_budget_seconds,
-                    )
-                    and not _inspect_report_outputs(data_dir, trace_log_path)["finalized"]
-                ):
-                    message = (
-                        "[SUMMARIZER-BUDGET] hypothesis_report.json has been "
-                        f"ready for {summarizer_budget_seconds}s but report "
-                        "artifacts are not finalized; switching to host "
-                        "finalization fixup."
-                    )
-                    print(f"\n{message}")
-                    trace_log_fp.write(f"\n{message}\n")
-                    trace_log_fp.flush()
-                    finalization_budget_aborted = True
-                    abort_for_finalization_budget = True
-                    break
-
-                if (
                     hypothesis_started_at is None
                     and _is_hypothesis_writer_stream_node(node_path, node_name)
                 ):
                     hypothesis_started_at = now
                 if (
-                    _summarizer_budget_exceeded(
+                    _hypothesis_budget_exceeded(
                         hypothesis_started_at,
                         now,
                         hypothesis_budget_seconds,
@@ -1068,32 +941,6 @@ async def run_traced(args: argparse.Namespace) -> int:
                     trace_log_fp.flush()
                     hypothesis_budget_aborted = True
                     abort_for_hypothesis_budget = True
-                    break
-
-                if (
-                    summarizer_started_at is None
-                    and _is_summarizer_stream_node(node_path, node_name)
-                ):
-                    summarizer_started_at = now
-                if (
-                    _summarizer_budget_exceeded(
-                        summarizer_started_at,
-                        now,
-                        summarizer_budget_seconds,
-                    )
-                    and (data_dir / "evidence" / "assessment_results.json").exists()
-                    and (data_dir / "evidence" / "hypothesis_report.json").exists()
-                ):
-                    message = (
-                        "[SUMMARIZER-BUDGET] summarizer stream exceeded "
-                        f"{summarizer_budget_seconds}s after evidence and "
-                        "hypothesis artifacts were written; switching to "
-                        "host finalization fixup."
-                    )
-                    print(f"\n{message}")
-                    trace_log_fp.write(f"\n{message}\n")
-                    trace_log_fp.flush()
-                    abort_for_summarizer_budget = True
                     break
 
                 node_counter += 1
@@ -1116,11 +963,17 @@ async def run_traced(args: argparse.Namespace) -> int:
 
                 # Capture drug.md content from Command(files=...) state updates
                 _capture_drug_md_from_update(node_data, captured_drug_md_holder)
-            if (
-                abort_for_hypothesis_budget
-                or abort_for_summarizer_budget
-                or abort_for_finalization_budget
-            ):
+                # Capture finalize_report state fields when the node emits them
+                if isinstance(node_data, dict):
+                    if "report_finalization_error" in node_data:
+                        captured_finalization_state["report_finalization_error"] = (
+                            node_data["report_finalization_error"]
+                        )
+                    if "evidence_truncated" in node_data:
+                        captured_finalization_state["evidence_truncated"] = bool(
+                            node_data["evidence_truncated"]
+                        )
+            if abort_for_hypothesis_budget:
                 break
 
     except asyncio.CancelledError:
@@ -1400,24 +1253,42 @@ async def run_traced(args: argparse.Namespace) -> int:
         with open(trace_log_path, "a") as fp:
             fp.write(f"\n[FALLBACK] drug.md extracted from Command(files=...) state update\n")
 
-    pre_fixup_status = _inspect_report_outputs(data_dir, trace_log_path)
-    if (
-        not pre_fixup_status["finalized"]
-        and assessment_path.exists()
-        and _hypothesis_report_ready_for_finalization(hypothesis_path, start)
-    ):
-        print(
-            "\n[HOST-FINALIZATION-FIXUP] report not finalized after agent stream; "
-            "running deterministic template-expansion finalization."
-        )
-        fixup_result = _run_host_template_finalization(data_dir, trace_log_path)
-        if fixup_result.get("finalized"):
-            print("[HOST-FINALIZATION-FIXUP] SUCCESS — host validator is valid=true")
-        else:
-            print(
-                "[HOST-FINALIZATION-FIXUP] FAILED — "
-                + "; ".join(fixup_result.get("errors", [])[:5])
+    # ── finalize_report node — the new super-graph node that follows the
+    # inner DeepAgents runnable in the production super-graph. The trace
+    # script invokes agent.astream() directly on the inner agent (bypassing
+    # the super-graph for streaming visibility), so we must invoke
+    # finalize_report manually here to reach the post-agent stage.
+    if not drug_md_path.exists():
+        print("\n[FINALIZE_REPORT] Invoking super-graph finalize_report node...")
+        finalize_start = time.time()
+        try:
+            from src.agents.drug_target.finalize_report import finalize_report
+            finalize_state = {
+                "data_dir": str(data_dir),
+                "disease": args.disease,
+            }
+            finalize_result = await finalize_report(finalize_state, {"recursion_limit": 100})
+            finalize_elapsed = time.time() - finalize_start
+            finalize_err = finalize_result.get("report_finalization_error")
+            evidence_trunc_now = finalize_result.get("evidence_truncated", False)
+            captured_finalization_state["report_finalization_error"] = finalize_err
+            captured_finalization_state["evidence_truncated"] = evidence_trunc_now
+            status = "OK" if finalize_err is None else f"ERROR: {finalize_err[:120]}"
+            print(f"  [FINALIZE_REPORT] {finalize_elapsed:.1f}s — {status}")
+            with open(trace_log_path, "a") as fp:
+                fp.write(
+                    f"\n[FINALIZE_REPORT] {finalize_elapsed:.1f}s — {status}\n"
+                )
+        except Exception as exc:  # noqa: BLE001 — fail-closed surfaces in summary
+            finalize_elapsed = time.time() - finalize_start
+            captured_finalization_state["report_finalization_error"] = (
+                f"finalize_report_exception: {type(exc).__name__}: {exc}"
             )
+            print(f"  [FINALIZE_REPORT] {finalize_elapsed:.1f}s — EXCEPTION: {exc}")
+            with open(trace_log_path, "a") as fp:
+                fp.write(
+                    f"\n[FINALIZE_REPORT] EXCEPTION ({type(exc).__name__}): {exc}\n"
+                )
 
     elapsed = time.time() - start
 
@@ -1428,6 +1299,9 @@ async def run_traced(args: argparse.Namespace) -> int:
 
     report_status = _inspect_report_outputs(data_dir, trace_log_path)
     evidence_count = report_status["evidence_count"]
+
+    finalization_error = captured_finalization_state["report_finalization_error"]
+    evidence_truncated = captured_finalization_state["evidence_truncated"]
 
     print(f"  Evidence files:      {evidence_count}")
     print(f"  assessment_results:  {'YES' if report_status['assessment_exists'] else 'NO'}")
@@ -1449,10 +1323,8 @@ async def run_traced(args: argparse.Namespace) -> int:
         f"  host_finalization:   "
         f"{'PASS' if report_status['report_finalization_valid'] else 'NO PASS'}"
     )
-    print(
-        f"  SUMMARIZER_STATUS:   "
-        f"{'PASS' if report_status['summarizer_status_passed'] else 'NO PASS'}"
-    )
+    print(f"  REPORT_FINALIZATION_ERROR: {finalization_error if finalization_error else '—'}")
+    print(f"  EVIDENCE_TRUNCATED:  {evidence_truncated}")
     print(f"  report_finalized:    {'YES' if report_status['finalized'] else 'NO'}")
     if report_status["missing_requirements"]:
         print(
@@ -1492,9 +1364,10 @@ async def run_traced(args: argparse.Namespace) -> int:
             f"{'PASS' if report_status['report_finalization_valid'] else 'NO PASS'}\n"
         )
         fp.write(
-            f"  SUMMARIZER_STATUS:   "
-            f"{'PASS' if report_status['summarizer_status_passed'] else 'NO PASS'}\n"
+            f"  REPORT_FINALIZATION_ERROR: "
+            f"{finalization_error if finalization_error else '—'}\n"
         )
+        fp.write(f"  EVIDENCE_TRUNCATED:  {evidence_truncated}\n")
         fp.write(f"  report_finalized:    {'YES' if report_status['finalized'] else 'NO'}\n")
         if report_status["missing_requirements"]:
             fp.write(
@@ -1508,10 +1381,34 @@ async def run_traced(args: argparse.Namespace) -> int:
         content = (data_dir / "drug.md").read_text()
         print(f"\n  drug.md: {len(content):,} chars")
 
+    # ── Idempotency SOP: hint when finalize_report was skipped ───────────
+    if report_status["finalized"] and pre_run_drug_md_exists:
+        print(
+            "\nNOTE: finalize_report may have been skipped because drug.md already"
+            " existed in the data_dir before this run.",
+            file=sys.stderr,
+        )
+        print(
+            "To force re-run, delete the four artifacts first:\n"
+            f"  rm -f {data_dir}/drug.md {data_dir}/drug_report.html"
+            f" {data_dir}/target_assessment.json {data_dir}/report_expansions.json",
+            file=sys.stderr,
+        )
+
     # ── Token usage report ────────────────────────────────────────────
     token_tracker.print_summary()
     token_tracker.save_report(token_usage_path)
     print(f"  Token usage report: {token_usage_path}")
+
+    # ── CI smoke fail on evidence truncation (Decision 10 / CP-P0-011) ──
+    if evidence_truncated:
+        print(
+            "\n[CI FAIL] evidence_truncated=True — finalize_report aborted due to"
+            " evidence budget exceeded. Delete stale artifacts and re-run after"
+            " evidence cap is resolved.",
+            file=sys.stderr,
+        )
+        return 2
 
     success = report_status["finalized"]
     print(f"\n  {'SUCCESS' if success else 'PARTIAL'}")

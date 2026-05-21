@@ -57,16 +57,6 @@ def test_configure_ollama_port_override_noops_without_port(monkeypatch):
     assert traced.os.environ["OLLAMA_HOST"] == "http://localhost:7000"
 
 
-def test_summarizer_stream_budget_only_applies_after_summarizer_starts():
-    assert traced._is_summarizer_stream_node("report_writer > summarizer", "tools")
-    assert traced._is_summarizer_stream_node("report_writer", "summarizer")
-    assert not traced._is_summarizer_stream_node("evidence_assessor", "tools")
-
-    assert not traced._summarizer_budget_exceeded(None, 200.0, 60)
-    assert not traced._summarizer_budget_exceeded(100.0, 159.9, 60)
-    assert traced._summarizer_budget_exceeded(100.0, 160.0, 60)
-
-
 def test_hypothesis_stream_budget_only_applies_after_hypothesis_writer_starts():
     assert traced._is_hypothesis_writer_stream_node(
         "tools > task > hypothesis_writer",
@@ -313,6 +303,7 @@ def test_template_expansion_fallback_marks_degraded_without_slot_match(tmp_path)
 
 
 def test_inspect_report_outputs_rejects_unexpanded_drug_md(tmp_path):
+    """drug.md with EXPAND markers is not finalized — artifact-existence check."""
     evidence_dir = tmp_path / "evidence"
     evidence_dir.mkdir()
     (evidence_dir / "assessment_results.json").write_text("{}", encoding="utf-8")
@@ -320,21 +311,20 @@ def test_inspect_report_outputs_rejects_unexpanded_drug_md(tmp_path):
     (tmp_path / "drug_report.html").write_text("<html></html>", encoding="utf-8")
     (tmp_path / "drug.md").write_text("intro\n<!-- EXPAND: unfinished -->\n", encoding="utf-8")
     trace_log = tmp_path / "trace.log"
-    trace_log.write_text(
-        "content='{\"valid\": true}' name='validate_drug_md'\n"
-        "AIMessage(content='SUMMARIZER_STATUS: PASS')\n",
-        encoding="utf-8",
-    )
+    trace_log.write_text("", encoding="utf-8")
 
     status = traced._inspect_report_outputs(tmp_path, trace_log)
 
-    assert status["finalized"] is False
+    # drug.md exists but has EXPAND markers — not finalized
     assert status["drug_md_exists"] is True
+    assert (tmp_path / "drug.md").exists()
     assert status["expand_marker_count"] == 1
+    assert status["finalized"] is False
     assert "no EXPAND markers" in status["missing_requirements"]
 
 
 def test_inspect_report_outputs_accepts_validated_final_report(tmp_path, monkeypatch):
+    """drug.md without EXPAND markers + valid finalization = finalized."""
     evidence_dir = tmp_path / "evidence"
     evidence_dir.mkdir()
     (evidence_dir / "assessment_results.json").write_text("{}", encoding="utf-8")
@@ -342,10 +332,7 @@ def test_inspect_report_outputs_accepts_validated_final_report(tmp_path, monkeyp
     (tmp_path / "drug.md").write_text("# Complete report\nNo placeholders.\n", encoding="utf-8")
     (tmp_path / "drug_report.html").write_text("<html></html>", encoding="utf-8")
     trace_log = tmp_path / "trace.log"
-    trace_log.write_text(
-        "AIMessage(content='SUMMARIZER_STATUS: FAIL')\n",
-        encoding="utf-8",
-    )
+    trace_log.write_text("", encoding="utf-8")
     monkeypatch.setattr(
         traced,
         "_validate_report_finalization",
@@ -355,16 +342,17 @@ def test_inspect_report_outputs_accepts_validated_final_report(tmp_path, monkeyp
 
     status = traced._inspect_report_outputs(tmp_path, trace_log)
 
+    assert (tmp_path / "drug.md").exists()
     assert status["finalized"] is True
     assert status["report_finalization_valid"] is True
-    assert status["summarizer_status_passed"] is False
     assert status["missing_requirements"] == []
 
 
-def test_inspect_report_outputs_rejects_trace_pass_without_host_finalization(
+def test_inspect_report_outputs_rejects_when_finalization_invalid(
     tmp_path,
     monkeypatch,
 ):
+    """drug.md exists but validate_drug_report_finalization=False → not finalized."""
     evidence_dir = tmp_path / "evidence"
     evidence_dir.mkdir()
     (evidence_dir / "assessment_results.json").write_text("{}", encoding="utf-8")
@@ -372,12 +360,7 @@ def test_inspect_report_outputs_rejects_trace_pass_without_host_finalization(
     (tmp_path / "drug.md").write_text("# Complete report\nNo placeholders.\n", encoding="utf-8")
     (tmp_path / "drug_report.html").write_text("<html></html>", encoding="utf-8")
     trace_log = tmp_path / "trace.log"
-    trace_log.write_text(
-        "tool_calls=[validate_drug_md]\n"
-        'tool: {"valid": true, "issues": []}...\n'
-        "AIMessage(content='SUMMARIZER_STATUS: PASS')\n",
-        encoding="utf-8",
-    )
+    trace_log.write_text("", encoding="utf-8")
     monkeypatch.setattr(
         traced,
         "_validate_report_finalization",
@@ -391,63 +374,13 @@ def test_inspect_report_outputs_rejects_trace_pass_without_host_finalization(
 
     status = traced._inspect_report_outputs(tmp_path, trace_log)
 
-    assert status["validate_drug_md_passed"] is False
+    assert (tmp_path / "drug.md").exists()
     assert status["report_finalization_valid"] is False
     assert status["finalized"] is False
     assert "validate_drug_report_finalization valid=true" in status["missing_requirements"]
 
 
-def test_host_template_finalization_writes_valid_report_artifacts(tmp_path):
-    fixture_evidence = (
-        Path(__file__).resolve().parent
-        / "agents"
-        / "drug_target"
-        / "fixtures"
-        / "baseline_hallucinated"
-        / "evidence"
-    )
-    shutil.copytree(fixture_evidence, tmp_path / "evidence")
-    (tmp_path / "evidence" / "known_drugs.json").write_text("[]", encoding="utf-8")
-    assessment_path = tmp_path / "evidence" / "assessment_results.json"
-    assessment = json.loads(assessment_path.read_text(encoding="utf-8"))
-    assessment["disease"] = "idiopathic pulmonary fibrosis"
-    assessment_path.write_text(json.dumps(assessment, indent=2), encoding="utf-8")
-    hypothesis_path = tmp_path / "evidence" / "hypothesis_report.json"
-    hypothesis = json.loads(hypothesis_path.read_text(encoding="utf-8"))
-    hypothesis["hypotheses"] = [
-        hyp
-        for hyp in hypothesis.get("hypotheses", [])
-        if "_FAILED" not in json.dumps(hyp)
-    ]
-    hypothesis_path.write_text(json.dumps(hypothesis, indent=2), encoding="utf-8")
-    (tmp_path / "lr_candidates.json").write_text(
-        json.dumps(
-            {
-                "disease": "idiopathic pulmonary fibrosis",
-                "pairs": [
-                    {"ligand": "FN1", "receptor": "SDC2"},
-                    {"ligand": "HLA-DQB1", "receptor": "CD4"},
-                    {"ligand": "ICAM1", "receptor": "EZR"},
-                    {"ligand": "ICAM1", "receptor": "ITGB2"},
-                    {"ligand": "ICAM1", "receptor": "MUC1"},
-                    {"ligand": "THBS1", "receptor": "CD47"},
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-    trace_log = tmp_path / "trace.log"
-    trace_log.write_text("", encoding="utf-8")
-
-    result = traced._run_host_template_finalization(tmp_path, trace_log)
-
-    assert result["finalized"] is True, result
-    assert (tmp_path / "drug.md").exists()
-    assert (tmp_path / "drug_report.html").exists()
-    assert (tmp_path / "target_assessment.json").exists()
-    drug_md = (tmp_path / "drug.md").read_text(encoding="utf-8")
-    assert "<!-- EXPAND:" not in drug_md
-    assert "Scope note: Stage 1 Census evidence for these hypotheses is labeled pulmonary fibrosis" in drug_md
-
-    status = traced._inspect_report_outputs(tmp_path, trace_log)
-    assert status["finalized"] is True, status
+# test_host_template_finalization_writes_valid_report_artifacts was deleted:
+# _run_host_template_finalization was removed in Phase 3 (Decision 4 / Option A).
+# finalize_report node in the super-graph is now the single source of truth for
+# rendering drug.md + HTML + target_assessment.json.

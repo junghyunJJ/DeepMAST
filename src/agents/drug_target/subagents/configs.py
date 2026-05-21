@@ -1,19 +1,17 @@
 """Subagent configurations for Drug Target Assessment Agent.
 
-Three-subagent staged funnel (happy path):
+Two-subagent staged funnel (happy path):
 - evidence_assessor: 3-stage funnel (Stage 2: validation & scoring ->
   Stage 1: biological context -> Stage 3: ChEMBL drug profiles inline)
   with inline rubric assessment.
 - hypothesis_writer: Hypothesis generation with UCB scoring from all evidence.
-- summarizer: Flat dict subagent (2026-05-13 simplification) that authors and
-  finalizes drug.md via the 6-step tool sequence
-  (build_evidence_summary -> load_evidence_files -> save_report_expansions
-  -> render_drug_md_from_expansions -> validate_drug_md
-  -> generate_drug_html_report). Quality gating is a combination of
-  ``validate_drug_md`` (semantic) and ``SummarizerFinalizationGuardMiddleware``
-  (mechanical: blocks HTML generation until the validator passes).
 
-Workflow order: evidence_assessor -> hypothesis_writer -> summarizer
+Report finalization is handled by the deterministic ``finalize_report`` node in
+the LangGraph super-graph (``src/agents/drug_target/finalize_report.py``).
+That node renders drug.md + HTML + target_assessment.json with cited-only
+provenance and a token-budget fail-closed gate — no LLM summarizer subagent.
+
+Workflow order: evidence_assessor -> hypothesis_writer
 """
 
 import json
@@ -29,10 +27,7 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
     WriteFileArgGuardMiddleware,
 )
 from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
-from src.agents.drug_target.subagents.summarizer import get_summarizer_subagent
-from src.agents.drug_target.subagents.summarizer.middleware import (
-    HypothesisRetryLoopMiddleware,
-)
+from src.agents.drug_target.middleware import HypothesisRetryLoopMiddleware
 from src.agents.drug_target.tools import (
     compute_rubric_scores,
     finalize_stage1_artifacts,
@@ -268,12 +263,12 @@ SUBAGENT_CONFIGS = {
 # Workflow Order
 # =============================================================================
 
-WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer", "summarizer"]
+WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer"]
 
 _TOP_LEVEL_SUBAGENTS = ("evidence_assessor", "hypothesis_writer")
 
 WORKFLOW_DESCRIPTION = """
-Drug Target Assessment 3-Agent Workflow (Staged Funnel):
+Drug Target Assessment 2-Agent Workflow (Staged Funnel):
 
 1. EVIDENCE_ASSESSOR (Plan->Execute->Reflect per stage)
    Stage 2 FIRST (ALL unique genes): batch OpenTargets + batch GWAS + VEP (conditional)
@@ -296,16 +291,9 @@ Drug Target Assessment 3-Agent Workflow (Staged Funnel):
    Outputs: hypothesis_report.json
    Gate: hypothesis_report.json must exist
 
-3. SUMMARIZER (flat dict subagent — 2026-05-13 simplification)
-   Six-step tool sequence executed by a single tool-calling LLM:
-     build_evidence_summary -> load_evidence_files -> save_report_expansions
-       -> render_drug_md_from_expansions -> validate_drug_md
-       -> generate_drug_html_report
-   Emits SUMMARIZER_STATUS: PASS or SUMMARIZER_STATUS: FAIL on its own line.
-   Quality gating:
-     - validate_drug_md (semantic gate, mandatory)
-     - SummarizerFinalizationGuardMiddleware (mechanical: blocks
-       generate_drug_html_report unless validate_drug_md returned valid=true)
+3. FINALIZE_REPORT NODE (deterministic post-agent): super-graph node renders
+   drug.md + HTML + target_assessment.json with cited-only provenance +
+   token-budget fail-closed gate. See src/agents/drug_target/finalize_report.py.
 """
 
 
@@ -321,36 +309,30 @@ def get_subagents(
     default_model: BaseChatModel | str | None = None,
     backend: object | None = None,
     enable_census: bool = True,
-    critic_enabled: bool = True,
     skills_sources: list[str] | None = None,
     skill_registry: dict[str, str] | None = None,
     skills_dir: str | None = None,
     subagent_skill_names: dict[str, tuple[str, ...]] | None = None,
     subagent_skill_registries: dict[str, dict[str, str]] | None = None,
 ) -> list[dict]:
-    """Build the three drug-target subagents in workflow order.
+    """Build the two drug-target subagents in workflow order.
 
-    Returns a list of three flat dict subagents:
+    Returns a list of two flat dict subagents:
       1. evidence_assessor — 3-stage funnel with inline rubric assessment.
       2. hypothesis_writer — hypothesis generation with UCB scoring.
-      3. summarizer — single dict subagent owning the drug.md authoring +
-         validation + HTML rendering workflow.
+
+    Report finalization is handled by the deterministic ``finalize_report``
+    LangGraph node after the DeepAgents harness completes.
 
     Args:
-        custom_tools: Additional tools to inject into evidence_assessor and
-            hypothesis_writer (not the summarizer — its tool set is fixed).
+        custom_tools: Additional tools to inject into each subagent.
         data_dir: Resolved data directory path; appended to each subagent's
             system prompt as a ``Data Directory`` note.
         disease: Disease context appended alongside ``data_dir``.
         model_overrides: Optional per-subagent model overrides keyed by
-            subagent name (``evidence_assessor``, ``hypothesis_writer``,
-            ``summarizer``).
-        default_model: Reserved for forward-compat; the new dict summarizer
-            inherits the parent agent's model when no override is provided.
-        backend: Passed into get_summarizer_subagent for future SubAgentMiddleware
-            wiring (task #4). Currently accepted and forwarded unchanged.
-        critic_enabled: When False the critic gate is disabled inside the
-            summarizer. Forwarded unchanged to get_summarizer_subagent.
+            subagent name (``evidence_assessor``, ``hypothesis_writer``).
+        default_model: Reserved for forward-compat.
+        backend: Accepted for API compat; not forwarded to any subagent.
         enable_census: When False, strips Census tools from evidence_assessor
             and appends a disabled-notice to its prompt.
         skills_sources: Legacy deepagents-native skill source paths.
@@ -362,47 +344,10 @@ def get_subagents(
     Returns:
         List of three subagent configuration dictionaries.
     """
-    # Resolve critic_model: critic override > summarizer override > default_model.
-    overrides = model_overrides or {}
-    critic_model: BaseChatModel | str | None = (
-        overrides.get("critic")
-        or overrides.get("summarizer")
-        or default_model
-    )
-    critic_model_supported = isinstance(critic_model, (str, BaseChatModel))
-    # Preserve the requested flag for the normal string/BaseChatModel path and
-    # for missing-model calls so get_summarizer_subagent remains the fail-closed
-    # authority. Test-only mocks are not executable model specs, so route those
-    # through the no-critic compatibility path.
-    summarizer_critic_enabled = bool(
-        critic_enabled and (critic_model is None or critic_model_supported)
-    )
-
     subagents = [
         {**SUBAGENT_CONFIGS[name], "tools": list(SUBAGENT_CONFIGS[name]["tools"])}
         for name in _TOP_LEVEL_SUBAGENTS
     ]
-    try:
-        summarizer_subagent = get_summarizer_subagent(
-            backend=backend,
-            default_model=default_model,
-            critic_model=critic_model,
-            critic_enabled=summarizer_critic_enabled,
-        )
-    except ValueError as exc:
-        if not (
-            critic_enabled
-            and critic_model is None
-            and "critic_enabled=True requires a resolved critic_model" in str(exc)
-        ):
-            raise
-        summarizer_subagent = get_summarizer_subagent(
-            backend=backend,
-            default_model=default_model,
-            critic_model=critic_model,
-            critic_enabled=False,
-        )
-    subagents.append(summarizer_subagent)
 
     for subagent in subagents:
         if subagent["name"] == "hypothesis_writer":
@@ -464,11 +409,7 @@ def get_subagents(
             subagent["system_prompt"] = subagent["system_prompt"] + data_dir_note
 
     if custom_tools:
-        # Custom tools go to evidence_assessor and hypothesis_writer only; the
-        # summarizer tool surface is fixed by `get_summarizer_subagent()`.
         for subagent in subagents:
-            if subagent["name"] == "summarizer":
-                continue
             current_tools = list(subagent.get("tools", []))
             current_tools.extend(custom_tools)
             subagent["tools"] = current_tools
@@ -504,7 +445,7 @@ def get_subagents(
     elif skills_sources:
         # Legacy path retained for callers that still use deepagents native
         # skill auto-loading.
-        _skill_subagents = {"evidence_assessor", "summarizer"}
+        _skill_subagents = {"evidence_assessor"}
         for subagent in subagents:
             if subagent["name"] in _skill_subagents:
                 subagent["skills"] = skills_sources

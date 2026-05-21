@@ -1,7 +1,7 @@
 """T1 RED: filter_hypothesis_evidence_files drops nonexistent evidence_files entries.
 
 The hypothesis_writer occasionally emits `evidence_files` entries that reference
-files that do not exist on disk (e.g. `known_drugs.json`). Before SUMMARIZER
+files that do not exist on disk (e.g. `known_drugs.json`). Before finalize_report
 consumes hypothesis_report.json, a pipeline-level filter must rewrite the file
 in place, dropping any entry whose target path does not exist under
 `<data_dir>/evidence/`.

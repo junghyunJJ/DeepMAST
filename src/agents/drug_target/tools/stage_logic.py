@@ -2793,9 +2793,17 @@ def _build_evidence_field_set(evidence_dir: "Path") -> frozenset[str]:
                     continue
                 provenance = sentence.get("source_provenance")
                 if isinstance(provenance, dict):
-                    add_field(provenance.get("source_field"))
+                    sf = provenance.get("source_field")
+                    add_field(sf)
+                    # Also register the bare field after a gene prefix
+                    # (``CD4::combined_total`` → ``combined_total``) so the
+                    # T7 unanchored-sentence check, which extracts the bare
+                    # segment via rsplit(":", 1)[-1], finds a match.
+                    if sf:
+                        add_field(str(sf).rsplit("::", 1)[-1])
                 for field in sentence.get("source_fields", []) or []:
                     add_field(str(field).rsplit(".", 1)[-1])
+                    add_field(str(field).rsplit("::", 1)[-1])
     reference_path = data_dir / "drug_report_reference_card.json"
     if reference_path.exists():
         try:

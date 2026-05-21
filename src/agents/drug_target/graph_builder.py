@@ -2,47 +2,33 @@
 
 Provides LangGraph CLI integration for standalone testing and deployment.
 
-Graph: DrugTarget — standalone drug target assessment agent
+Graph: DrugTarget — drug target assessment super-graph
+Topology: START → run_deep_agent → finalize_report → END
+
+Invocation contract (HARD — per Decision 1 / CP-P1-014):
+    ``recursion_limit`` is a TOP-LEVEL ``RunnableConfig`` key, NOT nested
+    under ``configurable``.  Callers MUST use::
+
+        await drug_target_graph.ainvoke(
+            initial_state,
+            config={
+                "recursion_limit": cfg.recursion_limit,
+                "configurable": {"thread_id": "..."},
+            },
+        )
+
+    Passing ``recursion_limit`` inside ``configurable`` is silently ignored
+    by LangGraph 0.3+ and will cause the graph to use the default limit.
 """
 
-import os
-
 from dotenv import load_dotenv
-from langchain_core.runnables import Runnable
 
 load_dotenv()
 
-from src.agents.drug_target.agent import (  # noqa: E402
-    create_drug_target_agent,
-    DrugTargetConfig,
-)
+from src.agents.drug_target.super_graph import build_drug_target_super_graph  # noqa: E402
 
 
-def _get_drug_target_graph() -> Runnable:
-    """Drug Target Assessment graph — for LangGraph CLI.
-
-    Uses environment variables:
-    - LLM_PROVIDER: LLM provider (default: "openai")
-    - DEEP_INTERPRETER_DATA_DIR: Data directory with lr_candidates.json
-
-    Returns:
-        Compiled Drug Target Agent runnable
-    """
-    provider = os.getenv("LLM_PROVIDER", "openai")
-    data_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace")
-
-    config = DrugTargetConfig(
-        provider=provider,
-        data_dir=data_dir,
-        use_checkpointer=False,  # LangGraph CLI uses its own persistence
-    )
-
-    agent, backend = create_drug_target_agent(config)
-    if backend and hasattr(backend, "cleanup"):
-        import atexit
-        atexit.register(backend.cleanup)
-    return agent
-
-
-# LangGraph CLI export — eager initialization (LangGraph reads module.__dict__ directly)
-drug_target_graph = _get_drug_target_graph()
+# LangGraph CLI export — langgraph.json entry path:
+#   "DrugTarget": "src.agents.drug_target.graph_builder:drug_target_graph"
+# Symbol name MUST stay ``drug_target_graph`` (langgraph.json depends on it).
+drug_target_graph = build_drug_target_super_graph()

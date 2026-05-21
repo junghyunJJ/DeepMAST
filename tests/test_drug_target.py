@@ -177,59 +177,31 @@ class TestSubagentConfigs:
 
     def test_workflow_order(self):
         from src.agents.drug_target.subagents.configs import WORKFLOW_ORDER
-        assert WORKFLOW_ORDER == ["evidence_assessor", "hypothesis_writer", "summarizer"]
+        assert WORKFLOW_ORDER == ["evidence_assessor", "hypothesis_writer"]
 
-    def test_get_subagents_returns_3(self):
+    def test_get_subagents_returns_2(self):
         from src.agents.drug_target.subagents.configs import get_subagents
         subagents = get_subagents()
-        assert len(subagents) == 3
+        assert len(subagents) == 2
 
     def test_get_subagents_order(self):
         from src.agents.drug_target.subagents.configs import get_subagents
         subagents = get_subagents()
         names = [s["name"] for s in subagents]
-        assert names == ["evidence_assessor", "hypothesis_writer", "summarizer"]
-
-    def test_summarizer_is_flat_dict_subagent(self):
-        """Post-simplification (2026-05-13): summarizer is a flat dict subagent
-        with the canonical DeepAgents SubAgent shape, not a CompiledSubAgent."""
-        from src.agents.drug_target.subagents.configs import get_subagents
-
-        subagents = get_subagents()
-        summarizer = next(s for s in subagents if s["name"] == "summarizer")
-
-        # Flat dict spec — no `runnable` key.
-        assert "runnable" not in summarizer
-        assert "system_prompt" in summarizer
-        assert "tools" in summarizer
-        assert "middleware" in summarizer
-
-        tool_names = {t.name for t in summarizer["tools"]}
-        assert tool_names == {
-            "build_evidence_summary",
-            "load_evidence_files",
-            "lookup_provenance_value",
-            "save_report_expansions",
-            "render_drug_md_from_expansions",
-            "read_skill_file",
-            "validate_drug_md",
-            "generate_drug_html_report",
-            "think_tool",
-        }
+        assert names == ["evidence_assessor", "hypothesis_writer"]
 
     def test_custom_tools_appended_to_interpretive_subagents_only(self):
-        """Custom tools go to evidence_assessor and hypothesis_writer; the
-        summarizer tool surface is fixed by ``get_summarizer_subagent()``."""
+        """Custom tools are appended to all 2 subagents; no summarizer present."""
         from src.agents.drug_target.subagents.configs import get_subagents
         mock_tool = MagicMock(spec=["name"])
         mock_tool.name = "custom_tool"
         subagents = get_subagents(custom_tools=[mock_tool])
-        for s in subagents:
-            tool_names = [t.name for t in s["tools"]]
-            if s["name"] == "summarizer":
-                assert "custom_tool" not in tool_names
-            else:
-                assert "custom_tool" in tool_names
+        # No summarizer in 2-subagent setup
+        assert not any(s["name"] == "summarizer" for s in subagents)
+        # custom_tool is appended to every subagent
+        for sub in subagents:
+            tool_names = [t.name for t in sub["tools"]]
+            assert "custom_tool" in tool_names
 
     def test_evidence_assessor_prompt_mentions_databases_and_rubric(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -271,13 +243,12 @@ class TestSubagentConfigs:
         assert "Stage 3" in prompt
         assert "ChEMBL" in prompt
 
-    def test_workflow_description_mentions_3_agents(self):
+    def test_workflow_description_mentions_2_agents(self):
         from src.agents.drug_target.subagents.configs import WORKFLOW_DESCRIPTION
 
-        assert "3-Agent Workflow" in WORKFLOW_DESCRIPTION
+        assert "2-Agent Workflow" in WORKFLOW_DESCRIPTION and "finalize_report" in WORKFLOW_DESCRIPTION
         assert "EVIDENCE_ASSESSOR" in WORKFLOW_DESCRIPTION
         assert "HYPOTHESIS_WRITER" in WORKFLOW_DESCRIPTION
-        assert "SUMMARIZER" in WORKFLOW_DESCRIPTION
 
     def test_evidence_assessor_prompt_mentions_census_and_gwas(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
@@ -320,14 +291,24 @@ class TestSubagentConfigs:
         assert "Evidence_Coverage" in prompt
         assert "Specificity" in prompt
 
-    def test_subagent_prompts_registry_has_3_entries(self):
-        """SUBAGENT_PROMPTS includes the top-level stages plus inner summarizer workers."""
+    def test_subagent_prompts_registry_has_2_entries(self):
+        """SUBAGENT_PROMPTS contains only evidence_assessor and hypothesis_writer
+        after summarizer/critic/report_writer removal."""
         from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
-        assert len(SUBAGENT_PROMPTS) == 5
-        assert set(SUBAGENT_PROMPTS.keys()) == {
-            "evidence_assessor", "hypothesis_writer", "summarizer",
-            "report_writer", "critic",
-        }
+        assert len(SUBAGENT_PROMPTS) == 2
+        assert set(SUBAGENT_PROMPTS.keys()) == {"evidence_assessor", "hypothesis_writer"}
+
+    def test_orchestrator_prompt_has_no_summarizer_status(self):
+        """Row 7: SUMMARIZER_STATUS must not appear in the orchestrator prompt."""
+        from src.agents.drug_target.agent import ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
+        assert "SUMMARIZER_STATUS" not in ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
+        assert "EVIDENCE_PIPELINE_COMPLETE" in ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
+
+    def test_drug_target_config_has_no_summarizer_skill_names(self):
+        """Row 8: DrugTargetConfig must not have the removed summarizer_skill_names field."""
+        from src.agents.drug_target.agent import DrugTargetConfig
+        assert not hasattr(DrugTargetConfig, "summarizer_skill_names")
+        assert not hasattr(DrugTargetConfig, "critic_enabled")
 
 
 class TestStage1NullSafe:
@@ -2630,12 +2611,14 @@ class TestIntegration:
             })
         )
         result = json.loads(raw)
-        assert "error" in result
-        assert "not found" in result["error"]
+        # New envelope shape: success=False + errors list (CP-P0-008)
+        assert result["success"] is False
+        assert len(result["errors"]) > 0
+        assert "not found" in result["errors"][0]
 
     @pytest.mark.asyncio
     async def test_run_drug_target_assessment_with_mock_agent(self, mock_data_dir):
-        """Full integration: mock agent writes drug.md, integration reads it."""
+        """Full integration: mock super-graph writes drug.md, integration reads envelope."""
         from src.agents.drug_target.integration import run_drug_target_assessment
 
         mock_report = "# Drug Target Assessment\n\n## Executive Summary\nMock report."
@@ -2645,43 +2628,25 @@ class TestIntegration:
             "featured_candidates_deep_dive": [],
         }
 
-        mock_agent = MagicMock()
+        # Simulate the super-graph writing artifacts and returning final_state
+        async def mock_graph_ainvoke(initial_state, config=None):
+            (mock_data_dir / "drug.md").write_text(mock_report, encoding="utf-8")
+            (mock_data_dir / "target_assessment.json").write_text(
+                json.dumps(mock_json), encoding="utf-8"
+            )
+            return {
+                "messages": [],
+                "report_finalization_error": None,
+                "evidence_truncated": False,
+            }
 
-        async def mock_ainvoke(input_dict, config=None):
-            # Simulate agent writing drug.md
-            (mock_data_dir / "drug.md").write_text(mock_report)
-            (mock_data_dir / "target_assessment.json").write_text(json.dumps(mock_json))
-            return {"messages": []}
+        mock_graph = MagicMock()
+        mock_graph.ainvoke = mock_graph_ainvoke
 
-        mock_agent.ainvoke = mock_ainvoke
-
-        # Patch at source module (lazy import inside the function).
-        # create_drug_target_agent returns (agent, backend_or_None).
-        # validate_drug_report_finalization is the new fail-closed gate; mock
-        # it to return valid=true so this integration test exercises only the
-        # host-gate dispatch logic, not the validator itself (which has its
-        # own dedicated test suite under tests/agents/drug_target/).
+        # Patch at graph_builder — integration.py lazy-imports from there at call time
         with patch(
-            "src.agents.drug_target.agent.create_drug_target_agent",
-            return_value=(mock_agent, None),
-        ), patch(
-            "src.agents.drug_target.integration.finalize_stage1_workspace",
-            return_value={"success": True, "post_validation": {"errors": []}},
-        ), patch(
-            "src.agents.drug_target.tools.validate_drug_report_finalization.func",
-            return_value=json.dumps({
-                "valid": True,
-                "issue_count": 0,
-                "issues": [],
-                "checks": {
-                    "data_dir": {"status": "pass", "path": str(mock_data_dir)},
-                    "required_artifacts": {"status": "pass", "missing": []},
-                    "validate_drug_md": {"status": "pass", "raw": {"valid": True}},
-                    "target_assessment": {"status": "pass", "issues": []},
-                    "report_finalization": {"status": "pass", "issues": []},
-                },
-                "sources": [],
-            }),
+            "src.agents.drug_target.graph_builder.drug_target_graph",
+            mock_graph,
         ):
             raw = await run_drug_target_assessment.ainvoke({
                 "data_dir": str(mock_data_dir),
@@ -2695,7 +2660,7 @@ class TestIntegration:
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")
-    def test_create_agent_passes_subagents_with_3_entries(
+    def test_create_agent_passes_subagents_with_2_entries(
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
@@ -2708,7 +2673,7 @@ class TestIntegration:
 
         call_kwargs = mock_create_deep_agent.call_args
         subagents = call_kwargs.kwargs.get("subagents") or call_kwargs[1].get("subagents")
-        assert len(subagents) == 3
+        assert len(subagents) == 2
 
     def test_shared_skills_middleware_filters_allowed_skill_names(self, tmp_path):
         import asyncio
@@ -2742,11 +2707,8 @@ class TestIntegration:
     def test_create_drug_target_agent_attaches_skills_to_interpretive_subagents_only(
         self, mock_create_llm, mock_create_deep_agent, tmp_path
     ):
-        """Skills are attached to interpretive subagents (hypothesis_writer + summarizer)
-        and NOT to the tool-driven evidence_assessor. Post-2026-05-13 simplification:
-        the summarizer is a flat dict subagent and receives ``drug-target-reporting``
-        via the same SkillsMiddleware + SkillActivator path used for hypothesis_writer.
-        """
+        """Skills attach to hypothesis_writer only; evidence_assessor has no skills.
+        Summarizer subagent is gone — post-Phase-3 2-subagent topology."""
         from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
         from src.agents.shared.skill_activator import SkillActivator
         from src.agents.shared.skills_middleware import SkillsMiddleware
@@ -2758,8 +2720,6 @@ class TestIntegration:
         create_drug_target_agent(config)
 
         call_kwargs = mock_create_deep_agent.call_args.kwargs
-        # Orchestrator middleware: WriteFileArgGuard + ThinkToolQualityGate +
-        # ReadFileBlock + SubagentErrorGuard
         middleware = call_kwargs.get("middleware", [])
         mw_names = [type(m).__name__ for m in middleware]
         assert "WriteFileArgGuardMiddleware" in mw_names
@@ -2767,6 +2727,11 @@ class TestIntegration:
         assert "SubagentErrorGuardMiddleware" in mw_names
 
         subagents = call_kwargs.get("subagents", [])
+        # No summarizer in 2-subagent world
+        assert not any(s["name"] == "summarizer" for s in subagents)
+        # evidence_assessor should NOT have SkillsMiddleware (it's not in _skill_subagents)
+        assert len(subagents) == 2
+
         ea = next(s for s in subagents if s["name"] == "evidence_assessor")
         ea_mw = ea.get("middleware", [])
         assert "skills" not in ea
@@ -2784,15 +2749,6 @@ class TestIntegration:
             "gwas-database",
             "chembl-database",
         }
-
-        summarizer = next(s for s in subagents if s["name"] == "summarizer")
-        # Post-2026-05-13: flat dict spec (no `runnable`).
-        assert "runnable" not in summarizer
-        sm_mw = summarizer.get("middleware", [])
-        assert "skills" not in summarizer
-        assert any(isinstance(m, SkillsMiddleware) for m in sm_mw)
-        sm_activator = next(m for m in sm_mw if isinstance(m, SkillActivator))
-        assert set(sm_activator.skill_registry) == {"drug-target-reporting"}
 
     @patch("src.agents.drug_target.agent.create_deep_agent")
     @patch("src.agents.drug_target.agent.create_llm")

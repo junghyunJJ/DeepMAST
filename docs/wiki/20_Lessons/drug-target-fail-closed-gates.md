@@ -1,19 +1,22 @@
 ---
 title: "Drug Target Agent Fail-Closed Quality Gates"
-description: "Why deterministic middleware-level gates replace LLM self-judgment in the drug-target agent: 4 defect cases, the wrap_tool_call vs wrap_model_call hook selection, and the post-handler tool result inspection pattern reused from RepairCycleCounterMiddleware. Updated 2026-05-13 to record the summarizer simplification: 4 of 5 summarizer-scoped middleware classes were removed in favor of prompt-level enforcement; SummarizerFinalizationGuardMiddleware survived, adapted to the new 7-tool surface."
+description: "Why deterministic gates replace LLM self-judgment in the drug-target agent: 4 defect cases, wrap_tool_call vs wrap_model_call hook selection, and the post-handler inspection pattern. Updated 2026-05-19: summarizer subagent removed; finalize_report LangGraph node is now the single observable failure surface via 5 error classes (evidence_budget_exceeded, llm_call_failed_after_retries, validation_failed, cited_only_violation, finalization_validation_failed) and report_finalization_error state field, replacing SUMMARIZER_STATUS: FAIL."
 type: lesson
-tags: [middleware, fail-closed, langchain, deepagents, drug_target, wrap_tool_call, quality-gate, deterministic]
+tags: [middleware, fail-closed, langchain, deepagents, drug_target, wrap_tool_call, quality-gate, deterministic, langgraph, finalize_report]
 created: 2026-05-06
-updated: 2026-05-15
+updated: 2026-05-19
 sources:
   - src/agents/deep_interpreter/middleware/think_tool_quality_gate.py
   - src/agents/deep_interpreter/middleware/write_file_guard.py
-  - src/agents/drug_target/subagents/summarizer/middleware.py
-  - src/agents/drug_target/subagents/summarizer/agent.py
+  - src/agents/drug_target/finalize_report.py
+  - src/agents/drug_target/super_graph.py
+  - src/agents/drug_target/validators.py
+  - src/agents/drug_target/finalize_report_prompts.py
   - src/agents/drug_target/tools/stage_logic.py
 related-plans:
   - .omb/plans/2026-05-06-drug-target-agent-quality-gates.md
   - .omb/plans/2026-05-13-drug-target-summarizer-simplification.md
+  - .omb/plans/2026-05-19-drug-target-finalize-node.md
 ---
 
 ## Lesson: Drug Target Agent Fail-Closed Quality Gates
@@ -667,3 +670,53 @@ proceeds during a live agent run.
 - `pyright` is not installed in this worktree's venv — flag as env gap for reviewer.
 - 2 pre-existing failures in `test_drug_md_new_flags.py` (`TestWrongApprovalYearExtension`,
   `TestUngroundedMechanism`) predate this branch and are not introduced here.
+
+---
+
+## 2026-05-19 Update — summarizer → finalize_report node migration
+
+### What changed
+
+The `summarizer` subagent (with its `SummarizerFinalizationGuardMiddleware` and
+`CriticGateMiddleware`) was removed entirely. Report finalization is now handled by the
+deterministic `finalize_report` LangGraph node (`src/agents/drug_target/finalize_report.py`),
+which runs after `run_deep_agent` completes via a static edge in the super-graph
+(`START → run_deep_agent → finalize_report → END`, compiled in `graph_builder.py`).
+
+### The single observable failure surface
+
+`report_finalization_error` (a `str | None` field in `DrugTargetState`, `super_graph.py`) is
+now the **only** way finalization failures are reported. It replaces the previous
+`SUMMARIZER_STATUS: FAIL` literal-line contract that required the orchestrator LLM to emit a
+specific token to signal failure — an inherently unreliable prompt-level enforcement pattern
+(see Defect 3 above).
+
+The `integration.run_drug_target_assessment()` tool reads this field from `final_state` and
+maps it directly to the JSON envelope: `report_finalization_error is not None → success=False,
+errors=[finalization_error]`.
+
+### 5 error classes (deterministic Python, not LLM judgment)
+
+| Error class | Source | Disk writes? |
+|-------------|---------|-------------|
+| `evidence_budget_exceeded` | Token estimate > 20K at node entry | None |
+| `llm_call_failed_after_retries` | 2-attempt structured-output LLM call exhausted | None |
+| `validation_failed` | `validate_report_expansions()` schema errors | None |
+| `cited_only_violation` | `validate_cited_only_provenance()` provenance errors | None |
+| `finalization_validation_failed` | `validate_drug_report_finalization()` post-render | drug.md + HTML written |
+
+All checks in the first four classes run **before any disk writes**, preserving the
+fail-closed discipline established in this document's earlier sections.
+
+### Why this is architecturally consistent with the lessons above
+
+The core lesson from Defects 1–4 stands unchanged: **prompt-only enforcement is unreliable for
+fail-closed decisions**. The `finalize_report` node extends that principle by moving the entire
+failure-surface out of the LLM's reasoning loop. Instead of middleware intercepting tool calls
+within a subagent loop, the entire finalization step is a single deterministic Python function
+with explicit error classification. The LLM's one job (structured output fill) is bounded and
+retried at most twice; everything else is Python sequencing.
+
+The token-budget gate is the strongest expression of this principle: it fires *before* any LLM
+call, making it impossible for the node to incur LLM cost on oversized inputs regardless of
+what the model would have done.

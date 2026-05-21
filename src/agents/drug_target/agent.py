@@ -1,17 +1,15 @@
 """Drug Target Assessment Agent using DeepAgents framework.
 
-3-Subagent Architecture (2026-05-13 simplification):
+2-Subagent Architecture:
 1. EVIDENCE_ASSESSOR: 3-stage funnel (Stage 2: validation & scoring ->
    Stage 1: biological context -> Stage 3: ChEMBL drug profiles)
    with inline rubric assessment.
 2. HYPOTHESIS_WRITER: Hypothesis generation with UCB scoring from all evidence.
-3. SUMMARIZER: Flat dict subagent owning the drug.md authoring + validation +
-   HTML rendering workflow via a fixed 6-step tool sequence
-   (build_evidence_summary -> load_evidence_files -> save_report_expansions
-   -> render_drug_md_from_expansions -> validate_drug_md
-   -> generate_drug_html_report). Quality gating is enforced by
-   ``validate_drug_md`` (semantic) plus ``SummarizerFinalizationGuardMiddleware``
-   (mechanical: blocks HTML generation until the validator passes).
+
+Report finalization (drug.md, HTML, target_assessment.json) is handled by the
+deterministic ``finalize_report`` LangGraph node in the super-graph
+(``src/agents/drug_target/finalize_report.py``), which runs after the
+DeepAgents harness completes.
 
 All database queries are wrapped as @tool functions that run on the host process.
 Docker backend is OPTIONAL — set docker_image in DrugTargetConfig to enable
@@ -62,32 +60,6 @@ from src.agents.drug_target.tools import (
 logger = logging.getLogger(__name__)
 
 
-_CRITIC_DISABLE_TOKENS: frozenset[str] = frozenset({"false", "0", "no", "off"})
-_CRITIC_KNOWN_TOKENS: frozenset[str] = frozenset({"false", "0", "no", "off", "true", "1", "yes", "on"})
-
-
-def _critic_enabled_default_from_env() -> bool:
-    """Read DRUG_TARGET_CRITIC_ENABLED and return the critic-enabled flag.
-
-    Returns:
-        False only when the env var is set to one of: false, 0, no, off
-        (case-insensitive, stripped). Returns True for unset, empty, or any
-        other value — fail-closed means the critic stays ENABLED unless the
-        operator explicitly opts out.
-    """
-    raw = os.environ.get("DRUG_TARGET_CRITIC_ENABLED", "")
-    normalized = raw.strip().lower()
-    if normalized in _CRITIC_DISABLE_TOKENS:
-        return False
-    if normalized and normalized not in _CRITIC_KNOWN_TOKENS:
-        logger.warning(
-            "DRUG_TARGET_CRITIC_ENABLED=%r is not a recognized value "
-            "(known: true/1/yes/on/false/0/no/off). Treating as enabled (fail-closed).",
-            raw,
-        )
-    return True
-
-
 # =============================================================================
 # Orchestrator System Prompt
 # =============================================================================
@@ -101,24 +73,48 @@ Data directory: {data_dir} | Disease: {disease}
             instruction="Run Stage 1+2+3 for {disease}. Data dir: {data_dir}. <paste lr_candidates output>")
 3. Call task(subagent_type="hypothesis_writer",
             instruction="Generate hypotheses from evidence. Data dir: {data_dir}")
-4. Call task(subagent_type="summarizer",
-            instruction="Finalize drug.md and target_assessment.json with write -> validate -> critic -> repair loop. Data dir: {data_dir}")
-5. If summarizer returns "SUMMARIZER_STATUS: PASS", reply "Pipeline complete." with zero tool calls.
-   If summarizer returns "SUMMARIZER_STATUS: FAIL", reply "Pipeline incomplete: report remains draft." and include the summarizer's remaining gate failures.
+4. Reply with the single line: EVIDENCE_PIPELINE_COMPLETE
 
 ## Rules
-- Execute steps 1-5 in order. Do not skip, reorder, or repeat.
+- Execute steps 1-4 in order. Do not skip, reorder, or repeat.
 - Do not read files. Do not analyze evidence.
-- Only summarize the summarizer return when it reports SUMMARIZER_STATUS: FAIL;
-  include gate failures verbatim so the caller knows the report is incomplete.
-- Completion is fail-closed: never claim success unless summarizer explicitly reports SUMMARIZER_STATUS: PASS.
-- After step 5, stop. Any additional tool call is a failure.
+- After step 4, stop. Any additional tool call is a failure.
+- Report finalization (drug.md, HTML, target_assessment.json) is handled by
+  the downstream finalize_report node — the orchestrator must not attempt it.
 
 ## Input
 - lr_candidates.json: top-30 L-R pairs (loaded in step 1)
 
 ## Output
-- drug.md, target_assessment.json, hypothesis_report.json, evidence/*.json
+- hypothesis_report.json, evidence/*.json (finalize_report node writes drug.md + HTML)
+"""
+
+
+# Resume orchestrator prompt — skips load_lr_candidates + evidence_assessor.
+# Activated when env var DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR=1 (set by trace
+# script --skip-evidence-assessor flag). Use ONLY when evidence/*.json files
+# from a prior partial run are present on disk; the orchestrator does not
+# verify integrity — the caller is responsible.
+ORCHESTRATOR_RESUME_PROMPT_TEMPLATE = """You are the Drug Target Assessment orchestrator (RESUME mode).
+Data directory: {data_dir} | Disease: {disease}
+
+## Steps (execute in exact order)
+1. Call task(subagent_type="hypothesis_writer",
+            instruction="Generate hypotheses from evidence already on disk. Data dir: {data_dir}")
+2. Reply with the single line: EVIDENCE_PIPELINE_COMPLETE
+
+## Rules
+- Evidence files (evidence/*.json, assessment_results.json, stage*.json) are
+  ASSUMED to exist on disk from a prior partial run. Do NOT re-run the
+  evidence_assessor subagent.
+- Execute steps 1-2 in order. Do not skip, reorder, or repeat.
+- Do not read files. Do not analyze evidence.
+- After step 2, stop. Any additional tool call is a failure.
+- Report finalization (drug.md, HTML, target_assessment.json) is handled by
+  the downstream finalize_report node — the orchestrator must not attempt it.
+
+## Output
+- hypothesis_report.json (finalize_report node writes drug.md + HTML)
 """
 
 
@@ -130,8 +126,6 @@ class DrugTargetConfig:
         provider: LLM provider. Defaults to 'openrouter'.
         data_dir: Directory containing lr_candidates.json and workspace.
         disease: Disease context for queries.
-        max_iterations: Maximum quality refinement iterations (default: 2).
-        quality_threshold: Minimum quality score to pass (default: 0.7).
         use_checkpointer: Whether to use memory checkpointer (default: False).
         custom_tools: Additional tools to include.
         docker_image: Docker image for sandbox backend. None (default) disables
@@ -142,7 +136,6 @@ class DrugTargetConfig:
         agent_skill_names: Legacy fallback skill tuple retained for registry helpers.
         evidence_assessor_skill_names: Skills exposed to evidence_assessor.
         hypothesis_writer_skill_names: Skills exposed to hypothesis_writer.
-        summarizer_skill_names: Skills exposed to the summarizer subagent.
         skills_dir: Optional override for the project skills directory.
     """
 
@@ -173,20 +166,11 @@ class DrugTargetConfig:
         "gwas-database",
         "chembl-database",
     )
-    summarizer_skill_names: tuple[str, ...] = (
-        "drug-target-reporting",
-    )
     skills_dir: str | None = None
     subagent_models: dict[str, BaseChatModel | str] | None = None
     # init_chat_model format per subagent, e.g.:
-    # {"evidence_assessor": "openai:gpt-4.1", "summarizer": "openai:gpt-4.1-mini"}
+    # {"evidence_assessor": "openai:gpt-4.1", "hypothesis_writer": "openai:gpt-4.1-mini"}
     # If None, auto-loads from SUBAGENT_{NAME}_PROVIDER env vars.
-    critic_enabled: bool = field(default_factory=_critic_enabled_default_from_env)
-    # Reads DRUG_TARGET_CRITIC_ENABLED env var. Returns False only for
-    # explicit disable tokens (false/0/no/off). Any other value (including
-    # unset) returns True — fail-closed means critic stays ENABLED unless
-    # explicitly disabled. Explicit caller-provided values always win because
-    # default_factory only runs when the argument is omitted.
 
     def __post_init__(self):
         if self.subagent_models is None:
@@ -194,8 +178,6 @@ class DrugTargetConfig:
                 [
                     "evidence_assessor",
                     "hypothesis_writer",
-                    "summarizer",
-                    "critic",
                 ]
             )
 
@@ -271,7 +253,6 @@ def _build_subagent_skill_name_map(
             enable_census=enable_census,
         ),
         "hypothesis_writer": tuple(config.hypothesis_writer_skill_names),
-        "summarizer": tuple(config.summarizer_skill_names),
     }
 
 
@@ -281,12 +262,11 @@ def create_drug_target_agent(
     """Create the Drug Target Assessment agent using DeepAgents framework.
 
     Creates a fully configured agent with:
-    - 3 top-level subagents (evidence_assessor, hypothesis_writer, summarizer)
-    - summarizer is a flat dict subagent (2026-05-13 simplification);
-      ``SummarizerFinalizationGuardMiddleware`` blocks HTML generation until
-      ``validate_drug_md`` returns ``valid=true``
+    - 2 top-level subagents (evidence_assessor, hypothesis_writer)
     - All database queries via @tool wrappers (host-side by default)
     - Optional DockerBackend when docker_image is set in config
+    - Report finalization is handled by the deterministic finalize_report
+      LangGraph node in the super-graph after this agent completes
 
     Args:
         config: Optional configuration. Uses defaults if not provided.
@@ -339,8 +319,7 @@ def create_drug_target_agent(
     if config.custom_tools:
         tools.extend(config.custom_tools)
 
-    # 3. Create the orchestrator LLM before subagents so the summarizer
-    #    CompiledSubAgent can share the parent model by default.
+    # 3. Create the orchestrator LLM.
     llm = create_llm(provider=config.provider)
 
     # 4. Get subagent specs — primary subagents use allow-listed shared
@@ -354,7 +333,6 @@ def create_drug_target_agent(
         default_model=llm,
         backend=backend,
         enable_census=config.enable_census,
-        critic_enabled=config.critic_enabled,
         skills_dir=skills_dir,
         subagent_skill_names=subagent_skill_names,
         subagent_skill_registries=subagent_skill_registries,
@@ -365,7 +343,13 @@ def create_drug_target_agent(
 
     # Render system prompt with config values so the LLM knows
     # data_dir / disease without parsing the user message.
-    system_prompt = ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE.format(
+    # Resume mode (DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR=1) skips evidence_assessor
+    # — used by trace script --skip-evidence-assessor for partial re-runs.
+    resume_mode = os.getenv("DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR", "").lower() in {"1", "true", "yes"}
+    template = ORCHESTRATOR_RESUME_PROMPT_TEMPLATE if resume_mode else ORCHESTRATOR_SYSTEM_PROMPT_TEMPLATE
+    if resume_mode:
+        logger.info("Orchestrator running in RESUME mode (evidence_assessor skipped).")
+    system_prompt = template.format(
         data_dir=resolved_data_dir,
         disease=config.disease or "(see lr_candidates.json)",
     )
@@ -388,13 +372,11 @@ def create_drug_target_agent(
     agent = create_deep_agent(**create_kwargs)
     # evidence_assessor alone can consume 500-800 steps for large gene panels
     # (41 genes × ~10 steps/gene for Stage 2, plus Stage 1 batch + rubric + gates).
-    # All 3 top-level subagents share this budget. With the 2026-05-13 summarizer
-    # simplification the summarizer runs as a single dict subagent (no inner
-    # report_writer/critic graph), so its share drops sharply. Conservative
-    # estimate after simplification:
+    # Both top-level subagents share this budget. Conservative estimate:
     #   evidence_assessor: ~1500, hypothesis_writer: ~300,
-    #   summarizer (single LLM loop, max 2 validator retries): ~300,
-    #   orchestrator: ~200 = ~2300 typical, 10000 for margin.
+    #   orchestrator: ~200 = ~2000 typical, 10000 for margin.
+    # Report finalization is handled by the deterministic finalize_report node
+    # in the super-graph and does not consume recursion budget here.
     agent = agent.with_config({"recursion_limit": 10000})
 
     return agent, backend

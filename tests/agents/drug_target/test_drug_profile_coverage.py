@@ -12,11 +12,11 @@ confirm D3 wording is present:
 
 from __future__ import annotations
 
+from src.agents.drug_target.subagents.prompts import REPORT_WRITER_PROMPT
+
 
 def _report_writer_prompt() -> str:
-    from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
-
-    return SUBAGENT_PROMPTS["report_writer"]
+    return REPORT_WRITER_PROMPT
 
 
 def test_drug_profile_data_source_mentions_resolved_drugs() -> None:

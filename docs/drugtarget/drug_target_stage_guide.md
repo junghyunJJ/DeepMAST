@@ -1,28 +1,33 @@
 # Drug Target Assessment Agent -- Stage-by-Stage Guide
 
-> **Version**: Current independent agent (`src/agents/drug_target/`)
+> **Version**: Current independent agent (`src/agents/drug_target/`) — updated 2026-05-19 for 2-subagent + finalize_report node migration
 > **Supersedes**: `docs/phase47_drug_target_assessment_step_by_step.md` (legacy deep_interpreter Phase 4.7)
 
 ---
 
 ## 1. Overview
 
-### Architecture: 3-Subagent + 3-Stage Funnel
+### Architecture: 2-Subagent + finalize_report Node + 3-Stage Funnel
 
 The Drug Target Assessment Agent evaluates therapeutic potential of ligand-receptor (L-R) pairs
 identified from spatial transcriptomics cell-cell interaction (CCI) analysis.
 
 ```
-Orchestrator (agent.py)
-  ├── evidence_assessor   ← 3-Stage Funnel + Inline Rubric
-  ├── hypothesis_writer   ← UCB-scored mechanistic hypothesis generation
-  └── summarizer          ← drug.md authoring + validation + HTML render
-                            (flat dict subagent, 6-step tool sequence)
+LangGraph Super-Graph (graph_builder.py: drug_target_graph)
+  START
+    └── run_deep_agent node (super_graph.py)
+          Orchestrator (agent.py)
+            ├── evidence_assessor   ← 3-Stage Funnel + Inline Rubric
+            └── hypothesis_writer   ← UCB-scored mechanistic hypothesis generation
+    └── finalize_report node (finalize_report.py)
+          Deterministic 6-step: load inputs → token-budget gate → 1 LLM call
+          → validate (schema + cited-only) → render outputs → finalize workspace
+  END
 ```
 
 `evidence_assessor` and `hypothesis_writer` follow a **Plan -> Execute -> Reflect**
-cognitive cycle per stage. `summarizer` is a single tool-calling LLM loop that
-executes a fixed 6-step sequence (see §6).
+cognitive cycle per stage. Report finalization is handled by the deterministic
+`finalize_report` LangGraph node — not a subagent (see §6).
 
 ### Input / Output
 
@@ -38,8 +43,11 @@ executes a fixed 6-step sequence (see §6).
 ### Workflow Order
 
 ```
-load_lr_candidates → evidence_assessor → hypothesis_writer → summarizer
+load_lr_candidates → evidence_assessor → hypothesis_writer → [finalize_report node]
 ```
+
+`evidence_assessor` and `hypothesis_writer` run inside the `run_deep_agent` node.
+`finalize_report` is a separate deterministic LangGraph node connected by a static edge.
 
 ---
 
@@ -275,37 +283,67 @@ Query template: `"{target_name}"[tiab] AND "Clinical Trial"[pt] AND "adverse eve
 
 ---
 
-## 6. Summarizer (post-2026-05-13)
+## 6. Finalize Report Node (post-2026-05-19)
 
-The summarizer authors `drug.md` and renders the HTML report. It is a flat
-dict subagent (no inner subagents, no Python repair loop) and executes a
-fixed 6-step tool sequence under a single tool-calling LLM:
+The `finalize_report` node (`src/agents/drug_target/finalize_report.py`) is a
+**deterministic LangGraph node**, not a subagent. It runs after `run_deep_agent`
+completes, connected by a static edge. It makes exactly **1 LLM call** (structured
+output, `ReportExpansionsPayload`). All other steps are plain Python.
 
-1. `build_evidence_summary(data_dir)` — pre-fills the deterministic evidence
-   summary skeleton. Called exactly once at the start.
-2. `load_evidence_files(data_dir, ...)` — load per-gene evidence JSON.
-3. `save_report_expansions(data_dir, expansions)` — author schema-validated
-   per-section Markdown expansions.
-4. `render_drug_md_from_expansions(data_dir)` — deterministic assembly of
-   `drug.md` from the saved expansions. The LLM never hand-writes drug.md.
-5. `validate_drug_md(data_dir)` — MANDATORY semantic quality gate. Returns
-   `{"valid": bool, "errors": [...]}`. On `valid=false`, re-call
-   `save_report_expansions` for the failing sections, re-render, and
-   re-validate. Max 2 retries (prompt-budgeted).
-6. `generate_drug_html_report(data_dir)` — final HTML render. Mechanically
-   blocked by `SummarizerFinalizationGuardMiddleware` unless the most recent
-   `validate_drug_md` returned `valid=true`. Called exactly once after the
-   validator passes.
+### 6.1 6-Step Internal Sequence
 
-After step 6 the summarizer emits `SUMMARIZER_STATUS: PASS` on its own line
-(or `SUMMARIZER_STATUS: FAIL` if the 2-retry budget is exhausted). The
-orchestrator parses this literal line to decide pipeline completion.
+1. **Idempotency check** — if `drug.md` exists at node entry, skip all
+   processing and return success. Resume protocol: delete the 4 artifacts
+   (`drug.md`, `drug_report.html`, `target_assessment.json`, `report_expansions.json`)
+   and re-invoke the graph to force a fresh finalization run.
 
-`target_assessment.json` is produced earlier in the funnel by
-`finalize_stage1_artifacts` / `save_target_assessment`; the summarizer is
-responsible only for `drug.md` and the rendered HTML.
+2. **Load inputs** — `_load_expansion_inputs(data_dir, disease)` loads:
+   - Evidence dict via `load_evidence_files(data_dir)` tool
+   - Expansion schema spec from `expansion_schema_spec.json`
+   - Reference card from `drug_report_reference_card.json`
 
-### 6.1 `target_assessment.json` Contract
+3. **Token-budget fail-closed gate** — estimate evidence size as
+   `len(json.dumps(evidence)) // 4` tokens. If `> 20_000`, return immediately:
+   ```python
+   {"report_finalization_error": "evidence_budget_exceeded: {n} > 20000",
+    "evidence_truncated": True}
+   ```
+   No LLM call is made. No disk artifacts are written.
+
+4. **LLM call** — `_llm_fill_expansions_once(model, spec, evidence, reference_card, config)`:
+   - Uses `model.with_structured_output(ReportExpansionsPayload).with_retry(stop_after_attempt=2)`
+   - Model: `create_llm(LLM_PROVIDER)` with `temperature=0`
+   - On exhausted retries: `report_finalization_error="llm_call_failed_after_retries: ..."`
+
+5. **Persist + validate** — `_persist_and_validate(data_dir, payload, reference_card)`:
+   - **5a. Schema validation**: `validate_report_expansions(data_dir, payload.model_dump())`
+     (`tools/report_expansion_schema.py`)
+   - **5b. Cited-only provenance check**: `validate_cited_only_provenance(payload, reference_card)`
+     (`validators.py`) — verifies every sentence's `source_file::source_field` key exists
+     in the reference card's provenance index. `cited_only` errors take precedence over
+     `schema` errors in error classification.
+   - On any errors: set `report_finalization_error` and **return without disk writes**.
+   - On pass: atomic save of `report_expansions.json`.
+
+6. **Render outputs** — `_render_outputs(data_dir, payload)`:
+   - `render_drug_md_from_expansions()` → `drug.md`
+   - `generate_drug_html_report()` → `drug_report.html`
+   - Atomic write of `target_assessment.json` from `payload.model_dump()`
+
+7. **Finalize workspace** — `_finalize_workspace(data_dir)`:
+   - `finalize_stage1_artifacts()` — stage 1 artifact normalization
+   - `validate_drug_report_finalization()` — final validation gate
+   - On failure: `report_finalization_error="finalization_validation_failed: ..."`
+
+All writes in steps 6–7 use `tempfile` + `os.replace` for atomicity.
+
+### 6.2 Error Classes
+
+All failures surface via the `report_finalization_error` state field. See
+[`drug_target_agent_reference.md` Section 2.5](drug_target_agent_reference.md#25-finalize_report-node--5-error-classes)
+for the complete error class table.
+
+### 6.3 `target_assessment.json` Contract
 
 The schema contract written upstream by `save_target_assessment()`:
 
@@ -360,8 +398,11 @@ the druggability_matrix before writing, and validates the schema contract.
 
 | File | Key Functions |
 |------|---------------|
-| `assessment_output.py` | `save_target_assessment()`, `_validate_contract()` |
-| `subagents/prompts.py` | `REPORT_WRITER_PROMPT` (defines the 4-section structure) |
+| `finalize_report.py` | `finalize_report()`, `_load_expansion_inputs()`, `_llm_fill_expansions_once()`, `_persist_and_validate()`, `_render_outputs()`, `_finalize_workspace()` |
+| `validators.py` | `validate_cited_only_provenance()` |
+| `tools/report_expansion_schema.py` | `ReportExpansionsPayload`, `validate_report_expansions()`, `_build_provenance_index()` |
+| `super_graph.py` | `DrugTargetState`, `run_deep_agent()`, `build_drug_target_super_graph()` |
+| `graph_builder.py` | `drug_target_graph` (compiled `CompiledStateGraph`) |
 
 ---
 
@@ -457,63 +498,80 @@ Disease matching uses keyword variants (e.g., for breast cancer:
 lr_candidates.json ─────────────────────────────────────────────────────┐
 targets.json (optional) ────────────────────────────────────────────────┤
                                                                         │
-                        ┌───────────────────────────────────────────────▼───┐
-                        │              ORCHESTRATOR (agent.py)              │
-                        │  load_lr_candidates() → gene_symbols, lr_pairs   │
-                        └──────────────────┬───────────────────────────────┘
-                                           │
-                        ┌──────────────────▼───────────────────────────────┐
-                        │         EVIDENCE ASSESSOR (subagent #1)          │
-                        │                                                   │
-                        │  Phase 0: Disease/Cell Type Mapping               │
-                        │    list_census_diseases() → census_disease        │
-                        │                                                   │
-                        │  Stage 1: Biological Context (ALL pairs)          │
-                        │    ┌─ CELLxGENE Census (disease context)          │
-                        │    ├─ KEGG (ligand + receptor pathways)           │
-                        │    ├─ Reactome (ligand + receptor pathways)       │
-                        │    ├─ STRING PPI (interaction score)              │
-                        │    └─ Census cross-validation (z-test)            │
-                        │    → stage1_{L}_{R}.json per pair                 │
-                        │    → compute_stage1_confidence()                  │
-                        │    → stage1_confidence.json                       │
-                        │                                                   │
-                        │  Stage 2: Validation & Scoring (ALL genes)        │
-                        │    ┌─ OpenTargets (target info + disease evidence)│
-                        │    ├─ GWAS Catalog (gene-trait associations)      │
-                        │    ├─ Ensembl VEP [gated: oncology/GWAS]         │
-                        │    └─ OpenTargets Known Drugs (once per disease)  │
-                        │    → ot_{GENE}.json per gene                      │
-                        │    → known_drugs.json, gene_manifest.json         │
-                        │                                                   │
-                        │  Inline Rubric → rank_featured_candidates()       │
-                        │    → assessment_results.json                      │
-                        │    → gwas_interpretation.json                     │
-                        │    → clinical_landscape.json                      │
-                        │    → Featured (2-5) + Novel (1-3) selected        │
-                        │                                                   │
-                        │  Stage 3: Deep Dive (Featured + Novel only)       │
-                        │    ┌─ DrugBank / ChEMBL (drug profiles)           │
-                        │    └─ PubMed [gated: phase >= 2]                  │
-                        │    → stage3_{GENE}.json per candidate             │
-                        └──────────────────┬───────────────────────────────┘
-                                           │
-                        ┌──────────────────▼───────────────────────────────┐
-                        │          REPORT WRITER (subagent #2)              │
-                        │                                                   │
-                        │  1. load_evidence_files() → all evidence/*.json   │
-                        │  2. save_target_assessment() → contract JSON      │
-                        │  3. write drug.md (4-section structure)            │
-                        │  4. validate_quality() >= 0.7                     │
-                        └──────────────────┬───────────────────────────────┘
-                                           │
-                                           ▼
-                        ┌──────────────────────────────────────────────────┐
-                        │                   OUTPUTS                        │
-                        │  target_assessment.json  (structured contract)   │
-                        │  drug.md                 (markdown report)       │
-                        │  evidence/*.json         (intermediate data)     │
-                        └──────────────────────────────────────────────────┘
+         ┌──────────────────────────────────────────────────────────────▼──┐
+         │         run_deep_agent NODE (super_graph.py)                     │
+         │                                                                  │
+         │  ┌──────────────────────────────────────────────────────────┐   │
+         │  │              ORCHESTRATOR (agent.py)                     │   │
+         │  │  load_lr_candidates() → gene_symbols, lr_pairs          │   │
+         │  └──────────────────┬───────────────────────────────────────┘   │
+         │                     │                                            │
+         │  ┌──────────────────▼───────────────────────────────────────┐   │
+         │  │         EVIDENCE ASSESSOR (subagent #1)                  │   │
+         │  │                                                           │   │
+         │  │  Phase 0: Disease/Cell Type Mapping                      │   │
+         │  │    list_census_diseases() → census_disease               │   │
+         │  │                                                           │   │
+         │  │  Stage 1: Biological Context (ALL pairs)                 │   │
+         │  │    ┌─ CELLxGENE Census (disease context)                 │   │
+         │  │    ├─ KEGG (ligand + receptor pathways)                  │   │
+         │  │    ├─ Reactome (ligand + receptor pathways)              │   │
+         │  │    ├─ STRING PPI (interaction score)                     │   │
+         │  │    └─ Census cross-validation (z-test)                   │   │
+         │  │    → stage1_{L}_{R}.json per pair                        │   │
+         │  │    → compute_stage1_confidence()                         │   │
+         │  │    → stage1_confidence.json                              │   │
+         │  │                                                           │   │
+         │  │  Stage 2: Validation & Scoring (ALL genes)               │   │
+         │  │    ┌─ OpenTargets (target info + disease evidence)       │   │
+         │  │    ├─ GWAS Catalog (gene-trait associations)             │   │
+         │  │    ├─ Ensembl VEP [gated: oncology/GWAS]                │   │
+         │  │    └─ OpenTargets Known Drugs (once per disease)         │   │
+         │  │    → ot_{GENE}.json per gene                             │   │
+         │  │    → known_drugs.json, gene_manifest.json                │   │
+         │  │                                                           │   │
+         │  │  Inline Rubric → rank_featured_candidates()              │   │
+         │  │    → assessment_results.json                             │   │
+         │  │    → gwas_interpretation.json                            │   │
+         │  │    → clinical_landscape.json                             │   │
+         │  │    → Featured (2-5) + Novel (1-3) selected               │   │
+         │  │                                                           │   │
+         │  │  Stage 3: Deep Dive (Featured + Novel only)              │   │
+         │  │    ┌─ DrugBank / ChEMBL (drug profiles)                  │   │
+         │  │    └─ PubMed [gated: phase >= 2]                         │   │
+         │  │    → stage3_{GENE}.json per candidate                    │   │
+         │  └──────────────────┬───────────────────────────────────────┘   │
+         │                     │                                            │
+         │  ┌──────────────────▼───────────────────────────────────────┐   │
+         │  │         HYPOTHESIS WRITER (subagent #2)                  │   │
+         │  │  UCB-scored mechanistic hypothesis generation             │   │
+         │  │  → hypothesis_report.json                                 │   │
+         │  └──────────────────┬───────────────────────────────────────┘   │
+         │                     │ (EVIDENCE_PIPELINE_COMPLETE sentinel)      │
+         └─────────────────────┼──────────────────────────────────────────-┘
+                               │  static edge
+         ┌─────────────────────▼──────────────────────────────────────────-┐
+         │         finalize_report NODE (finalize_report.py)               │
+         │                                                                  │
+         │  1. Idempotency check (drug.md exists? → skip)                  │
+         │  2. load_evidence_files() + reference_card + spec               │
+         │  3. Token-budget gate [>20K tokens → evidence_truncated=True]   │
+         │  4. LLM call → ReportExpansionsPayload (1 call, temperature=0)  │
+         │  5. validate_report_expansions() + validate_cited_only_prov()   │
+         │  6. render drug.md + HTML + target_assessment.json (atomic)     │
+         │  7. finalize_stage1_artifacts() + validate_drug_report_final()  │
+         │                                                                  │
+         │  Error surface: report_finalization_error state field           │
+         └─────────────────────┬──────────────────────────────────────────-┘
+                               │
+                               ▼
+         ┌──────────────────────────────────────────────────────────────────┐
+         │                        OUTPUTS                                   │
+         │  target_assessment.json  (structured contract)                   │
+         │  drug.md                 (markdown report)                       │
+         │  drug_report.html        (rendered HTML)                         │
+         │  evidence/*.json         (intermediate data)                     │
+         └──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -522,15 +580,21 @@ targets.json (optional) ──────────────────�
 
 | File | Role | Key Contents |
 |------|------|-------------|
+| `src/agents/drug_target/super_graph.py` | LangGraph super-graph | `DrugTargetState`, `run_deep_agent()`, `build_drug_target_super_graph()` |
+| `src/agents/drug_target/graph_builder.py` | Compiled graph entry | `drug_target_graph` (module-level `CompiledStateGraph`) |
+| `src/agents/drug_target/finalize_report.py` | Finalize node | `finalize_report()`, `_load_expansion_inputs()`, `_llm_fill_expansions_once()`, `_persist_and_validate()`, `_render_outputs()`, `_finalize_workspace()` |
+| `src/agents/drug_target/finalize_report_prompts.py` | LLM prompts for finalize | `FINALIZE_REPORT_SYSTEM_PROMPT`, `FINALIZE_REPORT_USER_TEMPLATE` |
+| `src/agents/drug_target/validators.py` | Cited-only validation | `validate_cited_only_provenance()` |
+| `src/agents/drug_target/middleware.py` | Subagent middleware | `HypothesisRetryLoopMiddleware` |
 | `src/agents/drug_target/agent.py` | Orchestrator | `DrugTargetConfig`, `create_drug_target_agent()`, `ORCHESTRATOR_SYSTEM_PROMPT` |
-| `src/agents/drug_target/subagents/prompts.py` | Subagent prompts | `EVIDENCE_ASSESSOR_PROMPT`, `REPORT_WRITER_PROMPT` |
-| `src/agents/drug_target/subagents/configs.py` | Subagent tool configs | `SUBAGENT_CONFIGS`, `get_subagents()`, `WORKFLOW_ORDER` |
-| `src/agents/drug_target/tools/__init__.py` | Tool registry | All 21 tool re-exports |
-| `src/agents/drug_target/tools/stage_domain_tools.py` | Domain tools (11) | CELLxGENE, KEGG, Reactome, STRING, VEP, OpenTargets, GWAS, DrugBank/ChEMBL, PubMed |
+| `src/agents/drug_target/subagents/prompts.py` | Subagent prompts | `EVIDENCE_ASSESSOR_PROMPT`, `HYPOTHESIS_WRITER_PROMPT` |
+| `src/agents/drug_target/subagents/configs.py` | Subagent tool configs | `SUBAGENT_CONFIGS`, `get_subagents()`, `WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer"]` |
+| `src/agents/drug_target/tools/__init__.py` | Tool registry | Tool re-exports with lazy imports |
+| `src/agents/drug_target/tools/stage_domain_tools.py` | Domain tools | CELLxGENE, KEGG, Reactome, STRING, VEP, OpenTargets, GWAS, DrugBank/ChEMBL, PubMed |
 | `src/agents/drug_target/tools/census_lr_validation_tools.py` | Census cross-validation | `run_compare_census_lr_pair()`, fuzzy matching logic |
 | `src/agents/drug_target/tools/stage_logic.py` | Rubric & gates | `compute_stage1_confidence`, `rank_featured_candidates`, `classify_target`, `compute_priority`, `should_run_vep`, `should_run_pubmed`, `compute_drug_evidence_scores` |
 | `src/agents/drug_target/tools/evidence_loader.py` | I/O helpers | `load_lr_candidates`, `load_evidence_files`, `save_evidence` |
-| `src/agents/drug_target/tools/assessment_output.py` | Output contract | `save_target_assessment()`, schema validation |
+| `src/agents/drug_target/tools/report_expansion_schema.py` | Expansion schema | `ReportExpansionsPayload`, `validate_report_expansions()`, `_build_provenance_index()` |
 | `src/agents/drug_target/tools/common.py` | Cognitive tools | `sequential_thinking`, `think_tool`, `validate_quality` |
-| `src/agents/drug_target/integration.py` | Reporter bridge | `run_drug_target_assessment()` -- async tool for deep_interpreter |
+| `src/agents/drug_target/integration.py` | Reporter bridge | `run_drug_target_assessment()` — async tool for deep_interpreter; invokes `drug_target_graph.ainvoke(...)` |
 | `docs/drugtarget/output_schema.json` | JSON schema | Contract schema for `target_assessment.json` |

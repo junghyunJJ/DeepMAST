@@ -3,7 +3,7 @@ title: Closed-Book Hallucination-Reduction Policy
 category: architecture
 status: accepted
 created: 2026-04-29
-updated: 2026-05-02
+updated: 2026-05-19
 tags: drug-target, hallucination, validation, quality-gate, adr
 relates-to: src/agents/drug_target/tools/stage_logic.py, src/agents/drug_target/subagents/configs.py, src/agents/drug_target/subagents/critic_schema.py
 depends-on: docs/drugtarget/drug_target_agent_reference.md
@@ -89,16 +89,35 @@ Evidence slices are injected via
 `load_evidence_files("evidence/_critic_slices/<gene>.json")` per gene and hypothesis,
 keeping each critic invocation within context limits.
 
-### Layer 5 — Programmatic auto-revise loop
+### Layer 5 — Programmatic validation in finalize_report node (post-2026-05-19)
 
-`run_summarizer_loop` (`src/agents/drug_target/subagents/configs.py:614`) drives a repair cycle:
+> **Note**: The summarizer-side Layer 5 helpers (`run_summarizer_loop`, `RepairCycleCounterMiddleware`,
+> `synthesize_repair_instructions`) are **superseded** as of 2026-05-19. The `summarizer` subagent
+> and its repair loop were removed; `src/agents/drug_target/subagents/summarizer/` was deleted.
+> The following describes the **replacement** Layer 5 responsibilities in the `finalize_report` node.
 
-- Maximum **2 cycles** (`max_cycles=2`).
-- On each cycle: run validator → if P0 flags remain, enter REPAIR MODE in `REPORT_WRITER_PROMPT`.
-- REPAIR MODE loads the existing `drug.md` via `load_evidence_files` and applies surgical edits
-  to flagged sentences only — it does NOT regenerate the full report skeleton.
-- After 2 cycles with P0 flags unresolved, the loop returns `status: "BLOCKED"` with the
-  remaining P0 findings as the blocker payload.
+The `finalize_report` node (`src/agents/drug_target/finalize_report.py`) enforces three
+programmatic validation sub-layers inside `_persist_and_validate()`, **before any disk writes**:
+
+**Validation gate** — `validate_report_expansions(data_dir, payload.model_dump())`
+(`src/agents/drug_target/tools/report_expansion_schema.py`): schema validation of the
+`ReportExpansionsPayload` structured output returned by the single LLM call. Errors are
+classified as `validation_failed`.
+
+**Cited-only provenance check** — `validate_cited_only_provenance(payload, reference_card)`
+(`src/agents/drug_target/validators.py`): verifies that every sentence's
+`source_provenance.source_file::source_field` key exists in the reference card's provenance
+index (built by `_build_provenance_index(reference_card)`). Errors are classified as
+`cited_only_violation` and take precedence over schema errors in `_classify_validation_error()`.
+
+**Token-budget fail-closed gate** — enforced in `finalize_report` before the LLM call
+(`finalize_report.py:81–84`): if `len(json.dumps(evidence)) // 4 > 20_000`, the node returns
+immediately with `evidence_truncated=True` and no LLM invocation. This is a hard pre-check,
+not a post-validation step.
+
+If any of these checks fail, `finalize_report` sets `report_finalization_error` and returns
+without writing any artifact to disk. This replaces the previous LLM-driven repair loop with
+deterministic Python fail-closed semantics.
 
 ---
 
@@ -145,16 +164,16 @@ pytest tests/agents/drug_target/ -v
 # (xfail decorators removed at lines 218/262 of test_drug_md_hallucination_regression.py)
 ```
 
-**Phase 5 E2E reproduction script (requires Ollama at `OLLAMA_HOST`):**
+**E2E reproduction (post-2026-05-19 migration — `run_drug_target_summarizer_only.py` deleted):**
+
+> `scripts/run_drug_target_summarizer_only.py` was deleted as part of the 2026-05-19
+> finalize_report node migration. Use `scripts/run_drug_target_traced.py` for E2E runs.
 
 ```bash
-OLLAMA_HOST=http://localhost:6000 \
-LANGCHAIN_TRACING_V2=false \
-OMB_CRITIC_SLICES_KEEP=1 \
+LLM_PROVIDER=openrouter \
 PYTHONUNBUFFERED=1 \
-uv run python scripts/run_drug_target_summarizer_only.py \
-  --model qwen3.5:35b \
-  --keep-data-dir
+uv run python scripts/run_drug_target_traced.py \
+  --data-dir /path/to/workspace
 ```
 
 ---
@@ -223,6 +242,17 @@ Per-prompt smoke status (PR body MUST attest):
 | 2026-04-30 | `2026-04-30-drug-target-closed-book-followups.md` | All 6 phases landed. Three guards added to close the residual gaps from PR #11 audit: (1) `filter_hypothesis_evidence_files` pipeline filter wired into `_CriticSliceWrapper.{invoke,ainvoke}` cleans `hypothesis_report.json` before SUMMARIZER consumes it. Two passes: list-key pass (drops `evidence_files` and `evidence_references` entries pointing to nonexistent files or ending in `_FAILED`); prose pass (rewrites `<file>.json_FAILED` → `<file>.json` in any string anywhere in the document, including `falsifiable_prediction` / `validation_approach` prose where the LLM can echo the suffix verbatim). (2) `AnnotationDensityMiddleware` rejects `save_drug_md` when prose has ≥10 sentences but <10 `[source: <field>]` annotations, replacing prompt-only enforcement with a programmatic guard. (3) REPORT_WRITER_PROMPT drug-profile data source broadened to the allowlist UNION (`resolved_drugs.json[*].name` ∪ `stage3_<gene>.json[*].matched_drugs[*].name` ∪ `stage3_<gene>.json[*].preclinical_compounds[*].name`) so featured candidates with OpenTargets drugs no longer collapse to "No known drugs". |
 | 2026-05-01 | `2026-04-30-drug-target-closed-book-followups.md` (E2E reproduction + audit) | Live E2E reproduction (qwen3.5:35b on Ollama via `scripts/run_drug_target_summarizer_only.py --keep-data-dir`) regenerated `tests/agents/drug_target/fixtures/regenerated/drug.md` (41679 bytes, 502 lines) in 38.8 minutes. **AC1 = 0** nonexistent-file refs (down from 1 in PR #11; `known_drugs.json`, `_FAILED` suffix, `ot_*.json` all eliminated). **AC2 = 81** `[source:]` annotations (up from 1 in PR #11; threshold ≥10 satisfied). **AC4** full pytest: 129 passed (16 new unit tests across 3 test files), 2 pre-existing failures unrelated to this plan, 2 xfailed. AC3 (drug-profile coverage) is N/A on the baseline_hallucinated fixture because `resolved_drugs.json` is empty and all stage3 files have empty `matched_drugs` — the guard 3 prompt change is verified by unit tests, but the union itself is empty so "No known drugs" is the correct output for this fixture. A separate run with non-empty OpenTargets data would be needed to demonstrate drug-name population. Earlier qwen3.5:122b retries (v3, v4, v5) showed inconsistent behavior — v3 gave up at 6.8 min after a path-resolution misread, v4 echoed `_FAILED` from `falsifiable_prediction` prose (which prompted the prose-strip extension), v5 hung for 1.5 hours without producing drug.md; 35b proved more stable for this fixture. |
 | 2026-05-01 | `2026-05-01-deepagents-filesystem-backend-ls-glob-investigation.md` | **Diagnosis + observability landing** for the long-suspected `FilesystemBackend(virtual_mode=True)` empty-result bug that caused v3 (qwen3.5:122b) and v7 (gemma4:31b) to give up. **Root cause: HYPOTHESIS (b) — LLM path mistake.** Under deepagents 0.5.3 `virtual_mode=True`, the model is told `data_dir: /private/tmp/drug_target_summarizer_XXX/data_dir` in its prompt and naively prepends that absolute disk path when calling `ls`/`glob`. `_resolve_path` then treats the absolute path as a *virtual* path under cwd, looks for `<cwd>/private/tmp/...`, finds nothing, and returns `LsResult(entries=[])`. The correct virtual form `ls /evidence` returns 35 entries. Captured live in T4 instrumented gemma4:31b run on 2026-05-01 — backend log shows `[ts=1777667099] tool=ls path=/private/tmp/drug_target_t4_out/data_dir/evidence result_count=0` vs `[ts=1777667077] tool=ls path=/evidence result_count=35`. **Phase 0+1+2 landed**: T0.7a/b live-runner wiring fix (`create_summarizer_agent` factory now accepts `data_dir` kwarg with mutual-exclusivity guard, paired with `scripts/run_drug_target_summarizer_only.py` passing `data_dir=str(data_dir)`); T1+T2 standalone backend RED matrix (0 RED at backend layer; bug confirmed at LLM layer per T2.5); T3 `LoggingAndFallbackFilesystemBackend` wrapper (logging only — T6 fallback **SKIPPED** per CP-P1-002 because RED is at LLM layer, not backend); T3.5 `LoggingFilesystemMiddleware` standalone (mechanism (b) — `wrap_tool_call` interception; not yet wired to avoid stack risk); T3.6 `JsonlFormatter` + 5-phase `_CriticSliceWrapper` lifecycle logger; CLI flags `--log-level` / `--log-file` added. **Prompt-side fix landed**: T8 GUIDANCE sentence appended to `SUMMARIZER_PROMPT` / `REPORT_WRITER_PROMPT` / `CRITIC_PROMPT` directing the LLM to call `load_evidence_files(data_dir)` whenever ls/glob returns empty unexpectedly, with CP-P1-003 sanitization and CP-P2-005 negation-aware regex regression test (8 tests, all pass). **Plan accuracy gap discovered**: §2.2.1 claimed `_resolve_path` blocks `~` for virtual_mode=True, but on 0.5.3 `_resolve_path` prepends `/` BEFORE checking `startswith("~")`, so `ls("~/secrets")` → `vpath="/~/secrets"` which is NOT rejected (only middleware-layer `validate_path` blocks `~`); documented as `xfail` test `test_ls_blocks_tilde_path_xfail_documented_upstream_gap`. **Environment note**: worktree was synced from main's uncommitted `pyproject.toml` pin `deepagents==0.5.3` — the committed pin was `>=0.4.4` which made an early `uv add --dev` resolve to 0.4.4 with the old `ls_info`/`glob_info` API; recommend committing the pin to main and rebasing the worktree branch. T9 (gemma4:31b post-fix verification) and T10 (qwen3.5:35b regression) deferred to a follow-up session — diagnosis and prompt-side fix are sufficient to unblock; live-LLM verification is a separate compute commitment. |
+
+### 2026-05-19 — summarizer → finalize_report node migration
+
+**Plan:** `.omb/plans/2026-05-19-drug-target-finalize-node.md`
+
+**Outcome:** Layer 5 summarizer-side helpers (`run_summarizer_loop`, `RepairCycleCounterMiddleware`, `synthesize_repair_instructions`) superseded. The `summarizer` subagent and `subagents/summarizer/` directory were deleted. Layer 5 responsibilities migrated to three deterministic validation sub-layers inside `finalize_report._persist_and_validate()`:
+- `validate_report_expansions()` (schema gate, existing)
+- `validate_cited_only_provenance()` (NEW, `validators.py`)
+- Token-budget fail-closed gate (NEW, `finalize_report.py:81–84`, before LLM call)
+
+All three checks run before any disk writes. The `report_finalization_error` state field is the single observable failure surface, replacing `SUMMARIZER_STATUS: FAIL`.
 
 ### 2026-05-13 — Summarizer simplification
 

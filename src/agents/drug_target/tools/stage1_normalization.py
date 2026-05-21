@@ -38,6 +38,7 @@ MICROENVIRONMENT_SUPPORT_MIN_PCT = 10.0
 STAGE1_SKIP_FILES = frozenset({
     "stage1_evidence.json",
     "stage1_filter.json",
+    "stage1_filter_results.json",
     "stage1_audit.json",
 })
 
