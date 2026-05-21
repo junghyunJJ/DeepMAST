@@ -28,7 +28,6 @@ def _collect_system_prompts(disease: str | None, data_dir: str = "/data/run") ->
     subagents = mod.get_subagents(  # type: ignore[attr-defined]
         data_dir=data_dir,
         disease=disease,
-        critic_enabled=False,
     )
     return [s["system_prompt"] for s in subagents]
 
@@ -92,8 +91,8 @@ def test_disease_none_or_empty_does_not_break_prompt_assembly() -> None:
     """disease=None and disease='' must both produce a valid system_prompt."""
     for disease_val in (None, ""):
         prompts = _collect_system_prompts(disease=disease_val)
-        assert len(prompts) == 3, (
-            f"Expected 3 subagent prompts, got {len(prompts)} for disease={disease_val!r}"
+        assert len(prompts) == 2, (
+            f"Expected 2 subagent prompts, got {len(prompts)} for disease={disease_val!r}"
         )
         for prompt in prompts:
             assert isinstance(prompt, str) and len(prompt) > 0, (

@@ -8,10 +8,10 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from langchain_core.tools import tool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, WithJsonSchema
 
 REFERENCE_CARD_VERSION = "drug_report_reference_card.v1"
 REPORT_EXPANSIONS_VERSION = "report_expansions.v1"
@@ -196,11 +196,15 @@ class SourceProvenance(BaseModel):
             "source), or 'absence' (source must be empty)."
         ),
     )
-    source_value: Any = Field(
+    source_value: Annotated[Any, WithJsonSchema({"type": "null"})] = Field(
         default=None,
         description=(
-            "The actual value pulled from the reference-card provenance "
-            "index. For 'direct_value' it must match the index entry."
+            "Leave this as null — the host post-fills it from the "
+            "reference-card provenance index after the LLM call. The "
+            "JSON schema deliberately presents this as null-only so the "
+            "LLM never has to faithfully copy complex reference-card "
+            "values (which can be list[dict]). Internally the field "
+            "accepts any JSON value once the host writes it."
         ),
     )
 

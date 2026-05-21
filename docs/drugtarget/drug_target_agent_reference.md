@@ -1,14 +1,14 @@
 # Drug Target Assessment Agent -- Comprehensive Reference
 
 > **Source of truth**: `src/agents/drug_target/` codebase
-> **Last verified**: 2026-05-15 (updated for critic subagent + CriticGateMiddleware)
+> **Last verified**: 2026-05-19 (updated for 2-subagent + finalize_report node migration)
 > **Related**: `drug_target_stage_guide.md` (stage-level detail), `output_schema.json` (JSON contract)
 
 ---
 
 ## 1. Overview
 
-The Drug Target Assessment Agent evaluates therapeutic potential of ligand-receptor (L-R) pairs identified from spatial transcriptomics (ST) cell-cell interaction (CCI) analysis. It uses a **3-subagent architecture** with a **3-stage funnel** to systematically gather multi-database evidence, score targets against a structured rubric, and generate a publication-quality report.
+The Drug Target Assessment Agent evaluates therapeutic potential of ligand-receptor (L-R) pairs identified from spatial transcriptomics (ST) cell-cell interaction (CCI) analysis. It uses a **2-subagent + finalize_report node** architecture with a **3-stage funnel** to systematically gather multi-database evidence, score targets against a structured rubric, and generate a publication-quality report via a deterministic LangGraph super-graph node.
 
 ### Key Design Principles
 
@@ -37,59 +37,64 @@ The Drug Target Assessment Agent evaluates therapeutic potential of ligand-recep
 ```
 Wrapper Pipeline (Step 9.5)
   -> run_drug_target_assessment(data_dir, disease)    [integration.py]
-    -> DrugTargetConfig                                [agent.py]
-    -> create_drug_target_agent(config)                [agent.py]
-      -> DeepAgents framework (LangGraph Runnable)
-      -> 3 subagents + 7 orchestrator tools + SkillsMiddleware
-         -> summarizer (flat dict subagent)
-              -> SubAgentMiddleware([critic])           [when critic_enabled=True]
-                   -> critic (inner subagent, tools=[])
+    -> drug_target_graph.ainvoke(...)                 [graph_builder.py]
+      -> LangGraph super-graph (START → run_deep_agent → finalize_report → END)
+         -> run_deep_agent node                        [super_graph.py]
+              -> DrugTargetConfig                      [agent.py]
+              -> create_drug_target_agent(config)      [agent.py]
+                -> DeepAgents framework (LangGraph Runnable)
+                -> 2 subagents + orchestrator tools + SkillsMiddleware
+         -> finalize_report node (deterministic, 1 LLM call)  [finalize_report.py]
+              -> validate_report_expansions()          [report_expansion_schema.py]
+              -> validate_cited_only_provenance()      [validators.py]
+              -> render_drug_md_from_expansions()
+              -> generate_drug_html_report()
 ```
 
 ### 2.2 Source File Map
 
 | File | Role |
 |------|------|
-| `agent.py` | Orchestrator factory: `DrugTargetConfig`, `create_drug_target_agent()`, system prompt, `_critic_enabled_default_from_env()` |
-| `subagents/configs.py` | Tool registry per subagent: `SUBAGENT_CONFIGS`, `WORKFLOW_ORDER`, `get_subagents()` |
-| `subagents/prompts.py` | Subagent system prompts: `EVIDENCE_ASSESSOR_PROMPT`, `SUMMARIZER_PROMPT_CORE`, `CRITIC_REVIEW_STEP_FRAGMENT`; `SUMMARIZER_PROMPT` is a backward-compat alias for `SUMMARIZER_PROMPT_CORE` |
-| `subagents/critic/agent.py` | Critic inner-subagent factory: `get_critic_subagent(model, *, response_format_pydantic_compatible)` |
-| `subagents/summarizer/agent.py` | Summarizer subagent factory: `get_summarizer_subagent(backend, default_model, critic_model, critic_enabled)` |
-| `subagents/summarizer/middleware.py` | `SummarizerFinalizationGuardMiddleware`, `CriticGateMiddleware`, `HypothesisRetryLoopMiddleware`; envelope parsing helpers |
-| `tools/__init__.py` | Tool re-exports (21 tools in `__all__`) with lazy imports for circular-dep breaking |
-| `tools/stage_domain_tools.py` | Stage 1-3 domain tools (12): CELLxGENE, KEGG, Reactome, STRING, VEP, OT, GWAS, DrugBank/ChEMBL, PubMed |
+| `super_graph.py` | LangGraph super-graph: `DrugTargetState`, `run_deep_agent` node, `build_drug_target_super_graph()`. Topology: `START → run_deep_agent → finalize_report → END` |
+| `graph_builder.py` | Module-level `drug_target_graph` symbol (compiled `CompiledStateGraph`) referenced by `langgraph.json` entry path |
+| `finalize_report.py` | Deterministic 6-step `finalize_report` node (1 LLM call). Entry: `async def finalize_report(state, config)` |
+| `finalize_report_prompts.py` | Prompts for the `finalize_report` LLM call: `FINALIZE_REPORT_SYSTEM_PROMPT`, `FINALIZE_REPORT_USER_TEMPLATE` |
+| `validators.py` | `validate_cited_only_provenance(payload, reference_card)` — cited-only provenance check called inside `_persist_and_validate` |
+| `middleware.py` | `HypothesisRetryLoopMiddleware` (moved from deleted `subagents/summarizer/middleware.py`) |
+| `agent.py` | Orchestrator factory: `DrugTargetConfig`, `create_drug_target_agent()`, system prompt |
+| `subagents/configs.py` | Tool registry per subagent: `SUBAGENT_CONFIGS`, `WORKFLOW_ORDER`, `get_subagents()`. `WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer"]` |
+| `subagents/prompts.py` | Subagent system prompts: `EVIDENCE_ASSESSOR_PROMPT`, `HYPOTHESIS_WRITER_PROMPT` |
+| `tools/__init__.py` | Tool re-exports with lazy imports for circular-dep breaking |
+| `tools/stage_domain_tools.py` | Stage 1-3 domain tools: CELLxGENE, KEGG, Reactome, STRING, VEP, OT, GWAS, DrugBank/ChEMBL, PubMed |
 | `tools/stage2_service.py` | Stage 2 batch orchestration: `build_stage2_gene_panel()`, parquet/API routing, workspace caching |
 | `tools/stage_logic.py` | Rubric scoring, classification, priority, confidence, stage gates |
 | `tools/evidence_loader.py` | I/O helpers: `load_lr_candidates`, `load_evidence_files`, `save_evidence` |
 | `tools/assessment_output.py` | Output contract: `save_target_assessment()`, `_validate_contract()` |
 | `tools/census_lr_validation_tools.py` | Census cross-validation: `run_compare_census_lr_pair()`, fuzzy matching |
-| `tools/report_expansion_schema.py` | `canonical_json_hash`, `normalize_expansions_for_hash` — shared hash helpers used by both `CriticGateMiddleware` and `HypothesisRetryLoopMiddleware` |
+| `tools/report_expansion_schema.py` | `ReportExpansionsPayload` Pydantic model, `validate_report_expansions()`, `canonical_json_hash`, `_build_provenance_index` |
 | `tools/skill_reader.py` | Progressive disclosure: `read_skill_file()` |
 | `tools/common.py` | Cognitive tools: `sequential_thinking`, `think_tool`, `validate_quality` |
-| `integration.py` | Reporter bridge: `run_drug_target_assessment()` async tool for deep_interpreter Step 9.5 |
+| `integration.py` | Reporter bridge: `run_drug_target_assessment()` async tool for deep_interpreter Step 9.5. Invokes `drug_target_graph.ainvoke(...)` and returns `json.dumps({success, drug_md, target_assessment, errors, evidence_truncated})` |
 
 ### 2.3 Subagent Configuration
 
-**Workflow order**: `["evidence_assessor", "hypothesis_writer", "summarizer"]` (strict sequential)
+**Workflow order**: `["evidence_assessor", "hypothesis_writer"]` (strict sequential, defined in `subagents/configs.py`)
 
-The critic subagent is **NOT** in `WORKFLOW_ORDER` and is **NOT** returned by `get_subagents()`. It exists only as an inner subagent installed inside the summarizer via `SubAgentMiddleware`.
+Report finalization is **not** a subagent. It is the deterministic `finalize_report` LangGraph node that runs after the DeepAgents runnable completes (see Section 2.1).
 
-| Subagent | Spec shape | Tools | Role |
-|----------|------------|-------|------|
-| `evidence_assessor` | flat dict | ~20 tools | 3-stage funnel: biological context -> validation & scoring -> deep dive + inline rubric |
-| `hypothesis_writer` | flat dict | 7 tools | UCB-scored mechanistic hypothesis generation from Stage 1-3 evidence |
-| `summarizer` | flat dict | 7 tools + 3 middleware | Author drug.md via 6-step tool sequence; finalize HTML report. Fail-closed on `validate_drug_md` and (when `critic_enabled=True`) on critic review before `save_report_expansions`. |
-| `critic` (inner) | flat dict, `tools=[]` | none | Grounding reviewer: verifies cited-source support for each sentence in the expansion payload. Never calls external tools. Installed by `SubAgentMiddleware` inside the summarizer only. |
+| Component | Type | Tools | Role |
+|-----------|------|-------|------|
+| `evidence_assessor` | flat dict subagent | ~20 tools | 3-stage funnel: biological context -> validation & scoring -> deep dive + inline rubric |
+| `hypothesis_writer` | flat dict subagent | 7 tools | UCB-scored mechanistic hypothesis generation from Stage 1-3 evidence. Carries `HypothesisRetryLoopMiddleware` (`middleware.py`). |
+| `finalize_report` | LangGraph node (not a subagent) | — | Deterministic 6-step post-processing: load inputs → token-budget gate → 1 LLM call (structured output `ReportExpansionsPayload`) → schema + cited-only validation → render outputs → finalize workspace. Error surface: `report_finalization_error` state field. |
 
-The summarizer carries three middleware classes (when `critic_enabled=True`):
+The `hypothesis_writer` carries one middleware class:
 
-| Middleware | Order | What it enforces |
+| Middleware | Location | What it enforces |
 |---|---|---|
-| `SummarizerFinalizationGuardMiddleware` | first | Blocks `generate_drug_html_report` until `validate_drug_md` returned `valid=true`. Reset via `before_agent`/`abefore_agent`. |
-| `CriticGateMiddleware` | second | Blocks `save_report_expansions` unless the critic was called, returned `valid=True`, no blocker findings, and the payload hash submitted to save matches the hash reviewed by the critic. Reset via `before_agent`/`abefore_agent`. |
-| `SubAgentMiddleware([critic])` | third | Installs the inner critic subagent so the summarizer can call `task(subagent_type="critic", ...)`. |
+| `HypothesisRetryLoopMiddleware` | `middleware.py` | Retry loop for hypothesis generation tool calls. |
 
-When `critic_enabled=False`, `CriticGateMiddleware` and `SubAgentMiddleware(critic)` are absent; only `SummarizerFinalizationGuardMiddleware` remains.
+**Sentinel**: The orchestrator's last assistant message contains `EVIDENCE_PIPELINE_COMPLETE` as an informational marker. This is not parsed for routing — a static edge routes `run_deep_agent → finalize_report`.
 
 ### 2.4 DrugTargetConfig Options
 
@@ -105,92 +110,37 @@ When `critic_enabled=False`, `CriticGateMiddleware` and `SubAgentMiddleware(crit
 | `agent_skill_names` | tuple | `("opentargets-database", "gwas-database", "chembl-database")` | Skills exposed to agent |
 | `skills_dir` | str\|None | `None` | Override project skills directory |
 | `subagent_models` | dict\|None | `None` | Per-subagent model overrides (init_chat_model format) |
-| `critic_enabled` | bool | env `DRUG_TARGET_CRITIC_ENABLED` (fail-closed: default `True`) | Enable the summarizer-local critic subagent + `CriticGateMiddleware`. See [Section 2.5](#25-critic-kill-switch-critic_enabled). |
 
-### 2.5 Critic Kill Switch (`critic_enabled`)
+> **Note**: `critic_enabled` and `summarizer_skill_names` config fields were removed in the 2026-05-19 migration. The summarizer subagent no longer exists; report finalization is performed by the deterministic `finalize_report` LangGraph node.
 
-`DrugTargetConfig.critic_enabled` is a `bool` field backed by the `DRUG_TARGET_CRITIC_ENABLED`
-environment variable. The default is **fail-closed** — the critic is active unless explicitly
-disabled.
+### 2.5 `finalize_report` Node — 5 Error Classes
 
-**Env values that disable the critic** (case-insensitive after strip):
+The `finalize_report` node (`src/agents/drug_target/finalize_report.py`) surfaces all failures through the `report_finalization_error` state field (`DrugTargetState`). When this field is non-`None`, `integration.run_drug_target_assessment()` returns `success=False` and no disk artifacts are written for that step.
 
-```
-DRUG_TARGET_CRITIC_ENABLED=false
-DRUG_TARGET_CRITIC_ENABLED=0
-DRUG_TARGET_CRITIC_ENABLED=no
-DRUG_TARGET_CRITIC_ENABLED=off
-```
+| Error class | When raised | Disk writes? |
+|-------------|-------------|-------------|
+| `evidence_budget_exceeded` | Evidence token estimate > 20 000 tokens at node entry (before LLM call) | None — `evidence_truncated=True` |
+| `llm_call_failed_after_retries` | `_llm_fill_expansions_once` exhausts 2 attempts (ValidationError, OutputParserException, or provider error) | None |
+| `validation_failed` | `validate_report_expansions()` returns non-empty errors | None |
+| `cited_only_violation` | `validate_cited_only_provenance()` finds sentences citing keys absent from `reference_card` | None |
+| `finalization_validation_failed` | `validate_drug_report_finalization()` returns `valid=false` in `_finalize_workspace` | drug.md + HTML already written |
 
-Any other value — including empty, unset, or a typo — leaves the critic enabled.
+**Token-budget fail-closed gate** (line 81–84, `finalize_report.py`): at node entry, before any LLM call, the node estimates evidence token count as `len(json.dumps(evidence)) // 4`. If this exceeds `_TOKEN_BUDGET = 20_000`, the node returns immediately with `evidence_truncated=True` and `report_finalization_error="evidence_budget_exceeded: ..."`. No LLM call is made; no disk writes occur.
 
-**Precedence**: an explicit constructor argument `DrugTargetConfig(critic_enabled=False)` wins
-over the env var. The `default_factory` only runs when the argument is omitted at construction.
+**Idempotency** (Decision 12, line 77, `finalize_report.py`): if `drug.md` already exists at node entry, `finalize_report` skips all processing and returns success. This allows safe re-invocation without re-running the LLM call.
 
-**Critic model resolution** (when `critic_enabled=True`):
+### 2.6 Super-Graph State Schema (`DrugTargetState`)
 
-```
-critic_model = model_overrides.get("critic")
-           or model_overrides.get("summarizer")
-           or default_model
-```
+Defined in `src/agents/drug_target/super_graph.py`:
 
-Set `SUBAGENT_CRITIC_PROVIDER` / `SUBAGENT_CRITIC_MODEL` (loaded via
-`load_subagent_models_from_env(["evidence_assessor","hypothesis_writer","summarizer","critic"])`)
-to give the critic a dedicated model.
-
-### 2.6 Critic Task Envelope (canonical schema)
-
-When `critic_enabled=True` the summarizer must call
-`task(subagent_type="critic", description=<envelope JSON>)` before calling
-`save_report_expansions`. `CriticGateMiddleware` parses and validates the envelope;
-an unparseable or wrong-version envelope causes the save to be blocked.
-
-**Envelope JSON shape** (`schema_version="summarizer_critic_review.v1"`):
-
-```json
-{
-  "schema_version": "summarizer_critic_review.v1",
-  "payload": {
-    "schema_version": "report_expansions.v1",
-    "slots": [ ... ]
-  },
-  "payload_hash": "<sha256 hex — LLM-supplied; NOT used for gate logic>",
-  "provenance_context": {
-    "<slot_id>": "<verbatim text from the cited source file only>"
-  }
-}
-```
-
-Key constraints enforced by `CriticGateMiddleware`:
-
-- `schema_version` must be exactly `"summarizer_critic_review.v1"`.
-- `payload.schema_version` must be `"report_expansions.v1"`.
-- `provenance_context` must contain only text cited from source evidence files — no external
-  medical knowledge.
-- The **canonical payload hash** is computed by `CriticGateMiddleware` itself (via
-  `canonical_json_hash(normalize_expansions_for_hash(envelope.payload))`), stripping
-  `reference_card_hash` before hashing. The LLM-supplied `payload_hash` field in the envelope
-  is ignored for gate logic.
-- At save time the hash of the payload submitted to `save_report_expansions` is computed
-  **before** `handler(request)` runs (because `save_report_expansions` mutates
-  `reference_card_hash` during its own validation pass). If this hash does not match the hash
-  the critic reviewed, the save is blocked.
-
-**Critic is reviewer, NOT author.** The critic subagent has `tools=[]` — it cannot call any
-tool, write any file, or modify any state. It returns structured JSON only. `CriticGateMiddleware`
-is the enforcement layer; the critic LLM is forbidden from judging whether a medical claim is
-generally true. Its only mandate is to judge whether the cited `provenance_context` text
-supports each sentence.
-
-### 2.7 Legacy Persisted-Report Critic Path
-
-`validate_drug_report_finalization(require_critic=True)` (importable from
-`src/agents/drug_target/tools/`) is a **legacy compatibility path** that produces
-`evidence/critic_report.json`. It is **not** part of the new pre-save critic gate and is
-**not called** by the new summarizer-local critic flow. It may be used by external callers or
-scripts that need a persisted critic audit artifact, but it has no bearing on whether
-`save_report_expansions` is allowed to proceed during a live agent run.
+| Field | Type | Description |
+|-------|------|-------------|
+| `data_dir` | `str` | Workspace directory (read-only across all nodes) |
+| `disease` | `str` | Disease context string |
+| `featured_lr_pairs` | `list[str] \| None` | Featured L-R pairs from evidence assessor |
+| `messages` | `Annotated[list[BaseMessage], add_messages]` | Accumulated messages; `run_deep_agent` returns only the last `AIMessage` |
+| `report_finalization_error` | `str \| None` | Set by `finalize_report` on any failure; `None` means success |
+| `evidence_truncated` | `bool` | `True` when token-budget gate fired; default `False` |
 
 ---
 
@@ -281,42 +231,44 @@ For each selected candidate:
 
 **Save**: `evidence/stage3_{GENE}.json` per candidate
 
-### 3.7 Report Generation
+### 3.7 Report Finalization (finalize_report node)
 
-The `summarizer` subagent (flat dict spec, 7 tools) executes the following
-sequence. When `critic_enabled=True` a critic review step is inserted between
-expansion authoring and save (step 3b below).
+After `run_deep_agent` completes, the static edge routes to the deterministic
+`finalize_report` node (`src/agents/drug_target/finalize_report.py`).
+This node performs exactly **1 LLM call** and is not a subagent.
 
-1. `build_evidence_summary(data_dir)` — pre-fills the deterministic evidence
-   summary skeleton (call EXACTLY ONCE).
-2. `load_evidence_files(data_dir, ...)` — load per-gene evidence JSON.
-3. Author expansion payload (per-section Markdown via `save_report_expansions`
-   schema). When `critic_enabled=True`:
-   - **3a.** Call `task(subagent_type="critic", description=<envelope JSON>)`
-     with the full expansion payload + `schema_version="summarizer_critic_review.v1"`
-     + cited-only `provenance_context`. Cap repair attempts at 2; rebuild full
-     payload (not patch) on blocker findings.
-   - **3b.** Call `save_report_expansions(data_dir, expansions)` — this call is
-     mechanically blocked by `CriticGateMiddleware` if: critic was never called,
-     critic JSON was malformed, critic returned `valid=False` or blocker findings,
-     or the payload hash submitted to save differs from the hash the critic reviewed.
-   When `critic_enabled=False`, step 3a is skipped and `save_report_expansions`
-   is not gated by the critic.
-4. `render_drug_md_from_expansions(data_dir)` — deterministically assemble
-   `drug.md` from the saved expansions (the LLM never hand-writes drug.md).
-5. `validate_drug_md(data_dir)` — MANDATORY quality gate (semantic).
-   - On `valid=false`: re-call `save_report_expansions` (and re-run critic if
-     enabled) to fix the offending sections, re-render, re-validate. Max 2
-     retries (prompt-budgeted).
-6. `generate_drug_html_report(data_dir)` — call EXACTLY ONCE after
-   `validate_drug_md` returns `valid=true`. This call is mechanically blocked
-   by `SummarizerFinalizationGuardMiddleware` until the validator passes.
-7. Emit `SUMMARIZER_STATUS: PASS` on its own line (or `SUMMARIZER_STATUS: FAIL`
-   on retry budget exhaustion).
+**6-step internal sequence:**
 
-The orchestrator parses the literal `SUMMARIZER_STATUS:` line to decide
-pipeline completion. `target_assessment.json` is no longer written by the
-summarizer surface (it is produced earlier in the funnel).
+1. **Idempotency check** — if `drug.md` already exists, skip all processing
+   and return success (Decision 12, `finalize_report.py:77`).
+2. **Load inputs** — `_load_expansion_inputs(data_dir, disease)` loads
+   evidence dict, expansion schema spec, and reference card from disk.
+3. **Token-budget gate** — estimate evidence token count as
+   `len(json.dumps(evidence)) // 4`. If `> 20_000`, return
+   `evidence_truncated=True` immediately. No LLM call; no disk writes.
+4. **LLM call** — `_llm_fill_expansions_once(model, spec, evidence, reference_card, config)`
+   calls `model.with_structured_output(ReportExpansionsPayload).with_retry(stop_after_attempt=2)`.
+   On failure (ValidationError, OutputParserException, provider error), return
+   `report_finalization_error="llm_call_failed_after_retries: ..."`.
+5. **Persist + validate** — `_persist_and_validate(data_dir, payload, reference_card)`:
+   - **5a.** `validate_report_expansions(data_dir, payload.model_dump())` — schema validation.
+   - **5b.** `validate_cited_only_provenance(payload, reference_card)` — cited-only provenance
+     check; verifies every `source_provenance.source_file::source_field` key exists in the
+     reference card's provenance index. `cited_only` errors win over `schema` errors.
+   - On any errors: return `report_finalization_error` and **do not write disk artifacts**.
+   - On pass: atomically save `report_expansions.json`.
+6. **Render outputs** — `_render_outputs(data_dir, payload)`:
+   `render_drug_md_from_expansions()` → `drug.md`;
+   `generate_drug_html_report()` → HTML;
+   atomic write of `target_assessment.json` (from `payload.model_dump()`).
+7. **Finalize workspace** — `_finalize_workspace(data_dir)`:
+   `finalize_stage1_artifacts()` then `validate_drug_report_finalization()`.
+   On failure: `report_finalization_error="finalization_validation_failed: ..."`.
+
+All writes in steps 6–7 are atomic (`tempfile` + `os.replace`).
+The `report_finalization_error` state field is the single observable failure
+surface for this node. `integration.run_drug_target_assessment()` reads it
+and sets `success=False` with `errors=[finalization_error]` in the return envelope.
 
 ---
 
@@ -374,21 +326,29 @@ summarizer surface (it is produced earlier in the funnel).
 | `think_tool` | Reflection and assessment (Reflect phase) |
 | `validate_quality` | Quality score check (threshold >= 0.7) |
 
-### 4.2 Summarizer Tools (7)
+### 4.2 finalize_report Node Tools
 
-| Tool | Purpose |
-|------|---------|
-| `build_evidence_summary` | Pre-fills the deterministic evidence summary skeleton (called once at start) |
-| `load_evidence_files` | Load all `evidence/*.json` |
-| `save_report_expansions` | Schema-validated per-section Markdown expansion writes. Gated by `CriticGateMiddleware` when `critic_enabled=True`. |
-| `render_drug_md_from_expansions` | Deterministic Markdown assembly of `drug.md` from saved expansions |
-| `validate_drug_md` | MANDATORY semantic quality gate (returns `{valid: bool, errors: [...]}`) |
-| `generate_drug_html_report` | Final HTML render (mechanically blocked by `SummarizerFinalizationGuardMiddleware` unless `validate_drug_md` returned `valid=true`) |
-| `think_tool` | Reflection / scratchpad |
+The `finalize_report` node calls tool `.func()` directly (not via LLM tool-calling). The following tools from `tools/__init__.py` are used internally:
 
-The summarizer's middleware stack (when `critic_enabled=True`):
-`SummarizerFinalizationGuardMiddleware` → `CriticGateMiddleware` → `SubAgentMiddleware([critic])`.
-See [Section 2.3](#23-subagent-configuration) for the full gate description.
+| Tool | Called by | Purpose |
+|------|-----------|---------|
+| `load_evidence_files` | `_load_expansion_inputs` | Load all `evidence/*.json` |
+| `save_report_expansions` | `_persist_and_validate` | Atomic save of schema-validated expansions |
+| `render_drug_md_from_expansions` | `_render_outputs` | Deterministic Markdown assembly of `drug.md` |
+| `generate_drug_html_report` | `_render_outputs` | Final HTML render |
+| `finalize_stage1_artifacts` | `_finalize_workspace` | Stage 1 artifact normalization |
+| `validate_drug_report_finalization` | `_finalize_workspace` | Final validation gate |
+
+Validation functions called directly (not LangChain tools):
+
+| Function | Module | Purpose |
+|----------|--------|---------|
+| `validate_report_expansions` | `tools/report_expansion_schema.py` | Schema validation of expansion payload |
+| `validate_cited_only_provenance` | `validators.py` | Cited-only provenance check against reference card |
+
+> **Note**: The `summarizer` subagent and its associated tools (`build_evidence_summary`, `validate_drug_md`, `think_tool` in summarizer context) were removed in the 2026-05-19 migration. Report finalization now runs deterministically as a LangGraph node.
+
+See [Section 2.5](#25-finalize_report-node--5-error-classes) for the full error class table and gate description.
 
 ---
 
@@ -612,12 +572,27 @@ async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
 
 **Integration flow**:
 1. Reporter subagent (deep_interpreter) calls `run_drug_target_assessment(data_dir, disease)`
-2. Function lazily imports `create_drug_target_agent` (breaks circular dependency)
-3. Creates `DrugTargetConfig` with provider from `LLM_PROVIDER` env var
-4. Runs agent with `ainvoke()` and unique thread_id
-5. Returns `drug.md` content + `target_assessment.json` as JSON response
+2. Function lazily imports `drug_target_graph` from `graph_builder` (breaks circular dependency)
+3. Invokes the super-graph: `drug_target_graph.ainvoke(initial_state, config={"recursion_limit": 10000, "configurable": {"thread_id": uuid4()}})`
+4. Reads `report_finalization_error` and `evidence_truncated` from final state
+5. On success: reads `drug.md` and `target_assessment.json` from disk and returns `json.dumps({success, drug_md, target_assessment, errors, evidence_truncated})`
+6. On failure: returns `json.dumps({success=False, drug_md=None, target_assessment=None, errors=[finalization_error], evidence_truncated})`
 
-**Circular dependency handling**: `integration.py` uses lazy imports inside the tool function body to break the chain: `deep_interpreter.subagents.configs -> drug_target.integration -> drug_target.agent -> drug_target.subagents.configs`.
+**Return envelope** (invariant contract — `wrapper_agent.py` calls `json.loads(result)`):
+
+```json
+{
+  "success": true,
+  "drug_md": "<string content of drug.md>",
+  "target_assessment": { ... },
+  "errors": [],
+  "evidence_truncated": false
+}
+```
+
+**Circular dependency handling**: `integration.py` uses a lazy import of `drug_target_graph` inside the tool function body to break the chain: `deep_interpreter.subagents.configs → drug_target.integration → drug_target.graph_builder → drug_target.super_graph`.
+
+**Wrapper transparency**: The disk-artifact contract (`drug.md`, `drug_report.html`, `target_assessment.json`) is unchanged. `wrapper_agent.run_drug_target_node` continues to read these artifacts from disk without modification.
 
 ---
 

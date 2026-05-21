@@ -28,13 +28,40 @@ def _load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _bare_source_field(field: str) -> str:
+    """Strip gene prefix (``CD4::combined_total`` → ``combined_total``) and
+    file suffix (``ot_CD4.json.clinical_drugs`` → ``clinical_drugs``) so the
+    inline ``[source:]`` annotation matches what validate_drug_md (T7)
+    extracts via ``rsplit(":", 1)[-1]``.
+    """
+    return field.rsplit("::", 1)[-1].rsplit(".", 1)[-1].strip()
+
+
 def _slot_text(slot: dict) -> str:
     sentences = slot.get("sentences", [])
-    return "\n".join(
-        str(sentence.get("text", "")).strip()
-        for sentence in sentences
-        if isinstance(sentence, dict) and str(sentence.get("text", "")).strip()
-    )
+    lines: list[str] = []
+    for sentence in sentences:
+        if not isinstance(sentence, dict):
+            continue
+        text = str(sentence.get("text", "")).strip()
+        if not text:
+            continue
+        # Append an inline [source: <field>] annotation from the structured
+        # source_fields when the LLM's prose does not already carry one.
+        # validate_drug_md's T7 check requires every EXPAND-region sentence
+        # to cite an evidence field; the finalize_report LLM supplies these
+        # in source_fields rather than inline, so the renderer bridges them.
+        if "[source:" not in text.lower():
+            fields = [
+                _bare_source_field(str(f))
+                for f in (sentence.get("source_fields") or [])
+                if str(f).strip()
+            ]
+            fields = [f for f in fields if f]
+            if fields:
+                text = f"{text} [source: {', '.join(fields)}]"
+        lines.append(text)
+    return "\n".join(lines)
 
 
 def _inject_expansion_slots(template: str, required_slots: list[str], slot_map: dict[str, dict]) -> str:

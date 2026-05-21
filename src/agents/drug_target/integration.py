@@ -2,10 +2,9 @@
 
 Provides run_drug_target_assessment() as a single @tool that the Reporter
 subagent calls to delegate the entire Step 9.5 drug target assessment
-to the DrugTargetAgent.
+to the DrugTargetAgent super-graph.
 """
 
-import asyncio
 import json
 import logging
 import os
@@ -13,174 +12,109 @@ import uuid
 from pathlib import Path
 
 from langchain_core.tools import tool
-from src.agents.drug_target.tools.stage1_normalization import (
-    finalize_stage1_workspace,
-)
-from src.agents.drug_target.tools.stage2_service import extract_lr_pairs
 
 logger = logging.getLogger(__name__)
 
-# NOTE: create_drug_target_agent and DrugTargetConfig are imported lazily
-# inside run_drug_target_assessment() to break circular import chain:
+# NOTE: drug_target_graph is imported lazily inside run_drug_target_assessment()
+# to break the circular import chain:
 # deep_interpreter.subagents.configs → drug_target.integration
-#   → drug_target.agent → drug_target.subagents.configs (cycle)
+#   → drug_target.graph_builder → drug_target.super_graph (cycle)
 
 
 @tool
 async def run_drug_target_assessment(data_dir: str, disease: str) -> str:
     """Run the Drug Target Assessment agent on lr_candidates.json.
 
-    Delegates the full therapeutic target assessment to the DrugTargetAgent,
-    which uses 3 top-level subagents (evidence_assessor, hypothesis_writer,
-    summarizer) to gather evidence, score targets, generate hypotheses, and
-    produce an audited drug.md.
+    Delegates the full therapeutic target assessment to the drug-target
+    super-graph (START → run_deep_agent → finalize_report → END), which
+    uses 2 top-level subagents (evidence_assessor, hypothesis_writer) to
+    gather evidence, score targets, generate hypotheses, and produce an
+    audited drug.md via the deterministic finalize_report node.
 
     Args:
         data_dir: Directory containing lr_candidates.json
         disease: Disease context (e.g., "breast cancer", "glioblastoma")
 
     Returns:
-        Content of drug.md with therapeutic analysis, or error message
+        JSON string with keys: success, drug_md, target_assessment, errors,
+        evidence_truncated.
     """
     resolved_dir = str(Path(data_dir).expanduser().resolve())
-    drug_md_path = Path(resolved_dir) / "drug.md"
-    target_assessment_path = Path(resolved_dir) / "target_assessment.json"
 
     # Check prerequisite files
     lr_path = Path(resolved_dir) / "lr_candidates.json"
     if not lr_path.exists():
         return json.dumps({
-            "error": f"lr_candidates.json not found at {lr_path}",
+            "success": False,
             "drug_md": None,
+            "target_assessment": None,
+            "errors": [f"lr_candidates.json not found at {lr_path}"],
+            "evidence_truncated": False,
         })
 
     _prev_disable_rc = os.environ.get("DISABLE_RUN_COMPRESSION")
     try:
-        # Lazy import to break circular dependency
-        from src.agents.drug_target.agent import create_drug_target_agent, DrugTargetConfig
-
-        # Get provider from environment
-        provider = os.getenv("LLM_PROVIDER", "openrouter")
         if os.getenv("LANGSMITH_TRACING", "").lower() == "true" and not _prev_disable_rc:
             os.environ["DISABLE_RUN_COMPRESSION"] = "true"
             logger.info(
                 "Temporarily set DISABLE_RUN_COMPRESSION for drug-target runtime"
             )
 
-        config = DrugTargetConfig(
-            provider=provider,
-            data_dir=resolved_dir,
-            disease=disease,
+        # Lazy import to break circular dependency
+        from src.agents.drug_target.graph_builder import drug_target_graph
+
+        initial_state = {
+            "messages": [],
+            "data_dir": resolved_dir,
+            "disease": disease,
+            "featured_lr_pairs": None,
+            "report_finalization_error": None,
+            "evidence_truncated": False,
+        }
+
+        # recursion_limit is a top-level RunnableConfig key (NOT under configurable).
+        final_state = await drug_target_graph.ainvoke(
+            initial_state,
+            config={
+                "recursion_limit": 10000,
+                "configurable": {"thread_id": str(uuid.uuid4())},
+            },
         )
 
-        agent, backend = await asyncio.to_thread(create_drug_target_agent, config)
+        finalization_error: str | None = final_state.get("report_finalization_error")
+        evidence_truncated: bool = final_state.get("evidence_truncated", False)
 
-        try:
-            # Natural language message — data_dir and disease are already
-            # injected into the system prompt via DrugTargetConfig.
-            initial_message = (
-                f"Run the full drug target assessment pipeline for {disease}."
+        if finalization_error is not None:
+            envelope = {
+                "success": False,
+                "drug_md": None,
+                "target_assessment": None,
+                "errors": [finalization_error],
+                "evidence_truncated": evidence_truncated,
+            }
+        else:
+            drug_md = (Path(resolved_dir) / "drug.md").read_text(encoding="utf-8")
+            target_assessment = json.loads(
+                (Path(resolved_dir) / "target_assessment.json").read_text(encoding="utf-8")
             )
+            envelope = {
+                "success": True,
+                "drug_md": drug_md,
+                "target_assessment": target_assessment,
+                "errors": [],
+                "evidence_truncated": evidence_truncated,
+            }
 
-            # Run the agent
-            result = await agent.ainvoke(
-                {
-                    "messages": [{
-                        "role": "user",
-                        "content": initial_message,
-                    }]
-                },
-                config={"configurable": {"thread_id": str(uuid.uuid4())}},
-            )
-        finally:
-            if backend and hasattr(backend, "cleanup"):
-                backend.cleanup()
+        return json.dumps(envelope, ensure_ascii=False)
 
-        # Determine pair_subset from stage3_candidates (Stage 2 selects FEATURED genes
-        # before Stage 1 runs, so Stage 1 only covers FEATURED pairs).
-        pair_subset = None
-        assessment_path = Path(resolved_dir) / "evidence" / "assessment_results.json"
-        if assessment_path.exists():
-            try:
-                assessment = json.loads(assessment_path.read_text())
-                stage3_genes = [c["gene"] for c in assessment.get("stage3_candidates", [])]
-                if stage3_genes:
-                    from src.agents.drug_target.tools.stage_logic import map_featured_genes_to_pairs
-                    lr_path = Path(resolved_dir) / "lr_candidates.json"
-                    lr_data = json.loads(lr_path.read_text())
-                    lr_pairs = extract_lr_pairs(lr_data)
-                    featured = map_featured_genes_to_pairs(stage3_genes, lr_pairs)
-                    pair_subset = [
-                        ((p.get("ligand") or "").upper(), (p.get("receptor") or "").upper())
-                        for p in featured
-                    ]
-            except Exception as exc:
-                logger.warning("Could not determine pair_subset for finalize: %s", exc)
-
-        stage1_result = await asyncio.to_thread(
-            finalize_stage1_workspace,
-            resolved_dir,
-            disease=disease,
-            rerun_missing_census=True,
-            pair_subset=pair_subset,
-        )
-
-        # Read drug.md — wrap file I/O in thread to avoid blocking async loop
-        def _read_results():
-            from src.agents.drug_target.tools import validate_drug_report_finalization
-            finalization_raw = validate_drug_report_finalization.func(data_dir=str(resolved_dir))
-            finalization_validation = json.loads(finalization_raw)
-
-            if stage1_result["success"] and finalization_validation["valid"]:
-                content = drug_md_path.read_text()
-                target_assessment = None
-                if target_assessment_path.exists():
-                    try:
-                        target_assessment = json.loads(target_assessment_path.read_text())
-                    except Exception as parse_err:
-                        logger.warning(
-                            "Failed to parse target_assessment.json at %s: %s",
-                            target_assessment_path,
-                            parse_err,
-                        )
-                return json.dumps({
-                    "success": True,
-                    "drug_md": content,
-                    "drug_md_path": str(drug_md_path),
-                    "target_assessment": target_assessment,
-                    "stage1_validation": stage1_result["post_validation"],
-                    "finalization_validation": finalization_validation,
-                    "target_assessment_path": (
-                        str(target_assessment_path) if target_assessment_path.exists() else None
-                    ),
-                })
-            else:
-                errors: list[str] = []
-                if not stage1_result["success"]:
-                    errors.append(
-                        "Stage1 artifacts incomplete: "
-                        + "; ".join(stage1_result["post_validation"]["errors"])
-                    )
-                if not finalization_validation["valid"]:
-                    for issue in finalization_validation["issues"]:
-                        errors.append(f"{issue['code']}: {issue.get('message', '')}")
-                return json.dumps({
-                    "success": False,
-                    "drug_md": None,
-                    "drug_md_path": str(drug_md_path) if drug_md_path.exists() else None,
-                    "stage1_validation": stage1_result["post_validation"],
-                    "finalization_validation": finalization_validation,
-                    "errors": errors,
-                })
-
-        return await asyncio.to_thread(_read_results)
-
-    except Exception as e:
-        logger.error("Drug target assessment failed: %s", e, exc_info=True)
+    except Exception as exc:
+        logger.error("Drug target assessment failed: %s", exc, exc_info=True)
         return json.dumps({
             "success": False,
-            "error": str(e),
             "drug_md": None,
+            "target_assessment": None,
+            "errors": [str(exc)],
+            "evidence_truncated": False,
         })
     finally:
         # Restore DISABLE_RUN_COMPRESSION to its original state
