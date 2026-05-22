@@ -83,6 +83,53 @@ def test_harness_writes_diagnostics_for_successful_no_llm_report(
         assert diagnostics["artifacts"][name]["size_bytes"] > 0
 
 
+def test_harness_writes_diagnostics_when_finalizer_raises(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import src.agents.drug_target.report_harness as report_harness
+
+    async def _raise_finalizer_exception(
+        state: dict,
+        config: dict,
+    ) -> dict:
+        raise RuntimeError("template missing")
+
+    monkeypatch.setattr(
+        report_harness,
+        "finalize_report_mvp",
+        _raise_finalizer_exception,
+    )
+    workspace = _copy_baseline_workspace(tmp_path)
+
+    result = asyncio.run(
+        report_harness.run_deterministic_report_harness(
+            {
+                "data_dir": str(workspace),
+                "disease": "idiopathic pulmonary fibrosis",
+                "report_finalization_error": None,
+                "evidence_truncated": False,
+            },
+            {},
+        )
+    )
+    diagnostics_path = workspace / "report_harness_diagnostics.json"
+    diagnostics = json.loads(diagnostics_path.read_text(encoding="utf-8"))
+
+    expected_error = (
+        "deterministic_report_exception: RuntimeError: template missing"
+    )
+    assert result["report_finalization_error"] == expected_error
+    assert result["evidence_truncated"] is False
+    assert diagnostics == result["report_harness_diagnostics"]
+    assert diagnostics["valid"] is False
+    assert diagnostics["finalizer_result"] == {
+        "report_finalization_error": expected_error,
+        "evidence_truncated": False,
+    }
+    assert "FINALIZER_EXCEPTION" in _issue_codes(diagnostics)
+
+
 def test_harness_classifies_missing_required_evidence_without_llm(
     tmp_path: Path,
 ) -> None:
@@ -179,6 +226,39 @@ def test_harness_flags_unexpanded_markers_after_artifact_generation(
 
     assert diagnostics["valid"] is False
     assert "UNEXPANDED_PLACEHOLDER" in _issue_codes(diagnostics)
+
+
+def test_harness_ignores_plain_expand_text_after_artifact_generation(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+    from src.agents.drug_target.report_harness import (
+        collect_report_harness_diagnostics,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    result = asyncio.run(
+        finalize_report_mvp(
+            {
+                "data_dir": str(workspace),
+                "disease": "idiopathic pulmonary fibrosis",
+                "report_finalization_error": None,
+                "evidence_truncated": False,
+            },
+            {},
+        )
+    )
+    assert result["report_finalization_error"] is None
+
+    (workspace / "drug.md").write_text(
+        "# Report\n\nThis paragraph uses EXPAND as a plain English word.\n",
+        encoding="utf-8",
+    )
+
+    diagnostics = collect_report_harness_diagnostics(str(workspace))
+
+    assert diagnostics["valid"] is True
+    assert "UNEXPANDED_PLACEHOLDER" not in _issue_codes(diagnostics)
 
 
 def test_harness_classifies_missing_required_artifact(tmp_path: Path) -> None:

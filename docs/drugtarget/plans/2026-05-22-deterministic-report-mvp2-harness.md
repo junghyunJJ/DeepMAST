@@ -126,6 +126,7 @@ Failure codes:
 - `MALFORMED_ARTIFACT_JSON`
 - `REPORT_VALIDATION_FAILED`
 - `UNEXPANDED_PLACEHOLDER`
+- `FINALIZER_EXCEPTION`
 
 ## Acceptance Criteria
 
@@ -137,7 +138,9 @@ Failure codes:
 - Missing required artifacts are classified as `MISSING_REQUIRED_ARTIFACT`.
 - Malformed JSON artifacts are classified as `MALFORMED_ARTIFACT_JSON`.
 - Failed deterministic report validation is classified as `REPORT_VALIDATION_FAILED`.
-- `EXPAND` marker leakage is classified as `UNEXPANDED_PLACEHOLDER`.
+- Explicit `<!-- EXPAND:` marker leakage is classified as `UNEXPANDED_PLACEHOLDER`.
+- Plain prose that contains the word `EXPAND` is not classified as marker leakage.
+- Finalizer exceptions are classified as `FINALIZER_EXCEPTION` and still write `report_harness_diagnostics.json`.
 - DeepAgents boundary contract lists allowed and forbidden responsibilities.
 - `src/agents/drug_target/finalize_report.py` remains unchanged.
 - `src/agents/drug_target/super_graph.py` remains unchanged.

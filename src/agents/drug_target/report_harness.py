@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +17,7 @@ from src.agents.drug_target.evidence_filenames import EvidenceFiles
 
 HARNESS_SCHEMA_VERSION = "drug_target.report_harness_diagnostics.v1"
 HARNESS_DIAGNOSTICS_FILENAME = "report_harness_diagnostics.json"
+EXPAND_MARKER_PATTERN = re.compile(r"<!--\s*EXPAND:")
 REQUIRED_REPORT_ARTIFACTS = (
     "report_data.json",
     "drug.md",
@@ -64,6 +66,10 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 
 def _read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _has_expand_marker(text: str) -> bool:
+    return bool(EXPAND_MARKER_PATTERN.search(text))
 
 
 def _artifact_metadata(base: Path, name: str) -> dict[str, Any]:
@@ -147,7 +153,7 @@ def _artifact_issues(
             )
     for name in ("drug.md", "drug_report.html"):
         path = base / name
-        if path.exists() and "EXPAND" in path.read_text(encoding="utf-8"):
+        if path.exists() and _has_expand_marker(path.read_text(encoding="utf-8")):
             issues.append(
                 {
                     "code": "UNEXPANDED_PLACEHOLDER",
@@ -239,6 +245,25 @@ def write_report_harness_diagnostics(
     return payload
 
 
+def _finalizer_exception_result(exc: Exception) -> dict[str, Any]:
+    return {
+        "report_finalization_error": (
+            f"deterministic_report_exception: {type(exc).__name__}: {exc}"
+        ),
+        "evidence_truncated": False,
+    }
+
+
+def _finalizer_exception_issue(exc: Exception) -> dict[str, Any]:
+    return {
+        "code": "FINALIZER_EXCEPTION",
+        "severity": "critical",
+        "message": "Deterministic report finalizer raised before returning a result",
+        "exception_type": type(exc).__name__,
+        "error": str(exc),
+    }
+
+
 async def run_deterministic_report_harness(
     state: dict[str, Any],
     config: RunnableConfig | None = None,
@@ -249,8 +274,15 @@ async def run_deterministic_report_harness(
         **state,
         "data_dir": str(base),
     }
-    finalizer_result = await finalize_report_mvp(finalizer_state, config or {})
-    diagnostics = collect_report_harness_diagnostics(str(base))
+    try:
+        finalizer_result = await finalize_report_mvp(finalizer_state, config or {})
+    except Exception as exc:
+        finalizer_result = _finalizer_exception_result(exc)
+        diagnostics = collect_report_harness_diagnostics(str(base))
+        diagnostics["issues"].append(_finalizer_exception_issue(exc))
+        diagnostics["valid"] = False
+    else:
+        diagnostics = collect_report_harness_diagnostics(str(base))
     diagnostics["finalizer_result"] = finalizer_result
     write_report_harness_diagnostics(str(base), diagnostics)
     return {
