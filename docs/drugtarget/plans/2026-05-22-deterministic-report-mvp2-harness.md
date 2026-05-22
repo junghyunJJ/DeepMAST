@@ -85,7 +85,7 @@ Schema version:
 drug_target.report_harness_diagnostics.v1
 ```
 
-Required top-level fields:
+Required base diagnostics top-level fields:
 
 ```json
 {
@@ -96,7 +96,14 @@ Required top-level fields:
   "artifacts": {},
   "evidence": {},
   "issues": [],
-  "deepagents_boundary": {},
+  "deepagents_boundary": {}
+}
+```
+
+harness-run diagnostics add required `finalizer_result`:
+
+```json
+{
   "finalizer_result": {}
 }
 ```
@@ -137,7 +144,7 @@ pytest tests/agents/drug_target/test_report_renderer.py tests/agents/drug_target
 Then confirm the PR did not edit production routing files:
 
 ```bash
-git diff -- src/agents/drug_target/finalize_report.py src/agents/drug_target/super_graph.py src/agents/drug_target/agent.py
+git diff --exit-code origin/main...HEAD -- src/agents/drug_target/finalize_report.py src/agents/drug_target/super_graph.py src/agents/drug_target/agent.py
 ```
 
 Expected:
