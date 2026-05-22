@@ -17,11 +17,21 @@ The current `deterministic_report.py` path can build:
 The next PR must prepare deterministic finalization for later DeepAgents
 integration without changing the production super-graph routing yet.
 
+Numbering note: the original MVP architecture document listed Better
+Harness / Eval Loop later in the PR sequence. This MVP2 intentionally pulls
+the harness/eval/diagnostics slice forward before production integration so
+the deterministic finalizer has an explicit acceptance gate before routing
+changes.
+
 ## MVP2 Goal
 
 Add a provider-free harness/eval/diagnostics layer around deterministic report
 generation so future integration PRs can route production finalization through
 deterministic code with explicit evidence.
+
+MVP2 is no-LLM by design. Ollama/OpenAI/DeepAgents model availability must not
+be required for this harness to pass; LLM interpretation remains a later
+optional layer.
 
 ## Scope
 
@@ -124,6 +134,9 @@ Failure codes:
 - Successful deterministic runs report `valid: true`.
 - Missing required evidence is classified as `MISSING_REQUIRED_EVIDENCE`.
 - Malformed required evidence JSON is classified as `MALFORMED_REQUIRED_EVIDENCE_JSON`.
+- Missing required artifacts are classified as `MISSING_REQUIRED_ARTIFACT`.
+- Malformed JSON artifacts are classified as `MALFORMED_ARTIFACT_JSON`.
+- Failed deterministic report validation is classified as `REPORT_VALIDATION_FAILED`.
 - `EXPAND` marker leakage is classified as `UNEXPANDED_PLACEHOLDER`.
 - DeepAgents boundary contract lists allowed and forbidden responsibilities.
 - `src/agents/drug_target/finalize_report.py` remains unchanged.
