@@ -230,7 +230,11 @@ def write_report_harness_diagnostics(
 ) -> dict[str, Any]:
     """Write report_harness_diagnostics.json and return the written payload."""
     base = Path(data_dir).expanduser().resolve()
-    payload = diagnostics or collect_report_harness_diagnostics(str(base))
+    payload = (
+        diagnostics
+        if diagnostics is not None
+        else collect_report_harness_diagnostics(str(base))
+    )
     _write_json(base / HARNESS_DIAGNOSTICS_FILENAME, payload)
     return payload
 
