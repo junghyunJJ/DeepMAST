@@ -7,6 +7,7 @@ Artifact writes are delegated to the existing tools, which write atomically.
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import os
@@ -44,6 +45,7 @@ _validate_finalization_st = cast(StructuredTool, _validate_drug_report_finalizat
 from src.agents.drug_target.tools.report_expansion_schema import (
     EXPANSION_SCHEMA_SPEC_FILE,
     ReportExpansionsPayload,
+    canonical_json_hash,
     validate_report_expansions,
 )
 from src.agents.drug_target.validators import validate_cited_only_provenance
@@ -69,6 +71,189 @@ _REFERENCE_CARD_FILE = "drug_report_reference_card.json"
 # (evidence_budget_exceeded) rather than silently truncated by the model.
 # Deployments with smaller context windows should lower this accordingly.
 _TOKEN_BUDGET = 200_000
+_COMPACTION_TRIGGER_RATIO = 0.80
+_OT_COMPACT_TOP_N = 3
+_OT_COMPACT_SCHEMA = "drug_target.ot_per_target_summary.v1"
+
+
+def _estimate_json_tokens(payload: dict) -> int:
+    return len(json.dumps(payload, ensure_ascii=False)) // 4
+
+
+def _featured_gene_set(reference_card: dict) -> set[str]:
+    genes: set[str] = set()
+    for raw in reference_card.get("stage3_candidates", []) or []:
+        gene = raw.get("gene") if isinstance(raw, dict) else raw
+        if gene:
+            genes.add(str(gene).strip().upper())
+    for card in reference_card.get("featured_genes", []) or []:
+        if isinstance(card, dict) and card.get("gene"):
+            genes.add(str(card["gene"]).strip().upper())
+    return genes
+
+
+def _list_count(value: object) -> int:
+    return len(value) if isinstance(value, list) else 0
+
+
+def _target_drug_rows(payload: dict) -> list[dict]:
+    target_drugs = payload.get("target_drugs")
+    rows = target_drugs.get("rows") if isinstance(target_drugs, dict) else []
+    return rows if isinstance(rows, list) else []
+
+
+def _target_drug_count(payload: dict) -> int:
+    target_drugs = payload.get("target_drugs")
+    if isinstance(target_drugs, dict) and isinstance(target_drugs.get("count"), int):
+        return target_drugs["count"]
+    return len(_target_drug_rows(payload))
+
+
+def _compact_disease_evidence(entry: dict) -> dict:
+    return {
+        key: entry[key]
+        for key in (
+            "datasourceId",
+            "datatypeId",
+            "score",
+            "studyId",
+            "literature",
+            "url",
+            "targetId",
+            "diseaseId",
+        )
+        if key in entry
+    }
+
+
+def _compact_association(entry: dict) -> dict:
+    return {
+        key: entry[key]
+        for key in ("disease", "score", "datatypeScores", "evidenceCount")
+        if key in entry
+    }
+
+
+def _compact_target_drug(entry: dict) -> dict:
+    return {
+        key: entry[key]
+        for key in (
+            "maxClinicalStage",
+            "drug",
+            "diseases",
+            "mechanismOfAction",
+            "target",
+        )
+        if key in entry
+    }
+
+
+def _compact_ot_payload(filename: str, payload: dict, top_n: int = _OT_COMPACT_TOP_N) -> dict:
+    target_info = payload.get("target_info") if isinstance(payload.get("target_info"), dict) else {}
+    disease_evidence = payload.get("disease_evidence")
+    associations = payload.get("associations")
+    target_drug_rows = _target_drug_rows(payload)
+    errors = payload.get("errors")
+    return {
+        "_compact_schema": _OT_COMPACT_SCHEMA,
+        "_source_file": f"evidence/{filename}",
+        "_source_hash": canonical_json_hash(payload),
+        "_original_token_estimate": _estimate_json_tokens(payload),
+        "gene_symbol": payload.get("gene_symbol"),
+        "disease": payload.get("disease"),
+        "ensembl_id": payload.get("ensembl_id"),
+        "target_identity": {
+            "id": target_info.get("id"),
+            "approvedSymbol": target_info.get("approvedSymbol"),
+            "approvedName": target_info.get("approvedName"),
+            "biotype": target_info.get("biotype"),
+        },
+        "counts": {
+            "disease_evidence": _list_count(disease_evidence),
+            "associations_loaded": _list_count(associations),
+            "associations_total": payload.get("associations_total_count", _list_count(associations)),
+            "target_drugs": _target_drug_count(payload),
+            "target_drugs_loaded": len(target_drug_rows),
+            "tractability": _list_count(target_info.get("tractability")),
+            "safety_liabilities": _list_count(target_info.get("safetyLiabilities")),
+            "errors": _list_count(errors),
+        },
+        "flags": {
+            "executed": payload.get("executed"),
+            "associations_truncated": payload.get("associations_truncated"),
+            "disease_evidence_truncated": payload.get("disease_evidence_truncated"),
+            "has_errors": bool(errors),
+        },
+        "top_disease_evidence": [
+            _compact_disease_evidence(entry)
+            for entry in (disease_evidence[:top_n] if isinstance(disease_evidence, list) else [])
+            if isinstance(entry, dict)
+        ],
+        "top_associations": [
+            _compact_association(entry)
+            for entry in (associations[:top_n] if isinstance(associations, list) else [])
+            if isinstance(entry, dict)
+        ],
+        "top_target_drugs": [
+            _compact_target_drug(entry)
+            for entry in target_drug_rows[:top_n]
+            if isinstance(entry, dict)
+        ],
+        "provenance_source_fields_preserved": [
+            "gene_symbol",
+            "disease",
+            "ensembl_id",
+            "target_info",
+            "disease_evidence",
+            "associations",
+            "target_drugs",
+            "errors",
+        ],
+    }
+
+
+def _compact_evidence_for_budget(
+    evidence: dict,
+    reference_card: dict,
+    top_n: int = _OT_COMPACT_TOP_N,
+) -> dict:
+    compacted = copy.deepcopy(evidence)
+    files = compacted.get("files")
+    if not isinstance(files, dict):
+        return compacted
+
+    featured_genes = _featured_gene_set(reference_card)
+    for filename, payload in list(files.items()):
+        if not (
+            isinstance(filename, str)
+            and filename.startswith("ot_")
+            and filename.endswith(".json")
+            and isinstance(payload, dict)
+        ):
+            continue
+        gene = filename.removeprefix("ot_").removesuffix(".json").strip().upper()
+        if gene in featured_genes:
+            continue
+        files[filename] = _compact_ot_payload(filename, payload, top_n=top_n)
+    return compacted
+
+
+def _compact_evidence_if_needed(evidence: dict, reference_card: dict) -> tuple[dict, int]:
+    token_estimate = _estimate_json_tokens(evidence)
+    if token_estimate < int(_TOKEN_BUDGET * _COMPACTION_TRIGGER_RATIO):
+        return evidence, token_estimate
+
+    compacted = _compact_evidence_for_budget(evidence, reference_card)
+    compacted_token_estimate = _estimate_json_tokens(compacted)
+    if compacted_token_estimate >= token_estimate:
+        return evidence, token_estimate
+
+    logger.info(
+        "compacted evidence payload: %d -> %d tokens",
+        token_estimate,
+        compacted_token_estimate,
+    )
+    return compacted, compacted_token_estimate
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +270,7 @@ async def finalize_report(state: dict, config: RunnableConfig) -> dict:
     # short-circuit finalization: on a reused workspace with different input
     # that would silently return stale results (and skip validation).
     evidence, spec, reference_card = _load_expansion_inputs(data_dir, disease)
-    token_estimate = len(json.dumps(evidence)) // 4
+    evidence, token_estimate = _compact_evidence_if_needed(evidence, reference_card)
     if token_estimate > _TOKEN_BUDGET:
         logger.warning("evidence budget exceeded: %d > %d", token_estimate, _TOKEN_BUDGET)
         return {"report_finalization_error": f"evidence_budget_exceeded: {token_estimate} > {_TOKEN_BUDGET}", "evidence_truncated": True}

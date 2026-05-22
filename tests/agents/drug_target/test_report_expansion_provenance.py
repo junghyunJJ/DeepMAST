@@ -439,6 +439,187 @@ def _make_state(tmp_path: Path) -> dict:
     return {"data_dir": str(tmp_path), "disease": "test disease"}
 
 
+def _make_ot_payload(
+    gene: str,
+    *,
+    evidence_count: int,
+    association_count: int,
+    drug_count: int,
+) -> dict:
+    return {
+        "gene_symbol": gene,
+        "disease": "test disease",
+        "executed": True,
+        "ensembl_id": f"ENSG_{gene}",
+        "target_info": {
+            "id": f"ENSG_{gene}",
+            "approvedSymbol": gene,
+            "approvedName": f"{gene} test target",
+            "biotype": "protein_coding",
+            "functionDescriptions": [
+                f"{gene} function description " + ("x" * 200)
+            ],
+            "tractability": [
+                {"modality": "SM", "id": f"tractability_{i}", "value": i % 2 == 0}
+                for i in range(8)
+            ],
+            "safetyLiabilities": [
+                {"event": f"safety_{i}", "datasource": "ToxCast"}
+                for i in range(2)
+            ],
+        },
+        "disease_evidence": [
+            {
+                "datasourceId": "europepmc",
+                "datatypeId": "literature",
+                "score": float(evidence_count - i),
+                "studyId": None,
+                "literature": [str(10_000 + i)],
+            }
+            for i in range(evidence_count)
+        ],
+        "associations": [
+            {
+                "disease": {"id": f"EFO_{i}", "name": f"association disease {i}"},
+                "score": float(association_count - i),
+                "datatypeScores": [{"id": "literature", "score": 1.0}],
+            }
+            for i in range(association_count)
+        ],
+        "target_drugs": {
+            "count": drug_count,
+            "rows": [
+                {
+                    "maxClinicalStage": i % 5,
+                    "drug": {
+                        "id": f"CHEMBL{i}",
+                        "name": f"drug_{i}",
+                        "maximumClinicalStage": i % 5,
+                    },
+                    "diseases": [
+                        {
+                            "diseaseFromSource": f"drug disease {i}",
+                            "disease": {"id": f"MONDO_{i}", "name": f"drug disease {i}"},
+                        }
+                    ],
+                }
+                for i in range(drug_count)
+            ],
+        },
+        "associations_total_count": association_count,
+        "associations_truncated": association_count > 3,
+        "disease_evidence_truncated": evidence_count > 3,
+        "errors": [],
+    }
+
+
+def test_compact_evidence_preserves_featured_ot_payload() -> None:
+    from src.agents.drug_target.finalize_report import _compact_evidence_for_budget
+
+    featured_payload = _make_ot_payload("MUC1", evidence_count=5, association_count=5, drug_count=5)
+    nonfeatured_payload = _make_ot_payload("TGFB1", evidence_count=6, association_count=6, drug_count=4)
+    evidence = {"files": {"ot_MUC1.json": featured_payload, "ot_TGFB1.json": nonfeatured_payload}}
+    reference_card = {"stage3_candidates": ["MUC1"], "featured_genes": [{"gene": "MUC1"}]}
+
+    compacted = _compact_evidence_for_budget(evidence, reference_card, top_n=3)
+
+    assert compacted["files"]["ot_MUC1.json"] == featured_payload
+    compact_tgfb1 = compacted["files"]["ot_TGFB1.json"]
+    assert compact_tgfb1["_compact_schema"] == "drug_target.ot_per_target_summary.v1"
+    assert compact_tgfb1["_source_file"] == "evidence/ot_TGFB1.json"
+    assert compact_tgfb1["counts"]["disease_evidence"] == 6
+    assert compact_tgfb1["counts"]["associations_loaded"] == 6
+    assert compact_tgfb1["counts"]["target_drugs"] == 4
+    assert len(compact_tgfb1["top_disease_evidence"]) == 3
+    assert len(compact_tgfb1["top_associations"]) == 3
+    assert len(compact_tgfb1["top_target_drugs"]) == 3
+    assert "_source_hash" in compact_tgfb1
+    assert "_original_token_estimate" in compact_tgfb1
+
+
+def test_compact_evidence_reduces_nonfeatured_ot_tokens() -> None:
+    from src.agents.drug_target.finalize_report import (
+        _compact_evidence_for_budget,
+        _estimate_json_tokens,
+    )
+
+    nonfeatured_payload = _make_ot_payload("TGFB1", evidence_count=20, association_count=20, drug_count=10)
+    evidence = {"files": {"ot_TGFB1.json": nonfeatured_payload}}
+    reference_card = {"stage3_candidates": []}
+
+    compacted = _compact_evidence_for_budget(evidence, reference_card, top_n=3)
+
+    assert _estimate_json_tokens(compacted) < _estimate_json_tokens(evidence)
+
+
+@pytest.mark.asyncio
+async def test_finalize_report_compacts_large_nonfeatured_ot_before_budget_gate(tmp_path: Path, monkeypatch) -> None:
+    import src.agents.drug_target.finalize_report as mod
+
+    _write_minimal_workspace(tmp_path)
+    reference_card = {"stage3_candidates": ["MUC1"], "featured_genes": [{"gene": "MUC1"}]}
+    valid_payload = _make_valid_payload()
+
+    monkeypatch.setattr(mod, "_TOKEN_BUDGET", 2_500)
+
+    evidence = {
+        "files": {
+            "ot_MUC1.json": _make_ot_payload("MUC1", evidence_count=2, association_count=2, drug_count=2),
+            "ot_TGFB1.json": _make_ot_payload("TGFB1", evidence_count=80, association_count=80, drug_count=20),
+        }
+    }
+
+    with (
+        patch("src.agents.drug_target.finalize_report._load_expansion_inputs", return_value=(evidence, {}, reference_card)),
+        patch("src.agents.model.create_llm") as mock_llm,
+        patch("src.agents.drug_target.finalize_report._persist_and_validate", return_value=[]),
+        patch("src.agents.drug_target.finalize_report._render_outputs"),
+        patch("src.agents.drug_target.finalize_report._finalize_workspace", return_value=[]),
+    ):
+        mock_model = MagicMock()
+        mock_model.bind.return_value = mock_model
+        structured = MagicMock()
+        structured.with_retry.return_value = structured
+        structured.invoke.return_value = valid_payload
+        mock_model.with_structured_output.return_value = structured
+        mock_llm.return_value = mock_model
+
+        result = await mod.finalize_report(_make_state(tmp_path), config={})
+
+    assert result["report_finalization_error"] is None
+    mock_model.with_structured_output.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_finalize_report_fails_closed_after_compaction_if_still_over_budget(tmp_path: Path, monkeypatch) -> None:
+    import src.agents.drug_target.finalize_report as mod
+
+    _write_minimal_workspace(tmp_path)
+    reference_card = {"stage3_candidates": []}
+    monkeypatch.setattr(mod, "_TOKEN_BUDGET", 200)
+
+    evidence = {
+        "files": {
+            "ot_TGFB1.json": _make_ot_payload("TGFB1", evidence_count=80, association_count=80, drug_count=20),
+        },
+        "uncompactable": "x" * 5_000,
+    }
+
+    with (
+        patch("src.agents.drug_target.finalize_report._load_expansion_inputs", return_value=(evidence, {}, reference_card)),
+        patch("src.agents.model.create_llm") as mock_llm,
+    ):
+        mock_model = MagicMock()
+        mock_model.bind.return_value = mock_model
+        mock_llm.return_value = mock_model
+
+        result = await mod.finalize_report(_make_state(tmp_path), config={})
+
+    assert result["report_finalization_error"].startswith("evidence_budget_exceeded:")
+    assert result["evidence_truncated"] is True
+    mock_model.with_structured_output.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # Test 1 — Happy path
 # ---------------------------------------------------------------------------
