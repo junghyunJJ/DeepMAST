@@ -1,0 +1,229 @@
+{# ===========================================================================
+   DeepMAST Drug Target Assessment Report — Jinja2 Markdown Template
+
+   Context variables expected:
+     disease, n_genes, n_featured, stage3_genes,
+     featured_cards (with _drugs, _pairs pre-formatted),
+     featured_rows, other_rows, stage1_filter_results
+   =========================================================================== #}
+# Therapeutic Target Assessment Report — {{ disease }}
+
+## 1. Executive Summary
+
+This report presents a comprehensive therapeutic target assessment for **{{ disease }}** based on spatial transcriptomics cell-cell interaction (CCI) analysis. A total of **{{ n_genes }} unique genes** from the top-30 L-R pairs were evaluated through a 3-stage evidence funnel, yielding **{{ n_featured }} featured candidates** for deep-dive analysis.
+
+### Featured Candidates
+
+{% for card in featured_cards %}
+- **{{ card.gene }}** — Classification: {{ card.rubric.classification | default('N/A') }}, Priority: {{ card.rubric.priority | default('N/A') }}, Exploratory Total: {{ card.rubric.exploratory_total | default('N/A') }}, Combined Total: {{ card.rubric.combined_total | default('N/A') }}
+{% endfor %}
+
+<!-- EXPAND: Add 2-3 sentences summarizing key therapeutic opportunities -->
+
+## 2. Gene & L-R Pair Prioritization
+
+### 2.1. Druggability Matrix
+
+<!-- EXPAND: Add 2-3 sentences interpreting the overall scoring landscape -->
+
+| Gene | Drug Ev. | Trial | Safety | Val. Total | GWAS | Tract. | Bio. Plaus. | Novelty | Expl. Total | Combined | Classification | Priority | Stage3 |
+|------|--------:|------:|-------:|-----------:|-----:|-------:|------------:|--------:|------------:|---------:|----------------|----------|--------|
+{% for row in featured_rows %}
+| **{{ row.gene }}** | {{ row.existing_drug_evidence | default(0) }} | {{ row.clinical_trial_activity | default(0) }} | {{ row.safety_profile | default(0) }} | {{ row.validated_total | default(0) }} | {{ row.gwas_support | default(0) }} | {{ row.tractability | default(0) }} | {{ row.biological_plausibility | default(0) }} | {{ row.novelty_opportunity | default(0) }} | {{ row.exploratory_total | default(0) }} | {{ row.combined_total | default(0) }} | {{ row.classification | default('N/A') }} | {{ row.priority | default('N/A') }} | Yes |
+{% endfor %}
+{% for row in other_rows %}
+| {{ row.gene }} | {{ row.existing_drug_evidence | default(0) }} | {{ row.clinical_trial_activity | default(0) }} | {{ row.safety_profile | default(0) }} | {{ row.validated_total | default(0) }} | {{ row.gwas_support | default(0) }} | {{ row.tractability | default(0) }} | {{ row.biological_plausibility | default(0) }} | {{ row.novelty_opportunity | default(0) }} | {{ row.exploratory_total | default(0) }} | {{ row.combined_total | default(0) }} | {{ row.classification | default('N/A') }} | {{ row.priority | default('N/A') }} |  |
+{% endfor %}
+
+#### Scoring Legend
+
+Each gene is scored on two independent tracks reflecting different types of therapeutic evidence. The **Validated Track** captures existing clinical and drug development activity, while the **Exploratory Track** captures genetic, biological, and novelty signals that suggest untapped therapeutic potential.
+
+##### Validated Track (Clinical Evidence)
+
+| Column | Full Name | Range | Data Source | Scoring Logic | Interpretation |
+|--------|-----------|-------|-------------|---------------|----------------|
+| Drug Ev. | existing_drug_evidence | -5 to +5 | OpenTargets | (gene-level drug count) minus (disease-level drug count), clamped | Positive = repurposing opportunity across indications; Negative = saturated drug landscape for this disease; Zero = no known drugs |
+| Trial | clinical_trial_activity | -5 to +5 | ChEMBL, ClinicalTrials | (gene-level clinical programs) minus (disease-level trial entries), clamped | Positive = active pipeline with novel indication potential; Negative = competitive/crowded trial space |
+| Safety | safety_profile | -3 to 0 | PharmGKB, ToxCast, AOP-Wiki | 0 = no concerns; -1 = preclinical signals only (ToxCast/AOP-Wiki 3+); -2 = clinical concerns (PharmGKB 1-2 entries); -3 = major clinical safety issues (PharmGKB 3+) | Penalty score: more negative = higher safety risk |
+| Val. Total | validated_total | -13 to +10 | (computed) | Sum of Drug Ev. + Trial + Safety | Overall clinical readiness; higher = stronger existing drug development evidence |
+
+##### Exploratory Track (Genetic & Biological Evidence)
+
+| Column | Full Name | Range | Data Source | Scoring Logic | Interpretation |
+|--------|-----------|-------|-------------|---------------|----------------|
+| GWAS | gwas_support | 0-3 | GWAS Catalog | 0 = no disease-specific GWAS evidence; 1 = proximity hits only (within 500kb); 2 = direct disease link (gene-in-trait or gene-SNP overlap); 3 = genome-wide significant overlap (p < 5e-8) | Genetic validation strength for this disease |
+| Tract. | tractability | 0-3 | OpenTargets Tractability | 0 = unknown druggability; 1 = predicted structure or druggable family; 2 = clinical precedent (advanced clinical / Phase 1); 3 = approved drug exists for this modality | How feasible it is to develop a drug against this target |
+| Bio. Plaus. | biological_plausibility | 0-5 | OpenTargets Evidence + Ensembl VEP | Count of distinct evidence types (affected_pathway, literature, animal_model, somatic_mutation) + bonus if max score >= 0.7, + VEP high-impact variant boost | Breadth and strength of biological evidence linking gene to disease |
+| Novelty | novelty_opportunity | 0-5 | OpenTargets Associations | {{ novelty_opportunity_legend }} | Higher = less explored, greater opportunity for novel discovery |
+| Expl. Total | exploratory_total | 0-16 | (computed) | Sum of GWAS + Tract. + Bio. Plaus. + Novelty | Overall exploratory potential; higher = stronger biological rationale for investigation |
+
+##### Combined Score, Classification & Priority
+
+| Field | Description |
+|-------|-------------|
+| **Combined** | validated_total + exploratory_total. Overall target attractiveness across both tracks. |
+| **Classification** | Rule-based assignment: `validated_target` if Drug Ev. >= 3 or (Drug Ev. >= 1 and Val. Total >= 3); `exploratory_target` if GWAS >= 1 or Tract. >= 2 or Bio. Plaus. >= 3; `novel_candidate` if Bio. Plaus. >= 2 or Novelty >= 3 or (Tract. >= 1 and Novelty >= 2); `insufficient_evidence` otherwise. |
+| **Priority** | For validated_target: `high` (Combined >= 10), `medium` (>= 5), `low`. For exploratory/novel: `high` (Expl. Total >= 12), `medium` (>= 7), `low`. insufficient_evidence is always `unranked`. |
+| **Stage3** | Genes with combined_total >= 10 that also appear in stage1_filter_passed_genes are selected as featured candidates and proceed to Stage 3 deep-dive analysis (ChEMBL drug profiling). |
+
+### 2.2. Biological Interaction Filter Results
+
+<!-- EXPAND: Add 2-3 sentences interpreting which L-R pairs passed biological validation and the implications for target selection -->
+
+{% if stage1_filter_results %}
+| L-R Pair | Passed | STRING | Coexpr p | Gene A p | Gene B p | Gene A RR | Gene B RR | Coexpr RR | Coexpr Tgt% |
+|----------|--------|-------:|---------:|---------:|---------:|----------:|----------:|----------:|------------:|
+{% for row in stage1_filter_results %}
+| {% if row._passed %}**{{ row.ligand }} — {{ row.receptor }}**{% else %}{{ row.ligand }} — {{ row.receptor }}{% endif %} | {{ "Pass" if row._passed else "Fail" }} | {{ row._string }} | {{ row._coexpr_p }} | {{ row._gene_a_p }} | {{ row._gene_b_p }} | {{ row._gene_a_rr }} | {{ row._gene_b_rr }} | {{ row._coexpr_rr }} | {{ row._coexpr_tgt }} |
+{% endfor %}
+{% else %}
+*No Stage 1 filter results available.*
+{% endif %}
+
+#### Scoring Legend
+
+**Stage 1 Filter Criteria** — A pair passes only if ALL four criteria are met:
+
+| Criterion | Threshold | Data Source |
+|-----------|-----------|-------------|
+| STRING PPI combined score | > 0.8 | STRING database |
+| Census coexpression p-value | < 0.05 | CellxGene Census (target vs. rest) |
+| Census gene A (ligand) p-value | < 0.05 | CellxGene Census (target vs. rest) |
+| Census gene B (receptor) p-value | < 0.05 | CellxGene Census (target vs. rest) |
+
+**RR** = Risk Ratio (relative target-cell signal vs. rest; RR>1 indicates higher target-cell signal, RR<1 indicates lower target-cell signal/depletion, not enrichment). N/A indicates the gene was not detected in non-target cells (denominator = 0).
+
+## 3. Featured Candidate Deep Dives
+
+{% for card in featured_cards %}
+### {{ card.gene }} — Classification: {{ card.rubric.classification | default('N/A') }} | Priority: {{ card.rubric.priority | default('N/A') }}
+
+**A. Drug Profile**
+
+{% if card._clinical_drugs %}
+**Clinical Compounds (OpenTargets):**
+
+| Drug | ChEMBL ID | Mechanism of Action | Phase | Indications |
+|------|-----------|---------------------|------:|-------------|
+{% for d in card._clinical_drugs -%}
+| **{{ d.name }}** | {{ d.chembl_id }} | {{ d.moa | replace('|', '\\|') }} | {{ d.phase }} | {{ d.indications | replace('|', '\\|') }} |
+{% endfor %}
+{% endif %}
+{% if card._preclinical_compounds %}
+**Preclinical Compounds (ChEMBL Bioactivity):**
+{% for d in card._preclinical_compounds %}
+- **{{ d.name }}** ({{ d.chembl_id }}) — {{ d.moa }}, Phase: {{ d.phase }}, Indications: {{ d.indications }}
+{% endfor %}
+{% endif %}
+{% if not card._clinical_drugs and not card._preclinical_compounds %}
+- No known drugs targeting this gene
+{% endif %}
+
+<!-- EXPAND: Describe what drugs exist and their approved indications. Do NOT speculate about repurposing potential or therapeutic opportunities for the study disease. State only what is known from the listed data. -->
+
+**B. Biological Context (Stage 1)**
+
+{% if card._pairs %}
+{% for p in card._pairs %}
+- **{{ p.ligand }}–{{ p.receptor }}**{% if '_passed' in p %} **[Stage 1: {{ "PASS" if p._passed else "FAIL" }}]**{% endif %}: STRING PPI score={{ p.score }}, interaction={{ p.interaction }}
+{% for kp in p.kegg %}
+  - KEGG ({{ kp.role }}): {{ kp.pathways }}
+{% endfor %}
+{% for rp in p.reactome %}
+  - Reactome ({{ rp.role }}): {{ rp.pathways }}
+{% endfor %}
+{% if p.census_rr is not none %}
+  - Census: risk_ratio={{ p.census_rr }}, p_value={{ p.census_p }} [from {{ p.pair_file }}]
+{% endif %}
+{% endfor %}
+{% else %}
+- No Stage 1 data available for this gene
+{% endif %}
+
+<!-- EXPAND: Interpret biological context and pathway relevance -->
+
+**C. Rubric Assessment**
+
+- Validated Track: existing_drug_evidence={{ card.rubric.existing_drug_evidence | default(0) }}, clinical_trial_activity={{ card.rubric.clinical_trial_activity | default(0) }}, safety_profile={{ card.rubric.safety_profile | default(0) }} → **validated_total={{ card.rubric.validated_total | default(0) }}**
+- Exploratory Track: gwas_support={{ card.rubric.gwas_support | default(0) }}, tractability={{ card.rubric.tractability | default(0) }}, biological_plausibility={{ card.rubric.biological_plausibility | default(0) }}, novelty_opportunity={{ card.rubric.novelty_opportunity | default(0) }} → **exploratory_total={{ card.rubric.exploratory_total | default(0) }}**
+- **Combined Total: {{ card.rubric.combined_total | default(0) }}** | Classification: {{ card.rubric.classification | default('N/A') }} | Priority: {{ card.rubric.priority | default('N/A') }}
+
+<!-- EXPAND: Add therapeutic recommendation based on evidence -->
+
+---
+
+{% endfor %}
+## 4. Hypothesis-Driven Analysis
+
+{% if disease_scope and disease_scope.requires_proxy_note %}
+{{ disease_scope.proxy_note }}
+
+{% endif %}
+{% if hypothesis_data and hypothesis_data.hypotheses %}
+Evidence coverage: {{ hypothesis_data.evidence_coverage_pct }}% ({{ hypothesis_data.hypotheses_retained }} hypotheses retained from {{ hypothesis_data.hypotheses_generated }} generated)
+
+<!-- EXPAND: Add 2-3 sentences summarizing the hypothesis generation approach and key themes -->
+
+{% for h in hypothesis_data.hypotheses %}
+### 4.{{ h.rank }}. {{ h.title }}
+
+**Category:** {{ h.category }}
+
+**Core Claim:** {{ h.core_claim }}
+
+**Evidence References:**
+{% for ref in h.evidence_references %}
+- {{ ref }}
+{% endfor %}
+
+**Biological Entities:**
+- Genes: {{ h.biological_entities.genes | join(', ') }}
+- Pathways: {{ h.biological_entities.pathways | join(', ') }}
+- Cell Types: {{ h.biological_entities.cell_types | join(', ') }}
+{% if h.biological_entities.drugs %}
+- Drugs: {{ h.biological_entities.drugs | join(', ') }}
+{% endif %}
+
+**Falsifiable Prediction:** {{ h.falsifiable_prediction }}
+
+**Validation Approach:** {{ h.validation_approach }}
+
+<!-- EXPAND: Add 1-2 sentences on therapeutic implications of this hypothesis -->
+
+---
+
+{% endfor %}
+
+{% if hypothesis_data.gap_analysis %}
+### Gap Analysis
+
+Evidence coverage: {{ hypothesis_data.gap_analysis.referenced_files | default(0) }} of {{ hypothesis_data.gap_analysis.total_evidence_files | default(0) }} evidence files referenced.
+
+{% if hypothesis_data.gap_analysis.orphan_files | default([]) %}
+**Uncovered evidence files:**
+{% for f in hypothesis_data.gap_analysis.orphan_files | default([]) %}
+- {{ f }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% else %}
+*No hypothesis analysis available. The hypothesis_writer subagent may not have completed.*
+{% endif %}
+
+{% if data_limitations %}
+## Data Limitations
+
+{% for limitation in data_limitations %}
+> **Note:** {{ limitation }}
+{% endfor %}
+{% endif %}
+
+## 5. Pipeline Execution Summary & Recommendations
+
+- Total genes assessed: {{ n_genes }}
+- Featured candidates (Stage 3): {{ n_featured }}
+- Featured genes: {{ stage3_genes | join(', ') }}
+
+<!-- EXPAND: Add recommendations for validated targets, exploratory targets, and next steps -->
