@@ -471,7 +471,7 @@ async def generate_report_interpretations(
                 "issues": [
                     {
                         "code": "INTERPRETATION_PROVIDER_ERROR",
-                        "severity": "critical",
+                        "severity": "low",
                         "message": str(exc),
                         "card_id": card_id,
                     }

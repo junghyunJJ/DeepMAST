@@ -107,6 +107,30 @@ def test_generate_interpretations_records_provider_error_with_card_id_key(
     assert "executive_summary_opportunities" not in render_map
 
 
+def test_generate_interpretations_accepts_async_provider(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.report_interpretations import (
+        generate_report_interpretations,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+
+    async def provider(card):
+        if card["id"] == "executive_summary.opportunities":
+            return "FN1 anchors a deterministic opportunity in the 41-gene assessment."
+        return ""
+
+    payload, render_map = asyncio.run(
+        generate_report_interpretations(report_data, provider=provider)
+    )
+
+    assert payload["summary"]["accepted"] == 1
+    assert render_map["executive_summary_opportunities"].startswith("FN1 anchors")
+
+
 def test_build_interpretation_cards_include_existing_expand_slots(
     tmp_path: Path,
 ) -> None:
