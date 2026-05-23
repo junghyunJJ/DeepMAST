@@ -61,9 +61,14 @@ def test_generate_interpretations_accepts_and_rejects_mock_provider(
     )
 
     assert payload["schema_version"] == "drug_target.report_interpretations.v1"
+    assert payload["summary"]["cards"] > 0
     assert payload["summary"]["accepted"] == 1
     assert payload["summary"]["rejected"] >= 1
     assert payload["summary"]["missing"] >= 1
+    assert "executive_summary.opportunities" in payload["snippets"]
+    accepted = payload["snippets"]["executive_summary.opportunities"]
+    assert accepted["status"] == "accepted"
+    assert accepted["text"].startswith("FN1 anchors")
     assert render_map["executive_summary_opportunities"].startswith("FN1 anchors")
     assert "scoring_landscape" not in render_map
     rejected = payload["snippets"]["scoring_landscape"]
@@ -73,6 +78,33 @@ def test_generate_interpretations_accepts_and_rejects_mock_provider(
         "UNSUPPORTED_NUMBER",
         "UNSUPPORTED_SOURCE",
     }
+
+
+def test_generate_interpretations_records_provider_error_with_card_id_key(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.report_interpretations import (
+        generate_report_interpretations,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+
+    def provider(card):
+        if card["id"] == "executive_summary.opportunities":
+            raise RuntimeError("provider unavailable")
+        return ""
+
+    payload, render_map = asyncio.run(
+        generate_report_interpretations(report_data, provider=provider)
+    )
+
+    snippet = payload["snippets"]["executive_summary.opportunities"]
+    assert snippet["status"] == "provider_error"
+    assert snippet["issues"][0]["code"] == "INTERPRETATION_PROVIDER_ERROR"
+    assert payload["summary"]["provider_errors"] == 1
+    assert "executive_summary_opportunities" not in render_map
 
 
 def test_build_interpretation_cards_include_existing_expand_slots(

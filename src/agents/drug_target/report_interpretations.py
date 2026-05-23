@@ -448,6 +448,7 @@ async def generate_report_interpretations(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     cards = build_interpretation_cards(report_data)
     summary = {
+        "cards": len(cards),
         "accepted": 0,
         "rejected": 0,
         "missing": 0,
@@ -458,22 +459,18 @@ async def generate_report_interpretations(
 
     for card in cards:
         card_id = str(card.get("id") or "")
-        root_key, nested_key, _leaf_key = _render_key(card_id)
-        snippet_key = root_key
-        if nested_key is not None:
-            snippet_key = card_id.replace(".", "_")
 
         try:
             text = (await _call_provider(provider, card)).strip()
         except Exception as exc:  # noqa: BLE001
             summary["provider_errors"] += 1
-            snippets[snippet_key] = {
+            snippets[card_id] = {
                 "card_id": card_id,
                 "status": "provider_error",
                 "text": "",
                 "issues": [
                     {
-                        "code": "PROVIDER_ERROR",
+                        "code": "INTERPRETATION_PROVIDER_ERROR",
                         "severity": "critical",
                         "message": str(exc),
                         "card_id": card_id,
@@ -484,7 +481,7 @@ async def generate_report_interpretations(
 
         if not text:
             summary["missing"] += 1
-            snippets[snippet_key] = {
+            snippets[card_id] = {
                 "card_id": card_id,
                 "status": "missing",
                 "text": "",
@@ -495,7 +492,7 @@ async def generate_report_interpretations(
         issues = validate_interpretation_text(card, text)
         if issues:
             summary["rejected"] += 1
-            snippets[snippet_key] = {
+            snippets[card_id] = {
                 "card_id": card_id,
                 "status": "rejected",
                 "text": text,
@@ -505,7 +502,7 @@ async def generate_report_interpretations(
 
         summary["accepted"] += 1
         _put_render_text(render_map, card_id, text)
-        snippets[snippet_key] = {
+        snippets[card_id] = {
             "card_id": card_id,
             "status": "accepted",
             "text": text,
