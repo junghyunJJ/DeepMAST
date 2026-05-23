@@ -131,6 +131,76 @@ def test_generate_interpretations_accepts_async_provider(
     assert render_map["executive_summary_opportunities"].startswith("FN1 anchors")
 
 
+def test_render_report_markdown_inserts_accepted_interpretations(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import (
+        build_report_data,
+        render_report_markdown,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(
+        str(workspace),
+        "idiopathic pulmonary fibrosis",
+    )
+    render_map = {
+        "executive_summary_opportunities": (
+            "Executive accepted snippet for FN1 and MUC1."
+        ),
+        "scoring_landscape": "Scoring landscape accepted snippet.",
+        "stage1_filter": "Stage 1 filter accepted snippet.",
+        "candidates": {
+            "FN1": {
+                "drug_profile": "FN1 drug profile accepted snippet.",
+                "biological_context": "FN1 biology accepted snippet.",
+                "recommendation": "FN1 recommendation accepted snippet.",
+            }
+        },
+        "hypotheses_overview": "Hypotheses overview accepted snippet.",
+        "hypotheses": {
+            "1": {
+                "implication": "Hypothesis 1 implication accepted snippet.",
+            }
+        },
+        "final_recommendations": "Final recommendations accepted snippet.",
+    }
+
+    markdown = render_report_markdown(report_data, interpretations=render_map)
+
+    assert "Executive accepted snippet for FN1 and MUC1." in markdown
+    assert "Scoring landscape accepted snippet." in markdown
+    assert "Stage 1 filter accepted snippet." in markdown
+    assert "FN1 drug profile accepted snippet." in markdown
+    assert "FN1 biology accepted snippet." in markdown
+    assert "FN1 recommendation accepted snippet." in markdown
+    assert "Hypotheses overview accepted snippet." in markdown
+    assert "Hypothesis 1 implication accepted snippet." in markdown
+    assert "Final recommendations accepted snippet." in markdown
+    assert "EXPAND" not in markdown
+    assert "_interpretations" not in report_data["candidates"][0]
+
+
+def test_drug_report_templates_are_byte_identical() -> None:
+    skill_template = (
+        Path(__file__).resolve().parents[3]
+        / "skills"
+        / "drug-target-reporting"
+        / "templates"
+        / "drug_report.md.j2"
+    )
+    package_template = (
+        Path(__file__).resolve().parents[3]
+        / "src"
+        / "agents"
+        / "drug_target"
+        / "templates"
+        / "drug_report.md.j2"
+    )
+
+    assert skill_template.read_bytes() == package_template.read_bytes()
+
+
 def test_build_interpretation_cards_include_existing_expand_slots(
     tmp_path: Path,
 ) -> None:

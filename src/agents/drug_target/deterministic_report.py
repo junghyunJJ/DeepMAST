@@ -479,7 +479,11 @@ def _candidate_row(candidate: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _markdown_template_context(report_data: dict[str, Any]) -> dict[str, Any]:
+def _markdown_template_context(
+    report_data: dict[str, Any],
+    interpretations: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    interpretations = interpretations if isinstance(interpretations, dict) else {}
     raw_candidates = report_data.get("candidates", [])
     candidates = _dict_list(raw_candidates)
     selected = [candidate for candidate in candidates if candidate.get("stage3_candidate")]
@@ -512,18 +516,55 @@ def _markdown_template_context(report_data: dict[str, Any]) -> dict[str, Any]:
             drugs = _dict_list(candidate.get("drugs", []))
             clinical, preclinical = _split_template_drugs(drugs)
         gene = _safe_text(candidate.get("gene"), "")
-        featured_cards.append(
-            {
-                "gene": gene,
-                "rubric": _candidate_row(candidate),
-                "_clinical_drugs": clinical,
-                "_preclinical_compounds": preclinical,
-                "_pairs": _template_pairs_for_gene(gene, stage1_pairs, filter_lookup),
-            }
+        card = {
+            "gene": gene,
+            "rubric": _candidate_row(candidate),
+            "_clinical_drugs": clinical,
+            "_preclinical_compounds": preclinical,
+            "_pairs": _template_pairs_for_gene(gene, stage1_pairs, filter_lookup),
+        }
+        candidate_interpretations = interpretations.get("candidates", {})
+        candidate_interpretations = (
+            candidate_interpretations
+            if isinstance(candidate_interpretations, dict)
+            else {}
         )
+        snippets = candidate_interpretations.get(gene.upper(), {})
+        snippets = snippets if isinstance(snippets, dict) else {}
+        card_interpretations = {
+            key: snippets[key]
+            for key in ("drug_profile", "biological_context", "recommendation")
+            if isinstance(snippets.get(key), str) and snippets[key].strip()
+        }
+        if card_interpretations:
+            card["_interpretations"] = card_interpretations
+        featured_cards.append(card)
 
     hypothesis_data = template_context.get("hypothesis_data", {})
     hypothesis_data = hypothesis_data if isinstance(hypothesis_data, dict) else {}
+    hypothesis_data = dict(hypothesis_data)
+    hypotheses = hypothesis_data.get("hypotheses")
+    if isinstance(hypotheses, list):
+        hypothesis_interpretations = interpretations.get("hypotheses", {})
+        hypothesis_interpretations = (
+            hypothesis_interpretations
+            if isinstance(hypothesis_interpretations, dict)
+            else {}
+        )
+        rendered_hypotheses: list[Any] = []
+        for hypothesis in hypotheses:
+            if not isinstance(hypothesis, dict):
+                rendered_hypotheses.append(hypothesis)
+                continue
+            rendered_hypothesis = dict(hypothesis)
+            rank = str(rendered_hypothesis.get("rank") or "")
+            snippets = hypothesis_interpretations.get(rank, {})
+            snippets = snippets if isinstance(snippets, dict) else {}
+            implication = snippets.get("implication")
+            if isinstance(implication, str) and implication.strip():
+                rendered_hypothesis["_interpretation"] = implication
+            rendered_hypotheses.append(rendered_hypothesis)
+        hypothesis_data["hypotheses"] = rendered_hypotheses
     return {
         "disease": _safe_text(report_data.get("disease"), "unspecified disease"),
         "n_genes": len(candidates),
@@ -541,6 +582,7 @@ def _markdown_template_context(report_data: dict[str, Any]) -> dict[str, Any]:
         "disease_scope": {"requires_proxy_note": False},
         "data_limitations": [],
         "novelty_opportunity_legend": NOVELTY_OPPORTUNITY_LEGEND,
+        "interpretations": interpretations,
     }
 
 
@@ -1141,7 +1183,10 @@ def _add_self_validation_artifact(validation: dict[str, Any]) -> dict[str, Any]:
     return validation
 
 
-def render_report_markdown(report_data: dict[str, Any]) -> str:
+def render_report_markdown(
+    report_data: dict[str, Any],
+    interpretations: dict[str, Any] | None = None,
+) -> str:
     template_str = _markdown_template_path().read_text(encoding="utf-8")
     env = Environment(
         loader=BaseLoader(),
@@ -1150,7 +1195,7 @@ def render_report_markdown(report_data: dict[str, Any]) -> str:
         lstrip_blocks=True,
     )
     rendered = env.from_string(template_str).render(
-        **_markdown_template_context(report_data)
+        **_markdown_template_context(report_data, interpretations=interpretations)
     )
     return _strip_expand_markers(rendered)
 
