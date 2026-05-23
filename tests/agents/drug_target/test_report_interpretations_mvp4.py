@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import shutil
 from pathlib import Path
 
@@ -13,6 +14,65 @@ def _copy_baseline_workspace(tmp_path: Path) -> Path:
     workspace = tmp_path / "workspace"
     shutil.copytree(fixture, workspace)
     return workspace
+
+
+def test_report_interpretations_disabled_by_default(monkeypatch) -> None:
+    from src.agents.drug_target.report_interpretations import (
+        report_interpretations_enabled,
+    )
+
+    monkeypatch.delenv("DEEPMAST_ENABLE_REPORT_INTERPRETATIONS", raising=False)
+
+    assert report_interpretations_enabled({}) is False
+
+
+def test_report_interpretations_enabled_by_config(monkeypatch) -> None:
+    from src.agents.drug_target.report_interpretations import (
+        report_interpretations_enabled,
+    )
+
+    monkeypatch.delenv("DEEPMAST_ENABLE_REPORT_INTERPRETATIONS", raising=False)
+
+    assert report_interpretations_enabled(
+        {"configurable": {"enable_report_interpretations": True}}
+    ) is True
+
+
+def test_generate_interpretations_accepts_and_rejects_mock_provider(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.report_interpretations import (
+        generate_report_interpretations,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+
+    def provider(card):
+        if card["id"] == "executive_summary.opportunities":
+            return "FN1 anchors a deterministic opportunity in the 41-gene assessment."
+        if card["id"] == "scoring_landscape":
+            return "NINTEDANIB creates 99% unsupported benefit from fabricated.json."
+        return ""
+
+    payload, render_map = asyncio.run(
+        generate_report_interpretations(report_data, provider=provider)
+    )
+
+    assert payload["schema_version"] == "drug_target.report_interpretations.v1"
+    assert payload["summary"]["accepted"] == 1
+    assert payload["summary"]["rejected"] >= 1
+    assert payload["summary"]["missing"] >= 1
+    assert render_map["executive_summary_opportunities"].startswith("FN1 anchors")
+    assert "scoring_landscape" not in render_map
+    rejected = payload["snippets"]["scoring_landscape"]
+    assert rejected["status"] == "rejected"
+    assert {issue["code"] for issue in rejected["issues"]} >= {
+        "UNSUPPORTED_ENTITY",
+        "UNSUPPORTED_NUMBER",
+        "UNSUPPORTED_SOURCE",
+    }
 
 
 def test_build_interpretation_cards_include_existing_expand_slots(

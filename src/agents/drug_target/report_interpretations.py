@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import inspect
+import os
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 from typing import Any
 
@@ -38,6 +40,18 @@ _DOMAIN_TOKEN_ALLOWLIST = {
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def report_interpretations_enabled(config: Mapping[str, Any] | None) -> bool:
+    configurable = config.get("configurable") if config else None
+    if (
+        isinstance(configurable, Mapping)
+        and configurable.get(ENABLE_INTERPRETATIONS_CONFIG_KEY) is True
+    ):
+        return True
+
+    env_value = os.environ.get(ENABLE_INTERPRETATIONS_ENV, "")
+    return env_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _dict_list(value: object) -> list[dict[str, Any]]:
@@ -373,3 +387,136 @@ def validate_interpretation_text(
             )
 
     return issues
+
+
+def _render_key(card_id: str) -> tuple[str, str | None, str | None]:
+    if card_id == "executive_summary.opportunities":
+        return ("executive_summary_opportunities", None, None)
+    if card_id == "scoring_landscape":
+        return ("scoring_landscape", None, None)
+    if card_id == "stage1_filter.interpretation":
+        return ("stage1_filter", None, None)
+    if card_id == "hypotheses.overview":
+        return ("hypotheses_overview", None, None)
+    if card_id == "final_recommendations":
+        return ("final_recommendations", None, None)
+
+    parts = card_id.split(".")
+    if len(parts) == 3 and parts[0] == "candidate":
+        return ("candidates", parts[1], parts[2])
+    if len(parts) == 3 and parts[0] == "hypothesis":
+        return ("hypotheses", parts[1], parts[2])
+    return (card_id.replace(".", "_"), None, None)
+
+
+def _put_render_text(
+    render_map: dict[str, Any],
+    card_id: str,
+    text: str,
+) -> None:
+    root_key, nested_key, leaf_key = _render_key(card_id)
+    if nested_key is None or leaf_key is None:
+        render_map[root_key] = text
+        return
+
+    nested = render_map.setdefault(root_key, {})
+    if not isinstance(nested, dict):
+        nested = {}
+        render_map[root_key] = nested
+    leaf = nested.setdefault(nested_key, {})
+    if not isinstance(leaf, dict):
+        leaf = {}
+        nested[nested_key] = leaf
+    leaf[leaf_key] = text
+
+
+async def _call_provider(
+    provider: Callable[[Mapping[str, Any]], object],
+    card: Mapping[str, Any],
+) -> str:
+    result = provider(card)
+    if inspect.isawaitable(result):
+        result = await result
+    if result is None:
+        return ""
+    return str(result)
+
+
+async def generate_report_interpretations(
+    report_data: Mapping[str, Any],
+    provider: Callable[[Mapping[str, Any]], object],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    cards = build_interpretation_cards(report_data)
+    summary = {
+        "accepted": 0,
+        "rejected": 0,
+        "missing": 0,
+        "provider_errors": 0,
+    }
+    snippets: dict[str, Any] = {}
+    render_map: dict[str, Any] = {}
+
+    for card in cards:
+        card_id = str(card.get("id") or "")
+        root_key, nested_key, _leaf_key = _render_key(card_id)
+        snippet_key = root_key
+        if nested_key is not None:
+            snippet_key = card_id.replace(".", "_")
+
+        try:
+            text = (await _call_provider(provider, card)).strip()
+        except Exception as exc:  # noqa: BLE001
+            summary["provider_errors"] += 1
+            snippets[snippet_key] = {
+                "card_id": card_id,
+                "status": "provider_error",
+                "text": "",
+                "issues": [
+                    {
+                        "code": "PROVIDER_ERROR",
+                        "severity": "critical",
+                        "message": str(exc),
+                        "card_id": card_id,
+                    }
+                ],
+            }
+            continue
+
+        if not text:
+            summary["missing"] += 1
+            snippets[snippet_key] = {
+                "card_id": card_id,
+                "status": "missing",
+                "text": "",
+                "issues": [],
+            }
+            continue
+
+        issues = validate_interpretation_text(card, text)
+        if issues:
+            summary["rejected"] += 1
+            snippets[snippet_key] = {
+                "card_id": card_id,
+                "status": "rejected",
+                "text": text,
+                "issues": issues,
+            }
+            continue
+
+        summary["accepted"] += 1
+        _put_render_text(render_map, card_id, text)
+        snippets[snippet_key] = {
+            "card_id": card_id,
+            "status": "accepted",
+            "text": text,
+            "issues": [],
+        }
+
+    payload = {
+        "schema_version": INTERPRETATIONS_SCHEMA_VERSION,
+        "enabled": True,
+        "created_at": _utc_now(),
+        "summary": summary,
+        "snippets": snippets,
+    }
+    return payload, render_map
