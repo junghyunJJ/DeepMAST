@@ -78,7 +78,7 @@ def test_validate_interpretation_accepts_allowed_entities() -> None:
         "id": "executive_summary.opportunities",
         "allowed_genes": ["FN1", "MUC1"],
         "allowed_drugs": [],
-        "allowed_numbers": ["41", "6"],
+        "allowed_numbers": ["41", "6", "2"],
         "allowed_sources": ["evidence/assessment_results.json"],
     }
 
@@ -118,4 +118,28 @@ def test_validate_interpretation_rejects_unsupported_claim_tokens() -> None:
         "UNSUPPORTED_ENTITY",
         "UNSUPPORTED_NUMBER",
         "UNSUPPORTED_SOURCE",
+    }
+
+
+def test_validate_interpretation_rejects_case_variant_entities_and_single_digit_claims() -> None:
+    from src.agents.drug_target.report_interpretations import (
+        validate_interpretation_text,
+    )
+
+    card = {
+        "id": "executive_summary.opportunities",
+        "allowed_genes": ["FN1"],
+        "allowed_drugs": [],
+        "allowed_numbers": ["41"],
+        "allowed_sources": ["evidence/assessment_results.json"],
+    }
+
+    issues = validate_interpretation_text(
+        card,
+        "Nintedanib improves 3 outcomes through Tgfb2.",
+    )
+
+    assert {issue["code"] for issue in issues} >= {
+        "UNSUPPORTED_ENTITY",
+        "UNSUPPORTED_NUMBER",
     }

@@ -13,7 +13,9 @@ ENABLE_INTERPRETATIONS_ENV = "DEEPMAST_ENABLE_REPORT_INTERPRETATIONS"
 ENABLE_INTERPRETATIONS_CONFIG_KEY = "enable_report_interpretations"
 INTERPRETATION_PROVIDER_CONFIG_KEY = "report_interpretation_provider"
 
-_ENTITY_TOKEN_RE = re.compile(r"\b[A-Z][A-Z0-9-]{2,}\b")
+_ENTITY_TOKEN_RE = re.compile(
+    r"\b(?:[A-Z][A-Z0-9-]{2,}|[A-Z][a-z]{2,}|[A-Z][a-z]+[0-9]+)\b"
+)
 _SOURCE_RE = re.compile(r"\b[\w.-]+\.json\b")
 _NUMBER_RE = re.compile(r"(?<![A-Za-z])\d+(?:\.\d+)?(?:e[+-]?\d+)?%?")
 _DOMAIN_TOKEN_ALLOWLIST = {
@@ -277,15 +279,6 @@ def _allowed_source_basenames(values: object) -> set[str]:
     return {value.rsplit("/", 1)[-1] for value in _string_list(values)}
 
 
-def _is_numeric_claim(number: str) -> bool:
-    return (
-        "%" in number
-        or "." in number
-        or "e" in number.lower()
-        or len(number) > 1
-    )
-
-
 def validate_interpretation_text(
     card: Mapping[str, Any],
     text: str,
@@ -319,9 +312,10 @@ def validate_interpretation_text(
         | _DOMAIN_TOKEN_ALLOWLIST
     )
     for token in sorted(set(_ENTITY_TOKEN_RE.findall(stripped))):
-        if token.startswith("CHEMBL"):
+        upper_token = token.upper()
+        if upper_token.startswith("CHEMBL"):
             continue
-        if token not in allowed_entities:
+        if upper_token not in allowed_entities:
             issues.append(
                 {
                     "code": "UNSUPPORTED_ENTITY",
@@ -356,8 +350,6 @@ def validate_interpretation_text(
         str(value) for value in _string_list(card.get("allowed_numbers"))
     )
     for number in sorted(set(_NUMBER_RE.findall(stripped))):
-        if not _is_numeric_claim(number):
-            continue
         if number not in allowed_numbers:
             issues.append(
                 {
