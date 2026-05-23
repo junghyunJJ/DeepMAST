@@ -41,6 +41,21 @@ def _state(workspace: Path) -> dict:
     }
 
 
+def _write_lr_candidates(workspace: Path) -> None:
+    (workspace / "lr_candidates.json").write_text(
+        json.dumps(
+            {
+                "pairs": [
+                    {"ligand": "ICAM1", "receptor": "MUC1"},
+                    {"ligand": "FN1", "receptor": "PLAUR"},
+                ]
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
 @pytest.mark.asyncio
 async def test_finalize_report_uses_deterministic_mvp_without_llm(
     tmp_path: Path,
@@ -67,6 +82,30 @@ async def test_finalize_report_uses_deterministic_mvp_without_llm(
     assert (workspace / "report_validation.json").exists()
     assert not (workspace / "report_expansions.json").exists()
     assert "EXPAND" not in (workspace / "drug.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_finalize_report_writes_target_assessment_for_fresh_workspace(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.finalize_report import finalize_report
+    from src.agents.drug_target.tools.assessment_output import (
+        validate_target_assessment_file,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    _write_lr_candidates(workspace)
+    assert not (workspace / "target_assessment.json").exists()
+
+    result = await finalize_report(_state(workspace), {})
+
+    assert result == {
+        "report_finalization_error": None,
+        "evidence_truncated": False,
+    }
+    validation = validate_target_assessment_file(workspace)
+    assert validation["valid"], validation["errors"]
+    assert validation["matrix_pair_count"] == 2
 
 
 @pytest.mark.asyncio
