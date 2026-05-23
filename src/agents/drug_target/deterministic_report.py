@@ -479,11 +479,35 @@ def _candidate_row(candidate: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _normalize_template_interpretations(
+    interpretations: dict[str, Any],
+) -> dict[str, Any]:
+    normalized: dict[str, Any] = {}
+    for key in (
+        "executive_summary_opportunities",
+        "scoring_landscape",
+        "stage1_filter",
+        "hypotheses_overview",
+        "final_recommendations",
+    ):
+        value = interpretations.get(key)
+        if isinstance(value, str) and value.strip():
+            normalized[key] = value
+
+    for key in ("candidates", "hypotheses"):
+        value = interpretations.get(key)
+        if isinstance(value, dict):
+            normalized[key] = value
+
+    return normalized
+
+
 def _markdown_template_context(
     report_data: dict[str, Any],
     interpretations: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     interpretations = interpretations if isinstance(interpretations, dict) else {}
+    interpretations = _normalize_template_interpretations(interpretations)
     raw_candidates = report_data.get("candidates", [])
     candidates = _dict_list(raw_candidates)
     selected = [candidate for candidate in candidates if candidate.get("stage3_candidate")]

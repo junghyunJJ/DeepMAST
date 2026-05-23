@@ -181,6 +181,29 @@ def test_render_report_markdown_inserts_accepted_interpretations(
     assert "_interpretations" not in report_data["candidates"][0]
 
 
+def test_render_report_markdown_drops_non_string_top_level_interpretations(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import (
+        build_report_data,
+        render_report_markdown,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(
+        str(workspace),
+        "idiopathic pulmonary fibrosis",
+    )
+    render_map = {
+        "executive_summary_opportunities": {"bad": "dict"},
+    }
+
+    markdown = render_report_markdown(report_data, interpretations=render_map)
+
+    assert "{'bad': 'dict'}" not in markdown
+    assert "EXPAND" not in markdown
+
+
 def test_drug_report_templates_are_byte_identical() -> None:
     skill_template = (
         Path(__file__).resolve().parents[3]
