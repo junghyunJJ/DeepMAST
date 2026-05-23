@@ -30,21 +30,21 @@ Excluded:
 ## File Structure
 
 Create:
-- `src/agents/drug_target/report_interpretations.py`  
+- `src/agents/drug_target/report_interpretations.py`
   Owns interpretation-card construction, opt-in detection, provider invocation, snippet validation, and `report_interpretations.json` payload shaping.
-- `tests/agents/drug_target/test_report_interpretations_mvp4.py`  
+- `tests/agents/drug_target/test_report_interpretations_mvp4.py`
   Focused unit/integration tests for cards, validation, opt-in behavior, markdown insertion, and no-LLM fallback.
-- `tests/agents/drug_target/test_report_harness_mvp4.py`  
+- `tests/agents/drug_target/test_report_harness_mvp4.py`
   Focused tests for new harness checks and diagnostics aggregation.
 
 Modify:
-- `src/agents/drug_target/deterministic_report.py`  
+- `src/agents/drug_target/deterministic_report.py`
   Accept optional interpretations in markdown rendering, call the interpretation layer only when opt-in, write `report_interpretations.json` only when enabled, and preserve existing deterministic fallback behavior.
-- `src/agents/drug_target/report_harness.py`  
+- `src/agents/drug_target/report_harness.py`
   Add MVP4 diagnostic checks and aggregation while preserving existing MVP2 top-level fields and issue codes.
-- `skills/drug-target-reporting/templates/drug_report.md.j2`  
+- `skills/drug-target-reporting/templates/drug_report.md.j2`
   Render accepted interpretation snippets at existing `EXPAND` locations.
-- `src/agents/drug_target/templates/drug_report.md.j2`  
+- `src/agents/drug_target/templates/drug_report.md.j2`
   Keep package fallback byte-aligned with the repo-local template.
 - `docs/drugtarget/plans/2026-05-22-deterministic-report-mvp2-harness.md` or a new MVP4 plan note only if reviewers need a durable PR scope document. Prefer not to edit old MVP2 docs unless necessary.
 

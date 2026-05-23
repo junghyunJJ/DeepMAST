@@ -21,6 +21,8 @@ INTERPRETATION_PROVIDER_CONFIG_KEY = "report_interpretation_provider"
 _ENTITY_TOKEN_RE = re.compile(
     r"\b(?:[A-Z][A-Z0-9-]{2,}|[A-Z][a-z]+[0-9]+|[A-Z][A-Za-z0-9-]{3,}ib)\b"
 )
+_GENE_LIKE_TOKEN_RE = re.compile(r"\b[A-Za-z]{2,}[0-9]+\b")
+_DRUG_SUFFIX_TOKEN_RE = re.compile(r"\b[A-Za-z][A-Za-z0-9-]{3,}ib\b")
 _SOURCE_RE = re.compile(r"\b[\w.-]+\.json\b")
 _NUMBER_RE = re.compile(r"(?<![A-Za-z])\d+(?:\.\d+)?(?:e[+-]?\d+)?%?")
 _DOMAIN_TOKEN_ALLOWLIST = {
@@ -371,9 +373,20 @@ def _allowed_source_basenames(values: object) -> set[str]:
 def _mask_allowed_spans(text: str, values: object) -> str:
     masked = text
     for value in sorted(_string_list(values), key=len, reverse=True):
-        pattern = re.compile(rf"(?<!\w){re.escape(value)}(?!\w)")
+        pattern = re.compile(
+            rf"(?<!\w){re.escape(value)}(?!\w)",
+            flags=re.IGNORECASE,
+        )
         masked = pattern.sub(lambda match: " " * len(match.group(0)), masked)
     return masked
+
+
+def _entity_tokens(text: str) -> set[str]:
+    return {
+        *_ENTITY_TOKEN_RE.findall(text),
+        *_GENE_LIKE_TOKEN_RE.findall(text),
+        *_DRUG_SUFFIX_TOKEN_RE.findall(text),
+    }
 
 
 def validate_interpretation_text(
@@ -408,7 +421,7 @@ def validate_interpretation_text(
         masked = _mask_allowed_spans(masked, card.get(key))
 
     allowed_entities = _DOMAIN_TOKEN_ALLOWLIST
-    for token in sorted(set(_ENTITY_TOKEN_RE.findall(masked))):
+    for token in sorted(_entity_tokens(masked)):
         upper_token = token.upper()
         if upper_token.startswith("CHEMBL"):
             continue

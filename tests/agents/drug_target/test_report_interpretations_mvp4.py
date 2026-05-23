@@ -131,6 +131,38 @@ def test_generate_interpretations_accepts_async_provider(
     assert render_map["executive_summary_opportunities"].startswith("FN1 anchors")
 
 
+def test_generate_interpretations_rejects_lowercase_unsupported_entities(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.report_interpretations import (
+        generate_report_interpretations,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+
+    def provider(card):
+        if card["id"] == "executive_summary.opportunities":
+            return "nintedanib may be relevant through tgfb2."
+        return ""
+
+    payload, render_map = asyncio.run(
+        generate_report_interpretations(report_data, provider=provider)
+    )
+
+    snippet = payload["snippets"]["executive_summary.opportunities"]
+    entity_tokens = {
+        str(issue.get("token")).lower()
+        for issue in snippet["issues"]
+        if issue.get("code") == "UNSUPPORTED_ENTITY"
+    }
+
+    assert snippet["status"] == "rejected"
+    assert {"nintedanib", "tgfb2"} <= entity_tokens
+    assert "executive_summary_opportunities" not in render_map
+
+
 def test_render_report_markdown_inserts_accepted_interpretations(
     tmp_path: Path,
 ) -> None:
@@ -352,6 +384,53 @@ def test_validate_interpretation_rejects_case_variant_entities_and_single_digit_
         "UNSUPPORTED_ENTITY",
         "UNSUPPORTED_NUMBER",
     }
+
+
+def test_validate_interpretation_rejects_lowercase_unsupported_entities() -> None:
+    from src.agents.drug_target.report_interpretations import (
+        validate_interpretation_text,
+    )
+
+    card = {
+        "id": "executive_summary.opportunities",
+        "allowed_genes": ["FN1"],
+        "allowed_drugs": [],
+        "allowed_numbers": [],
+        "allowed_sources": ["evidence/assessment_results.json"],
+    }
+
+    issues = validate_interpretation_text(
+        card,
+        "nintedanib may be relevant through tgfb2.",
+    )
+
+    entity_tokens = {
+        str(issue.get("token")).lower()
+        for issue in issues
+        if issue.get("code") == "UNSUPPORTED_ENTITY"
+    }
+    assert {"nintedanib", "tgfb2"} <= entity_tokens
+
+
+def test_validate_interpretation_allows_case_variant_allowed_entities() -> None:
+    from src.agents.drug_target.report_interpretations import (
+        validate_interpretation_text,
+    )
+
+    card = {
+        "id": "candidate.FN1.drug_profile",
+        "allowed_genes": ["FN1"],
+        "allowed_drugs": ["Nintedanib"],
+        "allowed_numbers": [],
+        "allowed_sources": ["evidence/assessment_results.json"],
+    }
+
+    issues = validate_interpretation_text(
+        card,
+        "fn1 and nintedanib remain listed in the deterministic card.",
+    )
+
+    assert issues == []
 
 
 def test_validate_interpretation_allows_ordinary_sentence_initial_words() -> None:
