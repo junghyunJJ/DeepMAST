@@ -420,11 +420,11 @@ def _no_llm_success_check(
             "reason": "finalizer_result is not available",
         }
     finalizer_error = finalizer_result.get("report_finalization_error")
-    evidence_truncated = bool(finalizer_result.get("evidence_truncated"))
+    evidence_truncated = finalizer_result.get("evidence_truncated")
     passed = (
         finalizer_error is None
         and diagnostics_valid
-        and not evidence_truncated
+        and evidence_truncated is False
     )
     return {
         "status": "pass" if passed else "fail",
@@ -551,7 +551,7 @@ async def run_deterministic_report_harness(
         "report_finalization_error": finalizer_result.get(
             "report_finalization_error"
         ),
-        "evidence_truncated": bool(finalizer_result.get("evidence_truncated")),
+        "evidence_truncated": finalizer_result.get("evidence_truncated"),
         "report_harness_diagnostics": diagnostics,
         "report_harness_diagnostics_path": str(
             base / HARNESS_DIAGNOSTICS_FILENAME
