@@ -990,14 +990,103 @@ def validate_report_data(report_data: dict[str, Any]) -> list[dict[str, Any]]:
     return issues
 
 
+def _target_assessment_inputs(
+    report_data: dict[str, Any],
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], list[str]]:
+    rubric_by_gene: dict[str, dict[str, Any]] = {}
+    stage3_data: dict[str, dict[str, Any]] = {}
+    stage3_genes: list[str] = []
+
+    for candidate in _dict_list(report_data.get("candidates", [])):
+        gene = _normalize_gene(candidate.get("gene"))
+        if not gene:
+            continue
+
+        scores = candidate.get("scores", {})
+        scores = scores if isinstance(scores, dict) else {}
+        rubric_by_gene[gene] = {
+            **{field: scores.get(field, 0) for field in _SCORE_FIELDS},
+            "classification": candidate.get("classification", "unknown"),
+            "priority": candidate.get("priority", "unranked"),
+            "stage3_candidate": candidate.get("stage3_candidate", False),
+        }
+        stage3_data[gene] = {
+            "drugs": _dict_list(candidate.get("drugs", [])),
+            "safety_summary": candidate.get("safety_summary")
+            or "No safety data available",
+        }
+        if candidate.get("stage3_candidate"):
+            stage3_genes.append(gene)
+
+    return rubric_by_gene, stage3_data, stage3_genes
+
+
+def _persist_target_assessment_if_applicable(
+    base: Path,
+    report_data: dict[str, Any],
+) -> list[dict[str, Any]]:
+    if not (base / "lr_candidates.json").exists():
+        return []
+
+    try:
+        from src.agents.drug_target.tools.assessment_output import (
+            validate_target_assessment_file,
+        )
+        from src.agents.drug_target.tools.stage_logic import (
+            _prebuild_target_assessment,
+        )
+
+        rubric_by_gene, stage3_data, stage3_genes = _target_assessment_inputs(
+            report_data
+        )
+        template_context = report_data.get("template_context", {})
+        template_context = template_context if isinstance(template_context, dict) else {}
+        stage1_data = template_context.get("stage1_pairs", {})
+        stage1_data = stage1_data if isinstance(stage1_data, dict) else {}
+
+        _prebuild_target_assessment(
+            base,
+            base / "evidence",
+            str(report_data.get("disease") or ""),
+            rubric_by_gene,
+            stage3_data,
+            stage1_data,
+            stage3_genes,
+        )
+        validation = validate_target_assessment_file(base)
+    except Exception as exc:  # pragma: no cover - defensive envelope
+        return [
+            {
+                "code": "TARGET_ASSESSMENT_WRITE_FAILED",
+                "severity": "critical",
+                "message": f"target_assessment.json generation failed: {exc}",
+                "path": "target_assessment.json",
+            }
+        ]
+
+    if validation.get("valid"):
+        return []
+    return [
+        {
+            "code": "TARGET_ASSESSMENT_INVALID",
+            "severity": "critical",
+            "message": "target_assessment.json failed contract validation",
+            "path": "target_assessment.json",
+            "errors": validation.get("errors", []),
+        }
+    ]
+
+
 def _artifact_validation(base: Path, report_data: dict[str, Any]) -> dict[str, Any]:
     issues = validate_report_data(report_data)
     artifacts: dict[str, dict[str, Any]] = {}
-    required_artifacts = (
+    required_artifacts = [
         "report_data.json",
         "drug.md",
         "drug_report.html",
-    )
+    ]
+    if (base / "lr_candidates.json").exists():
+        required_artifacts.append("target_assessment.json")
     for name in required_artifacts:
         path = base / name
         metadata: dict[str, Any] = {
@@ -1093,8 +1182,15 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
         render_report_html(report_data, markdown),
         encoding="utf-8",
     )
+    target_assessment_issues = _persist_target_assessment_if_applicable(
+        base,
+        report_data,
+    )
 
     validation = _artifact_validation(base, report_data)
+    if target_assessment_issues:
+        validation["valid"] = False
+        validation["issues"].extend(target_assessment_issues)
     _add_self_validation_artifact(validation)
     _write_json(base / "report_validation.json", validation)
     if not validation["valid"]:

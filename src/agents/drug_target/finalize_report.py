@@ -1,8 +1,8 @@
 """LangGraph node: finalize_report.
 
-Deterministic 6-step post-processing node that runs after the DeepAgents
-run_deep_agent node completes. Exactly 1 LLM call (structured output).
-Artifact writes are delegated to the existing tools, which write atomically.
+Production finalization delegates to the no-LLM deterministic report MVP path.
+The former report-expansion implementation remains available as an explicit
+legacy path for transition tests and debugging.
 """
 
 from __future__ import annotations
@@ -262,7 +262,14 @@ def _compact_evidence_if_needed(evidence: dict, reference_card: dict) -> tuple[d
 
 
 async def finalize_report(state: dict, config: RunnableConfig) -> dict:
-    """Deterministic 6-step node (1 LLM call). Returns state-update dict."""
+    """Production finalizer node. Returns a LangGraph state-update dict."""
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+
+    return await finalize_report_mvp(state, config)
+
+
+async def finalize_report_legacy(state: dict, config: RunnableConfig) -> dict:
+    """Legacy report-expansion node (1 LLM call). Returns state-update dict."""
     data_dir: str = state["data_dir"]
     disease: str = state["disease"]
     _ok: dict = {"report_finalization_error": None, "evidence_truncated": False}

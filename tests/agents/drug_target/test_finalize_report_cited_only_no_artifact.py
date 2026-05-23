@@ -132,7 +132,9 @@ async def test_cited_only_violation_sets_error_field(tmp_path: Path) -> None:
 
         mock_call_tool.side_effect = _side_effect
 
-        from src.agents.drug_target.finalize_report import finalize_report
+        from src.agents.drug_target.finalize_report import (
+            finalize_report_legacy as finalize_report,
+        )
 
         state = {
             "data_dir": str(tmp_path),
@@ -193,7 +195,9 @@ async def test_cited_only_violation_blocks_all_four_disk_artifacts(
 
         mock_call_tool.side_effect = _side_effect
 
-        from src.agents.drug_target.finalize_report import finalize_report
+        from src.agents.drug_target.finalize_report import (
+            finalize_report_legacy as finalize_report,
+        )
 
         state = {
             "data_dir": str(tmp_path),
