@@ -1225,7 +1225,6 @@ def render_report_markdown(
 
 
 async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
-    del config
     base = Path(state["data_dir"]).expanduser().resolve()
     report_data = build_report_data(str(base), str(state.get("disease") or ""))
     _write_json(base / "report_data.json", report_data)
@@ -1245,7 +1244,25 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
             "evidence_truncated": False,
         }
 
-    markdown = render_report_markdown(report_data)
+    interpretations: dict[str, Any] | None = None
+    from src.agents.drug_target.report_interpretations import (
+        generate_report_interpretations,
+        interpretation_provider_from_config,
+        report_interpretations_enabled,
+    )
+
+    if report_interpretations_enabled(config):
+        provider = interpretation_provider_from_config(config)
+        if provider is not None:
+            payload, interpretations = await generate_report_interpretations(
+                report_data,
+                provider,
+            )
+        else:
+            payload, interpretations = {}, {}
+        _write_json(base / "report_interpretations.json", payload)
+
+    markdown = render_report_markdown(report_data, interpretations=interpretations)
     (base / "drug.md").write_text(markdown, encoding="utf-8")
     (base / "drug_report.html").write_text(
         render_report_html(report_data, markdown),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 import os
 import re
 from collections.abc import Callable, Mapping
@@ -52,6 +53,74 @@ def report_interpretations_enabled(config: Mapping[str, Any] | None) -> bool:
 
     env_value = os.environ.get(ENABLE_INTERPRETATIONS_ENV, "")
     return env_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _provider_creation_error_provider(exc: Exception) -> Callable[[Mapping[str, Any]], object]:
+    def provider(card: Mapping[str, Any]) -> object:
+        raise RuntimeError(f"interpretation provider unavailable: {exc}") from exc
+
+    return provider
+
+
+def _message_content_to_text(response: object) -> str:
+    content = getattr(response, "content", response)
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, Mapping):
+                text = item.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+        return "\n".join(parts)
+    return "" if content is None else str(content)
+
+
+def _live_llm_interpretation_provider(llm: object) -> Callable[[Mapping[str, Any]], object]:
+    async def provider(card: Mapping[str, Any]) -> object:
+        from langchain_core.messages import HumanMessage
+
+        prompt = (
+            "Write only the requested deterministic drug-target report "
+            "interpretation. Use only the facts and allowed values in this "
+            "card. Do not add unsupported genes, drugs, sources, or numbers.\n\n"
+            f"{json.dumps(card, sort_keys=True, ensure_ascii=False)}"
+        )
+        messages = [HumanMessage(content=prompt)]
+        if hasattr(llm, "ainvoke"):
+            response = await llm.ainvoke(messages)
+        elif hasattr(llm, "invoke"):
+            response = llm.invoke(messages)
+        else:
+            raise TypeError("interpretation LLM provider has no invoke method")
+        return _message_content_to_text(response)
+
+    return provider
+
+
+def interpretation_provider_from_config(
+    config: Mapping[str, Any] | None,
+) -> Callable[[Mapping[str, Any]], object] | None:
+    configurable = config.get("configurable") if config else None
+    if isinstance(configurable, Mapping):
+        provider = configurable.get(INTERPRETATION_PROVIDER_CONFIG_KEY)
+        if provider is not None:
+            return provider
+
+    if not report_interpretations_enabled(config):
+        return None
+
+    try:
+        from src.agents.model import create_llm_from_config
+
+        llm = create_llm_from_config(config)
+    except Exception as exc:  # noqa: BLE001
+        return _provider_creation_error_provider(exc)
+
+    return _live_llm_interpretation_provider(llm)
 
 
 def _dict_list(value: object) -> list[dict[str, Any]]:
