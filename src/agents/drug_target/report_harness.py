@@ -420,11 +420,17 @@ def _no_llm_success_check(
             "reason": "finalizer_result is not available",
         }
     finalizer_error = finalizer_result.get("report_finalization_error")
-    passed = finalizer_error is None and diagnostics_valid
+    evidence_truncated = bool(finalizer_result.get("evidence_truncated"))
+    passed = (
+        finalizer_error is None
+        and diagnostics_valid
+        and not evidence_truncated
+    )
     return {
         "status": "pass" if passed else "fail",
         "report_finalization_error": finalizer_error,
         "diagnostics_valid": diagnostics_valid,
+        "evidence_truncated": evidence_truncated,
     }
 
 

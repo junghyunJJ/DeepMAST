@@ -86,6 +86,21 @@ def test_harness_success_includes_mvp4_checks(tmp_path: Path) -> None:
     assert checks["no_llm_success"]["status"] == "pass"
 
 
+def test_no_llm_success_fails_when_evidence_truncated() -> None:
+    from src.agents.drug_target.report_harness import _no_llm_success_check
+
+    check = _no_llm_success_check(
+        {
+            "report_finalization_error": None,
+            "evidence_truncated": True,
+        },
+        diagnostics_valid=True,
+    )
+
+    assert check["status"] == "fail"
+    assert check["evidence_truncated"] is True
+
+
 def test_source_hash_mismatch_after_finalization_is_flagged(
     tmp_path: Path,
 ) -> None:
