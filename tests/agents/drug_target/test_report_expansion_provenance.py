@@ -584,7 +584,7 @@ async def test_finalize_report_compacts_large_nonfeatured_ot_before_budget_gate(
         mock_model.with_structured_output.return_value = structured
         mock_llm.return_value = mock_model
 
-        result = await mod.finalize_report(_make_state(tmp_path), config={})
+        result = await mod.finalize_report_legacy(_make_state(tmp_path), config={})
 
     assert result["report_finalization_error"] is None
     mock_model.with_structured_output.assert_called_once()
@@ -613,7 +613,7 @@ async def test_finalize_report_fails_closed_after_compaction_if_still_over_budge
         mock_model.bind.return_value = mock_model
         mock_llm.return_value = mock_model
 
-        result = await mod.finalize_report(_make_state(tmp_path), config={})
+        result = await mod.finalize_report_legacy(_make_state(tmp_path), config={})
 
     assert result["report_finalization_error"].startswith("evidence_budget_exceeded:")
     assert result["evidence_truncated"] is True
@@ -648,7 +648,9 @@ async def test_finalize_report_happy_path_writes_artifacts(tmp_path: Path) -> No
         mock_model.with_structured_output.return_value = structured
         mock_llm.return_value = mock_model
 
-        from src.agents.drug_target.finalize_report import finalize_report
+        from src.agents.drug_target.finalize_report import (
+            finalize_report_legacy as finalize_report,
+        )
 
         result = await finalize_report(_make_state(tmp_path), config={})
 
@@ -752,7 +754,9 @@ async def test_finalize_report_schema_validation_failure_sets_error(tmp_path: Pa
         mock_model.with_structured_output.return_value = structured
         mock_llm.return_value = mock_model
 
-        from src.agents.drug_target.finalize_report import finalize_report
+        from src.agents.drug_target.finalize_report import (
+            finalize_report_legacy as finalize_report,
+        )
 
         result = await finalize_report(_make_state(tmp_path), config={})
 
@@ -798,7 +802,9 @@ async def test_finalize_report_llm_retry_exhaust_sets_error(tmp_path: Path) -> N
         mock_model.with_structured_output.return_value = structured
         mock_llm.return_value = mock_model
 
-        from src.agents.drug_target.finalize_report import finalize_report
+        from src.agents.drug_target.finalize_report import (
+            finalize_report_legacy as finalize_report,
+        )
 
         result = await finalize_report(_make_state(tmp_path), config={})
 
@@ -845,7 +851,9 @@ async def test_finalize_report_cited_only_violation_blocks_artifacts(tmp_path: P
         mock_model.with_structured_output.return_value = structured
         mock_llm.return_value = mock_model
 
-        from src.agents.drug_target.finalize_report import finalize_report
+        from src.agents.drug_target.finalize_report import (
+            finalize_report_legacy as finalize_report,
+        )
 
         result = await finalize_report(_make_state(tmp_path), config={})
 
@@ -892,7 +900,9 @@ async def test_finalize_report_well_cited_payload_renders_artifacts(tmp_path: Pa
         mock_model.with_structured_output.return_value = structured
         mock_llm.return_value = mock_model
 
-        from src.agents.drug_target.finalize_report import finalize_report
+        from src.agents.drug_target.finalize_report import (
+            finalize_report_legacy as finalize_report,
+        )
 
         result = await finalize_report(_make_state(tmp_path), config={})
 
@@ -929,7 +939,9 @@ async def test_finalize_report_evidence_budget_exceeded_no_llm_call(tmp_path: Pa
         mock_model.bind.return_value = mock_model
         mock_llm.return_value = mock_model
 
-        from src.agents.drug_target.finalize_report import finalize_report
+        from src.agents.drug_target.finalize_report import (
+            finalize_report_legacy as finalize_report,
+        )
 
         result = await finalize_report(_make_state(tmp_path), config={})
 
@@ -964,7 +976,9 @@ async def test_finalize_report_regenerates_when_drug_md_exists(tmp_path: Path) -
         mock_model.bind.return_value = mock_model
         mock_llm.return_value = mock_model
 
-        from src.agents.drug_target.finalize_report import finalize_report
+        from src.agents.drug_target.finalize_report import (
+            finalize_report_legacy as finalize_report,
+        )
 
         await finalize_report(_make_state(tmp_path), config={})
 
