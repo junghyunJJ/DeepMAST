@@ -143,3 +143,45 @@ def test_validate_interpretation_rejects_case_variant_entities_and_single_digit_
         "UNSUPPORTED_ENTITY",
         "UNSUPPORTED_NUMBER",
     }
+
+
+def test_validate_interpretation_allows_ordinary_sentence_initial_words() -> None:
+    from src.agents.drug_target.report_interpretations import (
+        validate_interpretation_text,
+    )
+
+    card = {
+        "id": "executive_summary.opportunities",
+        "allowed_genes": ["FN1"],
+        "allowed_drugs": [],
+        "allowed_numbers": [],
+        "allowed_sources": ["evidence/assessment_results.json"],
+    }
+
+    issues = validate_interpretation_text(
+        card,
+        "These FN1 targets remain prioritized.",
+    )
+
+    assert issues == []
+
+
+def test_validate_interpretation_allows_exact_multi_token_drug_names() -> None:
+    from src.agents.drug_target.report_interpretations import (
+        validate_interpretation_text,
+    )
+
+    card = {
+        "id": "candidate.FN1.drug_profile",
+        "allowed_genes": ["FN1"],
+        "allowed_drugs": ["Chloropeptin I analogue"],
+        "allowed_numbers": [],
+        "allowed_sources": ["evidence/assessment_results.json"],
+    }
+
+    issues = validate_interpretation_text(
+        card,
+        "Chloropeptin I analogue remains listed as an allowed compound.",
+    )
+
+    assert issues == []

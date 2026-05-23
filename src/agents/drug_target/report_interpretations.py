@@ -14,7 +14,7 @@ ENABLE_INTERPRETATIONS_CONFIG_KEY = "enable_report_interpretations"
 INTERPRETATION_PROVIDER_CONFIG_KEY = "report_interpretation_provider"
 
 _ENTITY_TOKEN_RE = re.compile(
-    r"\b(?:[A-Z][A-Z0-9-]{2,}|[A-Z][a-z]{2,}|[A-Z][a-z]+[0-9]+)\b"
+    r"\b(?:[A-Z][A-Z0-9-]{2,}|[A-Z][a-z]+[0-9]+|[A-Z][A-Za-z0-9-]{3,}ib)\b"
 )
 _SOURCE_RE = re.compile(r"\b[\w.-]+\.json\b")
 _NUMBER_RE = re.compile(r"(?<![A-Za-z])\d+(?:\.\d+)?(?:e[+-]?\d+)?%?")
@@ -279,6 +279,14 @@ def _allowed_source_basenames(values: object) -> set[str]:
     return {value.rsplit("/", 1)[-1] for value in _string_list(values)}
 
 
+def _mask_allowed_spans(text: str, values: object) -> str:
+    masked = text
+    for value in sorted(_string_list(values), key=len, reverse=True):
+        pattern = re.compile(rf"(?<!\w){re.escape(value)}(?!\w)")
+        masked = pattern.sub(lambda match: " " * len(match.group(0)), masked)
+    return masked
+
+
 def validate_interpretation_text(
     card: Mapping[str, Any],
     text: str,
@@ -306,12 +314,12 @@ def validate_interpretation_text(
             }
         )
 
-    allowed_entities = (
-        _allowed_upper_values(card.get("allowed_genes"))
-        | _allowed_upper_values(card.get("allowed_drugs"))
-        | _DOMAIN_TOKEN_ALLOWLIST
-    )
-    for token in sorted(set(_ENTITY_TOKEN_RE.findall(stripped))):
+    masked = stripped
+    for key in ("allowed_genes", "allowed_drugs", "allowed_sources"):
+        masked = _mask_allowed_spans(masked, card.get(key))
+
+    allowed_entities = _DOMAIN_TOKEN_ALLOWLIST
+    for token in sorted(set(_ENTITY_TOKEN_RE.findall(masked))):
         upper_token = token.upper()
         if upper_token.startswith("CHEMBL"):
             continue
@@ -331,7 +339,7 @@ def validate_interpretation_text(
 
     allowed_sources = set(_string_list(card.get("allowed_sources")))
     allowed_basenames = _allowed_source_basenames(card.get("allowed_sources"))
-    for source in sorted(set(_SOURCE_RE.findall(stripped))):
+    for source in sorted(set(_SOURCE_RE.findall(masked))):
         if source not in allowed_sources and source not in allowed_basenames:
             issues.append(
                 {
@@ -349,7 +357,7 @@ def validate_interpretation_text(
     allowed_numbers = set(
         str(value) for value in _string_list(card.get("allowed_numbers"))
     )
-    for number in sorted(set(_NUMBER_RE.findall(stripped))):
+    for number in sorted(set(_NUMBER_RE.findall(masked))):
         if number not in allowed_numbers:
             issues.append(
                 {
