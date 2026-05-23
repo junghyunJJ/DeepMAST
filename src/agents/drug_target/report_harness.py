@@ -449,34 +449,19 @@ def deepagents_boundary_contract() -> dict[str, Any]:
     }
 
 
-def _iter_check_statuses(
-    name: str,
-    check: Mapping[str, Any],
-) -> Iterable[tuple[str, str]]:
-    status = check.get("status")
-    if status is not None:
-        yield name, str(status)
-    for nested_name, nested_check in check.items():
-        if isinstance(nested_check, Mapping):
-            yield from _iter_check_statuses(
-                f"{name}.{nested_name}",
-                nested_check,
-            )
-
-
 def aggregate_report_harness_diagnostics(
     diagnostics: Iterable[Mapping[str, Any]],
 ) -> dict[str, Any]:
     """Aggregate deterministic report harness diagnostics without I/O."""
-    total_payloads = 0
-    valid_payloads = 0
+    total = 0
+    valid = 0
     issue_code_counts: Counter[str] = Counter()
     check_status_counts: dict[str, Counter[str]] = {}
 
     for payload in diagnostics:
-        total_payloads += 1
+        total += 1
         if payload.get("valid") is True:
-            valid_payloads += 1
+            valid += 1
 
         issues = payload.get("issues")
         if isinstance(issues, list):
@@ -493,17 +478,16 @@ def aggregate_report_harness_diagnostics(
         for check_name, check in checks.items():
             if not isinstance(check, Mapping):
                 continue
-            for status_name, status in _iter_check_statuses(
-                str(check_name),
-                check,
-            ):
-                check_status_counts.setdefault(status_name, Counter())[status] += 1
+            status = check.get("status")
+            if not status:
+                continue
+            check_status_counts.setdefault(str(check_name), Counter())[str(status)] += 1
 
     return {
         "schema_version": HARNESS_EVAL_SCHEMA_VERSION,
-        "total_payloads": total_payloads,
-        "valid_payloads": valid_payloads,
-        "invalid_payloads": total_payloads - valid_payloads,
+        "total": total,
+        "valid": valid,
+        "invalid": total - valid,
         "issue_code_counts": dict(sorted(issue_code_counts.items())),
         "check_status_counts": {
             check_name: dict(sorted(status_counts.items()))

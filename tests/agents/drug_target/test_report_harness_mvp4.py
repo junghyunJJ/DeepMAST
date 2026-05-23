@@ -106,6 +106,8 @@ def test_aggregate_report_harness_diagnostics_counts_validity_issues_and_checks(
                         "sub_check": {"status": "skipped"},
                         "ignored": "not a check dict",
                     },
+                    "empty_status": {"status": ""},
+                    "ignored": "not a check dict",
                 },
             },
             {
@@ -125,16 +127,15 @@ def test_aggregate_report_harness_diagnostics_counts_validity_issues_and_checks(
 
     assert summary == {
         "schema_version": "drug_target.report_harness_eval.v1",
-        "total_payloads": 2,
-        "valid_payloads": 1,
-        "invalid_payloads": 1,
+        "total": 2,
+        "valid": 1,
+        "invalid": 1,
         "issue_code_counts": {
             "MISSING_REQUIRED_ARTIFACT": 1,
             "SOURCE_HASH_MISMATCH": 2,
         },
         "check_status_counts": {
             "artifact_validity": {"fail": 1, "pass": 1},
-            "nested_group.sub_check": {"skipped": 1},
             "source_consistency": {"fail": 1, "pass": 1},
             "target_assessment": {"skipped": 1},
         },
