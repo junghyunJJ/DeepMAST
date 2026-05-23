@@ -6,9 +6,11 @@ import inspect
 import json
 import os
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
+
+from langchain_core.runnables import RunnableConfig
 
 
 INTERPRETATIONS_SCHEMA_VERSION = "drug_target.report_interpretations.v1"
@@ -90,10 +92,14 @@ def _live_llm_interpretation_provider(llm: object) -> Callable[[Mapping[str, Any
             f"{json.dumps(card, sort_keys=True, ensure_ascii=False)}"
         )
         messages = [HumanMessage(content=prompt)]
-        if hasattr(llm, "ainvoke"):
-            response = await llm.ainvoke(messages)
-        elif hasattr(llm, "invoke"):
-            response = llm.invoke(messages)
+        ainvoke = getattr(llm, "ainvoke", None)
+        invoke = getattr(llm, "invoke", None)
+        if callable(ainvoke):
+            response = await cast(Callable[[object], Awaitable[object]], ainvoke)(
+                messages
+            )
+        elif callable(invoke):
+            response = cast(Callable[[object], object], invoke)(messages)
         else:
             raise TypeError("interpretation LLM provider has no invoke method")
         return _message_content_to_text(response)
@@ -102,7 +108,7 @@ def _live_llm_interpretation_provider(llm: object) -> Callable[[Mapping[str, Any
 
 
 def interpretation_provider_from_config(
-    config: Mapping[str, Any] | None,
+    config: RunnableConfig | None,
 ) -> Callable[[Mapping[str, Any]], object] | None:
     configurable = config.get("configurable") if config else None
     if isinstance(configurable, Mapping):
