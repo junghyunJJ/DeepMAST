@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping
+from collections import Counter
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,7 @@ from src.agents.drug_target.tools.assessment_output import (
 
 
 HARNESS_SCHEMA_VERSION = "drug_target.report_harness_diagnostics.v1"
+HARNESS_EVAL_SCHEMA_VERSION = "drug_target.report_harness_eval.v1"
 HARNESS_DIAGNOSTICS_FILENAME = "report_harness_diagnostics.json"
 EXPAND_MARKER_PATTERN = re.compile(r"<!--\s*EXPAND:")
 REQUIRED_REPORT_ARTIFACTS = (
@@ -443,6 +445,69 @@ def deepagents_boundary_contract() -> dict[str, Any]:
         },
         "deterministic_code": {
             "owns": list(DETERMINISTIC_CODE_OWNS),
+        },
+    }
+
+
+def _iter_check_statuses(
+    name: str,
+    check: Mapping[str, Any],
+) -> Iterable[tuple[str, str]]:
+    status = check.get("status")
+    if status is not None:
+        yield name, str(status)
+    for nested_name, nested_check in check.items():
+        if isinstance(nested_check, Mapping):
+            yield from _iter_check_statuses(
+                f"{name}.{nested_name}",
+                nested_check,
+            )
+
+
+def aggregate_report_harness_diagnostics(
+    diagnostics: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Aggregate deterministic report harness diagnostics without I/O."""
+    total_payloads = 0
+    valid_payloads = 0
+    issue_code_counts: Counter[str] = Counter()
+    check_status_counts: dict[str, Counter[str]] = {}
+
+    for payload in diagnostics:
+        total_payloads += 1
+        if payload.get("valid") is True:
+            valid_payloads += 1
+
+        issues = payload.get("issues")
+        if isinstance(issues, list):
+            for issue in issues:
+                if not isinstance(issue, Mapping):
+                    continue
+                code = issue.get("code")
+                if isinstance(code, str):
+                    issue_code_counts[code] += 1
+
+        checks = payload.get("checks")
+        if not isinstance(checks, Mapping):
+            continue
+        for check_name, check in checks.items():
+            if not isinstance(check, Mapping):
+                continue
+            for status_name, status in _iter_check_statuses(
+                str(check_name),
+                check,
+            ):
+                check_status_counts.setdefault(status_name, Counter())[status] += 1
+
+    return {
+        "schema_version": HARNESS_EVAL_SCHEMA_VERSION,
+        "total_payloads": total_payloads,
+        "valid_payloads": valid_payloads,
+        "invalid_payloads": total_payloads - valid_payloads,
+        "issue_code_counts": dict(sorted(issue_code_counts.items())),
+        "check_status_counts": {
+            check_name: dict(sorted(status_counts.items()))
+            for check_name, status_counts in sorted(check_status_counts.items())
         },
     }
 

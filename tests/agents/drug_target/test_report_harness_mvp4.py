@@ -86,6 +86,80 @@ def test_harness_success_includes_mvp4_checks(tmp_path: Path) -> None:
     assert checks["no_llm_success"]["status"] == "pass"
 
 
+def test_aggregate_report_harness_diagnostics_counts_validity_issues_and_checks() -> None:
+    from src.agents.drug_target.report_harness import (
+        aggregate_report_harness_diagnostics,
+    )
+
+    summary = aggregate_report_harness_diagnostics(
+        [
+            {
+                "valid": True,
+                "issues": [
+                    {"code": "SOURCE_HASH_MISMATCH"},
+                    {"code": "MISSING_REQUIRED_ARTIFACT"},
+                ],
+                "checks": {
+                    "artifact_validity": {"status": "pass"},
+                    "source_consistency": {"status": "pass"},
+                    "nested_group": {
+                        "sub_check": {"status": "skipped"},
+                        "ignored": "not a check dict",
+                    },
+                },
+            },
+            {
+                "valid": False,
+                "issues": [
+                    {"code": "SOURCE_HASH_MISMATCH"},
+                    {"message": "missing code is ignored"},
+                ],
+                "checks": {
+                    "artifact_validity": {"status": "fail"},
+                    "source_consistency": {"status": "fail"},
+                    "target_assessment": {"status": "skipped"},
+                },
+            },
+        ]
+    )
+
+    assert summary == {
+        "schema_version": "drug_target.report_harness_eval.v1",
+        "total_payloads": 2,
+        "valid_payloads": 1,
+        "invalid_payloads": 1,
+        "issue_code_counts": {
+            "MISSING_REQUIRED_ARTIFACT": 1,
+            "SOURCE_HASH_MISMATCH": 2,
+        },
+        "check_status_counts": {
+            "artifact_validity": {"fail": 1, "pass": 1},
+            "nested_group.sub_check": {"skipped": 1},
+            "source_consistency": {"fail": 1, "pass": 1},
+            "target_assessment": {"skipped": 1},
+        },
+    }
+
+
+def test_holdout_trace_fixture_exposes_variability_stats() -> None:
+    from scripts.analyze_drug_target_trace_variability import analyze_trace_file
+
+    trace_path = (
+        Path(__file__).resolve().parent
+        / "fixtures"
+        / "v8_run_excerpt"
+        / "v8_partial_run.jsonl"
+    )
+    if not trace_path.exists():
+        pytest.skip("holdout trace fixture is not available")
+
+    stats = analyze_trace_file(trace_path)
+
+    assert stats["trace_path"] == str(trace_path)
+    assert "issue_codes" in stats
+    assert "final_pass" in stats
+
+
 def test_no_llm_success_fails_when_evidence_truncated() -> None:
     from src.agents.drug_target.report_harness import _no_llm_success_check
 
