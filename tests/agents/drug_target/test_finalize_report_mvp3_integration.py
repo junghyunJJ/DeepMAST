@@ -81,7 +81,152 @@ async def test_finalize_report_uses_deterministic_mvp_without_llm(
     assert (workspace / "drug_report.html").exists()
     assert (workspace / "report_validation.json").exists()
     assert not (workspace / "report_expansions.json").exists()
+    assert not (workspace / "report_interpretations.json").exists()
     assert "EXPAND" not in (workspace / "drug.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_finalize_report_mvp_does_not_call_interpretation_provider_by_default(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+
+    workspace = _copy_baseline_workspace(tmp_path)
+
+    def fail_provider(card):
+        raise AssertionError(f"provider must not be called: {card['id']}")
+
+    result = await finalize_report_mvp(
+        _state(workspace),
+        {"configurable": {"report_interpretation_provider": fail_provider}},
+    )
+
+    assert result == {
+        "report_finalization_error": None,
+        "evidence_truncated": False,
+    }
+    assert not (workspace / "report_interpretations.json").exists()
+
+
+@pytest.mark.asyncio
+async def test_finalize_report_mvp_writes_accepted_interpretations_when_enabled(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    accepted_text = (
+        "FN1 anchors a deterministic opportunity in the 41-gene assessment."
+    )
+
+    def provider(card):
+        if card["id"] == "executive_summary.opportunities":
+            return accepted_text
+        return ""
+
+    result = await finalize_report_mvp(
+        _state(workspace),
+        {
+            "configurable": {
+                "enable_report_interpretations": True,
+                "report_interpretation_provider": provider,
+            }
+        },
+    )
+
+    assert result == {
+        "report_finalization_error": None,
+        "evidence_truncated": False,
+    }
+    payload = json.loads(
+        (workspace / "report_interpretations.json").read_text(encoding="utf-8")
+    )
+    assert payload["enabled"] is True
+    assert payload["summary"]["accepted"] >= 1
+    assert accepted_text in (workspace / "drug.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_finalize_report_mvp_rejects_invalid_interpretation_and_still_succeeds(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    invalid_text = (
+        "NINTEDANIB improves 99% outcomes through TGFB2 according to "
+        "fabricated.json."
+    )
+
+    def provider(card):
+        if card["id"] == "executive_summary.opportunities":
+            return invalid_text
+        return ""
+
+    result = await finalize_report_mvp(
+        _state(workspace),
+        {
+            "configurable": {
+                "enable_report_interpretations": True,
+                "report_interpretation_provider": provider,
+            }
+        },
+    )
+
+    assert result == {
+        "report_finalization_error": None,
+        "evidence_truncated": False,
+    }
+    payload = json.loads(
+        (workspace / "report_interpretations.json").read_text(encoding="utf-8")
+    )
+    assert payload["summary"]["rejected"] >= 1
+    assert invalid_text not in (workspace / "drug.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_finalize_report_mvp_writes_repaired_interpretation_when_retry_succeeds(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    repaired_text = "Stage 1 biological validation keeps FN1 grounded."
+    calls = []
+
+    def provider(card):
+        if card["id"] != "stage1_filter.interpretation":
+            return ""
+        calls.append(card)
+        if "repair_context" in card:
+            return repaired_text
+        return "Stage 9 biological validation keeps FN1 grounded."
+
+    result = await finalize_report_mvp(
+        _state(workspace),
+        {
+            "configurable": {
+                "enable_report_interpretations": True,
+                "report_interpretation_provider": provider,
+            }
+        },
+    )
+
+    assert result == {
+        "report_finalization_error": None,
+        "evidence_truncated": False,
+    }
+    payload = json.loads(
+        (workspace / "report_interpretations.json").read_text(encoding="utf-8")
+    )
+    snippet = payload["snippets"]["stage1_filter.interpretation"]
+    assert snippet["status"] == "accepted"
+    assert snippet["attempts"] == 2
+    assert payload["summary"]["accepted"] == 1
+    assert len(calls) == 2
+    markdown = (workspace / "drug.md").read_text(encoding="utf-8")
+    assert "Stage 9" not in markdown
+    assert repaired_text in markdown
 
 
 @pytest.mark.asyncio
