@@ -222,9 +222,11 @@ async def test_finalize_report_mvp_writes_repaired_interpretation_when_retry_suc
     snippet = payload["snippets"]["stage1_filter.interpretation"]
     assert snippet["status"] == "accepted"
     assert snippet["attempts"] == 2
-    assert payload["summary"]["accepted"] >= 1
+    assert payload["summary"]["accepted"] == 1
     assert len(calls) == 2
-    assert repaired_text in (workspace / "drug.md").read_text(encoding="utf-8")
+    markdown = (workspace / "drug.md").read_text(encoding="utf-8")
+    assert "Stage 9" not in markdown
+    assert repaired_text in markdown
 
 
 @pytest.mark.asyncio
