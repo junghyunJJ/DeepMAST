@@ -38,6 +38,65 @@ def test_report_interpretations_enabled_by_config(monkeypatch) -> None:
     ) is True
 
 
+def test_build_interpretation_prompt_includes_style_and_allowed_terms() -> None:
+    from src.agents.drug_target.report_interpretations import (
+        build_interpretation_prompt,
+    )
+
+    card = {
+        "id": "candidate.FN1.biological_context",
+        "instruction": "Explain the Stage 1 biological rationale.",
+        "allowed_genes": ["FN1"],
+        "allowed_drugs": [],
+        "allowed_numbers": [],
+        "allowed_sources": ["evidence/stage1_FN1.json"],
+        "allowed_terms": ["Stage 1", "biological context"],
+        "facts": {"disease": "idiopathic pulmonary fibrosis", "gene": "FN1"},
+    }
+
+    prompt = build_interpretation_prompt(card)
+
+    assert "Explain the Stage 1 biological rationale." in prompt
+    assert "allowed_terms" in prompt
+    assert "Stage 1" in prompt
+    assert "Do not repeat the same sentence frame" in prompt
+
+
+def test_build_interpretation_prompt_includes_repair_context() -> None:
+    from src.agents.drug_target.report_interpretations import (
+        build_interpretation_prompt,
+    )
+
+    card = {
+        "id": "candidate.FN1.biological_context",
+        "instruction": "Rewrite the previous rejected answer.",
+        "allowed_genes": ["FN1"],
+        "allowed_drugs": [],
+        "allowed_numbers": [],
+        "allowed_sources": ["evidence/stage1_FN1.json"],
+        "allowed_terms": ["Stage 1"],
+        "facts": {"disease": "idiopathic pulmonary fibrosis", "gene": "FN1"},
+        "repair_context": {
+            "previous_text": "Stage 9 makes FN1 decisive.",
+            "issues": [
+                {
+                    "code": "UNSUPPORTED_NUMBER",
+                    "number": "9",
+                    "card_id": "candidate.FN1.biological_context",
+                }
+            ],
+            "instruction": "Rewrite with a different sentence structure.",
+        },
+    }
+
+    prompt = build_interpretation_prompt(card)
+
+    assert "Previous text rejected by validator" in prompt
+    assert "Stage 9 makes FN1 decisive." in prompt
+    assert "UNSUPPORTED_NUMBER" in prompt
+    assert "different sentence structure" in prompt
+
+
 def test_generate_interpretations_accepts_and_rejects_mock_provider(
     tmp_path: Path,
 ) -> None:

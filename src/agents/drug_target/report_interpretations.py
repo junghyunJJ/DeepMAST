@@ -84,16 +84,46 @@ def _message_content_to_text(response: object) -> str:
     return "" if content is None else str(content)
 
 
+def build_interpretation_prompt(card: Mapping[str, Any]) -> str:
+    prompt_parts = [
+        "Write only the requested deterministic drug-target report interpretation.",
+        "Use only the facts and allowed values in this card.",
+        "Do not add unsupported genes, drugs, sources, terms, or numbers.",
+        "Do not repeat the same sentence frame across card types; follow the card instruction.",
+        "Return only the final interpretation text with no markdown or reasoning.",
+        "",
+        f"Card instruction: {card.get('instruction', '')}",
+    ]
+    repair_context = card.get("repair_context")
+    if isinstance(repair_context, Mapping):
+        prompt_parts.extend(
+            [
+                "",
+                "Previous text rejected by validator:",
+                str(repair_context.get("previous_text") or ""),
+                "Validator issues:",
+                json.dumps(
+                    repair_context.get("issues") or [],
+                    sort_keys=True,
+                    ensure_ascii=False,
+                ),
+                str(repair_context.get("instruction") or ""),
+            ]
+        )
+    prompt_parts.extend(
+        [
+            "",
+            json.dumps(card, sort_keys=True, ensure_ascii=False),
+        ]
+    )
+    return "\n".join(prompt_parts)
+
+
 def _live_llm_interpretation_provider(llm: object) -> Callable[[Mapping[str, Any]], object]:
     async def provider(card: Mapping[str, Any]) -> object:
         from langchain_core.messages import HumanMessage
 
-        prompt = (
-            "Write only the requested deterministic drug-target report "
-            "interpretation. Use only the facts and allowed values in this "
-            "card. Do not add unsupported genes, drugs, sources, or numbers.\n\n"
-            f"{json.dumps(card, sort_keys=True, ensure_ascii=False)}"
-        )
+        prompt = build_interpretation_prompt(card)
         messages = [HumanMessage(content=prompt)]
         ainvoke = getattr(llm, "ainvoke", None)
         invoke = getattr(llm, "invoke", None)
