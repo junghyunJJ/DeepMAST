@@ -131,6 +131,40 @@ def test_generate_interpretations_accepts_async_provider(
     assert render_map["executive_summary_opportunities"].startswith("FN1 anchors")
 
 
+def test_generate_interpretations_retries_rejected_text_with_repair_card(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.report_interpretations import (
+        generate_report_interpretations,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+    calls = []
+
+    def provider(card):
+        if card["id"] != "stage1_filter.interpretation":
+            return ""
+        calls.append(card)
+        if "repair_context" in card:
+            return "Stage 1 biological validation keeps FN1 grounded."
+        return "Stage 9 biological validation keeps FN1 grounded."
+
+    payload, render_map = asyncio.run(
+        generate_report_interpretations(report_data, provider=provider)
+    )
+
+    snippet = payload["snippets"]["stage1_filter.interpretation"]
+    assert snippet["status"] == "accepted"
+    assert snippet["attempts"] == 2
+    assert calls[1]["repair_context"]["previous_text"].startswith("Stage 9")
+    assert calls[1]["repair_context"]["issues"][0]["code"] == "UNSUPPORTED_NUMBER"
+    assert render_map["stage1_filter"] == (
+        "Stage 1 biological validation keeps FN1 grounded."
+    )
+
+
 def test_generate_interpretations_rejects_lowercase_unsupported_entities(
     tmp_path: Path,
 ) -> None:

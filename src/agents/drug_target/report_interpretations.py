@@ -17,6 +17,7 @@ INTERPRETATIONS_SCHEMA_VERSION = "drug_target.report_interpretations.v1"
 ENABLE_INTERPRETATIONS_ENV = "DEEPMAST_ENABLE_REPORT_INTERPRETATIONS"
 ENABLE_INTERPRETATIONS_CONFIG_KEY = "enable_report_interpretations"
 INTERPRETATION_PROVIDER_CONFIG_KEY = "report_interpretation_provider"
+INTERPRETATION_MAX_ATTEMPTS = 2
 
 _ENTITY_TOKEN_RE = re.compile(
     r"\b(?:[A-Z][A-Z0-9-]{2,}|[A-Z][a-z]+[0-9]+|[A-Z][A-Za-z0-9-]{3,}ib)\b"
@@ -607,6 +608,27 @@ def _put_render_text(
     leaf[leaf_key] = text
 
 
+def _repair_card(
+    card: Mapping[str, Any],
+    previous_text: str,
+    issues: list[dict[str, Any]],
+) -> dict[str, Any]:
+    repaired = dict(card)
+    repaired["repair_context"] = {
+        "previous_text": previous_text,
+        "issues": issues,
+        "instruction": (
+            "Rewrite with a different sentence structure. Remove every "
+            "unsupported entity, source, and number reported by the validator."
+        ),
+    }
+    repaired["instruction"] = (
+        f"{card.get('instruction', '')} Rewrite the previous rejected answer "
+        "with a different sentence structure while using only allowed values."
+    ).strip()
+    return repaired
+
+
 async def _call_provider(
     provider: Callable[[Mapping[str, Any]], object],
     card: Mapping[str, Any],
@@ -637,23 +659,54 @@ async def generate_report_interpretations(
     for card in cards:
         card_id = str(card.get("id") or "")
 
-        try:
-            text = (await _call_provider(provider, card)).strip()
-        except Exception as exc:  # noqa: BLE001
-            summary["provider_errors"] += 1
-            snippets[card_id] = {
-                "card_id": card_id,
-                "status": "provider_error",
-                "text": "",
-                "issues": [
-                    {
-                        "code": "INTERPRETATION_PROVIDER_ERROR",
-                        "severity": "low",
-                        "message": str(exc),
-                        "card_id": card_id,
-                    }
-                ],
-            }
+        attempts = 0
+        text = ""
+        issues: list[dict[str, Any]] = []
+        current_card: Mapping[str, Any] = card
+
+        for attempt in range(1, INTERPRETATION_MAX_ATTEMPTS + 1):
+            attempts = attempt
+            try:
+                text = (await _call_provider(provider, current_card)).strip()
+            except Exception as exc:  # noqa: BLE001
+                summary["provider_errors"] += 1
+                snippets[card_id] = {
+                    "card_id": card_id,
+                    "status": "provider_error",
+                    "text": "",
+                    "attempts": attempts,
+                    "issues": [
+                        {
+                            "code": "INTERPRETATION_PROVIDER_ERROR",
+                            "severity": "low",
+                            "message": str(exc),
+                            "card_id": card_id,
+                        }
+                    ],
+                }
+                break
+
+            if not text:
+                issues = []
+                break
+
+            issues = validate_interpretation_text(card, text)
+            if not issues:
+                summary["accepted"] += 1
+                _put_render_text(render_map, card_id, text)
+                snippets[card_id] = {
+                    "card_id": card_id,
+                    "status": "accepted",
+                    "text": text,
+                    "attempts": attempts,
+                    "issues": [],
+                }
+                break
+
+            if attempt < INTERPRETATION_MAX_ATTEMPTS:
+                current_card = _repair_card(card, text, issues)
+
+        if card_id in snippets:
             continue
 
         if not text:
@@ -662,28 +715,18 @@ async def generate_report_interpretations(
                 "card_id": card_id,
                 "status": "missing",
                 "text": "",
+                "attempts": attempts,
                 "issues": [],
             }
             continue
 
-        issues = validate_interpretation_text(card, text)
-        if issues:
-            summary["rejected"] += 1
-            snippets[card_id] = {
-                "card_id": card_id,
-                "status": "rejected",
-                "text": text,
-                "issues": issues,
-            }
-            continue
-
-        summary["accepted"] += 1
-        _put_render_text(render_map, card_id, text)
+        summary["rejected"] += 1
         snippets[card_id] = {
             "card_id": card_id,
-            "status": "accepted",
+            "status": "rejected",
             "text": text,
-            "issues": [],
+            "attempts": attempts,
+            "issues": issues,
         }
 
     payload = {
