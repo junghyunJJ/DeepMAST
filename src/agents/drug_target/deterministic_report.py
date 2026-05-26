@@ -1249,6 +1249,7 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
         generate_report_interpretations,
         interpretation_provider_from_config,
         report_interpretations_enabled,
+        resolve_interpretation_max_attempts,
     )
 
     if report_interpretations_enabled(config):
@@ -1257,6 +1258,7 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
             payload, interpretations = await generate_report_interpretations(
                 report_data,
                 provider,
+                max_attempts=resolve_interpretation_max_attempts(config),
             )
         else:
             payload, interpretations = {}, {}

@@ -102,6 +102,18 @@ def test_aggregate_report_harness_diagnostics_counts_validity_issues_and_checks(
                 "checks": {
                     "artifact_validity": {"status": "pass"},
                     "source_consistency": {"status": "pass"},
+                    "interpretations": {
+                        "status": "present",
+                        "summary": {
+                            "accepted": 2,
+                            "rejected": 1,
+                            "missing": 3,
+                            "provider_errors": 0,
+                            "accepted_after_retry": 1,
+                            "retry_exhausted": 1,
+                        },
+                        "criteria": {"criteria_met": False},
+                    },
                     "nested_group": {
                         "sub_check": {"status": "skipped"},
                         "ignored": "not a check dict",
@@ -120,6 +132,18 @@ def test_aggregate_report_harness_diagnostics_counts_validity_issues_and_checks(
                     "artifact_validity": {"status": "fail"},
                     "source_consistency": {"status": "fail"},
                     "target_assessment": {"status": "skipped"},
+                    "interpretations": {
+                        "status": "present",
+                        "summary": {
+                            "accepted": 4,
+                            "rejected": 0,
+                            "missing": 0,
+                            "provider_errors": 1,
+                            "accepted_after_retry": 2,
+                            "retry_exhausted": 0,
+                        },
+                        "criteria": {"criteria_met": True},
+                    },
                 },
             },
         ]
@@ -136,9 +160,60 @@ def test_aggregate_report_harness_diagnostics_counts_validity_issues_and_checks(
         },
         "check_status_counts": {
             "artifact_validity": {"fail": 1, "pass": 1},
+            "interpretations": {"present": 2},
             "source_consistency": {"fail": 1, "pass": 1},
             "target_assessment": {"skipped": 1},
         },
+        "interpretation_summary_totals": {
+            "accepted": 6,
+            "rejected": 1,
+            "missing": 3,
+            "provider_errors": 1,
+            "accepted_after_retry": 3,
+            "retry_exhausted": 1,
+        },
+        "interpretation_criteria_counts": {
+            "met": 1,
+            "not_met": 1,
+        },
+    }
+
+
+def test_aggregate_report_harness_diagnostics_ignores_malformed_interpretation_totals() -> None:
+    from src.agents.drug_target.report_harness import (
+        aggregate_report_harness_diagnostics,
+    )
+
+    summary = aggregate_report_harness_diagnostics(
+        [
+            {
+                "valid": True,
+                "issues": [],
+                "checks": {
+                    "interpretations": {
+                        "status": "present",
+                        "summary": {
+                            "accepted": True,
+                            "rejected": -2,
+                            "missing": "3",
+                            "provider_errors": 1,
+                            "accepted_after_retry": False,
+                            "retry_exhausted": 0,
+                        },
+                        "criteria": {"criteria_met": False},
+                    },
+                },
+            }
+        ]
+    )
+
+    assert summary["interpretation_summary_totals"] == {
+        "accepted": 0,
+        "rejected": 0,
+        "missing": 0,
+        "provider_errors": 1,
+        "accepted_after_retry": 0,
+        "retry_exhausted": 0,
     }
 
 
@@ -253,7 +328,16 @@ def test_optional_legacy_artifacts_presence_tracked_without_deletion(
         "drug_report_render.json": {"schema_version": "legacy.render.v1"},
         "report_interpretations.json": {
             "schema_version": "drug_target.report_interpretations.v1",
-            "summary": {"accepted": 1, "rejected": 0},
+            "summary": {
+                "accepted": 1,
+                "rejected": 0,
+                "missing": 0,
+                "provider_errors": 0,
+                "accepted_after_retry": 1,
+                "retry_exhausted": 0,
+                "max_attempts_per_card": 4,
+                "criteria_met": False,
+            },
         },
     }
     for name, payload in optional_payloads.items():
@@ -275,4 +359,16 @@ def test_optional_legacy_artifacts_presence_tracked_without_deletion(
     assert diagnostics["checks"]["interpretations"]["summary"] == {
         "accepted": 1,
         "rejected": 0,
+        "missing": 0,
+        "provider_errors": 0,
+        "accepted_after_retry": 1,
+        "retry_exhausted": 0,
+        "max_attempts_per_card": 4,
+        "criteria_met": False,
+    }
+    assert diagnostics["checks"]["interpretations"]["criteria"] == {
+        "criteria_met": False,
+        "max_attempts_per_card": 4,
+        "accepted_after_retry": 1,
+        "retry_exhausted": 0,
     }

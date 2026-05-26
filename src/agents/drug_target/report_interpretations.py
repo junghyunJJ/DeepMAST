@@ -17,7 +17,10 @@ INTERPRETATIONS_SCHEMA_VERSION = "drug_target.report_interpretations.v1"
 ENABLE_INTERPRETATIONS_ENV = "DEEPMAST_ENABLE_REPORT_INTERPRETATIONS"
 ENABLE_INTERPRETATIONS_CONFIG_KEY = "enable_report_interpretations"
 INTERPRETATION_PROVIDER_CONFIG_KEY = "report_interpretation_provider"
-INTERPRETATION_MAX_ATTEMPTS = 2
+INTERPRETATION_DEFAULT_MAX_ATTEMPTS = 2
+INTERPRETATION_MAX_ATTEMPTS_CAP = 5
+INTERPRETATION_MAX_ATTEMPTS_ENV = "DEEPMAST_REPORT_INTERPRETATION_MAX_ATTEMPTS"
+INTERPRETATION_MAX_ATTEMPTS_CONFIG_KEY = "report_interpretation_max_attempts"
 
 _ENTITY_TOKEN_RE = re.compile(
     r"\b(?:[A-Z][A-Z0-9-]{2,}|[A-Z][a-z]+[0-9]+|[A-Z][A-Za-z0-9-]{3,}ib)\b"
@@ -58,6 +61,41 @@ def report_interpretations_enabled(config: Mapping[str, Any] | None) -> bool:
 
     env_value = os.environ.get(ENABLE_INTERPRETATIONS_ENV, "")
     return env_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _normalize_max_attempts(value: object) -> int:
+    if type(value) is int:
+        attempts = value
+    elif isinstance(value, str):
+        try:
+            attempts = int(value.strip())
+        except ValueError:
+            attempts = INTERPRETATION_DEFAULT_MAX_ATTEMPTS
+    else:
+        attempts = INTERPRETATION_DEFAULT_MAX_ATTEMPTS
+    return max(1, min(INTERPRETATION_MAX_ATTEMPTS_CAP, attempts))
+
+
+def resolve_interpretation_max_attempts(
+    config: Mapping[str, Any] | None = None,
+) -> int:
+    configurable = config.get("configurable") if config else None
+    if isinstance(configurable, Mapping) and (
+        INTERPRETATION_MAX_ATTEMPTS_CONFIG_KEY in configurable
+    ):
+        return _normalize_max_attempts(
+            configurable.get(INTERPRETATION_MAX_ATTEMPTS_CONFIG_KEY)
+        )
+    if config and INTERPRETATION_MAX_ATTEMPTS_CONFIG_KEY in config:
+        return _normalize_max_attempts(
+            config.get(INTERPRETATION_MAX_ATTEMPTS_CONFIG_KEY)
+        )
+
+    env_value = os.environ.get(INTERPRETATION_MAX_ATTEMPTS_ENV)
+    if env_value is not None:
+        return _normalize_max_attempts(env_value)
+
+    return INTERPRETATION_DEFAULT_MAX_ATTEMPTS
 
 
 def _provider_creation_error_provider(exc: Exception) -> Callable[[Mapping[str, Any]], object]:
@@ -659,6 +697,22 @@ def _repair_card(
     return repaired
 
 
+def _compact_attempt_issues(
+    issues: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    fields = ("code", "severity", "message", "number", "token", "source")
+    compact: list[dict[str, Any]] = []
+    for issue in issues:
+        item = {
+            key: issue[key]
+            for key in fields
+            if key in issue and issue[key] not in (None, "")
+        }
+        if item:
+            compact.append(item)
+    return compact
+
+
 async def _call_provider(
     provider: Callable[[Mapping[str, Any]], object],
     card: Mapping[str, Any],
@@ -674,14 +728,21 @@ async def _call_provider(
 async def generate_report_interpretations(
     report_data: Mapping[str, Any],
     provider: Callable[[Mapping[str, Any]], object],
+    *,
+    max_attempts: object = INTERPRETATION_DEFAULT_MAX_ATTEMPTS,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     cards = build_interpretation_cards(report_data)
+    resolved_max_attempts = _normalize_max_attempts(max_attempts)
     summary = {
         "cards": len(cards),
         "accepted": 0,
         "rejected": 0,
         "missing": 0,
         "provider_errors": 0,
+        "accepted_after_retry": 0,
+        "retry_exhausted": 0,
+        "max_attempts_per_card": resolved_max_attempts,
+        "criteria_met": False,
     }
     snippets: dict[str, Any] = {}
     render_map: dict[str, Any] = {}
@@ -693,18 +754,34 @@ async def generate_report_interpretations(
         text = ""
         issues: list[dict[str, Any]] = []
         current_card: Mapping[str, Any] = card
+        attempt_history: list[dict[str, Any]] = []
 
-        for attempt in range(1, INTERPRETATION_MAX_ATTEMPTS + 1):
+        for attempt in range(1, resolved_max_attempts + 1):
             attempts = attempt
             try:
                 text = (await _call_provider(provider, current_card)).strip()
             except Exception as exc:  # noqa: BLE001
                 summary["provider_errors"] += 1
+                attempt_history.append(
+                    {
+                        "attempt": attempt,
+                        "status": "provider_error",
+                        "issues": [
+                            {
+                                "code": "INTERPRETATION_PROVIDER_ERROR",
+                                "severity": "low",
+                                "message": str(exc),
+                            }
+                        ],
+                    }
+                )
                 snippets[card_id] = {
                     "card_id": card_id,
                     "status": "provider_error",
+                    "stop_reason": "provider_error",
                     "text": "",
                     "attempts": attempts,
+                    "attempt_history": attempt_history,
                     "issues": [
                         {
                             "code": "INTERPRETATION_PROVIDER_ERROR",
@@ -717,23 +794,48 @@ async def generate_report_interpretations(
                 break
 
             if not text:
+                attempt_history.append(
+                    {
+                        "attempt": attempt,
+                        "status": "missing_response",
+                        "issues": [],
+                    }
+                )
                 issues = []
                 break
 
             issues = validate_interpretation_text(card, text)
             if not issues:
                 summary["accepted"] += 1
+                if attempts > 1:
+                    summary["accepted_after_retry"] += 1
+                attempt_history.append(
+                    {
+                        "attempt": attempt,
+                        "status": "accepted",
+                        "issues": [],
+                    }
+                )
                 _put_render_text(render_map, card_id, text)
                 snippets[card_id] = {
                     "card_id": card_id,
                     "status": "accepted",
+                    "stop_reason": "accepted",
                     "text": text,
                     "attempts": attempts,
+                    "attempt_history": attempt_history,
                     "issues": [],
                 }
                 break
 
-            if attempt < INTERPRETATION_MAX_ATTEMPTS:
+            attempt_history.append(
+                {
+                    "attempt": attempt,
+                    "status": "rejected",
+                    "issues": _compact_attempt_issues(issues),
+                }
+            )
+            if attempt < resolved_max_attempts:
                 current_card = _repair_card(card, text, issues)
 
         if card_id in snippets:
@@ -744,21 +846,27 @@ async def generate_report_interpretations(
             snippets[card_id] = {
                 "card_id": card_id,
                 "status": "missing",
+                "stop_reason": "missing_response",
                 "text": "",
                 "attempts": attempts,
+                "attempt_history": attempt_history,
                 "issues": [],
             }
             continue
 
         summary["rejected"] += 1
+        summary["retry_exhausted"] += 1
         snippets[card_id] = {
             "card_id": card_id,
             "status": "rejected",
+            "stop_reason": "max_attempts_exhausted",
             "text": text,
             "attempts": attempts,
+            "attempt_history": attempt_history,
             "issues": issues,
         }
 
+    summary["criteria_met"] = summary["accepted"] == summary["cards"]
     payload = {
         "schema_version": INTERPRETATIONS_SCHEMA_VERSION,
         "enabled": True,

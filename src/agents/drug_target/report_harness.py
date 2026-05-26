@@ -405,10 +405,17 @@ def _interpretation_check(base: Path) -> dict[str, Any]:
         return {"status": "malformed", "artifact": metadata}
     payload = _read_json(base / "report_interpretations.json")
     summary = payload.get("summary") if isinstance(payload, dict) else None
+    summary = summary if isinstance(summary, dict) else {}
     return {
         "status": "present",
         "artifact": metadata,
-        "summary": summary if isinstance(summary, dict) else {},
+        "summary": summary,
+        "criteria": {
+            "criteria_met": summary.get("criteria_met"),
+            "max_attempts_per_card": summary.get("max_attempts_per_card"),
+            "accepted_after_retry": summary.get("accepted_after_retry"),
+            "retry_exhausted": summary.get("retry_exhausted"),
+        },
     }
 
 
@@ -457,6 +464,8 @@ def aggregate_report_harness_diagnostics(
     valid = 0
     issue_code_counts: Counter[str] = Counter()
     check_status_counts: dict[str, Counter[str]] = {}
+    interpretation_summary_totals: Counter[str] = Counter()
+    interpretation_criteria_counts: Counter[str] = Counter()
 
     for payload in diagnostics:
         total += 1
@@ -483,6 +492,30 @@ def aggregate_report_harness_diagnostics(
                 continue
             check_status_counts.setdefault(str(check_name), Counter())[str(status)] += 1
 
+        interpretations = checks.get("interpretations")
+        if not isinstance(interpretations, Mapping):
+            continue
+        summary = interpretations.get("summary")
+        if isinstance(summary, Mapping):
+            for key in (
+                "accepted",
+                "rejected",
+                "missing",
+                "provider_errors",
+                "accepted_after_retry",
+                "retry_exhausted",
+            ):
+                value = summary.get(key)
+                if type(value) is int and value >= 0:
+                    interpretation_summary_totals[key] += value
+        criteria = interpretations.get("criteria")
+        if not isinstance(criteria, Mapping):
+            continue
+        if criteria.get("criteria_met") is True:
+            interpretation_criteria_counts["met"] += 1
+        elif criteria.get("criteria_met") is False:
+            interpretation_criteria_counts["not_met"] += 1
+
     return {
         "schema_version": HARNESS_EVAL_SCHEMA_VERSION,
         "total": total,
@@ -492,6 +525,21 @@ def aggregate_report_harness_diagnostics(
         "check_status_counts": {
             check_name: dict(sorted(status_counts.items()))
             for check_name, status_counts in sorted(check_status_counts.items())
+        },
+        "interpretation_summary_totals": {
+            key: interpretation_summary_totals.get(key, 0)
+            for key in (
+                "accepted",
+                "rejected",
+                "missing",
+                "provider_errors",
+                "accepted_after_retry",
+                "retry_exhausted",
+            )
+        },
+        "interpretation_criteria_counts": {
+            "met": interpretation_criteria_counts.get("met", 0),
+            "not_met": interpretation_criteria_counts.get("not_met", 0),
         },
     }
 

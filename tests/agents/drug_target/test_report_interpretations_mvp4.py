@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import shutil
 from pathlib import Path
 
@@ -36,6 +37,72 @@ def test_report_interpretations_enabled_by_config(monkeypatch) -> None:
     assert report_interpretations_enabled(
         {"configurable": {"enable_report_interpretations": True}}
     ) is True
+
+
+def test_resolve_interpretation_max_attempts_default(monkeypatch) -> None:
+    from src.agents.drug_target.report_interpretations import (
+        resolve_interpretation_max_attempts,
+    )
+
+    monkeypatch.delenv(
+        "DEEPMAST_REPORT_INTERPRETATION_MAX_ATTEMPTS",
+        raising=False,
+    )
+
+    assert resolve_interpretation_max_attempts({}) == 2
+
+
+def test_resolve_interpretation_max_attempts_config_over_env(monkeypatch) -> None:
+    from src.agents.drug_target.report_interpretations import (
+        resolve_interpretation_max_attempts,
+    )
+
+    monkeypatch.setenv("DEEPMAST_REPORT_INTERPRETATION_MAX_ATTEMPTS", "5")
+
+    assert (
+        resolve_interpretation_max_attempts(
+            {"configurable": {"report_interpretation_max_attempts": "4"}}
+        )
+        == 4
+    )
+
+
+def test_resolve_interpretation_max_attempts_env_cap_and_lower_clamp(
+    monkeypatch,
+) -> None:
+    from src.agents.drug_target.report_interpretations import (
+        resolve_interpretation_max_attempts,
+    )
+
+    monkeypatch.setenv("DEEPMAST_REPORT_INTERPRETATION_MAX_ATTEMPTS", "99")
+    assert resolve_interpretation_max_attempts({}) == 5
+
+    monkeypatch.setenv("DEEPMAST_REPORT_INTERPRETATION_MAX_ATTEMPTS", "0")
+    assert resolve_interpretation_max_attempts({}) == 1
+
+
+def test_resolve_interpretation_max_attempts_invalid_falls_back_to_default(
+    monkeypatch,
+) -> None:
+    from src.agents.drug_target.report_interpretations import (
+        resolve_interpretation_max_attempts,
+    )
+
+    monkeypatch.setenv("DEEPMAST_REPORT_INTERPRETATION_MAX_ATTEMPTS", "invalid")
+    assert resolve_interpretation_max_attempts({}) == 2
+
+    assert (
+        resolve_interpretation_max_attempts(
+            {"configurable": {"report_interpretation_max_attempts": object()}}
+        )
+        == 2
+    )
+    assert (
+        resolve_interpretation_max_attempts(
+            {"configurable": {"report_interpretation_max_attempts": True}}
+        )
+        == 2
+    )
 
 
 def test_build_interpretation_prompt_includes_style_and_allowed_terms() -> None:
@@ -127,11 +194,30 @@ def test_generate_interpretations_accepts_and_rejects_mock_provider(
     assert "executive_summary.opportunities" in payload["snippets"]
     accepted = payload["snippets"]["executive_summary.opportunities"]
     assert accepted["status"] == "accepted"
+    assert accepted["stop_reason"] == "accepted"
+    assert accepted["attempt_history"] == [
+        {"attempt": 1, "status": "accepted", "issues": []}
+    ]
     assert accepted["text"].startswith("FN1 anchors")
     assert render_map["executive_summary_opportunities"].startswith("FN1 anchors")
     assert "scoring_landscape" not in render_map
     rejected = payload["snippets"]["scoring_landscape"]
     assert rejected["status"] == "rejected"
+    assert rejected["stop_reason"] == "max_attempts_exhausted"
+    assert "text" not in rejected["attempt_history"][0]
+    rejected_attempt_issues = rejected["attempt_history"][0]["issues"]
+    assert {issue["code"] for issue in rejected_attempt_issues} >= {
+        "UNSUPPORTED_ENTITY",
+        "UNSUPPORTED_NUMBER",
+        "UNSUPPORTED_SOURCE",
+    }
+    assert any(issue.get("number") == "99%" for issue in rejected_attempt_issues)
+    assert any(
+        issue.get("source") == "fabricated.json" for issue in rejected_attempt_issues
+    )
+    assert any(
+        issue.get("token") == "NINTEDANIB" for issue in rejected_attempt_issues
+    )
     assert {issue["code"] for issue in rejected["issues"]} >= {
         "UNSUPPORTED_ENTITY",
         "UNSUPPORTED_NUMBER",
@@ -161,6 +247,20 @@ def test_generate_interpretations_records_provider_error_with_card_id_key(
 
     snippet = payload["snippets"]["executive_summary.opportunities"]
     assert snippet["status"] == "provider_error"
+    assert snippet["stop_reason"] == "provider_error"
+    assert snippet["attempt_history"] == [
+        {
+            "attempt": 1,
+            "status": "provider_error",
+            "issues": [
+                {
+                    "code": "INTERPRETATION_PROVIDER_ERROR",
+                    "severity": "low",
+                    "message": "provider unavailable",
+                }
+            ],
+        }
+    ]
     assert snippet["issues"][0]["code"] == "INTERPRETATION_PROVIDER_ERROR"
     assert payload["summary"]["provider_errors"] == 1
     assert "executive_summary_opportunities" not in render_map
@@ -216,11 +316,147 @@ def test_generate_interpretations_retries_rejected_text_with_repair_card(
 
     snippet = payload["snippets"]["stage1_filter.interpretation"]
     assert snippet["status"] == "accepted"
+    assert snippet["stop_reason"] == "accepted"
     assert snippet["attempts"] == 2
+    assert snippet["attempt_history"] == [
+        {
+            "attempt": 1,
+            "status": "rejected",
+            "issues": [
+                {
+                    "code": "UNSUPPORTED_NUMBER",
+                    "severity": "critical",
+                    "message": "Unsupported numeric claim in interpretation: 9",
+                    "number": "9",
+                }
+            ],
+        },
+        {"attempt": 2, "status": "accepted", "issues": []},
+    ]
+    assert payload["summary"]["accepted_after_retry"] == 1
     assert calls[1]["repair_context"]["previous_text"].startswith("Stage 9")
     assert calls[1]["repair_context"]["issues"][0]["code"] == "UNSUPPORTED_NUMBER"
     assert render_map["stage1_filter"] == (
         "Stage 1 biological validation keeps FN1 grounded."
+    )
+
+
+def test_generate_interpretations_accepts_after_attempt_four(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.report_interpretations import (
+        generate_report_interpretations,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+    calls = []
+
+    def provider(card):
+        if card["id"] != "stage1_filter.interpretation":
+            return ""
+        calls.append(card)
+        if len(calls) == 4:
+            return "Stage 1 biological validation keeps FN1 grounded."
+        return "Stage 9 biological validation keeps FN1 grounded."
+
+    payload, render_map = asyncio.run(
+        generate_report_interpretations(
+            report_data,
+            provider=provider,
+            max_attempts=4,
+        )
+    )
+
+    snippet = payload["snippets"]["stage1_filter.interpretation"]
+    assert snippet["status"] == "accepted"
+    assert snippet["stop_reason"] == "accepted"
+    assert snippet["attempts"] == 4
+    assert len(snippet["attempt_history"]) == 4
+    assert snippet["attempt_history"][-1] == {
+        "attempt": 4,
+        "status": "accepted",
+        "issues": [],
+    }
+    assert payload["summary"]["accepted_after_retry"] == 1
+    assert payload["summary"]["retry_exhausted"] == 0
+    assert payload["summary"]["max_attempts_per_card"] == 4
+    assert payload["summary"]["criteria_met"] is False
+    assert len(calls) == 4
+    assert render_map["stage1_filter"] == (
+        "Stage 1 biological validation keeps FN1 grounded."
+    )
+
+
+def test_generate_interpretations_records_max_attempt_exhaustion(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.report_interpretations import (
+        generate_report_interpretations,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+
+    def provider(card):
+        if card["id"] == "scoring_landscape":
+            return "NINTEDANIB creates 99% unsupported benefit from fabricated.json."
+        return ""
+
+    payload, render_map = asyncio.run(
+        generate_report_interpretations(
+            report_data,
+            provider=provider,
+            max_attempts=3,
+        )
+    )
+
+    snippet = payload["snippets"]["scoring_landscape"]
+    assert snippet["status"] == "rejected"
+    assert snippet["stop_reason"] == "max_attempts_exhausted"
+    assert snippet["attempts"] == 3
+    assert len(snippet["attempt_history"]) == 3
+    assert all(
+        attempt["status"] == "rejected"
+        for attempt in snippet["attempt_history"]
+    )
+    assert all("text" not in attempt for attempt in snippet["attempt_history"])
+    assert all(
+        {issue["code"] for issue in attempt["issues"]}
+        >= {"UNSUPPORTED_ENTITY", "UNSUPPORTED_NUMBER", "UNSUPPORTED_SOURCE"}
+        for attempt in snippet["attempt_history"]
+    )
+    assert payload["summary"]["retry_exhausted"] == 1
+    assert payload["summary"]["criteria_met"] is False
+    assert "scoring_landscape" not in render_map
+
+
+def test_generate_interpretations_sets_criteria_met_when_all_cards_accepted(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.report_interpretations import (
+        generate_report_interpretations,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+
+    def provider(card):
+        return "this report remains grounded."
+
+    payload, render_map = asyncio.run(
+        generate_report_interpretations(report_data, provider=provider)
+    )
+
+    assert payload["summary"]["accepted"] == payload["summary"]["cards"]
+    assert payload["summary"]["criteria_met"] is True
+    assert payload["summary"]["accepted_after_retry"] == 0
+    assert payload["summary"]["retry_exhausted"] == 0
+    assert render_map["executive_summary_opportunities"] == (
+        "this report remains grounded."
     )
 
 
@@ -254,6 +490,57 @@ def test_generate_interpretations_rejects_lowercase_unsupported_entities(
     assert snippet["status"] == "rejected"
     assert {"nintedanib", "tgfb2"} <= entity_tokens
     assert "executive_summary_opportunities" not in render_map
+
+
+def test_finalize_report_mvp_uses_configured_interpretation_attempts(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    repaired_text = "Stage 1 biological validation keeps FN1 grounded."
+    calls = []
+
+    def provider(card):
+        if card["id"] != "stage1_filter.interpretation":
+            return ""
+        calls.append(card)
+        if len(calls) == 4:
+            return repaired_text
+        return "Stage 9 biological validation keeps FN1 grounded."
+
+    result = asyncio.run(
+        finalize_report_mvp(
+            {
+                "data_dir": str(workspace),
+                "disease": "idiopathic pulmonary fibrosis",
+                "report_finalization_error": None,
+                "evidence_truncated": False,
+            },
+            {
+                "configurable": {
+                    "enable_report_interpretations": True,
+                    "report_interpretation_provider": provider,
+                    "report_interpretation_max_attempts": 4,
+                }
+            },
+        )
+    )
+
+    assert result == {
+        "report_finalization_error": None,
+        "evidence_truncated": False,
+    }
+    assert len(calls) == 4
+    markdown = (workspace / "drug.md").read_text(encoding="utf-8")
+    payload = json.loads(
+        (workspace / "report_interpretations.json").read_text(encoding="utf-8")
+    )
+    snippet = payload["snippets"]["stage1_filter.interpretation"]
+    assert snippet["status"] == "accepted"
+    assert snippet["attempts"] == 4
+    assert payload["summary"]["max_attempts_per_card"] == 4
+    assert repaired_text in markdown
 
 
 def test_render_report_markdown_inserts_accepted_interpretations(
