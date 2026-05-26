@@ -501,7 +501,12 @@ def validate_interpretation_text(
         )
 
     masked = stripped
-    for key in ("allowed_genes", "allowed_drugs", "allowed_sources"):
+    for key in (
+        "allowed_genes",
+        "allowed_drugs",
+        "allowed_sources",
+        "allowed_terms",
+    ):
         masked = _mask_allowed_spans(masked, card.get(key))
 
     allowed_entities = _DOMAIN_TOKEN_ALLOWLIST

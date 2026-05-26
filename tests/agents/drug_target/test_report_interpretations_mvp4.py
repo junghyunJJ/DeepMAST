@@ -524,3 +524,50 @@ def test_validate_interpretation_allows_exact_multi_token_drug_names() -> None:
     )
 
     assert issues == []
+
+
+def test_validate_interpretation_allows_card_scoped_terms_with_numbers() -> None:
+    from src.agents.drug_target.report_interpretations import (
+        validate_interpretation_text,
+    )
+
+    card = {
+        "id": "candidate.FN1.biological_context",
+        "allowed_genes": ["FN1"],
+        "allowed_drugs": [],
+        "allowed_numbers": [],
+        "allowed_sources": ["evidence/stage1_FN1.json"],
+        "allowed_terms": ["Stage 1", "biological context"],
+    }
+
+    issues = validate_interpretation_text(
+        card,
+        "Stage 1 biological context keeps FN1 grounded in the report.",
+    )
+
+    assert issues == []
+
+
+def test_validate_interpretation_rejects_unscoped_stage_numbers() -> None:
+    from src.agents.drug_target.report_interpretations import (
+        validate_interpretation_text,
+    )
+
+    card = {
+        "id": "candidate.FN1.drug_profile",
+        "allowed_genes": ["FN1"],
+        "allowed_drugs": [],
+        "allowed_numbers": [],
+        "allowed_sources": ["evidence/assessment_results.json"],
+        "allowed_terms": ["drug profile"],
+    }
+
+    issues = validate_interpretation_text(
+        card,
+        "Stage 3 drug profile keeps FN1 grounded in the report.",
+    )
+
+    assert any(
+        issue["code"] == "UNSUPPORTED_NUMBER" and issue.get("number") == "3"
+        for issue in issues
+    )
