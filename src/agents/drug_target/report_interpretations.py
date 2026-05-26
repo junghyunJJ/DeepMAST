@@ -197,6 +197,35 @@ def _section_sources(
     return _string_list(section.get("sources"))
 
 
+def _score_facts(candidate: Mapping[str, Any]) -> dict[str, Any]:
+    scores = candidate.get("scores")
+    if not isinstance(scores, Mapping):
+        return {}
+    return {
+        key: scores[key]
+        for key in (
+            "validated_total",
+            "exploratory_total",
+            "combined_total",
+            "existing_drug_evidence",
+            "clinical_trial_activity",
+            "biological_plausibility",
+            "tractability",
+        )
+        if key in scores
+    }
+
+
+def _candidate_allowed_terms(slot: str) -> list[str]:
+    if slot == "drug_profile":
+        return ["drug profile", "listed drugs"]
+    if slot == "biological_context":
+        return ["biological context", "Stage 1"]
+    if slot == "recommendation":
+        return ["recommendation", "Stage 3", "actionable next step"]
+    return []
+
+
 def build_interpretation_cards(
     report_data: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
@@ -216,8 +245,10 @@ def build_interpretation_cards(
             "id": "executive_summary.opportunities",
             "kind": "section",
             "instruction": (
-                "Write 1-3 sentences summarizing key therapeutic opportunities."
+                "Synthesize the therapeutic opportunity across featured "
+                "candidates without introducing unsupported evidence."
             ),
+            "allowed_terms": ["therapeutic opportunity", "featured candidates"],
             "allowed_genes": featured_genes,
             "allowed_drugs": [],
             "allowed_numbers": [str(len(candidates)), str(len(featured_genes))],
@@ -225,14 +256,18 @@ def build_interpretation_cards(
             "facts": {
                 "disease": disease,
                 "featured_genes": featured_genes,
+                "candidate_count": len(candidates),
+                "featured_candidate_count": len(featured_genes),
             },
         },
         {
             "id": "scoring_landscape",
             "kind": "section",
             "instruction": (
-                "Write 1-3 sentences interpreting the scoring landscape."
+                "Contrast the validated track and exploratory track in the "
+                "deterministic scoring landscape."
             ),
+            "allowed_terms": ["validated track", "exploratory track"],
             "allowed_genes": all_genes,
             "allowed_drugs": [],
             "allowed_numbers": [str(len(candidates)), str(len(featured_genes))],
@@ -240,22 +275,28 @@ def build_interpretation_cards(
                 report_data,
                 "druggability_matrix",
             ),
-            "facts": {"disease": disease},
+            "facts": {
+                "disease": disease,
+                "candidate_count": len(candidates),
+                "featured_candidate_count": len(featured_genes),
+            },
         },
         {
             "id": "stage1_filter.interpretation",
             "kind": "section",
             "instruction": (
-                "Write 1-3 sentences interpreting Stage 1 biological validation."
+                "Explain the Stage 1 biological validation signal without "
+                "adding unsupported mechanisms."
             ),
+            "allowed_terms": ["Stage 1", "biological validation"],
             "allowed_genes": all_genes,
             "allowed_drugs": [],
-            "allowed_numbers": [],
+            "allowed_numbers": ["1"],
             "allowed_sources": [
                 "evidence/stage1_filter_results.json",
                 "evidence/stage1_evidence.json",
             ],
-            "facts": {"disease": disease},
+            "facts": {"disease": disease, "stage": "Stage 1"},
         },
     ]
 
@@ -268,28 +309,61 @@ def build_interpretation_cards(
             "allowed_drugs": _candidate_drugs(candidate),
             "allowed_numbers": _candidate_numbers(candidate),
             "allowed_sources": _string_list(candidate.get("sources")),
-            "facts": {"disease": disease, "gene": gene},
+            "facts": {
+                "disease": disease,
+                "gene": gene,
+                "candidate_kind": (
+                    "featured candidate"
+                    if candidate.get("stage3_candidate")
+                    else "candidate"
+                ),
+                "stage3_candidate": bool(candidate.get("stage3_candidate")),
+                "counts": {
+                    "clinical_drug_count": candidate.get(
+                        "clinical_drug_count"
+                    ),
+                    "preclinical_drug_count": candidate.get(
+                        "preclinical_drug_count"
+                    ),
+                    "drug_count": candidate.get("drug_count"),
+                },
+                "scores": _score_facts(candidate),
+            },
         }
         cards.extend(
             [
                 {
                     "id": f"candidate.{gene}.drug_profile",
                     "kind": "candidate",
-                    "instruction": "Describe known drugs and indications only.",
+                    "instruction": (
+                        "Describe listed drugs and indication context only; "
+                        "avoid biological interpretation in this slot."
+                    ),
+                    "allowed_terms": _candidate_allowed_terms("drug_profile"),
                     **base,
                 },
                 {
                     "id": f"candidate.{gene}.biological_context",
                     "kind": "candidate",
-                    "instruction": "Interpret Stage 1 biological context.",
+                    "instruction": (
+                        "Explain the Stage 1 biological rationale for this "
+                        "gene without naming unlisted drugs."
+                    ),
+                    "allowed_terms": _candidate_allowed_terms(
+                        "biological_context"
+                    ),
                     **base,
                 },
                 {
                     "id": f"candidate.{gene}.recommendation",
                     "kind": "candidate",
                     "instruction": (
-                        "Write a short evidence-grounded therapeutic "
-                        "recommendation."
+                        "State an actionable next step for this candidate, "
+                        "grounded in Stage 3 prioritization and listed "
+                        "evidence."
+                    ),
+                    "allowed_terms": _candidate_allowed_terms(
+                        "recommendation"
                     ),
                     **base,
                 },
@@ -300,7 +374,11 @@ def build_interpretation_cards(
         {
             "id": "hypotheses.overview",
             "kind": "hypotheses",
-            "instruction": "Write 1-3 sentences summarizing hypothesis themes.",
+            "instruction": (
+                "Summarize the hypothesis set as a thematic bridge from "
+                "ranked mechanisms to therapeutic follow-up."
+            ),
+            "allowed_terms": ["hypothesis themes", "therapeutic follow-up"],
             "allowed_genes": all_genes,
             "allowed_drugs": [],
             "allowed_numbers": [str(len(hypotheses))],
@@ -320,9 +398,14 @@ def build_interpretation_cards(
                 "id": f"hypothesis.{rank}.implication",
                 "kind": "hypothesis",
                 "instruction": (
-                    "Write 1-2 sentences on therapeutic implications of this "
-                    "hypothesis."
+                    "Explain the therapeutic implication of this hypothesis "
+                    "using a mechanism-oriented sentence structure."
                 ),
+                "allowed_terms": [
+                    "therapeutic implication",
+                    "mechanism",
+                    "validation approach",
+                ],
                 "allowed_genes": _string_list(entities.get("genes")),
                 "allowed_drugs": _string_list(entities.get("drugs")),
                 "allowed_numbers": [rank] if rank else [],
@@ -343,9 +426,10 @@ def build_interpretation_cards(
             "id": "final_recommendations",
             "kind": "section",
             "instruction": (
-                "Write 1-3 sentences recommending next deterministic "
-                "follow-up steps."
+                "Recommend deterministic follow-up actions without adding "
+                "new evidence or unsupported clinical claims."
             ),
+            "allowed_terms": ["deterministic follow-up", "candidate review"],
             "allowed_genes": featured_genes,
             "allowed_drugs": [],
             "allowed_numbers": [str(len(candidates)), str(len(featured_genes))],

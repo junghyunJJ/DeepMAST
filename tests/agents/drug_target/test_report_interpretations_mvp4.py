@@ -310,6 +310,57 @@ def test_build_interpretation_cards_include_existing_expand_slots(
     assert executive["facts"]["disease"] == "idiopathic pulmonary fibrosis"
 
 
+def test_build_interpretation_cards_include_type_specific_instructions_and_allowed_terms(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.report_interpretations import (
+        build_interpretation_cards,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(
+        str(workspace),
+        "idiopathic pulmonary fibrosis",
+    )
+
+    cards = build_interpretation_cards(report_data)
+    drug_profile = next(
+        card for card in cards if card["id"].endswith(".drug_profile")
+    )
+    biological_context = next(
+        card for card in cards if card["id"].endswith(".biological_context")
+    )
+    recommendation = next(
+        card for card in cards if card["id"].endswith(".recommendation")
+    )
+    hypothesis = next(
+        card for card in cards if card["id"].startswith("hypothesis.")
+    )
+    scoring = next(card for card in cards if card["id"] == "scoring_landscape")
+
+    assert "listed drugs" in drug_profile["instruction"]
+    assert "biological rationale" in biological_context["instruction"]
+    assert "actionable next step" in recommendation["instruction"]
+    assert "therapeutic implication" in hypothesis["instruction"]
+    assert len(
+        {
+            drug_profile["instruction"],
+            biological_context["instruction"],
+            recommendation["instruction"],
+            hypothesis["instruction"],
+        }
+    ) == 4
+
+    assert "Stage 1" in biological_context["allowed_terms"]
+    assert "Stage 3" in recommendation["allowed_terms"]
+    assert "validated track" in scoring["allowed_terms"]
+    assert "exploratory track" in scoring["allowed_terms"]
+    assert "validated track" not in biological_context["allowed_terms"]
+    assert drug_profile["facts"]["candidate_kind"] == "featured candidate"
+    assert "validated_total" in drug_profile["facts"]["scores"]
+
+
 def test_validate_interpretation_accepts_allowed_entities() -> None:
     from src.agents.drug_target.report_interpretations import (
         validate_interpretation_text,
