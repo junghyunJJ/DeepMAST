@@ -2121,3 +2121,21 @@ Type consistency:
 - Config keys are consistently `enable_report_interpretations` and `report_interpretation_provider`.
 - Output schema versions are consistently `drug_target.report_interpretations.v1` and `drug_target.report_harness_eval.v1`.
 - Render map keys match template insertion keys.
+
+## Addendum: Style-Diverse Validated Snippets
+
+Optional LLM interpretation snippets now carry card-specific prose roles so
+`drug_profile`, `biological_context`, `recommendation`, and `hypothesis`
+expansion slots do not all ask for the same generic interpretation. The
+validator remains claim-first: genes, drugs, sources, numbers, and report terms
+must still be present in the card allowlists.
+
+Report terms such as `Stage 1`, `Stage 3`, `validated track`, and
+`exploratory track` are card-scoped `allowed_terms`, not global exceptions.
+This preserves deterministic fallback behavior while allowing richer language
+when the deterministic card explicitly supplies the term.
+
+When a provider returns invalid text, `generate_report_interpretations` retries
+once with a repair card containing the previous text and validator issues. If
+the retry remains invalid, the snippet is rejected and the deterministic
+fallback remains in the rendered report.
