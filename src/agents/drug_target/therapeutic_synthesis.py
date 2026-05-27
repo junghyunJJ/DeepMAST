@@ -12,12 +12,17 @@ PART4_SYNTHESIS_FILENAME = "part4_therapeutic_synthesis.md"
 
 _MAX_FEATURED_CANDIDATES = 3
 _MAX_HYPOTHESES = 5
+_EXPAND_MARKER_PATTERN = re.compile(
+    r"<!--\s*EXPAND(?:\s*:|\s+).*?-->",
+    flags=re.IGNORECASE | re.DOTALL,
+)
 _DISALLOWED_MARKDOWN_PHRASES = (
-    ("EXPAND", "artifact marker"),
+    ("patients should receive", "experimental studies should evaluate"),
     ("recommended therapy", "candidate therapy"),
     ("should treat", "should test experimentally"),
     ("clinical ready", "experimentally prioritized"),
     ("standard of care", "care guidance"),
+    ("patients should", "experiments should"),
 )
 
 
@@ -265,13 +270,17 @@ def _issue_bullet(issue: Mapping[str, Any]) -> str:
 
 
 def _scrub_disallowed_phrases(text: str) -> str:
-    scrubbed = text
+    scrubbed = _EXPAND_MARKER_PATTERN.sub("artifact marker", text)
     for phrase, replacement in _DISALLOWED_MARKDOWN_PHRASES:
+        escaped_phrase = re.escape(phrase).replace(r"\ ", r"\s+")
+        pattern = re.compile(
+            rf"(?<!\w){escaped_phrase}(?!\w)",
+            flags=re.IGNORECASE,
+        )
         scrubbed = re.sub(
-            re.escape(phrase),
+            pattern,
             replacement,
             scrubbed,
-            flags=re.IGNORECASE,
         )
     return scrubbed
 

@@ -169,7 +169,7 @@ def _artifact_issues(
                     "error": metadata.get("json_error"),
                 }
             )
-    for name in ("drug.md", "drug_report.html"):
+    for name in ("drug.md", "drug_report.html", PART4_SYNTHESIS_FILENAME):
         path = base / name
         if path.exists() and _has_expand_marker(path.read_text(encoding="utf-8")):
             issues.append(

@@ -39,6 +39,14 @@ def _issue_codes(diagnostics: dict) -> set[str]:
     }
 
 
+def _issue_paths(diagnostics: dict) -> set[str]:
+    return {
+        str(issue.get("path"))
+        for issue in diagnostics.get("issues", [])
+        if isinstance(issue, dict)
+    }
+
+
 def test_harness_writes_diagnostics_for_successful_no_llm_report(
     tmp_path: Path,
 ) -> None:
@@ -227,6 +235,43 @@ def test_harness_flags_unexpanded_markers_after_artifact_generation(
 
     assert diagnostics["valid"] is False
     assert "UNEXPANDED_PLACEHOLDER" in _issue_codes(diagnostics)
+
+
+def test_harness_flags_unexpanded_markers_in_part4_artifact(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+    from src.agents.drug_target.report_harness import (
+        collect_report_harness_diagnostics,
+    )
+    from src.agents.drug_target.therapeutic_synthesis import (
+        PART4_SYNTHESIS_FILENAME,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    result = asyncio.run(
+        finalize_report_mvp(
+            {
+                "data_dir": str(workspace),
+                "disease": "idiopathic pulmonary fibrosis",
+                "report_finalization_error": None,
+                "evidence_truncated": False,
+            },
+            {},
+        )
+    )
+    assert result["report_finalization_error"] is None
+
+    (workspace / PART4_SYNTHESIS_FILENAME).write_text(
+        "# Broken Part 4\n\n<!-- EXPAND:therapeutic_synthesis -->\n",
+        encoding="utf-8",
+    )
+
+    diagnostics = collect_report_harness_diagnostics(str(workspace))
+
+    assert diagnostics["valid"] is False
+    assert "UNEXPANDED_PLACEHOLDER" in _issue_codes(diagnostics)
+    assert PART4_SYNTHESIS_FILENAME in _issue_paths(diagnostics)
 
 
 def test_harness_ignores_plain_expand_text_after_artifact_generation(

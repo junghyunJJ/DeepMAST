@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 
@@ -29,6 +30,19 @@ def _validation_payload(valid: bool = True) -> dict:
             "report_data.json": {"exists": True},
         },
     }
+
+
+def _normalized_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+_FORBIDDEN_CLINICAL_PHRASES = (
+    "should treat",
+    "recommended therapy",
+    "clinical ready",
+    "standard of care",
+    "patients should",
+)
 
 
 def test_part4_synthesis_data_prioritizes_featured_candidates(
@@ -106,6 +120,73 @@ def test_render_part4_synthesis_markdown_is_not_drug_md_copy(
     assert "standard of care" not in markdown.lower()
 
 
+def test_part4_synthesis_does_not_reuse_drug_report_sections_verbatim(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.therapeutic_synthesis import (
+        build_part4_therapeutic_synthesis,
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+    synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=_validation_payload(),
+        interpretations_payload=None,
+    )
+
+    markdown = render_part4_therapeutic_synthesis_markdown(synthesis)
+    source_drug_md = (workspace / "drug.md").read_text(encoding="utf-8")
+    normalized_markdown = _normalized_text(markdown)
+    normalized_source = _normalized_text(source_drug_md)
+
+    assert "## 1. Executive Summary" not in markdown
+    assert "## 2. Target Druggability Matrix" not in markdown
+    assert "## 3. Candidate Deep Dives" not in markdown
+    assert "## 4. Mechanistic Hypotheses" not in markdown
+    for snippet in (
+        "This report presents a comprehensive therapeutic target assessment "
+        "for **pulmonary fibrosis** based on spatial transcriptomics "
+        "cell-cell interaction (CCI) analysis.",
+        "All seven featured candidates achieved validated_target "
+        "classification with high priority, indicating substantial clinical "
+        "evidence and strong therapeutic potential.",
+        "The druggability matrix reveals a clear stratification of "
+        "therapeutic targets across validated and exploratory evidence tracks.",
+        "CD4 achieves the maximum validated_total score of 10, driven by "
+        "strong existing drug evidence (5) and clinical trial activity (5), "
+        "reflecting extensive clinical development of CD4-targeted therapeutics.",
+    ):
+        assert snippet in normalized_source
+        assert snippet not in normalized_markdown
+
+
+def test_part4_synthesis_uses_experimental_not_clinical_language(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.therapeutic_synthesis import (
+        build_part4_therapeutic_synthesis,
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+    synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=_validation_payload(),
+        interpretations_payload=None,
+    )
+
+    markdown = render_part4_therapeutic_synthesis_markdown(synthesis).lower()
+
+    for phrase in _FORBIDDEN_CLINICAL_PHRASES:
+        assert phrase not in markdown
+    assert "experimental prioritization" in markdown
+
+
 def test_render_part4_synthesis_scrubs_clinical_drift_from_hypotheses(
     tmp_path: Path,
 ) -> None:
@@ -124,7 +205,9 @@ def test_render_part4_synthesis_scrubs_clinical_drift_from_hypotheses(
             "category": "Therapeutic Strategy",
             "biological_entities": {"genes": ["CD4"], "drugs": []},
             "validation_approach": (
-                "Synthetic coverage text says the candidate is clinical ready."
+                "Synthetic coverage text says patients should receive the "
+                "recommended therapy as standard of care because the "
+                "candidate is clinical ready."
             ),
             "evidence_references": ["evidence/hypothesis_report.json"],
         }
@@ -138,7 +221,10 @@ def test_render_part4_synthesis_scrubs_clinical_drift_from_hypotheses(
     markdown = render_part4_therapeutic_synthesis_markdown(synthesis)
 
     assert "should treat" not in markdown.lower()
+    assert "patients should" not in markdown.lower()
+    assert "recommended therapy" not in markdown.lower()
     assert "clinical ready" not in markdown.lower()
+    assert "standard of care" not in markdown.lower()
 
 
 def test_render_part4_synthesis_handles_invalid_validation_metadata(
