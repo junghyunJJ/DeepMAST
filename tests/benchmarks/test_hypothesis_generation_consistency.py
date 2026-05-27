@@ -4,6 +4,8 @@ import importlib
 import json
 from pathlib import Path
 
+import pytest
+
 from docs.benchmarks.hypothesis_generation_consistency.analysis import (
     aggregate_trial_rows,
     jaccard,
@@ -155,6 +157,30 @@ def test_prepare_trial_workspace_copies_source_and_removes_stale_report(
 
     assert (workspace / "evidence" / "assessment_results.json").exists()
     assert not (workspace / "evidence" / "hypothesis_report.json").exists()
+
+
+@pytest.mark.parametrize("run_id", ["absolute", "../escaped"])
+def test_prepare_trial_workspace_rejects_escaping_run_id_without_touching_target(
+    tmp_path: Path,
+    run_id: str,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    workspace_root = tmp_path / "workspaces"
+    if run_id == "absolute":
+        target = tmp_path / "absolute_escape"
+        rejected_run_id = str(target)
+    else:
+        target = workspace_root / run_id
+        rejected_run_id = run_id
+    target.mkdir(parents=True)
+    sentinel = target / "sentinel.txt"
+    sentinel.write_text("preserved", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        prepare_trial_workspace(source, workspace_root, rejected_run_id, force=True)
+
+    assert sentinel.read_text(encoding="utf-8") == "preserved"
 
 
 def test_check_hypothesis_scope_reports_loader_errors(tmp_path: Path) -> None:

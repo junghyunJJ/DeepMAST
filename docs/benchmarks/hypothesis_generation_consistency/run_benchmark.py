@@ -28,7 +28,9 @@ from src.agents.drug_target.tools.evidence_loader import (
     load_evidence_files,
 )
 
-load_dotenv(PROJECT_ROOT / ".env", override=False)
+
+def load_benchmark_env() -> None:
+    load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 
 def utc_stamp() -> str:
@@ -63,7 +65,20 @@ def prepare_trial_workspace(
     force: bool,
 ) -> Path:
     source = source.resolve()
-    workspace = workspace_root / run_id
+    run_path = Path(run_id)
+    if (
+        not run_id
+        or run_path.is_absolute()
+        or len(run_path.parts) != 1
+        or run_path.parts[0] in {"", ".", ".."}
+    ):
+        raise ValueError(f"run_id must be a single relative path component: {run_id!r}")
+
+    workspace_root = workspace_root.resolve()
+    workspace = (workspace_root / run_path.parts[0]).resolve()
+    if not workspace.is_relative_to(workspace_root):
+        raise ValueError(f"workspace escapes workspace_root: {workspace}")
+
     if workspace.exists():
         if not force:
             raise FileExistsError(f"workspace already exists: {workspace}")
