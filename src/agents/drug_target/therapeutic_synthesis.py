@@ -268,6 +268,72 @@ def _preclinical_signal_summary(candidate: Mapping[str, Any]) -> str:
     return f"{count} ChEMBL bioactivity records"
 
 
+def _clinical_modulation_phrase(candidate: Mapping[str, Any]) -> str:
+    names = _string_list(candidate.get("clinical_drugs"))[:3]
+    if names:
+        return f"clinical modulation evidence from {', '.join(names)}"
+    return "no named clinical modulation evidence"
+
+
+def _hypothesis_linkage_phrase(linked: list[dict[str, Any]]) -> str:
+    if not linked:
+        return "it has no explicit ranked hypothesis linkage"
+
+    lead = linked[0]
+    lead_rank = _safe_int(lead.get("rank"), 0)
+    lead_title = _safe_text(lead.get("title"), "a ranked mechanistic hypothesis")
+    phrase = f"it links to rank {lead_rank}: {lead_title}"
+    if len(linked) > 1:
+        secondary = linked[1]
+        secondary_rank = _safe_int(secondary.get("rank"), 0)
+        secondary_title = _safe_text(secondary.get("title"))
+        if secondary_rank and secondary_title:
+            phrase += f"; it is also supported by rank {secondary_rank}: {secondary_title}"
+    return phrase
+
+
+def _selection_rationale(
+    candidate: Mapping[str, Any],
+    linked: list[dict[str, Any]],
+) -> str:
+    gene = _safe_text(candidate.get("gene"), "The candidate")
+    stage3_clause = "stage3 candidate" if _safe_bool(candidate.get("stage3_candidate")) else "candidate"
+    clinical_clause = _clinical_modulation_phrase(candidate)
+    preclinical_count = _safe_int(candidate.get("preclinical_drug_count"), 0)
+    preclinical_clause = (
+        f"{preclinical_count} ChEMBL preclinical bioactivity records"
+        if preclinical_count
+        else "no ChEMBL preclinical bioactivity records"
+    )
+    evidence_clause = (
+        f"{_candidate_render_track(candidate)} evidence, {clinical_clause}, "
+        f"and {preclinical_clause}"
+    )
+    if not linked:
+        if _safe_int(candidate.get("clinical_drug_count"), 0) or preclinical_count:
+            return (
+                f"{gene} was selected as a {stage3_clause} based on "
+                f"deterministic candidate-level evidence: {evidence_clause}. "
+                "No ranked mechanistic hypothesis explicitly linked this "
+                "candidate, so this rationale is evidence-driven rather than "
+                "mechanistic-axis driven."
+            )
+        return (
+            f"{gene} was retained as a {stage3_clause} based on deterministic "
+            f"candidate-level evidence: {evidence_clause}. No ranked mechanistic "
+            "hypothesis or named drug evidence was available, so this is a "
+            "coverage gap that requires follow-up before intervention "
+            "prioritization."
+        )
+
+    hypothesis_clause = _hypothesis_linkage_phrase(linked)
+    return (
+        f"{gene} was selected as a {stage3_clause} because {hypothesis_clause}. "
+        f"Its deterministic support combines {evidence_clause}, making it a "
+        "practical intervention handle for experimental prioritization."
+    )
+
+
 def _therapeutic_rationale(candidate: Mapping[str, Any]) -> str:
     gene = _safe_text(candidate.get("gene"), "candidate").upper()
     classification = _safe_text(candidate.get("classification"), "unknown")
@@ -394,6 +460,7 @@ def _candidate_hypothesis_context(
         "best_hypothesis_rank": best_rank,
         "best_hypothesis_composite": best_composite,
         "mechanistic_role_summary": role_summary,
+        "selection_rationale": _selection_rationale(candidate, linked_summary),
     }
 
 
@@ -652,6 +719,10 @@ def _candidate_section(candidate: Mapping[str, Any]) -> str:
                 f"{_safe_text(candidate.get('therapeutic_rationale'))}"
             ),
             (
+                "- Selection rationale: "
+                f"{_safe_text(candidate.get('selection_rationale'), 'No deterministic selection rationale was available.')}"
+            ),
+            (
                 "- Drug signal: "
                 f"{_safe_text(candidate.get('drug_signal_summary'))}"
             ),
@@ -736,9 +807,9 @@ def _hypothesis_section(hypothesis: Mapping[str, Any]) -> str:
         else None
     )
     score_line = (
-        f"**Composite score:** {_bounded_text(composite_score)}"
+        f"- Composite score: {_bounded_text(composite_score)}"
         if _safe_text(composite_score)
-        else "**Composite score:** No composite score was recorded."
+        else "- Composite score: No composite score was recorded."
     )
     evidence_references = [
         _bounded_text(reference, limit=_MAX_RENDER_LIST_ITEM_CHARS)
@@ -766,27 +837,27 @@ def _hypothesis_section(hypothesis: Mapping[str, Any]) -> str:
     return "\n".join(
         [
             f"### Hypothesis {rank_text}: {title}",
-            f"**Category:** {_bounded_text(hypothesis.get('category'), 'unspecified')}",
+            f"- Category: {_bounded_text(hypothesis.get('category'), 'unspecified')}",
             (
-                "**Genes:** "
+                "- Genes: "
                 f"{_render_list_or_fallback(hypothesis.get('genes'), 'No genes were recorded.')}"
             ),
             (
-                "**Pathways:** "
+                "- Pathways: "
                 f"{_render_list_or_fallback(hypothesis.get('pathways'), 'No pathways were recorded.')}"
             ),
             (
-                "**Cell types:** "
+                "- Cell types: "
                 f"{_render_list_or_fallback(hypothesis.get('cell_types'), 'No cell types were recorded.')}"
             ),
             (
-                "**Candidate compounds:** "
+                "- Candidate compounds: "
                 f"{_render_list_or_fallback(hypothesis.get('drugs'), 'No candidate compounds were recorded.')}"
             ),
-            f"**Core claim:** {core_claim}",
-            f"**Falsifiable prediction:** {prediction}",
-            f"**Validation design:** {validation_design}",
-            f"**Evidence anchors:** {evidence_line}",
+            f"- Core claim: {core_claim}",
+            f"- Falsifiable prediction: {prediction}",
+            f"- Validation design: {validation_design}",
+            f"- Evidence anchors: {evidence_line}",
             score_line,
         ]
     )

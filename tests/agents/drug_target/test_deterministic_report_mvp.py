@@ -156,7 +156,7 @@ def test_report_mvp_renders_without_llm(tmp_path: Path) -> None:
     assert "## Candidate Triage" in part4_text
     assert "## Mechanistic Intervention Map" in part4_text
     assert "- Therapeutic rationale:" in part4_text
-    assert "**Falsifiable prediction:**" in part4_text
+    assert "- Falsifiable prediction:" in part4_text
     assert "EXPAND" not in part4_text
 
 

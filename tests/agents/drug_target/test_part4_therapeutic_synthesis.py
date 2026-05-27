@@ -150,6 +150,14 @@ def test_part4_synthesis_data_preserves_candidate_evidence_context(
     assert candidate["mechanistic_hypothesis_count"] == 2
     assert candidate["best_hypothesis_rank"] == 1
     assert "ICAM1-ITGB2 Axis" in candidate["mechanistic_role_summary"]
+    assert "ICAM1 was selected as a stage3 candidate" in candidate[
+        "selection_rationale"
+    ]
+    assert "rank 1: ICAM1-ITGB2 Axis" in candidate["selection_rationale"]
+    assert "rank 5: MUC1-ICAM1 Crosstalk" in candidate["selection_rationale"]
+    assert "10 ChEMBL preclinical bioactivity records" in candidate[
+        "selection_rationale"
+    ]
     assert candidate["drug_target_evidence"].startswith("Preclinical:")
 
 
@@ -284,6 +292,7 @@ def test_render_part4_synthesis_has_rich_candidate_triage(
     ) in markdown
     assert "- Evidence track:" in markdown
     assert "- Therapeutic rationale:" in markdown
+    assert "- Selection rationale:" in markdown
     assert "- Drug signal:" in markdown
     assert "**Clinical Compounds (OpenTargets):**" in markdown
     assert "No named clinical compounds were available." in markdown
@@ -456,6 +465,63 @@ def test_part4_synthesis_selects_primary_mechanistic_axis_before_score_top3() ->
     assert "- Preclinical signal: 0 ChEMBL bioactivity records" in markdown
     assert "- Preclinical signal: 1 ChEMBL bioactivity records" in markdown
     assert "SHOULD_NOT_RENDER_PRECLINICAL" not in markdown
+    assert (
+        "- Selection rationale: CD47 was selected as a stage3 candidate because "
+        "it links to rank 1: THBS1-CD47 and ICAM1-ITGB2 convergence defines "
+        "an immune-retention program."
+    ) in markdown
+
+
+def test_part4_synthesis_rationale_handles_candidates_without_hypotheses() -> None:
+    from src.agents.drug_target.therapeutic_synthesis import (
+        build_part4_therapeutic_synthesis,
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    report_data = {
+        "disease": "IPF",
+        "candidates": [
+            {
+                "gene": "TGFB1",
+                "classification": "validated_target",
+                "priority": "high",
+                "stage3_candidate": True,
+                "scores": {
+                    "combined_total": 13,
+                    "validated_total": 9,
+                    "exploratory_total": 4,
+                },
+                "clinical_drug_count": 0,
+                "preclinical_drug_count": 0,
+                "clinical_drugs": [],
+                "preclinical_drugs": [],
+                "sources": ["evidence/assessment_results.json"],
+            }
+        ],
+        "hypotheses": [],
+    }
+
+    synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=_validation_payload(),
+        interpretations_payload=None,
+    )
+    candidate = synthesis["featured_candidates"][0]
+    markdown = render_part4_therapeutic_synthesis_markdown(synthesis)
+
+    assert candidate["gene"] == "TGFB1"
+    assert "TGFB1 was retained as a stage3 candidate" in candidate[
+        "selection_rationale"
+    ]
+    assert "because it has no explicit ranked hypothesis linkage" not in candidate[
+        "selection_rationale"
+    ]
+    assert "No ranked mechanistic hypothesis or named drug evidence" in candidate[
+        "selection_rationale"
+    ]
+    assert "coverage gap" in candidate["selection_rationale"]
+    assert "practical intervention handle" not in candidate["selection_rationale"]
+    assert "- Selection rationale: TGFB1 was retained" in markdown
 
 
 def test_render_part4_synthesis_has_mechanistic_intervention_map(
@@ -482,24 +548,24 @@ def test_render_part4_synthesis_has_mechanistic_intervention_map(
         "### Hypothesis 1: ICAM1-ITGB2 Axis Drives Fibroblast Activation "
         "and ECM Deposition in IPF [MoA - Immune Modulation]"
     ) in markdown
-    assert "**Category:** Mechanism of Action" in markdown
-    assert "**Genes:** ICAM1, ITGB2" in markdown
+    assert "- Category: Mechanism of Action" in markdown
+    assert "- Genes: ICAM1, ITGB2" in markdown
     assert (
-        "**Pathways:** integrin signaling, cell adhesion, fibroblast activation"
+        "- Pathways: integrin signaling, cell adhesion, fibroblast activation"
     ) in markdown
     assert (
-        "**Cell types:** fibroblasts, immune cells, alveolar type 2 cells"
+        "- Cell types: fibroblasts, immune cells, alveolar type 2 cells"
     ) in markdown
-    assert "**Candidate compounds:** Lifitegrast" in markdown
-    assert "**Core claim:**" in markdown
-    assert "**Falsifiable prediction:**" in markdown
-    assert "**Validation design:**" in markdown
-    assert "**Evidence anchors:**" in markdown
+    assert "- Candidate compounds: Lifitegrast" in markdown
+    assert "- Core claim:" in markdown
+    assert "- Falsifiable prediction:" in markdown
+    assert "- Validation design:" in markdown
+    assert "- Evidence anchors:" in markdown
     assert (
         "stage1_ICAM1--ITGB2.json, stage3_ICAM1.json, ot_ICAM1.json, "
         "stage3_ITGB2.json, ot_ITGB2.json"
     ) in markdown
-    assert "**Composite score:** 0.775" in markdown
+    assert "- Composite score: 0.775" in markdown
 
 
 def test_render_part4_synthesis_mechanistic_map_uses_stable_fallbacks() -> None:
@@ -619,10 +685,10 @@ def test_render_part4_synthesis_bounds_mechanistic_map_fields() -> None:
     )[0]
 
     assert "## Mechanistic Intervention Map" in markdown
-    assert "**Core claim:**" in section
-    assert "**Falsifiable prediction:**" in section
-    assert "**Validation design:**" in section
-    assert "**Evidence anchors:**" in section
+    assert "- Core claim:" in section
+    assert "- Falsifiable prediction:" in section
+    assert "- Validation design:" in section
+    assert "- Evidence anchors:" in section
     assert long_text not in section
     assert "..." in section
     assert "ANCHOR_0_" in section
