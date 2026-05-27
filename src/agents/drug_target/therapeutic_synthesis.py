@@ -304,25 +304,116 @@ def build_part4_therapeutic_synthesis(
     }
 
 
-def _candidate_bullet(candidate: Mapping[str, Any]) -> str:
-    stage_label = (
-        "stage3 candidate"
-        if _safe_bool(candidate.get("stage3_candidate"))
-        else "candidate"
+def _candidate_render_track(candidate: Mapping[str, Any]) -> str:
+    track = _safe_text(candidate.get("evidence_track"))
+    if track:
+        return track
+
+    validated = _candidate_render_score(candidate, "validated_total")
+    exploratory = _candidate_render_score(candidate, "exploratory_total")
+    if validated >= 7 and exploratory >= 4:
+        return "validated-and-exploratory"
+    if validated >= 7:
+        return "validated-dominant"
+    if exploratory >= 4:
+        return "exploratory-dominant"
+    return "limited-evidence"
+
+
+def _candidate_render_score(candidate: Mapping[str, Any], key: str) -> int:
+    score = candidate.get("score_profile")
+    if isinstance(score, Mapping) and key in score:
+        return _safe_int(score.get(key), 0)
+    return _safe_int(candidate.get(key), 0)
+
+
+def _candidate_discriminator(candidate: Mapping[str, Any]) -> str:
+    gene = _safe_text(candidate.get("gene"), "the candidate")
+    track = _candidate_render_track(candidate)
+    if track == "validated-and-exploratory":
+        return (
+            f"Test whether {gene} shows disease-context target engagement "
+            "and intervention directionality in disease-relevant cell states."
+        )
+    if track == "validated-dominant":
+        return (
+            f"Test whether existing {gene} target biology maps to disease-relevant "
+            "cell states and ligand-receptor contexts in this dataset."
+        )
+    if track == "exploratory-dominant":
+        return (
+            f"Test {gene} tractability with perturbation evidence before "
+            "advancing the candidate beyond exploratory prioritization."
+        )
+    return (
+        f"Complete {gene} evidence coverage before prioritization, including "
+        "source support, tractability, and disease-context perturbation data."
+    )
+
+
+def _candidate_section(candidate: Mapping[str, Any]) -> str:
+    gene = _safe_text(candidate.get("gene"), "UNKNOWN")
+    return "\n".join(
+        [
+            f"### Candidate: {gene}",
+            (
+                f"**Evidence track:** {_candidate_render_track(candidate)} "
+                "with combined score "
+                f"{_candidate_render_score(candidate, 'combined_total')} "
+                f"(validated {_candidate_render_score(candidate, 'validated_total')}, "
+                "exploratory "
+                f"{_candidate_render_score(candidate, 'exploratory_total')})."
+            ),
+            (
+                "**Therapeutic rationale:** "
+                f"{_safe_text(candidate.get('therapeutic_rationale'))}"
+            ),
+            (
+                "**Drug signal:** "
+                f"{_safe_text(candidate.get('drug_signal_summary'))}"
+            ),
+            (
+                "**Experimental discriminator:** "
+                f"{_candidate_discriminator(candidate)}"
+            ),
+        ]
+    )
+
+
+def _integrated_thesis(synthesis: Mapping[str, Any]) -> str:
+    disease = _safe_text(synthesis.get("disease"), "unspecified disease")
+    counts = synthesis.get("candidate_counts")
+    if not isinstance(counts, Mapping):
+        counts = {}
+    total_count = _safe_int(counts.get("total"), 0)
+    validated_count = _safe_int(counts.get("validated"), 0)
+    exploratory_count = _safe_int(counts.get("exploratory"), 0)
+    candidates = _dict_list(synthesis.get("featured_candidates"))
+    top_genes = [
+        gene
+        for candidate in candidates
+        if (gene := _safe_text(candidate.get("gene")))
+    ]
+    candidate_clause = (
+        f" The top triage set centers on {', '.join(top_genes)}."
+        if top_genes
+        else " No featured candidates were available for gene-level triage."
     )
     return (
-        f"- **{_safe_text(candidate.get('gene'), 'UNKNOWN')}** "
-        f"({_safe_text(candidate.get('classification'), 'unknown')}, "
-        f"{_safe_text(candidate.get('priority'), 'unranked')} priority, "
-        f"{stage_label}): combined score "
-        f"{_safe_int(candidate.get('combined_total'), 0)} "
-        f"(validated {_safe_int(candidate.get('validated_total'), 0)}, "
-        f"exploratory {_safe_int(candidate.get('exploratory_total'), 0)}); "
-        f"clinical drug count {_safe_int(candidate.get('clinical_drug_count'), 0)}, "
-        "preclinical compound count "
-        f"{_safe_int(candidate.get('preclinical_drug_count'), 0)}, "
-        f"source count {_safe_int(candidate.get('source_count'), 0)}."
+        f"For {disease}, the deterministic therapeutic landscape contains "
+        f"{_plural_phrase(total_count, 'candidate gene')}, including "
+        f"{_plural_phrase(validated_count, 'validated-classified entry', 'validated-classified entries')} "
+        "and "
+        f"{_plural_phrase(exploratory_count, 'exploratory-classified entry', 'exploratory-classified entries')}. "
+        "The synthesis treats these as evidence strata for "
+        "experimental prioritization and mechanistic testing, not as "
+        f"readiness for care decisions.{candidate_clause}"
     )
+
+
+def _plural_phrase(count: int, singular: str, plural: str | None = None) -> str:
+    label = singular if count == 1 else plural or f"{singular}s"
+    return f"{count} {label}"
 
 
 def _hypothesis_bullet(hypothesis: Mapping[str, Any]) -> str:
@@ -390,8 +481,8 @@ def render_part4_therapeutic_synthesis_markdown(
     validation_issues = _dict_list(synthesis.get("validation_issues"))
     report_valid = _safe_bool(synthesis.get("report_valid"))
 
-    candidate_lines = "\n".join(
-        _candidate_bullet(candidate)
+    candidate_lines = "\n\n".join(
+        _candidate_section(candidate)
         for candidate in candidates
     )
     if not candidate_lines:
@@ -426,6 +517,9 @@ def render_part4_therapeutic_synthesis_markdown(
 
 ## Therapeutic Opportunity Landscape
 The DrugTargetAgent assessment for {disease} evaluated {_safe_int(counts.get("total"), 0)} candidate genes. This Part 4 synthesis narrows the deterministic output to {_safe_int(counts.get("featured"), 0)} top triage candidates from {_safe_int(counts.get("stage3_total"), 0)} stage3 candidates, while keeping validated and exploratory evidence tracks separate.
+
+## Integrated Therapeutic Thesis
+{_integrated_thesis(synthesis)}
 
 ## Candidate Triage
 {candidate_lines}

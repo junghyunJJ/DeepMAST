@@ -246,6 +246,86 @@ def test_render_part4_synthesis_markdown_is_not_drug_md_copy(
     assert "standard of care" not in markdown.lower()
 
 
+def test_render_part4_synthesis_has_rich_candidate_triage(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.therapeutic_synthesis import (
+        build_part4_therapeutic_synthesis,
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+    markdown = render_part4_therapeutic_synthesis_markdown(
+        build_part4_therapeutic_synthesis(
+            report_data,
+            validation=_validation_payload(),
+            interpretations_payload=None,
+        )
+    )
+
+    assert "## Integrated Therapeutic Thesis" in markdown
+    assert "### Candidate: CD4" in markdown
+    assert "### Candidate: FN1" in markdown
+    assert "### Candidate: MUC1" in markdown
+    assert (
+        "**Evidence track:** validated-and-exploratory with combined score 15 "
+        "(validated 10, exploratory 5)."
+    ) in markdown
+    assert "**Evidence track:**" in markdown
+    assert "**Therapeutic rationale:**" in markdown
+    assert "**Drug signal:**" in markdown
+    assert "**Experimental discriminator:**" in markdown
+    assert "IPF cell states" not in markdown
+
+
+def test_render_part4_synthesis_candidate_triage_uses_flat_score_fallback() -> None:
+    from src.agents.drug_target.therapeutic_synthesis import (
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    markdown = render_part4_therapeutic_synthesis_markdown(
+        {
+            "disease": "systemic sclerosis",
+            "report_valid": True,
+            "candidate_counts": {
+                "total": 1,
+                "featured": 1,
+                "stage3_total": 1,
+                "validated": 1,
+                "exploratory": 0,
+            },
+            "featured_candidates": [
+                {
+                    "gene": "TGFB1",
+                    "combined_total": 9,
+                    "validated_total": 8,
+                    "exploratory_total": 1,
+                    "therapeutic_rationale": (
+                        "TGFB1 is a deterministic candidate for fibrosis "
+                        "mechanism testing."
+                    ),
+                    "drug_signal_summary": (
+                        "1 clinical and 2 preclinical structured drug signals"
+                    ),
+                }
+            ],
+            "hypotheses": [],
+            "interpretation_summary": {},
+            "validation_issues": [],
+        }
+    )
+
+    assert "### Candidate: TGFB1" in markdown
+    assert (
+        "**Evidence track:** validated-dominant with combined score 9 "
+        "(validated 8, exploratory 1)."
+    ) in markdown
+    assert "disease-relevant cell states" in markdown
+    assert "IPF cell states" not in markdown
+
+
 def test_part4_synthesis_does_not_reuse_drug_report_sections_verbatim(
     tmp_path: Path,
 ) -> None:
