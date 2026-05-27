@@ -529,6 +529,40 @@ def test_report_mvp_validation_fails_without_assessment_results(tmp_path: Path) 
     assert "sha256" not in self_artifact
 
 
+def test_report_mvp_failure_removes_stale_part4_artifact(tmp_path: Path) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    state = {
+        "data_dir": str(workspace),
+        "disease": "idiopathic pulmonary fibrosis",
+        "report_finalization_error": None,
+        "evidence_truncated": False,
+    }
+    first_result = asyncio.run(finalize_report_mvp(state, {}))
+    part4_path = workspace / "part4_therapeutic_synthesis.md"
+
+    assert first_result["report_finalization_error"] is None
+    assert part4_path.exists()
+
+    (workspace / "evidence" / "assessment_results.json").unlink()
+    second_result = asyncio.run(finalize_report_mvp(state, {}))
+
+    assert second_result["evidence_truncated"] is False
+    assert second_result["report_finalization_error"].startswith(
+        "deterministic_report_validation_failed:"
+    )
+    assert not part4_path.exists()
+    validation = json.loads(
+        (workspace / "report_validation.json").read_text(encoding="utf-8")
+    )
+    assert validation["valid"] is False
+    assert any(
+        issue["code"] == "MISSING_REQUIRED_EVIDENCE"
+        for issue in validation["issues"]
+    )
+
+
 @pytest.mark.parametrize(
     "filename",
     [

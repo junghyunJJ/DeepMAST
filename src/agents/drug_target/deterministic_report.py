@@ -1238,6 +1238,8 @@ def render_report_markdown(
 
 async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
     base = Path(state["data_dir"]).expanduser().resolve()
+    part4_path = base / PART4_SYNTHESIS_FILENAME
+    part4_path.unlink(missing_ok=True)
     report_data = build_report_data(str(base), str(state.get("disease") or ""))
     _write_json(base / "report_data.json", report_data)
 
@@ -1315,7 +1317,7 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
         validation=pre_part4_validation,
         interpretations_payload=interpretations_payload,
     )
-    (base / PART4_SYNTHESIS_FILENAME).write_text(
+    part4_path.write_text(
         render_part4_therapeutic_synthesis_markdown(part4_synthesis),
         encoding="utf-8",
     )
@@ -1324,6 +1326,7 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
     _add_self_validation_artifact(validation)
     _write_json(base / "report_validation.json", validation)
     if not validation["valid"]:
+        part4_path.unlink(missing_ok=True)
         reason = validation["issues"][0].get("code", "UNKNOWN")
         return {
             "report_finalization_error": (
