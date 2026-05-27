@@ -118,3 +118,143 @@ def patched_env(values: dict[str, str | None]) -> Iterator[None]:
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+
+
+def validate_trial_output(
+    run_id: str,
+    workspace: Path,
+    *,
+    elapsed_s: float,
+    error: str | None,
+) -> dict[str, Any]:
+    report_path = workspace / "evidence" / "hypothesis_report.json"
+    completion = json.loads(
+        check_hypothesis_completion.invoke({"data_dir": str(workspace)})
+    )
+    if error is not None:
+        return {
+            "run_id": run_id,
+            "workspace": str(workspace),
+            "hypothesis_report": str(report_path),
+            "success": False,
+            "validation_passed": False,
+            "elapsed_s": round(elapsed_s, 3),
+            "error": error,
+            "completion": completion,
+            "report_summary": None,
+        }
+    if not report_path.exists():
+        return {
+            "run_id": run_id,
+            "workspace": str(workspace),
+            "hypothesis_report": str(report_path),
+            "success": False,
+            "validation_passed": False,
+            "elapsed_s": round(elapsed_s, 3),
+            "error": "hypothesis_report.json missing",
+            "completion": completion,
+            "report_summary": None,
+        }
+    try:
+        report = read_json(report_path)
+    except Exception as exc:
+        return {
+            "run_id": run_id,
+            "workspace": str(workspace),
+            "hypothesis_report": str(report_path),
+            "success": False,
+            "validation_passed": False,
+            "elapsed_s": round(elapsed_s, 3),
+            "error": f"{type(exc).__name__}: {exc}",
+            "completion": completion,
+            "report_summary": None,
+        }
+    summary = summarize_report(report)
+    validation_passed = (
+        bool(completion.get("hypothesis_complete"))
+        and not summary["topn_missing"]
+        and summary["unverified_numeric_predictions"] == 0
+    )
+    return {
+        "run_id": run_id,
+        "workspace": str(workspace),
+        "hypothesis_report": str(report_path),
+        "success": True,
+        "validation_passed": validation_passed,
+        "elapsed_s": round(elapsed_s, 3),
+        "error": None,
+        "completion": completion,
+        "report_summary": summary,
+    }
+
+
+async def run_hypothesis_writer_once(
+    workspace: Path,
+    *,
+    disease: str,
+    provider: str,
+    timeout_s: int,
+) -> None:
+    from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
+
+    env = {
+        "DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR": "1",
+        "DRUG_TARGET_DATA_DIR": str(workspace),
+        "DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK": None,
+    }
+    with patched_env(env):
+        config = DrugTargetConfig(
+            provider=provider,  # type: ignore[arg-type]
+            data_dir=str(workspace),
+            disease=disease,
+            use_checkpointer=False,
+        )
+        agent, backend = create_drug_target_agent(config)
+        try:
+            await asyncio.wait_for(
+                agent.ainvoke(
+                    {
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": (
+                                    "Run resume-mode hypothesis generation only. "
+                                    "Use the hypothesis_writer subagent and save "
+                                    "evidence/hypothesis_report.json."
+                                ),
+                            }
+                        ]
+                    },
+                    config={"configurable": {"thread_id": str(uuid.uuid4())}},
+                ),
+                timeout=timeout_s,
+            )
+        finally:
+            if backend is not None and hasattr(backend, "cleanup"):
+                backend.cleanup()  # type: ignore[union-attr]
+
+
+async def run_trial(
+    *,
+    run_id: str,
+    source: Path,
+    workspace_root: Path,
+    disease: str,
+    provider: str,
+    timeout_s: int,
+    force: bool,
+) -> dict[str, Any]:
+    workspace = prepare_trial_workspace(source, workspace_root, run_id, force=force)
+    started = time.time()
+    error = None
+    try:
+        await run_hypothesis_writer_once(
+            workspace,
+            disease=disease,
+            provider=provider,
+            timeout_s=timeout_s,
+        )
+    except Exception as exc:
+        error = f"{type(exc).__name__}: {exc}"
+    elapsed = time.time() - started
+    return validate_trial_output(run_id, workspace, elapsed_s=elapsed, error=error)

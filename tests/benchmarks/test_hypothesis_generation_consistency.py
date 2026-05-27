@@ -14,6 +14,7 @@ from docs.benchmarks.hypothesis_generation_consistency.analysis import (
 from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
     check_hypothesis_scope,
     prepare_trial_workspace,
+    validate_trial_output,
 )
 
 
@@ -199,3 +200,15 @@ def test_check_hypothesis_scope_reports_loader_errors(tmp_path: Path) -> None:
     assert result["scope"] == "hypothesis"
     assert result["file_count"] == 0
     assert result["errors"]
+
+
+def test_validate_trial_output_marks_missing_report_as_failure(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    (workspace / "evidence").mkdir(parents=True)
+    row = validate_trial_output("run_01", workspace, elapsed_s=1.25, error=None)
+    assert row["run_id"] == "run_01"
+    assert row["success"] is False
+    assert row["validation_passed"] is False
+    assert "hypothesis_report.json missing" in row["error"]
