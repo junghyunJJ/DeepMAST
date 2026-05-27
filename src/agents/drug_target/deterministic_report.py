@@ -1148,7 +1148,12 @@ def _persist_target_assessment_if_applicable(
     ]
 
 
-def _artifact_validation(base: Path, report_data: dict[str, Any]) -> dict[str, Any]:
+def _artifact_validation(
+    base: Path,
+    report_data: dict[str, Any],
+    *,
+    require_part4: bool = True,
+) -> dict[str, Any]:
     issues = validate_report_data(report_data)
     artifacts: dict[str, dict[str, Any]] = {}
     required_artifacts = [
@@ -1156,6 +1161,8 @@ def _artifact_validation(base: Path, report_data: dict[str, Any]) -> dict[str, A
         "drug.md",
         "drug_report.html",
     ]
+    if require_part4:
+        required_artifacts.append(PART4_SYNTHESIS_FILENAME)
     if (base / "lr_candidates.json").exists():
         required_artifacts.append("target_assessment.json")
     for name in required_artifacts:
@@ -1178,7 +1185,7 @@ def _artifact_validation(base: Path, report_data: dict[str, Any]) -> dict[str, A
             )
         artifacts[name] = metadata
 
-    for name in ("drug.md", "drug_report.html"):
+    for name in ("drug.md", "drug_report.html", PART4_SYNTHESIS_FILENAME):
         path = base / name
         if not path.exists():
             continue
@@ -1236,7 +1243,7 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
 
     issues = validate_report_data(report_data)
     if issues:
-        validation = _artifact_validation(base, report_data)
+        validation = _artifact_validation(base, report_data, require_part4=False)
         validation["valid"] = False
         validation["issues"] = issues
         _add_self_validation_artifact(validation)
@@ -1284,10 +1291,36 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
         report_data,
     )
 
-    validation = _artifact_validation(base, report_data)
+    pre_part4_validation = _artifact_validation(
+        base,
+        report_data,
+        require_part4=False,
+    )
     if target_assessment_issues:
-        validation["valid"] = False
-        validation["issues"].extend(target_assessment_issues)
+        pre_part4_validation["valid"] = False
+        pre_part4_validation["issues"].extend(target_assessment_issues)
+    if not pre_part4_validation["valid"]:
+        _add_self_validation_artifact(pre_part4_validation)
+        _write_json(base / "report_validation.json", pre_part4_validation)
+        reason = pre_part4_validation["issues"][0].get("code", "UNKNOWN")
+        return {
+            "report_finalization_error": (
+                f"deterministic_report_validation_failed: {reason}"
+            ),
+            "evidence_truncated": False,
+        }
+
+    part4_synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=pre_part4_validation,
+        interpretations_payload=interpretations_payload,
+    )
+    (base / PART4_SYNTHESIS_FILENAME).write_text(
+        render_part4_therapeutic_synthesis_markdown(part4_synthesis),
+        encoding="utf-8",
+    )
+
+    validation = _artifact_validation(base, report_data)
     _add_self_validation_artifact(validation)
     _write_json(base / "report_validation.json", validation)
     if not validation["valid"]:
@@ -1298,16 +1331,6 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
             ),
             "evidence_truncated": False,
         }
-
-    part4_synthesis = build_part4_therapeutic_synthesis(
-        report_data,
-        validation=validation,
-        interpretations_payload=interpretations_payload,
-    )
-    (base / PART4_SYNTHESIS_FILENAME).write_text(
-        render_part4_therapeutic_synthesis_markdown(part4_synthesis),
-        encoding="utf-8",
-    )
 
     return {
         "report_finalization_error": None,

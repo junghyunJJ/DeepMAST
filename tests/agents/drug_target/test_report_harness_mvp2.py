@@ -77,6 +77,7 @@ def test_harness_writes_diagnostics_for_successful_no_llm_report(
         "report_data.json",
         "drug.md",
         "drug_report.html",
+        "part4_therapeutic_synthesis.md",
         "report_validation.json",
     ):
         assert diagnostics["artifacts"][name]["exists"] is True
@@ -391,6 +392,7 @@ def test_mvp2_harness_contract_keeps_deepagents_out_of_artifact_authoring() -> N
         "report_data_json",
         "drug_md",
         "drug_report_html",
+        "part4_therapeutic_synthesis_md",
         "report_validation_json",
         "report_harness_diagnostics_json",
         "final_success_or_failure",

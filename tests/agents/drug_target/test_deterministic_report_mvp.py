@@ -135,6 +135,9 @@ def test_report_mvp_renders_without_llm(tmp_path: Path) -> None:
     validation = json.loads(
         (workspace / "report_validation.json").read_text(encoding="utf-8")
     )
+    part4_artifact = validation["artifacts"]["part4_therapeutic_synthesis.md"]
+    assert part4_artifact["exists"] is True
+    assert part4_artifact["size_bytes"] > 0
     self_artifact = validation["artifacts"]["report_validation.json"]
     assert self_artifact["exists"] is True
     assert "size_bytes" not in self_artifact

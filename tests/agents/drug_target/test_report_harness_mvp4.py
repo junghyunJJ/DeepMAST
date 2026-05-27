@@ -77,6 +77,9 @@ def test_harness_success_includes_mvp4_checks(tmp_path: Path) -> None:
     checks = diagnostics["checks"]
 
     assert diagnostics["valid"] is True
+    part4_artifact = diagnostics["artifacts"]["part4_therapeutic_synthesis.md"]
+    assert part4_artifact["exists"] is True
+    assert part4_artifact["size_bytes"] > 0
     assert checks["artifact_validity"]["status"] == "pass"
     assert checks["source_consistency"]["status"] == "pass"
     assert checks["target_assessment"]["status"] == "skipped"
