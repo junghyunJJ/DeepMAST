@@ -131,6 +131,30 @@ def test_part4_candidate_selector_enabled_by_config(monkeypatch) -> None:
     )
 
 
+def test_provider_from_config_returns_explicit_provider(monkeypatch) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        ENABLE_PART4_CANDIDATE_SELECTOR_ENV,
+        PART4_CANDIDATE_SELECTOR_PROVIDER_CONFIG_KEY,
+        part4_candidate_selector_provider_from_config,
+    )
+
+    monkeypatch.delenv(ENABLE_PART4_CANDIDATE_SELECTOR_ENV, raising=False)
+
+    def provider(prompt: str) -> str:
+        return prompt
+
+    assert (
+        part4_candidate_selector_provider_from_config(
+            {
+                "configurable": {
+                    PART4_CANDIDATE_SELECTOR_PROVIDER_CONFIG_KEY: provider,
+                }
+            }
+        )
+        is provider
+    )
+
+
 def test_context_uses_only_stage3_pool_and_excludes_non_stage3_cxcr4(
     tmp_path: Path,
 ) -> None:
@@ -494,4 +518,175 @@ def test_part4_candidate_selection_fallback_records_deterministic_selection() ->
     assert fallback["attempt_history"] is attempt_history
     assert fallback["evidence_references"] == (
         PART4_CANDIDATE_SELECTION_EVIDENCE_REFERENCES
+    )
+
+
+@pytest.mark.asyncio
+async def test_generate_candidate_selection_accepts_fake_provider(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+        generate_part4_candidate_selection,
+    )
+
+    prompts: list[str] = []
+
+    def provider(prompt: str) -> str:
+        prompts.append(prompt)
+        return json.dumps(
+            {
+                "schema_version": PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+                "mode": "llm_rerank",
+                "selected_genes": ["CD47", "ITGB2", "ICAM1"],
+                "selection_rationales": {
+                    "CD47": "Strong bounded evidence for immune checkpoint biology.",
+                    "ITGB2": "Adhesion axis support with high actionability score.",
+                    "ICAM1": "Linked hypothesis and preclinical drug evidence.",
+                },
+                "excluded_high_score_candidates": {
+                    "FN1": "Lower target actionability in the bounded context."
+                },
+                "evidence_references": ["drug.md", "report_data.json"],
+            }
+        )
+
+    payload = await generate_part4_candidate_selection(
+        _minimal_report_data(),
+        deterministic_selected_genes=["ICAM1", "ITGB2", "CD47"],
+        provider=provider,
+        data_dir=tmp_path,
+    )
+
+    assert len(prompts) == 1
+    assert "Context JSON:" in prompts[0]
+    assert payload["status"] == "accepted"
+    assert payload["fallback_reason"] is None
+    assert payload["selected_genes"] == ["CD47", "ITGB2", "ICAM1"]
+    assert payload["llm_selected_genes"] == ["CD47", "ITGB2", "ICAM1"]
+    assert payload["deterministic_selected_genes"] == ["ICAM1", "ITGB2", "CD47"]
+    assert payload["validation_issues"] == []
+    assert payload["attempt_history"] == [
+        {"attempt": 1, "status": "accepted", "issues": []}
+    ]
+    assert payload["evidence_references"] == ["drug.md", "report_data.json"]
+
+
+@pytest.mark.parametrize(
+    ("evidence_references", "expected_code"),
+    [
+        (None, "MISSING_EVIDENCE_REFERENCES"),
+        ([], "MISSING_EVIDENCE_REFERENCES"),
+        (["fabricated.json"], "UNSUPPORTED_EVIDENCE_REFERENCE"),
+        (["PROMPT_LEAK:" + ("x" * 2000)], "EVIDENCE_REFERENCE_TOO_LONG"),
+        (["drug.md"] * 13, "TOO_MANY_EVIDENCE_REFERENCES"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_generate_candidate_selection_rejects_unsafe_evidence_references(
+    evidence_references: list[str] | None,
+    expected_code: str,
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+        generate_part4_candidate_selection,
+    )
+
+    def provider(_prompt: str) -> str:
+        payload = {
+            "schema_version": PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+            "mode": "llm_rerank",
+            "selected_genes": ["CD47", "ITGB2", "ICAM1"],
+            "selection_rationales": {
+                "CD47": "Strong bounded evidence for immune checkpoint biology.",
+                "ITGB2": "Adhesion axis support with high actionability score.",
+                "ICAM1": "Linked hypothesis and preclinical drug evidence.",
+            }
+        }
+        if evidence_references is not None:
+            payload["evidence_references"] = evidence_references
+        return json.dumps(payload)
+
+    payload = await generate_part4_candidate_selection(
+        _minimal_report_data(),
+        deterministic_selected_genes=["ICAM1", "ITGB2", "CD47"],
+        provider=provider,
+        data_dir=tmp_path,
+    )
+
+    assert payload["status"] == "fallback"
+    assert payload["fallback_reason"] == "validation_failed"
+    assert payload["selected_genes"] == ["ICAM1", "ITGB2", "CD47"]
+    assert payload["attempt_history"][0]["status"] == "rejected"
+    assert expected_code in {
+        issue["code"] for issue in payload["validation_issues"]
+    }
+
+
+@pytest.mark.asyncio
+async def test_generate_candidate_selection_falls_back_on_invalid_provider_output(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+        generate_part4_candidate_selection,
+    )
+
+    def provider(_prompt: str) -> str:
+        return json.dumps(
+            {
+                "schema_version": PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+                "mode": "llm_rerank",
+                "selected_genes": ["CD47", "ITGB2", "CXCR4"],
+                "selection_rationales": {
+                    "CD47": "Strong bounded evidence for immune checkpoint biology.",
+                    "ITGB2": "Adhesion axis support with high actionability score.",
+                    "CXCR4": "Excluded non-stage3 candidate selected by provider.",
+                },
+            }
+        )
+
+    payload = await generate_part4_candidate_selection(
+        _minimal_report_data(),
+        deterministic_selected_genes=["ICAM1", "ITGB2", "CD47"],
+        provider=provider,
+        data_dir=tmp_path,
+    )
+
+    assert payload["status"] == "fallback"
+    assert payload["fallback_reason"] == "validation_failed"
+    assert payload["selected_genes"] == ["ICAM1", "ITGB2", "CD47"]
+    assert payload["attempt_history"][0]["status"] == "rejected"
+    assert "GENE_OUTSIDE_STAGE3_POOL" in {
+        issue["code"] for issue in payload["validation_issues"]
+    }
+
+
+@pytest.mark.asyncio
+async def test_generate_candidate_selection_falls_back_on_provider_error(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        generate_part4_candidate_selection,
+    )
+
+    def provider(_prompt: str) -> str:
+        raise RuntimeError("provider unavailable")
+
+    payload = await generate_part4_candidate_selection(
+        _minimal_report_data(),
+        deterministic_selected_genes=["ICAM1", "ITGB2", "CD47"],
+        provider=provider,
+        data_dir=tmp_path,
+    )
+
+    assert payload["status"] == "fallback"
+    assert payload["fallback_reason"] == "provider_error"
+    assert payload["selected_genes"] == ["ICAM1", "ITGB2", "CD47"]
+    assert payload["attempt_history"][0]["status"] == "provider_error"
+    assert payload["validation_issues"][0]["code"] == "PART4_SELECTOR_PROVIDER_ERROR"
+    assert (
+        payload["attempt_history"][0]["issues"][0]["code"]
+        == "PART4_SELECTOR_PROVIDER_ERROR"
     )

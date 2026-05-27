@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 
 PART4_CANDIDATE_SELECTION_SCHEMA_VERSION = (
@@ -25,6 +26,8 @@ MAX_RATIONALE_CHARS = 500
 MAX_EXCLUDED_RATIONALE_CHARS = 500
 MAX_DRUG_MD_EXCERPT_CHARS = 6000
 MAX_CONTEXT_CHARS = 30000
+MAX_EVIDENCE_REFERENCE_COUNT = 12
+MAX_EVIDENCE_REFERENCE_CHARS = 160
 PART4_CANDIDATE_SELECTION_EVIDENCE_REFERENCES = [
     "drug.md",
     "report_data.json",
@@ -58,6 +61,34 @@ def part4_candidate_selector_enabled(config: Mapping[str, Any] | None) -> bool:
 
     env_value = os.getenv(ENABLE_PART4_CANDIDATE_SELECTOR_ENV, "")
     return env_value.strip().lower() in _TRUTHY_ENV_VALUES
+
+
+def part4_candidate_selector_provider_from_config(
+    config: Mapping[str, Any] | None,
+) -> Callable[[str], object] | None:
+    """Resolve the optional Part 4 selector provider from config or LLM setup."""
+
+    configurable = config.get("configurable") if isinstance(config, Mapping) else None
+    if (
+        isinstance(configurable, Mapping)
+        and PART4_CANDIDATE_SELECTOR_PROVIDER_CONFIG_KEY in configurable
+    ):
+        return cast(
+            Callable[[str], object] | None,
+            configurable.get(PART4_CANDIDATE_SELECTOR_PROVIDER_CONFIG_KEY),
+        )
+
+    if not part4_candidate_selector_enabled(config):
+        return None
+
+    try:
+        from src.agents.model import create_llm_from_config
+
+        llm = create_llm_from_config(cast(Any, config))
+    except Exception as exc:  # noqa: BLE001
+        return _provider_creation_error_provider(exc)
+
+    return _live_llm_selector_provider(llm)
 
 
 def build_part4_candidate_selection_context(
@@ -139,10 +170,12 @@ def validate_part4_candidate_selection_output(
     raw_output: object,
     *,
     allowed_candidates: list[str],
+    allowed_evidence_references: list[str] | None = None,
 ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     """Validate and normalize strict JSON output from the Part 4 selector."""
 
     allowed = {_gene_text(gene) for gene in allowed_candidates if _safe_text(gene)}
+    allowed_references = _allowed_evidence_reference_set(allowed_evidence_references)
     issues: list[dict[str, Any]] = []
 
     if not isinstance(raw_output, str):
@@ -230,6 +263,13 @@ def validate_part4_candidate_selection_output(
                     limit=MAX_EXCLUDED_RATIONALE_CHARS,
                 )
 
+    evidence_references_value = payload.get("evidence_references", [])
+    evidence_references, evidence_reference_issues = _validate_evidence_references(
+        evidence_references_value,
+        allowed_references=allowed_references,
+    )
+    issues.extend(evidence_reference_issues)
+
     if issues:
         return None, issues
 
@@ -240,9 +280,7 @@ def validate_part4_candidate_selection_output(
             "selected_genes": selected_genes,
             "selection_rationales": selection_rationales,
             "excluded_high_score_candidates": excluded_high_score_candidates,
-            "evidence_references": _string_list(
-                payload.get("evidence_references")
-            ),
+            "evidence_references": evidence_references,
         },
         [],
     )
@@ -283,6 +321,128 @@ def build_part4_candidate_selection_fallback(
         "attempt_history": attempt_history,
         "evidence_references": PART4_CANDIDATE_SELECTION_EVIDENCE_REFERENCES,
     }
+
+
+async def generate_part4_candidate_selection(
+    report_data: Mapping[str, Any],
+    *,
+    deterministic_selected_genes: list[str],
+    provider: Callable[[str], object] | None,
+    data_dir: str | Path | None,
+) -> dict[str, Any]:
+    """Generate accepted LLM selector audit or deterministic fallback payload."""
+
+    context = build_part4_candidate_selection_context(
+        report_data,
+        deterministic_selected_genes=deterministic_selected_genes,
+        data_dir=data_dir,
+    )
+    allowed_candidates = _string_list(context.get("allowed_candidates"))
+    allowed_evidence_references = _allowed_evidence_references(
+        _string_list(context.get("evidence_references"))
+    )
+
+    if provider is None:
+        return build_part4_candidate_selection_fallback(
+            allowed_candidates=allowed_candidates,
+            deterministic_selected_genes=deterministic_selected_genes,
+            fallback_reason="disabled",
+            validation_issues=[],
+            attempt_history=[],
+        )
+
+    prompt = build_part4_candidate_selection_prompt(context)
+    try:
+        raw_output = await _call_provider(provider, prompt)
+    except Exception as exc:  # noqa: BLE001
+        issue = _validation_issue(
+            "PART4_SELECTOR_PROVIDER_ERROR",
+            message=_bounded_text(exc, limit=300),
+        )
+        return build_part4_candidate_selection_fallback(
+            allowed_candidates=allowed_candidates,
+            deterministic_selected_genes=deterministic_selected_genes,
+            fallback_reason="provider_error",
+            validation_issues=[issue],
+            attempt_history=[
+                {"attempt": 1, "status": "provider_error", "issues": [issue]}
+            ],
+        )
+
+    accepted, issues = validate_part4_candidate_selection_output(
+        raw_output,
+        allowed_candidates=allowed_candidates,
+        allowed_evidence_references=allowed_evidence_references,
+    )
+    if accepted is None:
+        return build_part4_candidate_selection_fallback(
+            allowed_candidates=allowed_candidates,
+            deterministic_selected_genes=deterministic_selected_genes,
+            fallback_reason="validation_failed",
+            validation_issues=issues,
+            attempt_history=[
+                {"attempt": 1, "status": "rejected", "issues": issues}
+            ],
+        )
+
+    selected_genes = _string_list(accepted.get("selected_genes"))
+    evidence_references = _string_list(accepted.get("evidence_references"))
+    return {
+        "schema_version": PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+        "created_at": datetime.now(UTC).isoformat(),
+        "mode": "llm_rerank",
+        "status": "accepted",
+        "fallback_reason": None,
+        "selected_genes": selected_genes,
+        "deterministic_selected_genes": [
+            _gene_text(gene)
+            for gene in deterministic_selected_genes
+            if _safe_text(gene)
+        ],
+        "llm_selected_genes": selected_genes,
+        "allowed_candidates": allowed_candidates,
+        "selection_rationales": accepted["selection_rationales"],
+        "excluded_high_score_candidates": accepted["excluded_high_score_candidates"],
+        "validation_issues": [],
+        "attempt_history": [{"attempt": 1, "status": "accepted", "issues": []}],
+        "evidence_references": evidence_references,
+    }
+
+
+def _provider_creation_error_provider(exc: Exception) -> Callable[[str], object]:
+    def provider(prompt: str) -> object:
+        raise RuntimeError(
+            f"part4 candidate selector provider unavailable: {exc}"
+        ) from exc
+
+    return provider
+
+
+def _live_llm_selector_provider(llm: object) -> Callable[[str], object]:
+    async def provider(prompt: str) -> object:
+        from langchain_core.messages import HumanMessage
+
+        messages = [HumanMessage(content=prompt)]
+        ainvoke = getattr(llm, "ainvoke", None)
+        invoke = getattr(llm, "invoke", None)
+        if callable(ainvoke):
+            response = await cast(Callable[[object], Awaitable[object]], ainvoke)(
+                messages
+            )
+        elif callable(invoke):
+            response = cast(Callable[[object], object], invoke)(messages)
+        else:
+            raise TypeError("part4 candidate selector LLM provider has no invoke method")
+        return _message_content_to_text(response)
+
+    return provider
+
+
+async def _call_provider(provider: Callable[[str], object], prompt: str) -> object:
+    result = provider(prompt)
+    if inspect.isawaitable(result):
+        return await cast(Awaitable[object], result)
+    return result
 
 
 def _message_content_to_text(response: object) -> str:
@@ -326,6 +486,74 @@ def _validation_issue(code: str, **extra: Any) -> dict[str, Any]:
     issue: dict[str, Any] = {"code": code}
     issue.update(extra)
     return issue
+
+
+def _allowed_evidence_references(context_references: list[str] | None) -> list[str]:
+    references: list[str] = []
+    seen: set[str] = set()
+    for reference in [
+        *PART4_CANDIDATE_SELECTION_EVIDENCE_REFERENCES,
+        *(context_references or []),
+    ]:
+        text = _safe_text(reference)
+        if text and text not in seen:
+            seen.add(text)
+            references.append(text)
+    return references
+
+
+def _allowed_evidence_reference_set(
+    context_references: list[str] | None,
+) -> set[str]:
+    return set(_allowed_evidence_references(context_references))
+
+
+def _validate_evidence_references(
+    value: object,
+    *,
+    allowed_references: set[str],
+) -> tuple[list[str], list[dict[str, Any]]]:
+    if not isinstance(value, list):
+        return [], [_validation_issue("INVALID_EVIDENCE_REFERENCES_SHAPE")]
+    if not value:
+        return [], [_validation_issue("MISSING_EVIDENCE_REFERENCES")]
+
+    issues: list[dict[str, Any]] = []
+    references: list[str] = []
+    seen: set[str] = set()
+    if len(value) > MAX_EVIDENCE_REFERENCE_COUNT:
+        issues.append(_validation_issue("TOO_MANY_EVIDENCE_REFERENCES"))
+
+    for item in value:
+        if not isinstance(item, str):
+            issues.append(_validation_issue("INVALID_EVIDENCE_REFERENCE_SHAPE"))
+            continue
+
+        reference = _safe_text(item)
+        if not reference:
+            issues.append(_validation_issue("UNSUPPORTED_EVIDENCE_REFERENCE"))
+            continue
+        if len(reference) > MAX_EVIDENCE_REFERENCE_CHARS:
+            issues.append(
+                _validation_issue(
+                    "EVIDENCE_REFERENCE_TOO_LONG",
+                    length=len(reference),
+                )
+            )
+            continue
+        if reference not in allowed_references:
+            issues.append(
+                _validation_issue(
+                    "UNSUPPORTED_EVIDENCE_REFERENCE",
+                    reference=reference,
+                )
+            )
+            continue
+        if reference not in seen:
+            seen.add(reference)
+            references.append(reference)
+
+    return references, issues
 
 
 def _reject_json_constant(value: str) -> None:
