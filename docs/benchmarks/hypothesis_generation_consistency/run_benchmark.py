@@ -135,7 +135,8 @@ def validate_trial_output(
     if report_path.exists():
         try:
             report = read_json(report_path)
-            report_summary = summarize_report(report)
+            if isinstance(report, dict):
+                report_summary = summarize_report(report)
         except Exception:
             report_summary = None
     if error is not None:
@@ -176,12 +177,26 @@ def validate_trial_output(
             "completion": completion,
             "report_summary": None,
         }
+    if not isinstance(report, dict):
+        return {
+            "run_id": run_id,
+            "workspace": str(workspace),
+            "hypothesis_report": str(report_path),
+            "success": False,
+            "validation_passed": False,
+            "elapsed_s": round(elapsed_s, 3),
+            "error": (
+                "hypothesis_report.json must be a JSON object; "
+                f"got {type(report).__name__}"
+            ),
+            "completion": completion,
+            "report_summary": None,
+        }
     summary = summarize_report(report)
     validation_passed = (
         bool(completion.get("hypothesis_complete"))
         and summary["schema_version"] == "hypothesis_report.v2"
         and summary["hypothesis_count"] > 0
-        and isinstance(report, dict)
         and isinstance(report.get("topn_coverage"), dict)
         and isinstance(report.get("prediction_grounding_summary"), dict)
         and not summary["topn_missing"]

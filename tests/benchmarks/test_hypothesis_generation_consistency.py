@@ -244,6 +244,21 @@ def test_validate_trial_output_rejects_structurally_empty_reports(
     assert row["validation_passed"] is False
 
 
+def test_validate_trial_output_rejects_non_object_report(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    evidence = workspace / "evidence"
+    evidence.mkdir(parents=True)
+    (evidence / "hypothesis_report.json").write_text("[]", encoding="utf-8")
+
+    row = validate_trial_output("run_01", workspace, elapsed_s=1.25, error=None)
+
+    assert row["success"] is False
+    assert row["validation_passed"] is False
+    assert row["report_summary"] is None
+    assert "JSON object" in row["error"]
+    assert "list" in row["error"]
+
+
 def test_validate_trial_output_includes_summary_when_invocation_errors_after_report(
     tmp_path: Path,
 ) -> None:
