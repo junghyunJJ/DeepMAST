@@ -15,6 +15,11 @@ from typing import Any
 from jinja2 import BaseLoader, Environment
 from langchain_core.runnables import RunnableConfig
 
+from src.agents.drug_target.therapeutic_synthesis import (
+    PART4_SYNTHESIS_FILENAME,
+    build_part4_therapeutic_synthesis,
+    render_part4_therapeutic_synthesis_markdown,
+)
 from src.agents.drug_target.tools.scoring_metadata import NOVELTY_OPPORTUNITY_LEGEND
 
 
@@ -1245,6 +1250,7 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
         }
 
     interpretations: dict[str, Any] | None = None
+    interpretations_payload: dict[str, Any] | None = None
     from src.agents.drug_target.report_interpretations import (
         generate_report_interpretations,
         interpretation_provider_from_config,
@@ -1255,14 +1261,17 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
     if report_interpretations_enabled(config):
         provider = interpretation_provider_from_config(config)
         if provider is not None:
-            payload, interpretations = await generate_report_interpretations(
+            (
+                interpretations_payload,
+                interpretations,
+            ) = await generate_report_interpretations(
                 report_data,
                 provider,
                 max_attempts=resolve_interpretation_max_attempts(config),
             )
         else:
-            payload, interpretations = {}, {}
-        _write_json(base / "report_interpretations.json", payload)
+            interpretations_payload, interpretations = {}, {}
+        _write_json(base / "report_interpretations.json", interpretations_payload)
 
     markdown = render_report_markdown(report_data, interpretations=interpretations)
     (base / "drug.md").write_text(markdown, encoding="utf-8")
@@ -1289,6 +1298,16 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
             ),
             "evidence_truncated": False,
         }
+
+    part4_synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=validation,
+        interpretations_payload=interpretations_payload,
+    )
+    (base / PART4_SYNTHESIS_FILENAME).write_text(
+        render_part4_therapeutic_synthesis_markdown(part4_synthesis),
+        encoding="utf-8",
+    )
 
     return {
         "report_finalization_error": None,

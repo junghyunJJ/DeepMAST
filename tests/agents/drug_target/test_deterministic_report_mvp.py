@@ -130,6 +130,7 @@ def test_report_mvp_renders_without_llm(tmp_path: Path) -> None:
     assert (workspace / "report_data.json").exists()
     assert (workspace / "drug.md").exists()
     assert (workspace / "drug_report.html").exists()
+    assert (workspace / "part4_therapeutic_synthesis.md").exists()
     assert (workspace / "report_validation.json").exists()
     validation = json.loads(
         (workspace / "report_validation.json").read_text(encoding="utf-8")
@@ -143,6 +144,13 @@ def test_report_mvp_renders_without_llm(tmp_path: Path) -> None:
     assert "# Therapeutic Target Assessment Report" in rendered_text
     assert "## 1. Executive Summary" in rendered_text
     assert "EXPAND" not in rendered_text
+    part4_text = (workspace / "part4_therapeutic_synthesis.md").read_text(
+        encoding="utf-8"
+    )
+    assert part4_text.startswith("# Part 4: Therapeutic Synthesis")
+    assert part4_text != rendered_text
+    assert "## Candidate Triage" in part4_text
+    assert "EXPAND" not in part4_text
 
 
 def test_report_mvp_never_creates_llm(
@@ -503,6 +511,7 @@ def test_report_mvp_validation_fails_without_assessment_results(tmp_path: Path) 
     assert result["report_finalization_error"].startswith(
         "deterministic_report_validation_failed:"
     )
+    assert not (workspace / "part4_therapeutic_synthesis.md").exists()
     validation = json.loads(
         (workspace / "report_validation.json").read_text(encoding="utf-8")
     )
@@ -549,6 +558,7 @@ def test_report_mvp_validation_fails_for_malformed_required_json(
     assert result["report_finalization_error"].startswith(
         "deterministic_report_validation_failed:"
     )
+    assert not (workspace / "part4_therapeutic_synthesis.md").exists()
     validation = json.loads(
         (workspace / "report_validation.json").read_text(encoding="utf-8")
     )
