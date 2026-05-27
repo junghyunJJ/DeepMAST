@@ -79,6 +79,7 @@ async def test_finalize_report_uses_deterministic_mvp_without_llm(
     assert (workspace / "report_data.json").exists()
     assert (workspace / "drug.md").exists()
     assert (workspace / "drug_report.html").exists()
+    assert (workspace / "part4_therapeutic_synthesis.md").exists()
     assert (workspace / "report_validation.json").exists()
     assert not (workspace / "report_expansions.json").exists()
     assert not (workspace / "report_interpretations.json").exists()
@@ -144,6 +145,10 @@ async def test_finalize_report_mvp_writes_accepted_interpretations_when_enabled(
     assert payload["enabled"] is True
     assert payload["summary"]["accepted"] >= 1
     assert accepted_text in (workspace / "drug.md").read_text(encoding="utf-8")
+    part4_text = (workspace / "part4_therapeutic_synthesis.md").read_text(
+        encoding="utf-8"
+    )
+    assert f"accepted={payload['summary']['accepted']}" in part4_text
 
 
 @pytest.mark.asyncio
@@ -268,6 +273,7 @@ async def test_finalize_report_preserves_deterministic_failure_envelope(
     assert result["report_finalization_error"].startswith(
         "deterministic_report_validation_failed:"
     )
+    assert not (workspace / "part4_therapeutic_synthesis.md").exists()
 
     validation = json.loads(
         (workspace / "report_validation.json").read_text(encoding="utf-8")

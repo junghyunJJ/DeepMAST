@@ -15,6 +15,7 @@ from langchain_core.runnables import RunnableConfig
 
 from src.agents.drug_target.deterministic_report import finalize_report_mvp
 from src.agents.drug_target.evidence_filenames import EvidenceFiles
+from src.agents.drug_target.therapeutic_synthesis import PART4_SYNTHESIS_FILENAME
 from src.agents.drug_target.tools.assessment_output import (
     validate_target_assessment_file,
 )
@@ -28,6 +29,7 @@ REQUIRED_REPORT_ARTIFACTS = (
     "report_data.json",
     "drug.md",
     "drug_report.html",
+    PART4_SYNTHESIS_FILENAME,
     "report_validation.json",
 )
 OPTIONAL_LEGACY_ARTIFACTS = (
@@ -58,6 +60,7 @@ DETERMINISTIC_CODE_OWNS = (
     "report_data_json",
     "drug_md",
     "drug_report_html",
+    "part4_therapeutic_synthesis_md",
     "report_validation_json",
     "report_harness_diagnostics_json",
     "final_success_or_failure",
@@ -166,7 +169,7 @@ def _artifact_issues(
                     "error": metadata.get("json_error"),
                 }
             )
-    for name in ("drug.md", "drug_report.html"):
+    for name in ("drug.md", "drug_report.html", PART4_SYNTHESIS_FILENAME):
         path = base / name
         if path.exists() and _has_expand_marker(path.read_text(encoding="utf-8")):
             issues.append(

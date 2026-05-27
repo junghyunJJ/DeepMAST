@@ -15,6 +15,11 @@ from typing import Any
 from jinja2 import BaseLoader, Environment
 from langchain_core.runnables import RunnableConfig
 
+from src.agents.drug_target.therapeutic_synthesis import (
+    PART4_SYNTHESIS_FILENAME,
+    build_part4_therapeutic_synthesis,
+    render_part4_therapeutic_synthesis_markdown,
+)
 from src.agents.drug_target.tools.scoring_metadata import NOVELTY_OPPORTUNITY_LEGEND
 
 
@@ -1143,7 +1148,12 @@ def _persist_target_assessment_if_applicable(
     ]
 
 
-def _artifact_validation(base: Path, report_data: dict[str, Any]) -> dict[str, Any]:
+def _artifact_validation(
+    base: Path,
+    report_data: dict[str, Any],
+    *,
+    require_part4: bool = True,
+) -> dict[str, Any]:
     issues = validate_report_data(report_data)
     artifacts: dict[str, dict[str, Any]] = {}
     required_artifacts = [
@@ -1151,6 +1161,8 @@ def _artifact_validation(base: Path, report_data: dict[str, Any]) -> dict[str, A
         "drug.md",
         "drug_report.html",
     ]
+    if require_part4:
+        required_artifacts.append(PART4_SYNTHESIS_FILENAME)
     if (base / "lr_candidates.json").exists():
         required_artifacts.append("target_assessment.json")
     for name in required_artifacts:
@@ -1173,7 +1185,7 @@ def _artifact_validation(base: Path, report_data: dict[str, Any]) -> dict[str, A
             )
         artifacts[name] = metadata
 
-    for name in ("drug.md", "drug_report.html"):
+    for name in ("drug.md", "drug_report.html", PART4_SYNTHESIS_FILENAME):
         path = base / name
         if not path.exists():
             continue
@@ -1226,12 +1238,14 @@ def render_report_markdown(
 
 async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
     base = Path(state["data_dir"]).expanduser().resolve()
+    part4_path = base / PART4_SYNTHESIS_FILENAME
+    part4_path.unlink(missing_ok=True)
     report_data = build_report_data(str(base), str(state.get("disease") or ""))
     _write_json(base / "report_data.json", report_data)
 
     issues = validate_report_data(report_data)
     if issues:
-        validation = _artifact_validation(base, report_data)
+        validation = _artifact_validation(base, report_data, require_part4=False)
         validation["valid"] = False
         validation["issues"] = issues
         _add_self_validation_artifact(validation)
@@ -1245,6 +1259,7 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
         }
 
     interpretations: dict[str, Any] | None = None
+    interpretations_payload: dict[str, Any] | None = None
     from src.agents.drug_target.report_interpretations import (
         generate_report_interpretations,
         interpretation_provider_from_config,
@@ -1255,14 +1270,17 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
     if report_interpretations_enabled(config):
         provider = interpretation_provider_from_config(config)
         if provider is not None:
-            payload, interpretations = await generate_report_interpretations(
+            (
+                interpretations_payload,
+                interpretations,
+            ) = await generate_report_interpretations(
                 report_data,
                 provider,
                 max_attempts=resolve_interpretation_max_attempts(config),
             )
         else:
-            payload, interpretations = {}, {}
-        _write_json(base / "report_interpretations.json", payload)
+            interpretations_payload, interpretations = {}, {}
+        _write_json(base / "report_interpretations.json", interpretations_payload)
 
     markdown = render_report_markdown(report_data, interpretations=interpretations)
     (base / "drug.md").write_text(markdown, encoding="utf-8")
@@ -1275,13 +1293,40 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
         report_data,
     )
 
-    validation = _artifact_validation(base, report_data)
+    pre_part4_validation = _artifact_validation(
+        base,
+        report_data,
+        require_part4=False,
+    )
     if target_assessment_issues:
-        validation["valid"] = False
-        validation["issues"].extend(target_assessment_issues)
+        pre_part4_validation["valid"] = False
+        pre_part4_validation["issues"].extend(target_assessment_issues)
+    if not pre_part4_validation["valid"]:
+        _add_self_validation_artifact(pre_part4_validation)
+        _write_json(base / "report_validation.json", pre_part4_validation)
+        reason = pre_part4_validation["issues"][0].get("code", "UNKNOWN")
+        return {
+            "report_finalization_error": (
+                f"deterministic_report_validation_failed: {reason}"
+            ),
+            "evidence_truncated": False,
+        }
+
+    part4_synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=pre_part4_validation,
+        interpretations_payload=interpretations_payload,
+    )
+    part4_path.write_text(
+        render_part4_therapeutic_synthesis_markdown(part4_synthesis),
+        encoding="utf-8",
+    )
+
+    validation = _artifact_validation(base, report_data)
     _add_self_validation_artifact(validation)
     _write_json(base / "report_validation.json", validation)
     if not validation["valid"]:
+        part4_path.unlink(missing_ok=True)
         reason = validation["issues"][0].get("code", "UNKNOWN")
         return {
             "report_finalization_error": (
