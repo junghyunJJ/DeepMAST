@@ -234,7 +234,7 @@ def test_render_part4_synthesis_markdown_is_not_drug_md_copy(
     assert markdown.startswith("# Part 4: Therapeutic Synthesis")
     assert "## Therapeutic Opportunity Landscape" in markdown
     assert "## Candidate Triage" in markdown
-    assert "## Hypothesis-to-Intervention Map" in markdown
+    assert "## Mechanistic Intervention Map" in markdown
     assert "## Validation Next Steps" in markdown
     assert "## Confidence and Caveats" in markdown
     assert "CD4" in markdown
@@ -278,6 +278,179 @@ def test_render_part4_synthesis_has_rich_candidate_triage(
     assert "**Drug signal:**" in markdown
     assert "**Experimental discriminator:**" in markdown
     assert "IPF cell states" not in markdown
+
+
+def test_render_part4_synthesis_has_mechanistic_intervention_map(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.therapeutic_synthesis import (
+        build_part4_therapeutic_synthesis,
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+    markdown = render_part4_therapeutic_synthesis_markdown(
+        build_part4_therapeutic_synthesis(
+            report_data,
+            validation=_validation_payload(),
+            interpretations_payload=None,
+        )
+    )
+
+    assert "## Mechanistic Intervention Map" in markdown
+    assert (
+        "### Hypothesis 1: ICAM1-ITGB2 Axis Drives Fibroblast Activation "
+        "and ECM Deposition in IPF [MoA - Immune Modulation]"
+    ) in markdown
+    assert "**Category:** Mechanism of Action" in markdown
+    assert "**Genes:** ICAM1, ITGB2" in markdown
+    assert (
+        "**Pathways:** integrin signaling, cell adhesion, fibroblast activation"
+    ) in markdown
+    assert (
+        "**Cell types:** fibroblasts, immune cells, alveolar type 2 cells"
+    ) in markdown
+    assert "**Candidate compounds:** Lifitegrast" in markdown
+    assert "**Core claim:**" in markdown
+    assert "**Falsifiable prediction:**" in markdown
+    assert "**Validation design:**" in markdown
+    assert "**Evidence anchors:**" in markdown
+    assert (
+        "stage1_ICAM1--ITGB2.json, stage3_ICAM1.json, ot_ICAM1.json, "
+        "stage3_ITGB2.json, ot_ITGB2.json"
+    ) in markdown
+    assert "**Composite score:** 0.775" in markdown
+
+
+def test_render_part4_synthesis_mechanistic_map_uses_stable_fallbacks() -> None:
+    from src.agents.drug_target.therapeutic_synthesis import (
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    markdown = render_part4_therapeutic_synthesis_markdown(
+        {
+            "disease": "idiopathic pulmonary fibrosis",
+            "report_valid": True,
+            "candidate_counts": {},
+            "featured_candidates": [],
+            "hypotheses": [
+                {
+                    "rank": 1,
+                    "title": "Sparse deterministic hypothesis",
+                    "category": "Mechanism of Action",
+                    "genes": "ICAM1",
+                    "pathways": None,
+                    "cell_types": {"name": "fibroblasts"},
+                    "drugs": [],
+                    "evidence_references": None,
+                }
+            ],
+            "interpretation_summary": {},
+            "validation_issues": [],
+        }
+    )
+
+    assert "### Hypothesis 1: Sparse deterministic hypothesis" in markdown
+    assert (
+        "No explicit core claim was available in the deterministic hypothesis "
+        "artifact."
+    ) in markdown
+    assert (
+        "No explicit falsifiable prediction was available in the deterministic "
+        "hypothesis artifact."
+    ) in markdown
+    assert (
+        "No explicit validation design was available in the deterministic "
+        "hypothesis artifact."
+    ) in markdown
+    assert "No genes were recorded." in markdown
+    assert "No pathways were recorded." in markdown
+    assert "No cell types were recorded." in markdown
+    assert "No evidence references were recorded." in markdown
+    assert "No composite score was recorded." in markdown
+
+
+def test_render_part4_synthesis_bounds_mechanistic_map_fields() -> None:
+    from src.agents.drug_target.therapeutic_synthesis import (
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    long_text = "LONG_SENTINEL_" * 160
+    long_items = [f"ANCHOR_{index}_" + ("X" * 200) for index in range(8)]
+
+    markdown = render_part4_therapeutic_synthesis_markdown(
+        {
+            "disease": "idiopathic pulmonary fibrosis",
+            "report_valid": True,
+            "candidate_counts": {},
+            "featured_candidates": [],
+            "hypotheses": [
+                {
+                    "rank": 1,
+                    "title": long_text,
+                    "category": long_text,
+                    "genes": [
+                        long_text,
+                        long_text,
+                        long_text,
+                        long_text,
+                        long_text,
+                        long_text,
+                    ],
+                    "pathways": [
+                        long_text,
+                        long_text,
+                        long_text,
+                        long_text,
+                        long_text,
+                        long_text,
+                    ],
+                    "cell_types": [
+                        long_text,
+                        long_text,
+                        long_text,
+                        long_text,
+                        long_text,
+                        long_text,
+                    ],
+                    "drugs": [
+                        long_text,
+                        long_text,
+                        long_text,
+                        long_text,
+                        long_text,
+                        long_text,
+                    ],
+                    "core_claim": long_text,
+                    "falsifiable_prediction": long_text,
+                    "validation_approach": long_text,
+                    "evidence_references": long_items,
+                    "score_profile": {"composite": long_text},
+                }
+            ],
+            "interpretation_summary": {},
+            "validation_issues": [],
+        }
+    )
+
+    section = markdown.split("## Mechanistic Intervention Map", maxsplit=1)[1].split(
+        "## Validation Next Steps",
+        maxsplit=1,
+    )[0]
+
+    assert "## Mechanistic Intervention Map" in markdown
+    assert "**Core claim:**" in section
+    assert "**Falsifiable prediction:**" in section
+    assert "**Validation design:**" in section
+    assert "**Evidence anchors:**" in section
+    assert long_text not in section
+    assert "..." in section
+    assert "ANCHOR_0_" in section
+    assert "ANCHOR_4_" in section
+    assert "ANCHOR_5_" not in section
+    assert len(section) < 8_000
 
 
 def test_render_part4_synthesis_candidate_triage_uses_flat_score_fallback() -> None:

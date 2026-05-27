@@ -12,6 +12,9 @@ PART4_SYNTHESIS_FILENAME = "part4_therapeutic_synthesis.md"
 
 _MAX_FEATURED_CANDIDATES = 3
 _MAX_HYPOTHESES = 5
+_MAX_RENDER_TEXT_CHARS = 600
+_MAX_RENDER_LIST_ITEM_CHARS = 120
+_MAX_RENDER_LIST_ITEMS = 5
 _EXPAND_MARKER_PATTERN = re.compile(
     r"<!--\s*EXPAND(?:\s*:|\s+).*?-->",
     flags=re.IGNORECASE | re.DOTALL,
@@ -416,27 +419,90 @@ def _plural_phrase(count: int, singular: str, plural: str | None = None) -> str:
     return f"{count} {label}"
 
 
-def _hypothesis_bullet(hypothesis: Mapping[str, Any]) -> str:
+def _bounded_text(
+    value: object,
+    default: str = "",
+    *,
+    limit: int = _MAX_RENDER_TEXT_CHARS,
+) -> str:
+    text = re.sub(r"\s+", " ", _safe_text(value, default)).strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(limit - 3, 0)].rstrip() + "..."
+
+
+def _render_list_or_fallback(items: object, fallback: str) -> str:
+    values = [
+        _bounded_text(item, limit=_MAX_RENDER_LIST_ITEM_CHARS)
+        for item in _string_list(items)[:_MAX_RENDER_LIST_ITEMS]
+    ]
+    return ", ".join(values) if values else fallback
+
+
+def _hypothesis_section(hypothesis: Mapping[str, Any]) -> str:
     rank = _safe_int(hypothesis.get("rank"), 0)
     rank_text = str(rank) if rank else "unranked"
-    genes = ", ".join(_string_list(hypothesis.get("genes"))) or "unspecified genes"
-    drugs = ", ".join(_string_list(hypothesis.get("drugs")))
-    drug_clause = f" Candidate compounds already cited: {drugs}." if drugs else ""
-    validation = _safe_text(hypothesis.get("validation_approach"))
-    if not validation:
-        validation = _safe_text(hypothesis.get("falsifiable_prediction"))
-    validation_clause = (
-        f" Validation focus: {validation}"
-        if validation
-        else " Validation focus: perturbation and context-specific target engagement."
+    title = _bounded_text(hypothesis.get("title"), "Mechanistic hypothesis")
+    score_profile = hypothesis.get("score_profile")
+    composite_score = (
+        score_profile.get("composite")
+        if isinstance(score_profile, Mapping)
+        else None
     )
-    return (
-        f"- **Hypothesis {rank_text}:** "
-        f"{_safe_text(hypothesis.get('title'), 'Mechanistic hypothesis')} "
-        f"[{_safe_text(hypothesis.get('category'), 'unspecified')}]. "
-        f"Mapped genes: {genes}."
-        f"{drug_clause}"
-        f"{validation_clause}"
+    score_line = (
+        f"**Composite score:** {_bounded_text(composite_score)}"
+        if _safe_text(composite_score)
+        else "**Composite score:** No composite score was recorded."
+    )
+    evidence_references = [
+        _bounded_text(reference, limit=_MAX_RENDER_LIST_ITEM_CHARS)
+        for reference in _string_list(hypothesis.get("evidence_references"))[
+            :_MAX_RENDER_LIST_ITEMS
+        ]
+    ]
+    evidence_line = (
+        ", ".join(evidence_references)
+        if evidence_references
+        else "No evidence references were recorded."
+    )
+    core_claim = _safe_text(
+        _bounded_text(hypothesis.get("core_claim")),
+        "No explicit core claim was available in the deterministic hypothesis artifact.",
+    )
+    prediction = _safe_text(
+        _bounded_text(hypothesis.get("falsifiable_prediction")),
+        "No explicit falsifiable prediction was available in the deterministic hypothesis artifact.",
+    )
+    validation_design = _safe_text(
+        _bounded_text(hypothesis.get("validation_approach")),
+        "No explicit validation design was available in the deterministic hypothesis artifact.",
+    )
+    return "\n".join(
+        [
+            f"### Hypothesis {rank_text}: {title}",
+            f"**Category:** {_bounded_text(hypothesis.get('category'), 'unspecified')}",
+            (
+                "**Genes:** "
+                f"{_render_list_or_fallback(hypothesis.get('genes'), 'No genes were recorded.')}"
+            ),
+            (
+                "**Pathways:** "
+                f"{_render_list_or_fallback(hypothesis.get('pathways'), 'No pathways were recorded.')}"
+            ),
+            (
+                "**Cell types:** "
+                f"{_render_list_or_fallback(hypothesis.get('cell_types'), 'No cell types were recorded.')}"
+            ),
+            (
+                "**Candidate compounds:** "
+                f"{_render_list_or_fallback(hypothesis.get('drugs'), 'No candidate compounds were recorded.')}"
+            ),
+            f"**Core claim:** {core_claim}",
+            f"**Falsifiable prediction:** {prediction}",
+            f"**Validation design:** {validation_design}",
+            f"**Evidence anchors:** {evidence_line}",
+            score_line,
+        ]
     )
 
 
@@ -491,8 +557,8 @@ def render_part4_therapeutic_synthesis_markdown(
             "deterministic report data."
         )
 
-    hypothesis_lines = "\n".join(
-        _hypothesis_bullet(hypothesis)
+    hypothesis_lines = "\n\n".join(
+        _hypothesis_section(hypothesis)
         for hypothesis in hypotheses
     )
     if not hypothesis_lines:
@@ -524,7 +590,7 @@ The DrugTargetAgent assessment for {disease} evaluated {_safe_int(counts.get("to
 ## Candidate Triage
 {candidate_lines}
 
-## Hypothesis-to-Intervention Map
+## Mechanistic Intervention Map
 {hypothesis_lines}
 
 ## Validation Next Steps
