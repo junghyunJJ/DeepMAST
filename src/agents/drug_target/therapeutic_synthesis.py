@@ -77,6 +77,15 @@ def _safe_int(value: object, default: int = 0) -> int:
         return default
 
 
+def _safe_float(value: object, default: float = 0.0) -> float:
+    if isinstance(value, bool):
+        return float(value)
+    try:
+        return float(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
 def _safe_bool(value: object) -> bool:
     if isinstance(value, bool):
         return value
@@ -121,6 +130,91 @@ def _drug_signal_summary(candidate: Mapping[str, Any]) -> str:
     )
 
 
+def _phase_text(value: object) -> str:
+    if value is None:
+        return "phase not recorded"
+    phase = _safe_float(value, -1.0)
+    if phase < 0:
+        return "phase not recorded"
+    if phase.is_integer():
+        return f"phase {int(phase)}"
+    return f"phase {phase:g}"
+
+
+def _source_text(value: object) -> str:
+    source = _safe_text(value)
+    normalized = source.lower()
+    if normalized == "opentargets":
+        return "OpenTargets"
+    if normalized == "chembl":
+        return "ChEMBL"
+    return source
+
+
+def _drug_record_summary(record: Mapping[str, Any]) -> dict[str, str]:
+    return {
+        "name": _safe_text(
+            record.get("name")
+            or record.get("title")
+            or record.get("drug")
+            or record.get("drug_name"),
+        ),
+        "chembl_id": _safe_text(record.get("chembl_id")),
+        "phase": _phase_text(record.get("phase")),
+        "mechanism_of_action": _safe_text(record.get("mechanism_of_action")),
+        "source": _source_text(record.get("source")),
+    }
+
+
+def _drug_record_summaries(value: object, limit: int = 3) -> list[dict[str, str]]:
+    records: list[dict[str, str]] = []
+    for item in _dict_list(value):
+        summary = _drug_record_summary(item)
+        if summary["name"]:
+            records.append(summary)
+        if len(records) >= limit:
+            break
+    return records
+
+
+def _format_drug_record(record: Mapping[str, Any]) -> str:
+    name = _bounded_text(record.get("name"), "unnamed compound", limit=90)
+    parts = [
+        _bounded_text(record.get("phase"), limit=40),
+        _bounded_text(record.get("mechanism_of_action"), limit=110),
+        _bounded_text(record.get("source"), limit=40),
+    ]
+    details = [part for part in parts if part]
+    return f"{name} ({'; '.join(details)})" if details else name
+
+
+def _format_drug_records(records: object) -> str:
+    rendered = [
+        _format_drug_record(record)
+        for record in _dict_list(records)[:_MAX_RENDER_LIST_ITEMS]
+    ]
+    return ", ".join(rendered)
+
+
+def _drug_target_evidence_summary(candidate: Mapping[str, Any]) -> str:
+    clinical = _format_drug_records(candidate.get("clinical_drug_examples"))
+    preclinical = _format_drug_records(candidate.get("preclinical_drug_examples"))
+    segments: list[str] = []
+    if clinical:
+        segments.append(f"Clinical: {clinical}.")
+    if preclinical:
+        segments.append(f"Preclinical: {preclinical}.")
+    if segments:
+        return " ".join(segments)
+    return "No named clinical or preclinical drug records were available."
+
+
+def _drug_evidence_score(candidate: Mapping[str, Any]) -> int:
+    clinical = min(_safe_int(candidate.get("clinical_drug_count"), 0), 5)
+    preclinical = min(_safe_int(candidate.get("preclinical_drug_count"), 0), 5)
+    return clinical * 2 + preclinical
+
+
 def _therapeutic_rationale(candidate: Mapping[str, Any]) -> str:
     gene = _safe_text(candidate.get("gene"), "candidate").upper()
     classification = _safe_text(candidate.get("classification"), "unknown")
@@ -149,7 +243,11 @@ def _score_profile(value: object) -> dict[str, int | float]:
 def _candidate_summary(candidate: Mapping[str, Any]) -> dict[str, Any]:
     sources = _string_list(candidate.get("sources"))
     score_profile = _candidate_score_profile(candidate)
-    return {
+    clinical_drug_examples = _drug_record_summaries(candidate.get("clinical_drugs"))
+    preclinical_drug_examples = _drug_record_summaries(
+        candidate.get("preclinical_drugs"),
+    )
+    summary = {
         "gene": _safe_text(candidate.get("gene")).upper(),
         "classification": _safe_text(candidate.get("classification"), "unknown"),
         "priority": _safe_text(candidate.get("priority"), "unranked"),
@@ -162,6 +260,8 @@ def _candidate_summary(candidate: Mapping[str, Any]) -> dict[str, Any]:
         "drug_signal_summary": _drug_signal_summary(candidate),
         "clinical_drugs": _limited_names(candidate.get("clinical_drugs")),
         "preclinical_drugs": _limited_names(candidate.get("preclinical_drugs")),
+        "clinical_drug_examples": clinical_drug_examples,
+        "preclinical_drug_examples": preclinical_drug_examples,
         "therapeutic_rationale": _therapeutic_rationale(candidate),
         "clinical_drug_count": _safe_int(candidate.get("clinical_drug_count"), 0),
         "preclinical_drug_count": _safe_int(
@@ -171,11 +271,121 @@ def _candidate_summary(candidate: Mapping[str, Any]) -> dict[str, Any]:
         "source_count": len(sources),
         "evidence_sources": sources[:5],
     }
+    summary["drug_target_evidence"] = _drug_target_evidence_summary(summary)
+    return summary
+
+
+def _candidate_hypothesis_context(
+    candidate: Mapping[str, Any],
+    hypotheses: list[dict[str, Any]],
+) -> dict[str, Any]:
+    gene = _safe_text(candidate.get("gene")).upper()
+    linked = [
+        hypothesis
+        for hypothesis in hypotheses
+        if gene in {_safe_text(item).upper() for item in hypothesis.get("genes", [])}
+    ]
+    ranks = [
+        rank
+        for hypothesis in linked
+        if (rank := _safe_int(hypothesis.get("rank"), 0)) > 0
+    ]
+    composites = [
+        composite
+        for hypothesis in linked
+        if (
+            composite := _safe_float(
+                (
+                    hypothesis.get("score_profile", {})
+                    if isinstance(hypothesis.get("score_profile"), Mapping)
+                    else {}
+                ).get("composite"),
+                0.0,
+            )
+        )
+        > 0
+    ]
+    best_rank = min(ranks) if ranks else 0
+    best_composite = max(composites) if composites else 0.0
+    linked_summary = [
+        {
+            "rank": _safe_int(hypothesis.get("rank"), 0),
+            "title": _safe_text(hypothesis.get("title")),
+            "category": _safe_text(hypothesis.get("category")),
+            "drugs": _string_list(hypothesis.get("drugs"))[:3],
+            "composite": _safe_float(
+                (
+                    hypothesis.get("score_profile", {})
+                    if isinstance(hypothesis.get("score_profile"), Mapping)
+                    else {}
+                ).get("composite"),
+                0.0,
+            ),
+        }
+        for hypothesis in linked[:3]
+    ]
+    if linked_summary:
+        lead = linked_summary[0]
+        role_summary = (
+            f"Linked to {_plural_phrase(len(linked), 'deterministic hypothesis', 'deterministic hypotheses')}, "
+            f"including rank {lead['rank']}: {lead['title']}."
+        )
+    else:
+        role_summary = (
+            "No ranked mechanistic hypothesis explicitly linked this candidate "
+            "in the deterministic hypothesis artifact."
+        )
+    return {
+        "linked_hypotheses": linked_summary,
+        "mechanistic_hypothesis_count": len(linked),
+        "best_hypothesis_rank": best_rank,
+        "best_hypothesis_composite": best_composite,
+        "mechanistic_role_summary": role_summary,
+    }
+
+
+def _candidate_selection_sort_key(candidate: Mapping[str, Any]) -> tuple:
+    best_rank = _safe_int(candidate.get("best_hypothesis_rank"), 0) or 10_000
+    return (
+        -_safe_int(candidate.get("mechanistic_hypothesis_count"), 0),
+        -_safe_float(candidate.get("best_hypothesis_composite"), 0.0),
+        best_rank,
+        -_drug_evidence_score(candidate),
+        -_safe_int(candidate.get("combined_total"), 0),
+        _safe_text(candidate.get("gene")),
+    )
+
+
+def _primary_mechanistic_axis_genes(
+    hypotheses: list[dict[str, Any]],
+    candidate_genes: set[str],
+) -> list[str]:
+    for hypothesis in hypotheses:
+        axis_genes = [
+            gene
+            for gene in _string_list(hypothesis.get("genes"))
+            if gene.upper() in candidate_genes
+        ]
+        deduped_axis: list[str] = []
+        seen: set[str] = set()
+        for gene in axis_genes:
+            normalized = gene.upper()
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            deduped_axis.append(normalized)
+        if len(deduped_axis) >= 2:
+            return deduped_axis[:_MAX_FEATURED_CANDIDATES]
+    return []
 
 
 def _selected_candidates(report_data: Mapping[str, Any]) -> list[dict[str, Any]]:
+    hypotheses = _hypotheses(report_data)
     candidates = [
-        summary
+        {
+            **summary,
+            **_candidate_hypothesis_context(summary, hypotheses),
+        }
         for candidate in _dict_list(report_data.get("candidates"))
         if (summary := _candidate_summary(candidate))["gene"]
     ]
@@ -185,10 +395,26 @@ def _selected_candidates(report_data: Mapping[str, Any]) -> list[dict[str, Any]]
         if candidate["stage3_candidate"]
     ]
     pool = featured or candidates
-    return sorted(
-        pool,
-        key=lambda item: (-item["combined_total"], item["gene"]),
-    )[:_MAX_FEATURED_CANDIDATES]
+    by_gene = {candidate["gene"]: candidate for candidate in pool}
+    selected: list[dict[str, Any]] = []
+    selected_genes: set[str] = set()
+    for gene in _primary_mechanistic_axis_genes(hypotheses, set(by_gene)):
+        selected.append(by_gene[gene])
+        selected_genes.add(gene)
+        if len(selected) >= _MAX_FEATURED_CANDIDATES:
+            return selected
+
+    remaining = [
+        candidate
+        for candidate in pool
+        if candidate["gene"] not in selected_genes
+    ]
+    selected.extend(
+        sorted(remaining, key=_candidate_selection_sort_key)[
+            : _MAX_FEATURED_CANDIDATES - len(selected)
+        ],
+    )
+    return selected
 
 
 def _interpretation_summary(payload: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -270,6 +496,7 @@ def build_part4_therapeutic_synthesis(
         ),
         "validation_issues": _validation_issues(validation),
         "interpretation_summary": _interpretation_summary(interpretations_payload),
+        "selection_strategy": "deterministic_mechanistic_axis_and_drug_evidence",
         "candidate_counts": {
             "total": len(candidates),
             "featured": len(selected_candidates),
@@ -374,6 +601,14 @@ def _candidate_section(candidate: Mapping[str, Any]) -> str:
             (
                 "**Drug signal:** "
                 f"{_safe_text(candidate.get('drug_signal_summary'))}"
+            ),
+            (
+                "**Drug-target evidence:** "
+                f"{_safe_text(candidate.get('drug_target_evidence'), 'No named clinical or preclinical drug records were available.')}"
+            ),
+            (
+                "**Mechanistic synthesis role:** "
+                f"{_safe_text(candidate.get('mechanistic_role_summary'), 'No ranked mechanistic hypothesis explicitly linked this candidate in the deterministic hypothesis artifact.')}"
             ),
             (
                 "**Experimental discriminator:** "

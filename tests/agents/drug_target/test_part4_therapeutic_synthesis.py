@@ -75,13 +75,16 @@ def test_part4_synthesis_data_prioritizes_featured_candidates(
     assert synthesis["report_valid"] is True
     assert synthesis["interpretation_summary"]["accepted"] == 2
     assert [item["gene"] for item in synthesis["featured_candidates"][:3]] == [
-        "CD4",
-        "FN1",
-        "MUC1",
+        "ICAM1",
+        "ITGB2",
+        "CD47",
     ]
     assert synthesis["candidate_counts"]["featured"] == 3
     assert synthesis["candidate_counts"]["total"] >= 3
     assert synthesis["hypotheses"]
+    assert synthesis["selection_strategy"] == (
+        "deterministic_mechanistic_axis_and_drug_evidence"
+    )
 
 
 def test_part4_synthesis_data_preserves_candidate_evidence_context(
@@ -103,17 +106,17 @@ def test_part4_synthesis_data_preserves_candidate_evidence_context(
 
     candidate = synthesis["featured_candidates"][0]
     score_profile = {
-        "combined_total": 15,
-        "validated_total": 10,
-        "exploratory_total": 5,
+        "combined_total": 10,
+        "validated_total": 7,
+        "exploratory_total": 3,
     }
 
-    assert candidate["gene"] == "CD4"
+    assert candidate["gene"] == "ICAM1"
     assert candidate["score_profile"] == score_profile
     assert candidate["combined_total"] == score_profile["combined_total"]
     assert candidate["validated_total"] == score_profile["validated_total"]
     assert candidate["exploratory_total"] == score_profile["exploratory_total"]
-    assert candidate["evidence_track"] == "validated-and-exploratory"
+    assert candidate["evidence_track"] == "validated-dominant"
     assert (
         candidate["drug_signal_summary"]
         == "0 clinical and 10 preclinical structured drug signals"
@@ -121,27 +124,33 @@ def test_part4_synthesis_data_preserves_candidate_evidence_context(
     assert candidate["clinical_drugs"] == []
     assert candidate["preclinical_drugs"] == [
         (
-            "N1-(4-((4-(1-ethyl-4-fluoro-2-methyl-1H-benzo[d]imidazol-6-yl)"
-            "-5-fluoropyrimidin-2-yl)amino)benzyl)-N8-hydroxyoctanediamide"
+            "4-(4-Trifluoromethyl-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic "
+            "acid methylamide"
         ),
-        "Chloropeptin I analogue",
         (
-            "13-Cyclohexylmethoxy-6-methylene-4,8-di(p-toluenesulfonyl)-"
-            "4,8,15-triazabicyclo[9.3.1]pentadeca-1(15),11,13-triene "
-            "Hydrochloride"
+            "4-[4-(Tetrahydro-pyran-2-yloxymethyl)-phenoxy]-thieno[2,3-c]"
+            "pyridine-2-carboxylic acid amide"
         ),
-        "ISOCOMPLESTATIN",
-        "CHLOROPEPTIN",
+        "4-(4-Cyano-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid amide",
+        (
+            "4-{4-[2-(2-Methoxy-ethoxy)-ethoxymethyl]-phenoxy}-thieno[2,3-c]"
+            "pyridine-2-carboxylic acid methylamide"
+        ),
+        "4-(4-Vinyl-phenoxy)-thieno[2,3-c]pyridine-2-carboxylic acid amide",
     ]
     assert candidate["evidence_sources"] == [
         "evidence/assessment_results.json",
-        "evidence/stage3_CD4.json",
+        "evidence/stage3_ICAM1.json",
     ]
     assert candidate["source_count"] == 2
-    assert "CD4" in candidate["therapeutic_rationale"]
+    assert "ICAM1" in candidate["therapeutic_rationale"]
     assert "high" in candidate["therapeutic_rationale"]
     assert "validated_target" in candidate["therapeutic_rationale"]
-    assert "validated and exploratory support" in candidate["therapeutic_rationale"]
+    assert "validated dominant support" in candidate["therapeutic_rationale"]
+    assert candidate["mechanistic_hypothesis_count"] == 2
+    assert candidate["best_hypothesis_rank"] == 1
+    assert "ICAM1-ITGB2 Axis" in candidate["mechanistic_role_summary"]
+    assert candidate["drug_target_evidence"].startswith("Preclinical:")
 
 
 def test_part4_synthesis_data_preserves_hypothesis_context(
@@ -237,9 +246,9 @@ def test_render_part4_synthesis_markdown_is_not_drug_md_copy(
     assert "## Mechanistic Intervention Map" in markdown
     assert "## Validation Next Steps" in markdown
     assert "## Confidence and Caveats" in markdown
-    assert "CD4" in markdown
-    assert "FN1" in markdown
-    assert "MUC1" in markdown
+    assert "ICAM1" in markdown
+    assert "ITGB2" in markdown
+    assert "CD47" in markdown
     assert "validated_target" in markdown
     assert "EXPAND" not in markdown
     assert "recommended therapy" not in markdown.lower()
@@ -266,18 +275,157 @@ def test_render_part4_synthesis_has_rich_candidate_triage(
     )
 
     assert "## Integrated Therapeutic Thesis" in markdown
-    assert "### Candidate: CD4" in markdown
-    assert "### Candidate: FN1" in markdown
-    assert "### Candidate: MUC1" in markdown
+    assert "### Candidate: ICAM1" in markdown
+    assert "### Candidate: ITGB2" in markdown
+    assert "### Candidate: CD47" in markdown
     assert (
-        "**Evidence track:** validated-and-exploratory with combined score 15 "
-        "(validated 10, exploratory 5)."
+        "**Evidence track:** validated-dominant with combined score 10 "
+        "(validated 7, exploratory 3)."
     ) in markdown
     assert "**Evidence track:**" in markdown
     assert "**Therapeutic rationale:**" in markdown
     assert "**Drug signal:**" in markdown
+    assert "**Drug-target evidence:**" in markdown
+    assert "**Mechanistic synthesis role:**" in markdown
     assert "**Experimental discriminator:**" in markdown
     assert "IPF cell states" not in markdown
+
+
+def test_part4_synthesis_selects_primary_mechanistic_axis_before_score_top3() -> None:
+    from src.agents.drug_target.therapeutic_synthesis import (
+        build_part4_therapeutic_synthesis,
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    def candidate(
+        gene: str,
+        combined: int,
+        clinical_drugs: list[dict] | None = None,
+        preclinical_drugs: list[dict] | None = None,
+    ) -> dict:
+        clinical_drugs = clinical_drugs or []
+        preclinical_drugs = preclinical_drugs or []
+        return {
+            "gene": gene,
+            "classification": "validated_target",
+            "priority": "high",
+            "stage3_candidate": True,
+            "scores": {
+                "combined_total": combined,
+                "validated_total": min(combined, 10),
+                "exploratory_total": max(combined - 10, 0),
+            },
+            "clinical_drug_count": len(clinical_drugs),
+            "preclinical_drug_count": len(preclinical_drugs),
+            "clinical_drugs": clinical_drugs,
+            "preclinical_drugs": preclinical_drugs,
+            "sources": [f"evidence/stage3_{gene}.json"],
+        }
+
+    report_data = {
+        "disease": "IPF",
+        "candidates": [
+            candidate("FN1", 15),
+            candidate("MUC1", 15),
+            candidate("CD4", 14),
+            candidate(
+                "CD47",
+                11,
+                [
+                    {
+                        "name": "EVORPACEPT",
+                        "phase": 2,
+                        "mechanism_of_action": (
+                            "Leukocyte surface antigen CD47 inhibitor"
+                        ),
+                        "source": "opentargets",
+                    },
+                    {
+                        "name": "MAGROLIMAB",
+                        "phase": 3,
+                        "mechanism_of_action": (
+                            "Leukocyte surface antigen CD47 inhibitor"
+                        ),
+                        "source": "opentargets",
+                    },
+                ],
+            ),
+            candidate(
+                "ITGB2",
+                11,
+                [
+                    {
+                        "name": "LIFITEGRAST",
+                        "phase": 4,
+                        "mechanism_of_action": (
+                            "Integrin alpha-L/beta-2 (LFA-1) antagonist"
+                        ),
+                        "source": "opentargets",
+                    }
+                ],
+            ),
+            candidate(
+                "ICAM1",
+                10,
+                [
+                    {
+                        "name": "ALICAFORSEN",
+                        "phase": 3,
+                        "mechanism_of_action": (
+                            "Intercellular adhesion molecule-1 mRNA 3'UTR "
+                            "antisense inhibitor"
+                        ),
+                        "source": "opentargets",
+                    }
+                ],
+            ),
+        ],
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": (
+                    "THBS1-CD47 and ICAM1-ITGB2 convergence defines an "
+                    "immune-retention program"
+                ),
+                "category": "Cross-Target Interaction",
+                "biological_entities": {
+                    "genes": ["THBS1", "CD47", "ITGB2", "ICAM1"],
+                    "drugs": [],
+                },
+                "scores": {"composite": 0.852},
+                "evidence_references": ["stage1_ICAM1--ITGB2.json"],
+            }
+        ],
+    }
+
+    synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=_validation_payload(),
+        interpretations_payload=None,
+    )
+    markdown = render_part4_therapeutic_synthesis_markdown(synthesis)
+
+    assert [item["gene"] for item in synthesis["featured_candidates"]] == [
+        "CD47",
+        "ITGB2",
+        "ICAM1",
+    ]
+    assert "### Candidate: CD47" in markdown
+    assert "### Candidate: ITGB2" in markdown
+    assert "### Candidate: ICAM1" in markdown
+    assert markdown.index("### Candidate: CD47") < markdown.index(
+        "### Candidate: ITGB2"
+    )
+    assert markdown.index("### Candidate: ITGB2") < markdown.index(
+        "### Candidate: ICAM1"
+    )
+    assert "EVORPACEPT (phase 2; Leukocyte surface antigen CD47 inhibitor" in markdown
+    assert "MAGROLIMAB (phase 3; Leukocyte surface antigen CD47 inhibitor" in markdown
+    assert "LIFITEGRAST (phase 4; Integrin alpha-L/beta-2 (LFA-1) antagonist" in markdown
+    assert (
+        "ALICAFORSEN (phase 3; Intercellular adhesion molecule-1 mRNA "
+        "3'UTR antisense inhibitor"
+    ) in markdown
 
 
 def test_render_part4_synthesis_has_mechanistic_intervention_map(
