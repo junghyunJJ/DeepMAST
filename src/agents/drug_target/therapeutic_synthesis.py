@@ -587,7 +587,7 @@ def _candidate_section(candidate: Mapping[str, Any]) -> str:
         [
             f"### Candidate: {gene}",
             (
-                f"**Evidence track:** {_candidate_render_track(candidate)} "
+                f"- Evidence track: {_candidate_render_track(candidate)} "
                 "with combined score "
                 f"{_candidate_render_score(candidate, 'combined_total')} "
                 f"(validated {_candidate_render_score(candidate, 'validated_total')}, "
@@ -595,23 +595,23 @@ def _candidate_section(candidate: Mapping[str, Any]) -> str:
                 f"{_candidate_render_score(candidate, 'exploratory_total')})."
             ),
             (
-                "**Therapeutic rationale:** "
+                "- Therapeutic rationale: "
                 f"{_safe_text(candidate.get('therapeutic_rationale'))}"
             ),
             (
-                "**Drug signal:** "
+                "- Drug signal: "
                 f"{_safe_text(candidate.get('drug_signal_summary'))}"
             ),
             (
-                "**Drug-target evidence:** "
+                "- Drug-target evidence: "
                 f"{_safe_text(candidate.get('drug_target_evidence'), 'No named clinical or preclinical drug records were available.')}"
             ),
             (
-                "**Mechanistic synthesis role:** "
+                "- Mechanistic synthesis role: "
                 f"{_safe_text(candidate.get('mechanistic_role_summary'), 'No ranked mechanistic hypothesis explicitly linked this candidate in the deterministic hypothesis artifact.')}"
             ),
             (
-                "**Experimental discriminator:** "
+                "- Experimental discriminator: "
                 f"{_candidate_discriminator(candidate)}"
             ),
         ]

@@ -279,15 +279,15 @@ def test_render_part4_synthesis_has_rich_candidate_triage(
     assert "### Candidate: ITGB2" in markdown
     assert "### Candidate: CD47" in markdown
     assert (
-        "**Evidence track:** validated-dominant with combined score 10 "
+        "- Evidence track: validated-dominant with combined score 10 "
         "(validated 7, exploratory 3)."
     ) in markdown
-    assert "**Evidence track:**" in markdown
-    assert "**Therapeutic rationale:**" in markdown
-    assert "**Drug signal:**" in markdown
-    assert "**Drug-target evidence:**" in markdown
-    assert "**Mechanistic synthesis role:**" in markdown
-    assert "**Experimental discriminator:**" in markdown
+    assert "- Evidence track:" in markdown
+    assert "- Therapeutic rationale:" in markdown
+    assert "- Drug signal:" in markdown
+    assert "- Drug-target evidence:" in markdown
+    assert "- Mechanistic synthesis role:" in markdown
+    assert "- Experimental discriminator:" in markdown
     assert "IPF cell states" not in markdown
 
 
@@ -640,7 +640,7 @@ def test_render_part4_synthesis_candidate_triage_uses_flat_score_fallback() -> N
 
     assert "### Candidate: TGFB1" in markdown
     assert (
-        "**Evidence track:** validated-dominant with combined score 9 "
+        "- Evidence track: validated-dominant with combined score 9 "
         "(validated 8, exploratory 1)."
     ) in markdown
     assert "disease-relevant cell states" in markdown
