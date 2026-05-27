@@ -71,8 +71,10 @@ def _safe_text(value: object, default: str = "") -> str:
 def _safe_int(value: object, default: int = 0) -> int:
     if isinstance(value, bool):
         return int(value)
+    if not isinstance(value, str | int | float):
+        return default
     try:
-        return int(value) if value is not None else default
+        return int(value)
     except (TypeError, ValueError):
         return default
 
@@ -80,8 +82,10 @@ def _safe_int(value: object, default: int = 0) -> int:
 def _safe_float(value: object, default: float = 0.0) -> float:
     if isinstance(value, bool):
         return float(value)
+    if not isinstance(value, str | int | float):
+        return default
     try:
-        return float(value) if value is not None else default
+        return float(value)
     except (TypeError, ValueError):
         return default
 
@@ -499,7 +503,9 @@ def _primary_mechanistic_axis_genes(
     return []
 
 
-def _selected_candidates(report_data: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _candidate_selection_pool(
+    report_data: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     hypotheses = _hypotheses(report_data)
     candidates = [
         {
@@ -514,7 +520,13 @@ def _selected_candidates(report_data: Mapping[str, Any]) -> list[dict[str, Any]]
         for candidate in candidates
         if candidate["stage3_candidate"]
     ]
-    pool = featured or candidates
+    return candidates, featured or candidates
+
+
+def _selected_candidates_from_pool(
+    pool: list[dict[str, Any]],
+    hypotheses: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     by_gene = {candidate["gene"]: candidate for candidate in pool}
     selected: list[dict[str, Any]] = []
     selected_genes: set[str] = set()
@@ -535,6 +547,113 @@ def _selected_candidates(report_data: Mapping[str, Any]) -> list[dict[str, Any]]
         ],
     )
     return selected
+
+
+def _selected_candidates(report_data: Mapping[str, Any]) -> list[dict[str, Any]]:
+    _, pool = _candidate_selection_pool(report_data)
+    return _selected_candidates_from_pool(pool, _hypotheses(report_data))
+
+
+def _candidate_selection_summary(
+    *,
+    applied: bool,
+    mode: str,
+    fallback_reason: str | None,
+    payload_status: str | None,
+    selected_genes: list[str],
+    status: str,
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "mode": mode,
+        "applied": applied,
+        "payload_status": payload_status,
+        "fallback_reason": fallback_reason,
+        "selected_genes": selected_genes,
+    }
+
+
+def _apply_candidate_selection_payload(
+    *,
+    candidate_selection_payload: Mapping[str, Any] | None,
+    deterministic_candidates: list[dict[str, Any]],
+    pool: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], str, dict[str, Any]]:
+    deterministic_genes = [
+        _safe_text(candidate.get("gene"))
+        for candidate in deterministic_candidates
+    ]
+
+    def deterministic_result(
+        fallback_reason: str,
+        payload_status: str | None = None,
+        status: str = "invalid",
+    ) -> tuple[list[dict[str, Any]], str, dict[str, Any]]:
+        return (
+            deterministic_candidates,
+            "deterministic_mechanistic_axis_and_drug_evidence",
+            _candidate_selection_summary(
+                applied=False,
+                mode="deterministic",
+                fallback_reason=fallback_reason,
+                payload_status=payload_status,
+                selected_genes=deterministic_genes,
+                status=status,
+            ),
+        )
+
+    if candidate_selection_payload is None:
+        return deterministic_result("payload_absent", status="absent")
+    if not isinstance(candidate_selection_payload, Mapping):
+        return deterministic_result("payload_not_mapping")
+
+    payload_status = _safe_text(candidate_selection_payload.get("status"))
+    if payload_status != "accepted":
+        return deterministic_result(
+            "payload_status_not_accepted",
+            payload_status=payload_status or None,
+        )
+
+    raw_selected_genes = candidate_selection_payload.get("selected_genes")
+    if not isinstance(raw_selected_genes, list):
+        return deterministic_result(
+            "selected_genes_not_list",
+            payload_status=payload_status,
+        )
+
+    selected_genes = [_safe_text(gene).upper() for gene in raw_selected_genes]
+    if len(selected_genes) != _MAX_FEATURED_CANDIDATES or any(
+        not gene for gene in selected_genes
+    ):
+        return deterministic_result(
+            "selected_genes_wrong_count",
+            payload_status=payload_status,
+        )
+    if len(set(selected_genes)) != len(selected_genes):
+        return deterministic_result(
+            "selected_genes_duplicate",
+            payload_status=payload_status,
+        )
+
+    by_gene = {candidate["gene"]: candidate for candidate in pool}
+    if any(gene not in by_gene for gene in selected_genes):
+        return deterministic_result(
+            "selected_genes_outside_pool",
+            payload_status=payload_status,
+        )
+
+    return (
+        [by_gene[gene] for gene in selected_genes],
+        "llm_rerank_validated_stage3_pool",
+        _candidate_selection_summary(
+            applied=True,
+            mode="llm_rerank_validated_stage3_pool",
+            fallback_reason=None,
+            payload_status=payload_status,
+            selected_genes=selected_genes,
+            status=payload_status,
+        ),
+    )
 
 
 def _interpretation_summary(payload: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -601,11 +720,23 @@ def build_part4_therapeutic_synthesis(
     *,
     validation: Mapping[str, Any] | None,
     interpretations_payload: Mapping[str, Any] | None = None,
+    candidate_selection_payload: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a deterministic Part 4 synthesis model from report_data."""
 
-    candidates = _dict_list(report_data.get("candidates"))
-    selected_candidates = _selected_candidates(report_data)
+    raw_candidates = _dict_list(report_data.get("candidates"))
+    hypotheses = _hypotheses(report_data)
+    _, pool = _candidate_selection_pool(report_data)
+    deterministic_candidates = _selected_candidates_from_pool(pool, hypotheses)
+    (
+        selected_candidates,
+        selection_strategy,
+        candidate_selection_summary,
+    ) = _apply_candidate_selection_payload(
+        candidate_selection_payload=candidate_selection_payload,
+        deterministic_candidates=deterministic_candidates,
+        pool=pool,
+    )
     return {
         "schema_version": PART4_SYNTHESIS_SCHEMA_VERSION,
         "disease": _safe_text(report_data.get("disease"), "unspecified disease"),
@@ -616,21 +747,22 @@ def build_part4_therapeutic_synthesis(
         ),
         "validation_issues": _validation_issues(validation),
         "interpretation_summary": _interpretation_summary(interpretations_payload),
-        "selection_strategy": "deterministic_mechanistic_axis_and_drug_evidence",
+        "selection_strategy": selection_strategy,
+        "candidate_selection_summary": candidate_selection_summary,
         "candidate_counts": {
-            "total": len(candidates),
+            "total": len(raw_candidates),
             "featured": len(selected_candidates),
             "stage3_total": len(
                 [
                     candidate
-                    for candidate in candidates
+                    for candidate in raw_candidates
                     if _safe_bool(candidate.get("stage3_candidate"))
                 ]
             ),
             "validated": len(
                 [
                     candidate
-                    for candidate in candidates
+                    for candidate in raw_candidates
                     if _safe_text(candidate.get("classification"))
                     == "validated_target"
                 ]
@@ -638,7 +770,7 @@ def build_part4_therapeutic_synthesis(
             "exploratory": len(
                 [
                     candidate
-                    for candidate in candidates
+                    for candidate in raw_candidates
                     if (
                         classification := _safe_text(
                             candidate.get("classification"),
@@ -650,7 +782,7 @@ def build_part4_therapeutic_synthesis(
             ),
         },
         "featured_candidates": selected_candidates,
-        "hypotheses": _hypotheses(report_data),
+        "hypotheses": hypotheses,
     }
 
 

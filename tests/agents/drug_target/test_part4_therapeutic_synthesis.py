@@ -87,6 +87,96 @@ def test_part4_synthesis_data_prioritizes_featured_candidates(
     )
 
 
+def test_part4_synthesis_uses_accepted_candidate_selection_payload(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.therapeutic_synthesis import (
+        build_part4_therapeutic_synthesis,
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+
+    synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=_validation_payload(),
+        interpretations_payload=None,
+        candidate_selection_payload={
+            "status": "accepted",
+            "selected_genes": ["CD47", "ITGB2", "ICAM1"],
+        },
+    )
+    markdown = render_part4_therapeutic_synthesis_markdown(synthesis)
+
+    assert [item["gene"] for item in synthesis["featured_candidates"]] == [
+        "CD47",
+        "ITGB2",
+        "ICAM1",
+    ]
+    assert synthesis["selection_strategy"] == "llm_rerank_validated_stage3_pool"
+    assert synthesis["candidate_selection_summary"] == {
+        "status": "accepted",
+        "mode": "llm_rerank_validated_stage3_pool",
+        "applied": True,
+        "payload_status": "accepted",
+        "fallback_reason": None,
+        "selected_genes": ["CD47", "ITGB2", "ICAM1"],
+    }
+    assert markdown.index("### Candidate: CD47") < markdown.index(
+        "### Candidate: ITGB2"
+    )
+    assert markdown.index("### Candidate: ITGB2") < markdown.index(
+        "### Candidate: ICAM1"
+    )
+
+
+def test_part4_synthesis_ignores_invalid_candidate_selection_payload(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.therapeutic_synthesis import (
+        build_part4_therapeutic_synthesis,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+    baseline = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=_validation_payload(),
+        interpretations_payload=None,
+    )
+
+    synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=_validation_payload(),
+        interpretations_payload=None,
+        candidate_selection_payload={
+            "status": "accepted",
+            "selected_genes": ["CXCR4", "ITGB2", "ICAM1"],
+        },
+    )
+
+    assert [item["gene"] for item in synthesis["featured_candidates"]] == [
+        item["gene"] for item in baseline["featured_candidates"]
+    ]
+    assert synthesis["selection_strategy"] == (
+        "deterministic_mechanistic_axis_and_drug_evidence"
+    )
+    assert synthesis["candidate_selection_summary"] == {
+        "status": "invalid",
+        "mode": "deterministic",
+        "applied": False,
+        "payload_status": "accepted",
+        "fallback_reason": "selected_genes_outside_pool",
+        "selected_genes": [
+            item["gene"] for item in baseline["featured_candidates"]
+        ],
+    }
+    assert synthesis["candidate_selection_summary"]["status"] != "accepted"
+
+
 def test_part4_synthesis_data_preserves_candidate_evidence_context(
     tmp_path: Path,
 ) -> None:
