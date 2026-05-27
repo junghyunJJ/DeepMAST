@@ -95,3 +95,30 @@ def test_aggregate_trial_rows_reports_pairwise_consistency() -> None:
     assert aggregate["hypothesis_count_values"] == [2]
     assert aggregate["mean_pairwise_gene_jaccard"] == 1.0
     assert 0.0 < aggregate["mean_pairwise_title_similarity"] <= 1.0
+
+
+def test_aggregate_trial_rows_handles_failed_row_without_summary() -> None:
+    rows = [
+        {
+            "run_id": "run_01",
+            "success": True,
+            "validation_passed": True,
+            "report_summary": summarize_report(_report_one()),
+        },
+        {
+            "run_id": "run_failed",
+            "success": False,
+            "validation_passed": False,
+            "report_summary": None,
+        },
+    ]
+
+    aggregate = aggregate_trial_rows(rows)
+
+    assert aggregate["total_runs"] == 2
+    assert aggregate["successful_runs"] == 1
+    assert aggregate["validation_passed_runs"] == 1
+    assert aggregate["success_rate"] == 0.5
+    assert aggregate["validation_pass_rate"] == 0.5
+    assert aggregate["topn_missing_by_run"]["run_failed"] == []
+    assert aggregate["unverified_numeric_predictions_by_run"]["run_failed"] is None

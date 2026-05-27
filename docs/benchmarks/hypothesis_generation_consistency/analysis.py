@@ -90,6 +90,11 @@ def _successful_summaries(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+def _report_summary(row: dict[str, Any]) -> dict[str, Any]:
+    summary = row.get("report_summary")
+    return summary if isinstance(summary, dict) else {}
+
+
 def _mean_pairwise(
     summaries: list[dict[str, Any]],
     key: str,
@@ -136,14 +141,12 @@ def aggregate_trial_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "text",
         ),
         "topn_missing_by_run": {
-            row["run_id"]: row.get("report_summary", {}).get("topn_missing", [])
+            row["run_id"]: _report_summary(row).get("topn_missing", [])
             for row in rows
             if row.get("run_id")
         },
         "unverified_numeric_predictions_by_run": {
-            row["run_id"]: row.get("report_summary", {}).get(
-                "unverified_numeric_predictions"
-            )
+            row["run_id"]: _report_summary(row).get("unverified_numeric_predictions")
             for row in rows
             if row.get("run_id")
         },
