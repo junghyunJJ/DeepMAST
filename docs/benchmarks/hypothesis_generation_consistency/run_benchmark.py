@@ -28,6 +28,13 @@ from src.agents.drug_target.tools.evidence_loader import (
     load_evidence_files,
 )
 
+TRACE_DISABLED_ENV = {
+    "LANGCHAIN_TRACING_V2": "false",
+    "LANGSMITH_TRACING": "false",
+    "LANGCHAIN_API_KEY": None,
+    "LANGSMITH_API_KEY": None,
+}
+
 
 def load_benchmark_env() -> None:
     load_dotenv(PROJECT_ROOT / ".env", override=False)
@@ -118,6 +125,11 @@ def patched_env(values: dict[str, str | None]) -> Iterator[None]:
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+
+
+def check_hypothesis_scope_untraced(data_dir: Path) -> dict[str, Any]:
+    with patched_env(TRACE_DISABLED_ENV):
+        return check_hypothesis_scope(data_dir)
 
 
 def validate_trial_output(
@@ -349,7 +361,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source", default="res_ipf_ollama_tmp")
     parser.add_argument("--runs", type=int, default=10)
     parser.add_argument("--disease", default="pulmonary fibrosis")
-    parser.add_argument("--provider", default=os.getenv("LLM_PROVIDER", "ollama"))
+    parser.add_argument("--provider", default=os.getenv("LLM_PROVIDER") or "ollama")
     parser.add_argument("--timeout-s", type=int, default=1800)
     parser.add_argument("--output-root", default=None)
     parser.add_argument("--force", action="store_true")
@@ -363,10 +375,14 @@ async def async_main() -> int:
     source = resolve_path(args.source)
     if not source.exists():
         raise SystemExit(f"source workspace does not exist: {source}")
-    scope = check_hypothesis_scope(source)
     if args.dry_run:
+        scope = check_hypothesis_scope_untraced(source)
         print(json.dumps(scope, indent=2, ensure_ascii=False))
         return 0 if not scope["errors"] else 1
+    provider = args.provider.strip()
+    if not provider:
+        raise SystemExit("--provider must be non-empty for live benchmark runs")
+    scope = check_hypothesis_scope(source)
     if scope["errors"]:
         raise SystemExit(f"hypothesis scope loader errors: {scope['errors']}")
 
@@ -399,7 +415,7 @@ async def async_main() -> int:
             source=source,
             workspace_root=workspace_root,
             disease=args.disease,
-            provider=args.provider,
+            provider=provider,
             timeout_s=args.timeout_s,
             force=args.force,
         )
@@ -410,7 +426,7 @@ async def async_main() -> int:
     aggregate = aggregate_trial_rows(rows)
     result_payload = {
         "source": str(source),
-        "provider": args.provider,
+        "provider": provider,
         "disease": args.disease,
         "runs_requested": args.runs,
         "hypothesis_scope": scope,

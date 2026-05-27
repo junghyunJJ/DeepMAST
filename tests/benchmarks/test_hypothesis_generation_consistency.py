@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -13,6 +16,8 @@ from docs.benchmarks.hypothesis_generation_consistency.analysis import (
 )
 from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
     check_hypothesis_scope,
+    check_hypothesis_scope_untraced,
+    parse_args,
     prepare_trial_workspace,
     validate_trial_output,
 )
@@ -200,6 +205,74 @@ def test_check_hypothesis_scope_reports_loader_errors(tmp_path: Path) -> None:
     assert result["scope"] == "hypothesis"
     assert result["file_count"] == 0
     assert result["errors"]
+
+
+def test_check_hypothesis_scope_untraced_restores_tracing_env(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    (source / "evidence").mkdir(parents=True)
+    monkeypatch.setenv("LANGCHAIN_TRACING_V2", "true")
+    monkeypatch.setenv("LANGSMITH_TRACING", "true")
+    monkeypatch.setenv("LANGCHAIN_API_KEY", "test-langchain-key")
+    monkeypatch.setenv("LANGSMITH_API_KEY", "test-langsmith-key")
+
+    result = check_hypothesis_scope_untraced(source)
+
+    assert result["scope"] == "hypothesis"
+    assert os.environ["LANGCHAIN_TRACING_V2"] == "true"
+    assert os.environ["LANGSMITH_TRACING"] == "true"
+    assert os.environ["LANGCHAIN_API_KEY"] == "test-langchain-key"
+    assert os.environ["LANGSMITH_API_KEY"] == "test-langsmith-key"
+
+
+def test_dry_run_cli_suppresses_langsmith_tracing() -> None:
+    source = Path("res_ipf_ollama_tmp")
+    if not source.exists():
+        pytest.skip("benchmark source workspace is not available")
+    env = {
+        **os.environ,
+        "LANGCHAIN_TRACING_V2": "true",
+        "LANGSMITH_TRACING": "true",
+        "LANGCHAIN_API_KEY": "test-langchain-key",
+        "LANGSMITH_API_KEY": "test-langsmith-key",
+    }
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "docs/benchmarks/hypothesis_generation_consistency/run_benchmark.py",
+            "--source",
+            str(source),
+            "--runs",
+            "10",
+            "--dry-run",
+        ],
+        check=False,
+        capture_output=True,
+        encoding="utf-8",
+        env=env,
+    )
+
+    assert completed.returncode == 0
+    assert "LangSmith" not in completed.stderr
+    assert "RateLimit" not in completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["file_count"] == 64
+    assert payload["contrast_count"] == 10
+    assert payload["errors"] == []
+
+
+def test_parse_args_uses_ollama_when_provider_env_is_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "")
+    monkeypatch.setattr(sys, "argv", ["run_benchmark.py"])
+
+    args = parse_args()
+
+    assert args.provider == "ollama"
 
 
 def test_validate_trial_output_marks_missing_report_as_failure(
