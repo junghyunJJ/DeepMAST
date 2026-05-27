@@ -15,6 +15,12 @@ from typing import Any
 from jinja2 import BaseLoader, Environment
 from langchain_core.runnables import RunnableConfig
 
+from src.agents.drug_target.part4_candidate_selector import (
+    PART4_CANDIDATE_SELECTION_FILENAME,
+    generate_part4_candidate_selection,
+    part4_candidate_selector_enabled,
+    part4_candidate_selector_provider_from_config,
+)
 from src.agents.drug_target.therapeutic_synthesis import (
     PART4_SYNTHESIS_FILENAME,
     build_part4_therapeutic_synthesis,
@@ -1162,7 +1168,9 @@ def _artifact_validation(
         "drug_report.html",
     ]
     if require_part4:
-        required_artifacts.append(PART4_SYNTHESIS_FILENAME)
+        required_artifacts.extend(
+            [PART4_CANDIDATE_SELECTION_FILENAME, PART4_SYNTHESIS_FILENAME]
+        )
     if (base / "lr_candidates.json").exists():
         required_artifacts.append("target_assessment.json")
     for name in required_artifacts:
@@ -1239,7 +1247,9 @@ def render_report_markdown(
 async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
     base = Path(state["data_dir"]).expanduser().resolve()
     part4_path = base / PART4_SYNTHESIS_FILENAME
+    part4_candidate_selection_path = base / PART4_CANDIDATE_SELECTION_FILENAME
     part4_path.unlink(missing_ok=True)
+    part4_candidate_selection_path.unlink(missing_ok=True)
     report_data = build_report_data(str(base), str(state.get("disease") or ""))
     _write_json(base / "report_data.json", report_data)
 
@@ -1312,10 +1322,34 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
             "evidence_truncated": False,
         }
 
+    deterministic_synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=pre_part4_validation,
+        interpretations_payload=interpretations_payload,
+    )
+    deterministic_selected_genes = [
+        str(candidate.get("gene") or "")
+        for candidate in deterministic_synthesis["featured_candidates"]
+        if candidate.get("gene")
+    ]
+    selector_provider = (
+        part4_candidate_selector_provider_from_config(config)
+        if part4_candidate_selector_enabled(config)
+        else None
+    )
+    candidate_selection_payload = await generate_part4_candidate_selection(
+        report_data,
+        deterministic_selected_genes=deterministic_selected_genes,
+        provider=selector_provider,
+        data_dir=base,
+    )
+    _write_json(part4_candidate_selection_path, candidate_selection_payload)
+
     part4_synthesis = build_part4_therapeutic_synthesis(
         report_data,
         validation=pre_part4_validation,
         interpretations_payload=interpretations_payload,
+        candidate_selection_payload=candidate_selection_payload,
     )
     part4_path.write_text(
         render_part4_therapeutic_synthesis_markdown(part4_synthesis),
