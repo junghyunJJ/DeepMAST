@@ -212,3 +212,56 @@ def test_validate_trial_output_marks_missing_report_as_failure(
     assert row["success"] is False
     assert row["validation_passed"] is False
     assert "hypothesis_report.json missing" in row["error"]
+
+
+@pytest.mark.parametrize(
+    "report",
+    [
+        {},
+        {
+            "schema_version": "hypothesis_report.v2",
+            "hypotheses": [],
+            "topn_coverage": {"covered": [], "missing": []},
+            "prediction_grounding_summary": {"unverified": 0},
+        },
+    ],
+)
+def test_validate_trial_output_rejects_structurally_empty_reports(
+    tmp_path: Path,
+    report: dict,
+) -> None:
+    workspace = tmp_path / "workspace"
+    evidence = workspace / "evidence"
+    evidence.mkdir(parents=True)
+    (evidence / "hypothesis_report.json").write_text(
+        json.dumps(report),
+        encoding="utf-8",
+    )
+
+    row = validate_trial_output("run_01", workspace, elapsed_s=1.25, error=None)
+
+    assert row["success"] is True
+    assert row["validation_passed"] is False
+
+
+def test_validate_trial_output_includes_summary_when_invocation_errors_after_report(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    evidence = workspace / "evidence"
+    evidence.mkdir(parents=True)
+    (evidence / "hypothesis_report.json").write_text(
+        json.dumps(_report_one()),
+        encoding="utf-8",
+    )
+
+    row = validate_trial_output(
+        "run_01",
+        workspace,
+        elapsed_s=1.25,
+        error="RuntimeError: failed after writing report",
+    )
+
+    assert row["success"] is False
+    assert row["validation_passed"] is False
+    assert row["report_summary"]["hypothesis_count"] == 2

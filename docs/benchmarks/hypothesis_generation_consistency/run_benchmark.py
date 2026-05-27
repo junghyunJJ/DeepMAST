@@ -131,6 +131,13 @@ def validate_trial_output(
     completion = json.loads(
         check_hypothesis_completion.invoke({"data_dir": str(workspace)})
     )
+    report_summary = None
+    if report_path.exists():
+        try:
+            report = read_json(report_path)
+            report_summary = summarize_report(report)
+        except Exception:
+            report_summary = None
     if error is not None:
         return {
             "run_id": run_id,
@@ -141,7 +148,7 @@ def validate_trial_output(
             "elapsed_s": round(elapsed_s, 3),
             "error": error,
             "completion": completion,
-            "report_summary": None,
+            "report_summary": report_summary,
         }
     if not report_path.exists():
         return {
@@ -172,6 +179,11 @@ def validate_trial_output(
     summary = summarize_report(report)
     validation_passed = (
         bool(completion.get("hypothesis_complete"))
+        and summary["schema_version"] == "hypothesis_report.v2"
+        and summary["hypothesis_count"] > 0
+        and isinstance(report, dict)
+        and isinstance(report.get("topn_coverage"), dict)
+        and isinstance(report.get("prediction_grounding_summary"), dict)
         and not summary["topn_missing"]
         and summary["unverified_numeric_predictions"] == 0
     )
