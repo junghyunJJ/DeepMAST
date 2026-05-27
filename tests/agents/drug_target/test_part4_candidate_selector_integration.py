@@ -58,6 +58,20 @@ def _accepted_selector_response(selected_genes: list[str]) -> str:
     )
 
 
+def _accepted_selector_payload(selected_genes: list[str]) -> dict[str, object]:
+    return {
+        "schema_version": "drug_target.part4_candidate_selection.v1",
+        "mode": "llm_rerank",
+        "selected_genes": selected_genes,
+        "selection_rationales": {
+            gene: f"{gene} has bounded deterministic support."
+            for gene in selected_genes
+        },
+        "excluded_high_score_candidates": {},
+        "evidence_references": ["drug.md"],
+    }
+
+
 def _candidate_headings(markdown: str) -> list[str]:
     return [
         line.removeprefix("### Candidate: ").strip()
@@ -140,8 +154,72 @@ async def test_finalize_report_accepts_opt_in_selector_and_orders_part4(
 
 
 @pytest.mark.asyncio
-async def test_finalize_report_falls_back_when_selector_returns_invalid_gene(
+@pytest.mark.parametrize(
+    ("provider_output", "expected_issue_code", "invalid_selected_genes"),
+    [
+        pytest.param(
+            "not json",
+            "MALFORMED_JSON",
+            [],
+            id="malformed_json",
+        ),
+        pytest.param(
+            json.dumps(
+                _accepted_selector_payload(["CXCR4", "ITGB2", "ICAM1"])
+            ),
+            "GENE_OUTSIDE_STAGE3_POOL",
+            ["CXCR4", "ITGB2", "ICAM1"],
+            id="gene_outside_stage3_pool",
+        ),
+        pytest.param(
+            json.dumps(_accepted_selector_payload(["CD47", "ITGB2"])),
+            "INVALID_SELECTED_GENE_COUNT",
+            ["CD47", "ITGB2"],
+            id="invalid_selected_gene_count",
+        ),
+        pytest.param(
+            json.dumps(_accepted_selector_payload(["CD47", "ITGB2", "CD47"])),
+            "DUPLICATE_SELECTED_GENE",
+            ["CD47", "ITGB2", "CD47"],
+            id="duplicate_selected_gene",
+        ),
+        pytest.param(
+            json.dumps(
+                {
+                    **_accepted_selector_payload(["CD47", "ITGB2", "ICAM1"]),
+                    "selection_rationales": {
+                        "CD47": "Patients should receive this target.",
+                        "ITGB2": "ITGB2 has bounded deterministic support.",
+                        "ICAM1": "ICAM1 has bounded deterministic support.",
+                    },
+                }
+            ),
+            "CLINICAL_RECOMMENDATION_LANGUAGE",
+            ["CD47", "ITGB2", "ICAM1"],
+            id="clinical_recommendation_language",
+        ),
+        pytest.param(
+            json.dumps(
+                {
+                    **_accepted_selector_payload(["CD47", "ITGB2", "ICAM1"]),
+                    "selection_rationales": {
+                        "CD47": "x" * 501,
+                        "ITGB2": "ITGB2 has bounded deterministic support.",
+                        "ICAM1": "ICAM1 has bounded deterministic support.",
+                    },
+                }
+            ),
+            "RATIONALE_TOO_LONG",
+            ["CD47", "ITGB2", "ICAM1"],
+            id="rationale_too_long",
+        ),
+    ],
+)
+async def test_finalize_report_invalid_selector_outputs_fallback(
     tmp_path: Path,
+    provider_output: str,
+    expected_issue_code: str,
+    invalid_selected_genes: list[str],
 ) -> None:
     from src.agents.drug_target.deterministic_report import finalize_report_mvp
     from src.agents.drug_target.part4_candidate_selector import (
@@ -160,7 +238,7 @@ async def test_finalize_report_falls_back_when_selector_returns_invalid_gene(
     workspace = _copy_baseline_workspace(tmp_path, "selector_invalid")
 
     def provider(prompt: str) -> str:
-        return _accepted_selector_response(["CXCR4", "ITGB2", "ICAM1"])
+        return provider_output
 
     result = await finalize_report_mvp(
         _state(workspace),
@@ -181,9 +259,14 @@ async def test_finalize_report_falls_back_when_selector_returns_invalid_gene(
     )
     assert payload["status"] == "fallback"
     assert payload["fallback_reason"] == "validation_failed"
-    assert [
+    assert expected_issue_code in {
         issue["code"] for issue in payload["validation_issues"]
-    ] == ["GENE_OUTSIDE_STAGE3_POOL"]
+    }
+    assert payload["selected_genes"] == baseline_headings
+    if len(invalid_selected_genes) == 3:
+        assert payload["selected_genes"] != invalid_selected_genes
+    synthesis_path = workspace / "part4_therapeutic_synthesis.md"
+    assert synthesis_path.exists()
     assert _candidate_headings(
-        (workspace / "part4_therapeutic_synthesis.md").read_text(encoding="utf-8")
+        synthesis_path.read_text(encoding="utf-8")
     ) == baseline_headings
