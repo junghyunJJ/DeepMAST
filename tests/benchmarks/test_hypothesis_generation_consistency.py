@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import importlib
+import json
+from pathlib import Path
 
 from docs.benchmarks.hypothesis_generation_consistency.analysis import (
     aggregate_trial_rows,
     jaccard,
     summarize_report,
+)
+from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
+    check_hypothesis_scope,
+    prepare_trial_workspace,
 )
 
 
@@ -122,3 +128,48 @@ def test_aggregate_trial_rows_handles_failed_row_without_summary() -> None:
     assert aggregate["validation_pass_rate"] == 0.5
     assert aggregate["topn_missing_by_run"]["run_failed"] == []
     assert aggregate["unverified_numeric_predictions_by_run"]["run_failed"] is None
+
+
+def test_prepare_trial_workspace_copies_source_and_removes_stale_report(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    evidence = source / "evidence"
+    evidence.mkdir(parents=True)
+    (source / "lr_candidates.json").write_text("{}", encoding="utf-8")
+    (evidence / "assessment_results.json").write_text(
+        json.dumps({"stage3_candidates": [{"gene": "ICAM1"}]}),
+        encoding="utf-8",
+    )
+    (evidence / "hypothesis_report.json").write_text(
+        '{"stale": true}',
+        encoding="utf-8",
+    )
+
+    workspace = prepare_trial_workspace(
+        source,
+        tmp_path / "workspaces",
+        "run_01",
+        force=True,
+    )
+
+    assert (workspace / "evidence" / "assessment_results.json").exists()
+    assert not (workspace / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_check_hypothesis_scope_reports_loader_errors(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    evidence = source / "evidence"
+    evidence.mkdir(parents=True)
+    (evidence / "assessment_results.json").write_text(
+        json.dumps({"stage3_candidates": [{"gene": "ICAM1"}]}),
+        encoding="utf-8",
+    )
+    (evidence / "stage1_ICAM1--ITGB2.json").write_text(
+        json.dumps({"passed": True}),
+        encoding="utf-8",
+    )
+    result = check_hypothesis_scope(source)
+    assert result["scope"] == "hypothesis"
+    assert result["file_count"] == 0
+    assert result["errors"]
