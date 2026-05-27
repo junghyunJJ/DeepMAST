@@ -578,12 +578,18 @@ def render_part4_therapeutic_synthesis_markdown(
         if report_valid
         else "The deterministic report validation status is invalid or unavailable."
     )
+    caveat_section = ""
+    if not report_valid:
+        caveat_section = """
+## Data Validity Caveat
+The deterministic report validation status is invalid or unavailable. Candidate and hypothesis content below is retained only as a diagnostic synthesis of available artifacts and should not be treated as a completed prioritization.
+"""
 
     markdown = f"""# Part 4: Therapeutic Synthesis
 
 ## Therapeutic Opportunity Landscape
 The DrugTargetAgent assessment for {disease} evaluated {_safe_int(counts.get("total"), 0)} candidate genes. This Part 4 synthesis narrows the deterministic output to {_safe_int(counts.get("featured"), 0)} top triage candidates from {_safe_int(counts.get("stage3_total"), 0)} stage3 candidates, while keeping validated and exploratory evidence tracks separate.
-
+{caveat_section}
 ## Integrated Therapeutic Thesis
 {_integrated_thesis(synthesis)}
 

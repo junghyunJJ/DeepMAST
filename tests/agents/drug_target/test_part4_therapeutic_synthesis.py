@@ -566,6 +566,35 @@ def test_part4_synthesis_uses_experimental_not_clinical_language(
     assert "experimental prioritization" in markdown
 
 
+def test_rich_part4_synthesis_keeps_guardrails(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.therapeutic_synthesis import (
+        build_part4_therapeutic_synthesis,
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+    synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=_validation_payload(),
+        interpretations_payload=None,
+    )
+
+    markdown = render_part4_therapeutic_synthesis_markdown(synthesis)
+
+    assert "EXPAND" not in markdown
+    for phrase in _FORBIDDEN_CLINICAL_PHRASES:
+        assert phrase not in markdown.lower()
+    assert "## 1. Executive Summary" not in markdown
+    assert (
+        "This report presents a comprehensive therapeutic target assessment"
+        not in markdown
+    )
+
+
 def test_render_part4_synthesis_scrubs_clinical_drift_from_hypotheses(
     tmp_path: Path,
 ) -> None:
@@ -626,5 +655,10 @@ def test_render_part4_synthesis_handles_invalid_validation_metadata(
     markdown = render_part4_therapeutic_synthesis_markdown(synthesis)
 
     assert synthesis["report_valid"] is False
+    caveat_index = markdown.index("## Data Validity Caveat")
+    thesis_index = markdown.index("## Integrated Therapeutic Thesis")
+    triage_index = markdown.index("## Candidate Triage")
+
+    assert caveat_index < thesis_index < triage_index
     assert "report validation status is invalid" in markdown.lower()
     assert "TEST_INVALID_ARTIFACT" in markdown
