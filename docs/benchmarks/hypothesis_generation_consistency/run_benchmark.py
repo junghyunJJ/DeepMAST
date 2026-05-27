@@ -285,3 +285,151 @@ async def run_trial(
         error = f"{type(exc).__name__}: {exc}"
     elapsed = time.time() - started
     return validate_trial_output(run_id, workspace, elapsed_s=elapsed, error=error)
+
+
+def format_markdown_summary(
+    aggregate: dict[str, Any],
+    rows: list[dict[str, Any]],
+) -> str:
+    lines = [
+        "# Hypothesis Generation Consistency Benchmark Summary",
+        "",
+        f"- Total runs: {aggregate['total_runs']}",
+        f"- Successful runs: {aggregate['successful_runs']}",
+        f"- Validation-passed runs: {aggregate['validation_passed_runs']}",
+        f"- Success rate: {aggregate['success_rate']:.2%}",
+        f"- Validation pass rate: {aggregate['validation_pass_rate']:.2%}",
+        f"- Hypothesis count values: {aggregate['hypothesis_count_values']}",
+        f"- Mean pairwise gene Jaccard: {aggregate['mean_pairwise_gene_jaccard']}",
+        (
+            "- Mean pairwise evidence-reference Jaccard: "
+            f"{aggregate['mean_pairwise_ref_jaccard']}"
+        ),
+        (
+            "- Mean pairwise title similarity: "
+            f"{aggregate['mean_pairwise_title_similarity']}"
+        ),
+        (
+            "- Mean pairwise core-claim similarity: "
+            f"{aggregate['mean_pairwise_core_claim_similarity']}"
+        ),
+        "",
+        "## Runs",
+        "",
+        (
+            "| Run | Success | Validation | Hypotheses | TOP-N missing | "
+            "Unverified numeric | Elapsed s |"
+        ),
+        "| --- | --- | --- | ---: | --- | ---: | ---: |",
+    ]
+    for row in rows:
+        summary = row.get("report_summary") or {}
+        lines.append(
+            (
+                "| {run_id} | {success} | {validation} | {count} | {missing} | "
+                "{unverified} | {elapsed} |"
+            ).format(
+                run_id=row.get("run_id"),
+                success=row.get("success"),
+                validation=row.get("validation_passed"),
+                count=summary.get("hypothesis_count", 0),
+                missing=", ".join(summary.get("topn_missing", [])) or "-",
+                unverified=summary.get("unverified_numeric_predictions", "-"),
+                elapsed=row.get("elapsed_s"),
+            )
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run repeated real hypothesis_writer trials on frozen evidence."
+    )
+    parser.add_argument("--source", default="res_ipf_ollama_tmp")
+    parser.add_argument("--runs", type=int, default=10)
+    parser.add_argument("--disease", default="pulmonary fibrosis")
+    parser.add_argument("--provider", default=os.getenv("LLM_PROVIDER", "ollama"))
+    parser.add_argument("--timeout-s", type=int, default=1800)
+    parser.add_argument("--output-root", default=None)
+    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--dry-run", action="store_true")
+    return parser.parse_args()
+
+
+async def async_main() -> int:
+    load_benchmark_env()
+    args = parse_args()
+    source = resolve_path(args.source)
+    if not source.exists():
+        raise SystemExit(f"source workspace does not exist: {source}")
+    scope = check_hypothesis_scope(source)
+    if args.dry_run:
+        print(json.dumps(scope, indent=2, ensure_ascii=False))
+        return 0 if not scope["errors"] else 1
+    if scope["errors"]:
+        raise SystemExit(f"hypothesis scope loader errors: {scope['errors']}")
+
+    stem = (
+        Path(args.output_root).name
+        if args.output_root
+        else f"ipf_hypothesis_consistency_{utc_stamp()}"
+    )
+    output_root = (
+        resolve_path(args.output_root)
+        if args.output_root
+        else PROJECT_ROOT
+        / "docs/benchmarks/hypothesis_generation_consistency/results"
+        / stem
+    )
+    workspace_root = (
+        PROJECT_ROOT
+        / "docs/benchmarks/hypothesis_generation_consistency/workspaces"
+        / stem
+    )
+    output_root.mkdir(parents=True, exist_ok=True)
+    workspace_root.mkdir(parents=True, exist_ok=True)
+
+    trials_path = output_root / "trials.jsonl"
+    rows: list[dict[str, Any]] = []
+    for index in range(1, args.runs + 1):
+        run_id = f"run_{index:02d}"
+        row = await run_trial(
+            run_id=run_id,
+            source=source,
+            workspace_root=workspace_root,
+            disease=args.disease,
+            provider=args.provider,
+            timeout_s=args.timeout_s,
+            force=args.force,
+        )
+        rows.append(row)
+        append_jsonl(trials_path, row)
+        print(json.dumps(row, ensure_ascii=False))
+
+    aggregate = aggregate_trial_rows(rows)
+    result_payload = {
+        "source": str(source),
+        "provider": args.provider,
+        "disease": args.disease,
+        "runs_requested": args.runs,
+        "hypothesis_scope": scope,
+        "aggregate": aggregate,
+        "trials": rows,
+    }
+    write_json(output_root / "benchmark_results.json", result_payload)
+    (output_root / "benchmark_summary.md").write_text(
+        format_markdown_summary(aggregate, rows),
+        encoding="utf-8",
+    )
+    print(f"wrote {output_root / 'benchmark_results.json'}")
+    print(f"wrote {output_root / 'benchmark_summary.md'}")
+    return 0
+
+
+def main() -> int:
+    return asyncio.run(async_main())
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
