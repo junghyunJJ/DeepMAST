@@ -15,6 +15,7 @@ from docs.benchmarks.hypothesis_generation_consistency.analysis import (
     summarize_report,
 )
 from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
+    clean_hypothesis_benchmark_workspace,
     check_hypothesis_scope,
     check_hypothesis_scope_untraced,
     parse_args,
@@ -162,6 +163,66 @@ def test_prepare_trial_workspace_copies_source_and_removes_stale_report(
     )
 
     assert (workspace / "evidence" / "assessment_results.json").exists()
+    assert not (workspace / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_prepare_trial_workspace_removes_prior_report_artifacts(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    evidence = source / "evidence"
+    history = source / "conversation_history"
+    evidence.mkdir(parents=True)
+    history.mkdir()
+    (source / "lr_candidates.json").write_text("{}", encoding="utf-8")
+    (source / "drug.md").write_text("stale drug report", encoding="utf-8")
+    (source / "drug_report.html").write_text("<html></html>", encoding="utf-8")
+    (source / "drug_report_reference_card.json").write_text("{}", encoding="utf-8")
+    (source / "report_expansions.json").write_text("{}", encoding="utf-8")
+    (source / "target_assessment.json").write_text("{}", encoding="utf-8")
+    (history / "prior.md").write_text("old conversation", encoding="utf-8")
+    (evidence / "assessment_results.json").write_text(
+        json.dumps({"stage3_candidates": [{"gene": "ICAM1"}]}),
+        encoding="utf-8",
+    )
+    (evidence / "hypothesis_report.json").write_text(
+        json.dumps({"schema_version": "hypothesis_report.v2"}),
+        encoding="utf-8",
+    )
+
+    workspace = prepare_trial_workspace(
+        source,
+        tmp_path / "workspaces",
+        "run_01",
+        force=True,
+    )
+
+    assert (workspace / "lr_candidates.json").exists()
+    assert (workspace / "evidence" / "assessment_results.json").exists()
+    assert not (workspace / "drug.md").exists()
+    assert not (workspace / "drug_report.html").exists()
+    assert not (workspace / "drug_report_reference_card.json").exists()
+    assert not (workspace / "report_expansions.json").exists()
+    assert not (workspace / "target_assessment.json").exists()
+    assert not (workspace / "conversation_history").exists()
+    assert not (workspace / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_clean_hypothesis_benchmark_workspace_reports_removed_artifacts(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    (workspace / "evidence").mkdir(parents=True)
+    (workspace / "drug.md").write_text("stale", encoding="utf-8")
+    (workspace / "evidence" / "hypothesis_report.json").write_text(
+        "{}",
+        encoding="utf-8",
+    )
+
+    removed = clean_hypothesis_benchmark_workspace(workspace)
+
+    assert removed == ["drug.md", "evidence/hypothesis_report.json"]
+    assert not (workspace / "drug.md").exists()
     assert not (workspace / "evidence" / "hypothesis_report.json").exists()
 
 

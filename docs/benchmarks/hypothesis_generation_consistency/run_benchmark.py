@@ -35,6 +35,16 @@ TRACE_DISABLED_ENV = {
     "LANGSMITH_API_KEY": None,
 }
 
+HYPOTHESIS_BENCHMARK_CLEAN_FILES = (
+    "drug.md",
+    "drug_report.html",
+    "drug_report_reference_card.json",
+    "report_expansions.json",
+    "target_assessment.json",
+    "evidence/hypothesis_report.json",
+)
+HYPOTHESIS_BENCHMARK_CLEAN_DIRS = ("conversation_history",)
+
 
 def load_benchmark_env() -> None:
     load_dotenv(PROJECT_ROOT / ".env", override=False)
@@ -64,6 +74,22 @@ def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
         handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
+def clean_hypothesis_benchmark_workspace(workspace: Path) -> list[str]:
+    """Remove copied artifacts that can bias fresh hypothesis generation."""
+    removed: list[str] = []
+    for relative in HYPOTHESIS_BENCHMARK_CLEAN_FILES:
+        path = workspace / relative
+        if path.exists():
+            path.unlink()
+            removed.append(relative)
+    for relative in HYPOTHESIS_BENCHMARK_CLEAN_DIRS:
+        path = workspace / relative
+        if path.exists():
+            shutil.rmtree(path)
+            removed.append(f"{relative}/")
+    return removed
+
+
 def prepare_trial_workspace(
     source: Path,
     workspace_root: Path,
@@ -91,8 +117,7 @@ def prepare_trial_workspace(
             raise FileExistsError(f"workspace already exists: {workspace}")
         shutil.rmtree(workspace)
     shutil.copytree(source, workspace)
-    stale_report = workspace / "evidence" / "hypothesis_report.json"
-    stale_report.unlink(missing_ok=True)
+    clean_hypothesis_benchmark_workspace(workspace)
     return workspace
 
 
