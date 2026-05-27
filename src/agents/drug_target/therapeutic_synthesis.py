@@ -151,6 +151,26 @@ def _source_text(value: object) -> str:
     return source
 
 
+def _indications_text(value: object) -> str:
+    indications: list[str] = []
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, Mapping):
+                indication = _safe_text(
+                    item.get("efo_term")
+                    or item.get("mesh_heading")
+                    or item.get("name")
+                    or item.get("title"),
+                )
+            else:
+                indication = _safe_text(item)
+            if indication:
+                indications.append(indication)
+            if len(indications) >= _MAX_RENDER_LIST_ITEMS:
+                break
+    return ", ".join(indications) if indications else "N/A"
+
+
 def _drug_record_summary(record: Mapping[str, Any]) -> dict[str, str]:
     return {
         "name": _safe_text(
@@ -163,6 +183,7 @@ def _drug_record_summary(record: Mapping[str, Any]) -> dict[str, str]:
         "phase": _phase_text(record.get("phase")),
         "mechanism_of_action": _safe_text(record.get("mechanism_of_action")),
         "source": _source_text(record.get("source")),
+        "indications": _indications_text(record.get("indications")),
     }
 
 
@@ -213,6 +234,38 @@ def _drug_evidence_score(candidate: Mapping[str, Any]) -> int:
     clinical = min(_safe_int(candidate.get("clinical_drug_count"), 0), 5)
     preclinical = min(_safe_int(candidate.get("preclinical_drug_count"), 0), 5)
     return clinical * 2 + preclinical
+
+
+def _table_cell(value: object, default: str = "N/A") -> str:
+    return _bounded_text(value, default, limit=160).replace("|", r"\|")
+
+
+def _clinical_compounds_table(candidate: Mapping[str, Any]) -> str:
+    records = _dict_list(candidate.get("clinical_drug_examples"))
+    if not records:
+        return "**Clinical Compounds (OpenTargets):** No named clinical compounds were available."
+
+    rows = [
+        "**Clinical Compounds (OpenTargets):**",
+        "",
+        "| Drug | ChEMBL ID | Mechanism of Action | Phase | Indications |",
+        "|------|-----------|---------------------|------:|-------------|",
+    ]
+    for record in records[:_MAX_RENDER_LIST_ITEMS]:
+        rows.append(
+            "| "
+            f"**{_table_cell(record.get('name'))}** | "
+            f"{_table_cell(record.get('chembl_id'))} | "
+            f"{_table_cell(record.get('mechanism_of_action'))} | "
+            f"{_table_cell(record.get('phase'))} | "
+            f"{_table_cell(record.get('indications'))} |"
+        )
+    return "\n".join(rows)
+
+
+def _preclinical_signal_summary(candidate: Mapping[str, Any]) -> str:
+    count = _safe_int(candidate.get("preclinical_drug_count"), 0)
+    return f"{count} ChEMBL bioactivity records"
 
 
 def _therapeutic_rationale(candidate: Mapping[str, Any]) -> str:
@@ -602,10 +655,8 @@ def _candidate_section(candidate: Mapping[str, Any]) -> str:
                 "- Drug signal: "
                 f"{_safe_text(candidate.get('drug_signal_summary'))}"
             ),
-            (
-                "- Drug-target evidence: "
-                f"{_safe_text(candidate.get('drug_target_evidence'), 'No named clinical or preclinical drug records were available.')}"
-            ),
+            _clinical_compounds_table(candidate),
+            f"- Preclinical signal: {_preclinical_signal_summary(candidate)}",
             (
                 "- Mechanistic synthesis role: "
                 f"{_safe_text(candidate.get('mechanistic_role_summary'), 'No ranked mechanistic hypothesis explicitly linked this candidate in the deterministic hypothesis artifact.')}"

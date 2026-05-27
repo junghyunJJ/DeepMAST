@@ -285,7 +285,9 @@ def test_render_part4_synthesis_has_rich_candidate_triage(
     assert "- Evidence track:" in markdown
     assert "- Therapeutic rationale:" in markdown
     assert "- Drug signal:" in markdown
-    assert "- Drug-target evidence:" in markdown
+    assert "**Clinical Compounds (OpenTargets):**" in markdown
+    assert "No named clinical compounds were available." in markdown
+    assert "- Preclinical signal:" in markdown
     assert "- Mechanistic synthesis role:" in markdown
     assert "- Experimental discriminator:" in markdown
     assert "IPF cell states" not in markdown
@@ -334,18 +336,22 @@ def test_part4_synthesis_selects_primary_mechanistic_axis_before_score_top3() ->
                 [
                     {
                         "name": "EVORPACEPT",
+                        "chembl_id": "CHEMBL4297880",
                         "phase": 2,
                         "mechanism_of_action": (
                             "Leukocyte surface antigen CD47 inhibitor"
                         ),
+                        "indications": ["acute myeloid leukemia", "multiple myeloma"],
                         "source": "opentargets",
                     },
                     {
                         "name": "MAGROLIMAB",
+                        "chembl_id": "CHEMBL4297985",
                         "phase": 3,
                         "mechanism_of_action": (
                             "Leukocyte surface antigen CD47 inhibitor"
                         ),
+                        "indications": ["acute myeloid leukemia"],
                         "source": "opentargets",
                     },
                 ],
@@ -356,11 +362,20 @@ def test_part4_synthesis_selects_primary_mechanistic_axis_before_score_top3() ->
                 [
                     {
                         "name": "LIFITEGRAST",
+                        "chembl_id": "CHEMBL2048028",
                         "phase": 4,
                         "mechanism_of_action": (
                             "Integrin alpha-L/beta-2 (LFA-1) antagonist"
                         ),
+                        "indications": ["dry eye syndrome"],
                         "source": "opentargets",
+                    }
+                ],
+                [
+                    {
+                        "name": "SHOULD_NOT_RENDER_PRECLINICAL",
+                        "chembl_id": "CHEMBL-PRECLINICAL",
+                        "source": "chembl",
                     }
                 ],
             ),
@@ -370,11 +385,13 @@ def test_part4_synthesis_selects_primary_mechanistic_axis_before_score_top3() ->
                 [
                     {
                         "name": "ALICAFORSEN",
+                        "chembl_id": "CHEMBL2108326",
                         "phase": 3,
                         "mechanism_of_action": (
                             "Intercellular adhesion molecule-1 mRNA 3'UTR "
                             "antisense inhibitor"
                         ),
+                        "indications": ["ulcerative colitis"],
                         "source": "opentargets",
                     }
                 ],
@@ -419,13 +436,26 @@ def test_part4_synthesis_selects_primary_mechanistic_axis_before_score_top3() ->
     assert markdown.index("### Candidate: ITGB2") < markdown.index(
         "### Candidate: ICAM1"
     )
-    assert "EVORPACEPT (phase 2; Leukocyte surface antigen CD47 inhibitor" in markdown
-    assert "MAGROLIMAB (phase 3; Leukocyte surface antigen CD47 inhibitor" in markdown
-    assert "LIFITEGRAST (phase 4; Integrin alpha-L/beta-2 (LFA-1) antagonist" in markdown
+    assert "| Drug | ChEMBL ID | Mechanism of Action | Phase | Indications |" in markdown
     assert (
-        "ALICAFORSEN (phase 3; Intercellular adhesion molecule-1 mRNA "
-        "3'UTR antisense inhibitor"
+        "| **EVORPACEPT** | CHEMBL4297880 | Leukocyte surface antigen CD47 "
+        "inhibitor | phase 2 | acute myeloid leukemia, multiple myeloma |"
     ) in markdown
+    assert (
+        "| **MAGROLIMAB** | CHEMBL4297985 | Leukocyte surface antigen CD47 "
+        "inhibitor | phase 3 | acute myeloid leukemia |"
+    ) in markdown
+    assert (
+        "| **LIFITEGRAST** | CHEMBL2048028 | Integrin alpha-L/beta-2 "
+        "(LFA-1) antagonist | phase 4 | dry eye syndrome |"
+    ) in markdown
+    assert (
+        "| **ALICAFORSEN** | CHEMBL2108326 | Intercellular adhesion molecule-1 "
+        "mRNA 3'UTR antisense inhibitor | phase 3 | ulcerative colitis |"
+    ) in markdown
+    assert "- Preclinical signal: 0 ChEMBL bioactivity records" in markdown
+    assert "- Preclinical signal: 1 ChEMBL bioactivity records" in markdown
+    assert "SHOULD_NOT_RENDER_PRECLINICAL" not in markdown
 
 
 def test_render_part4_synthesis_has_mechanistic_intervention_map(
