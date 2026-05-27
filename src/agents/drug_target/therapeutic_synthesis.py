@@ -38,6 +38,28 @@ def _string_list(value: object) -> list[str]:
     return [text for item in value if (text := _safe_text(item))]
 
 
+def _limited_names(value: object, limit: int = 5) -> list[str]:
+    if not isinstance(value, list):
+        return []
+
+    names: list[str] = []
+    for item in value:
+        if isinstance(item, Mapping):
+            name = _safe_text(
+                item.get("name")
+                or item.get("title")
+                or item.get("drug")
+                or item.get("drug_name")
+            )
+        else:
+            name = _safe_text(item)
+        if name:
+            names.append(name)
+        if len(names) >= limit:
+            break
+    return names
+
+
 def _safe_text(value: object, default: str = "") -> str:
     text = "" if value is None else str(value).strip()
     return text if text else default
@@ -67,22 +89,84 @@ def _candidate_score(candidate: Mapping[str, Any], key: str) -> int:
     return _safe_int(scores.get(key), 0)
 
 
+def _candidate_score_profile(candidate: Mapping[str, Any]) -> dict[str, int]:
+    return {
+        "combined_total": _candidate_score(candidate, "combined_total"),
+        "validated_total": _candidate_score(candidate, "validated_total"),
+        "exploratory_total": _candidate_score(candidate, "exploratory_total"),
+    }
+
+
+def _evidence_track(candidate: Mapping[str, Any]) -> str:
+    validated = _candidate_score(candidate, "validated_total")
+    exploratory = _candidate_score(candidate, "exploratory_total")
+    if validated >= 7 and exploratory >= 4:
+        return "validated-and-exploratory"
+    if validated >= 7:
+        return "validated-dominant"
+    if exploratory >= 4:
+        return "exploratory-dominant"
+    return "limited-evidence"
+
+
+def _drug_signal_summary(candidate: Mapping[str, Any]) -> str:
+    clinical_count = _safe_int(candidate.get("clinical_drug_count"), 0)
+    preclinical_count = _safe_int(candidate.get("preclinical_drug_count"), 0)
+    return (
+        f"{clinical_count} clinical and {preclinical_count} preclinical "
+        "structured drug signals"
+    )
+
+
+def _therapeutic_rationale(candidate: Mapping[str, Any]) -> str:
+    gene = _safe_text(candidate.get("gene"), "candidate").upper()
+    classification = _safe_text(candidate.get("classification"), "unknown")
+    priority = _safe_text(candidate.get("priority"), "unranked")
+    track = _evidence_track(candidate).replace("-", " ")
+    return (
+        f"{gene} is prioritized as a {priority} {classification} candidate "
+        f"with {track} support in the deterministic evidence model."
+    )
+
+
+def _score_profile(value: object) -> dict[str, int | float]:
+    if not isinstance(value, Mapping):
+        return {}
+    profile: dict[str, int | float] = {}
+    for key, raw_score in value.items():
+        if (
+            isinstance(key, str)
+            and not isinstance(raw_score, bool)
+            and isinstance(raw_score, int | float)
+        ):
+            profile[key] = raw_score
+    return profile
+
+
 def _candidate_summary(candidate: Mapping[str, Any]) -> dict[str, Any]:
     sources = _string_list(candidate.get("sources"))
+    score_profile = _candidate_score_profile(candidate)
     return {
         "gene": _safe_text(candidate.get("gene")).upper(),
         "classification": _safe_text(candidate.get("classification"), "unknown"),
         "priority": _safe_text(candidate.get("priority"), "unranked"),
         "stage3_candidate": _safe_bool(candidate.get("stage3_candidate")),
-        "combined_total": _candidate_score(candidate, "combined_total"),
-        "validated_total": _candidate_score(candidate, "validated_total"),
-        "exploratory_total": _candidate_score(candidate, "exploratory_total"),
+        "score_profile": score_profile,
+        "combined_total": score_profile["combined_total"],
+        "validated_total": score_profile["validated_total"],
+        "exploratory_total": score_profile["exploratory_total"],
+        "evidence_track": _evidence_track(candidate),
+        "drug_signal_summary": _drug_signal_summary(candidate),
+        "clinical_drugs": _limited_names(candidate.get("clinical_drugs")),
+        "preclinical_drugs": _limited_names(candidate.get("preclinical_drugs")),
+        "therapeutic_rationale": _therapeutic_rationale(candidate),
         "clinical_drug_count": _safe_int(candidate.get("clinical_drug_count"), 0),
         "preclinical_drug_count": _safe_int(
             candidate.get("preclinical_drug_count"),
             0,
         ),
         "source_count": len(sources),
+        "evidence_sources": sources[:5],
     }
 
 
@@ -139,11 +223,15 @@ def _hypothesis_summary(hypothesis: Mapping[str, Any]) -> dict[str, Any]:
         "category": _safe_text(hypothesis.get("category"), "unspecified"),
         "genes": [gene.upper() for gene in _string_list(entities.get("genes"))],
         "drugs": _string_list(entities.get("drugs")),
+        "pathways": _limited_names(entities.get("pathways")),
+        "cell_types": _limited_names(entities.get("cell_types")),
         "core_claim": _safe_text(hypothesis.get("core_claim")),
         "falsifiable_prediction": _safe_text(
             hypothesis.get("falsifiable_prediction"),
         ),
         "validation_approach": _safe_text(hypothesis.get("validation_approach")),
+        "score_profile": _score_profile(hypothesis.get("scores")),
+        "evidence_references": evidence_references[:5],
         "source_count": len(evidence_references),
     }
 

@@ -84,6 +84,132 @@ def test_part4_synthesis_data_prioritizes_featured_candidates(
     assert synthesis["hypotheses"]
 
 
+def test_part4_synthesis_data_preserves_candidate_evidence_context(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.therapeutic_synthesis import (
+        build_part4_therapeutic_synthesis,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+
+    synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=_validation_payload(),
+        interpretations_payload=None,
+    )
+
+    candidate = synthesis["featured_candidates"][0]
+    score_profile = {
+        "combined_total": 15,
+        "validated_total": 10,
+        "exploratory_total": 5,
+    }
+
+    assert candidate["gene"] == "CD4"
+    assert candidate["score_profile"] == score_profile
+    assert candidate["combined_total"] == score_profile["combined_total"]
+    assert candidate["validated_total"] == score_profile["validated_total"]
+    assert candidate["exploratory_total"] == score_profile["exploratory_total"]
+    assert candidate["evidence_track"] == "validated-and-exploratory"
+    assert (
+        candidate["drug_signal_summary"]
+        == "0 clinical and 10 preclinical structured drug signals"
+    )
+    assert candidate["clinical_drugs"] == []
+    assert candidate["preclinical_drugs"] == [
+        (
+            "N1-(4-((4-(1-ethyl-4-fluoro-2-methyl-1H-benzo[d]imidazol-6-yl)"
+            "-5-fluoropyrimidin-2-yl)amino)benzyl)-N8-hydroxyoctanediamide"
+        ),
+        "Chloropeptin I analogue",
+        (
+            "13-Cyclohexylmethoxy-6-methylene-4,8-di(p-toluenesulfonyl)-"
+            "4,8,15-triazabicyclo[9.3.1]pentadeca-1(15),11,13-triene "
+            "Hydrochloride"
+        ),
+        "ISOCOMPLESTATIN",
+        "CHLOROPEPTIN",
+    ]
+    assert candidate["evidence_sources"] == [
+        "evidence/assessment_results.json",
+        "evidence/stage3_CD4.json",
+    ]
+    assert candidate["source_count"] == 2
+    assert "CD4" in candidate["therapeutic_rationale"]
+    assert "high" in candidate["therapeutic_rationale"]
+    assert "validated_target" in candidate["therapeutic_rationale"]
+    assert "validated and exploratory support" in candidate["therapeutic_rationale"]
+
+
+def test_part4_synthesis_data_preserves_hypothesis_context(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.therapeutic_synthesis import (
+        build_part4_therapeutic_synthesis,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+
+    synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=_validation_payload(),
+        interpretations_payload=None,
+    )
+
+    hypothesis = synthesis["hypotheses"][0]
+
+    assert hypothesis["rank"] == 1
+    assert (
+        hypothesis["title"]
+        == "ICAM1-ITGB2 Axis Drives Fibroblast Activation and ECM Deposition "
+        "in IPF [MoA - Immune Modulation]"
+    )
+    assert hypothesis["category"] == "Mechanism of Action"
+    assert hypothesis["genes"] == ["ICAM1", "ITGB2"]
+    assert hypothesis["pathways"] == [
+        "integrin signaling",
+        "cell adhesion",
+        "fibroblast activation",
+    ]
+    assert hypothesis["cell_types"] == [
+        "fibroblasts",
+        "immune cells",
+        "alveolar type 2 cells",
+    ]
+    assert hypothesis["score_profile"] == {
+        "actionability": 0.9,
+        "composite": 0.775,
+        "evidence_coverage": 0.85,
+        "novelty": 0.6,
+        "specificity": 0.8,
+    }
+    assert hypothesis["evidence_references"] == [
+        "stage1_ICAM1--ITGB2.json",
+        "stage3_ICAM1.json",
+        "ot_ICAM1.json",
+        "stage3_ITGB2.json",
+        "ot_ITGB2.json",
+    ]
+    assert hypothesis["source_count"] == 5
+    assert (
+        "ICAM1-ITGB2 interaction forms a critical adhesion signaling hub"
+        in hypothesis["core_claim"]
+    )
+    assert (
+        "blocking the ICAM1-ITGB2 interaction with Lifitegrast"
+        in hypothesis["falsifiable_prediction"]
+    )
+    assert (
+        "Primary IPF fibroblast cultures treated with Lifitegrast"
+        in hypothesis["validation_approach"]
+    )
+
+
 def test_render_part4_synthesis_markdown_is_not_drug_md_copy(
     tmp_path: Path,
 ) -> None:
