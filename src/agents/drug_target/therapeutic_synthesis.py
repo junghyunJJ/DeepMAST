@@ -1,0 +1,355 @@
+"""Deterministic Part 4 therapeutic synthesis artifact rendering."""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Mapping
+from typing import Any
+
+
+PART4_SYNTHESIS_SCHEMA_VERSION = "drug_target.part4_therapeutic_synthesis.v1"
+PART4_SYNTHESIS_FILENAME = "part4_therapeutic_synthesis.md"
+
+_MAX_FEATURED_CANDIDATES = 3
+_MAX_HYPOTHESES = 5
+_DISALLOWED_MARKDOWN_PHRASES = (
+    ("EXPAND", "artifact marker"),
+    ("recommended therapy", "candidate therapy"),
+    ("should treat", "should test experimentally"),
+    ("clinical ready", "experimentally prioritized"),
+    ("standard of care", "care guidance"),
+)
+
+
+def _dict_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [text for item in value if (text := _safe_text(item))]
+
+
+def _safe_text(value: object, default: str = "") -> str:
+    text = "" if value is None else str(value).strip()
+    return text if text else default
+
+
+def _safe_int(value: object, default: int = 0) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    try:
+        return int(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes"}
+    return bool(value)
+
+
+def _candidate_score(candidate: Mapping[str, Any], key: str) -> int:
+    scores = candidate.get("scores")
+    if not isinstance(scores, Mapping):
+        return 0
+    return _safe_int(scores.get(key), 0)
+
+
+def _candidate_summary(candidate: Mapping[str, Any]) -> dict[str, Any]:
+    sources = _string_list(candidate.get("sources"))
+    return {
+        "gene": _safe_text(candidate.get("gene")).upper(),
+        "classification": _safe_text(candidate.get("classification"), "unknown"),
+        "priority": _safe_text(candidate.get("priority"), "unranked"),
+        "stage3_candidate": _safe_bool(candidate.get("stage3_candidate")),
+        "combined_total": _candidate_score(candidate, "combined_total"),
+        "validated_total": _candidate_score(candidate, "validated_total"),
+        "exploratory_total": _candidate_score(candidate, "exploratory_total"),
+        "clinical_drug_count": _safe_int(candidate.get("clinical_drug_count"), 0),
+        "preclinical_drug_count": _safe_int(
+            candidate.get("preclinical_drug_count"),
+            0,
+        ),
+        "source_count": len(sources),
+    }
+
+
+def _selected_candidates(report_data: Mapping[str, Any]) -> list[dict[str, Any]]:
+    candidates = [
+        summary
+        for candidate in _dict_list(report_data.get("candidates"))
+        if (summary := _candidate_summary(candidate))["gene"]
+    ]
+    featured = [
+        candidate
+        for candidate in candidates
+        if candidate["stage3_candidate"]
+    ]
+    pool = featured or candidates
+    return sorted(
+        pool,
+        key=lambda item: (-item["combined_total"], item["gene"]),
+    )[:_MAX_FEATURED_CANDIDATES]
+
+
+def _interpretation_summary(payload: Mapping[str, Any] | None) -> dict[str, Any]:
+    summary = payload.get("summary") if isinstance(payload, Mapping) else None
+    if not isinstance(summary, Mapping):
+        summary = {}
+    return {
+        "accepted": _safe_int(summary.get("accepted"), 0),
+        "rejected": _safe_int(summary.get("rejected"), 0),
+        "missing": _safe_int(summary.get("missing"), 0),
+        "provider_errors": _safe_int(summary.get("provider_errors"), 0),
+        "criteria_met": _safe_bool(summary.get("criteria_met")),
+    }
+
+
+def _validation_issues(validation: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(validation, Mapping):
+        return []
+    return _dict_list(validation.get("issues"))
+
+
+def _hypothesis_summary(hypothesis: Mapping[str, Any]) -> dict[str, Any]:
+    entities = hypothesis.get("biological_entities")
+    if not isinstance(entities, Mapping):
+        entities = {}
+    evidence_references = _string_list(hypothesis.get("evidence_references"))
+    return {
+        "rank": _safe_int(hypothesis.get("rank"), 0),
+        "title": _safe_text(
+            hypothesis.get("title")
+            or hypothesis.get("hypothesis")
+            or hypothesis.get("mechanism"),
+            "Mechanistic hypothesis",
+        ),
+        "category": _safe_text(hypothesis.get("category"), "unspecified"),
+        "genes": [gene.upper() for gene in _string_list(entities.get("genes"))],
+        "drugs": _string_list(entities.get("drugs")),
+        "core_claim": _safe_text(hypothesis.get("core_claim")),
+        "falsifiable_prediction": _safe_text(
+            hypothesis.get("falsifiable_prediction"),
+        ),
+        "validation_approach": _safe_text(hypothesis.get("validation_approach")),
+        "source_count": len(evidence_references),
+    }
+
+
+def _hypotheses(report_data: Mapping[str, Any]) -> list[dict[str, Any]]:
+    summaries = [
+        _hypothesis_summary(hypothesis)
+        for hypothesis in _dict_list(report_data.get("hypotheses"))
+    ]
+    return sorted(
+        summaries,
+        key=lambda item: (item["rank"] if item["rank"] else 10_000, item["title"]),
+    )[:_MAX_HYPOTHESES]
+
+
+def build_part4_therapeutic_synthesis(
+    report_data: Mapping[str, Any],
+    *,
+    validation: Mapping[str, Any] | None,
+    interpretations_payload: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build a deterministic Part 4 synthesis model from report_data."""
+
+    candidates = _dict_list(report_data.get("candidates"))
+    selected_candidates = _selected_candidates(report_data)
+    return {
+        "schema_version": PART4_SYNTHESIS_SCHEMA_VERSION,
+        "disease": _safe_text(report_data.get("disease"), "unspecified disease"),
+        "report_valid": (
+            _safe_bool(validation.get("valid"))
+            if isinstance(validation, Mapping)
+            else False
+        ),
+        "validation_issues": _validation_issues(validation),
+        "interpretation_summary": _interpretation_summary(interpretations_payload),
+        "candidate_counts": {
+            "total": len(candidates),
+            "featured": len(selected_candidates),
+            "stage3_total": len(
+                [
+                    candidate
+                    for candidate in candidates
+                    if _safe_bool(candidate.get("stage3_candidate"))
+                ]
+            ),
+            "validated": len(
+                [
+                    candidate
+                    for candidate in candidates
+                    if _safe_text(candidate.get("classification"))
+                    == "validated_target"
+                ]
+            ),
+            "exploratory": len(
+                [
+                    candidate
+                    for candidate in candidates
+                    if (
+                        classification := _safe_text(
+                            candidate.get("classification"),
+                        ).lower()
+                    )
+                    in {"exploratory_target", "novel_candidate"}
+                    or "exploratory" in classification
+                ]
+            ),
+        },
+        "featured_candidates": selected_candidates,
+        "hypotheses": _hypotheses(report_data),
+    }
+
+
+def _candidate_bullet(candidate: Mapping[str, Any]) -> str:
+    stage_label = (
+        "stage3 candidate"
+        if _safe_bool(candidate.get("stage3_candidate"))
+        else "candidate"
+    )
+    return (
+        f"- **{_safe_text(candidate.get('gene'), 'UNKNOWN')}** "
+        f"({_safe_text(candidate.get('classification'), 'unknown')}, "
+        f"{_safe_text(candidate.get('priority'), 'unranked')} priority, "
+        f"{stage_label}): combined score "
+        f"{_safe_int(candidate.get('combined_total'), 0)} "
+        f"(validated {_safe_int(candidate.get('validated_total'), 0)}, "
+        f"exploratory {_safe_int(candidate.get('exploratory_total'), 0)}); "
+        f"clinical drug count {_safe_int(candidate.get('clinical_drug_count'), 0)}, "
+        "preclinical compound count "
+        f"{_safe_int(candidate.get('preclinical_drug_count'), 0)}, "
+        f"source count {_safe_int(candidate.get('source_count'), 0)}."
+    )
+
+
+def _hypothesis_bullet(hypothesis: Mapping[str, Any]) -> str:
+    rank = _safe_int(hypothesis.get("rank"), 0)
+    rank_text = str(rank) if rank else "unranked"
+    genes = ", ".join(_string_list(hypothesis.get("genes"))) or "unspecified genes"
+    drugs = ", ".join(_string_list(hypothesis.get("drugs")))
+    drug_clause = f" Candidate compounds already cited: {drugs}." if drugs else ""
+    validation = _safe_text(hypothesis.get("validation_approach"))
+    if not validation:
+        validation = _safe_text(hypothesis.get("falsifiable_prediction"))
+    validation_clause = (
+        f" Validation focus: {validation}"
+        if validation
+        else " Validation focus: perturbation and context-specific target engagement."
+    )
+    return (
+        f"- **Hypothesis {rank_text}:** "
+        f"{_safe_text(hypothesis.get('title'), 'Mechanistic hypothesis')} "
+        f"[{_safe_text(hypothesis.get('category'), 'unspecified')}]. "
+        f"Mapped genes: {genes}."
+        f"{drug_clause}"
+        f"{validation_clause}"
+    )
+
+
+def _issue_bullet(issue: Mapping[str, Any]) -> str:
+    code = _safe_text(issue.get("code"), "UNKNOWN_VALIDATION_ISSUE")
+    severity = _safe_text(issue.get("severity"), "unspecified")
+    message = _safe_text(issue.get("message"))
+    suffix = f": {message}" if message else ""
+    return f"- {code} ({severity}){suffix}"
+
+
+def _scrub_disallowed_phrases(text: str) -> str:
+    scrubbed = text
+    for phrase, replacement in _DISALLOWED_MARKDOWN_PHRASES:
+        scrubbed = re.sub(
+            re.escape(phrase),
+            replacement,
+            scrubbed,
+            flags=re.IGNORECASE,
+        )
+    return scrubbed
+
+
+def render_part4_therapeutic_synthesis_markdown(
+    synthesis: Mapping[str, Any],
+) -> str:
+    """Render deterministic Part 4 synthesis Markdown."""
+
+    disease = _safe_text(synthesis.get("disease"), "unspecified disease")
+    counts = synthesis.get("candidate_counts")
+    if not isinstance(counts, Mapping):
+        counts = {}
+    candidates = _dict_list(synthesis.get("featured_candidates"))
+    hypotheses = _dict_list(synthesis.get("hypotheses"))
+    interpretation_summary = synthesis.get("interpretation_summary")
+    if not isinstance(interpretation_summary, Mapping):
+        interpretation_summary = {}
+    validation_issues = _dict_list(synthesis.get("validation_issues"))
+    report_valid = _safe_bool(synthesis.get("report_valid"))
+
+    candidate_lines = "\n".join(
+        _candidate_bullet(candidate)
+        for candidate in candidates
+    )
+    if not candidate_lines:
+        candidate_lines = (
+            "- No featured therapeutic candidates were available in the "
+            "deterministic report data."
+        )
+
+    hypothesis_lines = "\n".join(
+        _hypothesis_bullet(hypothesis)
+        for hypothesis in hypotheses
+    )
+    if not hypothesis_lines:
+        hypothesis_lines = (
+            "- No mechanistic hypotheses were available for intervention mapping."
+        )
+
+    issue_lines = "\n".join(
+        _issue_bullet(issue)
+        for issue in validation_issues[:5]
+    )
+    if not issue_lines:
+        issue_lines = "- No blocking report validation issues were recorded."
+
+    validation_sentence = (
+        "The deterministic report validation status is valid."
+        if report_valid
+        else "The deterministic report validation status is invalid or unavailable."
+    )
+
+    markdown = f"""# Part 4: Therapeutic Synthesis
+
+## Therapeutic Opportunity Landscape
+The DrugTargetAgent assessment for {disease} evaluated {_safe_int(counts.get("total"), 0)} candidate genes. This Part 4 synthesis narrows the deterministic output to {_safe_int(counts.get("featured"), 0)} top triage candidates from {_safe_int(counts.get("stage3_total"), 0)} stage3 candidates, while keeping validated and exploratory evidence tracks separate.
+
+## Candidate Triage
+{candidate_lines}
+
+## Hypothesis-to-Intervention Map
+{hypothesis_lines}
+
+## Validation Next Steps
+- Confirm target localization and ligand-receptor context in the disease-relevant tissue and cell states.
+- Run perturbation assays for the featured targets before interpreting intervention directionality.
+- Measure target engagement markers and downstream pathway response in the implicated cell contexts.
+- Review safety, tractability, and evidence-source coverage before moving beyond experimental prioritization.
+
+## Confidence and Caveats
+{validation_sentence}
+
+Interpretation snippets: accepted={_safe_int(interpretation_summary.get("accepted"), 0)}, rejected={_safe_int(interpretation_summary.get("rejected"), 0)}, missing={_safe_int(interpretation_summary.get("missing"), 0)}, provider_errors={_safe_int(interpretation_summary.get("provider_errors"), 0)}, criteria_met={_safe_bool(interpretation_summary.get("criteria_met"))}.
+
+Validation issues:
+{issue_lines}
+
+This section is a scientific therapeutic synthesis for experimental prioritization only. It is not care guidance.
+"""
+    return _scrub_disallowed_phrases(markdown).strip() + "\n"

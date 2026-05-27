@@ -106,6 +106,41 @@ def test_render_part4_synthesis_markdown_is_not_drug_md_copy(
     assert "standard of care" not in markdown.lower()
 
 
+def test_render_part4_synthesis_scrubs_clinical_drift_from_hypotheses(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.therapeutic_synthesis import (
+        build_part4_therapeutic_synthesis,
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+    report_data["hypotheses"] = [
+        {
+            "rank": 1,
+            "title": "Synthetic hypothesis that says should treat",
+            "category": "Therapeutic Strategy",
+            "biological_entities": {"genes": ["CD4"], "drugs": []},
+            "validation_approach": (
+                "Synthetic coverage text says the candidate is clinical ready."
+            ),
+            "evidence_references": ["evidence/hypothesis_report.json"],
+        }
+    ]
+
+    synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=_validation_payload(),
+        interpretations_payload=None,
+    )
+    markdown = render_part4_therapeutic_synthesis_markdown(synthesis)
+
+    assert "should treat" not in markdown.lower()
+    assert "clinical ready" not in markdown.lower()
+
+
 def test_render_part4_synthesis_handles_invalid_validation_metadata(
     tmp_path: Path,
 ) -> None:
