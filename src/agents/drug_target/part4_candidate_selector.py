@@ -6,6 +6,7 @@ import json
 import os
 import re
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,11 +25,25 @@ MAX_RATIONALE_CHARS = 500
 MAX_EXCLUDED_RATIONALE_CHARS = 500
 MAX_DRUG_MD_EXCERPT_CHARS = 6000
 MAX_CONTEXT_CHARS = 30000
+PART4_CANDIDATE_SELECTION_EVIDENCE_REFERENCES = [
+    "drug.md",
+    "report_data.json",
+    "target_assessment.json",
+    "evidence/hypothesis_report.json",
+]
 
 _TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
 _ELLIPSIS = "..."
 _MAX_GENE_CHARS = 40
 _COMPACT_TEXT_CHARS = 120
+_DISALLOWED_CLINICAL_RECOMMENDATION_PHRASES = (
+    "patients should receive",
+    "recommended therapy",
+    "should treat",
+    "clinical ready",
+    "standard of care",
+    "patients should",
+)
 
 
 def part4_candidate_selector_enabled(config: Mapping[str, Any] | None) -> bool:
@@ -90,15 +105,17 @@ def build_part4_candidate_selection_prompt(context: Mapping[str, Any]) -> str:
 
     schema_example = {
         "schema_version": PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+        "mode": "llm_rerank",
         "selected_genes": ["GENE1", "GENE2", "GENE3"],
-        "rationale": "Brief evidence-grounded rationale under 500 characters.",
-        "excluded_rationales": {
+        "selection_rationales": {
+            "GENE1": "Brief evidence-grounded rationale under 500 characters.",
+            "GENE2": "Brief evidence-grounded rationale under 500 characters.",
+            "GENE3": "Brief evidence-grounded rationale under 500 characters.",
+        },
+        "excluded_high_score_candidates": {
             "GENE4": "Brief reason this allowed candidate was not selected."
         },
-        "clinical_recommendation_warning": (
-            "This is not a clinical recommendation; use only for research "
-            "prioritization."
-        ),
+        "evidence_references": ["drug.md"],
     }
     serialized_context = json.dumps(context, sort_keys=True, separators=(",", ":"))
     serialized_schema = json.dumps(schema_example, indent=2, sort_keys=True)
@@ -118,6 +135,182 @@ def build_part4_candidate_selection_prompt(context: Mapping[str, Any]) -> str:
     )
 
 
+def validate_part4_candidate_selection_output(
+    raw_output: object,
+    *,
+    allowed_candidates: list[str],
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    """Validate and normalize strict JSON output from the Part 4 selector."""
+
+    allowed = {_gene_text(gene) for gene in allowed_candidates if _safe_text(gene)}
+    issues: list[dict[str, Any]] = []
+
+    if not isinstance(raw_output, str):
+        return None, [_validation_issue("MALFORMED_JSON")]
+
+    try:
+        payload = json.loads(raw_output, parse_constant=_reject_json_constant)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None, [_validation_issue("MALFORMED_JSON")]
+
+    if not isinstance(payload, dict):
+        return None, [_validation_issue("INVALID_JSON_SHAPE")]
+
+    if payload.get("schema_version") != PART4_CANDIDATE_SELECTION_SCHEMA_VERSION:
+        issues.append(_validation_issue("INVALID_SCHEMA_VERSION"))
+
+    if payload.get("mode") != "llm_rerank":
+        issues.append(_validation_issue("INVALID_MODE"))
+
+    selected_value = payload.get("selected_genes")
+    selected_genes: list[str] = []
+    if not isinstance(selected_value, list):
+        issues.append(_validation_issue("INVALID_SELECTED_GENES_SHAPE"))
+    else:
+        selected_genes = [_gene_text(gene) for gene in selected_value]
+        selected_genes = [gene for gene in selected_genes if gene]
+        if len(selected_genes) != 3:
+            issues.append(_validation_issue("INVALID_SELECTED_GENE_COUNT"))
+        seen: set[str] = set()
+        for gene in selected_genes:
+            if gene in seen:
+                issues.append(
+                    _validation_issue("DUPLICATE_SELECTED_GENE", gene=gene)
+                )
+            seen.add(gene)
+            if gene not in allowed:
+                issues.append(
+                    _validation_issue("GENE_OUTSIDE_STAGE3_POOL", gene=gene)
+                )
+
+    rationales_value = payload.get("selection_rationales")
+    selection_rationales: dict[str, str] = {}
+    if not isinstance(rationales_value, Mapping):
+        issues.append(_validation_issue("INVALID_SELECTION_RATIONALES_SHAPE"))
+    else:
+        normalized_rationales = {
+            _gene_text(key): value for key, value in rationales_value.items()
+        }
+        rationale_keys = set(normalized_rationales)
+        if set(selected_genes) != rationale_keys:
+            issues.append(_validation_issue("INVALID_SELECTION_RATIONALES_SHAPE"))
+        for gene in selected_genes:
+            rationale_value = normalized_rationales.get(gene)
+            rationale = (
+                _safe_text(rationale_value)
+                if isinstance(rationale_value, str)
+                else ""
+            )
+            if not rationale:
+                issues.append(
+                    _validation_issue("MISSING_SELECTION_RATIONALE", gene=gene)
+                )
+                continue
+            if len(rationale) > MAX_RATIONALE_CHARS:
+                issues.append(_validation_issue("RATIONALE_TOO_LONG", gene=gene))
+            if _contains_clinical_recommendation_language(rationale):
+                issues.append(
+                    _validation_issue(
+                        "CLINICAL_RECOMMENDATION_LANGUAGE",
+                        gene=gene,
+                    )
+                )
+            selection_rationales[gene] = rationale
+
+    excluded_value = payload.get("excluded_high_score_candidates", {})
+    excluded_high_score_candidates: dict[str, str] = {}
+    if not isinstance(excluded_value, Mapping):
+        issues.append(_validation_issue("INVALID_EXCLUDED_CANDIDATES_SHAPE"))
+    else:
+        for key, value in excluded_value.items():
+            gene = _gene_text(key)
+            if gene in allowed and isinstance(value, str):
+                excluded_high_score_candidates[gene] = _bounded_text(
+                    value,
+                    limit=MAX_EXCLUDED_RATIONALE_CHARS,
+                )
+
+    if issues:
+        return None, issues
+
+    return (
+        {
+            "schema_version": PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+            "mode": "llm_rerank",
+            "selected_genes": selected_genes,
+            "selection_rationales": selection_rationales,
+            "excluded_high_score_candidates": excluded_high_score_candidates,
+            "evidence_references": _string_list(
+                payload.get("evidence_references")
+            ),
+        },
+        [],
+    )
+
+
+def build_part4_candidate_selection_fallback(
+    *,
+    allowed_candidates: list[str],
+    deterministic_selected_genes: list[str],
+    fallback_reason: str,
+    validation_issues: list[dict[str, Any]],
+    attempt_history: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Build an auditable deterministic fallback payload."""
+
+    selected_genes = [
+        _gene_text(gene)
+        for gene in deterministic_selected_genes
+        if _safe_text(gene)
+    ]
+    return {
+        "schema_version": PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
+        "created_at": datetime.now(UTC).isoformat(),
+        "mode": "deterministic_fallback",
+        "status": "fallback",
+        "fallback_reason": fallback_reason,
+        "selected_genes": selected_genes,
+        "deterministic_selected_genes": selected_genes,
+        "llm_selected_genes": [],
+        "allowed_candidates": [
+            _gene_text(gene)
+            for gene in allowed_candidates
+            if _safe_text(gene)
+        ],
+        "selection_rationales": {},
+        "excluded_high_score_candidates": {},
+        "validation_issues": validation_issues,
+        "attempt_history": attempt_history,
+        "evidence_references": PART4_CANDIDATE_SELECTION_EVIDENCE_REFERENCES,
+    }
+
+
+def _message_content_to_text(response: object) -> str:
+    """Extract text from provider response content shapes."""
+
+    content = getattr(response, "content", response)
+    if isinstance(content, str):
+        return content
+    if isinstance(content, Mapping):
+        text = _safe_text(content.get("text"))
+        if text:
+            return text
+        if "content" in content:
+            return _message_content_to_text(content.get("content"))
+        return ""
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, Mapping):
+                text = _safe_text(item.get("text"))
+                if text:
+                    parts.append(text)
+        return "\n".join(parts)
+    return _safe_text(content)
+
+
 def _dict_list(value: object) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
@@ -127,6 +320,24 @@ def _dict_list(value: object) -> list[dict[str, Any]]:
 def _safe_text(value: object, default: str = "") -> str:
     text = "" if value is None else str(value).strip()
     return text if text else default
+
+
+def _validation_issue(code: str, **extra: Any) -> dict[str, Any]:
+    issue: dict[str, Any] = {"code": code}
+    issue.update(extra)
+    return issue
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"Invalid JSON constant: {value}")
+
+
+def _contains_clinical_recommendation_language(text: str) -> bool:
+    normalized = re.sub(r"\s+", " ", text).strip().lower()
+    return any(
+        phrase in normalized
+        for phrase in _DISALLOWED_CLINICAL_RECOMMENDATION_PHRASES
+    )
 
 
 def _safe_bool(value: object) -> bool:
