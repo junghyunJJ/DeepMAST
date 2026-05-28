@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -13,8 +15,128 @@ from typing import Any
 import requests
 
 from src.agents.drug_target.tools._skill_loader import load_skill_module as _load_skill_module
+from src.agents.drug_target.tools.disease_context import (
+    compact_ot_disease_context,
+    merge_disease_context,
+    select_exact_or_first_disease_hit,
+)
 
 logger = logging.getLogger(__name__)
+
+_TRANSIENT_ERROR_PATTERNS = (
+    "request timed out",
+    "read timed out",
+    "connect timeout",
+    "connection timed out",
+    "timeout",
+    "timed out",
+    "connection reset",
+    "connection aborted",
+    "connection error",
+    "temporarily unavailable",
+    "too many requests",
+    "rate limit",
+    "http 429",
+    "http 500",
+    "http 502",
+    "http 503",
+    "http 504",
+    "internal server error",
+    "bad gateway",
+    "service unavailable",
+    "gateway timeout",
+)
+
+
+def _stage2_retry_attempts() -> int:
+    try:
+        return max(1, int(os.getenv("DRUG_TARGET_STAGE2_RETRY_ATTEMPTS", "3")))
+    except ValueError:
+        return 3
+
+
+def _stage2_retry_backoff_seconds() -> float:
+    try:
+        return max(0.0, float(os.getenv("DRUG_TARGET_STAGE2_RETRY_BACKOFF", "1.0")))
+    except ValueError:
+        return 1.0
+
+
+def _is_transient_error_text(text: str) -> bool:
+    lowered = text.casefold()
+    return any(pattern in lowered for pattern in _TRANSIENT_ERROR_PATTERNS)
+
+
+def _iter_error_texts(value: Any, *, under_error_key: bool = False):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            key_is_error = "error" in str(key).casefold()
+            yield from _iter_error_texts(
+                child,
+                under_error_key=under_error_key or key_is_error,
+            )
+    elif isinstance(value, list):
+        for child in value:
+            yield from _iter_error_texts(child, under_error_key=under_error_key)
+    elif under_error_key and value is not None:
+        yield str(value)
+
+
+def _payload_has_transient_error(payload: Any) -> bool:
+    return any(_is_transient_error_text(text) for text in _iter_error_texts(payload))
+
+
+def _first_transient_error(payload: Any) -> str:
+    for text in _iter_error_texts(payload):
+        if _is_transient_error_text(text):
+            return text
+    return "transient error"
+
+
+def _retry_delay(attempt: int) -> float:
+    return _stage2_retry_backoff_seconds() * (2 ** max(0, attempt - 1))
+
+
+def _with_stage2_transient_retry(label: str, fn):
+    """Retry transient Stage 2 source failures while preserving permanent misses."""
+    attempts = _stage2_retry_attempts()
+    last_result: Any = None
+    for attempt in range(1, attempts + 1):
+        try:
+            result = fn()
+        except Exception as exc:
+            if attempt >= attempts or not _is_transient_error_text(str(exc)):
+                raise
+            delay = _retry_delay(attempt)
+            logger.warning(
+                "%s transient exception on attempt %d/%d: %s; retrying in %.1fs",
+                label,
+                attempt,
+                attempts,
+                exc,
+                delay,
+            )
+            if delay:
+                time.sleep(delay)
+            continue
+
+        last_result = result
+        if not _payload_has_transient_error(result) or attempt >= attempts:
+            return result
+
+        delay = _retry_delay(attempt)
+        logger.warning(
+            "%s transient error on attempt %d/%d: %s; retrying in %.1fs",
+            label,
+            attempt,
+            attempts,
+            _first_transient_error(result),
+            delay,
+        )
+        if delay:
+            time.sleep(delay)
+
+    return last_result
 
 
 def _try_load_ot_module() -> tuple[Any, str]:
@@ -152,6 +274,7 @@ def _load_cached_stage2_bundle(
         evidence_dir / "stage2_evidence.json",
         evidence_dir / "known_drugs.json",
         evidence_dir / "gene_manifest.json",
+        evidence_dir / "disease_context.json",
         *[evidence_dir / f"ot_{gene}.json" for gene in genes],
     ]
     if any(not path.exists() for path in required_paths):
@@ -161,6 +284,7 @@ def _load_cached_stage2_bundle(
         stage2_evidence = _read_json_file(evidence_dir / "stage2_evidence.json")
         known_drugs = _read_json_file(evidence_dir / "known_drugs.json")
         gene_manifest = _read_json_file(evidence_dir / "gene_manifest.json")
+        disease_context = _read_json_file(evidence_dir / "disease_context.json")
         ot_payloads = {
             gene: _read_json_file(evidence_dir / f"ot_{gene}.json")
             for gene in genes
@@ -178,10 +302,24 @@ def _load_cached_stage2_bundle(
         return None
     if not isinstance(known_drugs, dict) or known_drugs.get("disease") != disease:
         return None
+    if not isinstance(disease_context, dict):
+        return None
+    stage2_context = disease_context.get("stage2")
+    if (
+        not isinstance(stage2_context, dict)
+        or stage2_context.get("disease_used") != disease
+    ):
+        return None
+    if _payload_has_transient_error(known_drugs):
+        logger.info("Stage 2 workspace cache ignored: known_drugs has transient errors")
+        return None
 
     for gene in genes:
         payload = stage2_evidence.get(gene)
         if not isinstance(payload, dict):
+            return None
+        if _payload_has_transient_error(payload):
+            logger.info("Stage 2 workspace cache ignored: %s has transient errors", gene)
             return None
 
         ot_payload = payload.get("opentargets")
@@ -210,16 +348,27 @@ def _load_cached_stage2_bundle(
             "opentargets": "cache",
             "gwas": "cache",
         },
+        "disease_context": disease_context,
     }
 
 
 def _build_ot_disease_context(mod: Any, disease: str) -> dict[str, Any]:
     hits = mod.search_entities(disease, entity_types=["disease"])
-    efo_id = hits[0]["id"] if hits else None
+    selected_hit, exact_match = select_exact_or_first_disease_hit(hits, disease)
+    efo_id = selected_hit.get("id") if selected_hit else None
+    match_label = selected_hit.get("name") or selected_hit.get("label") if selected_hit else None
+    fallback_used = bool(selected_hit and not exact_match)
     return {
         "disease": disease,
         "hits": hits,
         "efo_id": efo_id,
+        "match_label": match_label,
+        "exact_match": exact_match,
+        "fallback_used": fallback_used,
+        "fallback_reason": (
+            "OpenTargets disease search did not return an exact label; using top hit."
+            if fallback_used else ""
+        ),
     }
 
 
@@ -285,6 +434,7 @@ def query_opentargets_target_data(
     try:
         mod = mod or _try_load_ot_module()[0]
         disease_context = disease_context or _build_ot_disease_context(mod, disease)
+        result["disease_context"] = compact_ot_disease_context(disease_context)
         hits = mod.search_entities(gene_symbol, entity_types=["target"])
         if not hits:
             result["errors"].append(f"No OpenTargets target found for {gene_symbol}")
@@ -369,6 +519,8 @@ def query_opentargets_target_data(
 
         if disease_context.get("efo_id"):
             result["efo_id"] = disease_context["efo_id"]
+        if disease_context.get("match_label"):
+            result["matched_disease"] = disease_context["match_label"]
 
         # Target-level drugs (across all diseases) for druggability scoring
         try:
@@ -517,12 +669,15 @@ def query_opentargets_known_drugs_data(
     try:
         mod = mod or _try_load_ot_module()[0]
         disease_context = disease_context or _build_ot_disease_context(mod, disease)
+        result["disease_context"] = compact_ot_disease_context(disease_context)
         efo_id = disease_context.get("efo_id")
         if not efo_id:
             result["errors"].append(f"No disease found for '{disease}'")
             return result
 
         result["efo_id"] = efo_id
+        if disease_context.get("match_label"):
+            result["matched_disease"] = disease_context["match_label"]
         disease_landscape = mod.get_known_drugs_for_disease(efo_id)
         result["disease_landscape"] = disease_landscape
 
@@ -841,7 +996,10 @@ def build_stage2_gene_panel(
     ot_error = None
     try:
         ot_mod, ot_source = _try_load_ot_module()
-        ot_disease_context = _build_ot_disease_context(ot_mod, disease)
+        ot_disease_context = _with_stage2_transient_retry(
+            "OpenTargets disease context",
+            lambda: _build_ot_disease_context(ot_mod, disease),
+        )
     except Exception as exc:
         ot_error = f"OpenTargets setup failed: {exc}"
 
@@ -851,34 +1009,51 @@ def build_stage2_gene_panel(
     gwas_error = None
     try:
         gwas_mod, gwas_source = _try_load_gwas_module()
-        gwas_disease_context = _build_gwas_disease_context(gwas_mod, disease)
+        gwas_disease_context = _with_stage2_transient_retry(
+            "GWAS disease context",
+            lambda: _build_gwas_disease_context(gwas_mod, disease),
+        )
     except Exception as exc:
         gwas_error = f"GWAS setup failed: {exc}"
+
+    stage2_disease_metadata = compact_ot_disease_context(ot_disease_context)
+    if ot_error:
+        stage2_disease_metadata["fallback_used"] = False
+        stage2_disease_metadata["fallback_reason"] = ot_error
 
     def _query_single_gene(gene: str) -> tuple[str, dict[str, Any]]:
         """Query OT + GWAS + VEP for a single gene (thread-safe)."""
         gwas_data = (
-            query_gwas_gene_trait_data(
-                gene,
-                disease,
-                mod=gwas_mod,
-                disease_context=gwas_disease_context,
+            _with_stage2_transient_retry(
+                f"GWAS {gene}",
+                lambda: query_gwas_gene_trait_data(
+                    gene,
+                    disease,
+                    mod=gwas_mod,
+                    disease_context=gwas_disease_context,
+                ),
             )
             if gwas_error is None
             else _unavailable_gwas_result(gene, disease, gwas_error)
         )
         try:
-            vep_data = _query_vep_for_gene(gwas_data)
+            vep_data = _with_stage2_transient_retry(
+                f"Ensembl VEP {gene}",
+                lambda: _query_vep_for_gene(gwas_data),
+            )
         except Exception as vep_exc:
             logger.warning("VEP query failed for %s: %s", gene, vep_exc)
             vep_data = {"source": "ensembl_vep", "error": str(vep_exc), "variants": []}
         return gene, {
             "opentargets": (
-                query_opentargets_target_data(
-                    gene,
-                    disease,
-                    mod=ot_mod,
-                    disease_context=ot_disease_context,
+                _with_stage2_transient_retry(
+                    f"OpenTargets {gene}",
+                    lambda: query_opentargets_target_data(
+                        gene,
+                        disease,
+                        mod=ot_mod,
+                        disease_context=ot_disease_context,
+                    ),
                 )
                 if ot_error is None
                 else _unavailable_opentargets_result(gene, disease, ot_error)
@@ -911,11 +1086,14 @@ def build_stage2_gene_panel(
         "gene_symbols": genes,
         "stage2_evidence": stage2_evidence,
         "known_drugs": (
-            query_opentargets_known_drugs_data(
-                disease,
-                mod=ot_mod,
-                disease_context=ot_disease_context,
-                stage2_evidence=stage2_evidence,
+            _with_stage2_transient_retry(
+                "OpenTargets known drugs",
+                lambda: query_opentargets_known_drugs_data(
+                    disease,
+                    mod=ot_mod,
+                    disease_context=ot_disease_context,
+                    stage2_evidence=stage2_evidence,
+                ),
             )
             if ot_error is None
             else _unavailable_known_drugs_result(disease, ot_error)
@@ -924,6 +1102,11 @@ def build_stage2_gene_panel(
         "source_modes": {
             "opentargets": ot_source,
             "gwas": gwas_source,
+        },
+        "disease_context": {
+            "input_disease": disease,
+            "canonical_disease": disease,
+            "stage2": stage2_disease_metadata,
         },
     }
 
@@ -973,6 +1156,7 @@ def summarize_stage2_bundle(result_bundle: dict[str, Any]) -> dict[str, Any]:
         "known_drugs_executed": known_drugs.get("executed", False),
         "source_modes": result_bundle.get("source_modes", {}),
         "gene_manifest": result_bundle.get("gene_manifest", []),
+        "disease_context": result_bundle.get("disease_context", {}),
         "note": (
             "Full evidence data saved to evidence/ directory. "
             "Use load_evidence_files() to read detailed per-gene payloads."
@@ -987,6 +1171,35 @@ def write_stage2_artifacts(result_bundle: dict[str, Any], evidence_dir: str | Pa
 
     written_paths: list[Path] = []
     stage2_evidence = result_bundle.get("stage2_evidence", {})
+    bundle_context = result_bundle.get("disease_context", {})
+    if not isinstance(bundle_context, dict):
+        bundle_context = {}
+    known_drugs = result_bundle.get("known_drugs", {})
+    input_disease = (
+        result_bundle.get("disease")
+        or bundle_context.get("input_disease")
+        or bundle_context.get("canonical_disease")
+        or (known_drugs.get("disease") if isinstance(known_drugs, dict) else "")
+        or "unknown"
+    )
+    stage2_context = bundle_context.get("stage2")
+    if not isinstance(stage2_context, dict):
+        stage2_context = {
+            "requested_disease": input_disease,
+            "disease_used": input_disease,
+            "efo_id": known_drugs.get("efo_id") if isinstance(known_drugs, dict) else None,
+            "match_label": known_drugs.get("matched_disease") if isinstance(known_drugs, dict) else None,
+            "exact_match": False,
+            "fallback_used": False,
+            "fallback_reason": "",
+            "source": "OpenTargets",
+        }
+    disease_context = merge_disease_context(
+        out_dir,
+        input_disease=str(input_disease),
+        input_source=bundle_context.get("input_source"),
+        stage2=stage2_context,
+    )
 
     def _write_json(path: Path, payload: Any) -> None:
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -994,10 +1207,12 @@ def write_stage2_artifacts(result_bundle: dict[str, Any], evidence_dir: str | Pa
 
     # Include disease metadata for downstream scoring
     stage2_with_meta = dict(stage2_evidence)
-    stage2_with_meta["_disease"] = result_bundle.get("disease", "unknown")
+    stage2_with_meta["_disease"] = input_disease
+    stage2_with_meta["_disease_context"] = disease_context
     _write_json(out_dir / "stage2_evidence.json", stage2_with_meta)
     _write_json(out_dir / "known_drugs.json", result_bundle.get("known_drugs", {}))
     _write_json(out_dir / "gene_manifest.json", result_bundle.get("gene_manifest", []))
+    written_paths.append(out_dir / "disease_context.json")
 
     for gene in result_bundle.get("gene_symbols", []):
         ot_payload = stage2_evidence.get(gene, {}).get("opentargets", {})
