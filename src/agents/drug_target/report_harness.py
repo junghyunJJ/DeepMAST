@@ -29,12 +29,12 @@ REQUIRED_REPORT_ARTIFACTS = (
     "report_data.json",
     "drug.md",
     "drug_report.html",
+    "drug_report_render.json",
     PART4_SYNTHESIS_FILENAME,
     "report_validation.json",
 )
 OPTIONAL_LEGACY_ARTIFACTS = (
     "report_expansions.json",
-    "drug_report_render.json",
     "report_interpretations.json",
 )
 REQUIRED_EVIDENCE = (

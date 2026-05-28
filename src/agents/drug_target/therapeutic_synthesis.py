@@ -809,6 +809,45 @@ def _candidate_render_score(candidate: Mapping[str, Any], key: str) -> int:
     return _safe_int(candidate.get(key), 0)
 
 
+def _candidate_evidence_summary(candidate: Mapping[str, Any]) -> str:
+    gene = _safe_text(candidate.get("gene"), "The candidate")
+    combined = _candidate_render_score(candidate, "combined_total")
+    validated = _candidate_render_score(candidate, "validated_total")
+    exploratory = _candidate_render_score(candidate, "exploratory_total")
+    track = _candidate_render_track(candidate)
+    if track == "validated-and-exploratory":
+        evidence_balance = (
+            f"{gene} has both validated therapeutic evidence and "
+            "exploratory disease-context support."
+        )
+    elif track == "validated-dominant":
+        evidence_balance = (
+            f"{gene} has stronger validated evidence than exploratory evidence."
+        )
+    elif track == "exploratory-dominant":
+        evidence_balance = (
+            f"{gene} has stronger exploratory support than validated "
+            "therapeutic precedent."
+        )
+    else:
+        evidence_balance = f"{gene} has limited structured evidence coverage."
+    return (
+        f"{evidence_balance} Score profile: combined {combined} = "
+        f"validated {validated} + exploratory {exploratory}."
+    )
+
+
+def _candidate_featured_reason(candidate: Mapping[str, Any]) -> str:
+    return _safe_text(
+        candidate.get("selection_rationale"),
+        "No deterministic selection rationale was available.",
+    )
+
+
+def _candidate_main_uncertainty(candidate: Mapping[str, Any]) -> str:
+    return _candidate_discriminator(candidate)
+
+
 def _candidate_discriminator(candidate: Mapping[str, Any]) -> str:
     gene = _safe_text(candidate.get("gene"), "the candidate")
     track = _candidate_render_track(candidate)
@@ -833,26 +872,16 @@ def _candidate_discriminator(candidate: Mapping[str, Any]) -> str:
     )
 
 
-def _candidate_section(candidate: Mapping[str, Any]) -> str:
+def _candidate_section(candidate: Mapping[str, Any], priority_rank: int) -> str:
     gene = _safe_text(candidate.get("gene"), "UNKNOWN")
     return "\n".join(
         [
-            f"### Candidate: {gene}",
+            f"### {priority_rank}. Candidate: {gene}",
+            f"- Evidence summary: {_candidate_evidence_summary(candidate)}",
+            f"- Why this candidate was featured: {_candidate_featured_reason(candidate)}",
             (
-                f"- Evidence track: {_candidate_render_track(candidate)} "
-                "with combined score "
-                f"{_candidate_render_score(candidate, 'combined_total')} "
-                f"(validated {_candidate_render_score(candidate, 'validated_total')}, "
-                "exploratory "
-                f"{_candidate_render_score(candidate, 'exploratory_total')})."
-            ),
-            (
-                "- Therapeutic rationale: "
-                f"{_safe_text(candidate.get('therapeutic_rationale'))}"
-            ),
-            (
-                "- Selection rationale: "
-                f"{_safe_text(candidate.get('selection_rationale'), 'No deterministic selection rationale was available.')}"
+                "- Therapeutic interpretation: "
+                f"{_safe_text(candidate.get('therapeutic_rationale'), 'No deterministic therapeutic rationale was available.')}"
             ),
             (
                 "- Drug signal: "
@@ -864,10 +893,7 @@ def _candidate_section(candidate: Mapping[str, Any]) -> str:
                 "- Mechanistic synthesis role: "
                 f"{_safe_text(candidate.get('mechanistic_role_summary'), 'No ranked mechanistic hypothesis explicitly linked this candidate in the deterministic hypothesis artifact.')}"
             ),
-            (
-                "- Experimental discriminator: "
-                f"{_candidate_discriminator(candidate)}"
-            ),
+            f"- Main uncertainty: {_candidate_main_uncertainty(candidate)}",
         ]
     )
 
@@ -887,9 +913,9 @@ def _integrated_thesis(synthesis: Mapping[str, Any]) -> str:
         if (gene := _safe_text(candidate.get("gene")))
     ]
     candidate_clause = (
-        f" The top triage set centers on {', '.join(top_genes)}."
+        f" The top prioritized set centers on {', '.join(top_genes)}."
         if top_genes
-        else " No featured candidates were available for gene-level triage."
+        else " No featured candidates were available for gene-level prioritization."
     )
     return (
         f"For {disease}, the deterministic therapeutic landscape contains "
@@ -900,6 +926,16 @@ def _integrated_thesis(synthesis: Mapping[str, Any]) -> str:
         "The synthesis treats these as evidence strata for "
         "experimental prioritization and mechanistic testing, not as "
         f"readiness for care decisions.{candidate_clause}"
+    )
+
+
+def _evidence_track_legend() -> str:
+    return "\n".join(
+        [
+            "Validated evidence reflects prior therapeutic tractability: existing drug evidence, clinical trial activity, and safety or clinical precedent.",
+            "Exploratory evidence reflects discovery support: genetic support, tractability, biological plausibility, and novelty opportunity.",
+            "The combined score is a prioritization score, not a probability of clinical success. It summarizes structured evidence breadth, while final Part 4 selection also considers mechanistic hypothesis rank and whether the target anchors a testable intervention.",
+        ]
     )
 
 
@@ -1037,8 +1073,8 @@ def render_part4_therapeutic_synthesis_markdown(
     report_valid = _safe_bool(synthesis.get("report_valid"))
 
     candidate_lines = "\n\n".join(
-        _candidate_section(candidate)
-        for candidate in candidates
+        _candidate_section(candidate, priority_rank=index)
+        for index, candidate in enumerate(candidates, start=1)
     )
     if not candidate_lines:
         candidate_lines = (
@@ -1077,12 +1113,15 @@ The deterministic report validation status is invalid or unavailable. Candidate 
     markdown = f"""# Part 4: Therapeutic Synthesis
 
 ## Therapeutic Opportunity Landscape
-The DrugTargetAgent assessment for {disease} evaluated {_safe_int(counts.get("total"), 0)} candidate genes. This Part 4 synthesis narrows the deterministic output to {_safe_int(counts.get("featured"), 0)} top triage candidates from {_safe_int(counts.get("stage3_total"), 0)} stage3 candidates, while keeping validated and exploratory evidence tracks separate.
+The DrugTargetAgent assessment for {disease} evaluated {_safe_int(counts.get("total"), 0)} candidate genes. This Part 4 synthesis narrows the deterministic output to {_safe_int(counts.get("featured"), 0)} top prioritized candidates from {_safe_int(counts.get("stage3_total"), 0)} stage3 candidates, while keeping validated and exploratory evidence tracks separate.
 {caveat_section}
 ## Integrated Therapeutic Thesis
 {_integrated_thesis(synthesis)}
 
-## Candidate Triage
+## How to Read the Evidence Tracks
+{_evidence_track_legend()}
+
+## Prioritized Candidates
 {candidate_lines}
 
 ## Mechanistic Intervention Map

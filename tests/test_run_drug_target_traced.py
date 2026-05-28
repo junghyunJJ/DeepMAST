@@ -57,6 +57,33 @@ def test_configure_ollama_port_override_noops_without_port(monkeypatch):
     assert traced.os.environ["OLLAMA_HOST"] == "http://localhost:7000"
 
 
+def test_finalize_report_config_forwards_provider(monkeypatch):
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+
+    args = argparse.Namespace(provider="ollama")
+    config = traced._finalize_report_config(args)
+
+    assert config == {
+        "recursion_limit": 100,
+        "configurable": {"llm_provider": "ollama"},
+    }
+
+
+def test_finalize_report_config_forwards_llm_model(monkeypatch):
+    monkeypatch.setenv("LLM_MODEL", "qwen3.5:122b")
+
+    args = argparse.Namespace(provider="ollama")
+    config = traced._finalize_report_config(args)
+
+    assert config == {
+        "recursion_limit": 100,
+        "configurable": {
+            "llm_provider": "ollama",
+            "llm_model": "qwen3.5:122b",
+        },
+    }
+
+
 def test_hypothesis_stream_budget_only_applies_after_hypothesis_writer_starts():
     assert traced._is_hypothesis_writer_stream_node(
         "tools > task > hypothesis_writer",

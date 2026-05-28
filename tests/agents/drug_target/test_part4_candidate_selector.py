@@ -98,7 +98,7 @@ def _minimal_report_data() -> dict:
     }
 
 
-def test_part4_candidate_selector_disabled_by_default(monkeypatch) -> None:
+def test_part4_candidate_selector_enabled_by_default(monkeypatch) -> None:
     from src.agents.drug_target.part4_candidate_selector import (
         ENABLE_PART4_CANDIDATE_SELECTOR_ENV,
         part4_candidate_selector_enabled,
@@ -106,8 +106,44 @@ def test_part4_candidate_selector_disabled_by_default(monkeypatch) -> None:
 
     monkeypatch.delenv(ENABLE_PART4_CANDIDATE_SELECTOR_ENV, raising=False)
 
+    assert part4_candidate_selector_enabled({}) is True
+    assert part4_candidate_selector_enabled({"configurable": {}}) is True
+
+
+def test_part4_candidate_selector_can_be_disabled_by_config(monkeypatch) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        ENABLE_PART4_CANDIDATE_SELECTOR_CONFIG_KEY,
+        ENABLE_PART4_CANDIDATE_SELECTOR_ENV,
+        part4_candidate_selector_enabled,
+    )
+
+    monkeypatch.delenv(ENABLE_PART4_CANDIDATE_SELECTOR_ENV, raising=False)
+
+    assert (
+        part4_candidate_selector_enabled(
+            {
+                "configurable": {
+                    ENABLE_PART4_CANDIDATE_SELECTOR_CONFIG_KEY: False,
+                }
+            }
+        )
+        is False
+    )
+
+
+@pytest.mark.parametrize("env_value", ["0", "false", "no", "off"])
+def test_part4_candidate_selector_can_be_disabled_by_env(
+    monkeypatch,
+    env_value: str,
+) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        ENABLE_PART4_CANDIDATE_SELECTOR_ENV,
+        part4_candidate_selector_enabled,
+    )
+
+    monkeypatch.setenv(ENABLE_PART4_CANDIDATE_SELECTOR_ENV, env_value)
+
     assert part4_candidate_selector_enabled({}) is False
-    assert part4_candidate_selector_enabled({"configurable": {}}) is False
 
 
 def test_part4_candidate_selector_enabled_by_config(monkeypatch) -> None:

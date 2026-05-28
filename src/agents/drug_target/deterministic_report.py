@@ -77,6 +77,10 @@ def _sha256_path(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -1166,6 +1170,7 @@ def _artifact_validation(
         "report_data.json",
         "drug.md",
         "drug_report.html",
+        "drug_report_render.json",
     ]
     if require_part4:
         required_artifacts.extend(
@@ -1227,6 +1232,44 @@ def _add_self_validation_artifact(validation: dict[str, Any]) -> dict[str, Any]:
     return validation
 
 
+def _write_deterministic_render_metadata(base: Path, markdown: str) -> None:
+    source_paths: dict[str, str | None] = {
+        "report_data": "report_data.json",
+        "reference_card": (
+            "drug_report_reference_card.json"
+            if (base / "drug_report_reference_card.json").exists()
+            else None
+        ),
+        "report_expansions": (
+            "report_expansions.json"
+            if (base / "report_expansions.json").exists()
+            else None
+        ),
+    }
+    source_hashes = {
+        key: _sha256_path(base / path)
+        for key, path in source_paths.items()
+        if path is not None and (base / path).exists()
+    }
+    _write_json(
+        base / "drug_report_render.json",
+        {
+            "schema_version": "drug_report_render.v1",
+            "renderer": "deterministic_report.render_report_markdown",
+            "mode": "deterministic",
+            "source_paths": source_paths,
+            "source_hashes": source_hashes,
+            "rendered_drug_md_sha256": _sha256_text(markdown),
+            "required_slot_count": 0,
+            "rendered_slot_count": 0,
+            "missing_slots": [],
+            "extra_slots": [],
+            "pagination_warnings": [],
+            "created_at": _utc_now(),
+        },
+    )
+
+
 def render_report_markdown(
     report_data: dict[str, Any],
     interpretations: dict[str, Any] | None = None,
@@ -1250,6 +1293,7 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
     part4_candidate_selection_path = base / PART4_CANDIDATE_SELECTION_FILENAME
     part4_path.unlink(missing_ok=True)
     part4_candidate_selection_path.unlink(missing_ok=True)
+    (base / "drug_report_render.json").unlink(missing_ok=True)
     report_data = build_report_data(str(base), str(state.get("disease") or ""))
     _write_json(base / "report_data.json", report_data)
 
@@ -1294,6 +1338,7 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
 
     markdown = render_report_markdown(report_data, interpretations=interpretations)
     (base / "drug.md").write_text(markdown, encoding="utf-8")
+    _write_deterministic_render_metadata(base, markdown)
     (base / "drug_report.html").write_text(
         render_report_html(report_data, markdown),
         encoding="utf-8",

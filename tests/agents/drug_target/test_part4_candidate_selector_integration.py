@@ -74,14 +74,14 @@ def _accepted_selector_payload(selected_genes: list[str]) -> dict[str, object]:
 
 def _candidate_headings(markdown: str) -> list[str]:
     return [
-        line.removeprefix("### Candidate: ").strip()
+        line.split(". Candidate: ", 1)[1].strip()
         for line in markdown.splitlines()
-        if line.startswith("### Candidate: ")
+        if line.startswith("### ") and ". Candidate: " in line
     ]
 
 
 @pytest.mark.asyncio
-async def test_finalize_report_writes_disabled_selector_audit_without_provider_call(
+async def test_finalize_report_uses_selector_provider_by_default(
     tmp_path: Path,
 ) -> None:
     from src.agents.drug_target.deterministic_report import finalize_report_mvp
@@ -89,6 +89,87 @@ async def test_finalize_report_writes_disabled_selector_audit_without_provider_c
         PART4_CANDIDATE_SELECTION_FILENAME,
     )
 
+    workspace = _copy_baseline_workspace(tmp_path)
+    calls: list[str] = []
+
+    def provider(prompt: str) -> str:
+        calls.append(prompt)
+        return _accepted_selector_response(["CD47", "ITGB2", "ICAM1"])
+
+    result = await finalize_report_mvp(
+        _state(workspace),
+        {"configurable": {"part4_candidate_selector_provider": provider}},
+    )
+
+    assert len(calls) == 1
+    assert result == {
+        "report_finalization_error": None,
+        "evidence_truncated": False,
+    }
+    payload = json.loads(
+        (workspace / PART4_CANDIDATE_SELECTION_FILENAME).read_text(encoding="utf-8")
+    )
+    assert payload["status"] == "accepted"
+    assert payload["fallback_reason"] is None
+    assert payload["mode"] == "llm_rerank"
+    assert payload["selected_genes"] == ["CD47", "ITGB2", "ICAM1"]
+    assert _candidate_headings(
+        (workspace / "part4_therapeutic_synthesis.md").read_text(encoding="utf-8")
+    ) == ["CD47", "ITGB2", "ICAM1"]
+
+
+@pytest.mark.asyncio
+async def test_finalize_report_respects_explicit_disabled_selector(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+    from src.agents.drug_target.part4_candidate_selector import (
+        PART4_CANDIDATE_SELECTION_FILENAME,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    calls: list[str] = []
+
+    def provider(prompt: str) -> str:
+        calls.append(prompt)
+        return _accepted_selector_response(["CD47", "ITGB2", "ICAM1"])
+
+    result = await finalize_report_mvp(
+        _state(workspace),
+        {
+            "configurable": {
+                "enable_part4_candidate_selector": False,
+                "part4_candidate_selector_provider": provider,
+            }
+        },
+    )
+
+    assert calls == []
+    assert result == {
+        "report_finalization_error": None,
+        "evidence_truncated": False,
+    }
+    payload = json.loads(
+        (workspace / PART4_CANDIDATE_SELECTION_FILENAME).read_text(encoding="utf-8")
+    )
+    assert payload["status"] == "fallback"
+    assert payload["fallback_reason"] == "disabled"
+    assert payload["mode"] == "deterministic_fallback"
+    assert (workspace / "part4_therapeutic_synthesis.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_finalize_report_respects_env_disabled_selector_with_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+    from src.agents.drug_target.part4_candidate_selector import (
+        ENABLE_PART4_CANDIDATE_SELECTOR_ENV,
+        PART4_CANDIDATE_SELECTION_FILENAME,
+    )
+
+    monkeypatch.setenv(ENABLE_PART4_CANDIDATE_SELECTOR_ENV, "false")
     workspace = _copy_baseline_workspace(tmp_path)
     calls: list[str] = []
 

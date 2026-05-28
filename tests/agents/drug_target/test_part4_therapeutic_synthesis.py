@@ -124,11 +124,11 @@ def test_part4_synthesis_uses_accepted_candidate_selection_payload(
         "fallback_reason": None,
         "selected_genes": ["CD47", "ITGB2", "ICAM1"],
     }
-    assert markdown.index("### Candidate: CD47") < markdown.index(
-        "### Candidate: ITGB2"
+    assert markdown.index("### 1. Candidate: CD47") < markdown.index(
+        "### 2. Candidate: ITGB2"
     )
-    assert markdown.index("### Candidate: ITGB2") < markdown.index(
-        "### Candidate: ICAM1"
+    assert markdown.index("### 2. Candidate: ITGB2") < markdown.index(
+        "### 3. Candidate: ICAM1"
     )
 
 
@@ -340,7 +340,7 @@ def test_render_part4_synthesis_markdown_is_not_drug_md_copy(
     assert markdown != source_drug_md
     assert markdown.startswith("# Part 4: Therapeutic Synthesis")
     assert "## Therapeutic Opportunity Landscape" in markdown
-    assert "## Candidate Triage" in markdown
+    assert "## Prioritized Candidates" in markdown
     assert "## Mechanistic Intervention Map" in markdown
     assert "## Validation Next Steps" in markdown
     assert "## Confidence and Caveats" in markdown
@@ -353,7 +353,7 @@ def test_render_part4_synthesis_markdown_is_not_drug_md_copy(
     assert "standard of care" not in markdown.lower()
 
 
-def test_render_part4_synthesis_has_rich_candidate_triage(
+def test_render_part4_synthesis_has_rich_prioritized_candidates(
     tmp_path: Path,
 ) -> None:
     from src.agents.drug_target.deterministic_report import build_report_data
@@ -373,23 +373,61 @@ def test_render_part4_synthesis_has_rich_candidate_triage(
     )
 
     assert "## Integrated Therapeutic Thesis" in markdown
-    assert "### Candidate: ICAM1" in markdown
-    assert "### Candidate: ITGB2" in markdown
-    assert "### Candidate: CD47" in markdown
+    assert "### 1. Candidate: ICAM1" in markdown
+    assert "### 2. Candidate: ITGB2" in markdown
+    assert "### 3. Candidate: CD47" in markdown
+    assert "- Evidence summary:" in markdown
     assert (
-        "- Evidence track: validated-dominant with combined score 10 "
-        "(validated 7, exploratory 3)."
+        "ICAM1 has stronger validated evidence than exploratory evidence."
     ) in markdown
-    assert "- Evidence track:" in markdown
-    assert "- Therapeutic rationale:" in markdown
-    assert "- Selection rationale:" in markdown
+    assert "Score profile: combined 10 = validated 7 + exploratory 3." in markdown
+    assert "- Why this candidate was featured:" in markdown
+    assert "- Therapeutic interpretation:" in markdown
     assert "- Drug signal:" in markdown
     assert "**Clinical Compounds (OpenTargets):**" in markdown
     assert "No named clinical compounds were available." in markdown
     assert "- Preclinical signal:" in markdown
     assert "- Mechanistic synthesis role:" in markdown
-    assert "- Experimental discriminator:" in markdown
+    assert "- Main uncertainty:" in markdown
+    assert "- Evidence track:" not in markdown
     assert "IPF cell states" not in markdown
+
+
+def test_render_part4_synthesis_explains_evidence_tracks_for_readers(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+    from src.agents.drug_target.therapeutic_synthesis import (
+        build_part4_therapeutic_synthesis,
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(str(workspace), "idiopathic pulmonary fibrosis")
+
+    markdown = render_part4_therapeutic_synthesis_markdown(
+        build_part4_therapeutic_synthesis(
+            report_data,
+            validation=_validation_payload(),
+            interpretations_payload=None,
+        )
+    )
+
+    assert "## How to Read the Evidence Tracks" in markdown
+    assert (
+        "Validated evidence reflects prior therapeutic tractability: "
+        "existing drug evidence, clinical trial activity, and safety or clinical precedent."
+    ) in markdown
+    assert (
+        "Exploratory evidence reflects discovery support: genetic support, "
+        "tractability, biological plausibility, and novelty opportunity."
+    ) in markdown
+    assert (
+        "The combined score is a prioritization score, not a probability of clinical success."
+    ) in markdown
+    assert markdown.index("## How to Read the Evidence Tracks") < markdown.index(
+        "## Prioritized Candidates"
+    )
 
 
 def test_part4_synthesis_selects_primary_mechanistic_axis_before_score_top3() -> None:
@@ -526,14 +564,14 @@ def test_part4_synthesis_selects_primary_mechanistic_axis_before_score_top3() ->
         "ITGB2",
         "ICAM1",
     ]
-    assert "### Candidate: CD47" in markdown
-    assert "### Candidate: ITGB2" in markdown
-    assert "### Candidate: ICAM1" in markdown
-    assert markdown.index("### Candidate: CD47") < markdown.index(
-        "### Candidate: ITGB2"
+    assert "### 1. Candidate: CD47" in markdown
+    assert "### 2. Candidate: ITGB2" in markdown
+    assert "### 3. Candidate: ICAM1" in markdown
+    assert markdown.index("### 1. Candidate: CD47") < markdown.index(
+        "### 2. Candidate: ITGB2"
     )
-    assert markdown.index("### Candidate: ITGB2") < markdown.index(
-        "### Candidate: ICAM1"
+    assert markdown.index("### 2. Candidate: ITGB2") < markdown.index(
+        "### 3. Candidate: ICAM1"
     )
     assert "| Drug | ChEMBL ID | Mechanism of Action | Phase | Indications |" in markdown
     assert (
@@ -556,7 +594,7 @@ def test_part4_synthesis_selects_primary_mechanistic_axis_before_score_top3() ->
     assert "- Preclinical signal: 1 ChEMBL bioactivity records" in markdown
     assert "SHOULD_NOT_RENDER_PRECLINICAL" not in markdown
     assert (
-        "- Selection rationale: CD47 was selected as a stage3 candidate because "
+        "- Why this candidate was featured: CD47 was selected as a stage3 candidate because "
         "it links to rank 1: THBS1-CD47 and ICAM1-ITGB2 convergence defines "
         "an immune-retention program."
     ) in markdown
@@ -611,7 +649,7 @@ def test_part4_synthesis_rationale_handles_candidates_without_hypotheses() -> No
     ]
     assert "coverage gap" in candidate["selection_rationale"]
     assert "practical intervention handle" not in candidate["selection_rationale"]
-    assert "- Selection rationale: TGFB1 was retained" in markdown
+    assert "- Why this candidate was featured: TGFB1 was retained" in markdown
 
 
 def test_render_part4_synthesis_has_mechanistic_intervention_map(
@@ -787,7 +825,7 @@ def test_render_part4_synthesis_bounds_mechanistic_map_fields() -> None:
     assert len(section) < 8_000
 
 
-def test_render_part4_synthesis_candidate_triage_uses_flat_score_fallback() -> None:
+def test_render_part4_synthesis_prioritized_candidate_uses_flat_score_fallback() -> None:
     from src.agents.drug_target.therapeutic_synthesis import (
         render_part4_therapeutic_synthesis_markdown,
     )
@@ -824,11 +862,60 @@ def test_render_part4_synthesis_candidate_triage_uses_flat_score_fallback() -> N
         }
     )
 
-    assert "### Candidate: TGFB1" in markdown
+    assert "### 1. Candidate: TGFB1" in markdown
     assert (
-        "- Evidence track: validated-dominant with combined score 9 "
-        "(validated 8, exploratory 1)."
+        "TGFB1 has stronger validated evidence than exploratory evidence."
     ) in markdown
+    assert "Score profile: combined 9 = validated 8 + exploratory 1." in markdown
+    assert "- Evidence track:" not in markdown
+    assert "disease-relevant cell states" in markdown
+    assert "IPF cell states" not in markdown
+
+
+def test_render_part4_synthesis_candidate_capsule_explains_validated_and_exploratory_track(
+) -> None:
+    from src.agents.drug_target.therapeutic_synthesis import (
+        render_part4_therapeutic_synthesis_markdown,
+    )
+
+    markdown = render_part4_therapeutic_synthesis_markdown(
+        {
+            "disease": "systemic sclerosis",
+            "report_valid": True,
+            "candidate_counts": {
+                "total": 1,
+                "featured": 1,
+                "stage3_total": 1,
+                "validated": 1,
+                "exploratory": 1,
+            },
+            "featured_candidates": [
+                {
+                    "gene": "TGFB1",
+                    "combined_total": 15,
+                    "validated_total": 10,
+                    "exploratory_total": 5,
+                    "therapeutic_rationale": (
+                        "TGFB1 is a deterministic candidate for fibrosis mechanism testing."
+                    ),
+                    "drug_signal_summary": (
+                        "1 clinical and 2 preclinical structured drug signals"
+                    ),
+                }
+            ],
+            "hypotheses": [],
+            "interpretation_summary": {},
+            "validation_issues": [],
+        }
+    )
+
+    assert "### 1. Candidate: TGFB1" in markdown
+    assert (
+        "TGFB1 has both validated therapeutic evidence and "
+        "exploratory disease-context support."
+    ) in markdown
+    assert "Score profile: combined 15 = validated 10 + exploratory 5." in markdown
+    assert "- Evidence track:" not in markdown
     assert "disease-relevant cell states" in markdown
     assert "IPF cell states" not in markdown
 
@@ -991,8 +1078,8 @@ def test_render_part4_synthesis_handles_invalid_validation_metadata(
     assert synthesis["report_valid"] is False
     caveat_index = markdown.index("## Data Validity Caveat")
     thesis_index = markdown.index("## Integrated Therapeutic Thesis")
-    triage_index = markdown.index("## Candidate Triage")
+    prioritized_index = markdown.index("## Prioritized Candidates")
 
-    assert caveat_index < thesis_index < triage_index
+    assert caveat_index < thesis_index < prioritized_index
     assert "report validation status is invalid" in markdown.lower()
     assert "TEST_INVALID_ARTIFACT" in markdown

@@ -85,6 +85,7 @@ def test_harness_writes_diagnostics_for_successful_no_llm_report(
         "report_data.json",
         "drug.md",
         "drug_report.html",
+        "drug_report_render.json",
         "part4_therapeutic_synthesis.md",
         "report_validation.json",
     ):

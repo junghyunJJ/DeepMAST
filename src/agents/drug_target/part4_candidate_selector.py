@@ -36,6 +36,7 @@ PART4_CANDIDATE_SELECTION_EVIDENCE_REFERENCES = [
 ]
 
 _TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
+_FALSEY_ENV_VALUES = {"0", "false", "no", "off"}
 _ELLIPSIS = "..."
 _MAX_GENE_CHARS = 40
 _COMPACT_TEXT_CHARS = 120
@@ -50,17 +51,24 @@ _DISALLOWED_CLINICAL_RECOMMENDATION_PHRASES = (
 
 
 def part4_candidate_selector_enabled(config: Mapping[str, Any] | None) -> bool:
-    """Return whether the optional Part 4 candidate selector is enabled."""
+    """Return whether the Part 4 candidate selector is enabled."""
 
     configurable = config.get("configurable") if isinstance(config, Mapping) else None
     if (
         isinstance(configurable, Mapping)
-        and configurable.get(ENABLE_PART4_CANDIDATE_SELECTOR_CONFIG_KEY) is True
+        and ENABLE_PART4_CANDIDATE_SELECTOR_CONFIG_KEY in configurable
     ):
-        return True
+        return _safe_bool(configurable.get(ENABLE_PART4_CANDIDATE_SELECTOR_CONFIG_KEY))
 
-    env_value = os.getenv(ENABLE_PART4_CANDIDATE_SELECTOR_ENV, "")
-    return env_value.strip().lower() in _TRUTHY_ENV_VALUES
+    env_value = os.getenv(ENABLE_PART4_CANDIDATE_SELECTOR_ENV)
+    if env_value is not None:
+        normalized = env_value.strip().lower()
+        if normalized in _FALSEY_ENV_VALUES:
+            return False
+        if normalized in _TRUTHY_ENV_VALUES:
+            return True
+
+    return True
 
 
 def part4_candidate_selector_provider_from_config(
