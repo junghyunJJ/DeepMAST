@@ -702,6 +702,43 @@ def _query_stage3_gene_profile(
         return gene, None, f"ChEMBL {gene}: {exc}"
 
 
+def _stage3_error_list(value: Any) -> list[str]:
+    """Normalize a Stage 3 error field to a list."""
+    if isinstance(value, list):
+        return [str(item) for item in value if item]
+    if value:
+        return [str(value)]
+    return []
+
+
+def _existing_stage3_profile_reusable(path: Path, gene: str) -> tuple[bool, str]:
+    """Return whether an existing Stage 3 profile can be reused safely."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return False, f"invalid_json: {exc}"
+
+    if not isinstance(payload, dict):
+        return False, "not_json_object"
+
+    payload_gene = str(payload.get("gene") or payload.get("gene_symbol") or "").strip().upper()
+    if payload_gene and payload_gene != gene:
+        return False, f"gene_mismatch: {payload_gene}"
+    if not payload.get("executed", False):
+        return False, "not_executed"
+    if _stage3_error_list(payload.get("errors")):
+        return False, "errors_present"
+
+    chembl_payload = payload.get("chembl")
+    if isinstance(chembl_payload, dict):
+        if "executed" in chembl_payload and not chembl_payload.get("executed", False):
+            return False, "chembl_not_executed"
+        if _stage3_error_list(chembl_payload.get("errors")):
+            return False, "chembl_errors_present"
+
+    return True, ""
+
+
 @tool
 def run_stage3_batch(
     data_dir: str,
@@ -744,6 +781,7 @@ def run_stage3_batch(
             "total": 0,
             "queried_genes": [],
             "skipped_existing": [],
+            "retried_existing": [],
             "saved_files": [],
             "failed_genes": [],
             "validation": {"success": True, "skipped": "No stage3_candidates"},
@@ -756,13 +794,17 @@ def run_stage3_batch(
     failed_genes: list[str] = []
     errors: list[str] = []
     genes_to_query: list[str] = []
+    retried_existing: list[dict[str, str]] = []
 
     for gene in genes:
         filename = f"stage3_{gene}.json"
         out_path = evidence_dir / filename
         if out_path.exists():
-            skipped_existing.append(gene)
-            continue
+            reusable, reason = _existing_stage3_profile_reusable(out_path, gene)
+            if reusable:
+                skipped_existing.append(gene)
+                continue
+            retried_existing.append({"gene": gene, "reason": reason})
         genes_to_query.append(gene)
 
     if genes_to_query:
@@ -818,13 +860,14 @@ def run_stage3_batch(
         "total": len(genes),
         "queried_genes": queried_genes,
         "skipped_existing": skipped_existing,
+        "retried_existing": retried_existing,
         "saved_files": saved_files,
         "failed_genes": failed_genes,
         "validation": validation,
         "errors": errors,
         "note": (
             "Stage 3 ChEMBL profiles saved and gate validated. "
-            "Existing stage3 files were skipped for resume/idempotency."
+            "Existing successful stage3 files were skipped; failed or incomplete files were retried."
         ) if success else (
             "Stage 3 batch completed but gate validation failed. "
             "Inspect validation.missing_genes, validation.genes_with_errors, and errors."
@@ -1272,25 +1315,22 @@ def run_stage1_batch(
     # 6. Auto-apply Stage 1 filter to update assessment_results.json
     filter_status = "skipped"
     filter_summary: dict[str, Any] = {}
-    if workspace_reused:
-        filter_status = "skipped_existing"
-    else:
-        try:
-            from src.agents.drug_target.tools.stage_logic import apply_stage1_filter
-            filter_raw = apply_stage1_filter.invoke({"data_dir": data_dir})
-            filter_summary = json.loads(filter_raw) if isinstance(filter_raw, str) else filter_raw
-            filter_status = "applied" if filter_summary.get("success") else f"failed: {filter_summary.get('error')}"
-            logger.info("Stage 1 filter auto-applied: %s", filter_status)
-        except Exception as exc:
-            errors.append(f"apply_stage1_filter: {exc}")
-            filter_status = f"failed: {exc}"
+    try:
+        from src.agents.drug_target.tools.stage_logic import apply_stage1_filter
+        filter_raw = apply_stage1_filter.invoke({"data_dir": data_dir})
+        filter_summary = json.loads(filter_raw) if isinstance(filter_raw, str) else filter_raw
+        filter_status = "applied" if filter_summary.get("success") else f"failed: {filter_summary.get('error')}"
+        logger.info("Stage 1 filter auto-applied: %s", filter_status)
+    except Exception as exc:
+        errors.append(f"apply_stage1_filter: {exc}")
+        filter_status = f"failed: {exc}"
 
     _finalize_ok = finalize_status in {"completed", "skipped_existing"}
-    _filter_ok = filter_status in {"applied", "skipped_existing"}
+    _filter_ok = filter_status == "applied"
     _all_ok = _finalize_ok and _filter_ok and not errors
     _success_note = (
-        "Existing Stage 1 evidence, Census validation, and filter artifacts reused. "
-        "No external queries or aggregate rewrites were needed."
+        "Existing Stage 1 evidence and Census validation reused. "
+        "Stage 1 filter was reapplied to the current assessment_results.json."
     ) if workspace_reused else (
         "Stage 1 evidence files auto-saved and filter applied. "
         "assessment_results.json updated with filtered stage3_candidates. "

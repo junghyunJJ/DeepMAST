@@ -1673,6 +1673,7 @@ class TestStage3Batch:
         assert result["total"] == 2
         assert result["queried_genes"] == ["EGFR"]
         assert result["skipped_existing"] == ["MET"]
+        assert result["retried_existing"] == []
         assert result["saved_files"] == ["stage3_EGFR.json"]
         assert result["validation"]["success"] is True
         assert calls == [("EGFR", 5, "human")]
@@ -1682,6 +1683,68 @@ class TestStage3Batch:
         assert saved["executed"] is True
         assert saved["errors"] == []
         assert saved["chembl"]["matched_drugs"][0]["drug_name"] == "Gefitinib"
+
+    def test_run_stage3_batch_retries_invalid_existing_profiles(self, tmp_path):
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage3_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "BAD"},
+                {"gene": "GOOD"},
+            ],
+        }))
+        (evidence_dir / "stage3_BAD.json").write_text(json.dumps({
+            "gene": "BAD",
+            "executed": False,
+            "errors": ["ChEMBL HTTP 502"],
+            "chembl": {"executed": False, "matched_drugs": [], "errors": ["ChEMBL HTTP 502"]},
+            "source": "chembl",
+        }))
+        (evidence_dir / "stage3_GOOD.json").write_text(json.dumps({
+            "gene": "GOOD",
+            "executed": True,
+            "errors": [],
+            "chembl": {"executed": True, "matched_drugs": [{"drug_name": "Existing"}], "errors": []},
+            "source": "chembl",
+        }))
+
+        calls = []
+
+        def fake_profile(gene_symbol, max_drugs=10, organism="human"):
+            calls.append((gene_symbol, max_drugs, organism))
+            return {
+                "gene_symbol": gene_symbol,
+                "executed": True,
+                "matched_drugs": [{"chembl_id": "CHEMBL_BAD", "drug_name": "Recovered"}],
+                "source": "chembl",
+                "errors": [],
+            }
+
+        with patch(
+            "src.agents.drug_target.tools.stage_domain_tools._query_chembl_target_profile_payload",
+            side_effect=fake_profile,
+        ):
+            raw = run_stage3_batch.invoke({
+                "data_dir": str(tmp_path),
+                "max_drugs": 3,
+                "organism": "human",
+            })
+
+        result = json.loads(raw)
+        assert result["success"] is True
+        assert result["queried_genes"] == ["BAD"]
+        assert result["skipped_existing"] == ["GOOD"]
+        assert result["retried_existing"] == [{"gene": "BAD", "reason": "not_executed"}]
+        assert result["saved_files"] == ["stage3_BAD.json"]
+        assert result["validation"]["success"] is True
+        assert calls == [("BAD", 3, "human")]
+
+        saved = json.loads((evidence_dir / "stage3_BAD.json").read_text())
+        assert saved["executed"] is True
+        assert saved["errors"] == []
+        assert saved["chembl"]["matched_drugs"][0]["drug_name"] == "Recovered"
 
     def test_run_stage3_batch_fails_when_profile_has_errors(self, tmp_path):
         from src.agents.drug_target.tools.stage_domain_tools import run_stage3_batch
@@ -2089,7 +2152,7 @@ class TestStage1Batch:
         assert census_calls == []
         assert json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text()) == existing_payload
 
-    def test_run_stage1_batch_skips_finalize_filter_when_workspace_is_reused(self, tmp_path):
+    def test_run_stage1_batch_reapplies_filter_when_workspace_is_reused(self, tmp_path):
         from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
 
         evidence_dir = tmp_path / "evidence"
@@ -2132,11 +2195,13 @@ class TestStage1Batch:
             "LEGACY^PAIR": {"pair_key": "LEGACY^PAIR"},
         }))
         original_aggregate = (evidence_dir / "stage1_evidence.json").read_text()
+        filter_calls = []
 
-        class _FailingStage1FilterTool:
+        class _Stage1FilterTool:
             @staticmethod
             def invoke(args):
-                raise AssertionError("apply_stage1_filter should not run for reused workspace")
+                filter_calls.append(args)
+                return json.dumps({"success": True})
 
         with (
             patch(
@@ -2149,7 +2214,7 @@ class TestStage1Batch:
             ),
             patch(
                 "src.agents.drug_target.tools.stage_logic.apply_stage1_filter",
-                _FailingStage1FilterTool,
+                _Stage1FilterTool,
             ),
         ):
             raw = run_stage1_batch.invoke({
@@ -2165,7 +2230,8 @@ class TestStage1Batch:
         assert result["saved_files"] == []
         assert result["census_batch"] == "skipped_existing"
         assert result["finalize"] == "skipped_existing"
-        assert result["stage1_filter"] == "skipped_existing"
+        assert result["stage1_filter"] == "applied"
+        assert filter_calls == [{"data_dir": str(tmp_path)}]
         assert (evidence_dir / "stage1_evidence.json").read_text() == original_aggregate
 
 
