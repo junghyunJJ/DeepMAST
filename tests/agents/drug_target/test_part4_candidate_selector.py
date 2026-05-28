@@ -191,6 +191,64 @@ def test_provider_from_config_returns_explicit_provider(monkeypatch) -> None:
     )
 
 
+def test_provider_from_config_does_not_create_live_llm_for_empty_config(
+    monkeypatch,
+) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        ENABLE_PART4_CANDIDATE_SELECTOR_ENV,
+        part4_candidate_selector_provider_from_config,
+    )
+
+    monkeypatch.delenv(ENABLE_PART4_CANDIDATE_SELECTOR_ENV, raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+
+    def fail_create_llm_from_config(config):
+        raise AssertionError("empty config must not construct a live LLM")
+
+    monkeypatch.setattr(
+        "src.agents.model.create_llm_from_config",
+        fail_create_llm_from_config,
+    )
+
+    assert part4_candidate_selector_provider_from_config({}) is None
+    assert (
+        part4_candidate_selector_provider_from_config({"configurable": {}})
+        is None
+    )
+
+
+def test_provider_from_config_allows_live_llm_with_explicit_provider(
+    monkeypatch,
+) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        ENABLE_PART4_CANDIDATE_SELECTOR_ENV,
+        part4_candidate_selector_provider_from_config,
+    )
+
+    monkeypatch.delenv(ENABLE_PART4_CANDIDATE_SELECTOR_ENV, raising=False)
+    calls: list[dict] = []
+
+    class FakeLlm:
+        def invoke(self, prompt: str) -> str:
+            return prompt
+
+    def create_llm_from_config(config):
+        calls.append(config)
+        return FakeLlm()
+
+    monkeypatch.setattr(
+        "src.agents.model.create_llm_from_config",
+        create_llm_from_config,
+    )
+
+    provider = part4_candidate_selector_provider_from_config(
+        {"configurable": {"llm_provider": "ollama"}}
+    )
+
+    assert provider is not None
+    assert calls == [{"configurable": {"llm_provider": "ollama"}}]
+
+
 def test_context_uses_only_stage3_pool_and_excludes_non_stage3_cxcr4(
     tmp_path: Path,
 ) -> None:

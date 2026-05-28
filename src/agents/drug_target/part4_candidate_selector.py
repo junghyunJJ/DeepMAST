@@ -89,6 +89,9 @@ def part4_candidate_selector_provider_from_config(
     if not part4_candidate_selector_enabled(config):
         return None
 
+    if not _live_llm_selector_configured(config):
+        return None
+
     try:
         from src.agents.model import create_llm_from_config
 
@@ -97,6 +100,15 @@ def part4_candidate_selector_provider_from_config(
         return _provider_creation_error_provider(exc)
 
     return _live_llm_selector_provider(llm)
+
+
+def _live_llm_selector_configured(config: Mapping[str, Any] | None) -> bool:
+    configurable = config.get("configurable") if isinstance(config, Mapping) else None
+    if isinstance(configurable, Mapping):
+        provider = str(configurable.get("llm_provider") or "").strip()
+        if provider:
+            return True
+    return bool(os.getenv("LLM_PROVIDER", "").strip())
 
 
 def build_part4_candidate_selection_context(

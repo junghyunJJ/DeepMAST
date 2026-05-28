@@ -86,6 +86,7 @@ def test_harness_writes_diagnostics_for_successful_no_llm_report(
         "drug.md",
         "drug_report.html",
         "drug_report_render.json",
+        "part4_candidate_selection.json",
         "part4_therapeutic_synthesis.md",
         "report_validation.json",
     ):
@@ -335,6 +336,43 @@ def test_harness_classifies_missing_required_artifact(tmp_path: Path) -> None:
     assert diagnostics["valid"] is False
     assert "MISSING_REQUIRED_ARTIFACT" in _issue_codes(diagnostics)
     assert diagnostics["artifacts"]["drug_report.html"]["exists"] is False
+
+
+def test_harness_flags_missing_part4_candidate_selection_artifact(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+    from src.agents.drug_target.part4_candidate_selector import (
+        PART4_CANDIDATE_SELECTION_FILENAME,
+    )
+    from src.agents.drug_target.report_harness import (
+        collect_report_harness_diagnostics,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    result = asyncio.run(
+        finalize_report_mvp(
+            {
+                "data_dir": str(workspace),
+                "disease": "idiopathic pulmonary fibrosis",
+                "report_finalization_error": None,
+                "evidence_truncated": False,
+            },
+            {},
+        )
+    )
+    assert result["report_finalization_error"] is None
+
+    (workspace / PART4_CANDIDATE_SELECTION_FILENAME).unlink()
+
+    diagnostics = collect_report_harness_diagnostics(str(workspace))
+
+    assert diagnostics["valid"] is False
+    assert "MISSING_REQUIRED_ARTIFACT" in _issue_codes(diagnostics)
+    assert (
+        diagnostics["artifacts"][PART4_CANDIDATE_SELECTION_FILENAME]["exists"]
+        is False
+    )
 
 
 def test_harness_classifies_malformed_artifact_json(tmp_path: Path) -> None:

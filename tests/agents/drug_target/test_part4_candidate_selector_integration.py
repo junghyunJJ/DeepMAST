@@ -81,6 +81,41 @@ def _candidate_headings(markdown: str) -> list[str]:
 
 
 @pytest.mark.asyncio
+async def test_finalize_report_empty_config_uses_deterministic_fallback_without_live_llm(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+    from src.agents.drug_target.part4_candidate_selector import (
+        PART4_CANDIDATE_SELECTION_FILENAME,
+    )
+
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+
+    def fail_create_llm_from_config(config):
+        raise AssertionError("empty deterministic finalization must not create an LLM")
+
+    monkeypatch.setattr(
+        "src.agents.model.create_llm_from_config",
+        fail_create_llm_from_config,
+    )
+    workspace = _copy_baseline_workspace(tmp_path)
+
+    result = await finalize_report_mvp(_state(workspace), {})
+
+    assert result == {
+        "report_finalization_error": None,
+        "evidence_truncated": False,
+    }
+    payload = json.loads(
+        (workspace / PART4_CANDIDATE_SELECTION_FILENAME).read_text(encoding="utf-8")
+    )
+    assert payload["status"] == "fallback"
+    assert payload["fallback_reason"] == "disabled"
+    assert payload["mode"] == "deterministic_fallback"
+
+
+@pytest.mark.asyncio
 async def test_finalize_report_uses_selector_provider_by_default(
     tmp_path: Path,
 ) -> None:
