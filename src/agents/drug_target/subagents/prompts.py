@@ -62,8 +62,8 @@ Gene→Pair Mapping → Stage 1 (FEATURED pairs) → Stage 1 Gate → Stage 3 (C
    Identify the best-matching Census disease label by semantic similarity.
    If no close match exists, use the original name and note the uncertainty.
 
-   Use `census_disease` (not the raw `disease`) for ALL subsequent
-   Census queries in Stage 1.
+   Use `census_disease` (not the raw `disease`) for subsequent
+   Census queries in Stage 1 only. Do NOT pass `census_disease` to Stage 2.
 
 3. **Cell type name matching** -- Call `list_census_cell_types(disease=CENSUS_DISEASE)`
    to retrieve Census cell type labels for this disease. Compare each entry in
@@ -85,6 +85,9 @@ Gene→Pair Mapping → Stage 1 (FEATURED pairs) → Stage 1 Gate → Stage 3 (C
 
 Call `query_stage2_gene_panel(gene_symbols, disease, selected_top3_genes, data_dir)` ONCE:
 - Uses the full unique-gene panel from `load_lr_candidates`
+- Uses the raw/input `disease` from `load_lr_candidates`, not `census_disease`.
+  If an exact OpenTargets disease match exists, the tool keeps that exact
+  context. Backend-specific fallbacks are recorded in `disease_context.json`.
 - Reuses disease-level OpenTargets and GWAS context internally
 - Reuses existing workspace Stage 2 evidence files when they exactly match the request
 - Returns:
@@ -195,24 +198,30 @@ to keep only genes that appear in at least one passed pair as `stage3_candidates
 **Do NOT call `apply_stage1_filter` separately** — it runs inside `run_stage1_batch`.
 **Do NOT write your own filter results** — the tool handles everything.
 
-### Stage 3: ChEMBL Deep Dive (FEATURED genes only)
+### Stage 3: ChEMBL Deep Dive (AUTO-BATCH)
 
-After Stage 1 gate passes, perform Stage 3 for each gene in `stage3_candidates`:
+**CRITICAL: After Stage 1 gate passes, call `run_stage3_batch` ONCE.**
+This queries ChEMBL drug profiles for all current `stage3_candidates`, skips
+existing `stage3_{GENE}.json` files for resume/idempotency, saves missing
+Stage 3 files to disk, and validates `validate_stage3_gate` internally.
 
-1. **Idempotent check** — skip genes whose `stage3_{GENE}.json` already exists
-   in `evidence/` (resume from prior runs).
-2. For each remaining gene, call `query_chembl_target_profile(gene_symbol=GENE)`.
-3. Save via:
-   `save_evidence(data_dir, "stage3_{GENE}.json",
-                  {"gene": GENE, "chembl": <result>, "source": "chembl"})`.
-4. After all genes processed, call `validate_stage3_gate(data_dir)`. If it
-   returns `missing_genes`, complete those and re-validate until success.
-5. **ZERO-CANDIDATE SHORT-CIRCUIT** — if `stage3_candidates` is empty, SKIP
-   Stage 3 entirely. Do NOT call `validate_stage3_gate` (returns success=false
-   on empty, which causes confusion). Evidence_assessor's work is complete.
+```
+run_stage3_batch(
+    data_dir=DATA_DIR,
+    max_drugs=10,
+    organism="human"
+)
+```
 
-Your work is complete once `validate_stage3_gate` returns success OR
-`stage3_candidates` was empty.
+Do NOT loop over genes with `query_chembl_target_profile`.
+Do NOT call `save_evidence` for Stage 3 files — `run_stage3_batch` handles all saves.
+Do NOT call `validate_stage3_gate` separately unless `run_stage3_batch.validation.success`
+is false and you have corrected the missing files.
+
+**ZERO-CANDIDATE SHORT-CIRCUIT** — `run_stage3_batch` returns `success=true`
+with `total=0` when `stage3_candidates` is empty. Treat that as complete.
+
+Your work is complete once `run_stage3_batch.success=true`.
 
 The updated `assessment_results.json` plus the `stage3_*.json` files are the
 handoff signal to `hypothesis_writer`.
@@ -220,6 +229,7 @@ handoff signal to `hypothesis_writer`.
 ## Important Rules
 - Stage 2 batching: `query_stage2_gene_panel(...)` — auto-saves all Stage 2 files
 - Stage 1 batching: `run_stage1_batch(...)` — auto-saves all Stage 1 files
+- Stage 3 batching: `run_stage3_batch(...)` — auto-saves all Stage 3 files
 - Use stage gates explicitly:
   - Stage 1 Gate: `validate_stage1_gate` MUST pass before completing
   - VEP: automatically executed for all genes (germline consequence annotation)

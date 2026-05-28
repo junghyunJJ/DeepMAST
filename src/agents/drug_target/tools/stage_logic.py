@@ -882,6 +882,12 @@ def compute_drug_evidence_scores(
     }
 
 
+def _tractability_bucket_label(entry: dict[str, Any]) -> str:
+    """Return normalized OpenTargets tractability bucket label across payload shapes."""
+    raw = entry.get("id") or entry.get("top_category") or entry.get("label") or ""
+    return re.sub(r"\s+", " ", str(raw)).strip().casefold()
+
+
 def _check_opentargets_approved(
     tractability: list[dict] | None,
 ) -> bool:
@@ -889,13 +895,9 @@ def _check_opentargets_approved(
     if not tractability:
         return False
     for entry in tractability:
-        # OpenTargets tractability modality format:
-        #   {"modality": "SM", "top_category": "Approved Drug", "value": True}
-        # or nested format with buckets
         if isinstance(entry, dict):
-            if entry.get("top_category") == "Approved Drug" and entry.get("value") is True:
+            if _tractability_bucket_label(entry) == "approved drug" and entry.get("value") is True:
                 return True
-            # Alternative: check for has_drug / approved_drug fields
             if entry.get("approved_drug") is True or entry.get("has_drug") is True:
                 return True
     return False
@@ -1107,7 +1109,7 @@ def _score_tractability(tractability: list[dict] | None) -> int:
     modality_labels: dict[str, dict[str, bool]] = {}
     for entry in tractability:
         mod = (entry.get("modality") or "").upper()
-        label = (entry.get("id") or entry.get("top_category") or "").lower()
+        label = _tractability_bucket_label(entry)
         value = entry.get("value", False)
         if mod not in modality_labels:
             modality_labels[mod] = {}
@@ -1436,6 +1438,7 @@ def compute_rubric_scores(data_dir: str) -> str:
         "schema_version": 3,
         "assessment_date": datetime.now().isoformat(),
         "disease": stage2.get("_disease", "unknown") if isinstance(stage2, dict) else "unknown",
+        "disease_context": stage2.get("_disease_context", {}) if isinstance(stage2, dict) else {},
         "rubric_assessment": results,
         "stage3_candidates": [
             {"gene": r["gene"], "exploratory_total": r["exploratory_total"],
@@ -1611,10 +1614,11 @@ def validate_stage3_gate(data_dir: str) -> str:
     Reads assessment_results.json for stage3_candidates and checks that
     ``evidence/stage3_{GENE}.json`` exists for every candidate gene.
 
-    Returns success=true only when ALL expected files are present.
+    Returns success=true only when ALL expected files are present and no
+    completed profile contains query/API errors.
     Call this after Stage 3 completes to verify no genes were skipped.
-    If ``success`` is false, complete Stage 3 for the ``missing_genes``
-    first, then re-call.
+    If ``success`` is false, complete Stage 3 for the ``missing_genes`` or
+    retry genes listed in ``genes_with_errors`` first, then re-call.
     """
     from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir  # PR2-3
     data_dir_path = _resolve_data_dir(data_dir)
@@ -1649,7 +1653,7 @@ def validate_stage3_gate(data_dir: str) -> str:
                 data = json.loads(stage3_file.read_text())
                 has_errors = bool(data.get("errors"))
                 not_executed = not data.get("executed", False)
-                if has_errors and not_executed:
+                if has_errors or not_executed:
                     genes_with_errors.append(gene)
             except (json.JSONDecodeError, OSError):
                 genes_with_errors.append(gene)
@@ -1657,7 +1661,7 @@ def validate_stage3_gate(data_dir: str) -> str:
             missing.append(gene)
 
     result = {
-        "success": len(missing) == 0,
+        "success": len(missing) == 0 and len(genes_with_errors) == 0,
         "total": len(stage3_genes),
         "found": len(found),
         "completed_genes": found,

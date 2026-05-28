@@ -41,6 +41,7 @@ from src.agents.drug_target.tools import (
     query_stage2_gene_panel,
     query_string_ppi_pair,
     read_skill_file,
+    run_stage3_batch,
     run_batch_census_lr_pairs,
     run_compare_census_lr_pair,
     run_stage1_batch,
@@ -226,6 +227,7 @@ SUBAGENT_CONFIGS = {
             finalize_stage1_artifacts,
             validate_stage1_gate,
             # Stage 3: ChEMBL deep dive (inline after Stage 1)
+            run_stage3_batch,
             query_chembl_target_profile,
             validate_stage3_gate,
             read_skill_file,
@@ -277,9 +279,9 @@ Drug Target Assessment 2-Agent Workflow (Staged Funnel):
      -> Gene→Pair mapping to identify FEATURED L-R pairs
    Stage 1 (FEATURED pairs ONLY): Cellxgene + STRING + Census
      -> Stage 1 gate validation (validate_stage1_gate)
-   Stage 3 (FEATURED genes, inline): ChEMBL drug profiles
+   Stage 3 (FEATURED genes, inline): run_stage3_batch ChEMBL drug profiles
      -> stage3_{GENE}.json per gene (idempotent, skips completed genes)
-     -> validate_stage3_gate (skipped on zero-candidate)
+     -> validate_stage3_gate internally (skipped on zero-candidate)
    Outputs: evidence/*.json (per stage, per L-R pair/gene)
             assessment_results.json, rubric_scores.csv, stage3_{GENE}.json
    Gate: assessment_results.json must exist with stage3_candidates

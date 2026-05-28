@@ -7,6 +7,7 @@ from src.agents.drug_target.tools.stage_logic import (
     _indication_matches_disease,
     _indication_is_oncology,
     _score_existing_drug_evidence,
+    _score_tractability,
 )
 
 
@@ -74,6 +75,40 @@ class TestCheckOpentargetsApproved:
     def test_has_drug_field(self):
         data = [{"approved_drug": True}]
         assert _check_opentargets_approved(data)
+
+    def test_label_approved_drug_field(self):
+        data = [{"modality": "SM", "label": "Approved Drug", "value": True}]
+        assert _check_opentargets_approved(data)
+
+    def test_label_approved_drug_is_case_and_whitespace_tolerant(self):
+        data = [{"modality": "SM", "label": " approved   drug ", "value": True}]
+        assert _check_opentargets_approved(data)
+
+
+class TestScoreTractability:
+    def test_label_approved_drug_scores_three(self):
+        data = [{"modality": "SM", "label": "Approved Drug", "value": True}]
+        assert _score_tractability(data) == 3
+
+    def test_label_advanced_clinical_scores_two(self):
+        data = [{"modality": "AB", "label": "Advanced Clinical", "value": True}]
+        assert _score_tractability(data) == 2
+
+    def test_label_phase_one_scores_two(self):
+        data = [{"modality": "AB", "label": "Phase 1 Clinical", "value": True}]
+        assert _score_tractability(data) == 2
+
+    def test_label_structure_with_ligand_scores_one(self):
+        data = [{"modality": "SM", "label": "Structure with Ligand", "value": True}]
+        assert _score_tractability(data) == 1
+
+    def test_legacy_top_category_shape_still_scores_three(self):
+        data = [{"modality": "SM", "top_category": "Approved Drug", "value": True}]
+        assert _score_tractability(data) == 3
+
+    def test_legacy_id_shape_still_scores_two(self):
+        data = [{"modality": "OC", "id": "Advanced Clinical", "value": True}]
+        assert _score_tractability(data) == 2
 
 
 def test_score_existing_drug_evidence_consumes_target_linked_known_drug_rows():

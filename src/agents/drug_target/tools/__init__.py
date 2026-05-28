@@ -42,6 +42,7 @@ from src.agents.drug_target.tools.stage_domain_tools import (
     query_stage2_gene_panel,
     query_chembl_target_profile,
     run_stage1_batch,
+    run_stage3_batch,
 )
 from src.agents.drug_target.tools.census_lr_validation_tools import (
     run_compare_census_lr_pair,
@@ -101,6 +102,7 @@ __all__ = [
     "query_stage2_gene_panel",
     "query_chembl_target_profile",
     "run_stage1_batch",
+    "run_stage3_batch",
     "run_compare_census_lr_pair",
     "run_batch_census_lr_pairs",
     "read_skill_file",

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 import sqlite3
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import os
@@ -14,6 +16,12 @@ import re
 import requests
 from langchain_core.tools import tool
 
+from src.agents.drug_target.tools.disease_context import (
+    disease_labels_equal,
+    load_disease_context,
+    merge_disease_context,
+    resolve_stage2_input_disease,
+)
 from src.agents.drug_target.tools.stage2_service import (
     build_stage2_gene_panel,
     query_gwas_gene_trait_data,
@@ -43,6 +51,42 @@ _CHEMBL_COOLDOWN_SECONDS = int(os.getenv("CHEMBL_COOLDOWN_SECONDS", "60"))
 
 def _as_json(payload: dict[str, Any]) -> str:
     return json.dumps(payload, indent=2)
+
+
+def _chembl_circuit_breaker_open(result: dict[str, Any]) -> bool:
+    """Return True when ChEMBL should be skipped due to recent failures."""
+    with _CHEMBL_LOCK:
+        global _chembl_consecutive_failures, _chembl_last_failure_time
+        if _chembl_consecutive_failures < _CHEMBL_MAX_CONSECUTIVE:
+            return False
+        elapsed = time.time() - _chembl_last_failure_time
+        if elapsed < _CHEMBL_COOLDOWN_SECONDS:
+            result["errors"].append(
+                f"circuit_breaker_open: {_chembl_consecutive_failures} consecutive failures"
+            )
+            result["note"] = "ChEMBL API circuit breaker open - no drug data retrieved"
+            return True
+        logger.info(
+            "ChEMBL circuit breaker cooldown elapsed (%.0fs), resetting and retrying",
+            elapsed,
+        )
+        _chembl_consecutive_failures = 0
+        return False
+
+
+def _record_chembl_success() -> None:
+    """Reset ChEMBL circuit breaker failure count after a successful query."""
+    with _CHEMBL_LOCK:
+        global _chembl_consecutive_failures
+        _chembl_consecutive_failures = 0
+
+
+def _record_chembl_failure() -> None:
+    """Increment ChEMBL circuit breaker failure count after a failed query."""
+    with _CHEMBL_LOCK:
+        global _chembl_consecutive_failures, _chembl_last_failure_time
+        _chembl_consecutive_failures += 1
+        _chembl_last_failure_time = time.time()
 
 
 def _trim_text(value: str, max_len: int = 2000) -> str:
@@ -535,13 +579,12 @@ def query_ensembl_vep_consequence(variant_ids: str, species: str = "human") -> s
     return _as_json(result)
 
 
-@tool
-def query_chembl_target_profile(
+def _query_chembl_target_profile_payload(
     gene_symbol: str,
     max_drugs: int = 10,
     organism: str = "human",
-) -> str:
-    """Retrieve drugs targeting a gene symbol via ChEMBL."""
+) -> dict[str, Any]:
+    """Return the ChEMBL target profile payload for one gene symbol."""
     result = {
         "gene_symbol": gene_symbol,
         "executed": False,
@@ -549,80 +592,321 @@ def query_chembl_target_profile(
         "source": "chembl",
         "errors": [],
     }
-    # P2-3: BOTH global declarations now inside the lock.
-    # Pre-fix: `global _chembl_consecutive_failures` was outside, and the variable was
-    # read on line 521 without holding the lock. Benign under LangGraph serialization
-    # but creates a race window if concurrency is added later.
-    with _CHEMBL_LOCK:
-        global _chembl_consecutive_failures, _chembl_last_failure_time
-        # Circuit breaker: skip if too many consecutive failures,
-        # but auto-reset after cooldown period
-        if _chembl_consecutive_failures >= _CHEMBL_MAX_CONSECUTIVE:
-            elapsed = time.time() - _chembl_last_failure_time
-            if elapsed < _CHEMBL_COOLDOWN_SECONDS:
-                result["errors"].append(
-                    f"circuit_breaker_open: {_chembl_consecutive_failures} consecutive failures"
-                )
-                result["note"] = f"ChEMBL API circuit breaker open - no drug data retrieved"
-                return _as_json(result)
-            else:
-                logger.info(
-                    "ChEMBL circuit breaker cooldown elapsed (%.0fs), resetting and retrying",
-                    elapsed,
-                )
-                _chembl_consecutive_failures = 0
+    if _chembl_circuit_breaker_open(result):
+        return result
+
+    try:
+        matches = _query_chembl_drugs(gene_symbol, max_drugs, organism=organism)
+        result["matched_drugs"] = matches
+        result["executed"] = True
+        _record_chembl_success()
+    except LocalDataRequiredError as exc:
+        result["errors"].append(str(exc))
+    except (sqlite3.DatabaseError, sqlite3.OperationalError) as exc:
+        logger.warning("ChEMBL cache corrupted (%s), clearing and retrying", exc)
+        try:
+            from chembl_webresource_client.settings import Settings
+            with _CHEMBL_LOCK:
+                Settings.Instance().clear_cache()
+        except Exception:
+            pass
         try:
             matches = _query_chembl_drugs(gene_symbol, max_drugs, organism=organism)
             result["matched_drugs"] = matches
             result["executed"] = True
-            _chembl_consecutive_failures = 0
-        except LocalDataRequiredError as exc:
-            result["errors"].append(str(exc))
-        except (sqlite3.DatabaseError, sqlite3.OperationalError) as exc:
-            logger.warning("ChEMBL cache corrupted (%s), clearing and retrying", exc)
-            try:
-                from chembl_webresource_client.settings import Settings
-                Settings.Instance().clear_cache()
-            except Exception:
-                pass
+            _record_chembl_success()
+        except Exception as exc2:
+            _record_chembl_failure()
+            result["errors"].append(f"ChEMBL retry after cache clear failed: {exc2}")
+    except requests.exceptions.HTTPError as exc:
+        # Retry once with backoff for 5xx errors
+        status_code = getattr(exc.response, "status_code", 0)
+        if 500 <= status_code < 600:
+            logger.warning("ChEMBL %d for %s, retrying after 2s", status_code, gene_symbol)
+            time.sleep(2)
             try:
                 matches = _query_chembl_drugs(gene_symbol, max_drugs, organism=organism)
                 result["matched_drugs"] = matches
                 result["executed"] = True
-                _chembl_consecutive_failures = 0
-            except Exception as exc2:
-                _chembl_consecutive_failures += 1
-                _chembl_last_failure_time = time.time()
-                result["errors"].append(f"ChEMBL retry after cache clear failed: {exc2}")
-        except requests.exceptions.HTTPError as exc:
-            # Retry once with backoff for 5xx errors
-            status_code = getattr(exc.response, "status_code", 0)
-            if 500 <= status_code < 600:
-                logger.warning("ChEMBL %d for %s, retrying after 2s", status_code, gene_symbol)
-                time.sleep(2)
-                try:
-                    matches = _query_chembl_drugs(gene_symbol, max_drugs, organism=organism)
-                    result["matched_drugs"] = matches
-                    result["executed"] = True
-                    _chembl_consecutive_failures = 0
-                except Exception:
-                    _chembl_consecutive_failures += 1
-                    _chembl_last_failure_time = time.time()
-                    result["errors"].append(f"ChEMBL {status_code} after retry: {exc}")
-            else:
-                _chembl_consecutive_failures += 1
-                _chembl_last_failure_time = time.time()
-                result["errors"].append(f"ChEMBL HTTP {status_code}: {exc}")
-        except Exception as exc:
-            _chembl_consecutive_failures += 1
-            _chembl_last_failure_time = time.time()
-            result["errors"].append(f"ChEMBL query failed: {exc}")
-    return _as_json(result)
+                _record_chembl_success()
+            except Exception:
+                _record_chembl_failure()
+                result["errors"].append(f"ChEMBL {status_code} after retry: {exc}")
+        else:
+            _record_chembl_failure()
+            result["errors"].append(f"ChEMBL HTTP {status_code}: {exc}")
+    except Exception as exc:
+        _record_chembl_failure()
+        result["errors"].append(f"ChEMBL query failed: {exc}")
+    return result
+
+
+@tool
+def query_chembl_target_profile(
+    gene_symbol: str,
+    max_drugs: int = 10,
+    organism: str = "human",
+) -> str:
+    """Retrieve drugs targeting a gene symbol via ChEMBL."""
+    return _as_json(
+        _query_chembl_target_profile_payload(
+            gene_symbol,
+            max_drugs=max_drugs,
+            organism=organism,
+        )
+    )
+
+
+def _stage3_candidate_genes(assessment: dict[str, Any]) -> list[str]:
+    """Return normalized Stage 3 candidate genes from assessment_results.json."""
+    genes: list[str] = []
+    seen: set[str] = set()
+    for entry in assessment.get("stage3_candidates", []):
+        if isinstance(entry, dict):
+            gene = str(entry.get("gene") or entry.get("gene_symbol") or "").strip().upper()
+        else:
+            gene = str(entry).strip().upper()
+        if gene and gene not in seen:
+            seen.add(gene)
+            genes.append(gene)
+    return genes
+
+
+def _stage3_chembl_worker_count(gene_count: int) -> int:
+    """Return bounded worker count for Stage 3 ChEMBL calls."""
+    if gene_count <= 1:
+        return 1
+    try:
+        configured = int(os.getenv("DRUG_TARGET_STAGE3_CHEMBL_WORKERS", "5"))
+    except ValueError:
+        configured = 5
+    return max(1, min(gene_count, configured))
+
+
+def _query_stage3_gene_profile(
+    args: tuple[str, int, str],
+) -> tuple[str, dict[str, Any] | None, str | None]:
+    """Query one Stage 3 ChEMBL profile for batch execution."""
+    gene, max_drugs, organism = args
+    try:
+        return (
+            gene,
+            _query_chembl_target_profile_payload(
+                gene,
+                max_drugs=max_drugs,
+                organism=organism,
+            ),
+            None,
+        )
+    except Exception as exc:
+        return gene, None, f"ChEMBL {gene}: {exc}"
+
+
+@tool
+def run_stage3_batch(
+    data_dir: str,
+    max_drugs: int = 10,
+    organism: str = "human",
+) -> str:
+    """Run ChEMBL Stage 3 for all current stage3_candidates in one tool call.
+
+    This is the Stage 3 counterpart to ``query_stage2_gene_panel`` and
+    ``run_stage1_batch``. It reads ``assessment_results.json``, skips existing
+    ``stage3_{GENE}.json`` files for resume/idempotency, queries ChEMBL only for
+    missing genes, writes canonical stage3 JSON files, then validates the Stage
+    3 gate.
+    """
+    from src.agents.drug_target.tools.evidence_loader import _resolve_data_dir
+    from src.agents.drug_target.tools.stage_logic import validate_stage3_gate
+
+    base = _resolve_data_dir(data_dir)
+    evidence_dir = base / "evidence"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    assessment_path = evidence_dir / "assessment_results.json"
+    if not assessment_path.exists():
+        return _as_json({
+            "success": False,
+            "error": "assessment_results.json not found. Run compute_rubric_scores first.",
+        })
+
+    try:
+        assessment = json.loads(assessment_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return _as_json({
+            "success": False,
+            "error": f"Cannot parse assessment_results.json: {exc}",
+        })
+
+    genes = _stage3_candidate_genes(assessment)
+    if not genes:
+        return _as_json({
+            "success": True,
+            "total": 0,
+            "queried_genes": [],
+            "skipped_existing": [],
+            "saved_files": [],
+            "failed_genes": [],
+            "validation": {"success": True, "skipped": "No stage3_candidates"},
+            "note": "No stage3_candidates in assessment_results.json. Stage 3 skipped.",
+        })
+
+    queried_genes: list[str] = []
+    skipped_existing: list[str] = []
+    saved_files: list[str] = []
+    failed_genes: list[str] = []
+    errors: list[str] = []
+    genes_to_query: list[str] = []
+
+    for gene in genes:
+        filename = f"stage3_{gene}.json"
+        out_path = evidence_dir / filename
+        if out_path.exists():
+            skipped_existing.append(gene)
+            continue
+        genes_to_query.append(gene)
+
+    if genes_to_query:
+        worker_count = _stage3_chembl_worker_count(len(genes_to_query))
+        query_args = [(gene, max_drugs, organism) for gene in genes_to_query]
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            stage3_results = list(executor.map(_query_stage3_gene_profile, query_args))
+    else:
+        stage3_results = []
+
+    for gene, profile, error in stage3_results:
+        if error or profile is None:
+            failed_genes.append(gene)
+            errors.append(error or f"ChEMBL {gene}: no profile returned")
+            continue
+
+        queried_genes.append(gene)
+        profile_errors = profile.get("errors", [])
+        if not isinstance(profile_errors, list):
+            profile_errors = [str(profile_errors)] if profile_errors else []
+        if profile_errors or not profile.get("executed", False):
+            failed_genes.append(gene)
+
+        stage3_payload = {
+            "gene": gene,
+            "gene_symbol": gene,
+            "executed": bool(profile.get("executed", False)),
+            "errors": profile_errors,
+            "chembl": profile,
+            "source": "chembl",
+        }
+        if profile.get("note"):
+            stage3_payload["note"] = profile["note"]
+        filename = f"stage3_{gene}.json"
+        out_path = evidence_dir / filename
+        out_path.write_text(
+            json.dumps(stage3_payload, indent=2),
+            encoding="utf-8",
+        )
+        saved_files.append(filename)
+        logger.info("Stage 3 auto-saved: %s", filename)
+
+    validation_raw = validate_stage3_gate.invoke({"data_dir": str(base)})
+    try:
+        validation = json.loads(validation_raw)
+    except Exception:
+        validation = {"success": False, "raw": validation_raw}
+
+    validation_errors = validation.get("genes_with_errors") or []
+    success = bool(validation.get("success")) and not failed_genes and not errors and not validation_errors
+    return _as_json({
+        "success": success,
+        "total": len(genes),
+        "queried_genes": queried_genes,
+        "skipped_existing": skipped_existing,
+        "saved_files": saved_files,
+        "failed_genes": failed_genes,
+        "validation": validation,
+        "errors": errors,
+        "note": (
+            "Stage 3 ChEMBL profiles saved and gate validated. "
+            "Existing stage3 files were skipped for resume/idempotency."
+        ) if success else (
+            "Stage 3 batch completed but gate validation failed. "
+            "Inspect validation.missing_genes, validation.genes_with_errors, and errors."
+        ),
+    })
 
 
 def _chembl_fallback(gene_symbol: str, max_drugs: int = 10, organism: str = "human") -> list[dict]:
     """Compatibility wrapper for batch scripts that expect a plain list return."""
     return _query_chembl_drugs(gene_symbol, max_drugs, organism=organism)
+
+
+def _load_existing_stage1_pair_payload(
+    path: str | os.PathLike[str],
+    ligand: str,
+    receptor: str,
+) -> dict[str, Any] | None:
+    """Return reusable Stage 1 pair payload when the STRING result exists."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            payload = json.load(f)
+    except Exception:
+        return None
+    if not isinstance(payload, dict) or not isinstance(payload.get("string_ppi"), dict):
+        return None
+    payload_ligand = str(payload.get("ligand") or "").strip().upper()
+    payload_receptor = str(payload.get("receptor") or "").strip().upper()
+    if payload_ligand and payload_ligand != ligand:
+        return None
+    if payload_receptor and payload_receptor != receptor:
+        return None
+    return payload
+
+
+def _stage1_string_worker_count(pair_count: int) -> int:
+    """Return bounded worker count for Stage 1 STRING calls."""
+    if pair_count <= 1:
+        return 1
+    try:
+        configured = int(os.getenv("DRUG_TARGET_STAGE1_STRING_WORKERS", "5"))
+    except ValueError:
+        configured = 5
+    return max(1, min(pair_count, configured))
+
+
+def _stage1_pair_has_census_validation(
+    path: str | os.PathLike[str],
+    ligand: str,
+    receptor: str,
+) -> bool:
+    """Return True when a Stage 1 pair file already carries Census validation."""
+    payload = _load_existing_stage1_pair_payload(path, ligand, receptor)
+    if not isinstance(payload, dict):
+        return False
+    census = payload.get("census_validation")
+    if not isinstance(census, dict):
+        return False
+    return "executed" in census or "target_vs_rest" in census
+
+
+def _stage1_aggregate_artifacts_exist(evidence_dir: Path) -> bool:
+    """Return True when Stage 1 aggregate/filter outputs are already present."""
+    required = (
+        "stage1_evidence.json",
+        "stage1_filter.json",
+        "stage1_filter_results.json",
+        "stage1_audit.json",
+    )
+    return all((evidence_dir / name).exists() for name in required)
+
+
+def _query_stage1_string_pair(pair: tuple[str, str]) -> tuple[str, str, dict[str, Any], str | None]:
+    """Query STRING for one pair and return a canonical Stage 1 payload."""
+    ligand, receptor = pair
+    pair_data: dict[str, Any] = {"ligand": ligand, "receptor": receptor}
+    try:
+        string_raw = query_string_ppi_pair.invoke({"gene_a": ligand, "gene_b": receptor})
+        pair_data["string_ppi"] = json.loads(string_raw)
+        return ligand, receptor, pair_data, None
+    except Exception as exc:
+        pair_data["string_ppi"] = {"interaction_found": False, "error": str(exc)}
+        return ligand, receptor, pair_data, f"STRING {ligand}/{receptor}: {exc}"
 
 
 
@@ -691,21 +975,25 @@ def query_stage2_gene_panel(
 
     # Resolve data_dir with fallback to env var
     resolved_dir = _resolve_data_dir(data_dir)
+    evidence_dir = resolved_dir / "evidence"
+    stage2_disease, disease_warning = resolve_stage2_input_disease(evidence_dir, disease)
 
     bundle = build_stage2_gene_panel(
         gene_symbols,
-        disease,
+        stage2_disease,
         selected_top3_genes=selected_top3_genes,
         data_dir=str(resolved_dir),
     )
 
     # Always persist full evidence to disk.
-    evidence_dir = resolved_dir / "evidence"
     written = write_stage2_artifacts(bundle, evidence_dir)
     logger.info("Stage 2 artifacts written (%d files) → %s", len(written), evidence_dir)
 
     # Return a lightweight summary so ToolMessage stays small.
     summary = summarize_stage2_bundle(bundle)
+    if disease_warning:
+        summary["warnings"] = [disease_warning]
+        logger.warning(disease_warning)
     summary["evidence_dir"] = str(evidence_dir)
     summary["written_files_count"] = len(written)
     summary["note"] = (
@@ -758,6 +1046,13 @@ def run_stage1_batch(
     except Exception as exc:
         return _as_json({"success": False, "error": f"Cannot parse assessment_results.json: {exc}"})
 
+    existing_disease_context = load_disease_context(evidence_dir)
+    input_disease = (
+        str(existing_disease_context.get("input_disease") or "").strip()
+        or str(assessment.get("disease") or "").strip()
+        or disease
+    )
+
     raw_candidates = assessment.get("stage3_candidates", [])
     featured_genes: set[str] = set()
     for entry in raw_candidates:
@@ -808,20 +1103,30 @@ def run_stage1_batch(
 
     logger.info("Stage 1 batch: %d featured pairs for genes %s", len(featured_pairs), featured_genes)
 
-    # 3. Query Stage 1 databases for each FEATURED pair and auto-save
+    # 3. Query Stage 1 STRING evidence for missing FEATURED pairs and auto-save.
+    # Existing complete per-pair files are reused so partial reruns do not repeat
+    # external STRING calls.
     saved_files: list[str] = []
+    skipped_existing: list[str] = []
+    pairs_to_query: list[tuple[str, str]] = []
     for ligand, receptor in featured_pairs:
-        pair_data: dict[str, Any] = {"ligand": ligand, "receptor": receptor}
+        filename = f"stage1_{ligand}--{receptor}.json"
+        out_path = evidence_dir / filename
+        if _load_existing_stage1_pair_payload(out_path, ligand, receptor) is not None:
+            skipped_existing.append(filename)
+            continue
+        pairs_to_query.append((ligand, receptor))
 
-        # STRING PPI
-        try:
-            string_raw = query_string_ppi_pair.invoke({"gene_a": ligand, "gene_b": receptor})
-            pair_data["string_ppi"] = json.loads(string_raw)
-        except Exception as exc:
-            pair_data["string_ppi"] = {"interaction_found": False, "error": str(exc)}
-            errors.append(f"STRING {ligand}/{receptor}: {exc}")
+    if pairs_to_query:
+        worker_count = _stage1_string_worker_count(len(pairs_to_query))
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            stage1_results = list(executor.map(_query_stage1_string_pair, pairs_to_query))
+    else:
+        stage1_results = []
 
-        # AUTO-SAVE per-pair file to disk
+    for ligand, receptor, pair_data, error in stage1_results:
+        if error:
+            errors.append(error)
         filename = f"stage1_{ligand}--{receptor}.json"
         out_path = evidence_dir / filename
         out_path.write_text(json.dumps(pair_data, indent=2), encoding="utf-8")
@@ -830,113 +1135,207 @@ def run_stage1_batch(
 
     # 4. Census batch validation (one Census open for all pairs)
     census_status = "skipped"
+    stage1_disease_used = disease
+    stage1_disease_resolution_mode = (
+        "exact" if disease_labels_equal(input_disease, disease) else "provided_fallback"
+    )
     if enable_census and target_cell_type:
-        try:
-            from src.agents.drug_target.tools.census_batch_core import (
-                batch_census_lr_pairs,
-                write_census_csv,
+        pairs_requiring_census = [
+            (ligand, receptor)
+            for ligand, receptor in featured_pairs
+            if not _stage1_pair_has_census_validation(
+                evidence_dir / f"stage1_{ligand}--{receptor}.json",
+                ligand,
+                receptor,
             )
-            pairs_list = [list(pair) for pair in featured_pairs]
-            # Create lightweight LLM for cell type / disease semantic matching
+        ]
+        if not pairs_requiring_census:
+            census_status = "skipped_existing"
+        else:
             try:
-                from src.agents.model import create_llm as _create_llm
-                _census_llm = _create_llm()
-            except Exception:
-                _census_llm = None
-            _batch_results, csv_results = batch_census_lr_pairs(
-                pairs_list,
-                disease=disease,
-                target_cell_type=target_cell_type,
-                organism="homo_sapiens",
-                census_version=_DEFAULT_CENSUS_VERSION,
-                llm=_census_llm,
-            )
-            for pair_key, csv_rows in csv_results.items():
-                if isinstance(pair_key, tuple) and len(pair_key) == 2 and csv_rows:
-                    gene_a, gene_b = pair_key
-                    csv_name = (
-                        f"census_{gene_a.lower()}_{gene_b.lower()}_"
-                        f"{target_cell_type.lower().replace(' ', '_')}.csv"
-                    )
-                    write_census_csv(evidence_dir / csv_name, csv_rows)
-            # Save batch census results directly to per-pair stage1 JSONs
-            # (bypasses CSV re-parsing which can fail on cell type name mismatch)
-            for br in _batch_results:
-                ga = br.get("gene_a", "")
-                gb = br.get("gene_b", "")
-                if not ga or not gb:
-                    continue
-                json_path = evidence_dir / f"stage1_{ga}--{gb}.json"
-                if not json_path.exists():
-                    continue
-                try:
-                    stage1_data = json.loads(json_path.read_text(encoding="utf-8"))
-                    stage1_data["census_validation"] = {
-                        "disease": br.get("disease", ""),
-                        "requested_cell_type": br.get("requested_cell_type", ""),
-                        "resolved_cell_type": br.get("resolved_cell_type", ""),
-                        "resolution_mode": br.get("resolution_mode", ""),
-                        "executed": br.get("executed", False),
-                        "errors": br.get("errors", []),
-                        "target_vs_rest": br.get("target_vs_rest"),
-                        "n_target_cells": br.get("n_target_cells", 0),
-                        "n_rest_cells": br.get("n_rest_cells", 0),
-                        "census_version": br.get("census_version", ""),
-                        "source": "batch_census_direct",
-                    }
-                    json_path.write_text(
-                        json.dumps(stage1_data, indent=2), encoding="utf-8",
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "Failed to save census result for %s--%s: %s", ga, gb, exc,
-                    )
-            # Surface warning if Census validation failed for ALL pairs
-            if _batch_results and all(
-                not r.get("pair_result", r).get("executed", False) for r in _batch_results
-            ):
-                errors.append(
-                    f"WARNING: Census validation executed=false for ALL "
-                    f"{len(_batch_results)} pairs. Cell type '{target_cell_type}' "
-                    f"likely failed to resolve in Census vocabulary."
+                from src.agents.drug_target.tools.census_batch_core import (
+                    batch_census_lr_pairs,
+                    write_census_csv,
                 )
-            census_status = "completed"
-        except Exception as exc:
-            errors.append(f"Census batch: {exc}")
-            census_status = f"failed: {exc}"
+                pairs_list = [list(pair) for pair in pairs_requiring_census]
+                # Create lightweight LLM for cell type / disease semantic matching
+                try:
+                    from src.agents.model import create_llm as _create_llm
+                    _census_llm = _create_llm()
+                except Exception:
+                    _census_llm = None
+                _batch_results, csv_results = batch_census_lr_pairs(
+                    pairs_list,
+                    disease=disease,
+                    target_cell_type=target_cell_type,
+                    organism="homo_sapiens",
+                    census_version=_DEFAULT_CENSUS_VERSION,
+                    llm=_census_llm,
+                )
+                for br in _batch_results:
+                    if isinstance(br, dict) and br.get("disease"):
+                        stage1_disease_used = str(br.get("disease") or disease)
+                        stage1_disease_resolution_mode = str(
+                            br.get("disease_resolution_mode")
+                            or stage1_disease_resolution_mode
+                        )
+                        break
+                for pair_key, csv_rows in csv_results.items():
+                    if isinstance(pair_key, tuple) and len(pair_key) == 2 and csv_rows:
+                        gene_a, gene_b = pair_key
+                        csv_name = (
+                            f"census_{gene_a.lower()}_{gene_b.lower()}_"
+                            f"{target_cell_type.lower().replace(' ', '_')}.csv"
+                        )
+                        write_census_csv(evidence_dir / csv_name, csv_rows)
+                # Save batch census results directly to per-pair stage1 JSONs
+                # (bypasses CSV re-parsing which can fail on cell type name mismatch)
+                for br in _batch_results:
+                    ga = br.get("gene_a", "")
+                    gb = br.get("gene_b", "")
+                    if not ga or not gb:
+                        continue
+                    json_path = evidence_dir / f"stage1_{ga}--{gb}.json"
+                    if not json_path.exists():
+                        continue
+                    try:
+                        stage1_data = json.loads(json_path.read_text(encoding="utf-8"))
+                        stage1_data["census_validation"] = {
+                            "disease": br.get("disease", ""),
+                            "input_disease": input_disease,
+                            "disease_fallback_used": not disease_labels_equal(
+                                input_disease,
+                                br.get("disease", ""),
+                            ),
+                            "disease_resolution_mode": (
+                                br.get("disease_resolution_mode")
+                                or stage1_disease_resolution_mode
+                            ),
+                            "requested_cell_type": br.get("requested_cell_type", ""),
+                            "resolved_cell_type": br.get("resolved_cell_type", ""),
+                            "resolution_mode": br.get("resolution_mode", ""),
+                            "executed": br.get("executed", False),
+                            "errors": br.get("errors", []),
+                            "target_vs_rest": br.get("target_vs_rest"),
+                            "n_target_cells": br.get("n_target_cells", 0),
+                            "n_rest_cells": br.get("n_rest_cells", 0),
+                            "census_version": br.get("census_version", ""),
+                            "source": "batch_census_direct",
+                        }
+                        json_path.write_text(
+                            json.dumps(stage1_data, indent=2), encoding="utf-8",
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "Failed to save census result for %s--%s: %s", ga, gb, exc,
+                        )
+                # Surface warning if Census validation failed for ALL pairs
+                if _batch_results and all(
+                    not r.get("pair_result", r).get("executed", False) for r in _batch_results
+                ):
+                    errors.append(
+                        f"WARNING: Census validation executed=false for ALL "
+                        f"{len(_batch_results)} pairs. Cell type '{target_cell_type}' "
+                        f"likely failed to resolve in Census vocabulary."
+                    )
+                census_status = "completed"
+            except Exception as exc:
+                errors.append(f"Census batch: {exc}")
+                census_status = f"failed: {exc}"
+
+    workspace_reused = (
+        not saved_files
+        and census_status in {"skipped", "skipped_existing"}
+        and not errors
+        and _stage1_aggregate_artifacts_exist(evidence_dir)
+    )
 
     # 5. Finalize: normalize per-pair files and rebuild aggregates
     finalize_status = "skipped"
-    try:
-        from src.agents.drug_target.tools.stage1_normalization import finalize_stage1_workspace
-        finalize_stage1_workspace(
-            data_dir,
-            disease=disease,
-            target_cell_type=target_cell_type or None,
-            rerun_missing_census=enable_census,
-            pair_subset=list(featured_pairs),
-        )
-        finalize_status = "completed"
-    except Exception as exc:
-        errors.append(f"finalize_stage1_artifacts: {exc}")
-        finalize_status = f"failed: {exc}"
+    if workspace_reused:
+        finalize_status = "skipped_existing"
+    else:
+        try:
+            from src.agents.drug_target.tools.stage1_normalization import finalize_stage1_workspace
+            finalize_stage1_workspace(
+                data_dir,
+                disease=disease,
+                target_cell_type=target_cell_type or None,
+                rerun_missing_census=enable_census,
+                pair_subset=list(featured_pairs),
+            )
+            finalize_status = "completed"
+        except Exception as exc:
+            errors.append(f"finalize_stage1_artifacts: {exc}")
+            finalize_status = f"failed: {exc}"
 
     # 6. Auto-apply Stage 1 filter to update assessment_results.json
     filter_status = "skipped"
     filter_summary: dict[str, Any] = {}
-    try:
-        from src.agents.drug_target.tools.stage_logic import apply_stage1_filter
-        filter_raw = apply_stage1_filter.invoke({"data_dir": data_dir})
-        filter_summary = json.loads(filter_raw) if isinstance(filter_raw, str) else filter_raw
-        filter_status = "applied" if filter_summary.get("success") else f"failed: {filter_summary.get('error')}"
-        logger.info("Stage 1 filter auto-applied: %s", filter_status)
-    except Exception as exc:
-        errors.append(f"apply_stage1_filter: {exc}")
-        filter_status = f"failed: {exc}"
+    if workspace_reused:
+        filter_status = "skipped_existing"
+    else:
+        try:
+            from src.agents.drug_target.tools.stage_logic import apply_stage1_filter
+            filter_raw = apply_stage1_filter.invoke({"data_dir": data_dir})
+            filter_summary = json.loads(filter_raw) if isinstance(filter_raw, str) else filter_raw
+            filter_status = "applied" if filter_summary.get("success") else f"failed: {filter_summary.get('error')}"
+            logger.info("Stage 1 filter auto-applied: %s", filter_status)
+        except Exception as exc:
+            errors.append(f"apply_stage1_filter: {exc}")
+            filter_status = f"failed: {exc}"
 
-    _finalize_ok = finalize_status == "completed"
-    _filter_ok = filter_status == "applied"
+    _finalize_ok = finalize_status in {"completed", "skipped_existing"}
+    _filter_ok = filter_status in {"applied", "skipped_existing"}
     _all_ok = _finalize_ok and _filter_ok and not errors
+    _success_note = (
+        "Existing Stage 1 evidence, Census validation, and filter artifacts reused. "
+        "No external queries or aggregate rewrites were needed."
+    ) if workspace_reused else (
+        "Stage 1 evidence files auto-saved and filter applied. "
+        "assessment_results.json updated with filtered stage3_candidates. "
+        "Call validate_stage1_gate(data_dir) to confirm."
+    )
+    stage1_fallback_used = not disease_labels_equal(input_disease, stage1_disease_used)
+    stage1_disease_metadata = {
+        "requested_disease": input_disease,
+        "disease_used": stage1_disease_used,
+        "exact_match": not stage1_fallback_used and stage1_disease_resolution_mode == "exact",
+        "fallback_used": stage1_fallback_used,
+        "fallback_reason": (
+            "CELLxGENE Census used a backend-compatible disease label different "
+            "from the input disease."
+            if stage1_fallback_used else ""
+        ),
+        "resolution_mode": stage1_disease_resolution_mode,
+        "source": "cellxgene_census" if enable_census else "stage1",
+        "target_cell_type": target_cell_type,
+        "census_status": census_status,
+    }
+    disease_context = merge_disease_context(
+        evidence_dir,
+        input_disease=input_disease,
+        stage1=stage1_disease_metadata,
+    )
+    try:
+        assessment_for_context = json.loads(assessment_path.read_text(encoding="utf-8"))
+        if isinstance(assessment_for_context, dict):
+            assessment_for_context["disease"] = input_disease
+            assessment_for_context["disease_context"] = disease_context
+            assessment_path.write_text(
+                json.dumps(assessment_for_context, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+    except Exception as exc:
+        logger.warning("Failed to sync disease_context into assessment_results.json: %s", exc)
+    disease_warnings = disease_context.get("warnings", [])
+    if stage1_fallback_used:
+        logger.warning(
+            "Stage 1 disease fallback: input=%r, stage1=%r, mode=%s",
+            input_disease,
+            stage1_disease_used,
+            stage1_disease_resolution_mode,
+        )
 
     return _as_json({
         "success": _all_ok,
@@ -944,18 +1343,17 @@ def run_stage1_batch(
         "featured_genes": sorted(featured_genes),
         "pairs_processed": len(featured_pairs),
         "saved_files": saved_files,
+        "skipped_existing": skipped_existing,
         "census_batch": census_status,
         "finalize": finalize_status,
         "finalize_status": finalize_status,
         "stage1_filter": filter_status,
         "filter_status": filter_status,
         "stage1_filter_summary": filter_summary,
+        "disease_context": disease_context,
+        "warnings": disease_warnings,
         "errors": errors if errors else [],
-        "note": (
-            "Stage 1 evidence files auto-saved and filter applied. "
-            "assessment_results.json updated with filtered stage3_candidates. "
-            "Call validate_stage1_gate(data_dir) to confirm."
-        ) if _all_ok else (
+        "note": _success_note if _all_ok else (
             "Stage 1 batch completed with partial failures. Check finalize_status, "
             "filter_status, and errors for details. assessment_results.json may be stale."
         ),
@@ -977,4 +1375,5 @@ __all__ = [
     "query_chembl_target_profile",
     "query_pubmed_clinical_limitations",
     "run_stage1_batch",
+    "run_stage3_batch",
 ]
