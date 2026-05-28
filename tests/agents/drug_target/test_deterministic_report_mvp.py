@@ -130,11 +130,20 @@ def test_report_mvp_renders_without_llm(tmp_path: Path) -> None:
     assert (workspace / "report_data.json").exists()
     assert (workspace / "drug.md").exists()
     assert (workspace / "drug_report.html").exists()
+    assert (workspace / "drug_report_render.json").exists()
     assert (workspace / "part4_therapeutic_synthesis.md").exists()
     assert (workspace / "report_validation.json").exists()
     validation = json.loads(
         (workspace / "report_validation.json").read_text(encoding="utf-8")
     )
+    render_artifact = validation["artifacts"]["drug_report_render.json"]
+    assert render_artifact["exists"] is True
+    assert render_artifact["size_bytes"] > 0
+    render_metadata = json.loads(
+        (workspace / "drug_report_render.json").read_text(encoding="utf-8")
+    )
+    assert render_metadata["schema_version"] == "drug_report_render.v1"
+    assert render_metadata["mode"] == "deterministic"
     part4_artifact = validation["artifacts"]["part4_therapeutic_synthesis.md"]
     assert part4_artifact["exists"] is True
     assert part4_artifact["size_bytes"] > 0
@@ -153,9 +162,11 @@ def test_report_mvp_renders_without_llm(tmp_path: Path) -> None:
     assert part4_text.startswith("# Part 4: Therapeutic Synthesis")
     assert part4_text != rendered_text
     assert "## Integrated Therapeutic Thesis" in part4_text
-    assert "## Candidate Triage" in part4_text
+    assert "## Prioritized Candidates" in part4_text
     assert "## Mechanistic Intervention Map" in part4_text
-    assert "- Therapeutic rationale:" in part4_text
+    assert "- Evidence summary:" in part4_text
+    assert "- Therapeutic interpretation:" in part4_text
+    assert "- Main uncertainty:" in part4_text
     assert "- Falsifiable prediction:" in part4_text
     assert "EXPAND" not in part4_text
 

@@ -15,6 +15,9 @@ from langchain_core.runnables import RunnableConfig
 
 from src.agents.drug_target.deterministic_report import finalize_report_mvp
 from src.agents.drug_target.evidence_filenames import EvidenceFiles
+from src.agents.drug_target.part4_candidate_selector import (
+    PART4_CANDIDATE_SELECTION_FILENAME,
+)
 from src.agents.drug_target.therapeutic_synthesis import PART4_SYNTHESIS_FILENAME
 from src.agents.drug_target.tools.assessment_output import (
     validate_target_assessment_file,
@@ -29,12 +32,13 @@ REQUIRED_REPORT_ARTIFACTS = (
     "report_data.json",
     "drug.md",
     "drug_report.html",
+    "drug_report_render.json",
+    PART4_CANDIDATE_SELECTION_FILENAME,
     PART4_SYNTHESIS_FILENAME,
     "report_validation.json",
 )
 OPTIONAL_LEGACY_ARTIFACTS = (
     "report_expansions.json",
-    "drug_report_render.json",
     "report_interpretations.json",
 )
 REQUIRED_EVIDENCE = (

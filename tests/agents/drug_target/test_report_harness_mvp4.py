@@ -328,7 +328,6 @@ def test_optional_legacy_artifacts_presence_tracked_without_deletion(
 
     optional_payloads = {
         "report_expansions.json": {"schema_version": "legacy.expansions.v1"},
-        "drug_report_render.json": {"schema_version": "legacy.render.v1"},
         "report_interpretations.json": {
             "schema_version": "drug_target.report_interpretations.v1",
             "summary": {

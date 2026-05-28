@@ -31,8 +31,10 @@ import sys
 import tempfile
 import time
 import uuid
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Protocol, cast
 
 # ---------------------------------------------------------------------------
 # Force LangSmith OFF before any LangChain import
@@ -47,6 +49,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from dotenv import load_dotenv
+from langchain_core.runnables import RunnableConfig
 
 load_dotenv(PROJECT_ROOT / ".env", override=False)
 
@@ -84,6 +87,11 @@ MOCK_SELECTED_TOP3 = [
     {"ligand": "SPP1", "receptor": "CD44"},
     {"ligand": "VEGFA", "receptor": "FLT1"},
 ]
+
+
+class _CleanupBackend(Protocol):
+    def cleanup(self) -> None:
+        ...
 
 
 def _parse_port(value: str) -> int:
@@ -159,6 +167,14 @@ def _configure_ollama_port_override(args: argparse.Namespace) -> str | None:
     os.environ["OLLAMA_BASE_URL"] = base_url
     os.environ["OLLAMA_HOST"] = base_url
     return base_url
+
+
+def _finalize_report_config(args: argparse.Namespace) -> RunnableConfig:
+    """Build the config used when the traced runner invokes finalize_report directly."""
+    configurable: dict[str, str] = {"llm_provider": args.provider}
+    if llm_model := os.getenv("LLM_MODEL"):
+        configurable["llm_model"] = llm_model
+    return {"recursion_limit": 100, "configurable": configurable}
 
 
 def _setup_mock_data() -> Path:
@@ -253,7 +269,12 @@ def _validate_report_finalization(data_dir: Path) -> dict:
             getattr(validate_drug_report_finalization, "func", None)
             or validate_drug_report_finalization
         )
-        raw = impl(data_dir=str(data_dir))
+        if callable(impl):
+            raw = cast(Callable[..., Any], impl)(data_dir=str(data_dir))
+        else:
+            raw = validate_drug_report_finalization.invoke(
+                {"data_dir": str(data_dir)}
+            )
         return json.loads(raw) if isinstance(raw, str) else raw
     except Exception as exc:
         return {
@@ -995,7 +1016,7 @@ async def run_traced(args: argparse.Namespace) -> int:
     finally:
         trace_log_fp.close()
         if backend and hasattr(backend, "cleanup"):
-            backend.cleanup()
+            cast(_CleanupBackend, backend).cleanup()
 
     elapsed = time.time() - start
 
@@ -1267,7 +1288,10 @@ async def run_traced(args: argparse.Namespace) -> int:
                 "data_dir": str(data_dir),
                 "disease": args.disease,
             }
-            finalize_result = await finalize_report(finalize_state, {"recursion_limit": 100})
+            finalize_result = await finalize_report(
+                finalize_state,
+                _finalize_report_config(args),
+            )
             finalize_elapsed = time.time() - finalize_start
             finalize_err = finalize_result.get("report_finalization_error")
             evidence_trunc_now = finalize_result.get("evidence_truncated", False)
