@@ -130,10 +130,23 @@ def test_report_mvp_renders_without_llm(tmp_path: Path) -> None:
     assert (workspace / "report_data.json").exists()
     assert (workspace / "drug.md").exists()
     assert (workspace / "drug_report.html").exists()
+    assert (workspace / "drug_report_render.json").exists()
+    assert (workspace / "part4_therapeutic_synthesis.md").exists()
     assert (workspace / "report_validation.json").exists()
     validation = json.loads(
         (workspace / "report_validation.json").read_text(encoding="utf-8")
     )
+    render_artifact = validation["artifacts"]["drug_report_render.json"]
+    assert render_artifact["exists"] is True
+    assert render_artifact["size_bytes"] > 0
+    render_metadata = json.loads(
+        (workspace / "drug_report_render.json").read_text(encoding="utf-8")
+    )
+    assert render_metadata["schema_version"] == "drug_report_render.v1"
+    assert render_metadata["mode"] == "deterministic"
+    part4_artifact = validation["artifacts"]["part4_therapeutic_synthesis.md"]
+    assert part4_artifact["exists"] is True
+    assert part4_artifact["size_bytes"] > 0
     self_artifact = validation["artifacts"]["report_validation.json"]
     assert self_artifact["exists"] is True
     assert "size_bytes" not in self_artifact
@@ -143,6 +156,19 @@ def test_report_mvp_renders_without_llm(tmp_path: Path) -> None:
     assert "# Therapeutic Target Assessment Report" in rendered_text
     assert "## 1. Executive Summary" in rendered_text
     assert "EXPAND" not in rendered_text
+    part4_text = (workspace / "part4_therapeutic_synthesis.md").read_text(
+        encoding="utf-8"
+    )
+    assert part4_text.startswith("# Part 4: Therapeutic Synthesis")
+    assert part4_text != rendered_text
+    assert "## Integrated Therapeutic Thesis" in part4_text
+    assert "## Prioritized Candidates" in part4_text
+    assert "## Mechanistic Intervention Map" in part4_text
+    assert "- Evidence summary:" in part4_text
+    assert "- Therapeutic interpretation:" in part4_text
+    assert "- Main uncertainty:" in part4_text
+    assert "- Falsifiable prediction:" in part4_text
+    assert "EXPAND" not in part4_text
 
 
 def test_report_mvp_never_creates_llm(
@@ -503,6 +529,7 @@ def test_report_mvp_validation_fails_without_assessment_results(tmp_path: Path) 
     assert result["report_finalization_error"].startswith(
         "deterministic_report_validation_failed:"
     )
+    assert not (workspace / "part4_therapeutic_synthesis.md").exists()
     validation = json.loads(
         (workspace / "report_validation.json").read_text(encoding="utf-8")
     )
@@ -515,6 +542,40 @@ def test_report_mvp_validation_fails_without_assessment_results(tmp_path: Path) 
     assert self_artifact["exists"] is True
     assert "size_bytes" not in self_artifact
     assert "sha256" not in self_artifact
+
+
+def test_report_mvp_failure_removes_stale_part4_artifact(tmp_path: Path) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    state = {
+        "data_dir": str(workspace),
+        "disease": "idiopathic pulmonary fibrosis",
+        "report_finalization_error": None,
+        "evidence_truncated": False,
+    }
+    first_result = asyncio.run(finalize_report_mvp(state, {}))
+    part4_path = workspace / "part4_therapeutic_synthesis.md"
+
+    assert first_result["report_finalization_error"] is None
+    assert part4_path.exists()
+
+    (workspace / "evidence" / "assessment_results.json").unlink()
+    second_result = asyncio.run(finalize_report_mvp(state, {}))
+
+    assert second_result["evidence_truncated"] is False
+    assert second_result["report_finalization_error"].startswith(
+        "deterministic_report_validation_failed:"
+    )
+    assert not part4_path.exists()
+    validation = json.loads(
+        (workspace / "report_validation.json").read_text(encoding="utf-8")
+    )
+    assert validation["valid"] is False
+    assert any(
+        issue["code"] == "MISSING_REQUIRED_EVIDENCE"
+        for issue in validation["issues"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -549,6 +610,7 @@ def test_report_mvp_validation_fails_for_malformed_required_json(
     assert result["report_finalization_error"].startswith(
         "deterministic_report_validation_failed:"
     )
+    assert not (workspace / "part4_therapeutic_synthesis.md").exists()
     validation = json.loads(
         (workspace / "report_validation.json").read_text(encoding="utf-8")
     )

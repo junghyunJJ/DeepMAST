@@ -687,6 +687,7 @@ def render_drug_md(
     hypothesis_data: dict | None = None,
     disease_scope: dict | None = None,
     data_limitations: list[str] | None = None,
+    interpretations: dict[str, Any] | None = None,
     novelty_opportunity_legend: str = NOVELTY_OPPORTUNITY_LEGEND,
 ) -> str:
     """Render drug.md from structured data via Jinja2 template.
@@ -738,6 +739,7 @@ def render_drug_md(
         hypothesis_data=hypothesis_data or {},
         disease_scope=disease_scope or {},
         data_limitations=data_limitations or [],
+        interpretations=interpretations or {},
         novelty_opportunity_legend=novelty_opportunity_legend,
     )
 

@@ -171,6 +171,7 @@ class TestSubagentConfigs:
         assert expected.issubset(names)
         # Stage 3 ChEMBL tools now run inline in evidence_assessor.
         assert "query_chembl_target_profile" in names
+        assert "run_stage3_batch" in names
         assert "validate_stage3_gate" in names
         # PubMed literature search is NOT wired into evidence_assessor.
         assert "search_literature_dynamic" not in names
@@ -233,6 +234,7 @@ class TestSubagentConfigs:
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         tools = SUBAGENT_CONFIGS["evidence_assessor"]["tools"]
         names = {t.name for t in tools}
+        assert "run_stage3_batch" in names
         assert "query_chembl_target_profile" in names
         assert "validate_stage3_gate" in names
 
@@ -242,6 +244,7 @@ class TestSubagentConfigs:
         prompt = SUBAGENT_CONFIGS["evidence_assessor"]["system_prompt"]
         assert "Stage 3" in prompt
         assert "ChEMBL" in prompt
+        assert "run_stage3_batch" in prompt
 
     def test_workflow_description_mentions_2_agents(self):
         from src.agents.drug_target.subagents.configs import WORKFLOW_DESCRIPTION
@@ -391,6 +394,23 @@ class TestEvidenceLoader:
         raw = load_lr_candidates.invoke({"data_dir": str(mock_data_dir)})
         result = json.loads(raw)
         assert result["disease"] == "breast cancer"
+
+    def test_load_lr_candidates_persists_input_disease_context(self, mock_data_dir):
+        from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
+
+        raw = load_lr_candidates.invoke({
+            "data_dir": str(mock_data_dir),
+            "disease": "idiopathic pulmonary fibrosis",
+        })
+        result = json.loads(raw)
+        disease_context = json.loads(
+            (mock_data_dir / "evidence" / "disease_context.json").read_text()
+        )
+
+        assert result["disease"] == "idiopathic pulmonary fibrosis"
+        assert disease_context["input_disease"] == "idiopathic pulmonary fibrosis"
+        assert disease_context["canonical_disease"] == "idiopathic pulmonary fibrosis"
+        assert disease_context["input_source"] == "cli"
 
     def test_load_lr_candidates_infers_oncology_fields(self, mock_data_dir):
         from src.agents.drug_target.tools.evidence_loader import load_lr_candidates
@@ -868,6 +888,7 @@ class TestToolImports:
         assert stage_domain_tools.query_stage2_gene_panel.name == "query_stage2_gene_panel"
         assert stage_domain_tools.query_ensembl_vep_consequence.name == "query_ensembl_vep_consequence"
         assert stage_domain_tools.query_chembl_target_profile.name == "query_chembl_target_profile"
+        assert stage_domain_tools.run_stage3_batch.name == "run_stage3_batch"
 
     def test_import_census_lr_validation_tools(self):
         from src.agents.drug_target.tools import census_lr_validation_tools
@@ -887,6 +908,7 @@ class TestToolImports:
             "query_opentargets_target", "query_opentargets_known_drugs",
             "query_gwas_gene_trait", "query_stage2_gene_panel",
             "query_chembl_target_profile",
+            "run_stage3_batch",
             "run_compare_census_lr_pair",
             "finalize_stage1_artifacts",
             "read_skill_file",
@@ -967,6 +989,91 @@ class TestStage2Service:
         assert ot_ctx.call_count == 1
         assert gwas_ctx.call_count == 1
 
+    def test_build_ot_disease_context_prefers_exact_disease_hit(self):
+        import src.agents.drug_target.tools.stage2_service as mod
+
+        class FakeOpenTargetsModule:
+            def search_entities(self, query_string, entity_types=None):
+                assert query_string == "idiopathic pulmonary fibrosis"
+                assert entity_types == ["disease"]
+                return [
+                    {"id": "EFO_BROAD", "name": "pulmonary fibrosis"},
+                    {"id": "EFO_EXACT", "name": "idiopathic pulmonary fibrosis"},
+                ]
+
+        context = mod._build_ot_disease_context(
+            FakeOpenTargetsModule(),
+            "idiopathic pulmonary fibrosis",
+        )
+
+        assert context["efo_id"] == "EFO_EXACT"
+        assert context["match_label"] == "idiopathic pulmonary fibrosis"
+        assert context["exact_match"] is True
+        assert context["fallback_used"] is False
+
+    def test_query_stage2_gene_panel_prefers_phase0_input_disease(self, tmp_path):
+        from src.agents.drug_target.tools.disease_context import initialize_disease_context
+        from src.agents.drug_target.tools.stage_domain_tools import query_stage2_gene_panel
+
+        initialize_disease_context(
+            tmp_path / "evidence",
+            input_disease="idiopathic pulmonary fibrosis",
+            input_source="cli",
+        )
+        payload = {
+            "disease": "idiopathic pulmonary fibrosis",
+            "gene_symbols": ["LRP1"],
+            "stage2_evidence": {
+                "LRP1": {
+                    "opentargets": {
+                        "gene_symbol": "LRP1",
+                        "disease": "idiopathic pulmonary fibrosis",
+                        "executed": True,
+                        "disease_evidence": [],
+                        "associations": [],
+                        "errors": [],
+                    },
+                    "gwas": {
+                        "gene_symbol": "LRP1",
+                        "disease": "idiopathic pulmonary fibrosis",
+                        "executed": True,
+                        "trait_associations": [],
+                        "gene_associations": [],
+                        "errors": [],
+                    },
+                    "vep": {"source": "ensembl_vep", "variants": []},
+                }
+            },
+            "known_drugs": {
+                "disease": "idiopathic pulmonary fibrosis",
+                "executed": True,
+                "drugs": {"rows": []},
+            },
+            "gene_manifest": [{"symbol": "LRP1", "is_selected_top3": False}],
+            "source_modes": {"opentargets": "parquet", "gwas": "parquet"},
+        }
+
+        with patch(
+            "src.agents.drug_target.tools.stage_domain_tools.build_stage2_gene_panel",
+            return_value=payload,
+        ) as mock_build:
+            raw = query_stage2_gene_panel.invoke({
+                "gene_symbols": ["LRP1"],
+                "disease": "pulmonary fibrosis",
+                "selected_top3_genes": [],
+                "data_dir": str(tmp_path),
+            })
+
+        mock_build.assert_called_once_with(
+            ["LRP1"],
+            "idiopathic pulmonary fibrosis",
+            selected_top3_genes=[],
+            data_dir=str(tmp_path.resolve()),
+        )
+        result = json.loads(raw)
+        assert result["disease"] == "idiopathic pulmonary fibrosis"
+        assert "overridden by input disease" in result["warnings"][0]
+
     def test_build_stage2_gene_panel_uses_workspace_cache_when_exact_match(self, tmp_path):
         import src.agents.drug_target.tools.stage2_service as mod
 
@@ -1011,6 +1118,165 @@ class TestStage2Service:
         assert result["known_drugs"] == bundle["known_drugs"]
         assert result["gene_manifest"] == bundle["gene_manifest"]
         assert result["source_modes"] == {"opentargets": "cache", "gwas": "cache"}
+
+    def test_build_stage2_gene_panel_retries_transient_source_failures(self, monkeypatch):
+        import src.agents.drug_target.tools.stage2_service as mod
+
+        monkeypatch.setenv("DRUG_TARGET_STAGE2_RETRY_BACKOFF", "0")
+
+        ot_calls = []
+        gwas_calls = []
+        vep_calls = []
+        known_calls = []
+
+        def fake_ot(gene_symbol, disease, *, mod=None, disease_context=None):
+            ot_calls.append(gene_symbol)
+            if len(ot_calls) == 1:
+                return {
+                    "gene_symbol": gene_symbol,
+                    "disease": disease,
+                    "executed": False,
+                    "errors": ["OpenTargets query failed: HTTP 502 Bad Gateway"],
+                }
+            return {
+                "gene_symbol": gene_symbol,
+                "disease": disease,
+                "executed": True,
+                "ensembl_id": "ENSG_EGFR",
+                "errors": [],
+            }
+
+        def fake_gwas(gene_symbol, disease, *, mod=None, disease_context=None):
+            gwas_calls.append(gene_symbol)
+            if len(gwas_calls) == 1:
+                return {
+                    "gene_symbol": gene_symbol,
+                    "disease": disease,
+                    "executed": True,
+                    "trait_associations": [],
+                    "gene_associations": [{"error": "Request timed out"}],
+                    "errors": [],
+                }
+            return {
+                "gene_symbol": gene_symbol,
+                "disease": disease,
+                "executed": True,
+                "trait_associations": [],
+                "gene_associations": [{"rsId": "rs1"}],
+                "errors": [],
+            }
+
+        def fake_vep(gwas_data):
+            vep_calls.append(gwas_data)
+            if len(vep_calls) == 1:
+                return {
+                    "executed": False,
+                    "variants": [],
+                    "impact_summary": {},
+                    "errors": ["VEP query failed: HTTP 503 Service Unavailable"],
+                }
+            return {
+                "executed": True,
+                "variants": [{"id": "rs1"}],
+                "impact_summary": {"low_impact": 1},
+                "errors": [],
+            }
+
+        def fake_known(disease, *, mod=None, disease_context=None, stage2_evidence=None):
+            known_calls.append(disease)
+            if len(known_calls) == 1:
+                return {
+                    "disease": disease,
+                    "executed": False,
+                    "errors": ["OpenTargets drug query failed: gateway timeout"],
+                }
+            return {"disease": disease, "executed": True, "drugs": {"rows": []}, "errors": []}
+
+        with patch.object(mod, "_try_load_ot_module", return_value=(object(), "api")), \
+             patch.object(mod, "_try_load_gwas_module", return_value=(object(), "api")), \
+             patch.object(mod, "_build_ot_disease_context", return_value={"efo_id": "EFO_1"}), \
+             patch.object(mod, "_build_gwas_disease_context", return_value={"trait_associations": []}), \
+             patch.object(mod, "query_opentargets_target_data", side_effect=fake_ot), \
+             patch.object(mod, "query_gwas_gene_trait_data", side_effect=fake_gwas), \
+             patch.object(mod, "_query_vep_for_gene", side_effect=fake_vep), \
+             patch.object(mod, "query_opentargets_known_drugs_data", side_effect=fake_known):
+            result = mod.build_stage2_gene_panel(["EGFR"], "lung cancer")
+
+        gene_payload = result["stage2_evidence"]["EGFR"]
+        assert len(ot_calls) == 2
+        assert len(gwas_calls) == 2
+        assert len(vep_calls) == 2
+        assert len(known_calls) == 2
+        assert gene_payload["opentargets"]["executed"] is True
+        assert gene_payload["gwas"]["gene_associations"] == [{"rsId": "rs1"}]
+        assert gene_payload["vep"]["executed"] is True
+        assert result["known_drugs"]["executed"] is True
+
+    def test_build_stage2_gene_panel_cache_miss_on_transient_errors(self, tmp_path):
+        import src.agents.drug_target.tools.stage2_service as mod
+
+        cached_bundle = {
+            "disease": "lung cancer",
+            "gene_symbols": ["EGFR"],
+            "stage2_evidence": {
+                "EGFR": {
+                    "opentargets": {
+                        "gene_symbol": "EGFR",
+                        "disease": "lung cancer",
+                        "executed": True,
+                        "errors": [],
+                    },
+                    "gwas": {
+                        "gene_symbol": "EGFR",
+                        "disease": "lung cancer",
+                        "executed": True,
+                        "gene_associations": [{"error": "Request timed out"}],
+                        "errors": [],
+                    },
+                    "vep": {
+                        "source": "ensembl_vep",
+                        "variants": [],
+                    },
+                },
+            },
+            "known_drugs": {"disease": "lung cancer", "executed": True},
+            "gene_manifest": [{"symbol": "EGFR", "is_selected_top3": False}],
+        }
+        mod.write_stage2_artifacts(cached_bundle, tmp_path / "evidence")
+
+        rebuilt = {"called": False}
+
+        def fake_gwas(gene_symbol, disease, *, mod=None, disease_context=None):
+            rebuilt["called"] = True
+            return {
+                "gene_symbol": gene_symbol,
+                "disease": disease,
+                "executed": True,
+                "trait_associations": [],
+                "gene_associations": [],
+                "errors": [],
+            }
+
+        with patch.object(mod, "_try_load_ot_module", return_value=(object(), "parquet")), \
+             patch.object(mod, "_try_load_gwas_module", return_value=(object(), "parquet")), \
+             patch.object(mod, "_build_ot_disease_context", return_value={"efo_id": "EFO_1"}), \
+             patch.object(mod, "_build_gwas_disease_context", return_value={"trait_associations": []}), \
+             patch.object(
+                 mod,
+                 "query_opentargets_target_data",
+                 return_value={
+                     "gene_symbol": "EGFR",
+                     "disease": "lung cancer",
+                     "executed": True,
+                     "errors": [],
+                 },
+             ), \
+             patch.object(mod, "query_gwas_gene_trait_data", side_effect=fake_gwas), \
+             patch.object(mod, "query_opentargets_known_drugs_data", return_value={"disease": "lung cancer", "executed": True}):
+            result = mod.build_stage2_gene_panel(["EGFR"], "lung cancer", data_dir=tmp_path)
+
+        assert rebuilt["called"] is True
+        assert result["source_modes"] == {"opentargets": "parquet", "gwas": "parquet"}
 
     def test_build_stage2_gene_panel_cache_miss_rebuilds_on_manifest_mismatch(self, tmp_path):
         import src.agents.drug_target.tools.stage2_service as mod
@@ -1281,6 +1547,7 @@ class TestStage2Service:
             "stage2_evidence.json",
             "known_drugs.json",
             "gene_manifest.json",
+            "disease_context.json",
             "ot_EGFR.json",
             "ot_MET.json",
         }
@@ -1292,6 +1559,9 @@ class TestStage2Service:
             "gene_symbol": "EGFR",
             "executed": True,
         }
+        disease_context = json.loads((tmp_path / "evidence" / "disease_context.json").read_text())
+        assert disease_context["input_disease"] == "lung cancer"
+        assert disease_context["stage2"]["disease_used"] == "lung cancer"
 
     def test_query_stage2_gene_panel_tool_returns_bundle_json(self, tmp_path):
         from src.agents.drug_target.tools.stage_domain_tools import query_stage2_gene_panel
@@ -1352,6 +1622,617 @@ class TestStage2Service:
         assert egfr["has_ensembl_id"] is True
         assert egfr["ot_executed"] is True
         assert egfr["gwas_executed"] is True
+
+
+class TestStage3Batch:
+    """Batch Stage 3 ChEMBL orchestration and canonical artifact contract."""
+
+    def test_run_stage3_batch_saves_missing_profiles_and_skips_existing(self, tmp_path):
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage3_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "EGFR"},
+                {"gene": "MET"},
+            ],
+        }))
+        (evidence_dir / "stage3_MET.json").write_text(json.dumps({
+            "gene": "MET",
+            "executed": True,
+            "errors": [],
+            "chembl": {"matched_drugs": [{"drug_name": "Existing"}]},
+            "source": "chembl",
+        }))
+
+        calls = []
+
+        def fake_profile(gene_symbol, max_drugs=10, organism="human"):
+            calls.append((gene_symbol, max_drugs, organism))
+            return {
+                "gene_symbol": gene_symbol,
+                "executed": True,
+                "matched_drugs": [{"chembl_id": "CHEMBL1", "drug_name": "Gefitinib"}],
+                "source": "chembl",
+                "errors": [],
+            }
+
+        with patch(
+            "src.agents.drug_target.tools.stage_domain_tools._query_chembl_target_profile_payload",
+            side_effect=fake_profile,
+        ):
+            raw = run_stage3_batch.invoke({
+                "data_dir": str(tmp_path),
+                "max_drugs": 5,
+                "organism": "human",
+            })
+
+        result = json.loads(raw)
+        assert result["success"] is True
+        assert result["total"] == 2
+        assert result["queried_genes"] == ["EGFR"]
+        assert result["skipped_existing"] == ["MET"]
+        assert result["retried_existing"] == []
+        assert result["saved_files"] == ["stage3_EGFR.json"]
+        assert result["validation"]["success"] is True
+        assert calls == [("EGFR", 5, "human")]
+
+        saved = json.loads((evidence_dir / "stage3_EGFR.json").read_text())
+        assert saved["gene"] == "EGFR"
+        assert saved["executed"] is True
+        assert saved["errors"] == []
+        assert saved["chembl"]["matched_drugs"][0]["drug_name"] == "Gefitinib"
+
+    def test_run_stage3_batch_retries_invalid_existing_profiles(self, tmp_path):
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage3_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "BAD"},
+                {"gene": "GOOD"},
+            ],
+        }))
+        (evidence_dir / "stage3_BAD.json").write_text(json.dumps({
+            "gene": "BAD",
+            "executed": False,
+            "errors": ["ChEMBL HTTP 502"],
+            "chembl": {"executed": False, "matched_drugs": [], "errors": ["ChEMBL HTTP 502"]},
+            "source": "chembl",
+        }))
+        (evidence_dir / "stage3_GOOD.json").write_text(json.dumps({
+            "gene": "GOOD",
+            "executed": True,
+            "errors": [],
+            "chembl": {"executed": True, "matched_drugs": [{"drug_name": "Existing"}], "errors": []},
+            "source": "chembl",
+        }))
+
+        calls = []
+
+        def fake_profile(gene_symbol, max_drugs=10, organism="human"):
+            calls.append((gene_symbol, max_drugs, organism))
+            return {
+                "gene_symbol": gene_symbol,
+                "executed": True,
+                "matched_drugs": [{"chembl_id": "CHEMBL_BAD", "drug_name": "Recovered"}],
+                "source": "chembl",
+                "errors": [],
+            }
+
+        with patch(
+            "src.agents.drug_target.tools.stage_domain_tools._query_chembl_target_profile_payload",
+            side_effect=fake_profile,
+        ):
+            raw = run_stage3_batch.invoke({
+                "data_dir": str(tmp_path),
+                "max_drugs": 3,
+                "organism": "human",
+            })
+
+        result = json.loads(raw)
+        assert result["success"] is True
+        assert result["queried_genes"] == ["BAD"]
+        assert result["skipped_existing"] == ["GOOD"]
+        assert result["retried_existing"] == [{"gene": "BAD", "reason": "not_executed"}]
+        assert result["saved_files"] == ["stage3_BAD.json"]
+        assert result["validation"]["success"] is True
+        assert calls == [("BAD", 3, "human")]
+
+        saved = json.loads((evidence_dir / "stage3_BAD.json").read_text())
+        assert saved["executed"] is True
+        assert saved["errors"] == []
+        assert saved["chembl"]["matched_drugs"][0]["drug_name"] == "Recovered"
+
+    def test_run_stage3_batch_fails_when_profile_has_errors(self, tmp_path):
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage3_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "FAIL1"},
+            ],
+        }))
+
+        def fake_profile(gene_symbol, max_drugs=10, organism="human"):
+            return {
+                "gene_symbol": gene_symbol,
+                "executed": False,
+                "matched_drugs": [],
+                "source": "chembl",
+                "errors": ["ChEMBL HTTP 503: service unavailable"],
+            }
+
+        with patch(
+            "src.agents.drug_target.tools.stage_domain_tools._query_chembl_target_profile_payload",
+            side_effect=fake_profile,
+        ):
+            raw = run_stage3_batch.invoke({
+                "data_dir": str(tmp_path),
+                "max_drugs": 5,
+                "organism": "human",
+            })
+
+        result = json.loads(raw)
+        assert result["success"] is False
+        assert result["failed_genes"] == ["FAIL1"]
+        assert result["validation"]["success"] is False
+        assert result["validation"]["genes_with_errors"] == ["FAIL1"]
+
+        saved = json.loads((evidence_dir / "stage3_FAIL1.json").read_text())
+        assert saved["executed"] is False
+        assert saved["errors"] == ["ChEMBL HTTP 503: service unavailable"]
+
+    def test_run_stage3_batch_fails_when_profile_not_executed_without_errors(self, tmp_path):
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage3_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "NOEXEC"},
+            ],
+        }))
+
+        def fake_profile(gene_symbol, max_drugs=10, organism="human"):
+            return {
+                "gene_symbol": gene_symbol,
+                "executed": False,
+                "matched_drugs": [],
+                "source": "chembl",
+                "errors": [],
+            }
+
+        with patch(
+            "src.agents.drug_target.tools.stage_domain_tools._query_chembl_target_profile_payload",
+            side_effect=fake_profile,
+        ):
+            raw = run_stage3_batch.invoke({
+                "data_dir": str(tmp_path),
+                "max_drugs": 5,
+                "organism": "human",
+            })
+
+        result = json.loads(raw)
+        assert result["success"] is False
+        assert result["failed_genes"] == ["NOEXEC"]
+        assert result["validation"]["success"] is False
+        assert result["validation"]["genes_with_errors"] == ["NOEXEC"]
+
+    def test_validate_stage3_gate_fails_when_profile_executed_with_errors(self, tmp_path):
+        from src.agents.drug_target.tools.stage_logic import validate_stage3_gate
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "ERRGENE"},
+            ],
+        }))
+        (evidence_dir / "stage3_ERRGENE.json").write_text(json.dumps({
+            "gene": "ERRGENE",
+            "executed": True,
+            "errors": ["partial ChEMBL payload parse failed"],
+            "chembl": {"matched_drugs": []},
+            "source": "chembl",
+        }))
+
+        result = json.loads(validate_stage3_gate.invoke({"data_dir": str(tmp_path)}))
+
+        assert result["success"] is False
+        assert result["genes_with_errors"] == ["ERRGENE"]
+
+    def test_run_stage3_batch_fails_when_profile_executed_with_errors(self, tmp_path):
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage3_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "ERRTRUE"},
+            ],
+        }))
+
+        def fake_profile(gene_symbol, max_drugs=10, organism="human"):
+            return {
+                "gene_symbol": gene_symbol,
+                "executed": True,
+                "matched_drugs": [],
+                "source": "chembl",
+                "errors": ["partial ChEMBL payload parse failed"],
+            }
+
+        with patch(
+            "src.agents.drug_target.tools.stage_domain_tools._query_chembl_target_profile_payload",
+            side_effect=fake_profile,
+        ):
+            raw = run_stage3_batch.invoke({
+                "data_dir": str(tmp_path),
+                "max_drugs": 5,
+                "organism": "human",
+            })
+
+        result = json.loads(raw)
+        assert result["success"] is False
+        assert result["failed_genes"] == ["ERRTRUE"]
+        assert result["validation"]["success"] is False
+        assert result["validation"]["genes_with_errors"] == ["ERRTRUE"]
+
+    def test_run_stage3_batch_queries_missing_profiles_concurrently(self, tmp_path):
+        import os
+        import threading
+        import time
+
+        from src.agents.drug_target.tools import stage_domain_tools
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage3_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "EGFR"},
+                {"gene": "MET"},
+                {"gene": "ERBB2"},
+            ],
+        }))
+
+        lock = threading.Lock()
+        active_calls = 0
+        max_active_calls = 0
+
+        def fake_chembl_drugs(gene_symbol, max_drugs, organism="human"):
+            nonlocal active_calls, max_active_calls
+            with lock:
+                active_calls += 1
+                max_active_calls = max(max_active_calls, active_calls)
+            time.sleep(0.05)
+            with lock:
+                active_calls -= 1
+            return [{
+                "chembl_id": f"CHEMBL_{gene_symbol}",
+                "drug_name": f"{gene_symbol} inhibitor",
+            }]
+
+        with (
+            patch.object(stage_domain_tools, "_query_chembl_drugs", side_effect=fake_chembl_drugs),
+            patch.dict(os.environ, {"DRUG_TARGET_STAGE3_CHEMBL_WORKERS": "3"}),
+        ):
+            raw = run_stage3_batch.invoke({
+                "data_dir": str(tmp_path),
+                "max_drugs": 5,
+                "organism": "human",
+            })
+
+        result = json.loads(raw)
+        assert result["success"] is True
+        assert result["queried_genes"] == ["EGFR", "MET", "ERBB2"]
+        assert result["saved_files"] == [
+            "stage3_EGFR.json",
+            "stage3_MET.json",
+            "stage3_ERBB2.json",
+        ]
+        assert max_active_calls > 1
+
+
+class TestStage1Batch:
+    """Batch Stage 1 orchestration and resume behavior."""
+
+    def test_run_stage1_batch_skips_existing_stage1_files(self, tmp_path):
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (tmp_path / "lr_candidates.json").write_text(json.dumps({
+            "pairs": [
+                {"ligand": "EGFR", "receptor": "MET"},
+                {"ligand": "MET", "receptor": "ERBB2"},
+            ],
+        }))
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "EGFR"},
+                {"gene": "MET"},
+            ],
+        }))
+        existing_payload = {
+            "ligand": "EGFR",
+            "receptor": "MET",
+            "string_ppi": {"interaction_found": True, "combined_score": 0.99},
+        }
+        (evidence_dir / "stage1_EGFR--MET.json").write_text(json.dumps(existing_payload))
+
+        calls = []
+
+        def fake_string(args):
+            calls.append((args["gene_a"], args["gene_b"]))
+            return json.dumps({
+                "gene_a": args["gene_a"],
+                "gene_b": args["gene_b"],
+                "interaction_found": True,
+                "combined_score": 0.88,
+            })
+
+        class _FakeStringTool:
+            @staticmethod
+            def invoke(args):
+                return fake_string(args)
+
+        class _FakeStage1FilterTool:
+            @staticmethod
+            def invoke(args):
+                return json.dumps({"success": True})
+
+        with (
+            patch(
+                "src.agents.drug_target.tools.stage_domain_tools.query_string_ppi_pair",
+                _FakeStringTool,
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage1_normalization.finalize_stage1_workspace",
+                return_value={"success": True},
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage_logic.apply_stage1_filter",
+                _FakeStage1FilterTool,
+            ),
+        ):
+            raw = run_stage1_batch.invoke({
+                "data_dir": str(tmp_path),
+                "disease": "pulmonary fibrosis",
+                "target_cell_type": "",
+                "enable_census": False,
+            })
+
+        result = json.loads(raw)
+        assert result["success"] is True
+        assert result["pairs_processed"] == 2
+        assert result["skipped_existing"] == ["stage1_EGFR--MET.json"]
+        assert result["saved_files"] == ["stage1_MET--ERBB2.json"]
+        assert calls == [("MET", "ERBB2")]
+        assert json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text()) == existing_payload
+        saved = json.loads((evidence_dir / "stage1_MET--ERBB2.json").read_text())
+        assert saved["string_ppi"]["combined_score"] == 0.88
+
+    def test_run_stage1_batch_records_census_disease_fallback_context(self, tmp_path):
+        from src.agents.drug_target.tools.disease_context import initialize_disease_context
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        initialize_disease_context(
+            evidence_dir,
+            input_disease="idiopathic pulmonary fibrosis",
+            input_source="cli",
+        )
+        (tmp_path / "lr_candidates.json").write_text(json.dumps({
+            "pairs": [{"ligand": "APOE", "receptor": "LRP1"}],
+        }))
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "disease": "idiopathic pulmonary fibrosis",
+            "stage3_candidates": [{"gene": "LRP1"}],
+        }))
+
+        class _FakeStringTool:
+            @staticmethod
+            def invoke(args):
+                return json.dumps({
+                    "gene_a": args["gene_a"],
+                    "gene_b": args["gene_b"],
+                    "interaction_found": True,
+                    "combined_score": 0.9,
+                })
+
+        class _FakeStage1FilterTool:
+            @staticmethod
+            def invoke(args):
+                return json.dumps({"success": True})
+
+        with (
+            patch(
+                "src.agents.drug_target.tools.stage_domain_tools.query_string_ppi_pair",
+                _FakeStringTool,
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage1_normalization.finalize_stage1_workspace",
+                return_value={"success": True},
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage_logic.apply_stage1_filter",
+                _FakeStage1FilterTool,
+            ),
+        ):
+            raw = run_stage1_batch.invoke({
+                "data_dir": str(tmp_path),
+                "disease": "pulmonary fibrosis",
+                "target_cell_type": "",
+                "enable_census": False,
+            })
+
+        result = json.loads(raw)
+        disease_context = json.loads((evidence_dir / "disease_context.json").read_text())
+        assessment = json.loads((evidence_dir / "assessment_results.json").read_text())
+
+        assert result["success"] is True
+        assert disease_context["input_disease"] == "idiopathic pulmonary fibrosis"
+        assert disease_context["stage1"]["disease_used"] == "pulmonary fibrosis"
+        assert disease_context["stage1"]["fallback_used"] is True
+        assert "Stage1" in disease_context["warnings"][0]
+        assert assessment["disease"] == "idiopathic pulmonary fibrosis"
+        assert assessment["disease_context"]["stage1"]["fallback_used"] is True
+
+    def test_run_stage1_batch_skips_census_when_existing_files_have_validation(self, tmp_path):
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (tmp_path / "lr_candidates.json").write_text(json.dumps({
+            "pairs": [
+                {"ligand": "EGFR", "receptor": "MET"},
+            ],
+        }))
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "EGFR"},
+            ],
+        }))
+        existing_payload = {
+            "ligand": "EGFR",
+            "receptor": "MET",
+            "string_ppi": {"interaction_found": True, "combined_score": 0.99},
+            "census_validation": {
+                "executed": True,
+                "target_vs_rest": {"coexpression_p_value": 0.01},
+            },
+        }
+        (evidence_dir / "stage1_EGFR--MET.json").write_text(json.dumps(existing_payload))
+
+        census_calls = []
+
+        def fake_batch(*args, **kwargs):
+            census_calls.append((args, kwargs))
+            return [], {}
+
+        class _FakeStage1FilterTool:
+            @staticmethod
+            def invoke(args):
+                return json.dumps({"success": True})
+
+        with (
+            patch(
+                "src.agents.drug_target.tools.stage_domain_tools.query_string_ppi_pair",
+                object(),
+            ),
+            patch(
+                "src.agents.drug_target.tools.census_batch_core.batch_census_lr_pairs",
+                side_effect=fake_batch,
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage1_normalization.finalize_stage1_workspace",
+                return_value={"success": True},
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage_logic.apply_stage1_filter",
+                _FakeStage1FilterTool,
+            ),
+        ):
+            raw = run_stage1_batch.invoke({
+                "data_dir": str(tmp_path),
+                "disease": "pulmonary fibrosis",
+                "target_cell_type": "pulmonary alveolar type 2 cell",
+                "enable_census": True,
+            })
+
+        result = json.loads(raw)
+        assert result["success"] is True
+        assert result["skipped_existing"] == ["stage1_EGFR--MET.json"]
+        assert result["census_batch"] == "skipped_existing"
+        assert census_calls == []
+        assert json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text()) == existing_payload
+
+    def test_run_stage1_batch_reapplies_filter_when_workspace_is_reused(self, tmp_path):
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (tmp_path / "lr_candidates.json").write_text(json.dumps({
+            "pairs": [
+                {"ligand": "EGFR", "receptor": "MET"},
+            ],
+        }))
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "EGFR"},
+            ],
+            "stage1_filter_applied": True,
+        }))
+        existing_payload = {
+            "ligand": "EGFR",
+            "receptor": "MET",
+            "string_ppi": {"interaction_found": True, "combined_score": 0.99},
+            "census_validation": {
+                "executed": True,
+                "target_vs_rest": {"coexpression_p_value": 0.01},
+            },
+        }
+        (evidence_dir / "stage1_EGFR--MET.json").write_text(json.dumps(existing_payload))
+        (evidence_dir / "stage1_evidence.json").write_text(json.dumps({
+            "EGFR^MET": existing_payload,
+            "LEGACY^PAIR": {"stage1_filter": {"passed": False}},
+        }))
+        (evidence_dir / "stage1_filter.json").write_text(json.dumps({
+            "EGFR^MET": {"passed": True},
+            "LEGACY^PAIR": {"passed": False},
+        }))
+        (evidence_dir / "stage1_filter_results.json").write_text(json.dumps([
+            {"ligand": "EGFR", "receptor": "MET", "passed": True},
+            {"ligand": "LEGACY", "receptor": "PAIR", "passed": False},
+        ]))
+        (evidence_dir / "stage1_audit.json").write_text(json.dumps({
+            "EGFR^MET": {"pair_key": "EGFR^MET"},
+            "LEGACY^PAIR": {"pair_key": "LEGACY^PAIR"},
+        }))
+        original_aggregate = (evidence_dir / "stage1_evidence.json").read_text()
+        filter_calls = []
+
+        class _Stage1FilterTool:
+            @staticmethod
+            def invoke(args):
+                filter_calls.append(args)
+                return json.dumps({"success": True})
+
+        with (
+            patch(
+                "src.agents.drug_target.tools.stage_domain_tools.query_string_ppi_pair",
+                object(),
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage1_normalization.finalize_stage1_workspace",
+                side_effect=AssertionError("finalize should not run for reused workspace"),
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage_logic.apply_stage1_filter",
+                _Stage1FilterTool,
+            ),
+        ):
+            raw = run_stage1_batch.invoke({
+                "data_dir": str(tmp_path),
+                "disease": "pulmonary fibrosis",
+                "target_cell_type": "pulmonary alveolar type 2 cell",
+                "enable_census": True,
+            })
+
+        result = json.loads(raw)
+        assert result["success"] is True
+        assert result["skipped_existing"] == ["stage1_EGFR--MET.json"]
+        assert result["saved_files"] == []
+        assert result["census_batch"] == "skipped_existing"
+        assert result["finalize"] == "skipped_existing"
+        assert result["stage1_filter"] == "applied"
+        assert filter_calls == [{"data_dir": str(tmp_path)}]
+        assert (evidence_dir / "stage1_evidence.json").read_text() == original_aggregate
 
 
 # =========================================================================

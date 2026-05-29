@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
-from collections.abc import Mapping
+from collections import Counter
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -13,16 +15,31 @@ from langchain_core.runnables import RunnableConfig
 
 from src.agents.drug_target.deterministic_report import finalize_report_mvp
 from src.agents.drug_target.evidence_filenames import EvidenceFiles
+from src.agents.drug_target.part4_candidate_selector import (
+    PART4_CANDIDATE_SELECTION_FILENAME,
+)
+from src.agents.drug_target.therapeutic_synthesis import PART4_SYNTHESIS_FILENAME
+from src.agents.drug_target.tools.assessment_output import (
+    validate_target_assessment_file,
+)
 
 
 HARNESS_SCHEMA_VERSION = "drug_target.report_harness_diagnostics.v1"
+HARNESS_EVAL_SCHEMA_VERSION = "drug_target.report_harness_eval.v1"
 HARNESS_DIAGNOSTICS_FILENAME = "report_harness_diagnostics.json"
 EXPAND_MARKER_PATTERN = re.compile(r"<!--\s*EXPAND:")
 REQUIRED_REPORT_ARTIFACTS = (
     "report_data.json",
     "drug.md",
     "drug_report.html",
+    "drug_report_render.json",
+    PART4_CANDIDATE_SELECTION_FILENAME,
+    PART4_SYNTHESIS_FILENAME,
     "report_validation.json",
+)
+OPTIONAL_LEGACY_ARTIFACTS = (
+    "report_expansions.json",
+    "report_interpretations.json",
 )
 REQUIRED_EVIDENCE = (
     EvidenceFiles.assessment_results(),
@@ -47,6 +64,7 @@ DETERMINISTIC_CODE_OWNS = (
     "report_data_json",
     "drug_md",
     "drug_report_html",
+    "part4_therapeutic_synthesis_md",
     "report_validation_json",
     "report_harness_diagnostics_json",
     "final_success_or_failure",
@@ -66,6 +84,10 @@ def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
 
 def _read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _sha256_path(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _has_expand_marker(text: str) -> bool:
@@ -151,7 +173,7 @@ def _artifact_issues(
                     "error": metadata.get("json_error"),
                 }
             )
-    for name in ("drug.md", "drug_report.html"):
+    for name in ("drug.md", "drug_report.html", PART4_SYNTHESIS_FILENAME):
         path = base / name
         if path.exists() and _has_expand_marker(path.read_text(encoding="utf-8")):
             issues.append(
@@ -188,6 +210,246 @@ def _report_validation_issues(base: Path) -> list[dict[str, Any]]:
     ]
 
 
+def _artifact_validity_check(
+    artifacts: dict[str, dict[str, Any]],
+    issues: list[dict[str, Any]],
+) -> dict[str, Any]:
+    artifact_issue_codes = {
+        "MISSING_REQUIRED_ARTIFACT",
+        "MALFORMED_ARTIFACT_JSON",
+        "UNEXPANDED_PLACEHOLDER",
+        "REPORT_VALIDATION_FAILED",
+    }
+    relevant_issues = [
+        issue
+        for issue in issues
+        if issue.get("code") in artifact_issue_codes
+    ]
+    return {
+        "status": "fail" if relevant_issues else "pass",
+        "required_artifacts": artifacts,
+        "issue_count": len(relevant_issues),
+    }
+
+
+def _source_consistency_check(
+    base: Path,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    report_data_path = base / "report_data.json"
+    if not report_data_path.exists():
+        return (
+            {
+                "status": "skipped",
+                "reason": "report_data.json is missing",
+                "sources": {},
+            },
+            [],
+        )
+    try:
+        report_data = _read_json(report_data_path)
+    except json.JSONDecodeError:
+        return (
+            {
+                "status": "skipped",
+                "reason": "report_data.json is malformed",
+                "sources": {},
+            },
+            [],
+        )
+    sources = report_data.get("sources") if isinstance(report_data, dict) else None
+    if not isinstance(sources, dict):
+        issue = {
+            "code": "REPORT_DATA_SOURCES_INVALID",
+            "severity": "critical",
+            "message": "report_data.json sources must be an object",
+            "path": "report_data.json",
+        }
+        return (
+            {
+                "status": "fail",
+                "sources": {},
+                "issue_count": 1,
+            },
+            [issue],
+        )
+
+    checked_sources: dict[str, dict[str, Any]] = {}
+    issues: list[dict[str, Any]] = []
+    for source, metadata in sources.items():
+        source_name = str(source)
+        expected_sha256 = (
+            metadata.get("sha256") if isinstance(metadata, dict) else None
+        )
+        source_metadata: dict[str, Any] = {
+            "path": source_name,
+            "exists": False,
+            "expected_sha256": expected_sha256,
+        }
+        path = base / source_name
+        if not isinstance(metadata, dict) or not isinstance(expected_sha256, str):
+            issues.append(
+                {
+                    "code": "REPORT_DATA_SOURCES_INVALID",
+                    "severity": "critical",
+                    "message": (
+                        "report_data.json source entries must include a sha256 string"
+                    ),
+                    "path": "report_data.json",
+                    "source": source_name,
+                }
+            )
+            checked_sources[source_name] = source_metadata
+            continue
+        if not path.exists():
+            issues.append(
+                {
+                    "code": "MISSING_DECLARED_SOURCE",
+                    "severity": "critical",
+                    "message": f"Declared report_data source is missing: {source_name}",
+                    "path": source_name,
+                }
+            )
+            checked_sources[source_name] = source_metadata
+            continue
+        actual_sha256 = _sha256_path(path)
+        source_metadata.update(
+            {
+                "exists": True,
+                "actual_sha256": actual_sha256,
+            }
+        )
+        if actual_sha256 != expected_sha256:
+            issues.append(
+                {
+                    "code": "SOURCE_HASH_MISMATCH",
+                    "severity": "critical",
+                    "message": (
+                        f"Declared report_data source hash does not match: {source_name}"
+                    ),
+                    "path": source_name,
+                    "expected_sha256": expected_sha256,
+                    "actual_sha256": actual_sha256,
+                }
+            )
+        checked_sources[source_name] = source_metadata
+
+    return (
+        {
+            "status": "fail" if issues else "pass",
+            "sources": checked_sources,
+            "issue_count": len(issues),
+        },
+        issues,
+    )
+
+
+def _target_assessment_check(
+    base: Path,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    lr_candidates_exists = (base / "lr_candidates.json").exists()
+    target_metadata = _json_metadata(base, "target_assessment.json")
+    if not lr_candidates_exists:
+        return (
+            {
+                "status": "skipped",
+                "expected": False,
+                "lr_candidates": _json_metadata(base, "lr_candidates.json"),
+                "target_assessment": target_metadata,
+            },
+            [],
+        )
+
+    validation = validate_target_assessment_file(base)
+    valid = validation.get("valid") is True
+    check = {
+        "status": "pass" if valid else "fail",
+        "expected": True,
+        "lr_candidates": _json_metadata(base, "lr_candidates.json"),
+        "target_assessment": target_metadata,
+        "validation": validation,
+    }
+    if valid:
+        return check, []
+    issue_code = (
+        "MISSING_TARGET_ASSESSMENT"
+        if not target_metadata["exists"]
+        else "TARGET_ASSESSMENT_HARNESS_FAILED"
+    )
+    return (
+        check,
+        [
+            {
+                "code": issue_code,
+                "severity": "critical",
+                "message": "Expected target_assessment.json failed harness validation",
+                "path": "target_assessment.json",
+                "errors": validation.get("errors", []),
+            }
+        ],
+    )
+
+
+def _optional_legacy_artifacts(base: Path) -> dict[str, Any]:
+    artifacts = {
+        name: _json_metadata(base, name) for name in OPTIONAL_LEGACY_ARTIFACTS
+    }
+    status = (
+        "present"
+        if any(item["exists"] for item in artifacts.values())
+        else "absent"
+    )
+    return {
+        "status": status,
+        "artifacts": artifacts,
+    }
+
+
+def _interpretation_check(base: Path) -> dict[str, Any]:
+    metadata = _json_metadata(base, "report_interpretations.json")
+    if not metadata["exists"]:
+        return {"status": "absent", "artifact": metadata}
+    if metadata.get("valid_json") is False:
+        return {"status": "malformed", "artifact": metadata}
+    payload = _read_json(base / "report_interpretations.json")
+    summary = payload.get("summary") if isinstance(payload, dict) else None
+    summary = summary if isinstance(summary, dict) else {}
+    return {
+        "status": "present",
+        "artifact": metadata,
+        "summary": summary,
+        "criteria": {
+            "criteria_met": summary.get("criteria_met"),
+            "max_attempts_per_card": summary.get("max_attempts_per_card"),
+            "accepted_after_retry": summary.get("accepted_after_retry"),
+            "retry_exhausted": summary.get("retry_exhausted"),
+        },
+    }
+
+
+def _no_llm_success_check(
+    finalizer_result: Mapping[str, Any] | None,
+    diagnostics_valid: bool,
+) -> dict[str, Any]:
+    if finalizer_result is None:
+        return {
+            "status": "skipped",
+            "reason": "finalizer_result is not available",
+        }
+    finalizer_error = finalizer_result.get("report_finalization_error")
+    evidence_truncated = finalizer_result.get("evidence_truncated")
+    passed = (
+        finalizer_error is None
+        and diagnostics_valid
+        and evidence_truncated is False
+    )
+    return {
+        "status": "pass" if passed else "fail",
+        "report_finalization_error": finalizer_error,
+        "diagnostics_valid": diagnostics_valid,
+        "evidence_truncated": evidence_truncated,
+    }
+
+
 def deepagents_boundary_contract() -> dict[str, Any]:
     """Return the MVP2 responsibility boundary for DeepAgents integration."""
     return {
@@ -197,6 +459,94 @@ def deepagents_boundary_contract() -> dict[str, Any]:
         },
         "deterministic_code": {
             "owns": list(DETERMINISTIC_CODE_OWNS),
+        },
+    }
+
+
+def aggregate_report_harness_diagnostics(
+    diagnostics: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Aggregate deterministic report harness diagnostics without I/O."""
+    total = 0
+    valid = 0
+    issue_code_counts: Counter[str] = Counter()
+    check_status_counts: dict[str, Counter[str]] = {}
+    interpretation_summary_totals: Counter[str] = Counter()
+    interpretation_criteria_counts: Counter[str] = Counter()
+
+    for payload in diagnostics:
+        total += 1
+        if payload.get("valid") is True:
+            valid += 1
+
+        issues = payload.get("issues")
+        if isinstance(issues, list):
+            for issue in issues:
+                if not isinstance(issue, Mapping):
+                    continue
+                code = issue.get("code")
+                if isinstance(code, str):
+                    issue_code_counts[code] += 1
+
+        checks = payload.get("checks")
+        if not isinstance(checks, Mapping):
+            continue
+        for check_name, check in checks.items():
+            if not isinstance(check, Mapping):
+                continue
+            status = check.get("status")
+            if not status:
+                continue
+            check_status_counts.setdefault(str(check_name), Counter())[str(status)] += 1
+
+        interpretations = checks.get("interpretations")
+        if not isinstance(interpretations, Mapping):
+            continue
+        summary = interpretations.get("summary")
+        if isinstance(summary, Mapping):
+            for key in (
+                "accepted",
+                "rejected",
+                "missing",
+                "provider_errors",
+                "accepted_after_retry",
+                "retry_exhausted",
+            ):
+                value = summary.get(key)
+                if type(value) is int and value >= 0:
+                    interpretation_summary_totals[key] += value
+        criteria = interpretations.get("criteria")
+        if not isinstance(criteria, Mapping):
+            continue
+        if criteria.get("criteria_met") is True:
+            interpretation_criteria_counts["met"] += 1
+        elif criteria.get("criteria_met") is False:
+            interpretation_criteria_counts["not_met"] += 1
+
+    return {
+        "schema_version": HARNESS_EVAL_SCHEMA_VERSION,
+        "total": total,
+        "valid": valid,
+        "invalid": total - valid,
+        "issue_code_counts": dict(sorted(issue_code_counts.items())),
+        "check_status_counts": {
+            check_name: dict(sorted(status_counts.items()))
+            for check_name, status_counts in sorted(check_status_counts.items())
+        },
+        "interpretation_summary_totals": {
+            key: interpretation_summary_totals.get(key, 0)
+            for key in (
+                "accepted",
+                "rejected",
+                "missing",
+                "provider_errors",
+                "accepted_after_retry",
+                "retry_exhausted",
+            )
+        },
+        "interpretation_criteria_counts": {
+            "met": interpretation_criteria_counts.get("met", 0),
+            "not_met": interpretation_criteria_counts.get("not_met", 0),
         },
     }
 
@@ -218,6 +568,17 @@ def collect_report_harness_diagnostics(data_dir: str) -> dict[str, Any]:
         *_artifact_issues(base, artifacts),
         *_report_validation_issues(base),
     ]
+    source_consistency, source_issues = _source_consistency_check(base)
+    target_assessment, target_issues = _target_assessment_check(base)
+    issues.extend(source_issues)
+    issues.extend(target_issues)
+    checks = {
+        "artifact_validity": _artifact_validity_check(artifacts, issues),
+        "source_consistency": source_consistency,
+        "target_assessment": target_assessment,
+        "optional_legacy_artifacts": _optional_legacy_artifacts(base),
+        "interpretations": _interpretation_check(base),
+    }
     return {
         "schema_version": HARNESS_SCHEMA_VERSION,
         "valid": not issues,
@@ -226,6 +587,7 @@ def collect_report_harness_diagnostics(data_dir: str) -> dict[str, Any]:
         "artifacts": artifacts,
         "evidence": evidence,
         "issues": issues,
+        "checks": checks,
         "deepagents_boundary": deepagents_boundary_contract(),
     }
 
@@ -284,12 +646,16 @@ async def run_deterministic_report_harness(
     else:
         diagnostics = collect_report_harness_diagnostics(str(base))
     diagnostics["finalizer_result"] = finalizer_result
+    diagnostics["checks"]["no_llm_success"] = _no_llm_success_check(
+        finalizer_result,
+        bool(diagnostics["valid"]),
+    )
     write_report_harness_diagnostics(str(base), diagnostics)
     return {
         "report_finalization_error": finalizer_result.get(
             "report_finalization_error"
         ),
-        "evidence_truncated": bool(finalizer_result.get("evidence_truncated")),
+        "evidence_truncated": finalizer_result.get("evidence_truncated"),
         "report_harness_diagnostics": diagnostics,
         "report_harness_diagnostics_path": str(
             base / HARNESS_DIAGNOSTICS_FILENAME

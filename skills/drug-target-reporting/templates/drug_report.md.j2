@@ -18,12 +18,18 @@ This report presents a comprehensive therapeutic target assessment for **{{ dise
 - **{{ card.gene }}** — Classification: {{ card.rubric.classification | default('N/A') }}, Priority: {{ card.rubric.priority | default('N/A') }}, Exploratory Total: {{ card.rubric.exploratory_total | default('N/A') }}, Combined Total: {{ card.rubric.combined_total | default('N/A') }}
 {% endfor %}
 
+{% if interpretations.executive_summary_opportunities %}
+{{ interpretations.executive_summary_opportunities }}
+{% endif %}
 <!-- EXPAND: Add 2-3 sentences summarizing key therapeutic opportunities -->
 
 ## 2. Gene & L-R Pair Prioritization
 
 ### 2.1. Druggability Matrix
 
+{% if interpretations.scoring_landscape %}
+{{ interpretations.scoring_landscape }}
+{% endif %}
 <!-- EXPAND: Add 2-3 sentences interpreting the overall scoring landscape -->
 
 | Gene | Drug Ev. | Trial | Safety | Val. Total | GWAS | Tract. | Bio. Plaus. | Novelty | Expl. Total | Combined | Classification | Priority | Stage3 |
@@ -69,6 +75,9 @@ Each gene is scored on two independent tracks reflecting different types of ther
 
 ### 2.2. Biological Interaction Filter Results
 
+{% if interpretations.stage1_filter %}
+{{ interpretations.stage1_filter }}
+{% endif %}
 <!-- EXPAND: Add 2-3 sentences interpreting which L-R pairs passed biological validation and the implications for target selection -->
 
 {% if stage1_filter_results %}
@@ -120,6 +129,9 @@ Each gene is scored on two independent tracks reflecting different types of ther
 - No known drugs targeting this gene
 {% endif %}
 
+{% if card._interpretations is defined and card._interpretations.drug_profile %}
+{{ card._interpretations.drug_profile }}
+{% endif %}
 <!-- EXPAND: Describe what drugs exist and their approved indications. Do NOT speculate about repurposing potential or therapeutic opportunities for the study disease. State only what is known from the listed data. -->
 
 **B. Biological Context (Stage 1)**
@@ -141,6 +153,9 @@ Each gene is scored on two independent tracks reflecting different types of ther
 - No Stage 1 data available for this gene
 {% endif %}
 
+{% if card._interpretations is defined and card._interpretations.biological_context %}
+{{ card._interpretations.biological_context }}
+{% endif %}
 <!-- EXPAND: Interpret biological context and pathway relevance -->
 
 **C. Rubric Assessment**
@@ -149,6 +164,9 @@ Each gene is scored on two independent tracks reflecting different types of ther
 - Exploratory Track: gwas_support={{ card.rubric.gwas_support | default(0) }}, tractability={{ card.rubric.tractability | default(0) }}, biological_plausibility={{ card.rubric.biological_plausibility | default(0) }}, novelty_opportunity={{ card.rubric.novelty_opportunity | default(0) }} → **exploratory_total={{ card.rubric.exploratory_total | default(0) }}**
 - **Combined Total: {{ card.rubric.combined_total | default(0) }}** | Classification: {{ card.rubric.classification | default('N/A') }} | Priority: {{ card.rubric.priority | default('N/A') }}
 
+{% if card._interpretations is defined and card._interpretations.recommendation %}
+{{ card._interpretations.recommendation }}
+{% endif %}
 <!-- EXPAND: Add therapeutic recommendation based on evidence -->
 
 ---
@@ -163,6 +181,9 @@ Each gene is scored on two independent tracks reflecting different types of ther
 {% if hypothesis_data and hypothesis_data.hypotheses %}
 Evidence coverage: {{ hypothesis_data.evidence_coverage_pct }}% ({{ hypothesis_data.hypotheses_retained }} hypotheses retained from {{ hypothesis_data.hypotheses_generated }} generated)
 
+{% if interpretations.hypotheses_overview %}
+{{ interpretations.hypotheses_overview }}
+{% endif %}
 <!-- EXPAND: Add 2-3 sentences summarizing the hypothesis generation approach and key themes -->
 
 {% for h in hypothesis_data.hypotheses %}
@@ -189,6 +210,9 @@ Evidence coverage: {{ hypothesis_data.evidence_coverage_pct }}% ({{ hypothesis_d
 
 **Validation Approach:** {{ h.validation_approach }}
 
+{% if h._interpretation is defined and h._interpretation %}
+{{ h._interpretation }}
+{% endif %}
 <!-- EXPAND: Add 1-2 sentences on therapeutic implications of this hypothesis -->
 
 ---
@@ -226,4 +250,7 @@ Evidence coverage: {{ hypothesis_data.gap_analysis.referenced_files | default(0)
 - Featured candidates (Stage 3): {{ n_featured }}
 - Featured genes: {{ stage3_genes | join(', ') }}
 
+{% if interpretations.final_recommendations %}
+{{ interpretations.final_recommendations }}
+{% endif %}
 <!-- EXPAND: Add recommendations for validated targets, exploratory targets, and next steps -->

@@ -66,6 +66,33 @@ def test_configure_provider_env_sets_llm_provider(monkeypatch):
     assert traced.os.environ["LLM_PROVIDER"] == "ollama"
 
 
+def test_finalize_report_config_forwards_provider(monkeypatch):
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+
+    args = argparse.Namespace(provider="ollama")
+    config = traced._finalize_report_config(args)
+
+    assert config == {
+        "recursion_limit": 100,
+        "configurable": {"llm_provider": "ollama"},
+    }
+
+
+def test_finalize_report_config_forwards_llm_model(monkeypatch):
+    monkeypatch.setenv("LLM_MODEL", "qwen3.5:122b")
+
+    args = argparse.Namespace(provider="ollama")
+    config = traced._finalize_report_config(args)
+
+    assert config == {
+        "recursion_limit": 100,
+        "configurable": {
+            "llm_provider": "ollama",
+            "llm_model": "qwen3.5:122b",
+        },
+    }
+
+
 def test_capture_hypothesis_quality_state_records_gate_fields():
     holder = {
         "report_finalization_error": None,

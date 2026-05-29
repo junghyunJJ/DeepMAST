@@ -546,6 +546,11 @@ def normalize_stage1_record(
 
     normalized["ligand"] = ligand.upper()
     normalized["receptor"] = receptor.upper()
+    existing_census = (
+        normalized.get("census_validation")
+        if isinstance(normalized.get("census_validation"), dict)
+        else {}
+    )
 
     latest_census = build_census_validation_from_csv(
         evidence_dir,
@@ -560,6 +565,10 @@ def normalize_stage1_record(
         normalized["census_validation"] = latest_census
     else:
         normalized.setdefault("census_validation", {"executed": False})
+    if isinstance(existing_census, dict) and isinstance(normalized.get("census_validation"), dict):
+        for key in ("input_disease", "disease_fallback_used", "disease_resolution_mode"):
+            if key in existing_census:
+                normalized["census_validation"].setdefault(key, existing_census[key])
 
     # Remove legacy fields no longer used
     normalized.pop("cellxgene", None)

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Union
 
 from langchain_core.tools import tool
+from src.agents.drug_target.tools.disease_context import initialize_disease_context
 from src.agents.drug_target.tools.stage_logic import (
     classify_disease_type,
     infer_oncology_flag,
@@ -119,7 +120,24 @@ def load_lr_candidates(data_dir: str, disease: str = "") -> str:
         return json.dumps(result, indent=2)
 
     # Extract disease context: CLI param → lr_candidates.json → empty
+    if disease:
+        disease_source = "cli"
+    elif lr_data.get("disease"):
+        disease_source = "lr_candidates.json:disease"
+    elif lr_data.get("disease_context"):
+        disease_source = "lr_candidates.json:disease_context"
+    else:
+        disease_source = ""
     result["disease"] = disease or lr_data.get("disease", lr_data.get("disease_context", ""))
+    if result["disease"]:
+        try:
+            initialize_disease_context(
+                base / "evidence",
+                input_disease=result["disease"],
+                input_source=disease_source,
+            )
+        except Exception as exc:
+            result["errors"].append(f"Failed to save disease_context.json: {exc}")
     result["disease_type"] = classify_disease_type(result["disease"])
     result["oncology_flag"] = infer_oncology_flag(result["disease"])
 

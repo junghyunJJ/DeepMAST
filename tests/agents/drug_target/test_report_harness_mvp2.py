@@ -39,6 +39,14 @@ def _issue_codes(diagnostics: dict) -> set[str]:
     }
 
 
+def _issue_paths(diagnostics: dict) -> set[str]:
+    return {
+        str(issue.get("path"))
+        for issue in diagnostics.get("issues", [])
+        if isinstance(issue, dict)
+    }
+
+
 def test_harness_writes_diagnostics_for_successful_no_llm_report(
     tmp_path: Path,
 ) -> None:
@@ -77,6 +85,9 @@ def test_harness_writes_diagnostics_for_successful_no_llm_report(
         "report_data.json",
         "drug.md",
         "drug_report.html",
+        "drug_report_render.json",
+        "part4_candidate_selection.json",
+        "part4_therapeutic_synthesis.md",
         "report_validation.json",
     ):
         assert diagnostics["artifacts"][name]["exists"] is True
@@ -228,6 +239,43 @@ def test_harness_flags_unexpanded_markers_after_artifact_generation(
     assert "UNEXPANDED_PLACEHOLDER" in _issue_codes(diagnostics)
 
 
+def test_harness_flags_unexpanded_markers_in_part4_artifact(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+    from src.agents.drug_target.report_harness import (
+        collect_report_harness_diagnostics,
+    )
+    from src.agents.drug_target.therapeutic_synthesis import (
+        PART4_SYNTHESIS_FILENAME,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    result = asyncio.run(
+        finalize_report_mvp(
+            {
+                "data_dir": str(workspace),
+                "disease": "idiopathic pulmonary fibrosis",
+                "report_finalization_error": None,
+                "evidence_truncated": False,
+            },
+            {},
+        )
+    )
+    assert result["report_finalization_error"] is None
+
+    (workspace / PART4_SYNTHESIS_FILENAME).write_text(
+        "# Broken Part 4\n\n<!-- EXPAND:therapeutic_synthesis -->\n",
+        encoding="utf-8",
+    )
+
+    diagnostics = collect_report_harness_diagnostics(str(workspace))
+
+    assert diagnostics["valid"] is False
+    assert "UNEXPANDED_PLACEHOLDER" in _issue_codes(diagnostics)
+    assert PART4_SYNTHESIS_FILENAME in _issue_paths(diagnostics)
+
+
 def test_harness_ignores_plain_expand_text_after_artifact_generation(
     tmp_path: Path,
 ) -> None:
@@ -288,6 +336,43 @@ def test_harness_classifies_missing_required_artifact(tmp_path: Path) -> None:
     assert diagnostics["valid"] is False
     assert "MISSING_REQUIRED_ARTIFACT" in _issue_codes(diagnostics)
     assert diagnostics["artifacts"]["drug_report.html"]["exists"] is False
+
+
+def test_harness_flags_missing_part4_candidate_selection_artifact(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import finalize_report_mvp
+    from src.agents.drug_target.part4_candidate_selector import (
+        PART4_CANDIDATE_SELECTION_FILENAME,
+    )
+    from src.agents.drug_target.report_harness import (
+        collect_report_harness_diagnostics,
+    )
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    result = asyncio.run(
+        finalize_report_mvp(
+            {
+                "data_dir": str(workspace),
+                "disease": "idiopathic pulmonary fibrosis",
+                "report_finalization_error": None,
+                "evidence_truncated": False,
+            },
+            {},
+        )
+    )
+    assert result["report_finalization_error"] is None
+
+    (workspace / PART4_CANDIDATE_SELECTION_FILENAME).unlink()
+
+    diagnostics = collect_report_harness_diagnostics(str(workspace))
+
+    assert diagnostics["valid"] is False
+    assert "MISSING_REQUIRED_ARTIFACT" in _issue_codes(diagnostics)
+    assert (
+        diagnostics["artifacts"][PART4_CANDIDATE_SELECTION_FILENAME]["exists"]
+        is False
+    )
 
 
 def test_harness_classifies_malformed_artifact_json(tmp_path: Path) -> None:
@@ -391,6 +476,7 @@ def test_mvp2_harness_contract_keeps_deepagents_out_of_artifact_authoring() -> N
         "report_data_json",
         "drug_md",
         "drug_report_html",
+        "part4_therapeutic_synthesis_md",
         "report_validation_json",
         "report_harness_diagnostics_json",
         "final_success_or_failure",

@@ -15,6 +15,17 @@ from typing import Any
 from jinja2 import BaseLoader, Environment
 from langchain_core.runnables import RunnableConfig
 
+from src.agents.drug_target.part4_candidate_selector import (
+    PART4_CANDIDATE_SELECTION_FILENAME,
+    generate_part4_candidate_selection,
+    part4_candidate_selector_enabled,
+    part4_candidate_selector_provider_from_config,
+)
+from src.agents.drug_target.therapeutic_synthesis import (
+    PART4_SYNTHESIS_FILENAME,
+    build_part4_therapeutic_synthesis,
+    render_part4_therapeutic_synthesis_markdown,
+)
 from src.agents.drug_target.tools.scoring_metadata import NOVELTY_OPPORTUNITY_LEGEND
 
 
@@ -64,6 +75,10 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def _sha256_path(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _utc_now() -> str:
@@ -479,7 +494,35 @@ def _candidate_row(candidate: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _markdown_template_context(report_data: dict[str, Any]) -> dict[str, Any]:
+def _normalize_template_interpretations(
+    interpretations: dict[str, Any],
+) -> dict[str, Any]:
+    normalized: dict[str, Any] = {}
+    for key in (
+        "executive_summary_opportunities",
+        "scoring_landscape",
+        "stage1_filter",
+        "hypotheses_overview",
+        "final_recommendations",
+    ):
+        value = interpretations.get(key)
+        if isinstance(value, str) and value.strip():
+            normalized[key] = value
+
+    for key in ("candidates", "hypotheses"):
+        value = interpretations.get(key)
+        if isinstance(value, dict):
+            normalized[key] = value
+
+    return normalized
+
+
+def _markdown_template_context(
+    report_data: dict[str, Any],
+    interpretations: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    interpretations = interpretations if isinstance(interpretations, dict) else {}
+    interpretations = _normalize_template_interpretations(interpretations)
     raw_candidates = report_data.get("candidates", [])
     candidates = _dict_list(raw_candidates)
     selected = [candidate for candidate in candidates if candidate.get("stage3_candidate")]
@@ -512,18 +555,55 @@ def _markdown_template_context(report_data: dict[str, Any]) -> dict[str, Any]:
             drugs = _dict_list(candidate.get("drugs", []))
             clinical, preclinical = _split_template_drugs(drugs)
         gene = _safe_text(candidate.get("gene"), "")
-        featured_cards.append(
-            {
-                "gene": gene,
-                "rubric": _candidate_row(candidate),
-                "_clinical_drugs": clinical,
-                "_preclinical_compounds": preclinical,
-                "_pairs": _template_pairs_for_gene(gene, stage1_pairs, filter_lookup),
-            }
+        card = {
+            "gene": gene,
+            "rubric": _candidate_row(candidate),
+            "_clinical_drugs": clinical,
+            "_preclinical_compounds": preclinical,
+            "_pairs": _template_pairs_for_gene(gene, stage1_pairs, filter_lookup),
+        }
+        candidate_interpretations = interpretations.get("candidates", {})
+        candidate_interpretations = (
+            candidate_interpretations
+            if isinstance(candidate_interpretations, dict)
+            else {}
         )
+        snippets = candidate_interpretations.get(gene.upper(), {})
+        snippets = snippets if isinstance(snippets, dict) else {}
+        card_interpretations = {
+            key: snippets[key]
+            for key in ("drug_profile", "biological_context", "recommendation")
+            if isinstance(snippets.get(key), str) and snippets[key].strip()
+        }
+        if card_interpretations:
+            card["_interpretations"] = card_interpretations
+        featured_cards.append(card)
 
     hypothesis_data = template_context.get("hypothesis_data", {})
     hypothesis_data = hypothesis_data if isinstance(hypothesis_data, dict) else {}
+    hypothesis_data = dict(hypothesis_data)
+    hypotheses = hypothesis_data.get("hypotheses")
+    if isinstance(hypotheses, list):
+        hypothesis_interpretations = interpretations.get("hypotheses", {})
+        hypothesis_interpretations = (
+            hypothesis_interpretations
+            if isinstance(hypothesis_interpretations, dict)
+            else {}
+        )
+        rendered_hypotheses: list[Any] = []
+        for hypothesis in hypotheses:
+            if not isinstance(hypothesis, dict):
+                rendered_hypotheses.append(hypothesis)
+                continue
+            rendered_hypothesis = dict(hypothesis)
+            rank = str(rendered_hypothesis.get("rank") or "")
+            snippets = hypothesis_interpretations.get(rank, {})
+            snippets = snippets if isinstance(snippets, dict) else {}
+            implication = snippets.get("implication")
+            if isinstance(implication, str) and implication.strip():
+                rendered_hypothesis["_interpretation"] = implication
+            rendered_hypotheses.append(rendered_hypothesis)
+        hypothesis_data["hypotheses"] = rendered_hypotheses
     return {
         "disease": _safe_text(report_data.get("disease"), "unspecified disease"),
         "n_genes": len(candidates),
@@ -541,6 +621,7 @@ def _markdown_template_context(report_data: dict[str, Any]) -> dict[str, Any]:
         "disease_scope": {"requires_proxy_note": False},
         "data_limitations": [],
         "novelty_opportunity_legend": NOVELTY_OPPORTUNITY_LEGEND,
+        "interpretations": interpretations,
     }
 
 
@@ -1077,14 +1158,24 @@ def _persist_target_assessment_if_applicable(
     ]
 
 
-def _artifact_validation(base: Path, report_data: dict[str, Any]) -> dict[str, Any]:
+def _artifact_validation(
+    base: Path,
+    report_data: dict[str, Any],
+    *,
+    require_part4: bool = True,
+) -> dict[str, Any]:
     issues = validate_report_data(report_data)
     artifacts: dict[str, dict[str, Any]] = {}
     required_artifacts = [
         "report_data.json",
         "drug.md",
         "drug_report.html",
+        "drug_report_render.json",
     ]
+    if require_part4:
+        required_artifacts.extend(
+            [PART4_CANDIDATE_SELECTION_FILENAME, PART4_SYNTHESIS_FILENAME]
+        )
     if (base / "lr_candidates.json").exists():
         required_artifacts.append("target_assessment.json")
     for name in required_artifacts:
@@ -1107,7 +1198,7 @@ def _artifact_validation(base: Path, report_data: dict[str, Any]) -> dict[str, A
             )
         artifacts[name] = metadata
 
-    for name in ("drug.md", "drug_report.html"):
+    for name in ("drug.md", "drug_report.html", PART4_SYNTHESIS_FILENAME):
         path = base / name
         if not path.exists():
             continue
@@ -1141,7 +1232,48 @@ def _add_self_validation_artifact(validation: dict[str, Any]) -> dict[str, Any]:
     return validation
 
 
-def render_report_markdown(report_data: dict[str, Any]) -> str:
+def _write_deterministic_render_metadata(base: Path, markdown: str) -> None:
+    source_paths: dict[str, str | None] = {
+        "report_data": "report_data.json",
+        "reference_card": (
+            "drug_report_reference_card.json"
+            if (base / "drug_report_reference_card.json").exists()
+            else None
+        ),
+        "report_expansions": (
+            "report_expansions.json"
+            if (base / "report_expansions.json").exists()
+            else None
+        ),
+    }
+    source_hashes = {
+        key: _sha256_path(base / path)
+        for key, path in source_paths.items()
+        if path is not None and (base / path).exists()
+    }
+    _write_json(
+        base / "drug_report_render.json",
+        {
+            "schema_version": "drug_report_render.v1",
+            "renderer": "deterministic_report.render_report_markdown",
+            "mode": "deterministic",
+            "source_paths": source_paths,
+            "source_hashes": source_hashes,
+            "rendered_drug_md_sha256": _sha256_text(markdown),
+            "required_slot_count": 0,
+            "rendered_slot_count": 0,
+            "missing_slots": [],
+            "extra_slots": [],
+            "pagination_warnings": [],
+            "created_at": _utc_now(),
+        },
+    )
+
+
+def render_report_markdown(
+    report_data: dict[str, Any],
+    interpretations: dict[str, Any] | None = None,
+) -> str:
     template_str = _markdown_template_path().read_text(encoding="utf-8")
     env = Environment(
         loader=BaseLoader(),
@@ -1150,20 +1282,24 @@ def render_report_markdown(report_data: dict[str, Any]) -> str:
         lstrip_blocks=True,
     )
     rendered = env.from_string(template_str).render(
-        **_markdown_template_context(report_data)
+        **_markdown_template_context(report_data, interpretations=interpretations)
     )
     return _strip_expand_markers(rendered)
 
 
 async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
-    del config
     base = Path(state["data_dir"]).expanduser().resolve()
+    part4_path = base / PART4_SYNTHESIS_FILENAME
+    part4_candidate_selection_path = base / PART4_CANDIDATE_SELECTION_FILENAME
+    part4_path.unlink(missing_ok=True)
+    part4_candidate_selection_path.unlink(missing_ok=True)
+    (base / "drug_report_render.json").unlink(missing_ok=True)
     report_data = build_report_data(str(base), str(state.get("disease") or ""))
     _write_json(base / "report_data.json", report_data)
 
     issues = validate_report_data(report_data)
     if issues:
-        validation = _artifact_validation(base, report_data)
+        validation = _artifact_validation(base, report_data, require_part4=False)
         validation["valid"] = False
         validation["issues"] = issues
         _add_self_validation_artifact(validation)
@@ -1176,8 +1312,33 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
             "evidence_truncated": False,
         }
 
-    markdown = render_report_markdown(report_data)
+    interpretations: dict[str, Any] | None = None
+    interpretations_payload: dict[str, Any] | None = None
+    from src.agents.drug_target.report_interpretations import (
+        generate_report_interpretations,
+        interpretation_provider_from_config,
+        report_interpretations_enabled,
+        resolve_interpretation_max_attempts,
+    )
+
+    if report_interpretations_enabled(config):
+        provider = interpretation_provider_from_config(config)
+        if provider is not None:
+            (
+                interpretations_payload,
+                interpretations,
+            ) = await generate_report_interpretations(
+                report_data,
+                provider,
+                max_attempts=resolve_interpretation_max_attempts(config),
+            )
+        else:
+            interpretations_payload, interpretations = {}, {}
+        _write_json(base / "report_interpretations.json", interpretations_payload)
+
+    markdown = render_report_markdown(report_data, interpretations=interpretations)
     (base / "drug.md").write_text(markdown, encoding="utf-8")
+    _write_deterministic_render_metadata(base, markdown)
     (base / "drug_report.html").write_text(
         render_report_html(report_data, markdown),
         encoding="utf-8",
@@ -1187,13 +1348,64 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
         report_data,
     )
 
-    validation = _artifact_validation(base, report_data)
+    pre_part4_validation = _artifact_validation(
+        base,
+        report_data,
+        require_part4=False,
+    )
     if target_assessment_issues:
-        validation["valid"] = False
-        validation["issues"].extend(target_assessment_issues)
+        pre_part4_validation["valid"] = False
+        pre_part4_validation["issues"].extend(target_assessment_issues)
+    if not pre_part4_validation["valid"]:
+        _add_self_validation_artifact(pre_part4_validation)
+        _write_json(base / "report_validation.json", pre_part4_validation)
+        reason = pre_part4_validation["issues"][0].get("code", "UNKNOWN")
+        return {
+            "report_finalization_error": (
+                f"deterministic_report_validation_failed: {reason}"
+            ),
+            "evidence_truncated": False,
+        }
+
+    deterministic_synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=pre_part4_validation,
+        interpretations_payload=interpretations_payload,
+    )
+    deterministic_selected_genes = [
+        str(candidate.get("gene") or "")
+        for candidate in deterministic_synthesis["featured_candidates"]
+        if candidate.get("gene")
+    ]
+    selector_provider = (
+        part4_candidate_selector_provider_from_config(config)
+        if part4_candidate_selector_enabled(config)
+        else None
+    )
+    candidate_selection_payload = await generate_part4_candidate_selection(
+        report_data,
+        deterministic_selected_genes=deterministic_selected_genes,
+        provider=selector_provider,
+        data_dir=base,
+    )
+    _write_json(part4_candidate_selection_path, candidate_selection_payload)
+
+    part4_synthesis = build_part4_therapeutic_synthesis(
+        report_data,
+        validation=pre_part4_validation,
+        interpretations_payload=interpretations_payload,
+        candidate_selection_payload=candidate_selection_payload,
+    )
+    part4_path.write_text(
+        render_part4_therapeutic_synthesis_markdown(part4_synthesis),
+        encoding="utf-8",
+    )
+
+    validation = _artifact_validation(base, report_data)
     _add_self_validation_artifact(validation)
     _write_json(base / "report_validation.json", validation)
     if not validation["valid"]:
+        part4_path.unlink(missing_ok=True)
         reason = validation["issues"][0].get("code", "UNKNOWN")
         return {
             "report_finalization_error": (
