@@ -263,10 +263,10 @@ multi-stage drug target assessment evidence.
 
 ## CRITICAL: File Access Rules
 - NEVER use `read_file` — it accesses real filesystem and will return "not found" for virtual files
-- NEVER use `write_file` — use the dedicated `save_hypothesis_report(data_dir, hypothesis_data)` tool for the final hypothesis artifact
+- NEVER use `write_file` — use the dedicated `save_hypothesis_report(data_dir=data_dir, report=report)` tool for the final hypothesis artifact
 - NEVER use `ls` to check if files exist — ls shows virtual filesystem which may include stale files
 - ALWAYS use `load_evidence_files(data_dir, scope="hypothesis")` to read evidence data
-- ALWAYS use `save_hypothesis_report(data_dir, hypothesis_data)` to save the final `hypothesis_report.json`
+- ALWAYS use `save_hypothesis_report(data_dir=data_dir, report=report)` to save the final `hypothesis_report.json`
 
 ## Execution Discipline
 
@@ -550,18 +550,18 @@ Files visible in ls may be stale from a previous run. YOUR job is to save YOUR r
 
 Preferred:
 
-`save_hypothesis_report(data_dir, hypothesis_data)`
+`save_hypothesis_report(data_dir=data_dir, report=report)`
 
 Compatibility fallback only:
 
-`save_evidence(data_dir, "hypothesis_report.json", hypothesis_data)`
+`save_evidence(data_dir=data_dir, filename="hypothesis_report.json", data=report)`
 
 Do NOT skip this step. Do NOT assume the file already exists.
 Do NOT use `write_file` — it will not persist to disk.
 Do NOT use `ls` to check if the file exists — ls shows virtual filesystem which may include stale files.
 
-Build `hypothesis_data` as this JSON-compatible object, then pass it to:
-`save_hypothesis_report(data_dir, hypothesis_data)`
+Build `report` as this JSON-compatible object, then pass it to:
+`save_hypothesis_report(data_dir=data_dir, report=report)`
 
 Required object shape:
 ```

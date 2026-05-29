@@ -171,7 +171,7 @@ def test_hypothesis_writer_file_access_rules_name_save_hypothesis_report_as_prim
     text = prompts.HYPOTHESIS_WRITER_PROMPT
     file_rules = text.split("## Execution Discipline", 1)[0]
 
-    assert "ALWAYS use `save_hypothesis_report(data_dir, hypothesis_data)`" in file_rules
+    assert "ALWAYS use `save_hypothesis_report(data_dir=data_dir, report=report)`" in file_rules
     assert "NEVER use `write_file`" in file_rules
     assert "`save_evidence(data_dir, filename, data)`" not in file_rules
 
@@ -180,10 +180,10 @@ def test_hypothesis_writer_final_save_step_marks_save_evidence_as_fallback_only(
     text = prompts.HYPOTHESIS_WRITER_PROMPT
     final_save = text.split("### Phase 5: Save Report", 1)[1]
 
-    assert "`save_hypothesis_report(data_dir, hypothesis_data)`" in final_save
+    assert "`save_hypothesis_report(data_dir=data_dir, report=report)`" in final_save
     assert "Compatibility fallback only" in final_save
-    assert "`save_evidence(data_dir, \"hypothesis_report.json\", hypothesis_data)`" in final_save
-    assert final_save.index("`save_hypothesis_report(data_dir, hypothesis_data)`") < final_save.index(
+    assert "`save_evidence(data_dir=data_dir, filename=\"hypothesis_report.json\", data=report)`" in final_save
+    assert final_save.index("`save_hypothesis_report(data_dir=data_dir, report=report)`") < final_save.index(
         "Compatibility fallback only"
     )
 ```
@@ -205,10 +205,10 @@ In `src/agents/drug_target/subagents/prompts.py`, replace the `HYPOTHESIS_WRITER
 ```text
 ## CRITICAL: File Access Rules
 - NEVER use `read_file` — it accesses real filesystem and will return "not found" for virtual files
-- NEVER use `write_file` — use the dedicated `save_hypothesis_report(data_dir, hypothesis_data)` tool for the final hypothesis artifact
+- NEVER use `write_file` — use the dedicated `save_hypothesis_report(data_dir=data_dir, report=report)` tool for the final hypothesis artifact
 - NEVER use `ls` to check if files exist — ls shows virtual filesystem which may include stale files
 - ALWAYS use `load_evidence_files(data_dir, scope="hypothesis")` to read evidence data
-- ALWAYS use `save_hypothesis_report(data_dir, hypothesis_data)` to save the final `hypothesis_report.json`
+- ALWAYS use `save_hypothesis_report(data_dir=data_dir, report=report)` to save the final `hypothesis_report.json`
 ```
 
 - [ ] **Step 4: Update the final save example**
@@ -222,8 +222,8 @@ Save the hypothesis report as JSON:
 and the following `save_evidence(...)` code fence with:
 
 ```text
-Build `hypothesis_data` as this JSON-compatible object, then pass it to:
-`save_hypothesis_report(data_dir, hypothesis_data)`
+Build `report` as this JSON-compatible object, then pass it to:
+`save_hypothesis_report(data_dir=data_dir, report=report)`
 
 Required object shape:
 ```
@@ -297,4 +297,3 @@ Expected: only the planned source/test/plan files are modified or created.
 **Placeholder scan:** No implementation step uses TBD/TODO/fill-in language. Every code-edit step includes the exact target file and replacement content.
 
 **Type consistency:** The tests reference existing `prompts.HYPOTHESIS_WRITER_PROMPT`, `prepare_trial_workspace`, and `clean_hypothesis_benchmark_workspace` names already present in the codebase.
-
