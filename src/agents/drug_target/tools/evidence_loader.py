@@ -798,12 +798,18 @@ def _validate_hypothesis_report_topn_and_failed_pairs(
     Returns a diagnostic dict with keys:
       - topn_coverage: {covered, missing, coverage_pct}
       - evidence_coverage_pct: deterministic float (0..100)
+      - gap_analysis: {total_evidence_files, referenced_files, orphan_files}
       - failed_pair_violations: [strings] -- hypotheses citing or claiming failed Stage 1 pairs
       - reject_reason: str | None  (non-None means save_evidence MUST refuse)
     """
     diag: dict = {
         "topn_coverage": {"covered": [], "missing": [], "coverage_pct": 100.0},
         "evidence_coverage_pct": 0.0,
+        "gap_analysis": {
+            "total_evidence_files": 0,
+            "referenced_files": 0,
+            "orphan_files": [],
+        },
         "failed_pair_violations": [],
         "reject_reason": None,
     }
@@ -874,6 +880,11 @@ def _validate_hypothesis_report_topn_and_failed_pairs(
                 if token_match:
                     cited_files.add(token_match.group(1))
     cited_stage = cited_files & stage_files
+    diag["gap_analysis"] = {
+        "total_evidence_files": len(stage_files),
+        "referenced_files": len(cited_stage),
+        "orphan_files": sorted(stage_files - cited_stage),
+    }
     if stage_files:
         diag["evidence_coverage_pct"] = round(100.0 * len(cited_stage) / len(stage_files), 2)
 

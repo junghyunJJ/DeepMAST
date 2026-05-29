@@ -18,6 +18,7 @@ from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
     clean_hypothesis_benchmark_workspace,
     check_hypothesis_scope,
     check_hypothesis_scope_untraced,
+    find_forbidden_hypothesis_artifacts,
     parse_args,
     prepare_trial_workspace,
     validate_trial_output,
@@ -139,6 +140,33 @@ def test_aggregate_trial_rows_handles_failed_row_without_summary() -> None:
     assert aggregate["unverified_numeric_predictions_by_run"]["run_failed"] is None
 
 
+def test_aggregate_trial_rows_pairwise_metrics_use_validation_passed_runs() -> None:
+    invalid_report = _report_two()
+    invalid_report["hypotheses"][0]["title"] = "invalid divergent title"
+    rows = [
+        {
+            "run_id": "run_valid",
+            "success": True,
+            "validation_passed": True,
+            "report_summary": summarize_report(_report_one()),
+        },
+        {
+            "run_id": "run_invalid",
+            "success": True,
+            "validation_passed": False,
+            "report_summary": summarize_report(invalid_report),
+        },
+    ]
+
+    aggregate = aggregate_trial_rows(rows)
+
+    assert aggregate["successful_runs"] == 2
+    assert aggregate["validation_passed_runs"] == 1
+    assert aggregate["hypothesis_count_values"] == [2]
+    assert aggregate["mean_pairwise_title_similarity"] is None
+    assert aggregate["mean_pairwise_core_claim_similarity"] is None
+
+
 def test_prepare_trial_workspace_copies_source_and_removes_stale_report(
     tmp_path: Path,
 ) -> None:
@@ -172,15 +200,29 @@ def test_prepare_trial_workspace_removes_prior_report_artifacts(
     source = tmp_path / "source"
     evidence = source / "evidence"
     history = source / "conversation_history"
+    large_tool_results = source / "large_tool_results"
     evidence.mkdir(parents=True)
     history.mkdir()
+    large_tool_results.mkdir()
     (source / "lr_candidates.json").write_text("{}", encoding="utf-8")
     (source / "drug.md").write_text("stale drug report", encoding="utf-8")
     (source / "drug_report.html").write_text("<html></html>", encoding="utf-8")
     (source / "drug_report_reference_card.json").write_text("{}", encoding="utf-8")
     (source / "report_expansions.json").write_text("{}", encoding="utf-8")
     (source / "target_assessment.json").write_text("{}", encoding="utf-8")
+    (source / "hypothesis_report.json").write_text("{}", encoding="utf-8")
+    (source / "hypothesis_report.tmp.json").write_text("{}", encoding="utf-8")
+    (source / "Hypothesis_Report_Mixed.JSON").write_text("{}", encoding="utf-8")
+    (source / "hypothesis_report_draft.json").write_text("{}", encoding="utf-8")
+    (source / "report_data.json").write_text("{}", encoding="utf-8")
+    (source / "report_validation.json").write_text("{}", encoding="utf-8")
+    (source / "trace_20260528_113442.log").write_text("stale", encoding="utf-8")
+    (source / "token_usage_20260528_113442.json").write_text("{}", encoding="utf-8")
     (history / "prior.md").write_text("old conversation", encoding="utf-8")
+    (large_tool_results / "prior-tool-call").write_text(
+        '{"data_dir": "res_ipf_ollama"}',
+        encoding="utf-8",
+    )
     (evidence / "assessment_results.json").write_text(
         json.dumps({"stage3_candidates": [{"gene": "ICAM1"}]}),
         encoding="utf-8",
@@ -204,7 +246,16 @@ def test_prepare_trial_workspace_removes_prior_report_artifacts(
     assert not (workspace / "drug_report_reference_card.json").exists()
     assert not (workspace / "report_expansions.json").exists()
     assert not (workspace / "target_assessment.json").exists()
+    assert not (workspace / "hypothesis_report.json").exists()
+    assert not (workspace / "hypothesis_report.tmp.json").exists()
+    assert not (workspace / "Hypothesis_Report_Mixed.JSON").exists()
+    assert not (workspace / "hypothesis_report_draft.json").exists()
+    assert not (workspace / "report_data.json").exists()
+    assert not (workspace / "report_validation.json").exists()
+    assert not (workspace / "trace_20260528_113442.log").exists()
+    assert not (workspace / "token_usage_20260528_113442.json").exists()
     assert not (workspace / "conversation_history").exists()
+    assert not (workspace / "large_tool_results").exists()
     assert not (workspace / "evidence" / "hypothesis_report.json").exists()
 
 
@@ -213,7 +264,29 @@ def test_clean_hypothesis_benchmark_workspace_reports_removed_artifacts(
 ) -> None:
     workspace = tmp_path / "workspace"
     (workspace / "evidence").mkdir(parents=True)
+    (workspace / "conversation_history").mkdir()
+    (workspace / "large_tool_results").mkdir()
     (workspace / "drug.md").write_text("stale", encoding="utf-8")
+    (workspace / "drug_report.html").write_text("<html></html>", encoding="utf-8")
+    (workspace / "drug_report_reference_card.json").write_text("{}", encoding="utf-8")
+    (workspace / "report_expansions.json").write_text("{}", encoding="utf-8")
+    (workspace / "target_assessment.json").write_text("{}", encoding="utf-8")
+    (workspace / "hypothesis_report.json").write_text("{}", encoding="utf-8")
+    (workspace / "hypothesis_report.tmp.json").write_text("{}", encoding="utf-8")
+    (workspace / "Hypothesis_Report_Mixed.JSON").write_text("{}", encoding="utf-8")
+    (workspace / "hypothesis_report_draft.json").write_text("{}", encoding="utf-8")
+    (workspace / "report_data.json").write_text("{}", encoding="utf-8")
+    (workspace / "report_validation.json").write_text("{}", encoding="utf-8")
+    (workspace / "token_usage_20260528_113442.json").write_text("{}", encoding="utf-8")
+    (workspace / "trace_20260528_113442.log").write_text("stale", encoding="utf-8")
+    (workspace / "conversation_history" / "prior.md").write_text(
+        "old conversation",
+        encoding="utf-8",
+    )
+    (workspace / "large_tool_results" / "old-tool-result").write_text(
+        "stale payload",
+        encoding="utf-8",
+    )
     (workspace / "evidence" / "hypothesis_report.json").write_text(
         "{}",
         encoding="utf-8",
@@ -221,8 +294,39 @@ def test_clean_hypothesis_benchmark_workspace_reports_removed_artifacts(
 
     removed = clean_hypothesis_benchmark_workspace(workspace)
 
-    assert removed == ["drug.md", "evidence/hypothesis_report.json"]
+    assert removed == [
+        "drug.md",
+        "drug_report.html",
+        "drug_report_reference_card.json",
+        "report_expansions.json",
+        "target_assessment.json",
+        "report_data.json",
+        "report_validation.json",
+        "evidence/hypothesis_report.json",
+        "conversation_history/",
+        "large_tool_results/",
+        "hypothesis_report.json",
+        "hypothesis_report.tmp.json",
+        "hypothesis_report_draft.json",
+        "Hypothesis_Report_Mixed.JSON",
+        "token_usage_20260528_113442.json",
+        "trace_20260528_113442.log",
+    ]
     assert not (workspace / "drug.md").exists()
+    assert not (workspace / "drug_report.html").exists()
+    assert not (workspace / "drug_report_reference_card.json").exists()
+    assert not (workspace / "report_expansions.json").exists()
+    assert not (workspace / "target_assessment.json").exists()
+    assert not (workspace / "hypothesis_report.json").exists()
+    assert not (workspace / "hypothesis_report.tmp.json").exists()
+    assert not (workspace / "Hypothesis_Report_Mixed.JSON").exists()
+    assert not (workspace / "hypothesis_report_draft.json").exists()
+    assert not (workspace / "report_data.json").exists()
+    assert not (workspace / "report_validation.json").exists()
+    assert not (workspace / "conversation_history").exists()
+    assert not (workspace / "large_tool_results").exists()
+    assert not (workspace / "token_usage_20260528_113442.json").exists()
+    assert not (workspace / "trace_20260528_113442.log").exists()
     assert not (workspace / "evidence" / "hypothesis_report.json").exists()
 
 
@@ -391,6 +495,55 @@ def test_validate_trial_output_rejects_non_object_report(tmp_path: Path) -> None
     assert row["report_summary"] is None
     assert "JSON object" in row["error"]
     assert "list" in row["error"]
+
+
+def test_validate_trial_output_marks_forbidden_draft_artifact_invalid(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    evidence = workspace / "evidence"
+    evidence.mkdir(parents=True)
+    (workspace / "hypothesis_report.json").write_text("{}", encoding="utf-8")
+    (workspace / "hypothesis_report.tmp.json").write_text("{}", encoding="utf-8")
+    (workspace / "Hypothesis_Report_Mixed.JSON").write_text("{}", encoding="utf-8")
+    (workspace / "hypothesis_report_draft.json").write_text("{}", encoding="utf-8")
+    (evidence / "hypothesis_report.json").write_text(
+        json.dumps(_report_one()),
+        encoding="utf-8",
+    )
+
+    row = validate_trial_output("run_01", workspace, elapsed_s=1.25, error=None)
+
+    assert row["success"] is True
+    assert row["validation_passed"] is False
+    assert row["forbidden_artifacts"] == [
+        "hypothesis_report.json",
+        "hypothesis_report.tmp.json",
+        "hypothesis_report_draft.json",
+        "Hypothesis_Report_Mixed.JSON",
+    ]
+
+
+def test_find_forbidden_hypothesis_artifacts_reports_root_level_variants(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    evidence = workspace / "evidence"
+    evidence.mkdir(parents=True)
+    (workspace / "hypothesis_report.json").write_text("{}", encoding="utf-8")
+    (workspace / "hypothesis_report_a.json").write_text("{}", encoding="utf-8")
+    (workspace / "hypothesis_report_b.json").write_text("{}", encoding="utf-8")
+    (workspace / "Hypothesis_Report_Mixed.JSON").write_text("{}", encoding="utf-8")
+    (evidence / "hypothesis_report.json").write_text("{}", encoding="utf-8")
+
+    artifacts = find_forbidden_hypothesis_artifacts(workspace)
+
+    assert artifacts == [
+        "hypothesis_report.json",
+        "hypothesis_report_a.json",
+        "hypothesis_report_b.json",
+        "Hypothesis_Report_Mixed.JSON",
+    ]
 
 
 def test_validate_trial_output_includes_summary_when_invocation_errors_after_report(

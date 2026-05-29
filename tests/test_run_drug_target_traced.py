@@ -57,6 +57,99 @@ def test_configure_ollama_port_override_noops_without_port(monkeypatch):
     assert traced.os.environ["OLLAMA_HOST"] == "http://localhost:7000"
 
 
+def test_configure_provider_env_sets_llm_provider(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    args = argparse.Namespace(provider="ollama")
+
+    traced._configure_provider_env(args)
+
+    assert traced.os.environ["LLM_PROVIDER"] == "ollama"
+
+
+def test_capture_hypothesis_quality_state_records_gate_fields():
+    holder = {
+        "report_finalization_error": None,
+        "evidence_truncated": False,
+    }
+    result = {
+        "hypothesis_quality_valid": False,
+        "hypothesis_quality_errors": [
+            {
+                "code": "MISSING_REQUIRED_CATEGORIES",
+                "message": "Hypothesis report is missing required thematic categories.",
+                "missing": ["Novel Pathway"],
+            }
+        ],
+        "hypothesis_retry_attempted": True,
+        "hypothesis_retry_attempts": 2,
+        "hypothesis_retry_status": "failed",
+        "hypothesis_retry_error": None,
+        "report_finalization_error": "HYPOTHESIS_QUALITY_GATE_FAILED: missing category",
+    }
+
+    traced._capture_hypothesis_quality_state(result, holder)
+
+    assert holder["hypothesis_quality_valid"] is False
+    assert holder["hypothesis_retry_attempted"] is True
+    assert holder["hypothesis_retry_attempts"] == 2
+    assert holder["hypothesis_retry_status"] == "failed"
+    assert holder["report_finalization_error"].startswith("HYPOTHESIS_QUALITY_GATE_FAILED")
+
+
+def test_should_finalize_requires_passing_hypothesis_quality_gate():
+    assert traced._should_finalize_after_hypothesis_quality(
+        {"hypothesis_quality_valid": True}
+    )
+    assert not traced._should_finalize_after_hypothesis_quality(
+        {"hypothesis_quality_valid": False}
+    )
+    assert not traced._should_finalize_after_hypothesis_quality({})
+
+
+def test_remaining_timeout_seconds_clamps_at_zero():
+    assert traced._remaining_timeout_seconds(100.0, 120.0, now=110.0) == 110.0
+    assert traced._remaining_timeout_seconds(100.0, 120.0, now=220.0) == 0.0
+    assert traced._remaining_timeout_seconds(100.0, 120.0, now=230.0) == 0.0
+
+
+def test_record_hypothesis_quality_timeout_blocks_finalization_and_preserves_attempts():
+    holder: dict[str, object] = {"hypothesis_retry_attempts": 2}
+
+    traced._record_hypothesis_quality_timeout(
+        holder,
+        "CLI timeout reached during hypothesis quality gate.",
+        attempted=True,
+    )
+
+    assert holder["hypothesis_quality_valid"] is False
+    assert holder["hypothesis_retry_attempted"] is True
+    assert holder["hypothesis_retry_attempts"] == 2
+    assert holder["hypothesis_retry_status"] == "timeout"
+    assert holder["hypothesis_retry_error"] == "CLI timeout reached during hypothesis quality gate."
+    quality_errors = holder["hypothesis_quality_errors"]
+    assert isinstance(quality_errors, list)
+    assert isinstance(quality_errors[0], dict)
+    assert quality_errors[0]["code"] == "HYPOTHESIS_QUALITY_GATE_TIMEOUT"
+    finalization_error = holder["report_finalization_error"]
+    assert isinstance(finalization_error, str)
+    assert finalization_error.startswith("HYPOTHESIS_QUALITY_GATE_FAILED")
+    assert not traced._should_finalize_after_hypothesis_quality(holder)
+
+
+def test_record_hypothesis_quality_timeout_reports_at_least_one_started_attempt():
+    holder: dict[str, object] = {}
+
+    traced._record_hypothesis_quality_timeout(
+        holder,
+        "CLI timeout reached during hypothesis quality gate.",
+        attempted=True,
+    )
+
+    assert holder["hypothesis_retry_attempted"] is True
+    assert holder["hypothesis_retry_attempts"] == 1
+    assert holder["hypothesis_retry_status"] == "timeout"
+
+
 def test_hypothesis_stream_budget_only_applies_after_hypothesis_writer_starts():
     assert traced._is_hypothesis_writer_stream_node(
         "tools > task > hypothesis_writer",
@@ -156,36 +249,14 @@ def test_host_hypothesis_fallback_disabled_by_default(monkeypatch):
     assert traced._host_hypothesis_fallback_enabled() is False
 
 
-def test_hypothesis_retry_message_invokes_hypothesis_writer_only(tmp_path):
-    message = traced._build_hypothesis_retry_message(
-        tmp_path,
-        "idiopathic pulmonary fibrosis",
-    )
-
-    assert 'task(subagent_type="hypothesis_writer"' in message
-    assert 'task(subagent_type="report_writer"' not in message
-    assert 'task(subagent_type="summarizer"' not in message
-
-
-def test_early_retry_message_runs_hypothesis_writer_before_summarizer(tmp_path):
-    message = traced._build_early_retry_message(
-        tmp_path,
-        "idiopathic pulmonary fibrosis",
-    )
-
-    evidence_idx = message.index('task(subagent_type="evidence_assessor"')
-    hypothesis_idx = message.index('task(subagent_type="hypothesis_writer"')
-    summarizer_idx = message.index('task(subagent_type="summarizer"')
-    assert evidence_idx < hypothesis_idx < summarizer_idx
-    assert 'task(subagent_type="report_writer"' not in message
-
-
-def test_runner_orders_hypothesis_retry_before_host_fallback():
+def test_runner_delegates_hypothesis_retry_to_graph_quality_gate():
     source = Path(traced.__file__).read_text(encoding="utf-8")
 
-    assert source.index("# ── Hypothesis writer fixup") < source.index(
-        "# ── Host hypothesis fixup"
-    )
+    assert "validate_and_maybe_retry_hypothesis" in source
+    assert "_build_hypothesis_retry_message" not in source
+    assert "_build_early_retry_message" not in source
+    assert "[HYPOTHESIS-FIXUP]" not in source
+    assert "[RETRY] Early termination" not in source
 
 
 def test_check_hypothesis_completion_requires_retry_not_summarizer(tmp_path):

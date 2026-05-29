@@ -16,11 +16,11 @@ import logging
 import unicodedata
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from langchain.agents.middleware import AgentMiddleware
 from langchain.tools.tool_node import ToolCallRequest
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import ToolCall, ToolMessage
 from langgraph.types import Command
 
 logger = logging.getLogger(__name__)
@@ -39,14 +39,23 @@ def _redact_path(path: str) -> str:
 
 
 # Output artifacts that MUST NOT be written via write_file.
-_BLOCKED_ARTIFACT_NAMES = ("target_assessment.json", "drug.md", "hypothesis_report.json")
+_BLOCKED_ARTIFACT_NAMES = ("target_assessment.json", "drug.md")
 
 _BLOCKED_ARTIFACT_ERROR = (
     "ERROR: Do not use write_file for output artifacts. "
     "Use save_target_assessment for target_assessment.json, "
     "save_drug_md for drug.md, and "
-    "save_evidence(data_dir, 'hypothesis_report.json', data) for hypothesis_report.json."
+    "save_hypothesis_report(data_dir, report) for hypothesis_report.json."
 )
+
+
+def _artifact_basename(path: str) -> str:
+    normalized = str(path).replace("\\", "/")
+    return Path(normalized).name.casefold()
+
+
+def _is_blocked_hypothesis_report_artifact(name: str) -> bool:
+    return name.startswith("hypothesis_report") and name.endswith(".json")
 
 
 class ReadOnlyToolGuardMiddleware(AgentMiddleware):
@@ -124,8 +133,13 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
         args = tool_call.get("args")
         if not isinstance(args, dict):
             return False
-        path = str(args.get("path", "") or args.get("file_path", ""))
-        return any(name in path for name in _BLOCKED_ARTIFACT_NAMES)
+        paths = (args.get("file_path"), args.get("path"))
+        names = [_artifact_basename(str(path)) for path in paths if path]
+        return any(
+            name in _BLOCKED_ARTIFACT_NAMES
+            or _is_blocked_hypothesis_report_artifact(name)
+            for name in names
+        )
 
     @classmethod
     def _blocked_response(cls, request: ToolCallRequest) -> ToolMessage:
@@ -152,7 +166,7 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
             return request
 
         patched_args = {**args, "content": cls._coerce_content(content)}
-        patched_call = {**tool_call, "args": patched_args}
+        patched_call = cast(ToolCall, {**tool_call, "args": patched_args})
         return request.override(tool_call=patched_call)
 
     def _blocked(self, args: dict, reason: str) -> ToolMessage:
@@ -226,7 +240,7 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
                 normalized = self._normalize_path(args, self._backend_root)
                 if isinstance(normalized, ToolMessage):
                     return normalized
-                new_call = {**patched.tool_call, "args": normalized}
+                new_call = cast(ToolCall, {**patched.tool_call, "args": normalized})
                 patched = patched.override(tool_call=new_call)
         return handler(patched)
 
@@ -244,7 +258,7 @@ class WriteFileArgGuardMiddleware(AgentMiddleware):
                 normalized = self._normalize_path(args, self._backend_root)
                 if isinstance(normalized, ToolMessage):
                     return normalized
-                new_call = {**patched.tool_call, "args": normalized}
+                new_call = cast(ToolCall, {**patched.tool_call, "args": normalized})
                 patched = patched.override(tool_call=new_call)
         return await handler(patched)
 

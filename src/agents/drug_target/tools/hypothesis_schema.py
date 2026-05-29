@@ -29,6 +29,7 @@ _CATEGORIES = {
     "Cross-Target Interaction",
     "Novel Pathway",
 }
+REQUIRED_HYPOTHESIS_CATEGORIES = set(_CATEGORIES)
 _GAP_PREFIX_RE = re.compile(r"^\s*(\[(?:FEATURED-GAP|GAP)\])\s*(.*)$")
 _JSON_REF_RE = re.compile(r"([A-Za-z0-9_.\-]+\.json)(?:_FAILED)?")
 _STAGE1_REF_RE = re.compile(r"^stage1_([A-Za-z0-9-]+)--([A-Za-z0-9-]+)\.json$")
@@ -195,7 +196,8 @@ def canonicalize_hypothesis_report(
             hyp["legacy_title_prefix"] = label
 
         category = hyp.get("category")
-        category = _CATEGORY_ALIASES.get(category, category)
+        if isinstance(category, str):
+            category = _CATEGORY_ALIASES.get(category, category)
         if category not in _CATEGORIES:
             if legacy_compat:
                 category = "Mechanism of Action"
@@ -288,7 +290,6 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
         return result
 
     from src.agents.drug_target.tools.evidence_loader import (
-        _sanitize_gap_analysis,
         _tag_hypothesis_prediction_grounding,
         _validate_hypothesis_report_references,
         _validate_hypothesis_report_topn_and_failed_pairs,
@@ -297,6 +298,7 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
     diag = _validate_hypothesis_report_topn_and_failed_pairs(canonical, evidence_dir)
     canonical["evidence_coverage_pct"] = diag["evidence_coverage_pct"]
     canonical["topn_coverage"] = diag["topn_coverage"]
+    canonical["gap_analysis"] = diag["gap_analysis"]
 
     ref_errors = _validate_hypothesis_report_references(canonical, evidence_dir)
     if ref_errors:
@@ -311,7 +313,6 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
         result["failed_pair_violations"] = diag["failed_pair_violations"]
         return result
 
-    _sanitize_gap_analysis(canonical, evidence_dir)
     canonical["prediction_grounding_summary"] = _tag_hypothesis_prediction_grounding(
         canonical,
         evidence_dir=evidence_dir,
@@ -324,6 +325,190 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
     path.write_text(json.dumps(canonical, indent=2, ensure_ascii=False), encoding="utf-8")
     result["saved"] = True
     result["diagnostics"] = diagnostics
+    return result
+
+
+def _quality_error(code: str, message: str, **details: Any) -> dict[str, Any]:
+    err: dict[str, Any] = {"code": code, "message": message}
+    if details:
+        err["details"] = details
+    return err
+
+
+def validate_hypothesis_report_quality(
+    data_dir: str | Path,
+    *,
+    run_started_at: float | None = None,
+    min_hypotheses: int = 4,
+    max_hypotheses: int = 6,
+) -> dict:
+    """Validate a saved hypothesis report for graph-level finalization gating."""
+    base = Path(data_dir).expanduser().resolve()
+    evidence_dir = base / "evidence"
+    path = evidence_dir / "hypothesis_report.json"
+    result: dict = {
+        "valid": False,
+        "errors": [],
+        "warnings": [],
+        "path": str(path),
+        "hypothesis_count": None,
+        "category_coverage": {
+            "required": sorted(REQUIRED_HYPOTHESIS_CATEGORIES),
+            "present": [],
+            "missing": sorted(REQUIRED_HYPOTHESIS_CATEGORIES),
+        },
+        "topn_coverage": None,
+        "evidence_coverage_pct": None,
+    }
+
+    if not path.exists():
+        result["errors"].append(
+            _quality_error(
+                "HYPOTHESIS_REPORT_MISSING",
+                "evidence/hypothesis_report.json is missing.",
+            )
+        )
+        return result
+
+    try:
+        mtime = path.stat().st_mtime
+    except OSError as exc:
+        result["errors"].append(
+            _quality_error(
+                "HYPOTHESIS_REPORT_STAT_FAILED",
+                f"Could not inspect hypothesis_report.json: {exc}",
+            )
+        )
+        return result
+    if run_started_at is not None and mtime < run_started_at:
+        result["errors"].append(
+            _quality_error(
+                "HYPOTHESIS_REPORT_STALE",
+                "hypothesis_report.json predates the current graph run.",
+                report_mtime=mtime,
+                run_started_at=run_started_at,
+            )
+        )
+        return result
+
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        result["errors"].append(
+            _quality_error(
+                "HYPOTHESIS_REPORT_INVALID_JSON",
+                f"hypothesis_report.json is not valid JSON: {exc}",
+            )
+        )
+        return result
+
+    canonical, errors, diagnostics = canonicalize_hypothesis_report(
+        raw,
+        evidence_dir,
+        legacy_compat=False,
+    )
+    result["warnings"].extend(diagnostics)
+    if canonical is None:
+        result["errors"].append(
+            _quality_error(
+                "SCHEMA_VALIDATION_FAILED",
+                "; ".join(errors) or "hypothesis_report.json failed schema validation.",
+                errors=errors,
+            )
+        )
+        return result
+    if errors:
+        result["errors"].append(
+            _quality_error(
+                "SCHEMA_VALIDATION_FAILED",
+                "; ".join(errors),
+                errors=errors,
+            )
+        )
+
+    from src.agents.drug_target.tools.evidence_loader import (
+        _tag_hypothesis_prediction_grounding,
+        _validate_hypothesis_report_references,
+        _validate_hypothesis_report_topn_and_failed_pairs,
+    )
+
+    hypotheses = canonical.get("hypotheses", [])
+    hypothesis_count = len(hypotheses) if isinstance(hypotheses, list) else 0
+    result["hypothesis_count"] = hypothesis_count
+    if hypothesis_count < min_hypotheses or hypothesis_count > max_hypotheses:
+        result["errors"].append(
+            _quality_error(
+                "HYPOTHESIS_COUNT_OUT_OF_RANGE",
+                f"Expected {min_hypotheses}-{max_hypotheses} hypotheses, found {hypothesis_count}.",
+                min=min_hypotheses,
+                max=max_hypotheses,
+                found=hypothesis_count,
+            )
+        )
+
+    present_categories: set[str] = set()
+    for hyp in hypotheses:
+        if not isinstance(hyp, dict):
+            continue
+        category = hyp.get("category")
+        if isinstance(category, str) and category in REQUIRED_HYPOTHESIS_CATEGORIES:
+            present_categories.add(category)
+    missing_categories = sorted(REQUIRED_HYPOTHESIS_CATEGORIES - present_categories)
+    result["category_coverage"] = {
+        "required": sorted(REQUIRED_HYPOTHESIS_CATEGORIES),
+        "present": sorted(present_categories),
+        "missing": missing_categories,
+    }
+    if missing_categories:
+        result["errors"].append(
+            _quality_error(
+                "MISSING_REQUIRED_CATEGORIES",
+                "Hypothesis report is missing required thematic categories.",
+                missing=missing_categories,
+            )
+        )
+
+    diag = _validate_hypothesis_report_topn_and_failed_pairs(canonical, evidence_dir)
+    result["topn_coverage"] = diag["topn_coverage"]
+    result["evidence_coverage_pct"] = diag["evidence_coverage_pct"]
+    ref_errors = _validate_hypothesis_report_references(canonical, evidence_dir)
+    if ref_errors:
+        result["errors"].append(
+            _quality_error(
+                "INVALID_EVIDENCE_REFERENCES",
+                "; ".join(ref_errors),
+                errors=ref_errors,
+            )
+        )
+    if diag["failed_pair_violations"]:
+        result["errors"].append(
+            _quality_error(
+                "FAILED_PAIR_VIOLATION",
+                "; ".join(diag["failed_pair_violations"]),
+                errors=diag["failed_pair_violations"],
+            )
+        )
+    if diag["reject_reason"]:
+        result["errors"].append(
+            _quality_error(
+                "TOPN_COVERAGE_MISSING",
+                diag["reject_reason"],
+                topn_coverage=diag["topn_coverage"],
+            )
+        )
+
+    grounding = _tag_hypothesis_prediction_grounding(canonical, evidence_dir=evidence_dir)
+    result["prediction_grounding_summary"] = grounding
+    if grounding.get("unverified", 0) > 0:
+        result["errors"].append(
+            _quality_error(
+                "UNVERIFIED_NUMERIC_PREDICTION",
+                "One or more falsifiable predictions contain unverified numeric values.",
+                unverified_indices=grounding.get("unverified_indices", []),
+            )
+        )
+
+    result["valid"] = not result["errors"]
     return result
 
 

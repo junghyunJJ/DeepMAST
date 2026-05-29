@@ -42,11 +42,8 @@ def summarize_report(report: dict[str, Any]) -> dict[str, Any]:
         category = str(hyp.get("category") or "").strip()
         if category:
             category_counts[category] += 1
-        entities = (
-            hyp.get("biological_entities")
-            if isinstance(hyp.get("biological_entities"), dict)
-            else {}
-        )
+        raw_entities = hyp.get("biological_entities")
+        entities = raw_entities if isinstance(raw_entities, dict) else {}
         genes.update(g.upper() for g in _sorted_strings(entities.get("genes")))
         refs.update(_sorted_strings(hyp.get("evidence_references")))
         title = str(hyp.get("title") or "").strip()
@@ -56,16 +53,10 @@ def summarize_report(report: dict[str, Any]) -> dict[str, Any]:
         if claim:
             core_claims.append(claim)
 
-    topn = (
-        report.get("topn_coverage")
-        if isinstance(report.get("topn_coverage"), dict)
-        else {}
-    )
-    grounding = (
-        report.get("prediction_grounding_summary")
-        if isinstance(report.get("prediction_grounding_summary"), dict)
-        else {}
-    )
+    raw_topn = report.get("topn_coverage")
+    topn = raw_topn if isinstance(raw_topn, dict) else {}
+    raw_grounding = report.get("prediction_grounding_summary")
+    grounding = raw_grounding if isinstance(raw_grounding, dict) else {}
     return {
         "schema_version": report.get("schema_version"),
         "hypothesis_count": len(hypotheses),
@@ -82,11 +73,11 @@ def summarize_report(report: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _successful_summaries(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _validation_passed_summaries(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         row["report_summary"]
         for row in rows
-        if row.get("success") and isinstance(row.get("report_summary"), dict)
+        if row.get("validation_passed") and isinstance(row.get("report_summary"), dict)
     ]
 
 
@@ -117,7 +108,7 @@ def aggregate_trial_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
     total = len(rows)
     successes = [row for row in rows if row.get("success")]
     validation_passes = [row for row in rows if row.get("validation_passed")]
-    summaries = _successful_summaries(rows)
+    summaries = _validation_passed_summaries(rows)
     count_values = sorted({int(s.get("hypothesis_count") or 0) for s in summaries})
     category_distributions = [s.get("category_counts", {}) for s in summaries]
     return {

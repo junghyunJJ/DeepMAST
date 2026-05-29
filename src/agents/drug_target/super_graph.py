@@ -1,6 +1,7 @@
 """Super-graph for Drug Target Assessment.
 
-Topology: START → run_deep_agent → finalize_report → END
+Topology: START → run_deep_agent → validate_and_maybe_retry_hypothesis
+→ finalize_report → END
 
 The DeepAgents runnable is wrapped as a LangGraph node (run_deep_agent) so
 that the deterministic finalize_report node can run after it within a single
@@ -33,7 +34,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph
-from typing_extensions import TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 
 class DrugTargetState(TypedDict):
@@ -61,6 +62,9 @@ class DrugTargetState(TypedDict):
     evidence_truncated
         True when finalize_report aborted due to evidence token budget exceeded.
         Default False.
+    hypothesis_quality_valid
+        True only when the saved hypothesis_report.json passed deterministic
+        quality validation after the optional narrow retry.
     """
 
     data_dir: str
@@ -69,6 +73,13 @@ class DrugTargetState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     report_finalization_error: str | None
     evidence_truncated: bool
+    deep_agent_started_at: NotRequired[float]
+    hypothesis_quality_valid: NotRequired[bool]
+    hypothesis_quality_errors: NotRequired[list[dict]]
+    hypothesis_retry_attempted: NotRequired[bool]
+    hypothesis_retry_attempts: NotRequired[int]
+    hypothesis_retry_status: NotRequired[str]
+    hypothesis_retry_error: NotRequired[str | None]
 
 
 async def run_deep_agent(state: DrugTargetState, config: RunnableConfig) -> dict:
@@ -84,6 +95,7 @@ async def run_deep_agent(state: DrugTargetState, config: RunnableConfig) -> dict
     """
     # Lazy import to avoid circular dependency at module load time
     import os
+    import time
     from typing import Literal as _Lit, cast as _cast
 
     from langchain_core.runnables import RunnableConfig as _RC
@@ -92,6 +104,7 @@ async def run_deep_agent(state: DrugTargetState, config: RunnableConfig) -> dict
 
     data_dir: str = state["data_dir"]
     disease: str = state["disease"]
+    started_at = time.time()
 
     # Read provider from env — DrugTargetConfig.provider is a Literal; cast for pyright.
     provider_str = os.getenv("LLM_PROVIDER", "openrouter")
@@ -127,16 +140,233 @@ async def run_deep_agent(state: DrugTargetState, config: RunnableConfig) -> dict
     # Filter to last AIMessage only — blocks trailing ToolMessages from being
     # stored in the checkpoint (CP-P0-009 messages contract).
     ai_messages = [m for m in result.get("messages", [])[-3:] if isinstance(m, AIMessage)]
-    return {"messages": ai_messages[-1:]}
+    return {"messages": ai_messages[-1:], "deep_agent_started_at": started_at}
+
+
+def _graph_hypothesis_retry_enabled() -> bool:
+    """Return whether LangGraph-native hypothesis retry is enabled."""
+    import os
+
+    raw = os.getenv("DRUG_TARGET_GRAPH_HYPOTHESIS_RETRY", "1")
+    return raw.strip().casefold() not in {"0", "false", "no", "off"}
+
+
+def _hypothesis_retry_timeout_seconds() -> float | None:
+    """Return graph-level retry timeout; 0 disables the timeout."""
+    import os
+
+    raw = os.getenv("DRUG_TARGET_HYPOTHESIS_RETRY_TIMEOUT_SECONDS", "600")
+    try:
+        value = float(raw)
+    except ValueError:
+        value = 600.0
+    return None if value <= 0 else value
+
+
+def _hypothesis_max_quality_retries() -> int:
+    """Return the bounded graph-level hypothesis quality retry count."""
+    import os
+
+    raw = os.getenv("DRUG_TARGET_HYPOTHESIS_MAX_QUALITY_RETRIES", "3")
+    try:
+        value = int(raw)
+    except ValueError:
+        value = 3
+    return max(0, value)
+
+
+def _has_stage3_candidates(data_dir: str) -> bool:
+    """Check whether deterministic evidence exists for a hypothesis retry."""
+    import json
+    from pathlib import Path
+
+    path = Path(data_dir).expanduser().resolve() / "evidence" / "assessment_results.json"
+    if not path.exists():
+        return False
+    try:
+        assessment = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    candidates = assessment.get("stage3_candidates")
+    return isinstance(candidates, list) and bool(candidates)
+
+
+async def _invoke_hypothesis_retry(
+    state: DrugTargetState,
+    config: RunnableConfig,
+    quality_errors: list[dict],
+    *,
+    attempt: int,
+    max_attempts: int,
+) -> None:
+    """Invoke the drug-target agent with a hypothesis-writer-only instruction."""
+    import asyncio
+    import os
+    import uuid
+    from typing import Literal as _Lit, cast as _cast
+
+    from langchain_core.runnables import RunnableConfig as _RC
+
+    from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
+    from src.agents.drug_target.hypothesis_retry import build_hypothesis_retry_message
+
+    provider_str = os.getenv("LLM_PROVIDER", "openrouter")
+    provider = _cast(
+        _Lit["openai", "google", "ollama", "ollama-openai", "claude", "openrouter"],
+        provider_str,
+    )
+    agent_config = DrugTargetConfig(
+        provider=provider,
+        data_dir=state["data_dir"],
+        disease=state["disease"],
+        use_checkpointer=False,
+    )
+    runnable, backend = create_drug_target_agent(agent_config)
+
+    configurable = dict(config.get("configurable", {}) or {})
+    configurable["thread_id"] = f"hypothesis-retry-{uuid.uuid4()}"
+    inner_config: _RC = _RC(
+        recursion_limit=config.get("recursion_limit", 10000),
+        configurable=configurable,
+    )
+    message = build_hypothesis_retry_message(
+        state["data_dir"],
+        state["disease"],
+        quality_errors=quality_errors,
+        attempt=attempt,
+        max_attempts=max_attempts,
+    )
+    try:
+        call = runnable.ainvoke(
+            {"messages": [{"role": "user", "content": message}]},
+            config=inner_config,
+        )
+        timeout = _hypothesis_retry_timeout_seconds()
+        if timeout is None:
+            await call
+        else:
+            await asyncio.wait_for(call, timeout=timeout)
+    finally:
+        if backend is not None and hasattr(backend, "cleanup"):
+            backend.cleanup()  # type: ignore[union-attr]
+
+
+async def validate_and_maybe_retry_hypothesis(
+    state: DrugTargetState,
+    config: RunnableConfig,
+) -> dict:
+    """Validate hypothesis_report.json and run bounded narrow retries if needed."""
+    from src.agents.drug_target.tools.hypothesis_schema import (
+        validate_hypothesis_report_quality,
+    )
+
+    quality = validate_hypothesis_report_quality(
+        state["data_dir"],
+        run_started_at=state.get("deep_agent_started_at"),
+    )
+    attempts = 0
+    if quality["valid"]:
+        return {
+            "hypothesis_quality_valid": True,
+            "hypothesis_quality_errors": [],
+            "hypothesis_retry_attempted": False,
+            "hypothesis_retry_attempts": 0,
+            "hypothesis_retry_status": "skipped",
+            "hypothesis_retry_error": None,
+        }
+
+    retry_enabled = _graph_hypothesis_retry_enabled()
+    has_stage3_candidates = _has_stage3_candidates(state["data_dir"])
+    max_attempts = _hypothesis_max_quality_retries()
+
+    if retry_enabled and has_stage3_candidates and max_attempts > 0:
+        for attempt in range(1, max_attempts + 1):
+            attempts = attempt
+            try:
+                await _invoke_hypothesis_retry(
+                    state,
+                    config,
+                    quality.get("errors", []),
+                    attempt=attempt,
+                    max_attempts=max_attempts,
+                )
+                quality = validate_hypothesis_report_quality(
+                    state["data_dir"],
+                    run_started_at=state.get("deep_agent_started_at"),
+                )
+            except TimeoutError as exc:
+                return {
+                    "hypothesis_quality_valid": False,
+                    "hypothesis_quality_errors": quality.get("errors", []),
+                    "hypothesis_retry_attempted": True,
+                    "hypothesis_retry_attempts": attempts,
+                    "hypothesis_retry_status": "timeout",
+                    "hypothesis_retry_error": str(exc) or "hypothesis retry timed out",
+                    "report_finalization_error": (
+                        "HYPOTHESIS_QUALITY_GATE_FAILED: hypothesis retry timed out"
+                    ),
+                }
+            except Exception as exc:
+                return {
+                    "hypothesis_quality_valid": False,
+                    "hypothesis_quality_errors": quality.get("errors", []),
+                    "hypothesis_retry_attempted": True,
+                    "hypothesis_retry_attempts": attempts,
+                    "hypothesis_retry_status": "error",
+                    "hypothesis_retry_error": f"{type(exc).__name__}: {exc}",
+                    "report_finalization_error": (
+                        f"HYPOTHESIS_QUALITY_GATE_FAILED: {type(exc).__name__}: {exc}"
+                    ),
+                }
+            if quality["valid"]:
+                return {
+                    "hypothesis_quality_valid": True,
+                    "hypothesis_quality_errors": [],
+                    "hypothesis_retry_attempted": True,
+                    "hypothesis_retry_attempts": attempts,
+                    "hypothesis_retry_status": "success",
+                    "hypothesis_retry_error": None,
+                }
+        retry_status = "failed"
+        retry_attempted = True
+    else:
+        if not retry_enabled:
+            retry_status = "disabled"
+        elif not has_stage3_candidates:
+            retry_status = "skipped_no_stage3_candidates"
+        else:
+            retry_status = "max_retries_zero"
+        retry_attempted = False
+
+    return {
+        "hypothesis_quality_valid": False,
+        "hypothesis_quality_errors": quality.get("errors", []),
+        "hypothesis_retry_attempted": retry_attempted,
+        "hypothesis_retry_attempts": attempts,
+        "hypothesis_retry_status": retry_status,
+        "hypothesis_retry_error": None,
+        "report_finalization_error": (
+            "HYPOTHESIS_QUALITY_GATE_FAILED: "
+            + "; ".join(
+                f"{err.get('code')}: {err.get('message')}"
+                for err in quality.get("errors", [])
+                if isinstance(err, dict)
+            )
+        ),
+    }
+
+
+def _route_after_hypothesis_quality(state: DrugTargetState) -> str:
+    """Route to finalization only when hypothesis quality passed."""
+    return "finalize_report" if state.get("hypothesis_quality_valid") is True else END
 
 
 def build_drug_target_super_graph() -> CompiledStateGraph:
     """Build and compile the drug-target super-graph.
 
-    Topology: START → run_deep_agent → finalize_report → END
-    All edges are static (no conditional routing needed — finalize_report
-    always returns a plain dict and the static edge routes to END regardless
-    of error state).
+    Topology: START → run_deep_agent → validate_and_maybe_retry_hypothesis
+    → finalize_report → END. The quality gate conditionally routes directly to
+    END when hypothesis_report.json remains invalid after retry.
 
     Note: do NOT pass ``recursion_limit`` to ``.compile()`` — pass it at
     invocation time via ``config={"recursion_limit": N}``.
@@ -145,10 +375,19 @@ def build_drug_target_super_graph() -> CompiledStateGraph:
 
     graph = StateGraph(DrugTargetState)
     graph.add_node("run_deep_agent", run_deep_agent)  # type: ignore[arg-type]
+    graph.add_node(
+        "validate_and_maybe_retry_hypothesis",
+        validate_and_maybe_retry_hypothesis,  # type: ignore[arg-type]
+    )
     graph.add_node("finalize_report", finalize_report)  # type: ignore[arg-type]
 
     graph.add_edge(START, "run_deep_agent")
-    graph.add_edge("run_deep_agent", "finalize_report")
+    graph.add_edge("run_deep_agent", "validate_and_maybe_retry_hypothesis")
+    graph.add_conditional_edges(
+        "validate_and_maybe_retry_hypothesis",
+        _route_after_hypothesis_quality,
+        ["finalize_report", END],
+    )
     graph.add_edge("finalize_report", END)
 
     return graph.compile()

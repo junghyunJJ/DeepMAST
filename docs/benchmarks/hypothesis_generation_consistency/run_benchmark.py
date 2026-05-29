@@ -41,9 +41,46 @@ HYPOTHESIS_BENCHMARK_CLEAN_FILES = (
     "drug_report_reference_card.json",
     "report_expansions.json",
     "target_assessment.json",
+    "report_data.json",
+    "report_validation.json",
     "evidence/hypothesis_report.json",
 )
-HYPOTHESIS_BENCHMARK_CLEAN_DIRS = ("conversation_history",)
+HYPOTHESIS_BENCHMARK_CLEAN_DIRS = (
+    "conversation_history",
+    "large_tool_results",
+)
+HYPOTHESIS_BENCHMARK_CLEAN_GLOBS = (
+    "token_usage_*.json",
+    "trace_*.log",
+)
+
+
+def _is_root_hypothesis_report_artifact(path: Path) -> bool:
+    name = path.name.casefold()
+    return name.startswith("hypothesis_report") and name.endswith(".json")
+
+
+def _root_hypothesis_report_artifacts(workspace: Path) -> list[Path]:
+    if not workspace.exists():
+        return []
+    return sorted(
+        (
+            path
+            for path in workspace.iterdir()
+            if _is_root_hypothesis_report_artifact(path)
+            and (path.is_file() or path.is_dir())
+        ),
+        key=lambda path: (path.name.casefold(), path.name),
+    )
+
+
+def find_forbidden_hypothesis_artifacts(workspace: Path) -> list[str]:
+    """Return root-level hypothesis report artifacts outside evidence/."""
+    return [
+        path.name
+        for path in _root_hypothesis_report_artifacts(workspace)
+        if path.is_file()
+    ]
 
 
 def load_benchmark_env() -> None:
@@ -87,6 +124,21 @@ def clean_hypothesis_benchmark_workspace(workspace: Path) -> list[str]:
         if path.exists():
             shutil.rmtree(path)
             removed.append(f"{relative}/")
+    for path in _root_hypothesis_report_artifacts(workspace):
+        if path.is_file():
+            path.unlink()
+            removed.append(path.name)
+        elif path.is_dir():
+            shutil.rmtree(path)
+            removed.append(f"{path.name}/")
+    for pattern in HYPOTHESIS_BENCHMARK_CLEAN_GLOBS:
+        for path in sorted(workspace.glob(pattern)):
+            if path.is_file():
+                path.unlink()
+                removed.append(path.name)
+            elif path.is_dir():
+                shutil.rmtree(path)
+                removed.append(f"{path.name}/")
     return removed
 
 
@@ -165,6 +217,7 @@ def validate_trial_output(
     error: str | None,
 ) -> dict[str, Any]:
     report_path = workspace / "evidence" / "hypothesis_report.json"
+    forbidden_artifacts = find_forbidden_hypothesis_artifacts(workspace)
     completion = json.loads(
         check_hypothesis_completion.invoke({"data_dir": str(workspace)})
     )
@@ -187,6 +240,7 @@ def validate_trial_output(
             "error": error,
             "completion": completion,
             "report_summary": report_summary,
+            "forbidden_artifacts": forbidden_artifacts,
         }
     if not report_path.exists():
         return {
@@ -199,6 +253,7 @@ def validate_trial_output(
             "error": "hypothesis_report.json missing",
             "completion": completion,
             "report_summary": None,
+            "forbidden_artifacts": forbidden_artifacts,
         }
     try:
         report = read_json(report_path)
@@ -213,6 +268,7 @@ def validate_trial_output(
             "error": f"{type(exc).__name__}: {exc}",
             "completion": completion,
             "report_summary": None,
+            "forbidden_artifacts": forbidden_artifacts,
         }
     if not isinstance(report, dict):
         return {
@@ -228,6 +284,7 @@ def validate_trial_output(
             ),
             "completion": completion,
             "report_summary": None,
+            "forbidden_artifacts": forbidden_artifacts,
         }
     summary = summarize_report(report)
     validation_passed = (
@@ -238,6 +295,7 @@ def validate_trial_output(
         and isinstance(report.get("prediction_grounding_summary"), dict)
         and not summary["topn_missing"]
         and summary["unverified_numeric_predictions"] == 0
+        and not forbidden_artifacts
     )
     return {
         "run_id": run_id,
@@ -249,6 +307,7 @@ def validate_trial_output(
         "error": None,
         "completion": completion,
         "report_summary": summary,
+        "forbidden_artifacts": forbidden_artifacts,
     }
 
 
