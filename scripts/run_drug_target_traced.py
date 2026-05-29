@@ -169,6 +169,11 @@ def _configure_ollama_port_override(args: argparse.Namespace) -> str | None:
     return base_url
 
 
+def _configure_provider_env(args: argparse.Namespace) -> None:
+    """Keep graph-native retry provider resolution aligned with CLI args."""
+    os.environ["LLM_PROVIDER"] = str(args.provider)
+
+
 def _finalize_report_config(args: argparse.Namespace) -> RunnableConfig:
     """Build the config used when the traced runner invokes finalize_report directly."""
     configurable: dict[str, str] = {"llm_provider": args.provider}
@@ -275,7 +280,19 @@ def _validate_report_finalization(data_dir: Path) -> dict:
             raw = validate_drug_report_finalization.invoke(
                 {"data_dir": str(data_dir)}
             )
-        return json.loads(raw) if isinstance(raw, str) else raw
+        parsed = json.loads(raw) if isinstance(raw, str) else raw
+        if isinstance(parsed, dict):
+            return parsed
+        return {
+            "valid": False,
+            "issue_count": 1,
+            "issues": [
+                {
+                    "code": "REPORT_FINALIZATION_VALIDATOR_ERROR",
+                    "message": "Validator returned a non-dict result.",
+                }
+            ],
+        }
     except Exception as exc:
         return {
             "valid": False,
@@ -290,6 +307,81 @@ def _json_tool_result(raw: object) -> dict:
     if isinstance(raw, dict):
         return raw
     return {"result": raw}
+
+
+_HYPOTHESIS_QUALITY_STATE_FIELDS = (
+    "hypothesis_quality_valid",
+    "hypothesis_quality_errors",
+    "hypothesis_retry_attempted",
+    "hypothesis_retry_attempts",
+    "hypothesis_retry_status",
+    "hypothesis_retry_error",
+)
+
+
+def _capture_hypothesis_quality_state(result: dict, holder: dict) -> None:
+    """Copy graph hypothesis quality fields into the traced-run summary state."""
+    for field in _HYPOTHESIS_QUALITY_STATE_FIELDS:
+        if field in result:
+            holder[field] = result[field]
+    if "report_finalization_error" in result:
+        holder["report_finalization_error"] = result["report_finalization_error"]
+
+
+def _remaining_timeout_seconds(
+    started_at: float,
+    timeout_seconds: float,
+    *,
+    now: float | None = None,
+) -> float:
+    """Return remaining CLI timeout budget, clamped at zero."""
+    current = time.time() if now is None else now
+    return max(0.0, timeout_seconds - (current - started_at))
+
+
+def _record_hypothesis_quality_timeout(
+    holder: dict,
+    message: str,
+    *,
+    attempted: bool,
+) -> None:
+    """Fail closed when the traced runner timeout blocks quality validation."""
+    holder["hypothesis_quality_valid"] = False
+    holder["hypothesis_quality_errors"] = [
+        {
+            "code": "HYPOTHESIS_QUALITY_GATE_TIMEOUT",
+            "message": message,
+        }
+    ]
+    holder["hypothesis_retry_attempted"] = attempted
+    attempts = int(holder.get("hypothesis_retry_attempts") or 0)
+    if attempted and attempts == 0:
+        attempts = 1
+    holder["hypothesis_retry_attempts"] = attempts
+    holder["hypothesis_retry_status"] = "timeout"
+    holder["hypothesis_retry_error"] = message
+    holder["report_finalization_error"] = f"HYPOTHESIS_QUALITY_GATE_FAILED: {message}"
+
+
+def _should_finalize_after_hypothesis_quality(state: dict) -> bool:
+    """Mirror super-graph routing: finalize only after hypothesis quality passes."""
+    return state.get("hypothesis_quality_valid") is True
+
+
+def _format_hypothesis_quality_errors(errors: object, max_items: int = 5) -> str:
+    if not isinstance(errors, list) or not errors:
+        return "—"
+    rendered: list[str] = []
+    for err in errors[:max_items]:
+        if isinstance(err, dict):
+            code = str(err.get("code") or "UNKNOWN")
+            message = str(err.get("message") or "")
+            rendered.append(f"{code}: {message}" if message else code)
+        else:
+            rendered.append(str(err))
+    if len(errors) > max_items:
+        rendered.append(f"... +{len(errors) - max_items} more")
+    return "; ".join(rendered)
 
 
 def _is_hypothesis_writer_stream_node(node_path: str, node_name: str) -> bool:
@@ -417,48 +509,6 @@ def _artifact_predates_run(path: Path, run_started_at: float) -> bool:
 def _host_hypothesis_fallback_enabled() -> bool:
     value = os.environ.get("DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK", "")
     return value.strip().casefold() in {"1", "true", "yes", "on", "smoke", "recovery"}
-
-
-def _build_hypothesis_retry_message(data_dir: Path, disease: str) -> str:
-    return (
-        "The previous run completed Stage 1-3 evidence collection "
-        "but hypothesis_report.json was NOT saved or is stale. You MUST now "
-        "invoke ONLY the hypothesis_writer subagent to recover "
-        "hypothesis generation. Do not re-run evidence_assessor "
-        "or deep_diver. Do not re-run report_writer or summarizer. Emit exactly "
-        "one tool call:\n\n"
-        f"  task(subagent_type=\"hypothesis_writer\", instruction=\""
-        f"Recovery run for {disease}: load_evidence_files(data_dir='{data_dir}', "
-        f"scope='hypothesis'), generate 4-6 mechanistic hypotheses across MoA / "
-        f"Therapeutic / Cross-Target / Novel Pathway categories, "
-        f"call validate_evidence_references with every filename you "
-        f"plan to cite, then immediately call "
-        f"save_evidence(data_dir='{data_dir}', "
-        f"filename='hypothesis_report.json', data=<the JSON "
-        f"payload>). Do NOT call sequential_thinking more than 6 "
-        f"times. If sequential_thinking returns an error about a "
-        f"degenerate loop, STOP thinking and call save_evidence "
-        f"immediately with your best draft.\")\n\n"
-        "After the hypothesis_writer task returns, emit the "
-        "message 'Hypothesis fixup complete.' and stop."
-    )
-
-
-def _build_early_retry_message(data_dir: Path, disease: str) -> str:
-    return (
-        "You MUST execute the full pipeline using the `task` tool. "
-        "Do NOT stop until evidence_assessor, hypothesis_writer, and summarizer complete.\n"
-        f"Step 1: Call load_lr_candidates(data_dir=\"{data_dir}\", disease=\"{disease}\")\n"
-        f"Step 2: IMMEDIATELY call task(subagent_type=\"evidence_assessor\", "
-        f"instruction=\"Run full 3-stage evidence assessment for {disease}. "
-        f"Data dir: {data_dir}.\")\n"
-        f"Step 3: After evidence_assessor completes, call "
-        f"task(subagent_type=\"hypothesis_writer\", instruction=\"Generate "
-        f"hypothesis_report.json for {disease}. Data dir: {data_dir}.\")\n"
-        f"Step 4: After hypothesis_writer saves hypothesis_report.json, call "
-        f"task(subagent_type=\"summarizer\", instruction=\"Generate drug.md "
-        f"and final report artifacts for {disease}. Data dir: {data_dir}.\")"
-    )
 
 
 def _hypothesis_report_ready_for_finalization(path: Path, run_started_at: float) -> bool:
@@ -800,6 +850,7 @@ async def run_traced(args: argparse.Namespace) -> int:
     """Run the DrugTarget agent with step-by-step tracing."""
 
     ollama_base_url = _configure_ollama_port_override(args)
+    _configure_provider_env(args)
 
     # ── Debug mode ────────────────────────────────────────────────────
     if not args.no_debug:
@@ -861,9 +912,18 @@ async def run_traced(args: argparse.Namespace) -> int:
     agent, backend = create_drug_target_agent(config)
     print(f"[CONFIG] Agent created (provider={args.provider})")
     print(f"[CONFIG] Disease: {args.disease}")
+    print(f"[CONFIG] LLM_PROVIDER env: {os.environ['LLM_PROVIDER']}")
     if ollama_base_url:
         print(f"[CONFIG] Ollama base URL: {ollama_base_url}")
     print(f"[CONFIG] Census API: {'ENABLED' if args.census else 'DISABLED'}")
+    print(
+        "[CONFIG] Hypothesis quality gate retry: "
+        f"{os.environ.get('DRUG_TARGET_GRAPH_HYPOTHESIS_RETRY', '1')}"
+    )
+    print(
+        "[CONFIG] Hypothesis retry timeout seconds: "
+        f"{os.environ.get('DRUG_TARGET_HYPOTHESIS_RETRY_TIMEOUT_SECONDS', '600')}"
+    )
 
     # ── Stream with tracing ───────────────────────────────────────────
     initial_message = (
@@ -884,7 +944,16 @@ async def run_traced(args: argparse.Namespace) -> int:
     hypothesis_budget_aborted = False
     captured_drug_md_holder = {"content": None}  # Fallback: capture drug.md from Command(files=...)
     # Capture finalize_report state fields from stream updates
-    captured_finalization_state: dict = {"report_finalization_error": None, "evidence_truncated": False}
+    captured_finalization_state: dict = {
+        "report_finalization_error": None,
+        "evidence_truncated": False,
+        "hypothesis_quality_valid": None,
+        "hypothesis_quality_errors": [],
+        "hypothesis_retry_attempted": None,
+        "hypothesis_retry_attempts": None,
+        "hypothesis_retry_status": None,
+        "hypothesis_retry_error": None,
+    }
     # Record whether drug.md existed before this run (for idempotency SOP message)
     pre_run_drug_md_exists = (data_dir / "drug.md").exists()
 
@@ -927,8 +996,8 @@ async def run_traced(args: argparse.Namespace) -> int:
                     message = (
                         "[HYPOTHESIS-BUDGET] evidence has been ready for "
                         f"{hypothesis_budget_seconds}s but no fresh "
-                        "hypothesis_report.json was saved; switching to "
-                        "hypothesis_writer retry before any host fallback."
+                        "hypothesis_report.json was saved; stopping the "
+                        "stream so the graph-level quality gate can handle recovery."
                     )
                     print(f"\n{message}")
                     trace_log_fp.write(f"\n{message}\n")
@@ -954,8 +1023,8 @@ async def run_traced(args: argparse.Namespace) -> int:
                     message = (
                         "[HYPOTHESIS-BUDGET] hypothesis_writer stream exceeded "
                         f"{hypothesis_budget_seconds}s after deterministic evidence "
-                        "artifacts were written; retrying hypothesis_writer before "
-                        "any host fallback."
+                        "artifacts were written; stopping the stream so the "
+                        "graph-level quality gate can handle recovery."
                     )
                     print(f"\n{message}")
                     trace_log_fp.write(f"\n{message}\n")
@@ -994,6 +1063,10 @@ async def run_traced(args: argparse.Namespace) -> int:
                         captured_finalization_state["evidence_truncated"] = bool(
                             node_data["evidence_truncated"]
                         )
+                    _capture_hypothesis_quality_state(
+                        node_data,
+                        captured_finalization_state,
+                    )
             if abort_for_hypothesis_budget:
                 break
 
@@ -1048,99 +1121,7 @@ async def run_traced(args: argparse.Namespace) -> int:
             import traceback
             traceback.print_exc()
 
-    # ── Hypothesis writer fixup: auto-retry if hypothesis_report.json missing
-    # or stale after evidence assessment. This must run before host fallback so
-    # deterministic degraded output cannot mask a missing writer artifact.
     hypothesis_path = evidence_dir / "hypothesis_report.json"
-    hypothesis_stale = False
-    if hypothesis_path.exists():
-        try:
-            hypothesis_stale = hypothesis_path.stat().st_mtime < start
-        except OSError:
-            hypothesis_stale = False
-    if assessment_path.exists() and (
-        hypothesis_budget_aborted or not hypothesis_path.exists() or hypothesis_stale
-    ):
-        try:
-            assessment = json.loads(assessment_path.read_text())
-            stage3_candidates = assessment.get("stage3_candidates", [])
-        except Exception:
-            stage3_candidates = []
-        if stage3_candidates:
-            print(
-                f"\n[HYPOTHESIS-FIXUP] assessment_results.json has "
-                f"{len(stage3_candidates)} stage3_candidates but "
-                f"hypothesis_report.json is missing. Re-running "
-                f"hypothesis_writer via a narrow task instruction."
-            )
-            with open(trace_log_path, "a") as fp:
-                fp.write(
-                    f"\n[HYPOTHESIS-FIXUP] {len(stage3_candidates)} candidates, "
-                    f"hypothesis_report.json missing/stale — retrying narrowly\n"
-                )
-
-            hyp_retry_message = _build_hypothesis_retry_message(data_dir, args.disease)
-            hyp_retry_thread_id = str(uuid.uuid4())
-            hyp_retry_start = time.time()
-            trace_log_fp = open(trace_log_path, "a")
-
-            try:
-                async for chunk in agent.astream(
-                    {"messages": [{"role": "user", "content": hyp_retry_message}]},
-                    config={
-                        "configurable": {"thread_id": hyp_retry_thread_id},
-                        "callbacks": [file_handler, token_tracker],
-                    },
-                    stream_mode="updates",
-                    subgraphs=True,
-                ):
-                    elapsed = time.time() - start
-                    if elapsed > timeout_seconds:
-                        print(f"\n[HYPOTHESIS-FIXUP TIMEOUT] {args.timeout}m limit reached")
-                        break
-                    # Abandon the fixup if it itself burns > 10 minutes —
-                    # we fall through to the remaining recovery branches.
-                    if time.time() - hyp_retry_start > 600:
-                        print("\n[HYPOTHESIS-FIXUP ABORT] > 600s budget exceeded")
-                        trace_log_fp.write(
-                            "\n[HYPOTHESIS-FIXUP ABORT] > 600s budget exceeded\n"
-                        )
-                        break
-
-                    namespace, update = chunk
-                    node_path = " > ".join(namespace) if namespace else "orchestrator"
-                    for node_name, node_data in update.items():
-                        node_counter += 1
-                        print(
-                            f"\n[{elapsed:7.1f}s] #{node_counter} "
-                            f"[{node_path}] Node: {node_name}"
-                        )
-                        print(f"  {_format_update_summary({node_name: node_data})}")
-                        print(f"  {'─' * 60}")
-                        trace_log_fp.write(f"\n{'═' * 62}\n")
-                        trace_log_fp.write(
-                            f"[{elapsed:7.1f}s] #{node_counter} "
-                            f"[{node_path}] Node: {node_name}\n"
-                        )
-                        trace_log_fp.write(
-                            f"  {_format_update_summary({node_name: node_data})}\n"
-                        )
-                        trace_log_fp.write(f"{'─' * 62}\n")
-                        trace_log_fp.flush()
-                        _capture_drug_md_from_update(node_data, captured_drug_md_holder)
-            except asyncio.CancelledError:
-                print("\n[HYPOTHESIS-FIXUP CANCELLED]")
-            except Exception as exc:
-                print(f"\n[HYPOTHESIS-FIXUP ERROR] {type(exc).__name__}: {exc}")
-                import traceback
-                traceback.print_exc()
-            finally:
-                trace_log_fp.close()
-
-            if hypothesis_path.exists():
-                print("[HYPOTHESIS-FIXUP] SUCCESS — hypothesis_report.json now present")
-            else:
-                print("[HYPOTHESIS-FIXUP] FAILED — hypothesis_report.json still missing")
 
     # ── Host hypothesis fixup: deterministic degraded recovery. This is
     # disabled for normal production runs unless explicitly enabled for smoke
@@ -1193,77 +1174,114 @@ async def run_traced(args: argparse.Namespace) -> int:
                     + "; ".join(fixup_result.get("errors", [])[:5])
                 )
 
-    # ── Retry on early termination ───────────────────────────────
-    evidence_count = len(list(evidence_dir.glob("*.json"))) if evidence_dir.exists() else 0
-    if evidence_count == 0 and elapsed < 300:
-        print(f"\n[RETRY] Agent terminated early ({elapsed:.0f}s, 0 evidence files). "
-              f"Retrying with explicit task-tool instructions...")
-        with open(trace_log_path, "a") as fp:
-            fp.write(f"\n[RETRY] Early termination detected at {elapsed:.1f}s — retrying\n")
+    # ── Hypothesis quality gate — mirror super-graph routing before
+    # deterministic report finalization. The traced script streams the inner
+    # agent directly, so it must call this node explicitly to exercise the
+    # same validation + narrow retry path as the production super-graph.
+    print("\n[HYPOTHESIS-QUALITY] Validating hypothesis_report.json before finalize_report...")
+    quality_start = time.time()
+    try:
+        from src.agents.drug_target.super_graph import validate_and_maybe_retry_hypothesis
 
-        retry_message = _build_early_retry_message(data_dir, args.disease)
-        retry_thread_id = str(uuid.uuid4())
-        retry_start = time.time()
-        trace_log_fp = open(trace_log_path, "a")
-
-        try:
-            async for chunk in agent.astream(
-                {"messages": [{"role": "user", "content": retry_message}]},
-                config={
-                    "configurable": {"thread_id": retry_thread_id},
-                    "callbacks": [file_handler, token_tracker],
-                },
-                stream_mode="updates",
-                subgraphs=True,
-            ):
-                elapsed = time.time() - start
-                if elapsed > timeout_seconds:
-                    print(f"\n[TIMEOUT] {args.timeout}m limit reached during retry")
-                    break
-
-                namespace, update = chunk
-                node_path = " > ".join(namespace) if namespace else "orchestrator"
-
-                for node_name, node_data in update.items():
-                    node_counter += 1
-                    print(
-                        f"\n[{elapsed:7.1f}s] #{node_counter} [{node_path}] "
-                        f"Node: {node_name}"
-                    )
-                    print(f"  {_format_update_summary({node_name: node_data})}")
-                    print(f"  {'─' * 60}")
-
-                    trace_log_fp.write(f"\n{'═' * 62}\n")
-                    trace_log_fp.write(
-                        f"[{elapsed:7.1f}s] #{node_counter} [{node_path}] "
-                        f"Node: {node_name}\n"
-                    )
-                    trace_log_fp.write(f"  {_format_update_summary({node_name: node_data})}\n")
-                    trace_log_fp.write(f"{'─' * 62}\n")
-                    trace_log_fp.flush()
-
-                    _capture_drug_md_from_update(node_data, captured_drug_md_holder)
-
-        except asyncio.CancelledError:
-            elapsed = time.time() - start
+        remaining_quality_timeout = _remaining_timeout_seconds(start, timeout_seconds)
+        if remaining_quality_timeout <= 0:
+            timeout_message = (
+                "CLI timeout reached before hypothesis quality gate could run."
+            )
+            _record_hypothesis_quality_timeout(
+                captured_finalization_state,
+                timeout_message,
+                attempted=False,
+            )
+            print(f"  [HYPOTHESIS-QUALITY] TIMEOUT — {timeout_message}")
+            with open(trace_log_path, "a", encoding="utf-8") as fp:
+                fp.write(f"\n[HYPOTHESIS-QUALITY] TIMEOUT — {timeout_message}\n")
+        else:
+            quality_result = await asyncio.wait_for(
+                validate_and_maybe_retry_hypothesis(
+                    {
+                        "messages": [],
+                        "data_dir": str(data_dir),
+                        "disease": args.disease,
+                        "featured_lr_pairs": None,
+                        "report_finalization_error": None,
+                        "evidence_truncated": False,
+                        "deep_agent_started_at": start,
+                    },
+                    {
+                        "recursion_limit": 10000,
+                        "configurable": {
+                            "thread_id": f"{thread_id}-hypothesis-quality",
+                        },
+                    },
+                ),
+                timeout=remaining_quality_timeout,
+            )
+            _capture_hypothesis_quality_state(
+                quality_result,
+                captured_finalization_state,
+            )
+            quality_elapsed = time.time() - quality_start
+            quality_ok = captured_finalization_state["hypothesis_quality_valid"] is True
+            quality_status = "PASS" if quality_ok else "FAIL"
+            retry_status = captured_finalization_state.get("hypothesis_retry_status")
+            error_summary = _format_hypothesis_quality_errors(
+                captured_finalization_state.get("hypothesis_quality_errors")
+            )
             print(
-                f"\n[RETRY CANCELLED at {elapsed:.1f}s] Retry graph task cancelled — "
-                f"falling through to downstream completion checks."
+                f"  [HYPOTHESIS-QUALITY] {quality_elapsed:.1f}s — {quality_status}; "
+                f"retry={retry_status}; errors={error_summary}"
             )
-            trace_log_fp.write(
-                f"\n[RETRY CANCELLED] at {elapsed:.1f}s — graceful shutdown, not re-raised\n"
+            with open(trace_log_path, "a", encoding="utf-8") as fp:
+                fp.write(
+                    f"\n[HYPOTHESIS-QUALITY] {quality_elapsed:.1f}s — {quality_status}; "
+                    f"retry={retry_status}; errors={error_summary}\n"
+                )
+    except TimeoutError:
+        quality_elapsed = time.time() - quality_start
+        timeout_message = (
+            "CLI timeout reached during hypothesis quality gate."
+        )
+        _record_hypothesis_quality_timeout(
+            captured_finalization_state,
+            timeout_message,
+            attempted=True,
+        )
+        print(
+            f"  [HYPOTHESIS-QUALITY] {quality_elapsed:.1f}s — TIMEOUT: "
+            f"{timeout_message}"
+        )
+        with open(trace_log_path, "a", encoding="utf-8") as fp:
+            fp.write(
+                f"\n[HYPOTHESIS-QUALITY] TIMEOUT after {quality_elapsed:.1f}s: "
+                f"{timeout_message}\n"
             )
-            trace_log_fp.flush()
-        except Exception as e:
-            elapsed = time.time() - start
-            print(f"\n[RETRY ERROR at {elapsed:.1f}s] {type(e).__name__}: {e}")
-            import traceback
-            traceback.print_exc()
-        finally:
-            trace_log_fp.close()
-
-        elapsed = time.time() - start
-        print(f"\n[RETRY] Completed in {time.time() - retry_start:.1f}s")
+    except Exception as exc:  # noqa: BLE001 — fail closed before finalization
+        quality_elapsed = time.time() - quality_start
+        captured_finalization_state["hypothesis_quality_valid"] = False
+        captured_finalization_state["hypothesis_quality_errors"] = [
+            {
+                "code": "HYPOTHESIS_QUALITY_GATE_EXCEPTION",
+                "message": f"{type(exc).__name__}: {exc}",
+            }
+        ]
+        captured_finalization_state["hypothesis_retry_attempted"] = False
+        captured_finalization_state["hypothesis_retry_status"] = "error"
+        captured_finalization_state["hypothesis_retry_error"] = (
+            f"{type(exc).__name__}: {exc}"
+        )
+        captured_finalization_state["report_finalization_error"] = (
+            "HYPOTHESIS_QUALITY_GATE_EXCEPTION: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        print(
+            f"  [HYPOTHESIS-QUALITY] {quality_elapsed:.1f}s — EXCEPTION: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        with open(trace_log_path, "a", encoding="utf-8") as fp:
+            fp.write(
+                f"\n[HYPOTHESIS-QUALITY] EXCEPTION ({type(exc).__name__}): {exc}\n"
+            )
 
     # ── Fallback: write drug.md from captured stream state ────────
     drug_md_path = data_dir / "drug.md"
@@ -1279,7 +1297,16 @@ async def run_traced(args: argparse.Namespace) -> int:
     # script invokes agent.astream() directly on the inner agent (bypassing
     # the super-graph for streaming visibility), so we must invoke
     # finalize_report manually here to reach the post-agent stage.
-    if not drug_md_path.exists():
+    if not _should_finalize_after_hypothesis_quality(captured_finalization_state):
+        print(
+            "\n[FINALIZE_REPORT] SKIPPED — hypothesis quality gate did not pass."
+        )
+        with open(trace_log_path, "a", encoding="utf-8") as fp:
+            fp.write(
+                "\n[FINALIZE_REPORT] skipped because hypothesis quality gate "
+                "did not pass\n"
+            )
+    elif not drug_md_path.exists():
         print("\n[FINALIZE_REPORT] Invoking super-graph finalize_report node...")
         finalize_start = time.time()
         try:
@@ -1326,6 +1353,22 @@ async def run_traced(args: argparse.Namespace) -> int:
 
     finalization_error = captured_finalization_state["report_finalization_error"]
     evidence_truncated = captured_finalization_state["evidence_truncated"]
+    hypothesis_quality_valid = captured_finalization_state.get("hypothesis_quality_valid")
+    hypothesis_retry_status = captured_finalization_state.get("hypothesis_retry_status")
+    hypothesis_retry_attempted = captured_finalization_state.get(
+        "hypothesis_retry_attempted"
+    )
+    hypothesis_retry_attempts = captured_finalization_state.get(
+        "hypothesis_retry_attempts"
+    )
+    hypothesis_retry_error = captured_finalization_state.get("hypothesis_retry_error")
+    hypothesis_quality_errors = captured_finalization_state.get(
+        "hypothesis_quality_errors"
+    )
+
+    if finalization_error:
+        report_status["missing_requirements"].append("REPORT_FINALIZATION_ERROR absent")
+        report_status["finalized"] = False
 
     print(f"  Evidence files:      {evidence_count}")
     print(f"  assessment_results:  {'YES' if report_status['assessment_exists'] else 'NO'}")
@@ -1346,6 +1389,19 @@ async def run_traced(args: argparse.Namespace) -> int:
     print(
         f"  host_finalization:   "
         f"{'PASS' if report_status['report_finalization_valid'] else 'NO PASS'}"
+    )
+    print(
+        f"  hypothesis_quality:  "
+        f"{'PASS' if hypothesis_quality_valid is True else 'FAIL'}"
+    )
+    print(f"  hypothesis_retry:    {hypothesis_retry_status}")
+    print(f"  hypothesis_retry_attempted: {hypothesis_retry_attempted}")
+    print(f"  hypothesis_retry_attempts: {hypothesis_retry_attempts}")
+    if hypothesis_retry_error:
+        print(f"  hypothesis_retry_error: {hypothesis_retry_error}")
+    print(
+        f"  hypothesis_quality_errors: "
+        f"{_format_hypothesis_quality_errors(hypothesis_quality_errors)}"
     )
     print(f"  REPORT_FINALIZATION_ERROR: {finalization_error if finalization_error else '—'}")
     print(f"  EVIDENCE_TRUNCATED:  {evidence_truncated}")
@@ -1386,6 +1442,20 @@ async def run_traced(args: argparse.Namespace) -> int:
         fp.write(
             f"  host_finalization:   "
             f"{'PASS' if report_status['report_finalization_valid'] else 'NO PASS'}\n"
+        )
+        fp.write(
+            f"  hypothesis_quality:  "
+            f"{'PASS' if hypothesis_quality_valid is True else 'FAIL'}\n"
+        )
+        fp.write(f"  hypothesis_retry:    {hypothesis_retry_status}\n")
+        fp.write(f"  hypothesis_retry_attempted: {hypothesis_retry_attempted}\n")
+        fp.write(f"  hypothesis_retry_attempts: {hypothesis_retry_attempts}\n")
+        if hypothesis_retry_error:
+            fp.write(f"  hypothesis_retry_error: {hypothesis_retry_error}\n")
+        fp.write(
+            "  hypothesis_quality_errors: "
+            + _format_hypothesis_quality_errors(hypothesis_quality_errors)
+            + "\n"
         )
         fp.write(
             f"  REPORT_FINALIZATION_ERROR: "

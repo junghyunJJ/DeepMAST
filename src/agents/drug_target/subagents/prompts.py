@@ -263,10 +263,10 @@ multi-stage drug target assessment evidence.
 
 ## CRITICAL: File Access Rules
 - NEVER use `read_file` — it accesses real filesystem and will return "not found" for virtual files
-- NEVER use `write_file` — use `save_evidence(data_dir, filename, data)` instead
+- NEVER use `write_file` — use the dedicated `save_hypothesis_report(data_dir=data_dir, report=report)` tool for the final hypothesis artifact
 - NEVER use `ls` to check if files exist — ls shows virtual filesystem which may include stale files
 - ALWAYS use `load_evidence_files(data_dir, scope="hypothesis")` to read evidence data
-- ALWAYS use `save_evidence(data_dir, filename, data)` to save results to disk
+- ALWAYS use `save_hypothesis_report(data_dir=data_dir, report=report)` to save the final `hypothesis_report.json`
 
 ## Execution Discipline
 
@@ -335,6 +335,31 @@ The save_hypothesis_report validator checks both citations and hypothesis text.
 It rejects failed pair references and failed pair primary claims even if the
 failed pair file is not cited directly.
 
+### Evidence-vs-Inference Wording (ANTI-OVERCLAIM)
+
+Each hypothesis must clearly separate direct evidence from hypothesis-level
+inference:
+
+- **Direct evidence**: only state that the cited files show a value, association,
+  pass/fail status, target profile, drug match, or named relationship when that
+  fact is actually present in `evidence_references`.
+- **Hypothesis-level inference**: mechanisms that are biologically plausible but
+  not directly present in the cited files must be phrased with `may`, `could`, or `test whether`
+  (or related hedges such as `suggests`). Do not write these as established
+  facts.
+- Avoid unsupported therapeutic certainty. Do not claim a combination "provides
+  therapeutic benefit", "restores fibrosis resolution", or "drives disease"
+  unless the cited evidence directly supports that claim. Prefer testable
+  wording such as "may reduce", "could alter", or "will test whether".
+- Do not list anti-* antibodies, immune modulators, or experimental blockers
+  under `biological_entities.drugs` unless the exact agent appears in
+  `known_drugs.json`, `resolved_drugs.json`, or a cited `stage3_<GENE>.json`.
+  If the agent is only an experimental perturbation, mention it only in
+  `validation_approach as perturbation reagents`.
+- Genes or pathways not present in cited evidence may appear as mechanistic
+  context, but the hypothesis must not imply that the current evidence directly
+  validates them.
+
 Rules:
 - PASSED pair: reference normally as validated evidence when its file appears in `files`.
 - FAILED pair: may appear only under `contrast_evidence` as metadata-only
@@ -352,7 +377,7 @@ Generate **4-6 initial hypotheses** across four mandatory thematic categories:
 
 | Category | Focus | Min Count |
 |----------|-------|:---------:|
-| **Mechanism of Action (MoA)** | How a target mechanistically drives the disease | 1 |
+| **Mechanism of Action** | How a target mechanistically drives the disease | 1 |
 | **Therapeutic Strategy** | How to intervene (drug, modality, safety) | 1 |
 | **Cross-Target Interaction** | Multi-target synergies or pathway convergence | 1 |
 | **Novel Pathway** | Unexpected connections from the evidence data | 1 |
@@ -434,9 +459,12 @@ Filtering rules:
 1. Remove hypotheses with Specificity < 0.5
 2. Remove hypotheses with composite score < 0.4
 3. Rank remaining by composite score descending
-4. Keep top **max(5, len(stage3_candidates))** hypotheses (relaxed from "3-5" so
-   TOP-N coverage and category balance can both be satisfied).
-5. Ensure at least 3 of 4 categories represented
+4. Keep **4-6 retained hypotheses**. Default to 5 retained hypotheses; retain
+   6 only when needed for FEATURED gene coverage or mandatory category balance.
+5. Retained hypotheses MUST include all 4 mandatory categories: Mechanism of
+   Action, Therapeutic Strategy, Cross-Target Interaction, and Novel Pathway.
+6. Before saving, verify each required category appears at least once in the
+   retained hypotheses.
 
 ### Phase 4.75: TOP-N Coverage Hard Gate (DETERMINISTIC)
 
@@ -456,7 +484,11 @@ with the FEATURED list. If any FEATURED gene is missing, save_hypothesis_report
 or the save_evidence compatibility wrapper returns
 `saved=false` with `topn_coverage.missing` listing the absent genes.
 
-**Number of retained hypotheses MUST be at least max(4, len(FEATURED))**.
+**Number of retained hypotheses MUST be 4-6** while covering every FEATURED
+gene across the retained set. Use the default of 5 retained hypotheses unless
+6 are needed for FEATURED gene coverage or mandatory category balance. If
+FEATURED coverage cannot be satisfied within 6 retained hypotheses, stop and
+report the deterministic blocker instead of saving an incomplete payload.
 
 ### Phase 4.5: Validate Evidence References (MANDATORY, ANTI-HALLUCINATION)
 
@@ -518,19 +550,22 @@ Files visible in ls may be stale from a previous run. YOUR job is to save YOUR r
 
 Preferred:
 
-`save_hypothesis_report(data_dir, hypothesis_data)`
+`save_hypothesis_report(data_dir=data_dir, report=report)`
 
 Compatibility fallback only:
 
-`save_evidence(data_dir, "hypothesis_report.json", hypothesis_data)`
+`save_evidence(data_dir=data_dir, filename="hypothesis_report.json", data=report)`
 
 Do NOT skip this step. Do NOT assume the file already exists.
 Do NOT use `write_file` — it will not persist to disk.
 Do NOT use `ls` to check if the file exists — ls shows virtual filesystem which may include stale files.
 
-Save the hypothesis report as JSON:
+Build `report` as this JSON-compatible object, then pass it to:
+`save_hypothesis_report(data_dir=data_dir, report=report)`
+
+Required object shape:
 ```
-save_evidence(data_dir, "hypothesis_report.json", {
+{
     "disease": DISEASE,
     "evidence_coverage_pct": <float>,
     "hypotheses_generated": <int>,
@@ -561,7 +596,7 @@ save_evidence(data_dir, "hypothesis_report.json", {
         "referenced_files": <int>,
         "orphan_files": [...]
     }
-})
+}
 ```
 
 ## Important Rules

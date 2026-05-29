@@ -1,7 +1,10 @@
 """#18b — AC4 + CP-P0-009: Super-graph topology and messages contract.
 
-1. Node set includes run_deep_agent and finalize_report.
-2. Static edges: START→run_deep_agent, run_deep_agent→finalize_report,
+1. Node set includes run_deep_agent, validate_and_maybe_retry_hypothesis,
+   and finalize_report.
+2. Edges: START→run_deep_agent,
+   run_deep_agent→validate_and_maybe_retry_hypothesis,
+   validate_and_maybe_retry_hypothesis→finalize_report|END,
    finalize_report→END.
 3. Messages contract: only the last AIMessage survives after run_deep_agent.
 """
@@ -18,19 +21,21 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 
 def test_graph_contains_required_nodes() -> None:
-    """graph must expose run_deep_agent and finalize_report node IDs."""
+    """graph must expose required drug-target super-graph node IDs."""
     from src.agents.drug_target.graph_builder import drug_target_graph
 
     compiled = drug_target_graph.get_graph()
     node_ids = set(compiled.nodes.keys())
 
     assert "run_deep_agent" in node_ids, f"run_deep_agent missing from {node_ids}"
+    assert "validate_and_maybe_retry_hypothesis" in node_ids, (
+        f"validate_and_maybe_retry_hypothesis missing from {node_ids}"
+    )
     assert "finalize_report" in node_ids, f"finalize_report missing from {node_ids}"
 
 
 def test_graph_edges_include_required_transitions() -> None:
-    """Static edges START→run_deep_agent, run_deep_agent→finalize_report,
-    finalize_report→END must all be present."""
+    """Graph must validate hypothesis quality before finalization."""
     from langgraph.graph import END, START
 
     from src.agents.drug_target.graph_builder import drug_target_graph
@@ -39,8 +44,14 @@ def test_graph_edges_include_required_transitions() -> None:
     edges = [(e.source, e.target) for e in compiled.edges]
 
     assert (START, "run_deep_agent") in edges, f"Missing START→run_deep_agent in {edges}"
-    assert ("run_deep_agent", "finalize_report") in edges, (
-        f"Missing run_deep_agent→finalize_report in {edges}"
+    assert ("run_deep_agent", "validate_and_maybe_retry_hypothesis") in edges, (
+        f"Missing run_deep_agent→validate_and_maybe_retry_hypothesis in {edges}"
+    )
+    assert ("validate_and_maybe_retry_hypothesis", "finalize_report") in edges, (
+        f"Missing validate_and_maybe_retry_hypothesis→finalize_report in {edges}"
+    )
+    assert ("validate_and_maybe_retry_hypothesis", END) in edges, (
+        f"Missing validate_and_maybe_retry_hypothesis→END in {edges}"
     )
     assert ("finalize_report", END) in edges, f"Missing finalize_report→END in {edges}"
 

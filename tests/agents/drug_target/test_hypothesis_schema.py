@@ -103,7 +103,47 @@ def test_save_hypothesis_report_canonicalizes_labels_and_refs(tmp_path: Path) ->
         "stage1_pair_status": "passed",
         "display_reference": "stage1_FN1--CD4.json",
     }
-    assert saved["gap_analysis"]["orphan_files"] == ["stage1_FN1--CD4.json"]
+    assert saved["gap_analysis"] == {
+        "total_evidence_files": 4,
+        "referenced_files": 2,
+        "orphan_files": ["stage1_FN1--SDC2.json", "stage3_FN1.json"],
+    }
+    assert saved["evidence_coverage_pct"] == 50.0
+
+
+def test_save_hypothesis_report_recomputes_gap_analysis_from_actual_citations(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    report = _clone_report()
+    report["gap_analysis"] = {
+        "total_evidence_files": 99,
+        "referenced_files": 1,
+        "orphan_files": [
+            "stage1_FN1--CD4.json",
+            "stage3_CD4.json",
+            "stage3_NOT_REAL.json",
+        ],
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is True, result
+    saved = json.loads((data_dir / "evidence" / "hypothesis_report.json").read_text())
+    assert saved["gap_analysis"] == {
+        "total_evidence_files": 4,
+        "referenced_files": 2,
+        "orphan_files": ["stage1_FN1--SDC2.json", "stage3_FN1.json"],
+    }
+    cited = {
+        ref
+        for hyp in saved["hypotheses"]
+        for ref in hyp.get("evidence_references", [])
+    }
+    assert not (set(saved["gap_analysis"]["orphan_files"]) & cited)
+    assert saved["evidence_coverage_pct"] == 50.0
 
 
 def test_save_hypothesis_report_rejects_failed_pair_semantic_claim_without_citation(

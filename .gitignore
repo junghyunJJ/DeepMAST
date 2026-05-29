@@ -62,6 +62,10 @@ docs/benchmarks/*
 !docs/benchmarks/harness_x_model/
 !docs/benchmarks/harness_x_model/**
 docs/benchmarks/harness_x_model/__pycache__/
+!docs/benchmarks/hypothesis_generation_consistency/
+!docs/benchmarks/hypothesis_generation_consistency/**
+docs/benchmarks/hypothesis_generation_consistency/results/
+docs/benchmarks/hypothesis_generation_consistency/workspaces/
 # drug_target output contract — loaded at runtime by assessment_output.py
 !docs/drugtarget/
 !docs/drugtarget/**
