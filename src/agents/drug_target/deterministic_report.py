@@ -33,14 +33,100 @@ _SCORE_FIELDS = (
     "existing_drug_evidence",
     "clinical_trial_activity",
     "safety_profile",
+    "safety_evidence_level",
+    "safety_liability_count",
+    "safety_liability_sources",
     "validated_total",
     "gwas_support",
+    "gwas_evidence_type",
+    "gwas_min_pvalue",
+    "gwas_trait_match_level",
+    "gwas_direct_hit_count",
+    "gwas_proximity_hit_count",
     "tractability",
+    "tractability_basis",
+    "tractability_modalities",
+    "tractability_evidence_label",
+    "biological_plausibility_base",
+    "stage1_biological_support_bonus",
+    "biological_basis",
+    "biological_evidence_types",
+    "biological_evidence_count",
+    "biological_max_ot_score",
+    "vep_high_impact_count",
+    "stage1_support_pair_count",
+    "stage1_support_pairs",
+    "stage1_gate_status",
+    "stage1_total_pair_count",
+    "stage1_passed_pair_count",
+    "stage1_failed_pair_count",
+    "stage1_best_pair",
+    "stage1_best_string_combined",
+    "stage1_best_coexpr_pvalue",
+    "stage1_best_gene_a_pvalue",
+    "stage1_best_gene_b_pvalue",
+    "stage1_source",
     "biological_plausibility",
     "novelty_opportunity",
+    "novelty_basis",
+    "novelty_association_count",
+    "novelty_target_drug_count",
+    "novelty_bucket",
+    "novelty_source",
     "exploratory_total",
     "combined_total",
+    "gwas_rank_points",
+    "tractability_rank_points",
+    "biological_plausibility_rank_points",
+    "novelty_opportunity_rank_points",
+    "exploratory_rank_total",
+    "combined_rank_score",
 )
+_GWAS_AUDIT_FIELD_DEFAULTS = {
+    "gwas_evidence_type": "none",
+    "gwas_min_pvalue": None,
+    "gwas_trait_match_level": "none",
+    "gwas_direct_hit_count": 0,
+    "gwas_proximity_hit_count": 0,
+}
+_TRACTABILITY_AUDIT_FIELD_DEFAULTS = {
+    "tractability_basis": "unknown",
+    "tractability_modalities": "",
+    "tractability_evidence_label": "none",
+}
+_SAFETY_AUDIT_FIELD_DEFAULTS = {
+    "safety_evidence_level": "no_known_liability",
+    "safety_liability_count": 0,
+    "safety_liability_sources": "",
+}
+_BIOLOGICAL_AUDIT_FIELD_DEFAULTS = {
+    "biological_basis": "none",
+    "biological_evidence_types": "",
+    "biological_evidence_count": 0,
+    "biological_max_ot_score": None,
+    "vep_high_impact_count": 0,
+    "stage1_support_pair_count": 0,
+    "stage1_support_pairs": "",
+}
+_STAGE1_AUDIT_FIELD_DEFAULTS = {
+    "stage1_gate_status": "not_evaluated",
+    "stage1_total_pair_count": 0,
+    "stage1_passed_pair_count": 0,
+    "stage1_failed_pair_count": 0,
+    "stage1_best_pair": "",
+    "stage1_best_string_combined": None,
+    "stage1_best_coexpr_pvalue": None,
+    "stage1_best_gene_a_pvalue": None,
+    "stage1_best_gene_b_pvalue": None,
+    "stage1_source": "none",
+}
+_NOVELTY_AUDIT_FIELD_DEFAULTS = {
+    "novelty_basis": "st_only_or_brand_new_target",
+    "novelty_association_count": 0,
+    "novelty_target_drug_count": 0,
+    "novelty_bucket": "0-9 associations",
+    "novelty_source": "list_length",
+}
 _MARKDOWN_TEMPLATE_SUBPATH = (
     Path("skills")
     / "drug-target-reporting"
@@ -672,8 +758,34 @@ def render_report_html(report_data: dict[str, Any], markdown: str) -> str:
 def _score(candidate: dict[str, Any], field: str) -> object:
     scores = candidate.get("scores", {})
     if isinstance(scores, dict):
-        return scores.get(field, 0)
+        return scores.get(field, _score_field_default(field))
+    return _score_field_default(field)
+
+
+def _score_field_default(field: str) -> object:
+    if field in _GWAS_AUDIT_FIELD_DEFAULTS:
+        return _GWAS_AUDIT_FIELD_DEFAULTS[field]
+    if field in _TRACTABILITY_AUDIT_FIELD_DEFAULTS:
+        return _TRACTABILITY_AUDIT_FIELD_DEFAULTS[field]
+    if field in _SAFETY_AUDIT_FIELD_DEFAULTS:
+        return _SAFETY_AUDIT_FIELD_DEFAULTS[field]
+    if field in _BIOLOGICAL_AUDIT_FIELD_DEFAULTS:
+        return _BIOLOGICAL_AUDIT_FIELD_DEFAULTS[field]
+    if field in _STAGE1_AUDIT_FIELD_DEFAULTS:
+        return _STAGE1_AUDIT_FIELD_DEFAULTS[field]
+    if field in _NOVELTY_AUDIT_FIELD_DEFAULTS:
+        return _NOVELTY_AUDIT_FIELD_DEFAULTS[field]
     return 0
+
+
+def _score_field_value(scores: Mapping[str, Any], field: str) -> object:
+    if field in scores:
+        return scores.get(field)
+    if field == "exploratory_rank_total":
+        return scores.get("exploratory_total", _score_field_default(field))
+    if field == "combined_rank_score":
+        return scores.get("combined_total", _score_field_default(field))
+    return _score_field_default(field)
 
 
 def _drug_name(entry: dict[str, Any]) -> str:
@@ -915,7 +1027,8 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
     for row in sorted(
         rows,
         key=lambda item: (
-            -int(item.get("combined_total", item.get("validated_score", 0)) or 0),
+            -float(item.get("combined_rank_score", item.get("combined_total", item.get("validated_score", 0))) or 0),
+            -float(item.get("combined_total", item.get("validated_score", 0)) or 0),
             _normalize_gene(item.get("gene")),
         ),
     ):
@@ -957,7 +1070,10 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
                 "classification": row.get("classification", "unknown"),
                 "priority": row.get("priority", "unranked"),
                 "stage3_candidate": gene in selected_genes,
-                "scores": {field: row.get(field, 0) for field in _SCORE_FIELDS},
+                "scores": {
+                    field: _score_field_value(row, field)
+                    for field in _SCORE_FIELDS
+                },
                 "clinical_drug_count": len(clinical_drugs),
                 "preclinical_drug_count": len(preclinical_drugs),
                 "drug_count": len(drugs),
@@ -1086,7 +1202,10 @@ def _target_assessment_inputs(
         scores = candidate.get("scores", {})
         scores = scores if isinstance(scores, dict) else {}
         rubric_by_gene[gene] = {
-            **{field: scores.get(field, 0) for field in _SCORE_FIELDS},
+            **{
+                field: _score_field_value(scores, field)
+                for field in _SCORE_FIELDS
+            },
             "classification": candidate.get("classification", "unknown"),
             "priority": candidate.get("priority", "unranked"),
             "stage3_candidate": candidate.get("stage3_candidate", False),

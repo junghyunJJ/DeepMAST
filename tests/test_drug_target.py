@@ -2835,6 +2835,86 @@ class TestRubricScoring:
         assert et["pass"] is True
 
 
+class TestNoveltyAuditMetadata:
+    """Unit tests for non-scoring novelty_opportunity audit metadata."""
+
+    def test_summarize_novelty_uses_authoritative_total_count(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _summarize_novelty_opportunity,
+        )
+
+        assert _summarize_novelty_opportunity(
+            associations=[{"score": 0.91}] * 20,
+            associations_truncated=True,
+            associations_total_count=1633,
+            associations_total_source="parquet_pre_head",
+            target_drugs={"count": 5, "rows": [{"drug": {"id": "CHEMBL1"}}]},
+        ) == {
+            "novelty_basis": "well_studied_target",
+            "novelty_association_count": 1633,
+            "novelty_target_drug_count": 5,
+            "novelty_bucket": "1000+ associations",
+            "novelty_source": "parquet_pre_head",
+        }
+
+    def test_summarize_novelty_reports_sparse_target_without_drugs(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _summarize_novelty_opportunity,
+        )
+
+        assert _summarize_novelty_opportunity(
+            associations=[{"score": 0.2}] * 8,
+            associations_truncated=False,
+            associations_total_count=8,
+            associations_total_source="api_count",
+            target_drugs={"rows": []},
+        ) == {
+            "novelty_basis": "st_only_or_brand_new_target",
+            "novelty_association_count": 8,
+            "novelty_target_drug_count": 0,
+            "novelty_bucket": "0-9 associations",
+            "novelty_source": "api_count",
+        }
+
+    def test_summarize_novelty_reports_unknown_total_when_truncated_without_total(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _summarize_novelty_opportunity,
+        )
+
+        assert _summarize_novelty_opportunity(
+            associations=[{"score": 0.5}] * 20,
+            associations_truncated=True,
+            associations_total_count=None,
+            associations_total_source=None,
+            target_drugs={"rows": [{}, {}, {}]},
+        ) == {
+            "novelty_basis": "total_unknown_truncated",
+            "novelty_association_count": 20,
+            "novelty_target_drug_count": 3,
+            "novelty_bucket": "truncated_total_unknown",
+            "novelty_source": "truncated_list_length",
+        }
+
+    def test_summarize_novelty_ignores_malformed_inputs(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _summarize_novelty_opportunity,
+        )
+
+        assert _summarize_novelty_opportunity(
+            associations=None,
+            associations_truncated=False,
+            associations_total_count="bad",
+            associations_total_source="",
+            target_drugs={"count": "bad", "rows": "not-a-list"},
+        ) == {
+            "novelty_basis": "st_only_or_brand_new_target",
+            "novelty_association_count": 0,
+            "novelty_target_drug_count": 0,
+            "novelty_bucket": "0-9 associations",
+            "novelty_source": "list_length",
+        }
+
+
 class TestScoreGwasSupport:
     """Unit tests for disease-specific _score_gwas_support scoring."""
 
@@ -2877,6 +2957,62 @@ class TestScoreGwasSupport:
                 "n_gene_snps_in_disease": 0,
                 "n_proximity_hits": 3,
             }
+        }
+        assert _score_gwas_support(gwas) == 1
+
+    def test_pleiotropic_proximity_hit_remains_1(self):
+        from src.agents.drug_target.tools.stage_logic import _score_gwas_support
+        gwas = {
+            "disease": "breast cancer",
+            "disease_specific_hits": {
+                "n_gene_in_trait": 0,
+                "n_gene_snps_in_disease": 0,
+                "n_proximity_hits": 1,
+                "proximity_hits": [
+                    {
+                        "trait": "Breast cancer or lung cancer (pleiotropy)",
+                        "pvalue": 1e-10,
+                    }
+                ],
+            },
+        }
+        assert _score_gwas_support(gwas) == 1
+
+    def test_disease_specific_significant_proximity_returns_2(self):
+        from src.agents.drug_target.tools.stage_logic import _score_gwas_support
+        gwas = {
+            "disease": "idiopathic pulmonary fibrosis",
+            "disease_specific_hits": {
+                "n_gene_in_trait": 0,
+                "n_gene_snps_in_disease": 0,
+                "n_proximity_hits": 1,
+                "proximity_hits": [
+                    {
+                        "trait": "Idiopathic pulmonary fibrosis",
+                        "pvalue": 4e-9,
+                    }
+                ],
+            },
+        }
+        assert _score_gwas_support(gwas) == 2
+
+    def test_nested_proximity_requires_same_association_for_trait_and_pvalue(self):
+        from src.agents.drug_target.tools.stage_logic import _score_gwas_support
+        gwas = {
+            "disease": "breast cancer",
+            "disease_specific_hits": {
+                "n_gene_in_trait": 0,
+                "n_gene_snps_in_disease": 0,
+                "n_proximity_hits": 1,
+                "proximity_hits": [
+                    {
+                        "associations": [
+                            {"trait": "Breast cancer", "pvalue": 1e-4},
+                            {"trait": "Adult height", "pvalue": 1e-10},
+                        ],
+                    }
+                ],
+            },
         }
         assert _score_gwas_support(gwas) == 1
 
@@ -2935,6 +3071,120 @@ class TestScoreGwasSupport:
             }
         }
         assert _score_gwas_support(gwas) == 3  # gene_snps with p < 5e-8
+
+
+class TestGwasAuditMetadata:
+    """Unit tests for non-scoring GWAS audit metadata."""
+
+    def test_summarize_gwas_reports_no_evidence_defaults(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_gwas_support
+
+        assert _summarize_gwas_support(None) == {
+            "gwas_evidence_type": "none",
+            "gwas_min_pvalue": None,
+            "gwas_trait_match_level": "none",
+            "gwas_direct_hit_count": 0,
+            "gwas_proximity_hit_count": 0,
+        }
+
+    def test_summarize_gwas_reports_direct_significant_overlap(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_gwas_support
+
+        gwas = {
+            "disease": "breast cancer",
+            "disease_specific_hits": {
+                "n_gene_in_trait": 1,
+                "n_gene_snps_in_disease": 2,
+                "n_proximity_hits": 0,
+                "gene_snps_in_disease": [
+                    {"rsId": "rs111", "pvalue": 3e-7},
+                    {"rsId": "rs222", "associations": [{"pvalue": 4e-9}]},
+                ],
+            },
+        }
+
+        assert _summarize_gwas_support(gwas) == {
+            "gwas_evidence_type": "direct_significant_overlap",
+            "gwas_min_pvalue": 4e-9,
+            "gwas_trait_match_level": "disease_specific",
+            "gwas_direct_hit_count": 3,
+            "gwas_proximity_hit_count": 0,
+        }
+
+    def test_summarize_gwas_skips_malformed_gene_snps_and_reads_dict_associations(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_gwas_support
+
+        gwas = {
+            "disease": "breast cancer",
+            "disease_specific_hits": {
+                "n_gene_in_trait": 0,
+                "n_gene_snps_in_disease": 3,
+                "n_proximity_hits": 0,
+                "gene_snps_in_disease": [
+                    None,
+                    "malformed",
+                    {"rsId": "rs111", "pvalue": 3e-7},
+                    {"rsId": "rs222", "associations": {"pvalue": 2e-9}},
+                ],
+            },
+        }
+
+        assert _summarize_gwas_support(gwas) == {
+            "gwas_evidence_type": "direct_significant_overlap",
+            "gwas_min_pvalue": 2e-9,
+            "gwas_trait_match_level": "disease_specific",
+            "gwas_direct_hit_count": 3,
+            "gwas_proximity_hit_count": 0,
+        }
+
+    def test_summarize_gwas_reports_disease_specific_significant_proximity(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_gwas_support
+
+        gwas = {
+            "disease": "idiopathic pulmonary fibrosis",
+            "disease_specific_hits": {
+                "n_gene_in_trait": 0,
+                "n_gene_snps_in_disease": 0,
+                "n_proximity_hits": 1,
+                "proximity_hits": [
+                    {"trait": "Idiopathic pulmonary fibrosis", "pvalue": 4e-9},
+                ],
+            },
+        }
+
+        assert _summarize_gwas_support(gwas) == {
+            "gwas_evidence_type": "disease_specific_proximity",
+            "gwas_min_pvalue": 4e-9,
+            "gwas_trait_match_level": "disease_specific",
+            "gwas_direct_hit_count": 0,
+            "gwas_proximity_hit_count": 1,
+        }
+
+    def test_summarize_gwas_reports_pleiotropic_proximity(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_gwas_support
+
+        gwas = {
+            "disease": "breast cancer",
+            "disease_specific_hits": {
+                "n_gene_in_trait": 0,
+                "n_gene_snps_in_disease": 0,
+                "n_proximity_hits": 1,
+                "proximity_hits": [
+                    {
+                        "trait": "Breast cancer or lung cancer (pleiotropy)",
+                        "pvalue": 1e-10,
+                    },
+                ],
+            },
+        }
+
+        assert _summarize_gwas_support(gwas) == {
+            "gwas_evidence_type": "pleiotropic_proximity",
+            "gwas_min_pvalue": 1e-10,
+            "gwas_trait_match_level": "pleiotropic",
+            "gwas_direct_hit_count": 0,
+            "gwas_proximity_hit_count": 1,
+        }
 
 
 class TestScoreBiologicalPlausibility:
@@ -3062,6 +3312,535 @@ class TestScoreBiologicalPlausibility:
         from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
         evidence = [{"datatypeId": "animal_model", "score": 0.7}]
         assert _score_biological_plausibility(evidence) == 2  # 1 type + 1 bonus
+
+    def test_biological_plausibility_adds_stage1_bonus(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+
+        evidence = [{"datatypeId": "literature", "score": 0.3}]
+
+        assert _score_biological_plausibility(evidence, stage1_support_bonus=1) == 2
+
+    def test_biological_plausibility_stage1_bonus_caps_at_5(self):
+        from src.agents.drug_target.tools.stage_logic import _score_biological_plausibility
+
+        evidence = [
+            {"datatypeId": "affected_pathway", "score": 0.8},
+            {"datatypeId": "literature", "score": 0.5},
+            {"datatypeId": "animal_model", "score": 0.3},
+            {"datatypeId": "somatic_mutation", "score": 0.2},
+        ]
+
+        assert _score_biological_plausibility(evidence, stage1_support_bonus=1) == 5
+
+    def test_stage1_bio_bonus_for_gene_requires_passed_pair(self):
+        from src.agents.drug_target.tools.stage_logic import _stage1_bio_bonus_for_gene
+
+        stage1 = {
+            "FN1^SDC2": {
+                "ligand": "FN1",
+                "receptor": "SDC2",
+                "stage1_filter": {
+                    "passed": True,
+                    "string_combined": 0.959,
+                    "census_coexpr_pvalue": 0.0,
+                    "census_gene_a_pvalue": 0.0,
+                    "census_gene_b_pvalue": 0.0,
+                },
+            },
+            "FN1^PLAUR": {
+                "ligand": "FN1",
+                "receptor": "PLAUR",
+                "stage1_filter": {
+                    "passed": False,
+                    "string_combined": 0.697,
+                    "census_coexpr_pvalue": 0.0,
+                    "census_gene_a_pvalue": 0.0,
+                    "census_gene_b_pvalue": 0.0,
+                },
+            },
+        }
+
+        assert _stage1_bio_bonus_for_gene("FN1", stage1) == 1
+        assert _stage1_bio_bonus_for_gene("SDC2", stage1) == 1
+        assert _stage1_bio_bonus_for_gene("PLAUR", stage1) == 0
+        assert _stage1_bio_bonus_for_gene("MUC1", stage1) == 0
+
+    def test_stage1_bio_bonus_can_compute_filter_when_sidecar_missing(self):
+        from src.agents.drug_target.tools.stage_logic import _stage1_bio_bonus_for_gene
+
+        stage1 = {
+            "ITGB2^ICAM1": {
+                "string_ppi": {
+                    "max_combined_score": 0.91,
+                    "string_record_found": True,
+                },
+                "census_validation": {
+                    "target_vs_rest": {
+                        "gene_a": {"p_value": 0.001},
+                        "gene_b": {"p_value": 0.002},
+                        "coexpression": {"p_value": 0.003},
+                    }
+                },
+            }
+        }
+
+        assert _stage1_bio_bonus_for_gene("ITGB2", stage1) == 1
+        assert _stage1_bio_bonus_for_gene("ICAM1", stage1) == 1
+
+
+class TestBiologicalPlausibilityAuditMetadata:
+    """Unit tests for non-scoring biological plausibility audit metadata."""
+
+    def test_summarize_biological_reports_no_evidence_defaults(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _summarize_biological_plausibility,
+        )
+
+        assert _summarize_biological_plausibility(
+            disease_evidence=[],
+            vep_data=None,
+            gene="FN1",
+            stage1_evidence=None,
+        ) == {
+            "biological_basis": "none",
+            "biological_evidence_types": "",
+            "biological_evidence_count": 0,
+            "biological_max_ot_score": None,
+            "vep_high_impact_count": 0,
+            "stage1_support_pair_count": 0,
+            "stage1_support_pairs": "",
+        }
+
+    def test_summarize_biological_reports_ot_evidence_types_and_max_score(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _summarize_biological_plausibility,
+        )
+
+        disease_evidence = [
+            {"datatypeId": "literature", "score": 0.31},
+            {"datatypeId": "affected_pathway", "score": 0.82},
+            {"datatypeId": "known_drug", "score": 0.99},
+            {"datatypeId": "animal_model", "score": "0.45"},
+        ]
+
+        assert _summarize_biological_plausibility(
+            disease_evidence=disease_evidence,
+            vep_data={},
+            gene="FN1",
+            stage1_evidence={},
+        ) == {
+            "biological_basis": "ot_evidence",
+            "biological_evidence_types": "affected_pathway;animal_model;literature",
+            "biological_evidence_count": 3,
+            "biological_max_ot_score": 0.82,
+            "vep_high_impact_count": 0,
+            "stage1_support_pair_count": 0,
+            "stage1_support_pairs": "",
+        }
+
+    def test_summarize_biological_reports_vep_and_stage1_pair_support(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _summarize_biological_plausibility,
+        )
+
+        stage1 = {
+            "FN1^SDC2": {
+                "ligand": "FN1",
+                "receptor": "SDC2",
+                "stage1_filter": {"passed": True},
+            },
+            "FN1^PLAUR": {
+                "ligand": "FN1",
+                "receptor": "PLAUR",
+                "stage1_filter": {"passed": False},
+            },
+            "ITGB2^ICAM1": {
+                "ligand": "ITGB2",
+                "receptor": "ICAM1",
+                "stage1_filter": {"passed": True},
+            },
+        }
+
+        assert _summarize_biological_plausibility(
+            disease_evidence=[{"datatypeId": "literature", "score": 0.7}],
+            vep_data={"executed": True, "impact_summary": {"high_impact": 2}},
+            gene="FN1",
+            stage1_evidence=stage1,
+        ) == {
+            "biological_basis": "ot_evidence_plus_vep_high_impact_plus_stage1_pair",
+            "biological_evidence_types": "literature",
+            "biological_evidence_count": 1,
+            "biological_max_ot_score": 0.7,
+            "vep_high_impact_count": 2,
+            "stage1_support_pair_count": 1,
+            "stage1_support_pairs": "FN1^SDC2",
+        }
+
+    def test_summarize_biological_ignores_malformed_inputs(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _summarize_biological_plausibility,
+        )
+
+        summary = _summarize_biological_plausibility(
+            disease_evidence=[
+                None,
+                {"datatypeId": "literature", "score": "not-a-number"},
+                {"datatypeId": "genetic_association", "score": 1.0},
+            ],
+            vep_data={"executed": True, "impact_summary": {"high_impact": "bad"}},
+            gene="FN1",
+            stage1_evidence={"bad": "payload"},
+        )
+
+        assert summary == {
+            "biological_basis": "ot_evidence",
+            "biological_evidence_types": "literature",
+            "biological_evidence_count": 1,
+            "biological_max_ot_score": 0.0,
+            "vep_high_impact_count": 0,
+            "stage1_support_pair_count": 0,
+            "stage1_support_pairs": "",
+        }
+
+    def test_summarize_biological_treats_string_passed_as_non_passing(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _summarize_biological_plausibility,
+        )
+
+        summary = _summarize_biological_plausibility(
+            disease_evidence=[],
+            vep_data={},
+            gene="FN1",
+            stage1_evidence={
+                "FN1^SDC2": {
+                    "ligand": "FN1",
+                    "receptor": "SDC2",
+                    "stage1_filter": {"passed": "false"},
+                }
+            },
+        )
+
+        assert summary["stage1_support_pair_count"] == 0
+        assert summary["stage1_support_pairs"] == ""
+        assert summary["biological_basis"] == "none"
+
+    def test_summarize_biological_malformed_stage1_without_filter_fails_closed(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _summarize_biological_plausibility,
+        )
+
+        summary = _summarize_biological_plausibility(
+            disease_evidence=[],
+            vep_data={},
+            gene="FN1",
+            stage1_evidence={
+                "FN1^SDC2": {
+                    "ligand": "FN1",
+                    "receptor": "SDC2",
+                    "string_ppi": {"max_combined_score": "bad"},
+                }
+            },
+        )
+
+        assert summary["stage1_support_pair_count"] == 0
+        assert summary["stage1_support_pairs"] == ""
+        assert summary["biological_basis"] == "none"
+
+    def test_summarize_biological_logs_malformed_stage1_audit_pair(self, caplog):
+        import logging
+
+        from src.agents.drug_target.tools.stage_logic import (
+            _summarize_biological_plausibility,
+        )
+
+        with caplog.at_level(
+            logging.WARNING,
+            logger="src.agents.drug_target.tools.stage_logic",
+        ):
+            summary = _summarize_biological_plausibility(
+                disease_evidence=[],
+                vep_data={},
+                gene="FN1",
+                stage1_evidence={
+                    "FN1^SDC2": {
+                        "ligand": "FN1",
+                        "receptor": "SDC2",
+                        "string_ppi": "bad",
+                    }
+                },
+            )
+
+        assert summary["stage1_support_pair_count"] == 0
+        assert summary["stage1_support_pairs"] == ""
+        assert summary["biological_basis"] == "none"
+        assert "Skipping malformed Stage1 evidence in biological audit" in caplog.text
+
+    def test_summarize_biological_malformed_stage1_nested_containers_fail_closed(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _summarize_biological_plausibility,
+        )
+
+        malformed_pairs = [
+            {
+                "ligand": "FN1",
+                "receptor": "SDC2",
+                "string_ppi": "bad",
+            },
+            {
+                "ligand": "FN1",
+                "receptor": "SDC2",
+                "census_validation": None,
+            },
+            {
+                "ligand": "FN1",
+                "receptor": "SDC2",
+                "census_validation": {"target_vs_rest": None},
+            },
+        ]
+
+        for evidence in malformed_pairs:
+            summary = _summarize_biological_plausibility(
+                disease_evidence=[],
+                vep_data={},
+                gene="FN1",
+                stage1_evidence={"FN1^SDC2": evidence},
+            )
+
+            assert summary["stage1_support_pair_count"] == 0
+            assert summary["stage1_support_pairs"] == ""
+            assert summary["biological_basis"] == "none"
+
+
+class TestStage1GateAuditMetadata:
+    """Unit tests for non-scoring Stage1 gate audit metadata."""
+
+    def test_summarize_stage1_gate_reports_pass_and_best_pair(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_stage1_gate
+
+        stage1 = {
+            "FN1^PLAUR": {
+                "ligand": "FN1",
+                "receptor": "PLAUR",
+                "stage1_filter": {"passed": False},
+                "string_ppi": {"max_combined_score": 0.697},
+                "census_validation": {
+                    "target_vs_rest": {
+                        "gene_a": {"p_value": 0.001},
+                        "gene_b": {"p_value": 0.002},
+                        "coexpression": {"p_value": 0.003},
+                    }
+                },
+            },
+            "FN1^SDC2": {
+                "ligand": "FN1",
+                "receptor": "SDC2",
+                "stage1_filter": {"passed": True},
+                "string_ppi": {"max_combined_score": 0.959},
+                "census_validation": {
+                    "target_vs_rest": {
+                        "gene_a": {"p_value": 1e-6},
+                        "gene_b": {"p_value": 2e-6},
+                        "coexpression": {"p_value": 3e-6},
+                    }
+                },
+            },
+        }
+
+        assert _summarize_stage1_gate("FN1", stage1) == {
+            "stage1_gate_status": "pass",
+            "stage1_total_pair_count": 2,
+            "stage1_passed_pair_count": 1,
+            "stage1_failed_pair_count": 1,
+            "stage1_best_pair": "FN1^SDC2",
+            "stage1_best_string_combined": 0.959,
+            "stage1_best_coexpr_pvalue": 3e-6,
+            "stage1_best_gene_a_pvalue": 1e-6,
+            "stage1_best_gene_b_pvalue": 2e-6,
+            "stage1_source": "stage1_evidence.json",
+        }
+
+    def test_summarize_stage1_gate_reports_fail_when_pairs_exist_without_pass(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_stage1_gate
+
+        stage1 = {
+            "FN1^PLAUR": {
+                "ligand": "FN1",
+                "receptor": "PLAUR",
+                "stage1_filter": {"passed": False},
+                "string_ppi": {"max_combined_score": 0.697},
+                "census_validation": {
+                    "target_vs_rest": {
+                        "gene_a": {"p_value": 0.001},
+                        "gene_b": {"p_value": 0.002},
+                        "coexpression": {"p_value": 0.003},
+                    }
+                },
+            }
+        }
+
+        summary = _summarize_stage1_gate("FN1", stage1)
+
+        assert summary["stage1_gate_status"] == "fail"
+        assert summary["stage1_total_pair_count"] == 1
+        assert summary["stage1_passed_pair_count"] == 0
+        assert summary["stage1_failed_pair_count"] == 1
+        assert summary["stage1_best_pair"] == "FN1^PLAUR"
+        assert summary["stage1_source"] == "stage1_evidence.json"
+
+    def test_summarize_stage1_gate_keeps_malformed_matching_pair_as_fail(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_stage1_gate
+
+        stage1 = {
+            "FN1^SDC2": {
+                "ligand": "FN1",
+                "receptor": "SDC2",
+                "string_ppi": "bad",
+                "census_validation": None,
+            }
+        }
+
+        summary = _summarize_stage1_gate("FN1", stage1)
+
+        assert summary["stage1_gate_status"] == "fail"
+        assert summary["stage1_total_pair_count"] == 1
+        assert summary["stage1_passed_pair_count"] == 0
+        assert summary["stage1_failed_pair_count"] == 1
+        assert summary["stage1_source"] == "stage1_evidence.json"
+        assert summary["stage1_best_pair"] == "FN1^SDC2"
+        assert summary["stage1_best_string_combined"] == 0.0
+        assert summary["stage1_best_coexpr_pvalue"] == 1.0
+        assert summary["stage1_best_gene_a_pvalue"] == 1.0
+        assert summary["stage1_best_gene_b_pvalue"] == 1.0
+
+    def test_summarize_stage1_gate_ignores_pass_override_for_malformed_pair(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_stage1_gate
+
+        stage1 = {
+            "FN1^SDC2": {
+                "ligand": "FN1",
+                "receptor": "SDC2",
+                "stage1_filter": {"passed": True},
+                "string_ppi": "bad",
+                "census_validation": None,
+            }
+        }
+
+        summary = _summarize_stage1_gate("FN1", stage1)
+
+        assert summary["stage1_gate_status"] == "fail"
+        assert summary["stage1_total_pair_count"] == 1
+        assert summary["stage1_passed_pair_count"] == 0
+        assert summary["stage1_failed_pair_count"] == 1
+        assert summary["stage1_best_pair"] == "FN1^SDC2"
+        assert summary["stage1_source"] == "stage1_evidence.json"
+        assert summary["stage1_best_string_combined"] == 0.0
+        assert summary["stage1_best_coexpr_pvalue"] == 1.0
+        assert summary["stage1_best_gene_a_pvalue"] == 1.0
+        assert summary["stage1_best_gene_b_pvalue"] == 1.0
+
+    def test_summarize_stage1_gate_defaults_without_gene_pairs(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_stage1_gate
+
+        assert _summarize_stage1_gate("CD4", {"FN1^SDC2": {}}) == {
+            "stage1_gate_status": "not_evaluated",
+            "stage1_total_pair_count": 0,
+            "stage1_passed_pair_count": 0,
+            "stage1_failed_pair_count": 0,
+            "stage1_best_pair": "",
+            "stage1_best_string_combined": None,
+            "stage1_best_coexpr_pvalue": None,
+            "stage1_best_gene_a_pvalue": None,
+            "stage1_best_gene_b_pvalue": None,
+            "stage1_source": "none",
+        }
+
+
+class TestTractabilitySafetyAuditMetadata:
+    """Unit tests for non-scoring tractability/safety audit metadata."""
+
+    def test_summarize_tractability_reports_approved_drug_basis_and_modalities(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_tractability
+
+        tractability = [
+            {"modality": "AB", "label": "Approved Drug", "value": True},
+            {"modality": "SM", "label": "Druggable Family", "value": True},
+            {"modality": "PR", "label": "High-quality ligand", "value": False},
+        ]
+
+        assert _summarize_tractability(tractability) == {
+            "tractability_basis": "approved_drug",
+            "tractability_modalities": "AB;SM",
+            "tractability_evidence_label": "approved drug",
+        }
+
+    def test_summarize_tractability_reports_unknown_without_positive_signal(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_tractability
+
+        assert _summarize_tractability([]) == {
+            "tractability_basis": "unknown",
+            "tractability_modalities": "",
+            "tractability_evidence_label": "none",
+        }
+
+    def test_summarize_safety_reports_no_known_liability(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_safety
+
+        assert _summarize_safety([]) == {
+            "safety_evidence_level": "no_known_liability",
+            "safety_liability_count": 0,
+            "safety_liability_sources": "",
+        }
+
+    def test_summarize_safety_reports_clinical_liability_sources(self):
+        from src.agents.drug_target.tools.stage_logic import _summarize_safety
+
+        safety = [
+            {"datasource": "PharmGKB", "studies": [{"type": "clinical"}]},
+            {"datasource": "ToxCast", "studies": [{"type": "screen"}]},
+        ]
+
+        assert _summarize_safety(safety) == {
+            "safety_evidence_level": "clinical_liability",
+            "safety_liability_count": 2,
+            "safety_liability_sources": "pharmgkb;toxcast",
+        }
+
+    def test_preclinical_study_type_does_not_score_as_clinical(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _score_safety_profile,
+            _summarize_safety,
+        )
+
+        safety = [{"datasource": "AOP-Wiki", "studies": [{"type": "preclinical"}]}]
+
+        assert _score_safety_profile(safety) == 0
+        assert _summarize_safety(safety)["safety_evidence_level"] == "low_preclinical_signal"
+
+    def test_three_preclinical_entries_score_as_preclinical_liability(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _score_safety_profile,
+            _summarize_safety,
+        )
+
+        safety = [
+            {"datasource": "AOP-Wiki", "studies": [{"type": "preclinical"}]},
+            {"datasource": "ToxCast", "studies": [{"type": "screen"}]},
+            {"datasource": "Other", "studies": [{"type": "non-clinical"}]},
+        ]
+
+        assert _score_safety_profile(safety) == -1
+        assert _summarize_safety(safety)["safety_evidence_level"] == "preclinical_liability"
+
+    def test_explicit_clinical_study_scores_as_clinical_liability(self):
+        from src.agents.drug_target.tools.stage_logic import (
+            _score_safety_profile,
+            _summarize_safety,
+        )
+
+        safety = [{"datasource": "Other", "studies": [{"type": "clinical safety"}]}]
+
+        assert _score_safety_profile(safety) == -2
+        assert _summarize_safety(safety)["safety_evidence_level"] == "clinical_liability"
 
 
 class TestCompareCensusTool:
@@ -3958,16 +4737,16 @@ class TestNovelCandidates:
             )),
         }
 
-    def test_rank_novel_candidates_by_exploratory_total(self):
-        """Novel candidates (drug_evidence=0) are marked is_novel and sorted by exploratory_total."""
+    def test_rank_novel_candidates_by_normalized_exploratory_total(self):
+        """Novel candidates use normalized exploratory rank score for ordering."""
         from src.agents.drug_target.tools.stage_logic import rank_featured_candidates
 
         matrix = [
             # Featured pool (drug_evidence >= 1)
             self._row("A", "B", (2, 2, 0), (1, 1, 2, 1)),   # featured
-            # Novel pool (drug_evidence == 0), different exploratory totals
-            self._row("C", "D", (0, 0, 0), (2, 1, 2, 1)),   # exploratory_total=6
-            self._row("E", "F", (0, 0, 0), (1, 2, 3, 2)),   # exploratory_total=8
+            # Novel pool: E has higher raw total, C has higher normalized total.
+            self._row("C", "D", (0, 0, 0), (3, 3, 0, 0)),   # raw=6, rank=10
+            self._row("E", "F", (0, 0, 0), (1, 1, 3, 2)),   # raw=7, rank=8.33
             self._row("G", "H", (0, 0, 0), (0, 0, 3, 1)),   # exploratory_total=4, novel (bio>=3)
         ]
 
@@ -3975,10 +4754,10 @@ class TestNovelCandidates:
         novel = [r for r in ranked if r.get("is_novel")]
 
         assert len(novel) >= 1
-        # Novel sorted by exploratory_total descending
-        assert novel[0]["exploratory_total"] >= novel[-1]["exploratory_total"]
-        # Highest exploratory_total novel is E (8)
-        assert novel[0]["ligand"] == "E"
+        assert novel[0]["exploratory_rank_total"] >= novel[-1]["exploratory_rank_total"]
+        assert novel[0]["ligand"] == "C"
+        assert novel[0]["exploratory_total"] == 6
+        assert novel[1]["exploratory_total"] == 7
         # All novel have is_featured=False
         assert all(not r["is_featured"] for r in novel)
 
@@ -4301,6 +5080,353 @@ class TestStage1FilterCSVSync:
                 assert int(row["combined_total"]) == 12  # score preserved
 
 
+def test_compute_rubric_scores_adds_stage1_biological_bonus(tmp_path):
+    import csv
+    import json
+
+    from src.agents.drug_target.tools.stage_logic import compute_rubric_scores
+
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "known_drugs.json").write_text(json.dumps({"drugs": {"rows": []}}))
+    (evidence / "stage2_evidence.json").write_text(json.dumps({"FN1": {"gwas": {}, "vep": {}}}))
+    (evidence / "stage1_evidence.json").write_text(json.dumps({
+        "FN1^SDC2": {
+            "ligand": "FN1",
+            "receptor": "SDC2",
+            "stage1_filter": {
+                "passed": True,
+                "string_combined": 0.95,
+                "census_coexpr_pvalue": 0.001,
+                "census_gene_a_pvalue": 0.001,
+                "census_gene_b_pvalue": 0.001,
+            },
+        }
+    }))
+    (evidence / "ot_FN1.json").write_text(json.dumps({
+        "executed": True,
+        "disease_evidence": [{"datatypeId": "literature", "score": 0.3}],
+        "target_info": {
+            "tractability": [
+                {"modality": "AB", "label": "Approved Drug", "value": True},
+                {"modality": "SM", "label": "Druggable Family", "value": True},
+            ],
+            "safetyLiabilities": [
+                {"datasource": "ToxCast", "studies": [{"type": "screen"}]},
+                {"datasource": "AOP-Wiki", "studies": [{"type": "preclinical"}]},
+            ],
+        },
+        "associations": [],
+        "associations_total_count": 500,
+    }))
+
+    result = json.loads(compute_rubric_scores.invoke({"data_dir": str(tmp_path)}))
+    assert result["success"] is True
+
+    assessment = json.loads((evidence / "assessment_results.json").read_text())
+    row = assessment["rubric_assessment"][0]
+    assert row["gene"] == "FN1"
+    assert row["biological_plausibility_base"] == 1
+    assert row["stage1_biological_support_bonus"] == 1
+    assert row["biological_plausibility"] == 2
+    assert row["tractability_basis"] == "approved_drug"
+    assert row["tractability_modalities"] == "AB;SM"
+    assert row["tractability_evidence_label"] == "approved drug"
+    assert row["safety_evidence_level"] == "low_preclinical_signal"
+    assert row["safety_liability_count"] == 2
+    assert row["safety_liability_sources"] == "aop-wiki;toxcast"
+
+    with (evidence / "rubric_scores.csv").open() as handle:
+        csv_row = next(csv.DictReader(handle))
+    assert csv_row["biological_plausibility_base"] == "1"
+    assert csv_row["stage1_biological_support_bonus"] == "1"
+    assert csv_row["tractability_basis"] == "approved_drug"
+    assert csv_row["tractability_modalities"] == "AB;SM"
+    assert csv_row["tractability_evidence_label"] == "approved drug"
+    assert csv_row["safety_evidence_level"] == "low_preclinical_signal"
+    assert csv_row["safety_liability_count"] == "2"
+    assert csv_row["safety_liability_sources"] == "aop-wiki;toxcast"
+
+
+def test_compute_rubric_scores_persists_biological_audit_metadata(tmp_path):
+    import csv
+    import json
+
+    from src.agents.drug_target.tools.stage_logic import compute_rubric_scores
+
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "known_drugs.json").write_text(json.dumps({"drugs": {"rows": []}}))
+    (evidence / "stage2_evidence.json").write_text(json.dumps({
+        "FN1": {
+            "gwas": {},
+            "vep": {"executed": True, "impact_summary": {"high_impact": 2}},
+        }
+    }))
+    (evidence / "stage1_evidence.json").write_text(json.dumps({
+        "FN1^SDC2": {
+            "ligand": "FN1",
+            "receptor": "SDC2",
+            "stage1_filter": {
+                "passed": True,
+                "string_combined": 0.95,
+                "census_coexpr_pvalue": 0.001,
+                "census_gene_a_pvalue": 0.001,
+                "census_gene_b_pvalue": 0.001,
+            },
+        },
+        "FN1^PLAUR": {
+            "ligand": "FN1",
+            "receptor": "PLAUR",
+            "stage1_filter": {"passed": False},
+        },
+    }))
+    (evidence / "ot_FN1.json").write_text(json.dumps({
+        "executed": True,
+        "disease_evidence": [
+            {"datatypeId": "literature", "score": 0.31},
+            {"datatypeId": "affected_pathway", "score": 0.82},
+            {"datatypeId": "known_drug", "score": 0.99},
+        ],
+        "target_info": {},
+        "associations": [],
+        "associations_total_count": 500,
+    }))
+
+    result = json.loads(compute_rubric_scores.invoke({"data_dir": str(tmp_path)}))
+    assert result["success"] is True
+
+    assessment = json.loads((evidence / "assessment_results.json").read_text())
+    row = assessment["rubric_assessment"][0]
+    assert row["biological_plausibility_base"] == 4
+    assert row["stage1_biological_support_bonus"] == 1
+    assert row["biological_plausibility"] == 5
+    assert row["biological_basis"] == "ot_evidence_plus_vep_high_impact_plus_stage1_pair"
+    assert row["biological_evidence_types"] == "affected_pathway;literature"
+    assert row["biological_evidence_count"] == 2
+    assert row["biological_max_ot_score"] == 0.82
+    assert row["vep_high_impact_count"] == 2
+    assert row["stage1_support_pair_count"] == 1
+    assert row["stage1_support_pairs"] == "FN1^SDC2"
+
+    with (evidence / "rubric_scores.csv").open() as handle:
+        csv_row = next(csv.DictReader(handle))
+    assert csv_row["biological_plausibility_base"] == "4"
+    assert csv_row["stage1_biological_support_bonus"] == "1"
+    assert csv_row["biological_plausibility"] == "5"
+    assert csv_row["biological_basis"] == "ot_evidence_plus_vep_high_impact_plus_stage1_pair"
+    assert csv_row["biological_evidence_types"] == "affected_pathway;literature"
+    assert csv_row["biological_evidence_count"] == "2"
+    assert float(csv_row["biological_max_ot_score"]) == 0.82
+    assert csv_row["vep_high_impact_count"] == "2"
+    assert csv_row["stage1_support_pair_count"] == "1"
+    assert csv_row["stage1_support_pairs"] == "FN1^SDC2"
+
+
+def test_compute_rubric_scores_persists_stage1_audit_metadata_and_filter_rewrites_csv(tmp_path):
+    import csv
+    import json
+
+    from src.agents.drug_target.tools.stage_logic import (
+        apply_stage1_filter,
+        compute_rubric_scores,
+    )
+
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "known_drugs.json").write_text(json.dumps({"drugs": {"rows": []}}))
+    (evidence / "stage2_evidence.json").write_text(json.dumps({"FN1": {}}))
+    (evidence / "stage1_evidence.json").write_text(json.dumps({
+        "FN1^PLAUR": {
+            "ligand": "FN1",
+            "receptor": "PLAUR",
+            "stage1_filter": {"passed": False},
+            "string_ppi": {"max_combined_score": 0.697},
+            "census_validation": {
+                "target_vs_rest": {
+                    "gene_a": {"p_value": 0.001},
+                    "gene_b": {"p_value": 0.002},
+                    "coexpression": {"p_value": 0.003},
+                }
+            },
+        },
+        "FN1^SDC2": {
+            "ligand": "FN1",
+            "receptor": "SDC2",
+            "stage1_filter": {"passed": True},
+            "string_ppi": {"max_combined_score": 0.959},
+            "census_validation": {
+                "target_vs_rest": {
+                    "gene_a": {"p_value": 1e-6},
+                    "gene_b": {"p_value": 2e-6},
+                    "coexpression": {"p_value": 3e-6},
+                }
+            },
+        },
+    }))
+    (evidence / "ot_FN1.json").write_text(json.dumps({
+        "executed": True,
+        "disease_evidence": [{"datatypeId": "literature", "score": 0.31}],
+        "target_info": {},
+        "associations": [],
+        "associations_total_count": 500,
+    }))
+
+    result = json.loads(compute_rubric_scores.invoke({"data_dir": str(tmp_path)}))
+    assert result["success"] is True
+
+    assessment = json.loads((evidence / "assessment_results.json").read_text())
+    row = assessment["rubric_assessment"][0]
+    assert row["stage1_gate_status"] == "pass"
+    assert row["stage1_total_pair_count"] == 2
+    assert row["stage1_passed_pair_count"] == 1
+    assert row["stage1_failed_pair_count"] == 1
+    assert row["stage1_best_pair"] == "FN1^SDC2"
+    assert row["stage1_best_string_combined"] == 0.959
+    assert row["stage1_best_coexpr_pvalue"] == 3e-6
+    assert row["stage1_best_gene_a_pvalue"] == 1e-6
+    assert row["stage1_best_gene_b_pvalue"] == 2e-6
+    assert row["stage1_source"] == "stage1_evidence.json"
+
+    with (evidence / "rubric_scores.csv").open(newline="", encoding="utf-8") as handle:
+        csv_row = next(csv.DictReader(handle))
+    assert csv_row["stage1_gate_status"] == "pass"
+    assert csv_row["stage1_total_pair_count"] == "2"
+    assert csv_row["stage1_passed_pair_count"] == "1"
+    assert csv_row["stage1_failed_pair_count"] == "1"
+    assert csv_row["stage1_best_pair"] == "FN1^SDC2"
+    assert float(csv_row["stage1_best_string_combined"]) == 0.959
+    assert float(csv_row["stage1_best_coexpr_pvalue"]) == 3e-6
+    assert csv_row["stage1_source"] == "stage1_evidence.json"
+
+    filter_result = json.loads(apply_stage1_filter.invoke({"data_dir": str(tmp_path)}))
+    assert filter_result["success"] is True
+    with (evidence / "rubric_scores.csv").open(newline="", encoding="utf-8") as handle:
+        rewritten_row = next(csv.DictReader(handle))
+    assert rewritten_row["stage1_gate_status"] == "pass"
+    assert rewritten_row["stage1_best_pair"] == "FN1^SDC2"
+
+
+def test_compute_rubric_scores_persists_gwas_audit_metadata(tmp_path):
+    import csv
+    import json
+
+    from src.agents.drug_target.tools.stage_logic import compute_rubric_scores
+
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "known_drugs.json").write_text(json.dumps({"drugs": {"rows": []}}))
+    (evidence / "stage2_evidence.json").write_text(json.dumps({
+        "FN1": {
+            "gwas": {
+                "disease": "idiopathic pulmonary fibrosis",
+                "disease_specific_hits": {
+                    "n_gene_in_trait": 0,
+                    "n_gene_snps_in_disease": 0,
+                    "n_proximity_hits": 1,
+                    "proximity_hits": [
+                        {"trait": "Idiopathic pulmonary fibrosis", "pvalue": 4e-9},
+                    ],
+                },
+            },
+            "vep": {},
+        }
+    }))
+    (evidence / "stage1_evidence.json").write_text(json.dumps({}))
+    (evidence / "ot_FN1.json").write_text(json.dumps({
+        "executed": True,
+        "disease_evidence": [],
+        "target_info": {},
+        "associations": [],
+        "associations_total_count": 500,
+    }))
+
+    result = json.loads(compute_rubric_scores.invoke({"data_dir": str(tmp_path)}))
+    assert result["success"] is True
+
+    assessment = json.loads((evidence / "assessment_results.json").read_text())
+    row = assessment["rubric_assessment"][0]
+    assert row["gwas_support"] == 2
+    assert row["gwas_evidence_type"] == "disease_specific_proximity"
+    assert row["gwas_min_pvalue"] == 4e-9
+    assert row["gwas_trait_match_level"] == "disease_specific"
+    assert row["gwas_direct_hit_count"] == 0
+    assert row["gwas_proximity_hit_count"] == 1
+
+    with (evidence / "rubric_scores.csv").open() as handle:
+        csv_row = next(csv.DictReader(handle))
+    assert csv_row["gwas_support"] == "2"
+    assert csv_row["gwas_evidence_type"] == "disease_specific_proximity"
+    assert float(csv_row["gwas_min_pvalue"]) == 4e-9
+    assert csv_row["gwas_trait_match_level"] == "disease_specific"
+    assert csv_row["gwas_direct_hit_count"] == "0"
+    assert csv_row["gwas_proximity_hit_count"] == "1"
+
+
+def test_compute_rubric_scores_persists_novelty_audit_metadata(tmp_path):
+    import csv
+    import json
+
+    from src.agents.drug_target.tools.stage_logic import compute_rubric_scores
+
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "known_drugs.json").write_text(
+        json.dumps({"drugs": {"rows": []}}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage2_evidence.json").write_text(
+        json.dumps({"FN1": {"gwas": {}, "vep": {}}}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "ot_FN1.json").write_text(
+        json.dumps({
+            "gene_symbol": "FN1",
+            "disease": "idiopathic pulmonary fibrosis",
+            "executed": True,
+            "disease_evidence": [],
+            "target_info": {"tractability": [], "safetyLiabilities": []},
+            "associations": [{"score": 0.9}] * 20,
+            "associations_truncated": True,
+            "associations_total_count": 1633,
+            "associations_total_source": "parquet_pre_head",
+            "target_drugs": {
+                "count": 5,
+                "rows": [{"drug": {"id": "CHEMBL1"}}],
+            },
+        }),
+        encoding="utf-8",
+    )
+
+    result = json.loads(compute_rubric_scores.invoke({"data_dir": str(tmp_path)}))
+    assert result["genes_scored"] == 1
+
+    assessment = json.loads((evidence_dir / "assessment_results.json").read_text())
+    row = assessment["rubric_assessment"][0]
+    assert row["gene"] == "FN1"
+    assert row["novelty_opportunity"] == 0
+    assert row["novelty_basis"] == "well_studied_target"
+    assert row["novelty_association_count"] == 1633
+    assert row["novelty_target_drug_count"] == 5
+    assert row["novelty_bucket"] == "1000+ associations"
+    assert row["novelty_source"] == "parquet_pre_head"
+
+    matrix_row = assessment["all_genes_matrix"][0]
+    assert matrix_row["novelty_basis"] == "well_studied_target"
+    assert matrix_row["novelty_association_count"] == 1633
+    assert matrix_row["novelty_target_drug_count"] == 5
+    assert matrix_row["novelty_bucket"] == "1000+ associations"
+    assert matrix_row["novelty_source"] == "parquet_pre_head"
+
+    with (evidence_dir / "rubric_scores.csv").open(newline="", encoding="utf-8") as f:
+        csv_row = next(csv.DictReader(f))
+    assert csv_row["novelty_basis"] == "well_studied_target"
+    assert csv_row["novelty_association_count"] == "1633"
+    assert csv_row["novelty_target_drug_count"] == "5"
+    assert csv_row["novelty_bucket"] == "1000+ associations"
+    assert csv_row["novelty_source"] == "parquet_pre_head"
+
+
 # ===========================================================================
 # 9. C3 + C1 Regression Tests
 # ===========================================================================
@@ -4597,6 +5723,48 @@ class TestBuildEvidenceSummaryStage1Artifacts:
                 "combined_total": 12,
                 "validated_total": 7,
                 "exploratory_total": 5,
+                "existing_drug_evidence": 2,
+                "clinical_trial_activity": 1,
+                "safety_profile": 0,
+                "safety_evidence_level": "low_preclinical_signal",
+                "safety_liability_count": 2,
+                "safety_liability_sources": "aop-wiki;toxcast",
+                "gwas_support": 2,
+                "gwas_evidence_type": "disease_specific_proximity",
+                "gwas_min_pvalue": 4e-09,
+                "gwas_trait_match_level": "disease_specific",
+                "gwas_direct_hit_count": 0,
+                "gwas_proximity_hit_count": 1,
+                "tractability": 2,
+                "tractability_basis": "approved_drug",
+                "tractability_modalities": "AB;SM",
+                "tractability_evidence_label": "approved drug",
+                "biological_plausibility_base": 2,
+                "stage1_biological_support_bonus": 1,
+                "biological_basis": "ot_evidence_plus_stage1_pair",
+                "biological_evidence_types": "affected_pathway;literature",
+                "biological_evidence_count": 2,
+                "biological_max_ot_score": 0.82,
+                "vep_high_impact_count": 1,
+                "stage1_support_pair_count": 1,
+                "stage1_support_pairs": "TGFB1^TGFBR2",
+                "stage1_gate_status": "pass",
+                "stage1_total_pair_count": 2,
+                "stage1_passed_pair_count": 1,
+                "stage1_failed_pair_count": 1,
+                "stage1_best_pair": "TGFB1^TGFBR2",
+                "stage1_best_string_combined": 0.97,
+                "stage1_best_coexpr_pvalue": 0.001,
+                "stage1_best_gene_a_pvalue": 0.002,
+                "stage1_best_gene_b_pvalue": 0.003,
+                "stage1_source": "stage1_evidence.json",
+                "biological_plausibility": 3,
+                "novelty_opportunity": 2,
+                "novelty_basis": "st_only_or_brand_new_target",
+                "novelty_association_count": 4,
+                "novelty_target_drug_count": 0,
+                "novelty_bucket": "0-9 associations",
+                "novelty_source": "list_length",
                 "stage3_candidate": True,
             }],
         }))
@@ -4651,7 +5819,7 @@ class TestBuildEvidenceSummaryStage1Artifacts:
         with patch(
             "src.agents.drug_target.tools.drug_report_html.render_drug_md",
             return_value="# drug draft",
-        ):
+        ) as render_mock:
             raw = build_evidence_summary.invoke({"data_dir": str(tmp_path)})
 
         result = json.loads(raw)
@@ -4662,6 +5830,88 @@ class TestBuildEvidenceSummaryStage1Artifacts:
         assert pair["ligand"] == "TGFB1"
         assert pair["receptor"] == "TGFBR2"
         assert pair["string_ppi"]["max_combined_score"] == 0.97
+
+        expected_stage1_audit = {
+            "stage1_gate_status": "pass",
+            "stage1_total_pair_count": 2,
+            "stage1_passed_pair_count": 1,
+            "stage1_failed_pair_count": 1,
+            "stage1_best_pair": "TGFB1^TGFBR2",
+            "stage1_best_string_combined": 0.97,
+            "stage1_best_coexpr_pvalue": 0.001,
+            "stage1_best_gene_a_pvalue": 0.002,
+            "stage1_best_gene_b_pvalue": 0.003,
+            "stage1_source": "stage1_evidence.json",
+        }
+        for key, value in expected_stage1_audit.items():
+            assert featured["rubric"][key] == value
+            assert result["all_genes_druggability"][0][key] == value
+
+        rendered_matrix = render_mock.call_args.kwargs["all_genes_matrix"]
+        for key, value in expected_stage1_audit.items():
+            assert rendered_matrix[0][key] == value
+
+        target_assessment = json.loads((tmp_path / "target_assessment.json").read_text())
+        matrix_row = target_assessment["druggability_matrix"][0]
+        expected_pair_audit = {
+            "gwas_evidence_type": "disease_specific_proximity",
+            "gwas_min_pvalue": 4e-09,
+            "gwas_trait_match_level": "disease_specific",
+            "gwas_direct_hit_count": 0,
+            "gwas_proximity_hit_count": 1,
+            "tractability_basis": "approved_drug",
+            "tractability_modalities": "AB;SM",
+            "tractability_evidence_label": "approved drug",
+            "safety_evidence_level": "low_preclinical_signal",
+            "safety_liability_count": 2,
+            "safety_liability_sources": "aop-wiki;toxcast",
+            "biological_plausibility_base": 2,
+            "stage1_biological_support_bonus": 1,
+            "biological_basis": "ot_evidence_plus_stage1_pair",
+            "biological_evidence_types": "affected_pathway;literature",
+            "biological_evidence_count": 2,
+            "biological_max_ot_score": 0.82,
+            "vep_high_impact_count": 1,
+            "stage1_support_pair_count": 1,
+            "stage1_support_pairs": "TGFB1^TGFBR2",
+            **expected_stage1_audit,
+            "novelty_basis": "st_only_or_brand_new_target",
+            "novelty_association_count": 4,
+            "novelty_target_drug_count": 0,
+            "novelty_bucket": "0-9 associations",
+            "novelty_source": "list_length",
+        }
+        for key, value in expected_pair_audit.items():
+            assert matrix_row[key] == value
+
+    def test_build_evidence_summary_defaults_missing_biological_base_to_zero(
+        self,
+        tmp_path,
+    ):
+        from src.agents.drug_target.tools.stage_logic import build_evidence_summary
+
+        evidence = self._setup_reference_card_inputs(tmp_path)
+        assessment_path = evidence / "assessment_results.json"
+        assessment = json.loads(assessment_path.read_text())
+        rubric_row = assessment["rubric_assessment"][0]
+        assert rubric_row["biological_plausibility"] == 3
+        rubric_row.pop("biological_plausibility_base")
+        assessment_path.write_text(json.dumps(assessment))
+
+        with patch(
+            "src.agents.drug_target.tools.drug_report_html.render_drug_md",
+            return_value="# drug draft",
+        ) as render_mock:
+            raw = build_evidence_summary.invoke({"data_dir": str(tmp_path)})
+
+        result = json.loads(raw)
+
+        assert result["featured_genes"][0]["rubric"]["biological_plausibility_base"] == 0
+        assert result["all_genes_druggability"][0]["biological_plausibility_base"] == 0
+        rendered_matrix = render_mock.call_args.kwargs["all_genes_matrix"]
+        assert rendered_matrix[0]["biological_plausibility_base"] == 0
+        target_assessment = json.loads((tmp_path / "target_assessment.json").read_text())
+        assert target_assessment["druggability_matrix"][0]["biological_plausibility_base"] == 0
 
     def test_build_evidence_summary_skips_unexpected_non_dict_stage1_artifact(
         self,
@@ -4684,6 +5934,386 @@ class TestBuildEvidenceSummaryStage1Artifacts:
         featured = result["featured_genes"][0]
         assert "TGFB1_TGFBR2" in featured["stage1_pairs"]
         assert featured["stage1_pairs"]["TGFB1_TGFBR2"]["ligand"] == "TGFB1"
+
+
+class TestDrugReportHtmlAuditMetadata:
+    """HTML report conversion preserves candidate audit metadata."""
+
+    def test_parse_drug_md_preserves_audit_metadata_without_matrix_columns(self):
+        from src.agents.drug_target.tools.drug_report_html import parse_drug_md
+
+        context = parse_drug_md(self._drug_md_with_audit_metadata())
+
+        rubric = context["deep_dives"][0]["rubric"]
+        assert rubric["gwas_evidence_type"] == "disease_specific_proximity"
+        assert rubric["gwas_min_pvalue"] == 4e-09
+        assert rubric["gwas_trait_match_level"] == "disease_specific"
+        assert rubric["gwas_direct_hit_count"] == 0
+        assert rubric["gwas_proximity_hit_count"] == 1
+        assert rubric["biological_basis"] == "ot_evidence_plus_stage1_pair"
+        assert rubric["biological_evidence_types"] == "affected_pathway;literature"
+        assert rubric["biological_evidence_count"] == 2
+        assert rubric["biological_max_ot_score"] == 0.82
+        assert rubric["vep_high_impact_count"] == 1
+        assert rubric["stage1_support_pair_count"] == 2
+        assert rubric["stage1_support_pairs"] == "FN1^SDC2;FN1^ITGA5"
+        assert rubric["stage1_gate_status"] == "pass"
+        assert rubric["stage1_total_pair_count"] == 2
+        assert rubric["stage1_passed_pair_count"] == 1
+        assert rubric["stage1_failed_pair_count"] == 1
+        assert rubric["stage1_best_pair"] == "FN1^SDC2"
+        assert rubric["stage1_best_string_combined"] == 0.959
+        assert rubric["stage1_best_coexpr_pvalue"] == 3e-06
+        assert rubric["stage1_best_gene_a_pvalue"] == 1e-06
+        assert rubric["stage1_best_gene_b_pvalue"] == 2e-06
+        assert rubric["stage1_source"] == "stage1_evidence.json"
+        assert rubric["novelty_basis"] == "well_studied_target"
+        assert rubric["novelty_association_count"] == 1633
+        assert rubric["novelty_target_drug_count"] == 5
+        assert rubric["novelty_bucket"] == "1000+ associations"
+        assert rubric["novelty_source"] == "parquet_pre_head"
+        assert rubric["tractability_basis"] == "approved_drug"
+        assert rubric["tractability_modalities"] == "AB;SM"
+        assert rubric["tractability_evidence_label"] == "approved drug"
+        assert rubric["safety_evidence_level"] == "low_preclinical_signal"
+        assert rubric["safety_liability_count"] == 2
+        assert rubric["safety_liability_sources"] == "aop-wiki;toxcast"
+
+        headers = context["matrix"]["headers"]
+        for audit_field in (
+            "gwas_evidence_type",
+            "gwas_min_pvalue",
+            "gwas_trait_match_level",
+            "gwas_direct_hit_count",
+            "gwas_proximity_hit_count",
+            "biological_basis",
+            "biological_evidence_types",
+            "biological_evidence_count",
+            "biological_max_ot_score",
+            "vep_high_impact_count",
+            "stage1_support_pair_count",
+            "stage1_support_pairs",
+            "stage1_gate_status",
+            "stage1_total_pair_count",
+            "stage1_passed_pair_count",
+            "stage1_failed_pair_count",
+            "stage1_best_pair",
+            "stage1_best_string_combined",
+            "stage1_best_coexpr_pvalue",
+            "stage1_best_gene_a_pvalue",
+            "stage1_best_gene_b_pvalue",
+            "stage1_source",
+            "novelty_basis",
+            "novelty_association_count",
+            "novelty_target_drug_count",
+            "novelty_bucket",
+            "novelty_source",
+            "tractability_basis",
+            "tractability_modalities",
+            "tractability_evidence_label",
+            "safety_evidence_level",
+            "safety_liability_count",
+            "safety_liability_sources",
+        ):
+            assert audit_field not in headers
+
+    def test_render_drug_html_includes_audit_metadata_in_candidate_detail(self):
+        from src.agents.drug_target.tools.drug_report_html import (
+            parse_drug_md,
+            render_drug_html,
+        )
+
+        context = parse_drug_md(self._drug_md_with_audit_metadata())
+        context.update({"css": "", "js": "", "generation_date": "2026-05-30"})
+
+        html = render_drug_html(context)
+
+        assert "Audit Metadata" in html
+        assert "GWAS Audit" in html
+        assert "evidence_type" in html
+        assert "disease_specific_proximity" in html
+        assert "min_pvalue" in html
+        assert "4e-09" in html
+        assert "trait_match" in html
+        assert "disease_specific" in html
+        assert "direct_hits" in html
+        assert "proximity_hits" in html
+        assert "Biological Audit" in html
+        assert "basis" in html
+        assert "ot_evidence_plus_stage1_pair" in html
+        assert "evidence_types" in html
+        assert "affected_pathway;literature" in html
+        assert "evidence_count" in html
+        assert "max_ot_score" in html
+        assert "0.82" in html
+        assert "vep_high_impact_count" in html
+        assert "stage1_pair_count" in html
+        assert "stage1_pairs" in html
+        assert "FN1^SDC2;FN1^ITGA5" in html
+        assert "Stage1 Audit" in html
+        assert "gate_status" in html
+        assert "best_pair" in html
+        assert "FN1^SDC2" in html
+        assert "stage1_evidence.json" in html
+        assert "Novelty Audit" in html
+        assert "well_studied_target" in html
+        assert "1000+ associations" in html
+        assert "parquet_pre_head" in html
+        assert "tractability_basis" in html
+        assert "approved_drug" in html
+        assert "safety_evidence_level" in html
+        assert "low_preclinical_signal" in html
+        assert "aop-wiki;toxcast" in html
+
+    def test_render_drug_html_preserves_zero_gwas_min_pvalue(self):
+        from src.agents.drug_target.tools.drug_report_html import (
+            parse_drug_md,
+            render_drug_html,
+        )
+
+        context = parse_drug_md(self._drug_md_with_audit_metadata(min_pvalue="0.0"))
+        context.update({"css": "", "js": "", "generation_date": "2026-05-30"})
+
+        rubric = context["deep_dives"][0]["rubric"]
+        assert rubric["gwas_min_pvalue"] == 0.0
+
+        html = render_drug_html(context)
+
+        assert "<tr><td>min_pvalue</td><td>0.0</td></tr>" in html
+
+    def test_render_drug_html_blanks_none_biological_max_ot_score_and_preserves_zero(self):
+        from src.agents.drug_target.tools.drug_report_html import (
+            parse_drug_md,
+            render_drug_html,
+        )
+
+        none_context = parse_drug_md(self._drug_md_with_audit_metadata(max_ot_score=""))
+        none_context.update({"css": "", "js": "", "generation_date": "2026-05-30"})
+        zero_context = parse_drug_md(self._drug_md_with_audit_metadata(max_ot_score="0.0"))
+        zero_context.update({"css": "", "js": "", "generation_date": "2026-05-30"})
+
+        assert none_context["deep_dives"][0]["rubric"]["biological_max_ot_score"] is None
+        assert zero_context["deep_dives"][0]["rubric"]["biological_max_ot_score"] == 0.0
+
+        none_html = render_drug_html(none_context)
+        zero_html = render_drug_html(zero_context)
+
+        assert "<tr><td>max_ot_score</td><td></td></tr>" in none_html
+        assert "<tr><td>max_ot_score</td><td>0.0</td></tr>" in zero_html
+
+    def test_render_drug_html_escapes_biological_audit_string_fields(self):
+        from src.agents.drug_target.tools.drug_report_html import (
+            parse_drug_md,
+            render_drug_html,
+        )
+
+        context = parse_drug_md(self._drug_md_with_audit_metadata(
+            biological_basis="<script>alert(1)</script>",
+            biological_evidence_types="<img src=x onerror=alert(1)>",
+            stage1_support_pairs="FN1^SDC2;<b>bad</b>",
+        ))
+        context.update({"css": "", "js": "", "generation_date": "2026-05-30"})
+
+        html = render_drug_html(context)
+
+        assert "<script>alert(1)</script>" not in html
+        assert "<img src=x onerror=alert(1)>" not in html
+        assert "FN1^SDC2;<b>bad</b>" not in html
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+        assert "&lt;img src=x onerror=alert(1)&gt;" in html
+        assert "FN1^SDC2;&lt;b&gt;bad&lt;/b&gt;" in html
+
+    def test_render_drug_html_escapes_novelty_audit_strings(self):
+        from src.agents.drug_target.tools.drug_report_html import (
+            parse_drug_md,
+            render_drug_html,
+        )
+
+        context = parse_drug_md(self._drug_md_with_audit_metadata(
+            novelty_basis="<script>alert(1)</script>",
+            novelty_bucket="<img src=x onerror=alert(1)>",
+            novelty_source="<b>api_count</b>",
+        ))
+        context.update({"css": "", "js": "", "generation_date": "2026-05-30"})
+
+        html = render_drug_html(context)
+
+        assert "<script>alert(1)</script>" not in html
+        assert "<img src=x onerror=alert(1)>" not in html
+        assert "<b>api_count</b>" not in html
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+        assert "&lt;img src=x onerror=alert(1)&gt;" in html
+        assert "&lt;b&gt;api_count&lt;/b&gt;" in html
+
+    def test_render_drug_html_escapes_tractability_safety_audit_strings(self):
+        from src.agents.drug_target.tools.drug_report_html import (
+            parse_drug_md,
+            render_drug_html,
+        )
+
+        context = parse_drug_md(self._drug_md_with_audit_metadata())
+        rubric = context["deep_dives"][0]["rubric"]
+        rubric.update({
+            "tractability_basis": "<script>alert(1)</script>",
+            "tractability_modalities": "<img src=x onerror=alert(1)>",
+            "tractability_evidence_label": "<b>approved</b>",
+            "safety_evidence_level": "<svg onload=alert(1)>",
+            "safety_liability_sources": "toxcast;<i>bad</i>",
+        })
+        context.update({"css": "", "js": "", "generation_date": "2026-05-30"})
+
+        html = render_drug_html(context)
+
+        assert "<script>alert(1)</script>" not in html
+        assert "<img src=x onerror=alert(1)>" not in html
+        assert "<b>approved</b>" not in html
+        assert "<svg onload=alert(1)>" not in html
+        assert "toxcast;<i>bad</i>" not in html
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+        assert "&lt;img src=x onerror=alert(1)&gt;" in html
+        assert "&lt;b&gt;approved&lt;/b&gt;" in html
+        assert "&lt;svg onload=alert(1)&gt;" in html
+        assert "toxcast;&lt;i&gt;bad&lt;/i&gt;" in html
+
+    def test_render_drug_md_blanks_none_gwas_min_pvalue_and_preserves_zero(self):
+        none_markdown = self._render_drug_md_with_gwas_min_pvalue(None)
+        zero_markdown = self._render_drug_md_with_gwas_min_pvalue(0.0)
+
+        assert "min_pvalue=None" not in none_markdown
+        assert "min_pvalue=, trait_match=" in none_markdown
+        assert "min_pvalue=0.0" in zero_markdown
+
+    def test_render_drug_md_blanks_none_biological_max_ot_score_and_preserves_zero(self):
+        none_markdown = self._render_drug_md_with_biological_max_ot_score(None)
+        zero_markdown = self._render_drug_md_with_biological_max_ot_score(0.0)
+
+        assert "max_ot_score=None" not in none_markdown
+        assert "max_ot_score=, vep_high_impact_count=" in none_markdown
+        assert "max_ot_score=0.0" in zero_markdown
+
+    @staticmethod
+    def _render_drug_md_with_gwas_min_pvalue(min_pvalue):
+        from src.agents.drug_target.tools.drug_report_html import render_drug_md
+
+        return render_drug_md(
+            disease="test disease",
+            stage3_genes=["FN1"],
+            featured_cards=[
+                {
+                    "gene": "FN1",
+                    "rubric": {
+                        "classification": "validated_target",
+                        "priority": "high",
+                        "combined_total": 16,
+                        "validated_total": 6,
+                        "exploratory_total": 10,
+                        "existing_drug_evidence": 5,
+                        "clinical_trial_activity": 1,
+                        "safety_profile": 0,
+                        "gwas_support": 2,
+                        "gwas_min_pvalue": min_pvalue,
+                        "gwas_trait_match_level": "none",
+                    },
+                    "stage1_pairs": {},
+                    "stage3": {},
+                }
+            ],
+            all_genes_matrix=[
+                {
+                    "gene": "FN1",
+                    "stage3_candidate": True,
+                    "combined_total": 16,
+                    "combined_rank_score": 16,
+                }
+            ],
+            stage1_data={},
+            stage1_filter_results=[],
+        )
+
+    @staticmethod
+    def _render_drug_md_with_biological_max_ot_score(max_ot_score):
+        from src.agents.drug_target.tools.drug_report_html import render_drug_md
+
+        return render_drug_md(
+            disease="test disease",
+            stage3_genes=["FN1"],
+            featured_cards=[
+                {
+                    "gene": "FN1",
+                    "rubric": {
+                        "classification": "validated_target",
+                        "priority": "high",
+                        "combined_total": 16,
+                        "validated_total": 6,
+                        "exploratory_total": 10,
+                        "existing_drug_evidence": 5,
+                        "clinical_trial_activity": 1,
+                        "safety_profile": 0,
+                        "gwas_support": 2,
+                        "gwas_min_pvalue": None,
+                        "gwas_trait_match_level": "none",
+                        "biological_basis": "ot_evidence",
+                        "biological_evidence_types": "literature",
+                        "biological_evidence_count": 1,
+                        "biological_max_ot_score": max_ot_score,
+                        "vep_high_impact_count": 0,
+                        "stage1_support_pair_count": 0,
+                        "stage1_support_pairs": "",
+                    },
+                    "stage1_pairs": {},
+                    "stage3": {},
+                }
+            ],
+            all_genes_matrix=[
+                {
+                    "gene": "FN1",
+                    "stage3_candidate": True,
+                    "combined_total": 16,
+                    "combined_rank_score": 16,
+                }
+            ],
+            stage1_data={},
+            stage1_filter_results=[],
+        )
+
+    @staticmethod
+    def _drug_md_with_audit_metadata(
+        min_pvalue: str = "4e-09",
+        max_ot_score: str = "0.82",
+        biological_basis: str = "ot_evidence_plus_stage1_pair",
+        biological_evidence_types: str = "affected_pathway;literature",
+        stage1_support_pairs: str = "FN1^SDC2;FN1^ITGA5",
+        novelty_basis: str = "well_studied_target",
+        novelty_association_count: int = 1633,
+        novelty_target_drug_count: int = 5,
+        novelty_bucket: str = "1000+ associations",
+        novelty_source: str = "parquet_pre_head",
+    ) -> str:
+        return f"""# Therapeutic Target Assessment Report — test disease
+
+## 2. Druggability Matrix
+
+### 2.1. Druggability Matrix
+
+| Gene | Drug Ev. | Trial | Safety | Val. Total | GWAS | Tract. | Bio. Plaus. | Novelty | Expl. Total | Combined | Rank Score | Classification | Priority | Stage3 |
+|------|----------|-------|--------|------------|------|--------|--------------|---------|-------------|----------|------------|----------------|----------|--------|
+| **FN1** | 5 | 1 | 0 | 6 | 2 | 3 | 4 | 1 | 10 | 16 | 12.5 | validated_target | high | Yes |
+
+## 3. Featured Candidate Deep Dives
+
+### FN1 — Classification: validated_target | Priority: high
+
+**C. Rubric Assessment**
+
+- Validated Track: existing_drug_evidence=5, clinical_trial_activity=1, safety_profile=0 → **validated_total=6**
+- Exploratory Track: gwas_support=2, tractability=3, biological_plausibility=4, novelty_opportunity=1 → **exploratory_total=10**
+- GWAS Audit: evidence_type=disease_specific_proximity, min_pvalue={min_pvalue}, trait_match=disease_specific, direct_hits=0, proximity_hits=1
+- Biological Audit: basis={biological_basis}, evidence_types={biological_evidence_types}, evidence_count=2, max_ot_score={max_ot_score}, vep_high_impact_count=1, stage1_pair_count=2, stage1_pairs={stage1_support_pairs}
+- Stage1 Audit: gate_status=pass, total_pairs=2, passed_pairs=1, failed_pairs=1, best_pair=FN1^SDC2, best_string=0.959, best_coexpr_p=3e-06, best_gene_a_p=1e-06, best_gene_b_p=2e-06, source=stage1_evidence.json
+- Novelty Audit: basis={novelty_basis}, association_count={novelty_association_count}, target_drug_count={novelty_target_drug_count}, bucket={novelty_bucket}, source={novelty_source}
+- Audit Metadata: tractability_basis=approved_drug, tractability_modalities=AB;SM, tractability_evidence_label=approved drug, safety_evidence_level=low_preclinical_signal, safety_liability_count=2, safety_liability_sources=aop-wiki;toxcast
+- **Combined Total: 16** | Classification: validated_target | Priority: high
+"""
 
 
 class TestPR1HypothesisReportValidator:

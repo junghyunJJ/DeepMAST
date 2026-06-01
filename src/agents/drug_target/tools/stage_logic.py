@@ -187,6 +187,39 @@ def compute_stage1_filter(stage1_evidence: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _stage1_pair_genes(pair_key: str, evidence: dict[str, Any]) -> tuple[str, str] | None:
+    ligand = evidence.get("ligand")
+    receptor = evidence.get("receptor")
+    if ligand and receptor:
+        return str(ligand).upper(), str(receptor).upper()
+    parts = str(pair_key).replace("--", "^").split("^", 1)
+    if len(parts) == 2 and parts[0] and parts[1]:
+        return parts[0].upper(), parts[1].upper()
+    return None
+
+
+def _stage1_pair_passed(evidence: dict[str, Any]) -> bool:
+    recorded = evidence.get("stage1_filter")
+    if isinstance(recorded, dict) and "passed" in recorded:
+        return bool(recorded.get("passed"))
+    return bool(compute_stage1_filter(evidence).get("passed"))
+
+
+def _stage1_bio_bonus_for_gene(gene: str, stage1_evidence: dict[str, Any] | None) -> int:
+    gene_upper = str(gene or "").upper()
+    if not gene_upper or not isinstance(stage1_evidence, dict):
+        return 0
+    for pair_key, evidence in stage1_evidence.items():
+        if not isinstance(evidence, dict):
+            continue
+        pair_genes = _stage1_pair_genes(str(pair_key), evidence)
+        if pair_genes is None or gene_upper not in pair_genes:
+            continue
+        if _stage1_pair_passed(evidence):
+            return 1
+    return 0
+
+
 
 def infer_oncology_flag(disease: str) -> bool:
     """Infer whether disease context is oncology-related."""
@@ -298,6 +331,7 @@ def rank_featured_candidates(
         item["combined_total"] = combined_total
         item["validated_total"] = vt["total"]
         item["exploratory_total"] = et["total"]
+        item.update(compute_combined_rank_scores(vt["total"], et["scores"]))
         scored_rows.append(item)
 
     # Separate insufficient_evidence rows
@@ -309,14 +343,28 @@ def rank_featured_candidates(
         r for r in eligible
         if _safe_track_get(r, "validated_track", "existing_drug_evidence") >= 1
     ]
-    featured_pool.sort(key=lambda x: x["combined_total"], reverse=True)
+    featured_pool.sort(
+        key=lambda x: (
+            x.get("combined_rank_score", x["combined_total"]),
+            x["combined_total"],
+            x.get("exploratory_rank_total", x["exploratory_total"]),
+            x["exploratory_total"],
+        ),
+        reverse=True,
+    )
 
     # --- Novel pool: existing_drug_evidence == 0 ---
     novel_pool = [
         r for r in eligible
         if _safe_track_get(r, "validated_track", "existing_drug_evidence") == 0
     ]
-    novel_pool.sort(key=lambda x: x["exploratory_total"], reverse=True)
+    novel_pool.sort(
+        key=lambda x: (
+            x.get("exploratory_rank_total", x["exploratory_total"]),
+            x["exploratory_total"],
+        ),
+        reverse=True,
+    )
 
     # --- Novel tier assignment ---
     for row in novel_pool:
@@ -424,6 +472,40 @@ def compute_exploratory_track(assessment: dict[str, Any]) -> dict[str, Any]:
     passed = gwas >= 1 or tract >= 2 or bio >= 3
 
     return {"scores": scores, "total": total, "pass": passed}
+
+
+def _rank_points_0_to_5(score: int | float, max_score: int | float) -> float:
+    if not max_score:
+        return 0.0
+    return round((float(score or 0) / float(max_score)) * 5.0, 2)
+
+
+def compute_exploratory_rank_scores(scores: dict[str, int | float]) -> dict[str, float]:
+    """Normalize exploratory criteria to comparable 0-5 rank contributions."""
+    gwas = _rank_points_0_to_5(scores.get("gwas_genetic_support", 0), 3)
+    tract = _rank_points_0_to_5(scores.get("tractability", 0), 3)
+    bio = round(float(scores.get("biological_plausibility", 0) or 0), 2)
+    novelty = round(float(scores.get("novelty_opportunity", 0) or 0), 2)
+    total = round(gwas + tract + bio + novelty, 2)
+    return {
+        "gwas_rank_points": gwas,
+        "tractability_rank_points": tract,
+        "biological_plausibility_rank_points": bio,
+        "novelty_opportunity_rank_points": novelty,
+        "exploratory_rank_total": total,
+    }
+
+
+def compute_combined_rank_scores(
+    validated_total: int | float,
+    exploratory_scores: dict[str, int | float],
+) -> dict[str, float]:
+    rank_scores = compute_exploratory_rank_scores(exploratory_scores)
+    rank_scores["combined_rank_score"] = round(
+        float(validated_total or 0) + rank_scores["exploratory_rank_total"],
+        2,
+    )
+    return rank_scores
 
 
 def classify_target(assessment: dict[str, Any]) -> str:
@@ -648,9 +730,30 @@ def apply_stage1_filter(data_dir: str) -> str:
             # SYNC: keep in sync with compute_rubric_scores() fieldnames (~line 1170)
             rubric_fieldnames = [
                 "gene", "existing_drug_evidence", "clinical_trial_activity",
-                "safety_profile", "validated_total",
-                "gwas_support", "tractability", "biological_plausibility",
-                "novelty_opportunity", "exploratory_total", "combined_total",
+                "safety_profile", "safety_evidence_level", "safety_liability_count",
+                "safety_liability_sources", "validated_total",
+                "gwas_support", "gwas_evidence_type", "gwas_min_pvalue",
+                "gwas_trait_match_level", "gwas_direct_hit_count",
+                "gwas_proximity_hit_count", "tractability",
+                "tractability_basis", "tractability_modalities",
+                "tractability_evidence_label",
+                "biological_plausibility_base", "stage1_biological_support_bonus",
+                "biological_basis", "biological_evidence_types",
+                "biological_evidence_count", "biological_max_ot_score",
+                "vep_high_impact_count", "stage1_support_pair_count",
+                "stage1_support_pairs",
+                "stage1_gate_status", "stage1_total_pair_count",
+                "stage1_passed_pair_count", "stage1_failed_pair_count",
+                "stage1_best_pair", "stage1_best_string_combined",
+                "stage1_best_coexpr_pvalue", "stage1_best_gene_a_pvalue",
+                "stage1_best_gene_b_pvalue", "stage1_source",
+                "biological_plausibility",
+                "novelty_opportunity", "novelty_basis", "novelty_association_count",
+                "novelty_target_drug_count", "novelty_bucket",
+                "novelty_source", "exploratory_total", "combined_total",
+                "gwas_rank_points", "tractability_rank_points",
+                "biological_plausibility_rank_points", "novelty_opportunity_rank_points",
+                "exploratory_rank_total", "combined_rank_score",
                 "classification", "priority", "stage3_candidate",
             ]
             with open(csv_path_rubric, "w", newline="", encoding="utf-8") as f:
@@ -1003,13 +1106,43 @@ _BIO_PLAUSIBILITY_TYPES = frozenset({
 })
 
 
+def _safety_study_type_has_prefix(study_type: str, prefix: str) -> bool:
+    return study_type == prefix or any(
+        study_type.startswith(f"{prefix}{separator}")
+        for separator in (" ", "_", "-", "/", ":")
+    )
+
+
+def _classify_safety_liability(entry: Any) -> str | None:
+    """Classify one OT safety liability as clinical or preclinical."""
+    if not isinstance(entry, dict):
+        return None
+
+    src = str(entry.get("datasource") or "").lower().strip()
+    studies = entry.get("studies") or []
+    study_types = [
+        str(study.get("type") or "").lower().strip()
+        for study in studies
+        if isinstance(study, dict)
+    ]
+
+    has_clinical_study = any(
+        _safety_study_type_has_prefix(study_type, "clinical")
+        for study_type in study_types
+    )
+    if src == "pharmgkb" or has_clinical_study:
+        return "clinical"
+
+    return "preclinical"
+
+
 def _score_safety_profile(safety_liabilities: list | None) -> int:
     """Score safety_profile (-3 to 0) from OT safetyLiabilities.
 
     Distinguishes clinical evidence (PharmGKB, Brennan et al.) from
     preclinical screens (ToxCast, AOP-Wiki) per OT community guidance.
 
-     0: no safety concerns
+     0: no safety concerns or fewer than 3 preclinical concerns
     -1: preclinical concerns only (ToxCast/AOP-Wiki 3+)
     -2: clinical concerns (PharmGKB/clinical 1-2)
     -3: major clinical concerns (PharmGKB/clinical 3+)
@@ -1019,12 +1152,10 @@ def _score_safety_profile(safety_liabilities: list | None) -> int:
     clinical_count = 0
     preclinical_count = 0
     for entry in safety_liabilities:
-        src = (entry.get("datasource") or "").lower()
-        studies = entry.get("studies") or []
-        study_types = [(s.get("type") or "").lower() for s in studies]
-        if src == "pharmgkb" or "clinical" in " ".join(study_types):
+        classification = _classify_safety_liability(entry)
+        if classification == "clinical":
             clinical_count += 1
-        else:
+        elif classification == "preclinical":
             preclinical_count += 1
     if clinical_count >= 3:
         return -3
@@ -1035,10 +1166,53 @@ def _score_safety_profile(safety_liabilities: list | None) -> int:
     return 0
 
 
+def _summarize_safety(safety_liabilities: list | None) -> dict[str, Any]:
+    """Return non-scoring safety audit metadata."""
+    if not safety_liabilities:
+        return {
+            "safety_evidence_level": "no_known_liability",
+            "safety_liability_count": 0,
+            "safety_liability_sources": "",
+        }
+
+    clinical_count = 0
+    preclinical_count = 0
+    sources: set[str] = set()
+    for entry in safety_liabilities:
+        if not isinstance(entry, dict):
+            continue
+        src = str(entry.get("datasource") or "unknown").lower().strip()
+        sources.add(src)
+        classification = _classify_safety_liability(entry)
+        if classification == "clinical":
+            clinical_count += 1
+        elif classification == "preclinical":
+            preclinical_count += 1
+
+    if clinical_count >= 3:
+        level = "major_clinical_liability"
+    elif clinical_count >= 1:
+        level = "clinical_liability"
+    elif preclinical_count >= 3:
+        level = "preclinical_liability"
+    elif preclinical_count >= 1:
+        level = "low_preclinical_signal"
+    else:
+        level = "no_known_liability"
+
+    return {
+        "safety_evidence_level": level,
+        "safety_liability_count": clinical_count + preclinical_count,
+        "safety_liability_sources": ";".join(sorted(sources)),
+    }
+
+
 def _min_pval_from_gene_snps(gene_snps: list[dict]) -> float:
     """Extract minimum p-value from gene_snps_in_disease entries."""
     min_pval = 1.0
     for snp in gene_snps:
+        if not isinstance(snp, dict):
+            continue
         for key in ("pvalue", "p_value", "p-value"):
             pval = snp.get(key)
             if pval is not None:
@@ -1046,7 +1220,16 @@ def _min_pval_from_gene_snps(gene_snps: list[dict]) -> float:
                     min_pval = min(min_pval, float(pval))
                 except (ValueError, TypeError):
                     pass
-        for nested in snp.get("associations", []):
+        associations = snp.get("associations", [])
+        if isinstance(associations, dict):
+            nested_associations = [associations]
+        elif isinstance(associations, list):
+            nested_associations = associations
+        else:
+            nested_associations = []
+        for nested in nested_associations:
+            if not isinstance(nested, dict):
+                continue
             for key in ("pvalue", "p_value"):
                 pval = nested.get(key)
                 if pval is not None:
@@ -1057,6 +1240,211 @@ def _min_pval_from_gene_snps(gene_snps: list[dict]) -> float:
     return min_pval
 
 
+def _min_pval_from_hits(hits: list[dict]) -> float:
+    """Extract minimum p-value from flat or nested GWAS hit entries."""
+    min_pval = 1.0
+    for hit in hits:
+        if not isinstance(hit, dict):
+            continue
+        for key in ("pvalue", "p_value", "p-value", "p"):
+            pval = hit.get(key)
+            if pval is not None:
+                try:
+                    min_pval = min(min_pval, float(pval))
+                except (ValueError, TypeError):
+                    pass
+        nested_hits = []
+        for nested_key in ("associations", "association", "traits"):
+            nested = hit.get(nested_key)
+            if isinstance(nested, list):
+                nested_hits.extend(n for n in nested if isinstance(n, dict))
+            elif isinstance(nested, dict):
+                nested_hits.append(nested)
+        if nested_hits:
+            min_pval = min(min_pval, _min_pval_from_hits(nested_hits))
+    return min_pval
+
+
+def _normalize_trait_text(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+
+
+def _trait_is_disease_specific(trait: Any, disease: Any) -> bool:
+    trait_text = _normalize_trait_text(trait)
+    disease_text = _normalize_trait_text(disease)
+    if not trait_text:
+        return False
+    if "pleiotropy" in trait_text or " or " in f" {trait_text} ":
+        return False
+    if disease_text and disease_text in trait_text:
+        return True
+    disease_terms = [term for term in disease_text.split() if len(term) >= 4]
+    return bool(disease_terms) and all(term in trait_text for term in disease_terms)
+
+
+def _hit_trait_values(hit: dict[str, Any]) -> list[Any]:
+    values: list[Any] = []
+    for key in (
+        "trait",
+        "disease",
+        "mapped_trait",
+        "mappedTrait",
+        "reported_trait",
+        "reportedTrait",
+        "efo_trait",
+        "efoTrait",
+    ):
+        value = hit.get(key)
+        if isinstance(value, list):
+            values.extend(value)
+        elif value:
+            values.append(value)
+    for nested_key in ("associations", "association", "traits"):
+        nested = hit.get(nested_key)
+        if isinstance(nested, list):
+            for item in nested:
+                if isinstance(item, dict):
+                    values.extend(_hit_trait_values(item))
+                elif item:
+                    values.append(item)
+        elif isinstance(nested, dict):
+            values.extend(_hit_trait_values(nested))
+    return values
+
+
+def _hit_has_local_pvalue(hit: dict[str, Any], threshold: float = 5e-8) -> bool:
+    for key in ("pvalue", "p_value", "p-value", "p"):
+        pval = hit.get(key)
+        if pval is None:
+            continue
+        try:
+            if float(pval) < threshold:
+                return True
+        except (ValueError, TypeError):
+            pass
+    return False
+
+
+def _hit_has_disease_specific_significant_trait(hit: dict[str, Any], disease: Any) -> bool:
+    has_local_trait = any(
+        _trait_is_disease_specific(trait, disease)
+        for trait in _hit_trait_values({k: v for k, v in hit.items() if k not in {"associations", "association", "traits"}})
+    )
+    if has_local_trait and _hit_has_local_pvalue(hit):
+        return True
+    for nested_key in ("associations", "association", "traits"):
+        nested = hit.get(nested_key)
+        if isinstance(nested, list):
+            if any(
+                isinstance(item, dict) and _hit_has_disease_specific_significant_trait(item, disease)
+                for item in nested
+            ):
+                return True
+        elif isinstance(nested, dict) and _hit_has_disease_specific_significant_trait(nested, disease):
+            return True
+    return False
+
+
+def _has_significant_disease_specific_proximity(dsh: dict[str, Any], disease: Any) -> bool:
+    hits = dsh.get("proximity_hits", [])
+    if not isinstance(hits, list):
+        return False
+    for hit in hits:
+        if not isinstance(hit, dict):
+            continue
+        if _hit_has_disease_specific_significant_trait(hit, disease):
+            return True
+    return False
+
+
+def _gwas_count(value: Any) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _gwas_min_pvalue(*values: float) -> float | None:
+    valid = [value for value in values if value < 1.0]
+    return min(valid) if valid else None
+
+
+def _hit_has_pleiotropic_trait(hit: dict[str, Any]) -> bool:
+    for trait in _hit_trait_values(hit):
+        trait_text = _normalize_trait_text(trait)
+        if "pleiotropy" in trait_text or " or " in f" {trait_text} ":
+            return True
+    return False
+
+
+def _summarize_gwas_support(gwas_data: dict | None) -> dict[str, Any]:
+    """Return non-scoring GWAS audit metadata."""
+    default = {
+        "gwas_evidence_type": "none",
+        "gwas_min_pvalue": None,
+        "gwas_trait_match_level": "none",
+        "gwas_direct_hit_count": 0,
+        "gwas_proximity_hit_count": 0,
+    }
+    if not gwas_data:
+        return default
+
+    dsh = gwas_data.get("disease_specific_hits", {})
+    if not isinstance(dsh, dict):
+        return default
+
+    n_gene_in_trait = _gwas_count(dsh.get("n_gene_in_trait", 0))
+    n_gene_snps = _gwas_count(dsh.get("n_gene_snps_in_disease", 0))
+    n_proximity = _gwas_count(dsh.get("n_proximity_hits", 0))
+    direct_count = n_gene_in_trait + n_gene_snps
+
+    gene_snps = dsh.get("gene_snps_in_disease", [])
+    if not isinstance(gene_snps, list):
+        gene_snps = []
+    proximity_hits = dsh.get("proximity_hits", [])
+    if not isinstance(proximity_hits, list):
+        proximity_hits = []
+
+    direct_min_pvalue = _min_pval_from_gene_snps(gene_snps) if n_gene_snps > 0 else 1.0
+    proximity_min_pvalue = _min_pval_from_hits(proximity_hits) if n_proximity > 0 else 1.0
+    min_pvalue = _gwas_min_pvalue(direct_min_pvalue, proximity_min_pvalue)
+    disease = gwas_data.get("disease") or gwas_data.get("disease_name") or dsh.get("disease")
+
+    summary = {
+        **default,
+        "gwas_min_pvalue": min_pvalue,
+        "gwas_direct_hit_count": direct_count,
+        "gwas_proximity_hit_count": n_proximity,
+    }
+
+    if n_gene_snps > 0 and direct_min_pvalue < 5e-8:
+        summary.update({
+            "gwas_evidence_type": "direct_significant_overlap",
+            "gwas_trait_match_level": "disease_specific",
+        })
+    elif direct_count > 0:
+        summary.update({
+            "gwas_evidence_type": "direct_disease_link",
+            "gwas_trait_match_level": "disease_specific",
+        })
+    elif n_proximity > 0 and _has_significant_disease_specific_proximity(dsh, disease):
+        summary.update({
+            "gwas_evidence_type": "disease_specific_proximity",
+            "gwas_trait_match_level": "disease_specific",
+        })
+    elif n_proximity > 0:
+        is_pleiotropic = any(
+            isinstance(hit, dict) and _hit_has_pleiotropic_trait(hit)
+            for hit in proximity_hits
+        )
+        summary.update({
+            "gwas_evidence_type": "pleiotropic_proximity" if is_pleiotropic else "proximity",
+            "gwas_trait_match_level": "pleiotropic" if is_pleiotropic else "unknown",
+        })
+
+    return summary
+
+
 def _score_gwas_support(gwas_data: dict | None) -> int:
     """Score gwas_support (0-3) from disease-specific GWAS hits only.
 
@@ -1064,8 +1452,9 @@ def _score_gwas_support(gwas_data: dict | None) -> int:
     signal.  gene_associations without disease overlap score 0.
 
     Score 3: gene_snps_in_disease with p < 5e-8 (genome-wide significant overlap)
-    Score 2: gene_in_trait OR gene_snps_in_disease (any p-value)
-    Score 1: proximity_hits only (±500kb)
+    Score 2: gene_in_trait OR gene_snps_in_disease (any p-value), or
+             disease-specific genome-wide significant proximity hit
+    Score 1: proximity_hits only (±500kb), including pleiotropic proximity
     Score 0: no disease-specific GWAS evidence
     """
     if not gwas_data:
@@ -1088,6 +1477,13 @@ def _score_gwas_support(gwas_data: dict | None) -> int:
 
     # Score 2: direct disease link
     if n_gene_in_trait > 0 or n_gene_snps > 0:
+        return 2
+
+    # Score 2: significant disease-specific proximity only
+    if n_proximity > 0 and _has_significant_disease_specific_proximity(
+        dsh,
+        gwas_data.get("disease") or gwas_data.get("disease_name") or dsh.get("disease"),
+    ):
         return 2
 
     # Score 1: proximity only
@@ -1132,19 +1528,319 @@ def _score_tractability(tractability: list[dict] | None) -> int:
     return best
 
 
+_TRACTABILITY_AUDIT_PRIORITY: tuple[tuple[str, str], ...] = (
+    ("approved drug", "approved_drug"),
+    ("advanced clinical", "clinical_precedent"),
+    ("phase 1 clinical", "clinical_precedent"),
+    ("structure with ligand", "ligand_or_structure"),
+    ("high-quality ligand", "ligand_or_structure"),
+    ("druggable family", "druggable_family"),
+)
+
+
+def _summarize_tractability(tractability: list[dict] | None) -> dict[str, Any]:
+    """Return non-scoring tractability audit metadata."""
+    if not tractability:
+        return {
+            "tractability_basis": "unknown",
+            "tractability_modalities": "",
+            "tractability_evidence_label": "none",
+        }
+
+    positive_entries: list[tuple[str, str]] = []
+    modalities: set[str] = set()
+    for entry in tractability:
+        if not isinstance(entry, dict):
+            continue
+        label = _tractability_bucket_label(entry)
+        value = entry.get("value", False)
+        if value is not True:
+            continue
+        modality = str(entry.get("modality") or "").upper().strip()
+        if modality:
+            modalities.add(modality)
+        positive_entries.append((label, modality))
+
+    if not positive_entries:
+        return {
+            "tractability_basis": "unknown",
+            "tractability_modalities": "",
+            "tractability_evidence_label": "none",
+        }
+
+    for label, basis in _TRACTABILITY_AUDIT_PRIORITY:
+        if any(entry_label == label for entry_label, _mod in positive_entries):
+            return {
+                "tractability_basis": basis,
+                "tractability_modalities": ";".join(sorted(modalities)),
+                "tractability_evidence_label": label,
+            }
+
+    return {
+        "tractability_basis": "other_signal",
+        "tractability_modalities": ";".join(sorted(modalities)),
+        "tractability_evidence_label": positive_entries[0][0] or "other",
+    }
+
+
+def _safe_nonnegative_int(value: Any, default: int = 0) -> int:
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return default
+    try:
+        return max(0, int(value or default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float_score(value: Any) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _biological_evidence_entries(disease_evidence: list | None) -> list[dict[str, Any]]:
+    if not isinstance(disease_evidence, list):
+        return []
+    return [
+        entry for entry in disease_evidence
+        if isinstance(entry, dict) and entry.get("datatypeId") in _BIO_PLAUSIBILITY_TYPES
+    ]
+
+
+def _vep_high_impact_count(vep_data: dict | None) -> int:
+    if not isinstance(vep_data, dict) or not vep_data.get("executed"):
+        return 0
+    impact_summary = vep_data.get("impact_summary", {})
+    if not isinstance(impact_summary, dict):
+        return 0
+    return _safe_nonnegative_int(impact_summary.get("high_impact", 0))
+
+
+def _stage1_pair_passed_for_biological_audit(evidence: dict[str, Any]) -> bool:
+    recorded = evidence.get("stage1_filter")
+    if isinstance(recorded, dict) and "passed" in recorded:
+        return recorded.get("passed") is True
+    try:
+        return _stage1_pair_passed(evidence)
+    except Exception as exc:
+        logger.warning("Skipping malformed Stage1 evidence in biological audit: %s", exc)
+        return False
+
+
+def _stage1_bio_support_pairs_for_gene(
+    gene: str,
+    stage1_evidence: dict[str, Any] | None,
+) -> list[str]:
+    gene_upper = str(gene or "").upper()
+    if not gene_upper or not isinstance(stage1_evidence, dict):
+        return []
+    pairs: set[str] = set()
+    for pair_key, evidence in stage1_evidence.items():
+        if not isinstance(evidence, dict):
+            continue
+        pair_genes = _stage1_pair_genes(str(pair_key), evidence)
+        if pair_genes is None or gene_upper not in pair_genes:
+            continue
+        if _stage1_pair_passed_for_biological_audit(evidence):
+            pairs.add(f"{pair_genes[0]}^{pair_genes[1]}")
+    return sorted(pairs)
+
+
+def _stage1_audit_defaults() -> dict[str, Any]:
+    return {
+        "stage1_gate_status": "not_evaluated",
+        "stage1_total_pair_count": 0,
+        "stage1_passed_pair_count": 0,
+        "stage1_failed_pair_count": 0,
+        "stage1_best_pair": "",
+        "stage1_best_string_combined": None,
+        "stage1_best_coexpr_pvalue": None,
+        "stage1_best_gene_a_pvalue": None,
+        "stage1_best_gene_b_pvalue": None,
+        "stage1_source": "none",
+    }
+
+
+def _stage1_audit_metadata_from_row(row: dict[str, Any]) -> dict[str, Any]:
+    defaults = _stage1_audit_defaults()
+    return {key: row.get(key, default) for key, default in defaults.items()}
+
+
+def _target_assessment_audit_metadata_from_rubric(rubric: dict[str, Any]) -> dict[str, Any]:
+    """Copy gene-level audit metadata onto pair-level target-assessment rows."""
+    return {
+        "gwas_evidence_type": rubric.get("gwas_evidence_type", "none"),
+        "gwas_min_pvalue": rubric.get("gwas_min_pvalue"),
+        "gwas_trait_match_level": rubric.get("gwas_trait_match_level", "none"),
+        "gwas_direct_hit_count": rubric.get("gwas_direct_hit_count", 0),
+        "gwas_proximity_hit_count": rubric.get("gwas_proximity_hit_count", 0),
+        "tractability_basis": rubric.get("tractability_basis", "unknown"),
+        "tractability_modalities": rubric.get("tractability_modalities", ""),
+        "tractability_evidence_label": rubric.get("tractability_evidence_label", "none"),
+        "safety_evidence_level": rubric.get("safety_evidence_level", "no_known_liability"),
+        "safety_liability_count": rubric.get("safety_liability_count", 0),
+        "safety_liability_sources": rubric.get("safety_liability_sources", ""),
+        "biological_plausibility_base": rubric.get("biological_plausibility_base", 0),
+        "stage1_biological_support_bonus": rubric.get("stage1_biological_support_bonus", 0),
+        "biological_basis": rubric.get("biological_basis", "none"),
+        "biological_evidence_types": rubric.get("biological_evidence_types", ""),
+        "biological_evidence_count": rubric.get("biological_evidence_count", 0),
+        "biological_max_ot_score": rubric.get("biological_max_ot_score"),
+        "vep_high_impact_count": rubric.get("vep_high_impact_count", 0),
+        "stage1_support_pair_count": rubric.get("stage1_support_pair_count", 0),
+        "stage1_support_pairs": rubric.get("stage1_support_pairs", ""),
+        **_stage1_audit_metadata_from_row(rubric),
+        "novelty_basis": rubric.get("novelty_basis", "st_only_or_brand_new_target"),
+        "novelty_association_count": rubric.get("novelty_association_count", 0),
+        "novelty_target_drug_count": rubric.get("novelty_target_drug_count", 0),
+        "novelty_bucket": rubric.get("novelty_bucket", "0-9 associations"),
+        "novelty_source": rubric.get("novelty_source", "list_length"),
+    }
+
+
+def _stage1_filter_for_audit(evidence: dict[str, Any]) -> dict[str, Any]:
+    try:
+        computed = compute_stage1_filter(evidence)
+    except Exception as exc:
+        logger.warning("Using failed Stage1 audit defaults for malformed evidence: %s", exc)
+        return {
+            "passed": False,
+            "string_combined": 0.0,
+            "string_status": "malformed",
+            "census_coexpr_pvalue": 1.0,
+            "census_gene_a_pvalue": 1.0,
+            "census_gene_b_pvalue": 1.0,
+        }
+
+    recorded = evidence.get("stage1_filter")
+    if isinstance(recorded, dict) and type(recorded.get("passed")) is bool:
+        computed["passed"] = recorded["passed"]
+    return computed
+
+
+def _summarize_stage1_gate(
+    gene: str,
+    stage1_evidence: dict[str, Any] | None,
+) -> dict[str, Any]:
+    gene_upper = str(gene or "").upper()
+    if not gene_upper or not isinstance(stage1_evidence, dict):
+        return _stage1_audit_defaults()
+
+    rows: list[dict[str, Any]] = []
+    for pair_key, evidence in stage1_evidence.items():
+        if not isinstance(evidence, dict):
+            continue
+        pair_genes = _stage1_pair_genes(str(pair_key), evidence)
+        if pair_genes is None or gene_upper not in pair_genes:
+            continue
+
+        filt = _stage1_filter_for_audit(evidence)
+        if not filt:
+            continue
+        rows.append({
+            "pair": f"{pair_genes[0]}^{pair_genes[1]}",
+            "passed": filt.get("passed") is True,
+            "string_combined": _safe_float_score(filt.get("string_combined")),
+            "coexpr_pvalue": _safe_float_score(filt.get("census_coexpr_pvalue")),
+            "gene_a_pvalue": _safe_float_score(filt.get("census_gene_a_pvalue")),
+            "gene_b_pvalue": _safe_float_score(filt.get("census_gene_b_pvalue")),
+        })
+
+    if not rows:
+        return _stage1_audit_defaults()
+
+    rows.sort(
+        key=lambda row: (
+            not row["passed"],
+            -row["string_combined"],
+            row["coexpr_pvalue"],
+            str(row["pair"]),
+        )
+    )
+    best = rows[0]
+    passed_count = sum(1 for row in rows if row["passed"])
+    total_count = len(rows)
+    return {
+        "stage1_gate_status": "pass" if passed_count else "fail",
+        "stage1_total_pair_count": total_count,
+        "stage1_passed_pair_count": passed_count,
+        "stage1_failed_pair_count": total_count - passed_count,
+        "stage1_best_pair": best["pair"],
+        "stage1_best_string_combined": best["string_combined"],
+        "stage1_best_coexpr_pvalue": best["coexpr_pvalue"],
+        "stage1_best_gene_a_pvalue": best["gene_a_pvalue"],
+        "stage1_best_gene_b_pvalue": best["gene_b_pvalue"],
+        "stage1_source": "stage1_evidence.json",
+    }
+
+
+def _biological_basis(
+    biological_evidence_count: int,
+    vep_high_impact_count: int,
+    stage1_pair_count: int,
+) -> str:
+    sources: list[str] = []
+    if biological_evidence_count > 0:
+        sources.append("ot_evidence")
+    if vep_high_impact_count > 0:
+        sources.append("vep_high_impact")
+    if stage1_pair_count > 0:
+        sources.append("stage1_pair")
+    return "_plus_".join(sources) if sources else "none"
+
+
+def _summarize_biological_plausibility(
+    disease_evidence: list | None,
+    vep_data: dict | None,
+    gene: str,
+    stage1_evidence: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Return non-scoring biological plausibility audit metadata."""
+    entries = _biological_evidence_entries(disease_evidence)
+    evidence_types = sorted({
+        str(entry.get("datatypeId"))
+        for entry in entries
+        if entry.get("datatypeId")
+    })
+    max_score = max(
+        (_safe_float_score(entry.get("score")) for entry in entries),
+        default=None,
+    )
+    high_impact_count = _vep_high_impact_count(vep_data)
+    stage1_pairs = _stage1_bio_support_pairs_for_gene(gene, stage1_evidence)
+
+    return {
+        "biological_basis": _biological_basis(
+            len(entries),
+            high_impact_count,
+            len(stage1_pairs),
+        ),
+        "biological_evidence_types": ";".join(evidence_types),
+        "biological_evidence_count": len(entries),
+        "biological_max_ot_score": max_score,
+        "vep_high_impact_count": high_impact_count,
+        "stage1_support_pair_count": len(stage1_pairs),
+        "stage1_support_pairs": ";".join(stage1_pairs),
+    }
+
+
 def _score_biological_plausibility(
-    disease_evidence: list[dict], vep_data: dict | None = None,
+    disease_evidence: list[dict],
+    vep_data: dict | None = None,
+    stage1_support_bonus: int = 0,
 ) -> int:
     """Score biological_plausibility (0-5) via breadth-weighted evidence.
 
     Filters disease_evidence to datatypeIds NOT already scored by other
-    criteria (excludes known_drug, genetic_association).  Rewards breadth
-    (distinct qualifying types present) plus a bonus for high-confidence
-    evidence.
+    criteria (excludes known_drug, genetic_association). Rewards evidence
+    breadth, high-confidence OpenTargets evidence, VEP high-impact variants,
+    and one bounded Stage1/Census biological support bonus.
 
-    Score = min(5, n_types + max_score_bonus)
+    Score = min(5, n_types + max_score_bonus + stage1_support_bonus)
       - n_types:         count of distinct qualifying datatypeId present (0-4)
       - max_score_bonus: +1 if max(filtered scores) >= 0.7
+      - stage1_support_bonus: +1 when the gene appears in a Stage1-passed L-R pair
 
     VEP boost: high_impact variants -> +1, capped at 5.
     """
@@ -1163,6 +1859,8 @@ def _score_biological_plausibility(
     if vep_data and vep_data.get("executed"):
         if vep_data.get("impact_summary", {}).get("high_impact", 0) > 0:
             score = min(score + 1, 5)
+    if stage1_support_bonus > 0:
+        score = min(score + 1, 5)
     return score
 
 
@@ -1206,6 +1904,77 @@ def _score_novelty_opportunity(associations: list[dict],
     if associations_total_count is None and associations_truncated and score > 1:
         score = 1
     return score
+
+
+_NOVELTY_BASIS_BY_SCORE = {
+    0: "well_studied_target",
+    1: "moderately_studied_target",
+    2: "emerging_target",
+    3: "less_explored_target",
+    4: "sparsely_explored_target",
+    5: "st_only_or_brand_new_target",
+}
+
+
+def _novelty_bucket_for_count(count: int) -> dict[str, Any]:
+    for bucket in NOVELTY_OPPORTUNITY_BUCKETS:
+        if count >= int(bucket["min_count"]):
+            return bucket
+    return NOVELTY_OPPORTUNITY_BUCKETS[-1]
+
+
+def _target_drug_count_for_novelty_audit(target_drugs: Any) -> int:
+    if not isinstance(target_drugs, dict):
+        return 0
+    count = _safe_nonnegative_int(target_drugs.get("count"), default=-1)
+    if count >= 0:
+        return count
+    rows = target_drugs.get("rows")
+    return len(rows) if isinstance(rows, list) else 0
+
+
+def _summarize_novelty_opportunity(
+    associations: list[dict] | None,
+    associations_truncated: bool = False,
+    associations_total_count: Any = None,
+    associations_total_source: Any = None,
+    target_drugs: Any = None,
+) -> dict[str, Any]:
+    """Summarize audit-only metadata behind novelty_opportunity scoring."""
+    observed_count = len(associations) if isinstance(associations, list) else 0
+    authoritative_count = _safe_nonnegative_int(
+        associations_total_count,
+        default=-1,
+    )
+
+    if authoritative_count >= 0:
+        count = authoritative_count
+        source = str(associations_total_source or "associations_total_count").strip()
+        source = source or "associations_total_count"
+        bucket = _novelty_bucket_for_count(count)
+        score = int(bucket["score"])
+        basis = _NOVELTY_BASIS_BY_SCORE[score]
+        bucket_label = str(bucket["label"])
+    elif associations_truncated:
+        count = observed_count
+        source = "truncated_list_length"
+        basis = "total_unknown_truncated"
+        bucket_label = "truncated_total_unknown"
+    else:
+        count = observed_count
+        source = "list_length"
+        bucket = _novelty_bucket_for_count(count)
+        score = int(bucket["score"])
+        basis = _NOVELTY_BASIS_BY_SCORE[score]
+        bucket_label = str(bucket["label"])
+
+    return {
+        "novelty_basis": basis,
+        "novelty_association_count": count,
+        "novelty_target_drug_count": _target_drug_count_for_novelty_audit(target_drugs),
+        "novelty_bucket": bucket_label,
+        "novelty_source": source,
+    }
 
 
 def _ot_safety_summary(evidence_dir: Path, gene: str) -> str | None:
@@ -1318,6 +2087,11 @@ def compute_rubric_scores(data_dir: str) -> str:
     if s2_path.exists():
         stage2 = json.loads(s2_path.read_text())
 
+    stage1_path = evidence_dir / "stage1_evidence.json"
+    stage1_evidence: dict[str, Any] = {}
+    if stage1_path.exists():
+        stage1_evidence = json.loads(stage1_path.read_text(encoding="utf-8"))
+
     # Find all ot_*.json files
     ot_files = sorted(glob.glob(str(evidence_dir / "ot_*.json")))
     if not ot_files:
@@ -1356,17 +2130,49 @@ def compute_rubric_scores(data_dir: str) -> str:
         clinical_trial = _score_clinical_trial_activity(disease_evidence, target_drugs)
         safety = _score_safety_profile(safety_data)
         gwas = _score_gwas_support(gwas_data)
+        gwas_summary = _summarize_gwas_support(gwas_data)
         tract = _score_tractability(tractability_data)
-        bio_plaus = _score_biological_plausibility(disease_evidence, vep_data)
+        tractability_summary = _summarize_tractability(tractability_data)
+        safety_summary = _summarize_safety(safety_data)
+        bio_plaus_base = _score_biological_plausibility(disease_evidence, vep_data)
+        stage1_bio_bonus = _stage1_bio_bonus_for_gene(gene, stage1_evidence)
+        biological_summary = _summarize_biological_plausibility(
+            disease_evidence,
+            vep_data,
+            gene,
+            stage1_evidence,
+        )
+        stage1_summary = _summarize_stage1_gate(gene, stage1_evidence)
+        bio_plaus = _score_biological_plausibility(
+            disease_evidence,
+            vep_data,
+            stage1_support_bonus=stage1_bio_bonus,
+        )
         novelty = _score_novelty_opportunity(
             associations,
             ot.get("associations_truncated", False),
             ot.get("associations_total_count"),
         )
+        novelty_summary = _summarize_novelty_opportunity(
+            associations,
+            ot.get("associations_truncated", False),
+            ot.get("associations_total_count"),
+            ot.get("associations_total_source"),
+            target_drugs,
+        )
 
         validated_total = existing_drug + clinical_trial + safety
         exploratory_total = gwas + tract + bio_plaus + novelty
         combined_total = validated_total + exploratory_total
+        rank_scores = compute_combined_rank_scores(
+            validated_total,
+            {
+                "gwas_genetic_support": gwas,
+                "tractability": tract,
+                "biological_plausibility": bio_plaus,
+                "novelty_opportunity": novelty,
+            },
+        )
 
         assessment_for_classify = {
             "validated_track": {
@@ -1398,13 +2204,22 @@ def compute_rubric_scores(data_dir: str) -> str:
             "existing_drug_evidence": existing_drug,
             "clinical_trial_activity": clinical_trial,
             "safety_profile": safety,
+            **safety_summary,
             "validated_total": validated_total,
             "gwas_support": gwas,
+            **gwas_summary,
             "tractability": tract,
+            **tractability_summary,
+            "biological_plausibility_base": bio_plaus_base,
+            "stage1_biological_support_bonus": stage1_bio_bonus,
+            **biological_summary,
+            **stage1_summary,
             "biological_plausibility": bio_plaus,
             "novelty_opportunity": novelty,
+            **novelty_summary,
             "exploratory_total": exploratory_total,
             "combined_total": combined_total,
+            **rank_scores,
             "classification": classification,
             "priority": priority,
             "ot_disease_evidence_count": len(disease_evidence),
@@ -1412,10 +2227,12 @@ def compute_rubric_scores(data_dir: str) -> str:
         }
         results.append(row)
 
-    # Sort by combined_total descending, tiebreak: exploratory_total → bio_plausibility → tractability
+    # Sort by normalized rank score; keep raw combined_total for Stage 3 thresholding.
     results.sort(
         key=lambda r: (
+            r["combined_rank_score"],
             r["combined_total"],
+            r["exploratory_rank_total"],
             r["exploratory_total"],
             r["biological_plausibility"],
             r["tractability"],
@@ -1440,9 +2257,12 @@ def compute_rubric_scores(data_dir: str) -> str:
         "disease": stage2.get("_disease", "unknown") if isinstance(stage2, dict) else "unknown",
         "disease_context": stage2.get("_disease_context", {}) if isinstance(stage2, dict) else {},
         "rubric_assessment": results,
+        "all_genes_matrix": results,
         "stage3_candidates": [
             {"gene": r["gene"], "exploratory_total": r["exploratory_total"],
              "combined_total": r["combined_total"],
+             "exploratory_rank_total": r["exploratory_rank_total"],
+             "combined_rank_score": r["combined_rank_score"],
              "priority": r["priority"], "classification": r["classification"]}
             for r in results if r["stage3_candidate"]
         ],
@@ -1463,9 +2283,30 @@ def compute_rubric_scores(data_dir: str) -> str:
     # SYNC: keep in sync with apply_stage1_filter() rubric_fieldnames
     fieldnames = [
         "gene", "existing_drug_evidence", "clinical_trial_activity",
-        "safety_profile", "validated_total",
-        "gwas_support", "tractability", "biological_plausibility",
-        "novelty_opportunity", "exploratory_total", "combined_total",
+        "safety_profile", "safety_evidence_level", "safety_liability_count",
+        "safety_liability_sources", "validated_total",
+        "gwas_support", "gwas_evidence_type", "gwas_min_pvalue",
+        "gwas_trait_match_level", "gwas_direct_hit_count",
+        "gwas_proximity_hit_count", "tractability",
+        "tractability_basis", "tractability_modalities",
+        "tractability_evidence_label",
+        "biological_plausibility_base", "stage1_biological_support_bonus",
+        "biological_basis", "biological_evidence_types",
+        "biological_evidence_count", "biological_max_ot_score",
+        "vep_high_impact_count", "stage1_support_pair_count",
+        "stage1_support_pairs",
+        "stage1_gate_status", "stage1_total_pair_count",
+        "stage1_passed_pair_count", "stage1_failed_pair_count",
+        "stage1_best_pair", "stage1_best_string_combined",
+        "stage1_best_coexpr_pvalue", "stage1_best_gene_a_pvalue",
+        "stage1_best_gene_b_pvalue", "stage1_source",
+        "biological_plausibility",
+        "novelty_opportunity", "novelty_basis", "novelty_association_count",
+        "novelty_target_drug_count", "novelty_bucket",
+        "novelty_source", "exploratory_total", "combined_total",
+        "gwas_rank_points", "tractability_rank_points",
+        "biological_plausibility_rank_points", "novelty_opportunity_rank_points",
+        "exploratory_rank_total", "combined_rank_score",
         "classification", "priority", "stage3_candidate",
     ]
     with open(csv_path, "w", newline="") as f:
@@ -1480,7 +2321,12 @@ def compute_rubric_scores(data_dir: str) -> str:
         "csv_path": str(csv_path),
         "assessment_path": str(evidence_dir / "assessment_results.json"),
         "stage3_candidates": [
-            {"gene": r["gene"], "exploratory": r["exploratory_total"], "combined": r["combined_total"]}
+            {
+                "gene": r["gene"],
+                "exploratory": r["exploratory_total"],
+                "combined": r["combined_total"],
+                "combined_rank_score": r["combined_rank_score"],
+            }
             for r in results if r["stage3_candidate"]
         ],
     }, indent=2)
@@ -1862,6 +2708,7 @@ def _prebuild_target_assessment(
             "tractability": rubric.get("tractability", 0),
             "biological_plausibility": rubric.get("biological_plausibility", 0),
             "novelty_opportunity": rubric.get("novelty_opportunity", 0),
+            **_target_assessment_audit_metadata_from_rubric(rubric),
         })
 
     # C. Rank candidates and inject OpenTargets scores
@@ -2116,13 +2963,45 @@ def build_evidence_summary(data_dir: str) -> str:
             "validated_total": row.get("validated_total", 0),
             "exploratory_total": row.get("exploratory_total", 0),
             "combined_total": row.get("combined_total", 0),
+            "gwas_rank_points": row.get("gwas_rank_points", 0),
+            "tractability_rank_points": row.get("tractability_rank_points", 0),
+            "biological_plausibility_rank_points": row.get("biological_plausibility_rank_points", 0),
+            "novelty_opportunity_rank_points": row.get("novelty_opportunity_rank_points", 0),
+            "exploratory_rank_total": row.get("exploratory_rank_total", row.get("exploratory_total", 0)),
+            "combined_rank_score": row.get("combined_rank_score", row.get("combined_total", 0)),
             "existing_drug_evidence": row.get("existing_drug_evidence", 0),
             "clinical_trial_activity": row.get("clinical_trial_activity", 0),
             "safety_profile": row.get("safety_profile", 0),
+            "safety_evidence_level": row.get("safety_evidence_level", "no_known_liability"),
+            "safety_liability_count": row.get("safety_liability_count", 0),
+            "safety_liability_sources": row.get("safety_liability_sources", ""),
             "gwas_support": row.get("gwas_support", 0),
+            "gwas_evidence_type": row.get("gwas_evidence_type", "none"),
+            "gwas_min_pvalue": row.get("gwas_min_pvalue"),
+            "gwas_trait_match_level": row.get("gwas_trait_match_level", "none"),
+            "gwas_direct_hit_count": row.get("gwas_direct_hit_count", 0),
+            "gwas_proximity_hit_count": row.get("gwas_proximity_hit_count", 0),
             "tractability": row.get("tractability", 0),
+            "tractability_basis": row.get("tractability_basis", "unknown"),
+            "tractability_modalities": row.get("tractability_modalities", ""),
+            "tractability_evidence_label": row.get("tractability_evidence_label", "none"),
+            "biological_plausibility_base": row.get("biological_plausibility_base", 0),
+            "stage1_biological_support_bonus": row.get("stage1_biological_support_bonus", 0),
+            "biological_basis": row.get("biological_basis", "none"),
+            "biological_evidence_types": row.get("biological_evidence_types", ""),
+            "biological_evidence_count": row.get("biological_evidence_count", 0),
+            "biological_max_ot_score": row.get("biological_max_ot_score"),
+            "vep_high_impact_count": row.get("vep_high_impact_count", 0),
+            "stage1_support_pair_count": row.get("stage1_support_pair_count", 0),
+            "stage1_support_pairs": row.get("stage1_support_pairs", ""),
+            **_stage1_audit_metadata_from_row(row),
             "biological_plausibility": row.get("biological_plausibility", 0),
             "novelty_opportunity": row.get("novelty_opportunity", 0),
+            "novelty_basis": row.get("novelty_basis", "st_only_or_brand_new_target"),
+            "novelty_association_count": row.get("novelty_association_count", 0),
+            "novelty_target_drug_count": row.get("novelty_target_drug_count", 0),
+            "novelty_bucket": row.get("novelty_bucket", "0-9 associations"),
+            "novelty_source": row.get("novelty_source", "list_length"),
             "stage3_candidate": row.get("stage3_candidate", False),
         }
 
@@ -2322,13 +3201,45 @@ def build_evidence_summary(data_dir: str) -> str:
             "existing_drug_evidence": row.get("existing_drug_evidence", 0),
             "clinical_trial_activity": row.get("clinical_trial_activity", 0),
             "safety_profile": row.get("safety_profile", 0),
+            "safety_evidence_level": row.get("safety_evidence_level", "no_known_liability"),
+            "safety_liability_count": row.get("safety_liability_count", 0),
+            "safety_liability_sources": row.get("safety_liability_sources", ""),
             "validated_total": row.get("validated_total", 0),
             "gwas_support": row.get("gwas_support", 0),
+            "gwas_evidence_type": row.get("gwas_evidence_type", "none"),
+            "gwas_min_pvalue": row.get("gwas_min_pvalue"),
+            "gwas_trait_match_level": row.get("gwas_trait_match_level", "none"),
+            "gwas_direct_hit_count": row.get("gwas_direct_hit_count", 0),
+            "gwas_proximity_hit_count": row.get("gwas_proximity_hit_count", 0),
             "tractability": row.get("tractability", 0),
+            "tractability_basis": row.get("tractability_basis", "unknown"),
+            "tractability_modalities": row.get("tractability_modalities", ""),
+            "tractability_evidence_label": row.get("tractability_evidence_label", "none"),
+            "biological_plausibility_base": row.get("biological_plausibility_base", 0),
+            "stage1_biological_support_bonus": row.get("stage1_biological_support_bonus", 0),
+            "biological_basis": row.get("biological_basis", "none"),
+            "biological_evidence_types": row.get("biological_evidence_types", ""),
+            "biological_evidence_count": row.get("biological_evidence_count", 0),
+            "biological_max_ot_score": row.get("biological_max_ot_score"),
+            "vep_high_impact_count": row.get("vep_high_impact_count", 0),
+            "stage1_support_pair_count": row.get("stage1_support_pair_count", 0),
+            "stage1_support_pairs": row.get("stage1_support_pairs", ""),
+            **_stage1_audit_metadata_from_row(row),
             "biological_plausibility": row.get("biological_plausibility", 0),
             "novelty_opportunity": row.get("novelty_opportunity", 0),
+            "novelty_basis": row.get("novelty_basis", "st_only_or_brand_new_target"),
+            "novelty_association_count": row.get("novelty_association_count", 0),
+            "novelty_target_drug_count": row.get("novelty_target_drug_count", 0),
+            "novelty_bucket": row.get("novelty_bucket", "0-9 associations"),
+            "novelty_source": row.get("novelty_source", "list_length"),
             "exploratory_total": row.get("exploratory_total", 0),
             "combined_total": row.get("combined_total", 0),
+            "gwas_rank_points": row.get("gwas_rank_points", 0),
+            "tractability_rank_points": row.get("tractability_rank_points", 0),
+            "biological_plausibility_rank_points": row.get("biological_plausibility_rank_points", 0),
+            "novelty_opportunity_rank_points": row.get("novelty_opportunity_rank_points", 0),
+            "exploratory_rank_total": row.get("exploratory_rank_total", row.get("exploratory_total", 0)),
+            "combined_rank_score": row.get("combined_rank_score", row.get("combined_total", 0)),
             "classification": row.get("classification", "unknown"),
             "priority": row.get("priority", "unranked"),
             "stage3_candidate": row.get("stage3_candidate", False),
