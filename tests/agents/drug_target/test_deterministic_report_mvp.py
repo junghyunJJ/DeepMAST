@@ -224,6 +224,221 @@ def test_report_mvp_keeps_section_sources_deterministic(tmp_path: Path) -> None:
         assert "evidence/assessment_results.json" in candidate["sources"]
 
 
+def test_report_mvp_defaults_absent_gwas_audit_fields(tmp_path: Path) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(
+        str(workspace),
+        "idiopathic pulmonary fibrosis",
+    )
+
+    candidate = report_data["candidates"][0]
+    assert candidate["scores"]["gwas_evidence_type"] == "none"
+    assert candidate["scores"]["gwas_min_pvalue"] is None
+    assert candidate["scores"]["gwas_trait_match_level"] == "none"
+    assert candidate["scores"]["gwas_direct_hit_count"] == 0
+    assert candidate["scores"]["gwas_proximity_hit_count"] == 0
+
+
+def test_report_mvp_defaults_absent_biological_audit_fields(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(
+        str(workspace),
+        "idiopathic pulmonary fibrosis",
+    )
+
+    candidate = report_data["candidates"][0]
+    assert candidate["scores"]["biological_basis"] == "none"
+    assert candidate["scores"]["biological_evidence_types"] == ""
+    assert candidate["scores"]["biological_evidence_count"] == 0
+    assert candidate["scores"]["biological_max_ot_score"] is None
+    assert candidate["scores"]["vep_high_impact_count"] == 0
+    assert candidate["scores"]["stage1_support_pair_count"] == 0
+    assert candidate["scores"]["stage1_support_pairs"] == ""
+
+
+def test_report_mvp_defaults_absent_stage1_audit_fields(tmp_path: Path) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(
+        str(workspace),
+        "idiopathic pulmonary fibrosis",
+    )
+
+    candidate = report_data["candidates"][0]
+    assert candidate["scores"]["stage1_gate_status"] == "not_evaluated"
+    assert candidate["scores"]["stage1_total_pair_count"] == 0
+    assert candidate["scores"]["stage1_passed_pair_count"] == 0
+    assert candidate["scores"]["stage1_failed_pair_count"] == 0
+    assert candidate["scores"]["stage1_best_pair"] == ""
+    assert candidate["scores"]["stage1_best_string_combined"] is None
+    assert candidate["scores"]["stage1_best_coexpr_pvalue"] is None
+    assert candidate["scores"]["stage1_best_gene_a_pvalue"] is None
+    assert candidate["scores"]["stage1_best_gene_b_pvalue"] is None
+    assert candidate["scores"]["stage1_source"] == "none"
+
+
+def test_report_mvp_defaults_absent_tractability_safety_audit_fields(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+
+    workspace = _copy_baseline_workspace(tmp_path)
+    report_data = build_report_data(
+        str(workspace),
+        "idiopathic pulmonary fibrosis",
+    )
+
+    candidate = report_data["candidates"][0]
+    assert candidate["scores"]["tractability_basis"] == "unknown"
+    assert candidate["scores"]["tractability_modalities"] == ""
+    assert candidate["scores"]["tractability_evidence_label"] == "none"
+    assert candidate["scores"]["safety_evidence_level"] == "no_known_liability"
+    assert candidate["scores"]["safety_liability_count"] == 0
+    assert candidate["scores"]["safety_liability_sources"] == ""
+
+
+def test_report_mvp_defaults_absent_novelty_audit_fields(tmp_path: Path) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps(
+            {
+                "rubric_assessment": [
+                    {
+                        "gene": "CD4",
+                        "novelty_opportunity": 5,
+                        "classification": "novel_candidate",
+                        "priority": "medium",
+                        "stage3_candidate": True,
+                    }
+                ],
+                "stage3_candidates": [{"gene": "CD4"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (evidence_dir / "hypothesis_report.json").write_text(
+        json.dumps({"hypotheses": []}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "ot_CD4.json").write_text(
+        json.dumps({"gene_symbol": "CD4", "executed": True}),
+        encoding="utf-8",
+    )
+
+    report = build_report_data(str(tmp_path), disease="test disease")
+    candidate = report["candidates"][0]
+    assert candidate["scores"]["novelty_basis"] == "st_only_or_brand_new_target"
+    assert candidate["scores"]["novelty_association_count"] == 0
+    assert candidate["scores"]["novelty_target_drug_count"] == 0
+    assert candidate["scores"]["novelty_bucket"] == "0-9 associations"
+    assert candidate["scores"]["novelty_source"] == "list_length"
+
+
+def test_target_assessment_inputs_defaults_absent_gwas_audit_fields() -> None:
+    from src.agents.drug_target.deterministic_report import _target_assessment_inputs
+
+    rubric_by_gene, _, _ = _target_assessment_inputs(
+        {
+            "candidates": [
+                {
+                    "gene": "CD4",
+                    "scores": {
+                        "gwas_support": 0,
+                    },
+                }
+            ]
+        }
+    )
+
+    cd4 = rubric_by_gene["CD4"]
+    assert cd4["gwas_evidence_type"] == "none"
+    assert cd4["gwas_min_pvalue"] is None
+    assert cd4["gwas_trait_match_level"] == "none"
+    assert cd4["gwas_direct_hit_count"] == 0
+    assert cd4["gwas_proximity_hit_count"] == 0
+
+
+def test_target_assessment_inputs_defaults_absent_biological_audit_fields() -> None:
+    from src.agents.drug_target.deterministic_report import _target_assessment_inputs
+
+    rubric_by_gene, _, _ = _target_assessment_inputs(
+        {
+            "candidates": [
+                {
+                    "gene": "CD4",
+                    "scores": {
+                        "biological_plausibility": 0,
+                    },
+                }
+            ]
+        }
+    )
+
+    cd4 = rubric_by_gene["CD4"]
+    assert cd4["biological_basis"] == "none"
+    assert cd4["biological_evidence_types"] == ""
+    assert cd4["biological_evidence_count"] == 0
+    assert cd4["biological_max_ot_score"] is None
+    assert cd4["vep_high_impact_count"] == 0
+    assert cd4["stage1_support_pair_count"] == 0
+    assert cd4["stage1_support_pairs"] == ""
+
+
+def test_target_assessment_inputs_defaults_absent_stage1_audit_fields() -> None:
+    from src.agents.drug_target.deterministic_report import _target_assessment_inputs
+
+    rubric_by_gene, _, _ = _target_assessment_inputs(
+        {
+            "candidates": [
+                {
+                    "gene": "CD4",
+                    "scores": {
+                        "biological_plausibility": 0,
+                    },
+                }
+            ]
+        }
+    )
+
+    cd4 = rubric_by_gene["CD4"]
+    assert cd4["stage1_gate_status"] == "not_evaluated"
+    assert cd4["stage1_total_pair_count"] == 0
+    assert cd4["stage1_passed_pair_count"] == 0
+    assert cd4["stage1_failed_pair_count"] == 0
+    assert cd4["stage1_best_pair"] == ""
+    assert cd4["stage1_best_string_combined"] is None
+    assert cd4["stage1_best_coexpr_pvalue"] is None
+    assert cd4["stage1_best_gene_a_pvalue"] is None
+    assert cd4["stage1_best_gene_b_pvalue"] is None
+    assert cd4["stage1_source"] == "none"
+
+
+def test_target_assessment_inputs_defaults_absent_tractability_safety_audit_fields() -> None:
+    from src.agents.drug_target.deterministic_report import _target_assessment_inputs
+
+    rubric_by_gene, _, _ = _target_assessment_inputs(
+        {"candidates": [{"gene": "CD4", "scores": {}}]}
+    )
+
+    cd4 = rubric_by_gene["CD4"]
+    assert cd4["tractability_basis"] == "unknown"
+    assert cd4["tractability_modalities"] == ""
+    assert cd4["tractability_evidence_label"] == "none"
+    assert cd4["safety_evidence_level"] == "no_known_liability"
+    assert cd4["safety_liability_count"] == 0
+    assert cd4["safety_liability_sources"] == ""
+
+
 def test_report_mvp_markdown_has_required_sections(tmp_path: Path) -> None:
     from src.agents.drug_target.deterministic_report import (
         build_report_data,

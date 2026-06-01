@@ -91,6 +91,74 @@
     <strong>Combined Total: <span class="{{ rubric.combined_total|score_class('combined_total') }}" style="font-size: 1.3em;">{{ rubric.combined_total }}</span></strong>
 </div>
 {% endif %}
+{% if rubric.get('gwas_evidence_type') or rubric.get('gwas_trait_match_level') %}
+<div class="summary-box" style="margin-top: 12px;">
+    <h4>GWAS Audit</h4>
+    <table>
+        <tr><td>evidence_type</td><td><strong>{{ rubric.get('gwas_evidence_type', 'none') }}</strong></td></tr>
+        <tr><td>min_pvalue</td><td>{% if rubric.get('gwas_min_pvalue') is not none %}{{ rubric.get('gwas_min_pvalue') }}{% endif %}</td></tr>
+        <tr><td>trait_match</td><td>{{ rubric.get('gwas_trait_match_level', 'none') }}</td></tr>
+        <tr><td>direct_hits</td><td>{{ rubric.get('gwas_direct_hit_count', 0) }}</td></tr>
+        <tr><td>proximity_hits</td><td>{{ rubric.get('gwas_proximity_hit_count', 0) }}</td></tr>
+    </table>
+</div>
+{% endif %}
+{% if rubric.get('biological_basis') is not none %}
+<div class="summary-box" style="margin-top: 12px;">
+    <h4>Biological Audit</h4>
+    <table>
+        <tr><td>basis</td><td><strong>{{ rubric.get('biological_basis', 'none')|e }}</strong></td></tr>
+        <tr><td>evidence_types</td><td>{{ rubric.get('biological_evidence_types', '')|e }}</td></tr>
+        <tr><td>evidence_count</td><td>{{ rubric.get('biological_evidence_count', 0) }}</td></tr>
+        <tr><td>max_ot_score</td><td>{% if rubric.get('biological_max_ot_score') is not none %}{{ rubric.get('biological_max_ot_score') }}{% endif %}</td></tr>
+        <tr><td>vep_high_impact_count</td><td>{{ rubric.get('vep_high_impact_count', 0) }}</td></tr>
+        <tr><td>stage1_pair_count</td><td>{{ rubric.get('stage1_support_pair_count', 0) }}</td></tr>
+        <tr><td>stage1_pairs</td><td>{{ rubric.get('stage1_support_pairs', '')|e }}</td></tr>
+    </table>
+</div>
+{% endif %}
+{% if rubric.get('stage1_gate_status') is not none %}
+<div class="audit-block">
+    <h4>Stage1 Audit</h4>
+    <table>
+        <tr><td>gate_status</td><td><strong>{{ rubric.get('stage1_gate_status', 'not_evaluated')|e }}</strong></td></tr>
+        <tr><td>total_pairs</td><td>{{ rubric.get('stage1_total_pair_count', 0) }}</td></tr>
+        <tr><td>passed_pairs</td><td>{{ rubric.get('stage1_passed_pair_count', 0) }}</td></tr>
+        <tr><td>failed_pairs</td><td>{{ rubric.get('stage1_failed_pair_count', 0) }}</td></tr>
+        <tr><td>best_pair</td><td>{{ rubric.get('stage1_best_pair', '')|e }}</td></tr>
+        <tr><td>best_string</td><td>{% if rubric.get('stage1_best_string_combined') is not none %}{{ rubric.get('stage1_best_string_combined') }}{% endif %}</td></tr>
+        <tr><td>best_coexpr_p</td><td>{% if rubric.get('stage1_best_coexpr_pvalue') is not none %}{{ rubric.get('stage1_best_coexpr_pvalue') }}{% endif %}</td></tr>
+        <tr><td>best_gene_a_p</td><td>{% if rubric.get('stage1_best_gene_a_pvalue') is not none %}{{ rubric.get('stage1_best_gene_a_pvalue') }}{% endif %}</td></tr>
+        <tr><td>best_gene_b_p</td><td>{% if rubric.get('stage1_best_gene_b_pvalue') is not none %}{{ rubric.get('stage1_best_gene_b_pvalue') }}{% endif %}</td></tr>
+        <tr><td>source</td><td>{{ rubric.get('stage1_source', 'none')|e }}</td></tr>
+    </table>
+</div>
+{% endif %}
+{% if rubric.get('novelty_basis') is not none %}
+<div class="summary-box" style="margin-top: 12px;">
+    <h4>Novelty Audit</h4>
+    <table>
+        <tr><td>basis</td><td><strong>{{ rubric.get('novelty_basis', 'st_only_or_brand_new_target')|e }}</strong></td></tr>
+        <tr><td>association_count</td><td>{{ rubric.get('novelty_association_count', 0) }}</td></tr>
+        <tr><td>target_drug_count</td><td>{{ rubric.get('novelty_target_drug_count', 0) }}</td></tr>
+        <tr><td>bucket</td><td>{{ rubric.get('novelty_bucket', '0-9 associations')|e }}</td></tr>
+        <tr><td>source</td><td>{{ rubric.get('novelty_source', 'list_length')|e }}</td></tr>
+    </table>
+</div>
+{% endif %}
+{% if rubric.get('tractability_basis') or rubric.get('safety_evidence_level') %}
+<div class="summary-box" style="margin-top: 12px;">
+    <h4>Audit Metadata</h4>
+    <table>
+        <tr><td>tractability_basis</td><td><strong>{{ rubric.get('tractability_basis', 'unknown') }}</strong></td></tr>
+        <tr><td>tractability_modalities</td><td>{{ rubric.get('tractability_modalities', '') }}</td></tr>
+        <tr><td>tractability_evidence_label</td><td>{{ rubric.get('tractability_evidence_label', 'none') }}</td></tr>
+        <tr><td>safety_evidence_level</td><td><strong>{{ rubric.get('safety_evidence_level', 'no_known_liability') }}</strong></td></tr>
+        <tr><td>safety_liability_count</td><td>{{ rubric.get('safety_liability_count', 0) }}</td></tr>
+        <tr><td>safety_liability_sources</td><td>{{ rubric.get('safety_liability_sources', '') }}</td></tr>
+    </table>
+</div>
+{% endif %}
 {% endmacro %}
 
 {# ===== HTML Document ===== #}

@@ -412,8 +412,7 @@ def build_expansion_slots(reference_card: dict) -> list[dict]:
 
 
 # Rubric fields admitted as first-class provenance citations (Issue #22).
-# These match the keys built by ``rubric_by_gene`` in
-# ``stage_logic.py:2014-2030``. Each (gene, rubric_field) pair becomes its
+# These match the keys built by ``rubric_by_gene``. Each (gene, rubric_field) pair becomes its
 # own index key ``evidence/assessment_results.json::<GENE>::<field>`` with
 # a scalar ``source_value``. The per-gene key shape (gene embedded in
 # ``source_field``) preserves byte-equality of ``direct_value`` claims and
@@ -424,13 +423,54 @@ RUBRIC_FIELDS: tuple[str, ...] = (
     "validated_total",
     "exploratory_total",
     "combined_total",
+    "gwas_rank_points",
+    "tractability_rank_points",
+    "biological_plausibility_rank_points",
+    "novelty_opportunity_rank_points",
+    "exploratory_rank_total",
+    "combined_rank_score",
     "existing_drug_evidence",
     "clinical_trial_activity",
     "safety_profile",
+    "safety_evidence_level",
+    "safety_liability_count",
+    "safety_liability_sources",
     "gwas_support",
+    "gwas_evidence_type",
+    "gwas_min_pvalue",
+    "gwas_trait_match_level",
+    "gwas_direct_hit_count",
+    "gwas_proximity_hit_count",
     "tractability",
+    "tractability_basis",
+    "tractability_modalities",
+    "tractability_evidence_label",
+    "biological_plausibility_base",
+    "stage1_biological_support_bonus",
+    "biological_basis",
+    "biological_evidence_types",
+    "biological_evidence_count",
+    "biological_max_ot_score",
+    "vep_high_impact_count",
+    "stage1_support_pair_count",
+    "stage1_support_pairs",
+    "stage1_gate_status",
+    "stage1_total_pair_count",
+    "stage1_passed_pair_count",
+    "stage1_failed_pair_count",
+    "stage1_best_pair",
+    "stage1_best_string_combined",
+    "stage1_best_coexpr_pvalue",
+    "stage1_best_gene_a_pvalue",
+    "stage1_best_gene_b_pvalue",
+    "stage1_source",
     "biological_plausibility",
     "novelty_opportunity",
+    "novelty_basis",
+    "novelty_association_count",
+    "novelty_target_drug_count",
+    "novelty_bucket",
+    "novelty_source",
     "stage3_candidate",
 )
 RUBRIC_SOURCE_FILE = "evidence/assessment_results.json"

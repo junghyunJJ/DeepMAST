@@ -175,7 +175,7 @@ def _parse_executive_summary(body: str) -> dict[str, Any]:
 
 
 def _parse_druggability_matrix(body: str) -> dict[str, Any]:
-    """Parse the 14-column pipe-delimited druggability table and scoring legend."""
+    """Parse the pipe-delimited druggability table and scoring legend."""
     lines = body.strip().split("\n")
 
     # Find table lines (start with |)
@@ -198,6 +198,11 @@ def _parse_druggability_matrix(body: str) -> dict[str, Any]:
             is_featured = "**" in gene_raw
             gene = gene_raw.replace("**", "").strip()
 
+            has_rank_score = len(cells) > 11 and headers[11].strip().lower() == "rank score"
+            classification_idx = 12 if has_rank_score else 11
+            priority_idx = 13 if has_rank_score else 12
+            stage3_idx = 14 if has_rank_score else 13
+
             row: dict[str, Any] = {
                 "gene": gene,
                 "is_featured": is_featured,
@@ -211,9 +216,10 @@ def _parse_druggability_matrix(body: str) -> dict[str, Any]:
                 "novelty_opportunity": _safe_int(cells[8]),
                 "exploratory_total": _safe_int(cells[9]),
                 "combined_total": _safe_int(cells[10]),
-                "classification": cells[11].strip() if len(cells) > 11 else "",
-                "priority": cells[12].strip() if len(cells) > 12 else "",
-                "stage3": cells[13].strip().lower() == "yes" if len(cells) > 13 else False,
+                "combined_rank_score": _safe_float(cells[11]) if has_rank_score else _safe_int(cells[10]),
+                "classification": cells[classification_idx].strip() if len(cells) > classification_idx else "",
+                "priority": cells[priority_idx].strip() if len(cells) > priority_idx else "",
+                "stage3": cells[stage3_idx].strip().lower() == "yes" if len(cells) > stage3_idx else False,
             }
             rows.append(row)
 
@@ -265,7 +271,7 @@ def _build_matrix_from_deep_dives(deep_dives: list[dict]) -> dict[str, Any]:
     headers = [
         "Gene", "Drug Ev.", "Trial", "Safety", "Val. Total",
         "GWAS", "Tract.", "Bio. Plaus.", "Novelty", "Expl. Total",
-        "Combined", "Classification", "Priority", "Stage3",
+        "Combined", "Rank Score", "Classification", "Priority", "Stage3",
     ]
     rows: list[dict[str, Any]] = []
     for dive in deep_dives:
@@ -283,6 +289,7 @@ def _build_matrix_from_deep_dives(deep_dives: list[dict]) -> dict[str, Any]:
             "novelty_opportunity": rubric.get("novelty_opportunity", 0),
             "exploratory_total": rubric.get("exploratory_total", 0),
             "combined_total": rubric.get("combined_total", 0),
+            "combined_rank_score": rubric.get("combined_rank_score", rubric.get("combined_total", 0)),
             "classification": dive.get("classification", ""),
             "priority": dive.get("priority", ""),
             "stage3": True,
@@ -432,6 +439,104 @@ def _parse_rubric_assessment(body: str) -> dict[str, Any]:
         rubric["novelty_opportunity"] = int(et_m.group(4))
         rubric["exploratory_total"] = int(et_m.group(5))
 
+    # GWAS Audit line
+    gwas_audit_m = re.search(
+        r"GWAS Audit:\s*evidence_type=([^,\n]*),\s*"
+        r"min_pvalue=([^,\n]*),\s*"
+        r"trait_match=([^,\n]*),\s*"
+        r"direct_hits=([^,\n]*),\s*"
+        r"proximity_hits=([^\n]*)",
+        body,
+    )
+    if gwas_audit_m:
+        min_pvalue = gwas_audit_m.group(2).strip()
+        rubric["gwas_evidence_type"] = gwas_audit_m.group(1).strip()
+        rubric["gwas_min_pvalue"] = _safe_optional_float(min_pvalue)
+        rubric["gwas_trait_match_level"] = gwas_audit_m.group(3).strip()
+        rubric["gwas_direct_hit_count"] = _safe_int(gwas_audit_m.group(4))
+        rubric["gwas_proximity_hit_count"] = _safe_int(gwas_audit_m.group(5))
+
+    # Biological Audit line
+    biological_audit_m = re.search(
+        r"Biological Audit:\s*basis=([^,\n]*),\s*"
+        r"evidence_types=([^,\n]*),\s*"
+        r"evidence_count=([^,\n]*),\s*"
+        r"max_ot_score=([^,\n]*),\s*"
+        r"vep_high_impact_count=([^,\n]*),\s*"
+        r"stage1_pair_count=([^,\n]*),\s*"
+        r"stage1_pairs=([^\n]*)",
+        body,
+    )
+    if biological_audit_m:
+        max_ot_score = biological_audit_m.group(4).strip()
+        rubric["biological_basis"] = biological_audit_m.group(1).strip()
+        rubric["biological_evidence_types"] = biological_audit_m.group(2).strip()
+        rubric["biological_evidence_count"] = _safe_int(biological_audit_m.group(3))
+        rubric["biological_max_ot_score"] = _safe_optional_float(max_ot_score)
+        rubric["vep_high_impact_count"] = _safe_int(biological_audit_m.group(5))
+        rubric["stage1_support_pair_count"] = _safe_int(biological_audit_m.group(6))
+        rubric["stage1_support_pairs"] = biological_audit_m.group(7).strip()
+
+    # Stage1 Audit line
+    stage1_audit_m = re.search(
+        r"Stage1 Audit:\s*gate_status=([^,\n]*),\s*"
+        r"total_pairs=([^,\n]*),\s*"
+        r"passed_pairs=([^,\n]*),\s*"
+        r"failed_pairs=([^,\n]*),\s*"
+        r"best_pair=([^,\n]*),\s*"
+        r"best_string=([^,\n]*),\s*"
+        r"best_coexpr_p=([^,\n]*),\s*"
+        r"best_gene_a_p=([^,\n]*),\s*"
+        r"best_gene_b_p=([^,\n]*),\s*"
+        r"source=([^\n]*)",
+        body,
+    )
+    if stage1_audit_m:
+        rubric["stage1_gate_status"] = stage1_audit_m.group(1).strip()
+        rubric["stage1_total_pair_count"] = _safe_int(stage1_audit_m.group(2))
+        rubric["stage1_passed_pair_count"] = _safe_int(stage1_audit_m.group(3))
+        rubric["stage1_failed_pair_count"] = _safe_int(stage1_audit_m.group(4))
+        rubric["stage1_best_pair"] = stage1_audit_m.group(5).strip()
+        rubric["stage1_best_string_combined"] = _safe_optional_float(stage1_audit_m.group(6).strip())
+        rubric["stage1_best_coexpr_pvalue"] = _safe_optional_float(stage1_audit_m.group(7).strip())
+        rubric["stage1_best_gene_a_pvalue"] = _safe_optional_float(stage1_audit_m.group(8).strip())
+        rubric["stage1_best_gene_b_pvalue"] = _safe_optional_float(stage1_audit_m.group(9).strip())
+        rubric["stage1_source"] = stage1_audit_m.group(10).strip()
+
+    # Novelty Audit line
+    novelty_audit_m = re.search(
+        r"Novelty Audit:\s*basis=([^,\n]*),\s*"
+        r"association_count=([^,\n]*),\s*"
+        r"target_drug_count=([^,\n]*),\s*"
+        r"bucket=([^,\n]*),\s*"
+        r"source=([^\n]*)",
+        body,
+    )
+    if novelty_audit_m:
+        rubric["novelty_basis"] = novelty_audit_m.group(1).strip()
+        rubric["novelty_association_count"] = _safe_int(novelty_audit_m.group(2))
+        rubric["novelty_target_drug_count"] = _safe_int(novelty_audit_m.group(3))
+        rubric["novelty_bucket"] = novelty_audit_m.group(4).strip()
+        rubric["novelty_source"] = novelty_audit_m.group(5).strip()
+
+    # Audit Metadata line
+    audit_m = re.search(
+        r"Audit Metadata:\s*tractability_basis=([^,\n]*),\s*"
+        r"tractability_modalities=([^,\n]*),\s*"
+        r"tractability_evidence_label=([^,\n]*),\s*"
+        r"safety_evidence_level=([^,\n]*),\s*"
+        r"safety_liability_count=([^,\n]*),\s*"
+        r"safety_liability_sources=([^\n]*)",
+        body,
+    )
+    if audit_m:
+        rubric["tractability_basis"] = audit_m.group(1).strip()
+        rubric["tractability_modalities"] = audit_m.group(2).strip()
+        rubric["tractability_evidence_label"] = audit_m.group(3).strip()
+        rubric["safety_evidence_level"] = audit_m.group(4).strip()
+        rubric["safety_liability_count"] = _safe_int(audit_m.group(5))
+        rubric["safety_liability_sources"] = audit_m.group(6).strip()
+
     # Combined Total line
     ct_m = re.search(
         r"\*\*Combined Total:\s*(-?\d+)\*\*\s*\|\s*Classification:\s*(\S+)\s*\|\s*Priority:\s*(\S+)",
@@ -575,6 +680,23 @@ def _safe_int(val: str) -> int:
         return 0
 
 
+def _safe_float(val: str) -> float:
+    """Parse a float from a string, returning 0.0 on failure."""
+    try:
+        return float(val.strip())
+    except (ValueError, AttributeError):
+        return 0.0
+
+
+def _safe_optional_float(val: str) -> float | None:
+    """Parse a float from a string, returning None on empty or invalid values."""
+    try:
+        text = val.strip()
+        return float(text) if text else None
+    except (ValueError, AttributeError):
+        return None
+
+
 # ---------------------------------------------------------------------------
 # CSS / JS loading
 # ---------------------------------------------------------------------------
@@ -714,12 +836,12 @@ def render_drug_md(
 
     featured_rows = sorted(
         [r for r in all_genes_matrix if _is_validated(r)],
-        key=lambda r: r.get("combined_total", 0),
+        key=lambda r: (r.get("combined_rank_score", r.get("combined_total", 0)), r.get("combined_total", 0)),
         reverse=True,
     )
     other_rows = sorted(
         [r for r in all_genes_matrix if not _is_validated(r)],
-        key=lambda r: r.get("combined_total", 0),
+        key=lambda r: (r.get("combined_rank_score", r.get("combined_total", 0)), r.get("combined_total", 0)),
         reverse=True,
     )
 

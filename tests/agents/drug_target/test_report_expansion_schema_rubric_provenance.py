@@ -24,20 +24,61 @@ from src.agents.drug_target.tools.report_expansion_schema import (
 
 
 def _full_rubric(combined_total: int = 15) -> dict[str, Any]:
-    """Build a rubric dict carrying all 13 fields from rubric_by_gene."""
+    """Build a rubric dict carrying all first-class fields from rubric_by_gene."""
     return {
         "classification": "validated_target",
         "priority": "high",
         "validated_total": 10,
         "exploratory_total": 5,
         "combined_total": combined_total,
+        "gwas_rank_points": 0.0,
+        "tractability_rank_points": 5.0,
+        "biological_plausibility_rank_points": 2.0,
+        "novelty_opportunity_rank_points": 0.0,
+        "exploratory_rank_total": 7.0,
+        "combined_rank_score": float(combined_total + 2),
         "existing_drug_evidence": 5,
         "clinical_trial_activity": 5,
         "safety_profile": 0,
+        "safety_evidence_level": "no_known_liability",
+        "safety_liability_count": 0,
+        "safety_liability_sources": "",
         "gwas_support": 0,
+        "gwas_evidence_type": "direct_significant_overlap",
+        "gwas_min_pvalue": 4e-9,
+        "gwas_trait_match_level": "disease_specific",
+        "gwas_direct_hit_count": 2,
+        "gwas_proximity_hit_count": 0,
         "tractability": 3,
+        "tractability_basis": "approved_drug",
+        "tractability_modalities": "AB",
+        "tractability_evidence_label": "approved drug",
+        "biological_plausibility_base": 1,
+        "stage1_biological_support_bonus": 1,
+        "biological_basis": "ot_evidence_plus_stage1_pair",
+        "biological_evidence_types": "affected_pathway;literature",
+        "biological_evidence_count": 2,
+        "biological_max_ot_score": 0.82,
+        "vep_high_impact_count": 0,
+        "stage1_support_pair_count": 1,
+        "stage1_support_pairs": "CD4^MHC2",
+        "stage1_gate_status": "pass",
+        "stage1_total_pair_count": 2,
+        "stage1_passed_pair_count": 1,
+        "stage1_failed_pair_count": 1,
+        "stage1_best_pair": "CD4^MHC2",
+        "stage1_best_string_combined": 0.951,
+        "stage1_best_coexpr_pvalue": 3e-6,
+        "stage1_best_gene_a_pvalue": 1e-6,
+        "stage1_best_gene_b_pvalue": 2e-6,
+        "stage1_source": "stage1_evidence.json",
         "biological_plausibility": 2,
         "novelty_opportunity": 0,
+        "novelty_basis": "well_studied_target",
+        "novelty_association_count": 1633,
+        "novelty_target_drug_count": 5,
+        "novelty_bucket": "1000+ associations",
+        "novelty_source": "parquet_pre_head",
         "stage3_candidate": True,
     }
 
@@ -64,7 +105,7 @@ def _reference_card(cards: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------
-# T4 — index admits 13 rubric keys per gene with scalar source_value
+# T4 — index admits rubric keys per gene with scalar source_value
 # --------------------------------------------------------------------------
 def test_build_provenance_index_admits_per_gene_rubric_fields() -> None:
     card = _reference_card(
@@ -82,9 +123,9 @@ def test_build_provenance_index_admits_per_gene_rubric_fields() -> None:
         for field in RUBRIC_FIELDS
     }
     assert expected_keys.issubset(index.keys())
-    # 13 fields × 2 genes = 26 rubric entries.
+    # All first-class rubric fields are indexed per gene.
     rubric_keys = [k for k in index if k.startswith(f"{RUBRIC_SOURCE_FILE}::")]
-    assert len(rubric_keys) == 26
+    assert len(rubric_keys) == len(RUBRIC_FIELDS) * 2
 
     cd4_combined = index[f"{RUBRIC_SOURCE_FILE}::CD4::combined_total"]
     assert cd4_combined == {
@@ -98,6 +139,64 @@ def test_build_provenance_index_admits_per_gene_rubric_fields() -> None:
     # MUC1 isolated from CD4.
     muc1_combined = index[f"{RUBRIC_SOURCE_FILE}::MUC1::combined_total"]
     assert muc1_combined["source_value"] == 14
+
+    for field, expected_value in {
+        "gwas_evidence_type": "direct_significant_overlap",
+        "gwas_min_pvalue": 4e-9,
+        "gwas_trait_match_level": "disease_specific",
+        "gwas_direct_hit_count": 2,
+        "gwas_proximity_hit_count": 0,
+        "biological_basis": "ot_evidence_plus_stage1_pair",
+        "biological_evidence_types": "affected_pathway;literature",
+        "biological_evidence_count": 2,
+        "biological_max_ot_score": 0.82,
+        "vep_high_impact_count": 0,
+        "stage1_support_pair_count": 1,
+        "stage1_support_pairs": "CD4^MHC2",
+        "stage1_gate_status": "pass",
+        "stage1_total_pair_count": 2,
+        "stage1_passed_pair_count": 1,
+        "stage1_failed_pair_count": 1,
+        "stage1_best_pair": "CD4^MHC2",
+        "stage1_best_string_combined": 0.951,
+        "stage1_best_coexpr_pvalue": 3e-6,
+        "stage1_best_gene_a_pvalue": 1e-6,
+        "stage1_best_gene_b_pvalue": 2e-6,
+        "stage1_source": "stage1_evidence.json",
+        "novelty_basis": "well_studied_target",
+        "novelty_association_count": 1633,
+        "novelty_target_drug_count": 5,
+        "novelty_bucket": "1000+ associations",
+        "novelty_source": "parquet_pre_head",
+    }.items():
+        assert index[f"{RUBRIC_SOURCE_FILE}::CD4::{field}"] == {
+            "source_file": RUBRIC_SOURCE_FILE,
+            "source_field": f"CD4::{field}",
+            "source_class": RUBRIC_SOURCE_CLASS,
+            "source_value": expected_value,
+        }
+
+    assert index[f"{RUBRIC_SOURCE_FILE}::CD4::novelty_basis"]["source_value"] == (
+        "well_studied_target"
+    )
+    assert (
+        index[f"{RUBRIC_SOURCE_FILE}::CD4::novelty_association_count"][
+            "source_value"
+        ]
+        == 1633
+    )
+    assert (
+        index[f"{RUBRIC_SOURCE_FILE}::CD4::novelty_target_drug_count"][
+            "source_value"
+        ]
+        == 5
+    )
+    assert index[f"{RUBRIC_SOURCE_FILE}::CD4::novelty_bucket"]["source_value"] == (
+        "1000+ associations"
+    )
+    assert index[f"{RUBRIC_SOURCE_FILE}::CD4::novelty_source"]["source_value"] == (
+        "parquet_pre_head"
+    )
 
 
 # --------------------------------------------------------------------------
