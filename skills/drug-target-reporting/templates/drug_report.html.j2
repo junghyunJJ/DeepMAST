@@ -150,12 +150,12 @@
 <div class="summary-box" style="margin-top: 12px;">
     <h4>Audit Metadata</h4>
     <table>
-        <tr><td>tractability_basis</td><td><strong>{{ rubric.get('tractability_basis', 'unknown') }}</strong></td></tr>
-        <tr><td>tractability_modalities</td><td>{{ rubric.get('tractability_modalities', '') }}</td></tr>
-        <tr><td>tractability_evidence_label</td><td>{{ rubric.get('tractability_evidence_label', 'none') }}</td></tr>
-        <tr><td>safety_evidence_level</td><td><strong>{{ rubric.get('safety_evidence_level', 'no_known_liability') }}</strong></td></tr>
+        <tr><td>tractability_basis</td><td><strong>{{ rubric.get('tractability_basis', 'unknown')|e }}</strong></td></tr>
+        <tr><td>tractability_modalities</td><td>{{ rubric.get('tractability_modalities', '')|e }}</td></tr>
+        <tr><td>tractability_evidence_label</td><td>{{ rubric.get('tractability_evidence_label', 'none')|e }}</td></tr>
+        <tr><td>safety_evidence_level</td><td><strong>{{ rubric.get('safety_evidence_level', 'no_known_liability')|e }}</strong></td></tr>
         <tr><td>safety_liability_count</td><td>{{ rubric.get('safety_liability_count', 0) }}</td></tr>
-        <tr><td>safety_liability_sources</td><td>{{ rubric.get('safety_liability_sources', '') }}</td></tr>
+        <tr><td>safety_liability_sources</td><td>{{ rubric.get('safety_liability_sources', '')|e }}</td></tr>
     </table>
 </div>
 {% endif %}

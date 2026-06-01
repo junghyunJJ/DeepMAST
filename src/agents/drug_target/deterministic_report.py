@@ -778,6 +778,16 @@ def _score_field_default(field: str) -> object:
     return 0
 
 
+def _score_field_value(scores: Mapping[str, Any], field: str) -> object:
+    if field in scores:
+        return scores.get(field)
+    if field == "exploratory_rank_total":
+        return scores.get("exploratory_total", _score_field_default(field))
+    if field == "combined_rank_score":
+        return scores.get("combined_total", _score_field_default(field))
+    return _score_field_default(field)
+
+
 def _drug_name(entry: dict[str, Any]) -> str:
     return str(
         entry.get("drug_name")
@@ -1061,7 +1071,7 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
                 "priority": row.get("priority", "unranked"),
                 "stage3_candidate": gene in selected_genes,
                 "scores": {
-                    field: row.get(field, _score_field_default(field))
+                    field: _score_field_value(row, field)
                     for field in _SCORE_FIELDS
                 },
                 "clinical_drug_count": len(clinical_drugs),
@@ -1193,7 +1203,7 @@ def _target_assessment_inputs(
         scores = scores if isinstance(scores, dict) else {}
         rubric_by_gene[gene] = {
             **{
-                field: scores.get(field, _score_field_default(field))
+                field: _score_field_value(scores, field)
                 for field in _SCORE_FIELDS
             },
             "classification": candidate.get("classification", "unknown"),

@@ -344,6 +344,42 @@ def test_report_mvp_defaults_absent_novelty_audit_fields(tmp_path: Path) -> None
     assert candidate["scores"]["novelty_source"] == "list_length"
 
 
+def test_report_mvp_defaults_legacy_rank_scores_from_totals(tmp_path: Path) -> None:
+    from src.agents.drug_target.deterministic_report import build_report_data
+
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps(
+            {
+                "rubric_assessment": [
+                    {
+                        "gene": "CD4",
+                        "classification": "validated_target",
+                        "priority": "high",
+                        "validated_total": 6,
+                        "exploratory_total": 10,
+                        "combined_total": 16,
+                        "stage3_candidate": True,
+                    }
+                ],
+                "stage3_candidates": [{"gene": "CD4"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (evidence_dir / "hypothesis_report.json").write_text(
+        json.dumps({"hypotheses": []}),
+        encoding="utf-8",
+    )
+
+    report = build_report_data(str(tmp_path), disease="test disease")
+
+    scores = report["candidates"][0]["scores"]
+    assert scores["exploratory_rank_total"] == 10
+    assert scores["combined_rank_score"] == 16
+
+
 def test_target_assessment_inputs_defaults_absent_gwas_audit_fields() -> None:
     from src.agents.drug_target.deterministic_report import _target_assessment_inputs
 

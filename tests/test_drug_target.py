@@ -6145,6 +6145,36 @@ class TestDrugReportHtmlAuditMetadata:
         assert "&lt;img src=x onerror=alert(1)&gt;" in html
         assert "&lt;b&gt;api_count&lt;/b&gt;" in html
 
+    def test_render_drug_html_escapes_tractability_safety_audit_strings(self):
+        from src.agents.drug_target.tools.drug_report_html import (
+            parse_drug_md,
+            render_drug_html,
+        )
+
+        context = parse_drug_md(self._drug_md_with_audit_metadata())
+        rubric = context["deep_dives"][0]["rubric"]
+        rubric.update({
+            "tractability_basis": "<script>alert(1)</script>",
+            "tractability_modalities": "<img src=x onerror=alert(1)>",
+            "tractability_evidence_label": "<b>approved</b>",
+            "safety_evidence_level": "<svg onload=alert(1)>",
+            "safety_liability_sources": "toxcast;<i>bad</i>",
+        })
+        context.update({"css": "", "js": "", "generation_date": "2026-05-30"})
+
+        html = render_drug_html(context)
+
+        assert "<script>alert(1)</script>" not in html
+        assert "<img src=x onerror=alert(1)>" not in html
+        assert "<b>approved</b>" not in html
+        assert "<svg onload=alert(1)>" not in html
+        assert "toxcast;<i>bad</i>" not in html
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+        assert "&lt;img src=x onerror=alert(1)&gt;" in html
+        assert "&lt;b&gt;approved&lt;/b&gt;" in html
+        assert "&lt;svg onload=alert(1)&gt;" in html
+        assert "toxcast;&lt;i&gt;bad&lt;/i&gt;" in html
+
     def test_render_drug_md_blanks_none_gwas_min_pvalue_and_preserves_zero(self):
         none_markdown = self._render_drug_md_with_gwas_min_pvalue(None)
         zero_markdown = self._render_drug_md_with_gwas_min_pvalue(0.0)
