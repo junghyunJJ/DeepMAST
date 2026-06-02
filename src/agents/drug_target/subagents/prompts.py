@@ -82,10 +82,12 @@ Gene→Pair Mapping → Stage 1 (FEATURED pairs) → Stage 1 Gate → Stage 3 (C
    `pulmonary alveolar type 2 cell`, while `Transitional AT2` may resolve to the
    same Census label with `lost_modifiers=["transitional"]`.
 
-   **CRITICAL: `CENSUS_CELL_TYPE` must be the exact `primary_resolved_celltype`
-   returned by `resolve_census_celltypes`. Do not use `list_census_cell_types` for matching,
-   and do not invent a Census label. If `primary_resolved_celltype`
-   is empty, stop before Census Stage 1 and report the resolver errors.**
+   **CRITICAL: Only use `primary_resolved_celltype` after the resolver response has
+   `executed == true` and `errors == []`. `CENSUS_CELL_TYPE` must be the exact
+   `primary_resolved_celltype` returned by `resolve_census_celltypes`.
+   Do not use `list_census_cell_types` for matching, and do not invent a Census label. If
+   `executed` is false, `errors` is non-empty, or `primary_resolved_celltype` is
+   empty, stop before Census Stage 1 and report the resolver errors.**
 
 ### Stage 2: Target Validation & Scoring (ALL unique genes — RUNS FIRST)
 

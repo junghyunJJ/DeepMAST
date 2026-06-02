@@ -21,6 +21,7 @@ from typing import Callable, Sequence
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
+from langchain_core.tools.structured import StructuredTool
 
 from src.agents.deep_interpreter.middleware.write_file_guard import (
     ReadFileBlockMiddleware,
@@ -94,6 +95,43 @@ def _sanitize_prompt_value(value: str | None) -> str:
 
 # Backwards-compatible alias so existing callers and tests continue to work.
 _sanitize_data_dir = _sanitize_prompt_value
+
+
+def _disabled_census_stage1_batch_tool() -> StructuredTool:
+    """Return a run_stage1_batch variant that cannot enable Census queries."""
+
+    def _run_stage1_batch_census_disabled(
+        data_dir: str,
+        disease: str,
+        target_cell_type: str = "",
+        enable_census: bool = False,
+    ):
+        func = getattr(run_stage1_batch, "func", None)
+        if func is None:
+            return run_stage1_batch.invoke(
+                {
+                    "data_dir": data_dir,
+                    "disease": disease,
+                    "target_cell_type": target_cell_type,
+                    "enable_census": False,
+                }
+            )
+        return func(
+            data_dir=data_dir,
+            disease=disease,
+            target_cell_type=target_cell_type,
+            enable_census=False,
+        )
+
+    return StructuredTool.from_function(
+        func=_run_stage1_batch_census_disabled,
+        name="run_stage1_batch",
+        description=(
+            f"{run_stage1_batch.description}\n\n"
+            "Census is disabled for this run; this wrapper always forwards "
+            "enable_census=False even if the caller omits it or passes true."
+        ),
+    )
 
 
 def _strip_failed_suffix_in_strings(node: object) -> tuple[object, int]:
@@ -373,7 +411,10 @@ def get_subagents(
         for subagent in subagents:
             if subagent["name"] == "evidence_assessor":
                 subagent["tools"] = [
-                    t for t in subagent["tools"]
+                    _disabled_census_stage1_batch_tool()
+                    if getattr(t, "name", None) == "run_stage1_batch"
+                    else t
+                    for t in subagent["tools"]
                     if getattr(t, "name", None) not in _census_tool_names
                 ]
                 subagent["system_prompt"] += (
