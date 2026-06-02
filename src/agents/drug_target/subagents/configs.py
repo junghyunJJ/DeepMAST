@@ -41,6 +41,7 @@ from src.agents.drug_target.tools import (
     query_stage2_gene_panel,
     query_string_ppi_pair,
     read_skill_file,
+    resolve_census_celltypes,
     run_stage3_batch,
     run_batch_census_lr_pairs,
     run_compare_census_lr_pair,
@@ -214,6 +215,7 @@ SUBAGENT_CONFIGS = {
             # Phase 0: Disease vocabulary matching
             list_census_diseases,
             list_census_cell_types,
+            resolve_census_celltypes,
             # Stage 2: Target Validation (runs FIRST — batch all genes)
             query_stage2_gene_panel,
             query_ensembl_vep_consequence,
@@ -363,6 +365,7 @@ def get_subagents(
         _census_tool_names = {
             "query_cellxgene_lr_context",
             "list_census_diseases",
+            "resolve_census_celltypes",
             "run_compare_census_lr_pair",
             "run_batch_census_lr_pairs",
         }
@@ -375,7 +378,8 @@ def get_subagents(
                 subagent["system_prompt"] += (
                     "\n\n## Census API: DISABLED\n"
                     "Census tools (`query_cellxgene_lr_context`, `list_census_diseases`, "
-                    "`list_census_cell_types`, `run_compare_census_lr_pair`, "
+                    "`list_census_cell_types`, `resolve_census_celltypes`, "
+                    "`run_compare_census_lr_pair`, "
                     "`run_batch_census_lr_pairs`) are NOT available in this run.\n"
                     "- Skip Phase 0 Census disease/cell-type matching entirely.\n"
                     "- In Stage 1, rely on STRING-only validation via run_stage1_batch(enable_census=false).\n"

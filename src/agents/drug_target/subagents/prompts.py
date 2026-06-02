@@ -65,21 +65,27 @@ Gene→Pair Mapping → Stage 1 (FEATURED pairs) → Stage 1 Gate → Stage 3 (C
    Use `census_disease` (not the raw `disease`) for subsequent
    Census queries in Stage 1 only. Do NOT pass `census_disease` to Stage 2.
 
-3. **Cell type name matching** -- Call `list_census_cell_types(disease=CENSUS_DISEASE)`
-   to retrieve Census cell type labels for this disease. Compare each entry in
-   `interest_celltypes` (from targets.json) against the returned list and select
-   the best-matching Census cell type label. Store as `CENSUS_CELL_TYPE`.
+3. **Cell type name matching** -- Call
+   `resolve_census_celltypes(interest_celltypes=interest_celltypes, disease=CENSUS_DISEASE)`
+   to resolve every target cell type from targets.json against the full disease-scoped
+   CELLxGENE Census cell_type label set.
 
-   ST analysis labels often use abbreviations or informal names that differ from
-   Census CL ontology labels. Common mappings:
-   - "AT2" → "pulmonary alveolar type 2 cell"
-   - "Tumor Cell" → "malignant cell"
-   - "Fibroblast" → "fibroblast"
-   - "Immune cell" → "leukocyte"
+   Save the parsed resolver response with:
+   `save_evidence(data_dir=DATA_DIR, filename="celltype_resolution.json", data=<resolver_response>)`.
 
-   **CRITICAL: `CENSUS_CELL_TYPE` must be an EXACT string from the
-   `list_census_cell_types` output.** Do NOT invent a label — pick from the list.
-   Use the first entry in `interest_celltypes` as the primary target.
+   Use `primary_resolved_celltype` from `celltype_resolution.json` as
+   `CENSUS_CELL_TYPE`.
+
+   Use the first resolved interest cell type as the Stage 1 target. Preserve all
+   matches, match modes, and lost_modifiers in `celltype_resolution.json` for
+   hypothesis generation. For example, `AT2` may resolve to
+   `pulmonary alveolar type 2 cell`, while `Transitional AT2` may resolve to the
+   same Census label with `lost_modifiers=["transitional"]`.
+
+   **CRITICAL: `CENSUS_CELL_TYPE` must be the exact `primary_resolved_celltype`
+   returned by `resolve_census_celltypes`. Do not use `list_census_cell_types` for matching,
+   and do not invent a Census label. If `primary_resolved_celltype`
+   is empty, stop before Census Stage 1 and report the resolver errors.**
 
 ### Stage 2: Target Validation & Scoring (ALL unique genes — RUNS FIRST)
 
@@ -155,7 +161,8 @@ Each row in druggability_matrix includes validated_track and exploratory_track s
 **CRITICAL: After `compute_rubric_scores` completes, call `run_stage1_batch` ONCE.**
 This queries STRING PPI and Census co-expression for all FEATURED pairs.
 
-Use `CENSUS_CELL_TYPE` from Phase 0 (step 3) as `target_cell_type`.
+Use `CENSUS_CELL_TYPE = celltype_resolution.primary_resolved_celltype` from
+Phase 0 (step 3) as `target_cell_type`.
 
 ```
 run_stage1_batch(
