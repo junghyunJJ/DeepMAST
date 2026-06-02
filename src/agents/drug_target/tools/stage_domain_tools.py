@@ -1093,6 +1093,8 @@ def _run_single_pair_census_fallback(
             "csv_file": csv_name,
         }
         try:
+            if csv_path.exists():
+                csv_path.unlink()
             raw = run_compare_census_lr_pair.invoke({
                 "data_dir": str(data_dir),
                 "disease": disease,
@@ -1103,9 +1105,33 @@ def _run_single_pair_census_fallback(
                 "census_version": _DEFAULT_CENSUS_VERSION,
                 "output_csv": str(csv_path),
             })
-            single_result = json.loads(raw) if isinstance(raw, str) else raw
+            if isinstance(raw, str):
+                try:
+                    single_result = json.loads(raw)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(f"single-pair Census returned invalid JSON: {exc}") from exc
+            else:
+                single_result = raw
             if not isinstance(single_result, dict):
-                single_result = {}
+                raise ValueError(
+                    f"single-pair Census returned non-object result: "
+                    f"{type(single_result).__name__}"
+                )
+            tool_errors = single_result.get("errors")
+            if isinstance(tool_errors, list):
+                normalized_errors = [str(error) for error in tool_errors]
+                if normalized_errors:
+                    record["errors"] = normalized_errors
+            elif tool_errors:
+                record["errors"] = [str(tool_errors)]
+            if single_result.get("message"):
+                record["message"] = str(single_result["message"])
+            if single_result.get("executed") is not True:
+                failure_details = record.get("errors", [])
+                if record.get("message"):
+                    failure_details = [*failure_details, str(record["message"])]
+                detail = "; ".join(failure_details) if failure_details else "executed was not true"
+                raise ValueError(f"single-pair Census did not execute successfully: {detail}")
 
             disease_used = str(single_result.get("disease") or disease)
             requested_cell_type = str(
