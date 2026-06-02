@@ -1018,15 +1018,25 @@ def _integrate_existing_census_csvs(
     integrated_pairs: list[tuple[str, str]] = []
     reused_csv: list[str] = []
     for ligand, receptor in pairs:
-        validation = build_census_validation_from_csv(
-            evidence_dir,
-            ligand,
-            receptor,
-            csv_target_cell_type=target_cell_type,
-            requested_target_cell_type=target_cell_type,
-            resolved_target_cell_type=target_cell_type,
-            disease=disease,
-        )
+        try:
+            validation = build_census_validation_from_csv(
+                evidence_dir,
+                ligand,
+                receptor,
+                csv_target_cell_type=target_cell_type,
+                requested_target_cell_type=target_cell_type,
+                resolved_target_cell_type=target_cell_type,
+                disease=disease,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Skipping Census CSV reuse for %s--%s from likely CSV %s: %s",
+                ligand,
+                receptor,
+                _census_csv_name(ligand, receptor, target_cell_type),
+                exc,
+            )
+            continue
         if not validation:
             continue
         saved = _save_census_validation_to_stage1_file(
