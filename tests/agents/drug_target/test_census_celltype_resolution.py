@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+
+from src.agents.drug_target.tools import census_batch_core
+from src.agents.drug_target.tools import census_celltype_resolution as resolution
 from src.agents.drug_target.tools.census_celltype_resolution import (
     resolve_celltype_matches,
 )
@@ -130,3 +134,107 @@ def test_resolve_celltype_matches_unresolved_keeps_primary_empty() -> None:
     assert match["warnings"] == [
         "No Census cell_type label matched interest cell type 'AT2'."
     ]
+
+
+def test_resolve_celltype_matches_empty_interest_unresolved() -> None:
+    available = {
+        "pulmonary alveolar type 2 cell": 7545,
+        "fibroblast": 1000,
+    }
+
+    result = resolve_celltype_matches(
+        [""],
+        available,
+        disease="pulmonary fibrosis",
+        organism="homo_sapiens",
+        disease_resolved="pulmonary fibrosis",
+        disease_resolution_mode="exact",
+    )
+
+    match = result["matches"][0]
+    assert result["primary_resolved_celltype"] == ""
+    assert result["primary_match_mode"] == "unresolved"
+    assert match["matched_celltype"] == ""
+    assert match["match_mode"] == "unresolved"
+    assert match["confidence"] == "none"
+    assert match["warnings"] == [
+        "No Census cell_type label matched interest cell type ''."
+    ]
+
+
+def test_resolve_census_celltypes_reports_disease_resolution_failure(
+    monkeypatch,
+) -> None:
+    def fail_resolve_disease(disease: str, organism: str):
+        raise RuntimeError("resolver exploded")
+
+    monkeypatch.setattr(
+        census_batch_core,
+        "_resolve_disease_name",
+        fail_resolve_disease,
+    )
+    monkeypatch.setattr(
+        resolution,
+        "_query_available_cell_type_counts",
+        lambda *, disease_resolved, organism: (
+            {"pulmonary alveolar type 2 cell": 10},
+            [],
+        ),
+    )
+
+    raw = resolution.resolve_census_celltypes.invoke(
+        {
+            "interest_celltypes": ["AT2"],
+            "disease": "pulmonary fibrosis",
+            "organism": "human",
+        }
+    )
+
+    payload = json.loads(raw)
+    assert payload["organism"] == "homo_sapiens"
+    assert payload["disease_resolved"] == "pulmonary fibrosis"
+    assert payload["disease_resolution_mode"] == "input"
+    assert payload["executed"] is False
+    assert payload["errors"] == [
+        "Census disease resolution failed for 'pulmonary fibrosis': resolver exploded"
+    ]
+
+
+def test_resolve_census_celltypes_offline_wrapper_json_contract(monkeypatch) -> None:
+    monkeypatch.setattr(
+        resolution,
+        "_resolve_disease_for_census",
+        lambda disease, organism: ("pulmonary fibrosis", "exact", []),
+    )
+    monkeypatch.setattr(
+        resolution,
+        "_query_available_cell_type_counts",
+        lambda *, disease_resolved, organism: (
+            {"pulmonary alveolar type 2 cell": 10},
+            [],
+        ),
+    )
+
+    raw = resolution.resolve_census_celltypes.invoke(
+        {
+            "interest_celltypes": ["AT2"],
+            "disease": "pulmonary fibrosis",
+            "organism": "human",
+        }
+    )
+
+    payload = json.loads(raw)
+    assert payload["organism"] == "homo_sapiens"
+    assert payload["disease_input"] == "pulmonary fibrosis"
+    assert payload["disease_resolved"] == "pulmonary fibrosis"
+    assert payload["disease_resolution_mode"] == "exact"
+    assert payload["interest_celltypes"] == ["AT2"]
+    assert payload["available_cell_type_count"] == 1
+    assert payload["primary_input_celltype"] == "AT2"
+    assert payload["primary_resolved_celltype"] == "pulmonary alveolar type 2 cell"
+    assert payload["primary_match_mode"] == "alias"
+    assert payload["matches"][0]["total_cell_count"] == 10
+    assert payload["warnings"] == []
+    assert payload["errors"] == []
+    assert payload["executed"] is True
+    assert payload["census_version"]

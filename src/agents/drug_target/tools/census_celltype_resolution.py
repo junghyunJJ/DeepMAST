@@ -116,6 +116,21 @@ def _resolve_one(
 ) -> dict[str, Any]:
     normalized_input = _normalize_label(input_celltype)
     warnings: list[str] = []
+    if not normalized_input:
+        warnings.append(
+            f"No Census cell_type label matched interest cell type '{input_celltype}'."
+        )
+        return {
+            "input_celltype": input_celltype,
+            "matched_celltype": "",
+            "match_mode": "unresolved",
+            "confidence": "none",
+            "literal_exact_match": False,
+            "literal_substring_match": False,
+            "lost_modifiers": [],
+            "total_cell_count": 0,
+            "warnings": warnings,
+        }
 
     literal_exact = _match_exact(normalized_input, by_normalized)
     if literal_exact:
@@ -247,16 +262,23 @@ def resolve_celltype_matches(
     }
 
 
-def _resolve_disease_for_census(disease: str, organism: str) -> tuple[str, str]:
+def _resolve_disease_for_census(
+    disease: str,
+    organism: str,
+) -> tuple[str, str, list[str]]:
     try:
         from src.agents.drug_target.tools.census_batch_core import _resolve_disease_name
 
         resolved, mode = _resolve_disease_name(disease, organism)
-    except Exception:
-        return disease, "input"
+    except Exception as exc:
+        return (
+            disease,
+            "input",
+            [f"Census disease resolution failed for {disease!r}: {exc}"],
+        )
     if not resolved:
-        return disease, mode
-    return resolved, mode
+        return disease, mode, []
+    return resolved, mode, []
 
 
 def _escape_census_literal(value: str) -> str:
@@ -301,13 +323,14 @@ def resolve_census_celltypes(
 ) -> str:
     """Resolve interest cell types to disease-scoped CELLxGENE Census labels."""
     organism = _ORGANISM_MAP.get(organism.lower().strip(), organism)
-    disease_resolved, disease_resolution_mode = _resolve_disease_for_census(
-        disease, organism
+    disease_resolved, disease_resolution_mode, disease_errors = (
+        _resolve_disease_for_census(disease, organism)
     )
-    counts, errors = _query_available_cell_type_counts(
+    counts, query_errors = _query_available_cell_type_counts(
         disease_resolved=disease_resolved,
         organism=organism,
     )
+    errors = [*disease_errors, *query_errors]
     result = resolve_celltype_matches(
         interest_celltypes,
         counts,
