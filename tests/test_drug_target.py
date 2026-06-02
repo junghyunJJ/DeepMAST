@@ -2413,10 +2413,6 @@ class TestStage1Batch:
                 "src.agents.drug_target.tools.census_batch_core.write_census_csv",
             ),
             patch(
-                "src.agents.drug_target.tools.stage1_normalization.finalize_stage1_workspace",
-                return_value={"success": True},
-            ),
-            patch(
                 "src.agents.drug_target.tools.stage_logic.apply_stage1_filter",
                 _FakeStage1FilterTool,
             ),

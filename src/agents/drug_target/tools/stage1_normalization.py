@@ -552,15 +552,24 @@ def normalize_stage1_record(
         else {}
     )
 
-    latest_census = build_census_validation_from_csv(
-        evidence_dir,
-        ligand,
-        receptor,
-        csv_target_cell_type=csv_target_cell_type,
-        requested_target_cell_type=requested_target_cell_type,
-        resolved_target_cell_type=resolved_target_cell_type,
-        disease=disease,
-    )
+    try:
+        latest_census = build_census_validation_from_csv(
+            evidence_dir,
+            ligand,
+            receptor,
+            csv_target_cell_type=csv_target_cell_type,
+            requested_target_cell_type=requested_target_cell_type,
+            resolved_target_cell_type=resolved_target_cell_type,
+            disease=disease,
+        )
+    except Exception as exc:
+        latest_census = None
+        logger.warning(
+            "Skipping latest Census CSV refresh for %s--%s during Stage1 normalization: %s",
+            ligand,
+            receptor,
+            exc,
+        )
     if latest_census is not None:
         normalized["census_validation"] = latest_census
     else:
