@@ -329,6 +329,8 @@ cell-type context for hypothesis generation:
 - `interest_celltypes` are the user/ST-analysis biological focus labels.
 - `primary_resolved_celltype` is the exact Census label used for Stage 1.
 - `matches[*].lost_modifiers` records state labels that Census did not preserve.
+- `celltype_resolution.json` is context-only and must not appear in `evidence_references`;
+  cite Stage 1 pair files for Census evidence.
 
 For every retained hypothesis, `biological_entities.cell_types` should include
 at least one original interest label when relevant to the mechanism, for example

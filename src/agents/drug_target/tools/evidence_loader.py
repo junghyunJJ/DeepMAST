@@ -39,6 +39,13 @@ _HYPOTHESIS_DENIED_CITATIONS: frozenset[str] = frozenset({
     "stage1_evidence.json",
 })
 
+_HYPOTHESIS_CONTEXT_ONLY_CITATION_REASON = (
+    "context-only cell-type resolution; cite Stage 1 pair files for Census evidence."
+)
+_HYPOTHESIS_CONTEXT_ONLY_CITATIONS: frozenset[str] = frozenset({
+    "celltype_resolution.json",
+})
+
 # Files always loaded in full for hypothesis scope regardless of gene filter.
 _HYPOTHESIS_ALWAYS_FULL: frozenset[str] = frozenset({
     "assessment_results.json",
@@ -550,6 +557,12 @@ def _validate_hypothesis_report_references(
                     f"hypotheses[{idx}].evidence_references cites '{token}' "
                     "which is a legacy aggregate or prior-run output forbidden "
                     "as hypothesis input."
+                )
+                continue
+            if token in _HYPOTHESIS_CONTEXT_ONLY_CITATIONS:
+                errors.append(
+                    f"hypotheses[{idx}].evidence_references cites '{token}' "
+                    f"which is {_HYPOTHESIS_CONTEXT_ONLY_CITATION_REASON}"
                 )
                 continue
             m = _STAGE1_PAIR_NAME_RE.match(token)
@@ -1343,6 +1356,14 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
                     "legacy aggregate or prior-run output forbidden as "
                     "hypothesis_writer input; remove the citation."
                 ),
+            })
+            continue
+        if token in _HYPOTHESIS_CONTEXT_ONLY_CITATIONS:
+            invalid.append(ref)
+            denied.append({
+                "reference": ref,
+                "token": token,
+                "reason": _HYPOTHESIS_CONTEXT_ONLY_CITATION_REASON,
             })
             continue
         m = _STAGE1_PAIR_NAME_RE.match(token)
