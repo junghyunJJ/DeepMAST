@@ -2228,6 +2228,103 @@ class TestStage1Batch:
         assert stage1["census_validation"]["csv_file"] == "census_egfr_met_malignant_cell.csv"
         assert stage1["census_validation"]["target_vs_rest"]["coexpression"]["risk_ratio"] == 7.5
 
+    def test_run_stage1_batch_reuses_one_csv_and_batches_remaining_pair(self, tmp_path):
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (tmp_path / "lr_candidates.json").write_text(json.dumps({
+            "pairs": [
+                {"ligand": "EGFR", "receptor": "MET"},
+                {"ligand": "KDR", "receptor": "FLT1"},
+            ],
+        }))
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "EGFR"},
+                {"gene": "KDR"},
+            ],
+        }))
+        for ligand, receptor in (("EGFR", "MET"), ("KDR", "FLT1")):
+            (evidence_dir / f"stage1_{ligand}--{receptor}.json").write_text(json.dumps({
+                "ligand": ligand,
+                "receptor": receptor,
+                "string_ppi": {"interaction_found": True, "combined_score": 0.99},
+            }))
+        (evidence_dir / "census_egfr_met_malignant_cell.csv").write_text(
+            "\n".join([
+                "cell_type,n_cells,gene_a_pos,gene_a_pct,gene_b_pos,gene_b_pct,coexp_pos,coexp_pct",
+                "malignant cell,100,20,20.0,30,30.0,15,15.0",
+                "other,100,5,5.0,10,10.0,2,2.0",
+            ]) + "\n",
+            encoding="utf-8",
+        )
+
+        batch_calls = []
+
+        def fake_batch(pairs, *args, **kwargs):
+            batch_calls.append(pairs)
+            return [
+                {
+                    "gene_a": "KDR",
+                    "gene_b": "FLT1",
+                    "disease": "breast cancer",
+                    "disease_resolution_mode": "exact",
+                    "requested_cell_type": "malignant cell",
+                    "resolved_cell_type": "malignant cell",
+                    "resolution_mode": "exact",
+                    "executed": True,
+                    "errors": [],
+                    "target_vs_rest": {"coexpression": {"risk_ratio": 2.0}},
+                    "n_target_cells": 100,
+                    "n_rest_cells": 100,
+                    "census_version": "test",
+                },
+            ], {}
+
+        class _FakeStage1FilterTool:
+            @staticmethod
+            def invoke(args):
+                return json.dumps({"success": True})
+
+        with (
+            patch(
+                "src.agents.drug_target.tools.stage_domain_tools.query_string_ppi_pair",
+                object(),
+            ),
+            patch(
+                "src.agents.drug_target.tools.census_batch_core.batch_census_lr_pairs",
+                side_effect=fake_batch,
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage1_normalization.finalize_stage1_workspace",
+                return_value={"success": True},
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage_logic.apply_stage1_filter",
+                _FakeStage1FilterTool,
+            ),
+        ):
+            raw = run_stage1_batch.invoke({
+                "data_dir": str(tmp_path),
+                "disease": "breast cancer",
+                "target_cell_type": "malignant cell",
+                "enable_census": True,
+            })
+
+        result = json.loads(raw)
+        reused_stage1 = json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text())
+        batched_stage1 = json.loads((evidence_dir / "stage1_KDR--FLT1.json").read_text())
+
+        assert result["success"] is True
+        assert result["census_reused_csv"] == ["census_egfr_met_malignant_cell.csv"]
+        assert result["census_batch"] == "completed"
+        assert batch_calls == [[("KDR", "FLT1")]]
+        assert reused_stage1["census_validation"]["executed"] is True
+        assert batched_stage1["census_validation"]["executed"] is True
+        assert reused_stage1["census_validation"]["source"] == "csv_integration"
+        assert batched_stage1["census_validation"]["source"] == "batch_census_direct"
+
     def test_run_stage1_batch_reapplies_filter_when_workspace_is_reused(self, tmp_path):
         from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
 

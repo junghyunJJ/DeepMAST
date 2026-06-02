@@ -950,12 +950,31 @@ def _save_census_validation_to_stage1_file(
 ) -> bool:
     json_path = evidence_dir / f"stage1_{ligand}--{receptor}.json"
     if not json_path.exists():
+        logger.warning(
+            "Cannot integrate Census CSV for %s--%s: Stage 1 JSON missing at %s",
+            ligand,
+            receptor,
+            json_path,
+        )
         return False
     try:
         stage1_data = json.loads(json_path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "Cannot integrate Census CSV for %s--%s: failed to parse %s: %s",
+            ligand,
+            receptor,
+            json_path,
+            exc,
+        )
         return False
     if not isinstance(stage1_data, dict):
+        logger.warning(
+            "Cannot integrate Census CSV for %s--%s: Stage 1 JSON is not an object at %s",
+            ligand,
+            receptor,
+            json_path,
+        )
         return False
 
     payload = dict(census_validation)
@@ -1315,7 +1334,6 @@ def run_stage1_batch(
                     batch_census_lr_pairs,
                     write_census_csv,
                 )
-                pairs_list = [list(pair) for pair in pairs_requiring_census]
                 # Create lightweight LLM for cell type / disease semantic matching
                 try:
                     from src.agents.model import create_llm as _create_llm
@@ -1323,7 +1341,7 @@ def run_stage1_batch(
                 except Exception:
                     _census_llm = None
                 _batch_results, csv_results = batch_census_lr_pairs(
-                    pairs_list,
+                    pairs_requiring_census,
                     disease=disease,
                     target_cell_type=target_cell_type,
                     organism="homo_sapiens",
