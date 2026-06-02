@@ -996,12 +996,24 @@ def _integrate_existing_census_csvs(
     pairs: list[tuple[str, str]],
     disease: str,
     input_disease: str,
+    existing_disease_context: dict[str, Any],
     target_cell_type: str,
     stage1_disease_resolution_mode: str,
 ) -> dict[str, Any]:
     from src.agents.drug_target.tools.stage1_normalization import (
         build_census_validation_from_csv,
     )
+
+    if not _census_csv_reuse_provenance_matches(
+        existing_disease_context,
+        input_disease=input_disease,
+        disease=disease,
+        target_cell_type=target_cell_type,
+    ):
+        return {
+            "integrated_pairs": [],
+            "reused_csv": [],
+        }
 
     integrated_pairs: list[tuple[str, str]] = []
     reused_csv: list[str] = []
@@ -1038,6 +1050,44 @@ def _integrate_existing_census_csvs(
         "integrated_pairs": integrated_pairs,
         "reused_csv": reused_csv,
     }
+
+
+def _census_csv_reuse_provenance_matches(
+    disease_context: dict[str, Any],
+    *,
+    input_disease: str,
+    disease: str,
+    target_cell_type: str,
+) -> bool:
+    """Return True when workspace metadata proves Census CSVs fit this request."""
+    if not disease_context:
+        return False
+
+    labels_to_match = [input_disease, disease]
+    for key in ("input_disease", "canonical_disease"):
+        context_label = disease_context.get(key)
+        if any(disease_labels_equal(context_label, label) for label in labels_to_match):
+            break
+    else:
+        return False
+
+    stage1_meta = disease_context.get("stage1")
+    if not isinstance(stage1_meta, dict):
+        return True
+
+    stage1_target = str(stage1_meta.get("target_cell_type") or "").strip()
+    if stage1_target and not disease_labels_equal(stage1_target, target_cell_type):
+        return False
+
+    requested = stage1_meta.get("requested_disease")
+    if requested and not disease_labels_equal(requested, input_disease):
+        return False
+
+    disease_used = stage1_meta.get("disease_used")
+    if disease_used and not disease_labels_equal(disease_used, disease):
+        return False
+
+    return True
 
 
 def _stage1_aggregate_artifacts_exist(evidence_dir: Path) -> bool:
@@ -1202,9 +1252,10 @@ def run_stage1_batch(
         return _as_json({"success": False, "error": f"Cannot parse assessment_results.json: {exc}"})
 
     existing_disease_context = load_disease_context(evidence_dir)
+    assessment_disease = str(assessment.get("disease") or "").strip()
     input_disease = (
-        str(existing_disease_context.get("input_disease") or "").strip()
-        or str(assessment.get("disease") or "").strip()
+        assessment_disease
+        or str(existing_disease_context.get("input_disease") or "").strip()
         or disease
     )
 
@@ -1313,6 +1364,7 @@ def run_stage1_batch(
                 pairs=pairs_requiring_census,
                 disease=disease,
                 input_disease=input_disease,
+                existing_disease_context=existing_disease_context,
                 target_cell_type=target_cell_type,
                 stage1_disease_resolution_mode=stage1_disease_resolution_mode,
             )
