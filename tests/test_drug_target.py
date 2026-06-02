@@ -2356,6 +2356,165 @@ class TestStage1Batch:
         assert stage1["census_validation"]["batch_error"].startswith(batch_error)
         assert stage1["census_validation"]["target_vs_rest"]["coexpression"]["risk_ratio"] == 7.5
 
+    def test_run_stage1_batch_reports_partial_when_one_single_pair_fallback_fails(
+        self,
+        tmp_path,
+    ):
+        from src.agents.drug_target.tools.disease_context import initialize_disease_context
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        initialize_disease_context(
+            evidence_dir,
+            input_disease="breast cancer",
+            input_source="test",
+        )
+        (tmp_path / "lr_candidates.json").write_text(json.dumps({
+            "disease": "breast cancer",
+            "pairs": [
+                {"ligand": "EGFR", "receptor": "MET"},
+                {"ligand": "KDR", "receptor": "FLT1"},
+            ],
+        }))
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "disease": "breast cancer",
+            "stage3_candidates": [
+                {"gene": "EGFR"},
+                {"gene": "KDR"},
+            ],
+        }))
+
+        batch_error = "Census query returned 1101430 cells; max allowed is 1000000"
+        single_pair_calls = []
+
+        def fake_single_pair(args):
+            single_pair_calls.append(args)
+            if args["gene_a"] == "EGFR":
+                Path(args["output_csv"]).write_text(
+                    "\n".join([
+                        "cell_type,n_cells,gene_a_pos,gene_a_pct,gene_b_pos,gene_b_pct,coexp_pos,coexp_pct",
+                        "malignant cell,100,20,20.0,30,30.0,15,15.0",
+                        "other,100,5,5.0,10,10.0,2,2.0",
+                    ]) + "\n",
+                    encoding="utf-8",
+                )
+                return json.dumps({
+                    "gene_a": args["gene_a"],
+                    "gene_b": args["gene_b"],
+                    "disease": args["disease"],
+                    "requested_cell_type": args["target_cell_type"],
+                    "resolved_cell_type": args["target_cell_type"],
+                    "executed": True,
+                    "errors": [],
+                })
+            return json.dumps({
+                "gene_a": args["gene_a"],
+                "gene_b": args["gene_b"],
+                "disease": args["disease"],
+                "requested_cell_type": args["target_cell_type"],
+                "resolved_cell_type": args["target_cell_type"],
+                "executed": False,
+                "errors": ["single-pair census refused to run"],
+                "message": "cap exceeded",
+            })
+
+        class _FakeStringTool:
+            @staticmethod
+            def invoke(args):
+                return json.dumps({
+                    "gene_a": args["gene_a"],
+                    "gene_b": args["gene_b"],
+                    "interaction_found": True,
+                    "combined_score": 0.99,
+                })
+
+        class _FakeStage1FilterTool:
+            @staticmethod
+            def invoke(args):
+                return json.dumps({"success": True})
+
+        class _FakeSinglePairTool:
+            @staticmethod
+            def invoke(args):
+                return fake_single_pair(args)
+
+        with (
+            patch(
+                "src.agents.drug_target.tools.stage_domain_tools.query_string_ppi_pair",
+                _FakeStringTool,
+            ),
+            patch(
+                "src.agents.drug_target.tools.census_batch_core.batch_census_lr_pairs",
+                side_effect=MemoryError(batch_error),
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage1_normalization._batch_census_lr_pairs",
+                side_effect=MemoryError(batch_error),
+            ),
+            patch(
+                "src.agents.drug_target.tools.census_lr_validation_tools.run_compare_census_lr_pair",
+                _FakeSinglePairTool,
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage1_normalization.run_compare_census_lr_pair",
+                _FakeSinglePairTool,
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage1_normalization.finalize_stage1_workspace",
+                return_value={"success": True},
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage_logic.apply_stage1_filter",
+                _FakeStage1FilterTool,
+            ),
+        ):
+            raw = run_stage1_batch.invoke({
+                "data_dir": str(tmp_path),
+                "disease": "breast cancer",
+                "target_cell_type": "malignant cell",
+                "enable_census": True,
+            })
+
+        result = json.loads(raw)
+        successful_stage1 = json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text())
+        failed_stage1 = json.loads((evidence_dir / "stage1_KDR--FLT1.json").read_text())
+
+        assert result["success"] is False
+        assert result["census_batch"] == "partial_with_single_pair_fallback"
+        assert result["census_batch_error"].startswith(batch_error)
+        assert result["census_single_fallback"] == [
+            {
+                "pair": "EGFR--MET",
+                "executed": True,
+                "csv_file": "census_egfr_met_malignant_cell.csv",
+            },
+            {
+                "pair": "KDR--FLT1",
+                "executed": False,
+                "csv_file": "census_kdr_flt1_malignant_cell.csv",
+                "errors": ["single-pair census refused to run"],
+                "message": "cap exceeded",
+                "error": (
+                    "single-pair Census did not execute successfully: "
+                    "single-pair census refused to run; cap exceeded"
+                ),
+            },
+        ]
+        assert len(single_pair_calls) == 2
+        assert not any(error.startswith("Census batch:") for error in result["errors"])
+        assert any("KDR--FLT1" in error for error in result["errors"])
+        assert any("single-pair census refused to run" in error for error in result["errors"])
+        assert successful_stage1["census_validation"]["executed"] is True
+        assert successful_stage1["census_validation"]["source"] == "single_pair_fallback"
+        assert successful_stage1["census_validation"]["batch_error"].startswith(batch_error)
+        failed_validation = failed_stage1.get("census_validation", {})
+        assert failed_validation.get("source") not in {
+            "single_pair_fallback",
+            "csv_integration",
+        }
+        assert not (evidence_dir / "census_kdr_flt1_malignant_cell.csv").exists()
+
     def test_run_stage1_batch_does_not_treat_stale_single_pair_csv_as_success(
         self,
         tmp_path,

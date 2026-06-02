@@ -1680,7 +1680,11 @@ def run_stage1_batch(
                 if fallback["all_succeeded"]:
                     census_status = "completed_with_single_pair_fallback"
                 else:
-                    errors.append(f"Census batch: {exc}")
+                    any_fallback_succeeded = any(
+                        record.get("executed") for record in census_single_fallback
+                    )
+                    if not any_fallback_succeeded:
+                        errors.append(f"Census batch: {exc}")
                     for record in census_single_fallback:
                         if record.get("executed"):
                             continue
