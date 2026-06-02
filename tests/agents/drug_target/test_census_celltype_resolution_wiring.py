@@ -19,7 +19,7 @@ def test_evidence_assessor_exposes_resolver_tool() -> None:
     assert "resolve_census_celltypes" in _tool_names(evidence)
 
 
-def test_census_disable_strips_resolver_tool() -> None:
+def test_census_disable_strips_census_and_cellxgene_tools() -> None:
     subagents = configs.get_subagents(
         data_dir="/tmp/nonexistent",
         disease="pulmonary fibrosis",
@@ -27,7 +27,14 @@ def test_census_disable_strips_resolver_tool() -> None:
     )
     evidence = next(item for item in subagents if item["name"] == "evidence_assessor")
 
-    assert "resolve_census_celltypes" not in _tool_names(evidence)
+    assert {
+        "query_cellxgene_lr_context",
+        "list_census_diseases",
+        "list_census_cell_types",
+        "resolve_census_celltypes",
+        "run_compare_census_lr_pair",
+        "run_batch_census_lr_pairs",
+    }.isdisjoint(_tool_names(evidence))
 
 
 def test_evidence_prompt_requires_resolver_and_celltype_resolution_artifact() -> None:

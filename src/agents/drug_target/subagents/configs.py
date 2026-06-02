@@ -365,6 +365,7 @@ def get_subagents(
         _census_tool_names = {
             "query_cellxgene_lr_context",
             "list_census_diseases",
+            "list_census_cell_types",
             "resolve_census_celltypes",
             "run_compare_census_lr_pair",
             "run_batch_census_lr_pairs",
