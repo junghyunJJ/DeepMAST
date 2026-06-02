@@ -2234,6 +2234,128 @@ class TestStage1Batch:
         assert stage1["census_validation"]["csv_file"] == "census_egfr_met_malignant_cell.csv"
         assert stage1["census_validation"]["target_vs_rest"]["coexpression"]["risk_ratio"] == 7.5
 
+    def test_run_stage1_batch_falls_back_to_single_pair_when_batch_hits_cap(self, tmp_path):
+        from src.agents.drug_target.tools.disease_context import initialize_disease_context
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        initialize_disease_context(
+            evidence_dir,
+            input_disease="breast cancer",
+            input_source="test",
+        )
+        (tmp_path / "lr_candidates.json").write_text(json.dumps({
+            "disease": "breast cancer",
+            "disease_context": "breast cancer malignant cell validation",
+            "pairs": [
+                {"ligand": "EGFR", "receptor": "MET"},
+            ],
+        }))
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "disease": "breast cancer",
+            "stage3_candidates": [
+                {"gene": "EGFR"},
+            ],
+        }))
+
+        batch_error = "Census query returned 1101430 cells; max allowed is 1000000"
+        single_pair_calls = []
+
+        def fake_single_pair(args):
+            single_pair_calls.append(args)
+            Path(args["output_csv"]).write_text(
+                "\n".join([
+                    "cell_type,n_cells,gene_a_pos,gene_a_pct,gene_b_pos,gene_b_pct,coexp_pos,coexp_pct",
+                    "malignant cell,100,20,20.0,30,30.0,15,15.0",
+                    "other,100,5,5.0,10,10.0,2,2.0",
+                ]) + "\n",
+                encoding="utf-8",
+            )
+            return json.dumps({
+                "gene_a": args["gene_a"],
+                "gene_b": args["gene_b"],
+                "disease": args["disease"],
+                "requested_cell_type": args["target_cell_type"],
+                "resolved_cell_type": args["target_cell_type"],
+                "executed": True,
+                "errors": [],
+            })
+
+        class _FakeStringTool:
+            @staticmethod
+            def invoke(args):
+                return json.dumps({
+                    "gene_a": args["gene_a"],
+                    "gene_b": args["gene_b"],
+                    "interaction_found": True,
+                    "combined_score": 0.99,
+                })
+
+        class _FakeStage1FilterTool:
+            @staticmethod
+            def invoke(args):
+                return json.dumps({"success": True})
+
+        class _FakeSinglePairTool:
+            @staticmethod
+            def invoke(args):
+                return fake_single_pair(args)
+
+        with (
+            patch(
+                "src.agents.drug_target.tools.stage_domain_tools.query_string_ppi_pair",
+                _FakeStringTool,
+            ),
+            patch(
+                "src.agents.drug_target.tools.census_batch_core.batch_census_lr_pairs",
+                side_effect=MemoryError(batch_error),
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage1_normalization._batch_census_lr_pairs",
+                side_effect=MemoryError(batch_error),
+            ),
+            patch(
+                "src.agents.drug_target.tools.census_lr_validation_tools.run_compare_census_lr_pair",
+                _FakeSinglePairTool,
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage1_normalization.run_compare_census_lr_pair",
+                _FakeSinglePairTool,
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage_logic.apply_stage1_filter",
+                _FakeStage1FilterTool,
+            ),
+        ):
+            raw = run_stage1_batch.invoke({
+                "data_dir": str(tmp_path),
+                "disease": "breast cancer",
+                "target_cell_type": "malignant cell",
+                "enable_census": True,
+            })
+
+        result = json.loads(raw)
+        stage1 = json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text())
+
+        assert result["success"] is True
+        assert result["census_batch"] == "completed_with_single_pair_fallback"
+        assert result["census_batch_error"].startswith(batch_error)
+        assert result["errors"] == []
+        assert result["census_single_fallback"] == [{
+            "pair": "EGFR--MET",
+            "executed": True,
+            "csv_file": "census_egfr_met_malignant_cell.csv",
+        }]
+        assert len(single_pair_calls) == 1
+        assert single_pair_calls[0]["output_csv"].endswith(
+            "census_egfr_met_malignant_cell.csv"
+        )
+        assert stage1["census_validation"]["executed"] is True
+        assert stage1["census_validation"]["source"] == "single_pair_fallback"
+        assert stage1["census_validation"]["batch_error"].startswith(batch_error)
+        assert stage1["census_validation"]["target_vs_rest"]["coexpression"]["risk_ratio"] == 7.5
+
     def test_run_stage1_batch_reuses_one_csv_and_batches_remaining_pair(self, tmp_path):
         from src.agents.drug_target.tools.disease_context import initialize_disease_context
         from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
