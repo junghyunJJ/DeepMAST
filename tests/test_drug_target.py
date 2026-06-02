@@ -2152,6 +2152,82 @@ class TestStage1Batch:
         assert census_calls == []
         assert json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text()) == existing_payload
 
+    def test_run_stage1_batch_reuses_existing_census_csv_before_batch(self, tmp_path):
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (tmp_path / "lr_candidates.json").write_text(json.dumps({
+            "pairs": [
+                {"ligand": "EGFR", "receptor": "MET"},
+            ],
+        }))
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "EGFR"},
+            ],
+        }))
+        (evidence_dir / "stage1_EGFR--MET.json").write_text(json.dumps({
+            "ligand": "EGFR",
+            "receptor": "MET",
+            "string_ppi": {"interaction_found": True, "combined_score": 0.99},
+        }))
+        (evidence_dir / "census_egfr_met_malignant_cell.csv").write_text(
+            "\n".join([
+                "cell_type,n_cells,gene_a_pos,gene_a_pct,gene_b_pos,gene_b_pct,coexp_pos,coexp_pct",
+                "malignant cell,100,20,20.0,30,30.0,15,15.0",
+                "other,100,5,5.0,10,10.0,2,2.0",
+            ]) + "\n",
+            encoding="utf-8",
+        )
+
+        batch_calls = []
+
+        def fake_batch(*args, **kwargs):
+            batch_calls.append((args, kwargs))
+            raise AssertionError("batch should not run when a valid Census CSV already exists")
+
+        class _FakeStage1FilterTool:
+            @staticmethod
+            def invoke(args):
+                return json.dumps({"success": True})
+
+        with (
+            patch(
+                "src.agents.drug_target.tools.stage_domain_tools.query_string_ppi_pair",
+                object(),
+            ),
+            patch(
+                "src.agents.drug_target.tools.census_batch_core.batch_census_lr_pairs",
+                side_effect=fake_batch,
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage_logic.apply_stage1_filter",
+                _FakeStage1FilterTool,
+            ),
+        ):
+            raw = run_stage1_batch.invoke({
+                "data_dir": str(tmp_path),
+                "disease": "breast cancer",
+                "target_cell_type": "malignant cell",
+                "enable_census": True,
+            })
+
+        result = json.loads(raw)
+        stage1 = json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text())
+
+        assert result["success"] is True
+        assert result["census_batch"] == "completed_from_existing_csv"
+        assert result["census_reused_csv"] == ["census_egfr_met_malignant_cell.csv"]
+        assert result["census_single_fallback"] == []
+        assert result["census_batch_error"] == ""
+        assert result["errors"] == []
+        assert batch_calls == []
+        assert stage1["census_validation"]["executed"] is True
+        assert stage1["census_validation"]["source"] == "csv_integration"
+        assert stage1["census_validation"]["csv_file"] == "census_egfr_met_malignant_cell.csv"
+        assert stage1["census_validation"]["target_vs_rest"]["coexpression"]["risk_ratio"] == 7.5
+
     def test_run_stage1_batch_reapplies_filter_when_workspace_is_reused(self, tmp_path):
         from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
 
