@@ -322,6 +322,25 @@ Read the full skill guide first (do not skip):
 5. **Use only Stage 1 L-R pair files returned in `files`; these are the passed pairs**
 6. Extract key biological entities: convergent pathways, hub genes, tractable targets
 
+### Cell-Type Focus From `interest_celltypes`
+
+If `celltype_resolution.json` is present in `files`, treat it as the authoritative
+cell-type context for hypothesis generation:
+- `interest_celltypes` are the user/ST-analysis biological focus labels.
+- `primary_resolved_celltype` is the exact Census label used for Stage 1.
+- `matches[*].lost_modifiers` records state labels that Census did not preserve.
+
+For every retained hypothesis, `biological_entities.cell_types` should include
+at least one original interest label when relevant to the mechanism, for example
+`AT2` or `Transitional AT2`, and may also include the resolved Census label
+`pulmonary alveolar type 2 cell` when citing Stage 1 Census evidence.
+
+Do not claim that Census separately validated a lost state modifier. If
+`Transitional AT2` resolved through `state_stripped_alias` with
+`lost_modifiers=["transitional"]`, phrase the mechanism as AT2-focused or
+Transitional-AT2-motivated, and state that the Census validation used the broader
+resolved label.
+
 ### CRITICAL: Stage 1 Eligibility Gate (hard rules)
 
 Before referencing ANY stage1 L-R pair in a hypothesis, you MUST check its status

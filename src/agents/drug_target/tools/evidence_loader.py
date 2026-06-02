@@ -42,6 +42,7 @@ _HYPOTHESIS_DENIED_CITATIONS: frozenset[str] = frozenset({
 # Files always loaded in full for hypothesis scope regardless of gene filter.
 _HYPOTHESIS_ALWAYS_FULL: frozenset[str] = frozenset({
     "assessment_results.json",
+    "celltype_resolution.json",
     "stage1_filter.json",
     "stage1_filter_results.json",
     "gene_manifest.json",
