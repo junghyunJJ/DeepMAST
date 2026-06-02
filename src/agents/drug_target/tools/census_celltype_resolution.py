@@ -147,36 +147,6 @@ def _resolve_one(
             "warnings": warnings,
         }
 
-    literal_substring = _match_substring(normalized_input, by_normalized)
-    if literal_substring:
-        matched, count = literal_substring
-        return {
-            "input_celltype": input_celltype,
-            "matched_celltype": matched,
-            "match_mode": "substring",
-            "confidence": "medium",
-            "literal_exact_match": False,
-            "literal_substring_match": True,
-            "lost_modifiers": [],
-            "total_cell_count": count,
-            "warnings": warnings,
-        }
-
-    alias = _match_alias(normalized_input, by_normalized)
-    if alias:
-        matched, count = alias
-        return {
-            "input_celltype": input_celltype,
-            "matched_celltype": matched,
-            "match_mode": "alias",
-            "confidence": "high",
-            "literal_exact_match": False,
-            "literal_substring_match": False,
-            "lost_modifiers": [],
-            "total_cell_count": count,
-            "warnings": warnings,
-        }
-
     stripped, lost_modifiers = _strip_state_modifiers(normalized_input)
     if lost_modifiers and stripped:
         stripped_exact = _match_exact(stripped, by_normalized)
@@ -208,6 +178,36 @@ def _resolve_one(
                 "total_cell_count": count,
                 "warnings": warnings,
             }
+
+    literal_substring = _match_substring(normalized_input, by_normalized)
+    if literal_substring:
+        matched, count = literal_substring
+        return {
+            "input_celltype": input_celltype,
+            "matched_celltype": matched,
+            "match_mode": "substring",
+            "confidence": "medium",
+            "literal_exact_match": False,
+            "literal_substring_match": True,
+            "lost_modifiers": [],
+            "total_cell_count": count,
+            "warnings": warnings,
+        }
+
+    alias = _match_alias(normalized_input, by_normalized)
+    if alias:
+        matched, count = alias
+        return {
+            "input_celltype": input_celltype,
+            "matched_celltype": matched,
+            "match_mode": "alias",
+            "confidence": "high",
+            "literal_exact_match": False,
+            "literal_substring_match": False,
+            "lost_modifiers": [],
+            "total_cell_count": count,
+            "warnings": warnings,
+        }
 
     warnings.append(
         f"No Census cell_type label matched interest cell type '{input_celltype}'."

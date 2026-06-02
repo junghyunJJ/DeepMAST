@@ -111,6 +111,49 @@ def test_resolve_celltype_matches_transitional_at2_records_lost_modifier() -> No
     assert result["primary_resolved_celltype"] == "pulmonary alveolar type 2 cell"
 
 
+def test_resolve_celltype_matches_transitional_fibroblast_records_lost_modifier() -> None:
+    available = {
+        "fibroblast": 1000,
+    }
+
+    result = resolve_celltype_matches(
+        ["Transitional fibroblast"],
+        available,
+        disease="pulmonary fibrosis",
+        organism="homo_sapiens",
+        disease_resolved="pulmonary fibrosis",
+        disease_resolution_mode="exact",
+    )
+
+    match = result["matches"][0]
+    assert match["matched_celltype"] == "fibroblast"
+    assert match["match_mode"] == "state_stripped_exact"
+    assert match["confidence"] == "medium"
+    assert match["lost_modifiers"] == ["transitional"]
+    assert "transitional" in match["warnings"][0]
+
+
+def test_resolve_celltype_matches_activated_at2_label_records_lost_modifier() -> None:
+    available = {
+        "pulmonary alveolar type 2 cell": 7545,
+    }
+
+    result = resolve_celltype_matches(
+        ["Activated pulmonary alveolar type 2 cell"],
+        available,
+        disease="pulmonary fibrosis",
+        organism="homo_sapiens",
+        disease_resolved="pulmonary fibrosis",
+        disease_resolution_mode="exact",
+    )
+
+    match = result["matches"][0]
+    assert match["matched_celltype"] == "pulmonary alveolar type 2 cell"
+    assert match["match_mode"].startswith("state_stripped_")
+    assert match["confidence"] == "medium"
+    assert match["lost_modifiers"] == ["activated"]
+
+
 def test_resolve_celltype_matches_unresolved_keeps_primary_empty() -> None:
     available = {
         "fibroblast": 1000,
