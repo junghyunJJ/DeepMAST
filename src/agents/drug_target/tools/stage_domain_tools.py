@@ -1092,9 +1092,11 @@ def _run_single_pair_census_fallback(
             "executed": False,
             "csv_file": csv_name,
         }
+        invoked_single_pair_tool = False
         try:
             if csv_path.exists():
                 csv_path.unlink()
+            invoked_single_pair_tool = True
             raw = run_compare_census_lr_pair.invoke({
                 "data_dir": str(data_dir),
                 "disease": disease,
@@ -1176,6 +1178,15 @@ def _run_single_pair_census_fallback(
             if not first_resolution_mode:
                 first_resolution_mode = resolution_mode
         except Exception as exc:
+            if invoked_single_pair_tool and csv_path.exists():
+                try:
+                    csv_path.unlink()
+                except OSError as cleanup_exc:
+                    logger.warning(
+                        "Failed to remove rejected single-pair Census CSV %s: %s",
+                        csv_path,
+                        cleanup_exc,
+                    )
             record["error"] = str(exc)
             logger.warning(
                 "Single-pair Census fallback failed for %s from %s: %s",
