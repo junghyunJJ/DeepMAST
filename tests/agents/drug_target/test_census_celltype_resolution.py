@@ -59,6 +59,27 @@ def test_resolve_celltype_matches_at2_alias() -> None:
     assert match["warnings"] == []
 
 
+def test_resolve_celltype_matches_type_ii_alias() -> None:
+    available = {
+        "pulmonary alveolar type 2 cell": 10,
+    }
+
+    result = resolve_celltype_matches(
+        ["type II"],
+        available,
+        disease="pulmonary fibrosis",
+        organism="homo_sapiens",
+        disease_resolved="pulmonary fibrosis",
+        disease_resolution_mode="exact",
+    )
+
+    match = result["matches"][0]
+    assert result["primary_input_celltype"] == "type II"
+    assert result["primary_resolved_celltype"] == "pulmonary alveolar type 2 cell"
+    assert match["matched_celltype"] == "pulmonary alveolar type 2 cell"
+    assert match["match_mode"] == "alias"
+
+
 def test_resolve_celltype_matches_transitional_at2_records_lost_modifier() -> None:
     available = {
         "pulmonary alveolar type 2 cell": 7545,

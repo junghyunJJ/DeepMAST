@@ -22,6 +22,7 @@ _ALIAS_CANONICAL_LABELS = {
     "at2": "pulmonary alveolar type 2 cell",
     "alveolar type 2": "pulmonary alveolar type 2 cell",
     "alveolar type ii": "pulmonary alveolar type 2 cell",
+    "type ii": "pulmonary alveolar type 2 cell",
     "type 2 pneumocyte": "pulmonary alveolar type 2 cell",
     "type ii pneumocyte": "pulmonary alveolar type 2 cell",
     "pulmonary alveolar type 2": "pulmonary alveolar type 2 cell",
