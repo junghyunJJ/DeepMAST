@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 _STAGE1_REF_RE = re.compile(r"^stage1_([A-Za-z0-9-]+)--([A-Za-z0-9-]+)\.json$")
+_STAGE_GENE_REF_RE = re.compile(r"^stage[23]_([A-Za-z0-9-]+)\.json$")
 _JSON_TOKEN_RE = re.compile(r"([A-Za-z0-9_.\-]+\.json)")
 _PAIR_CUE_RE = re.compile(
     r"\b("
@@ -93,6 +94,29 @@ def _entity_genes(hypothesis: dict[str, Any]) -> list[str]:
     return genes
 
 
+def _known_gene_symbols(hypothesis: dict[str, Any]) -> set[str]:
+    genes = set(_entity_genes(hypothesis))
+    refs = hypothesis.get("evidence_references")
+    if not isinstance(refs, list):
+        return genes
+    for ref in refs:
+        token = _stage1_token(ref)
+        if token:
+            pair = _stage1_pair_from_filename(token)
+            if pair:
+                genes.update(pair)
+            continue
+        if not isinstance(ref, str):
+            continue
+        match = _JSON_TOKEN_RE.search(ref)
+        if not match:
+            continue
+        stage_gene = _STAGE_GENE_REF_RE.match(match.group(1))
+        if stage_gene:
+            genes.add(_normal_gene(stage_gene.group(1)))
+    return genes
+
+
 def _pair_text(hypothesis: dict[str, Any]) -> str:
     fields = (
         hypothesis.get("title", ""),
@@ -118,11 +142,13 @@ def _gene_occurs(gene: str, text: str) -> bool:
     ) is not None
 
 
-def _explicit_direct_pairs(text: str) -> set[tuple[str, str]]:
+def _explicit_direct_pairs(text: str, known_genes: set[str]) -> set[tuple[str, str]]:
     claimed: set[tuple[str, str]] = set()
     for match in _EXPLICIT_PAIR_RE.finditer(text):
         claimed.add((_normal_gene(match.group(1)), _normal_gene(match.group(2))))
     for match in _EXPLICIT_SINGLE_HYPHEN_PAIR_RE.finditer(text):
+        if _normal_gene(match.group(0)) in known_genes:
+            continue
         claimed.add((_normal_gene(match.group(1)), _normal_gene(match.group(2))))
     return claimed
 
@@ -133,7 +159,7 @@ def _claimed_direct_pairs(hypothesis: dict[str, Any]) -> set[tuple[str, str]]:
     if not text:
         return set()
 
-    claimed = _explicit_direct_pairs(text)
+    claimed = _explicit_direct_pairs(text, _known_gene_symbols(hypothesis))
     if len(genes) < 2:
         return claimed
 

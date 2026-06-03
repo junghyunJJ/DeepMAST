@@ -484,3 +484,31 @@ def test_hypothesis_grounding_uses_gene_boundaries_for_loose_pair_cues(
     }
 
     assert validate_hypothesis_grounding(report, evidence) == []
+
+
+def test_hypothesis_grounding_preserves_known_hyphenated_gene_mentions(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    report = {
+        "hypotheses": [
+            {
+                "title": "HLA-DRA antigen presentation axis",
+                "core_claim": (
+                    "HLA-DRA supports antigen presentation in IPF without claiming a "
+                    "direct receptor pair."
+                ),
+                "falsifiable_prediction": "HLA-DRA expression will track antigen presentation.",
+                "evidence_references": ["stage3_HLA-DRA.json"],
+                "biological_entities": {
+                    "genes": ["HLA-DRA"],
+                    "pathways": ["antigen presentation"],
+                    "cell_types": ["pulmonary alveolar type 2 cell"],
+                    "drugs": [],
+                },
+            }
+        ]
+    }
+
+    assert validate_hypothesis_grounding(report, evidence) == []
