@@ -10,6 +10,8 @@ from typing import Any
 
 from langchain_core.tools import tool
 
+from src.agents.drug_target.tools.hypothesis_grounding import validate_hypothesis_grounding
+
 _SCHEMA_VERSION = "hypothesis_report.v2"
 _SCORE_KEYS = (
     "evidence_coverage",
@@ -294,9 +296,6 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
         _validate_hypothesis_report_references,
         _validate_hypothesis_report_topn_and_failed_pairs,
     )
-    from src.agents.drug_target.tools.hypothesis_grounding import (
-        validate_hypothesis_grounding,
-    )
 
     diag = _validate_hypothesis_report_topn_and_failed_pairs(canonical, evidence_dir)
     canonical["evidence_coverage_pct"] = diag["evidence_coverage_pct"]
@@ -489,6 +488,16 @@ def validate_hypothesis_report_quality(
                 "INVALID_EVIDENCE_REFERENCES",
                 "; ".join(ref_errors),
                 errors=ref_errors,
+            )
+        )
+    grounding_errors = validate_hypothesis_grounding(canonical, evidence_dir)
+    result["hypothesis_grounding_violations"] = grounding_errors
+    if grounding_errors:
+        result["errors"].append(
+            _quality_error(
+                "HYPOTHESIS_GROUNDING_VIOLATION",
+                "; ".join(grounding_errors),
+                errors=grounding_errors,
             )
         )
     if diag["failed_pair_violations"]:

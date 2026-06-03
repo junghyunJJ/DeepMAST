@@ -94,7 +94,7 @@ def _valid_report() -> dict:
             _hypothesis(
                 4,
                 "Novel Pathway",
-                "FN1-CD4 novel pathway",
+                "FN1 matrix remodeling pathway",
                 ["stage3_FN1.json", "stage3_CD4.json"],
                 ["FN1", "CD4"],
             ),
