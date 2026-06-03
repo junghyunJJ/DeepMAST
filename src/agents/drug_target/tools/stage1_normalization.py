@@ -257,6 +257,7 @@ def resolve_stage1_context(
             "Could not resolve disease for Stage1 context from CLI or metadata. "
             "Provide --disease or populate lr_candidates.json / target_assessment.json / evidence/known_drugs.json."
         )
+    assert resolved_disease is not None
 
     requested_target_cell_type, requested_source = _pick_first_nonempty(
         (target_cell_type, "cli"),
@@ -282,6 +283,7 @@ def resolve_stage1_context(
             "Could not resolve target cell type for Stage1 context from CLI or metadata. "
             "Provide --target-cell-type or populate targets.json with interest_celltypes."
         )
+    assert requested_target_cell_type is not None
 
     resolved_target_cell_type, resolved_source = _pick_first_nonempty(
         (target_cell_type, "cli"),
@@ -299,6 +301,8 @@ def resolve_stage1_context(
         ),
         (resolved_target_cell_type, resolved_source or "resolved_target_cell_type"),
     )
+    assert resolved_target_cell_type is not None
+    assert csv_target_cell_type is not None
 
     return {
         "disease": resolved_disease,

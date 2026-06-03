@@ -212,8 +212,11 @@ def query_cellxgene_lr_context(
                 {"cell_type": str(name), "count": int(count)}
                 for name, count in vc.items()
             ]
+        feature_names = var.get("feature_name")
         result["available_genes"] = sorted(
-            {str(g).upper() for g in var.get("feature_name", []).tolist()}
+            {str(g).upper() for g in feature_names.tolist()}
+            if feature_names is not None
+            else set()
         )
     except Exception as exc:
         result["errors"].append(f"CELLxGENE query failed: {exc}")
@@ -917,15 +920,38 @@ def _stage1_pair_has_census_validation(
     path: str | os.PathLike[str],
     ligand: str,
     receptor: str,
+    *,
+    disease: str,
+    input_disease: str,
+    target_cell_type: str,
 ) -> bool:
-    """Return True when a Stage 1 pair file already carries Census validation."""
+    """Return True when a Stage 1 pair file carries current Census validation."""
     payload = _load_existing_stage1_pair_payload(path, ligand, receptor)
     if not isinstance(payload, dict):
         return False
     census = payload.get("census_validation")
     if not isinstance(census, dict):
         return False
-    return "executed" in census or "target_vs_rest" in census
+    if census.get("executed") is False:
+        return False
+
+    target_vs_rest = census.get("target_vs_rest")
+    if not isinstance(target_vs_rest, dict) or not target_vs_rest:
+        return False
+
+    census_disease = str(census.get("disease") or "").strip()
+    if not (
+        disease_labels_equal(census_disease, disease)
+        or disease_labels_equal(census_disease, input_disease)
+    ):
+        return False
+
+    requested_cell_type = str(census.get("requested_cell_type") or "").strip()
+    resolved_cell_type = str(census.get("resolved_cell_type") or "").strip()
+    return any(
+        disease_labels_equal(candidate, target_cell_type)
+        for candidate in (requested_cell_type, resolved_cell_type)
+    )
 
 
 def _sanitize_census_token(text: str) -> str:
@@ -1549,6 +1575,9 @@ def run_stage1_batch(
                 evidence_dir / f"stage1_{ligand}--{receptor}.json",
                 ligand,
                 receptor,
+                disease=disease,
+                input_disease=input_disease,
+                target_cell_type=target_cell_type,
             )
         ]
         if pairs_requiring_census:
@@ -1838,7 +1867,6 @@ __all__ = [
     "query_gwas_gene_trait",
     "query_stage2_gene_panel",
     "query_chembl_target_profile",
-    "query_pubmed_clinical_limitations",
     "run_stage1_batch",
     "run_stage3_batch",
 ]

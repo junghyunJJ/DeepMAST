@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -210,6 +211,106 @@ def test_artifact_predates_run_when_mtime_is_older(tmp_path):
     assert traced._artifact_predates_run(artifact, artifact.stat().st_mtime + 1)
     assert not traced._artifact_predates_run(artifact, artifact.stat().st_mtime - 1)
     assert traced._artifact_predates_run(tmp_path / "missing.json", 0)
+
+
+def test_should_invoke_finalize_when_drug_md_predates_fresh_hypothesis_report(tmp_path):
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    drug_md = tmp_path / "drug.md"
+    hypothesis_report = evidence_dir / "hypothesis_report.json"
+    drug_md.write_text("stale report", encoding="utf-8")
+    hypothesis_report.write_text("{}", encoding="utf-8")
+    run_started_at = 100.0
+    os.utime(drug_md, (run_started_at - 10, run_started_at - 10))
+    os.utime(hypothesis_report, (run_started_at + 10, run_started_at + 10))
+
+    assert traced._should_invoke_finalize_report(tmp_path, run_started_at)
+
+
+def test_should_not_invoke_finalize_when_drug_md_is_current(tmp_path):
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    drug_md = tmp_path / "drug.md"
+    hypothesis_report = evidence_dir / "hypothesis_report.json"
+    target_assessment = tmp_path / "target_assessment.json"
+    drug_html = tmp_path / "drug_report.html"
+    report_validation = tmp_path / "report_validation.json"
+    drug_md.write_text("fresh report", encoding="utf-8")
+    hypothesis_report.write_text("{}", encoding="utf-8")
+    target_assessment.write_text("{}", encoding="utf-8")
+    drug_html.write_text("<html></html>", encoding="utf-8")
+    report_validation.write_text('{"valid": true}', encoding="utf-8")
+    run_started_at = 100.0
+    os.utime(hypothesis_report, (run_started_at + 5, run_started_at + 5))
+    os.utime(drug_md, (run_started_at + 10, run_started_at + 10))
+    os.utime(target_assessment, (run_started_at + 10, run_started_at + 10))
+    os.utime(drug_html, (run_started_at + 10, run_started_at + 10))
+    os.utime(report_validation, (run_started_at + 10, run_started_at + 10))
+
+    assert not traced._should_invoke_finalize_report(tmp_path, run_started_at)
+
+
+def test_should_invoke_finalize_when_required_report_artifact_missing(tmp_path):
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    drug_md = tmp_path / "drug.md"
+    hypothesis_report = evidence_dir / "hypothesis_report.json"
+    target_assessment = tmp_path / "target_assessment.json"
+    report_validation = tmp_path / "report_validation.json"
+    drug_md.write_text("fresh report", encoding="utf-8")
+    hypothesis_report.write_text("{}", encoding="utf-8")
+    target_assessment.write_text("{}", encoding="utf-8")
+    report_validation.write_text('{"valid": true}', encoding="utf-8")
+    run_started_at = 100.0
+    os.utime(hypothesis_report, (run_started_at + 5, run_started_at + 5))
+    os.utime(drug_md, (run_started_at + 10, run_started_at + 10))
+    os.utime(target_assessment, (run_started_at + 10, run_started_at + 10))
+    os.utime(report_validation, (run_started_at + 10, run_started_at + 10))
+
+    assert traced._should_invoke_finalize_report(tmp_path, run_started_at)
+
+
+def test_should_invoke_finalize_when_report_validation_predates_hypothesis(tmp_path):
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    drug_md = tmp_path / "drug.md"
+    hypothesis_report = evidence_dir / "hypothesis_report.json"
+    target_assessment = tmp_path / "target_assessment.json"
+    drug_html = tmp_path / "drug_report.html"
+    report_validation = tmp_path / "report_validation.json"
+    drug_md.write_text("fresh report", encoding="utf-8")
+    hypothesis_report.write_text("{}", encoding="utf-8")
+    target_assessment.write_text("{}", encoding="utf-8")
+    drug_html.write_text("<html></html>", encoding="utf-8")
+    report_validation.write_text('{"valid": true}', encoding="utf-8")
+    run_started_at = 100.0
+    os.utime(report_validation, (run_started_at + 3, run_started_at + 3))
+    os.utime(target_assessment, (run_started_at + 4, run_started_at + 4))
+    os.utime(hypothesis_report, (run_started_at + 5, run_started_at + 5))
+    os.utime(drug_html, (run_started_at + 10, run_started_at + 10))
+    os.utime(drug_md, (run_started_at + 10, run_started_at + 10))
+
+    assert traced._should_invoke_finalize_report(tmp_path, run_started_at)
+
+
+def test_should_not_print_finalize_skip_note_when_finalize_ran():
+    report_status = {"finalized": True}
+
+    assert not traced._should_print_finalize_skip_note(
+        report_status,
+        pre_run_drug_md_exists=True,
+        finalize_report_invoked=True,
+    )
+
+
+def test_should_print_finalize_skip_note_when_existing_report_was_reused():
+    report_status = {"finalized": True}
+
+    assert traced._should_print_finalize_skip_note(
+        report_status,
+        pre_run_drug_md_exists=True,
+        finalize_report_invoked=False,
+    )
 
 
 def test_host_hypothesis_fallback_rewrites_failed_suffix_fixture(tmp_path):

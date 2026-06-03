@@ -506,6 +506,45 @@ def _artifact_predates_run(path: Path, run_started_at: float) -> bool:
         return True
 
 
+def _should_invoke_finalize_report(data_dir: Path, run_started_at: float) -> bool:
+    drug_md_path = data_dir / "drug.md"
+    hypothesis_path = data_dir / "evidence" / "hypothesis_report.json"
+    drug_html_path = data_dir / "drug_report.html"
+    report_validation_path = data_dir / "report_validation.json"
+    required_artifacts = [
+        data_dir / "target_assessment.json",
+        drug_html_path,
+        report_validation_path,
+    ]
+    if _artifact_predates_run(drug_md_path, run_started_at):
+        return True
+    if any(not artifact.exists() for artifact in required_artifacts):
+        return True
+    try:
+        if not hypothesis_path.exists():
+            return False
+        hypothesis_mtime = hypothesis_path.stat().st_mtime
+        return hypothesis_mtime > drug_md_path.stat().st_mtime or any(
+            hypothesis_mtime > artifact.stat().st_mtime
+            for artifact in (drug_html_path, report_validation_path)
+        )
+    except OSError:
+        return False
+
+
+def _should_print_finalize_skip_note(
+    report_status: dict,
+    *,
+    pre_run_drug_md_exists: bool,
+    finalize_report_invoked: bool,
+) -> bool:
+    return (
+        bool(report_status.get("finalized"))
+        and pre_run_drug_md_exists
+        and not finalize_report_invoked
+    )
+
+
 def _host_hypothesis_fallback_enabled() -> bool:
     value = os.environ.get("DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK", "")
     return value.strip().casefold() in {"1", "true", "yes", "on", "smoke", "recovery"}
@@ -956,6 +995,7 @@ async def run_traced(args: argparse.Namespace) -> int:
     }
     # Record whether drug.md existed before this run (for idempotency SOP message)
     pre_run_drug_md_exists = (data_dir / "drug.md").exists()
+    finalize_report_invoked = False
 
     try:
         async for chunk in agent.astream(
@@ -1306,8 +1346,9 @@ async def run_traced(args: argparse.Namespace) -> int:
                 "\n[FINALIZE_REPORT] skipped because hypothesis quality gate "
                 "did not pass\n"
             )
-    elif not drug_md_path.exists():
+    elif _should_invoke_finalize_report(data_dir, start):
         print("\n[FINALIZE_REPORT] Invoking super-graph finalize_report node...")
+        finalize_report_invoked = True
         finalize_start = time.time()
         try:
             from src.agents.drug_target.finalize_report import finalize_report
@@ -1476,7 +1517,11 @@ async def run_traced(args: argparse.Namespace) -> int:
         print(f"\n  drug.md: {len(content):,} chars")
 
     # ── Idempotency SOP: hint when finalize_report was skipped ───────────
-    if report_status["finalized"] and pre_run_drug_md_exists:
+    if _should_print_finalize_skip_note(
+        report_status,
+        pre_run_drug_md_exists=pre_run_drug_md_exists,
+        finalize_report_invoked=finalize_report_invoked,
+    ):
         print(
             "\nNOTE: finalize_report may have been skipped because drug.md already"
             " existed in the data_dir before this run.",

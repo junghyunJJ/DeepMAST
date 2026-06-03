@@ -2103,6 +2103,9 @@ class TestStage1Batch:
             "receptor": "MET",
             "string_ppi": {"interaction_found": True, "combined_score": 0.99},
             "census_validation": {
+                "disease": "pulmonary fibrosis",
+                "requested_cell_type": "pulmonary alveolar type 2 cell",
+                "resolved_cell_type": "pulmonary alveolar type 2 cell",
                 "executed": True,
                 "target_vs_rest": {"coexpression_p_value": 0.01},
             },
@@ -2151,6 +2154,109 @@ class TestStage1Batch:
         assert result["census_batch"] == "skipped_existing"
         assert census_calls == []
         assert json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text()) == existing_payload
+
+    def test_run_stage1_batch_reruns_census_when_existing_validation_is_stale_for_cell_type(
+        self,
+        tmp_path,
+    ):
+        from src.agents.drug_target.tools.stage_domain_tools import run_stage1_batch
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (tmp_path / "lr_candidates.json").write_text(json.dumps({
+            "pairs": [
+                {"ligand": "EGFR", "receptor": "MET"},
+            ],
+        }))
+        (evidence_dir / "assessment_results.json").write_text(json.dumps({
+            "stage3_candidates": [
+                {"gene": "EGFR"},
+            ],
+        }))
+        (evidence_dir / "stage1_EGFR--MET.json").write_text(json.dumps({
+            "ligand": "EGFR",
+            "receptor": "MET",
+            "string_ppi": {"interaction_found": True, "combined_score": 0.99},
+            "census_validation": {
+                "disease": "breast cancer",
+                "requested_cell_type": "malignant cell",
+                "resolved_cell_type": "malignant cell",
+                "executed": True,
+                "target_vs_rest": {"coexpression_p_value": 0.01},
+            },
+        }))
+
+        batch_calls = []
+
+        def fake_batch(pairs, **kwargs):
+            batch_calls.append({"pairs": pairs, **kwargs})
+            return [
+                {
+                    "gene_a": "EGFR",
+                    "gene_b": "MET",
+                    "disease": kwargs["disease"],
+                    "disease_resolution_mode": "exact",
+                    "requested_cell_type": kwargs["target_cell_type"],
+                    "resolved_cell_type": kwargs["target_cell_type"],
+                    "resolution_mode": "exact",
+                    "executed": True,
+                    "errors": [],
+                    "target_vs_rest": {"coexpression_p_value": 0.02},
+                    "n_target_cells": 10,
+                    "n_rest_cells": 90,
+                    "census_version": "test",
+                }
+            ], {}
+
+        class _FakeStage1FilterTool:
+            @staticmethod
+            def invoke(args):
+                return json.dumps({"success": True})
+
+        with (
+            patch(
+                "src.agents.drug_target.tools.stage_domain_tools.query_string_ppi_pair",
+                object(),
+            ),
+            patch(
+                "src.agents.drug_target.tools.census_batch_core.batch_census_lr_pairs",
+                side_effect=fake_batch,
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage1_normalization.finalize_stage1_workspace",
+                return_value={"success": True},
+            ),
+            patch(
+                "src.agents.drug_target.tools.stage_logic.apply_stage1_filter",
+                _FakeStage1FilterTool,
+            ),
+        ):
+            raw = run_stage1_batch.invoke({
+                "data_dir": str(tmp_path),
+                "disease": "breast cancer",
+                "target_cell_type": "mammary gland epithelial cell",
+                "enable_census": True,
+            })
+
+        result = json.loads(raw)
+        stage1 = json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text())
+
+        assert result["success"] is True
+        assert result["census_batch"] == "completed"
+        assert len(batch_calls) == 1
+        batch_calls[0].pop("llm", None)
+        assert batch_calls == [{
+            "pairs": [("EGFR", "MET")],
+            "disease": "breast cancer",
+            "target_cell_type": "mammary gland epithelial cell",
+            "organism": "homo_sapiens",
+            "census_version": "2025-11-08",
+        }]
+        assert stage1["census_validation"]["source"] == "batch_census_direct"
+        assert stage1["census_validation"]["resolved_cell_type"] == (
+            "mammary gland epithelial cell"
+        )
+        assert stage1["census_validation"]["target_vs_rest"]["coexpression_p_value"] == 0.02
 
     def test_run_stage1_batch_reuses_existing_census_csv_before_batch(self, tmp_path):
         from src.agents.drug_target.tools.disease_context import initialize_disease_context
@@ -3154,6 +3260,9 @@ class TestStage1Batch:
             "receptor": "MET",
             "string_ppi": {"interaction_found": True, "combined_score": 0.99},
             "census_validation": {
+                "disease": "pulmonary fibrosis",
+                "requested_cell_type": "pulmonary alveolar type 2 cell",
+                "resolved_cell_type": "pulmonary alveolar type 2 cell",
                 "executed": True,
                 "target_vs_rest": {"coexpression_p_value": 0.01},
             },
