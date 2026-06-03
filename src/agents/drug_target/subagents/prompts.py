@@ -66,15 +66,16 @@ Gene→Pair Mapping → Stage 1 (FEATURED pairs) → Stage 1 Gate → Stage 3 (C
    Census queries in Stage 1 only. Do NOT pass `census_disease` to Stage 2.
 
 3. **Cell type name matching** -- Call
-   `resolve_census_celltypes(interest_celltypes=interest_celltypes, disease=CENSUS_DISEASE)`
+   `resolve_census_celltypes(interest_celltypes=interest_celltypes, disease=CENSUS_DISEASE, data_dir=DATA_DIR)`
    to resolve every target cell type from targets.json against the full disease-scoped
    CELLxGENE Census cell_type label set.
 
+   The resolver output intentionally includes a compact
+   `available_celltype_preview`, not the full label set. The full
+   disease-scoped option set is saved as `evidence/census_celltype_options.json`.
+
    Save the parsed resolver response with:
    `save_evidence(data_dir=DATA_DIR, filename="celltype_resolution.json", data=<resolver_response>)`.
-
-   Use `primary_resolved_celltype` from `celltype_resolution.json` as
-   `CENSUS_CELL_TYPE`.
 
    Use the first resolved interest cell type as the Stage 1 target. Preserve all
    matches, match modes, and lost_modifiers in `celltype_resolution.json` for
@@ -82,12 +83,34 @@ Gene→Pair Mapping → Stage 1 (FEATURED pairs) → Stage 1 Gate → Stage 3 (C
    `pulmonary alveolar type 2 cell`, while `Transitional AT2` may resolve to the
    same Census label with `lost_modifiers=["transitional"]`.
 
-   **CRITICAL: Only use `primary_resolved_celltype` after the resolver response has
-   `executed == true` and `errors == []`. `CENSUS_CELL_TYPE` must be the exact
-   `primary_resolved_celltype` returned by `resolve_census_celltypes`.
-   Do not use `list_census_cell_types` for matching, and do not invent a Census label. If
-   `executed` is false, `errors` is non-empty, or `primary_resolved_celltype` is
-   empty, stop before Census Stage 1 and report the resolver errors.**
+   If the resolver response has `executed == true`, `errors == []`, and an
+   unresolved or empty `primary_resolved_celltype`, inspect
+   `available_celltype_preview` first. If the preview is insufficient, call
+   `search_census_celltype_options(data_dir=DATA_DIR, query=<short biological query>, top_k=25)`
+   to inspect compact candidates from the saved option artifact.
+
+   Semantic proxy selection must only use labels from `available_celltype_preview`
+   or `search_census_celltype_options` results. Do not hard-code tumor or lineage vocabulary.
+   Do not invent labels absent from the saved
+   `evidence/census_celltype_options.json` artifact.
+
+   When a biologically defensible proxy exists, call
+   `apply_semantic_celltype_proxy(resolution_result=<resolver_response>, data_dir=DATA_DIR, input_celltype=<original input label>, matched_celltype=<exact selected Census label>, rationale=<biological rationale>, confidence="medium", lost_modifiers=<lost modifiers>, candidate_labels_considered=<labels from preview/search>)`.
+   The `matched_celltype` value must be the exact selected label from preview or
+   search. Save the returned payload as `celltype_resolution.json` and use its
+   `primary_resolved_celltype`.
+
+   Example: `Prolif Invasive Tumor` may use `malignant cell` if it appears in
+   preview/search and no closer state-specific Census label exists.
+
+   **CRITICAL: Only use `primary_resolved_celltype` after the saved resolution
+   payload has `executed == true` and `errors == []`. `CENSUS_CELL_TYPE` must be
+   the exact `primary_resolved_celltype` from `celltype_resolution.json`. Stage 1
+   uses only `primary_resolved_celltype` from the saved resolution payload.
+   Do not use `list_census_cell_types` for matching. If `executed` is false,
+   `errors` is non-empty, or `primary_resolved_celltype` is empty after preview
+   and search/proxy evaluation, stop before Census Stage 1 and report the
+   unresolved cell type plus candidate labels considered.**
 
 ### Stage 2: Target Validation & Scoring (ALL unique genes — RUNS FIRST)
 

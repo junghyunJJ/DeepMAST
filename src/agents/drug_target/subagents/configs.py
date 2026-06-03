@@ -30,6 +30,7 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
 from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
 from src.agents.drug_target.middleware import HypothesisRetryLoopMiddleware
 from src.agents.drug_target.tools import (
+    apply_semantic_celltype_proxy,
     compute_rubric_scores,
     finalize_stage1_artifacts,
     list_census_cell_types,
@@ -43,6 +44,7 @@ from src.agents.drug_target.tools import (
     query_string_ppi_pair,
     read_skill_file,
     resolve_census_celltypes,
+    search_census_celltype_options,
     run_stage3_batch,
     run_batch_census_lr_pairs,
     run_compare_census_lr_pair,
@@ -254,6 +256,8 @@ SUBAGENT_CONFIGS = {
             list_census_diseases,
             list_census_cell_types,
             resolve_census_celltypes,
+            search_census_celltype_options,
+            apply_semantic_celltype_proxy,
             # Stage 2: Target Validation (runs FIRST — batch all genes)
             query_stage2_gene_panel,
             query_ensembl_vep_consequence,
@@ -405,6 +409,8 @@ def get_subagents(
             "list_census_diseases",
             "list_census_cell_types",
             "resolve_census_celltypes",
+            "search_census_celltype_options",
+            "apply_semantic_celltype_proxy",
             "run_compare_census_lr_pair",
             "run_batch_census_lr_pairs",
         }
@@ -421,12 +427,14 @@ def get_subagents(
                     "\n\n## Census API: DISABLED\n"
                     "Census tools (`query_cellxgene_lr_context`, `list_census_diseases`, "
                     "`list_census_cell_types`, `resolve_census_celltypes`, "
+                    "`search_census_celltype_options`, `apply_semantic_celltype_proxy`, "
                     "`run_compare_census_lr_pair`, "
                     "`run_batch_census_lr_pairs`) are NOT available in this run.\n"
                     "- Skip Phase 0 Census disease/cell-type matching entirely.\n"
                     "- In Stage 1, rely on STRING-only validation via run_stage1_batch(enable_census=false).\n"
-                    "- Do NOT call query_cellxgene_lr_context, run_compare_census_lr_pair, "
-                    "or run_batch_census_lr_pairs.\n"
+                    "- Do NOT call query_cellxgene_lr_context, search_census_celltype_options, "
+                    "apply_semantic_celltype_proxy, run_compare_census_lr_pair, or "
+                    "run_batch_census_lr_pairs.\n"
                 )
 
     # Apply per-subagent model overrides
