@@ -360,6 +360,49 @@ def test_apply_semantic_celltype_proxy_accepts_label_from_full_artifact_options(
     assert "semantic proxy" in match["warnings"][0]
 
 
+def test_apply_semantic_celltype_proxy_tool_reads_full_artifact_options(
+    tmp_path: Path,
+) -> None:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "census_celltype_options.json").write_text(
+        json.dumps(
+            {
+                "available_celltype_options": [
+                    {"label": "malignant cell", "total_cell_count": 576171},
+                    {"label": "macrophage", "total_cell_count": 80485},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = resolve_celltype_matches(
+        ["Prolif Invasive Tumor"],
+        {"malignant cell": 576171, "macrophage": 80485},
+        disease="breast cancer",
+        organism="homo_sapiens",
+        disease_resolved="breast cancer",
+        disease_resolution_mode="exact",
+        preview_limit=1,
+    )
+
+    raw = resolution.apply_semantic_celltype_proxy.invoke(
+        {
+            "resolution_result": result,
+            "data_dir": str(tmp_path),
+            "input_celltype": "Prolif Invasive Tumor",
+            "matched_celltype": "malignant cell",
+            "rationale": "Agent selected malignant cell from saved Census options.",
+            "confidence": "medium",
+        }
+    )
+    payload = json.loads(raw)
+
+    assert payload["primary_resolved_celltype"] == "malignant cell"
+    assert payload["primary_match_mode"] == "semantic_proxy"
+    assert payload["matches"][0]["match_mode"] == "semantic_proxy"
+
+
 def test_apply_semantic_celltype_proxy_rejects_label_not_in_full_options() -> None:
     result = resolve_celltype_matches(
         ["Prolif Invasive Tumor"],
