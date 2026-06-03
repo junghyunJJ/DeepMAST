@@ -3,26 +3,38 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Find PubMed literature for ligand-receptor, pathway, and celltype evidence in a breast cancer ST/CCI analysis and save the grounded result set to /papers.json.",
-      "expected_output": "Triggers the skill, uses the SEARCHER literature workflow, and saves a grounded /papers.json result set.",
+      "prompt": "I have an LR pair TGFB1 (ligand) and TGFBR2 (receptor) in breast cancer and want PubMed evidence that supports the interaction so I can cite it.",
+      "expected_output": "Triggers the skill, calls search_literature_dynamic with disease=breast cancer, max_results=100, max_iterations=1, output_path=papers_raw.json, then calls create_literature_handoff to write citation_candidates.json and filtered papers.json with direct/context evidence only.",
       "files": []
     },
     {
       "id": 2,
-      "prompt": "I need a literature pass for pathway and celltype gaps from an ST/CCI result, and the follow-up should be bundled instead of stopping early on coverage_sufficient.",
-      "expected_output": "Triggers the skill and describes bundled multi-axis follow-up using coverage plus missing pathway/celltype signals.",
+      "prompt": "Find primary literature for APOE and TREM2 in Alzheimer disease, with microglia as the celltype context.",
+      "expected_output": "Triggers the skill, retrieves one saved papers_raw.json with genes including APOE and TREM2, celltypes=[Microglia], disease=Alzheimer disease, dedups saved papers, writes citation_candidates.json, and writes filtered papers.json capped to direct/context evidence.",
       "files": []
     },
     {
       "id": 3,
-      "prompt": "Run the SEARCHER literature workflow for a high-context breast cancer interaction case and keep the paper set grounded for downstream interpretation.",
-      "expected_output": "Triggers the skill and preserves the SEARCHER-facing manual-wrapper distinction while keeping the workflow grounded.",
+      "prompt": "Back my CellChat top-ranked ligand-receptor pair COL1A2 and ITGA1 in breast cancer with primary literature.",
+      "expected_output": "Triggers the skill, treats CellChat as prioritization context rather than a query keyword, retrieves one saved papers_raw.json with COL1A2 and ITGA1 in the search context, and writes citation_candidates.json plus filtered papers.json.",
       "files": []
     },
     {
       "id": 4,
-      "prompt": "Write a general overview of breast cancer biology without using a structured literature-search workflow.",
-      "expected_output": "Does not over-trigger the full SEARCHER workflow, or explicitly declines to apply it because the request is out of scope.",
+      "prompt": "Find evidence for APP and AGER in Alzheimer disease; I need to avoid false positives from short symbols.",
+      "expected_output": "Triggers the skill, uses one retrieval call, then applies boundary regex matching in deterministic grading so substring collisions are rejected or placed in rejected_weak_evidence.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Write a general overview of breast cancer biology without using a structured literature-search workflow or citing specific papers.",
+      "expected_output": "Does not trigger the skill, or explicitly declines to apply it because the request does not need primary literature evidence artifacts.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Summarize what we know about cancer in three sentences. Do not look anything up.",
+      "expected_output": "Does not trigger the skill because the user suppresses lookup and does not request citation artifacts.",
       "files": []
     }
   ]

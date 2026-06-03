@@ -17,8 +17,8 @@ Example:
     python scripts/search_literature_dynamic.py \
         --genes "CDH1,TGFB1,VIM" \
         --disease "breast cancer" \
-        --max-results 20 \
-        --output-path papers.json \
+        --max-results 100 \
+        --output-path papers_raw.json \
         --data-dir /tmp/literature-smoke
 """
 
@@ -79,8 +79,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-results",
         type=int,
-        default=30,
-        help="Maximum number of papers to return (default: 30).",
+        default=100,
+        help="Maximum number of papers to return (default: 100 for SEARCHER raw retrieval).",
     )
     parser.add_argument(
         "--target-gene-coverage",
@@ -116,7 +116,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-path",
         default="",
-        help="Relative output JSON filename for auto-save (e.g., papers.json).",
+        help="Relative output JSON filename for auto-save (e.g., papers_raw.json for SEARCHER raw retrieval).",
     )
     parser.add_argument(
         "--data-dir",

@@ -54,6 +54,8 @@ def list_skills(project_skills_dir: Path | None = None) -> list[SkillMetadata]:
     for skill_dir in project_skills_dir.iterdir():
         if not skill_dir.is_dir():
             continue
+        if _is_archived_skill_dir(skill_dir):
+            continue
 
         skill_file = skill_dir / "SKILL.md"
         if not skill_file.exists():
@@ -71,6 +73,11 @@ def list_skills(project_skills_dir: Path | None = None) -> list[SkillMetadata]:
             )
 
     return skills
+
+
+def _is_archived_skill_dir(skill_dir: Path) -> bool:
+    """Return true for versioned skill snapshots kept under skills/."""
+    return bool(re.search(r"_v\d+(?:\.\d+)*(?:$|[-_])", skill_dir.name))
 
 
 def _parse_skill_frontmatter(skill_file: Path) -> dict | None:

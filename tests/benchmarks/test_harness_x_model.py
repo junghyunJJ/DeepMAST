@@ -4,7 +4,9 @@ import argparse
 import json
 import os
 import sys
+import urllib.request
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -18,6 +20,7 @@ from docs.benchmarks.harness_x_model.common import (
     BENCHMARK_SKILL_KWARG_HINT,
     HARDCODED_SKILL_BLOCK,
     SearchTrialResult,
+    _ADVANCED_KWARG_LEAKAGE_TERMS,
     _make_benchmark_search_tool,
     _searcher_tools,
     _SEARCHER_PROMPT_KWARG_STRIPS,
@@ -33,6 +36,7 @@ from docs.benchmarks.harness_x_model.common import (
     normalize_case,
     select_pilot_cases,
 )
+from docs.benchmarks.harness_x_model import common as harness_common
 
 
 @pytest.fixture
@@ -323,10 +327,32 @@ def test_compose_searcher_prompt_on_arm_has_kwarg_hint_mode_c() -> None:
     assert "enable_lr_pair_queries=True" in prompt
 
 
+@pytest.mark.parametrize("benchmark_mode", ["B_prime", "C"])
+def test_compose_searcher_prompt_on_arm_preserves_skill_kwarg_hint(
+    benchmark_mode: str,
+) -> None:
+    prompt = compose_searcher_prompt(skill_on=True, benchmark_mode=benchmark_mode)
+
+    assert BENCHMARK_SKILL_KWARG_HINT in prompt
+    assert "Advanced Kwargs" in prompt
+    assert "enable_lr_pair_queries=True" in prompt
+    assert "coverage_weighted_sort=True" in prompt
+
+
 def test_compose_searcher_prompt_off_arm_hides_kwarg_hint_mode_c() -> None:
     prompt = compose_searcher_prompt(skill_on=False, benchmark_mode="C")
     assert "Advanced Kwargs" not in prompt
     assert "enable_lr_pair_queries=True" not in prompt
+
+
+@pytest.mark.parametrize("benchmark_mode", ["B_prime", "C"])
+def test_compose_searcher_prompt_off_arm_has_no_advanced_kwarg_leakage(
+    benchmark_mode: str,
+) -> None:
+    prompt = compose_searcher_prompt(skill_on=False, benchmark_mode=benchmark_mode)
+
+    for term in _ADVANCED_KWARG_LEAKAGE_TERMS:
+        assert term not in prompt
 
 
 def test_off_arm_has_no_behavioral_fan_out_hint_mode_bprime() -> None:
@@ -420,9 +446,11 @@ def test_restricted_schema_parity() -> None:
     whether to expose it in the restricted schema.
     """
     from src.agents.deep_interpreter.tools.literature import search_literature_dynamic
-    full = set(search_literature_dynamic.args_schema.model_json_schema()["properties"].keys())
+    full_schema = cast(Any, search_literature_dynamic.args_schema)
+    full = set(full_schema.model_json_schema()["properties"].keys())
     restricted_tool = _make_benchmark_search_tool(skill_on=False)
-    restricted = set(restricted_tool.args_schema.model_json_schema()["properties"].keys())
+    restricted_schema = cast(Any, restricted_tool.args_schema)
+    restricted = set(restricted_schema.model_json_schema()["properties"].keys())
     diff = full - restricted
     assert diff == {"enable_lr_pair_queries", "coverage_weighted_sort"}, (
         f"Schema drift detected: full−restricted = {diff}; "
@@ -728,3 +756,52 @@ def test_apply_ollama_host_override_sets_both_env_vars(monkeypatch) -> None:
     apply_ollama_host_override(argparse.Namespace(ollama_host=None))
     assert "OLLAMA_HOST" not in os.environ
     assert "OLLAMA_BASE_URL" not in os.environ
+
+
+def test_ollama_readiness_cache_keys_by_host_and_model(monkeypatch) -> None:
+    """Same model on a different Ollama host must not be skipped by the readiness cache."""
+    calls: list[str] = []
+
+    class FakeResponse:
+        def read(self) -> bytes:
+            return b'{"models": []}'
+
+    def fake_urlopen(request, timeout):
+        calls.append(request if isinstance(request, str) else request.full_url)
+        return FakeResponse()
+
+    monkeypatch.setenv("OLLAMA_HOST", "http://localhost:7000")
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(harness_common, "_last_ollama_target", None, raising=False)
+
+    harness_common._ensure_ollama_model_ready("qwen3.5:35b")
+    harness_common._ensure_ollama_model_ready("qwen3.5:35b")
+    monkeypatch.setenv("OLLAMA_HOST", "http://localhost:7001")
+    harness_common._ensure_ollama_model_ready("qwen3.5:35b")
+
+    assert calls == [
+        "http://localhost:7000/api/ps",
+        "http://localhost:7001/api/ps",
+    ]
+
+
+def test_ollama_readiness_probe_failure_does_not_update_cache(monkeypatch) -> None:
+    """A failed readiness probe must not mark the host/model pair as ready."""
+    calls: list[str] = []
+
+    def fake_urlopen(request, timeout):
+        calls.append(request if isinstance(request, str) else request.full_url)
+        raise OSError("connection refused")
+
+    monkeypatch.setenv("OLLAMA_HOST", "http://localhost:7000")
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(harness_common, "_last_ollama_target", None, raising=False)
+
+    harness_common._ensure_ollama_model_ready("qwen3.5:35b")
+    harness_common._ensure_ollama_model_ready("qwen3.5:35b")
+
+    assert calls == [
+        "http://localhost:7000/api/ps",
+        "http://localhost:7000/api/ps",
+    ]
+    assert harness_common._last_ollama_target is None

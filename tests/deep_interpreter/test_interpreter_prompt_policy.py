@@ -16,6 +16,7 @@ import re
 import pytest
 
 from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
+from src.agents.deep_interpreter.subagents.configs import SUBAGENT_CONFIGS
 
 
 INTERPRETER_PROMPT = SUBAGENT_PROMPTS["interpreter"]
@@ -130,3 +131,26 @@ def test_phase4_labels_consumer_side_comparison():
         "so future maintainers do not mistakenly add score_threshold=0.8 to "
         "validate_quality."
     )
+
+
+def test_interpreter_prompt_treats_papers_json_as_filtered_handoff():
+    prompt = INTERPRETER_PROMPT
+
+    assert "filtered" in prompt.lower()
+    assert "evidence_bucket" in prompt
+    assert "direct_lr_evidence" in prompt
+    assert "receptor_pathway_context_evidence" in prompt
+    assert "disease_only_background" in prompt
+    assert "rejected_weak_evidence" in prompt
+    assert "context-level" in prompt.lower()
+    assert "partN_papers" not in prompt
+    assert "/part1_papers" not in prompt
+    assert "/part2_papers" not in prompt
+    assert "/part3_papers" not in prompt
+
+
+def test_interpreter_config_uses_filtered_shared_papers_json():
+    description = SUBAGENT_CONFIGS["interpreter"]["description"]
+
+    assert "filtered /papers.json" in description
+    assert "partN_papers" not in description

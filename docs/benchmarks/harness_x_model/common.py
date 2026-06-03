@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 #   B       — kwargs pinned in both arms (null control, kwarg-pinned appendix)
 #   B_prime — kwargs stripped from prompt, hint on skill_on arm only
 #   C       — all B' behavior + schema isolation on skill_off arm
-BENCHMARK_MODE = Literal["B", "B_prime", "C"]
+#   retrieval_only — raw retrieval only; no production handoff artifacts during agent run
+BENCHMARK_MODE = Literal["B", "B_prime", "C", "retrieval_only"]
 
 from src.agents.deep_interpreter.agent import DeepInterpreterConfig, _build_skill_registry
 from src.agents.deep_interpreter.middleware import WriteFileArgGuardMiddleware
@@ -105,17 +106,61 @@ Use the provided benchmark case context directly. Do not inspect raw CSVs or exp
 """.strip()
 
 
+BENCHMARK_APPENDIX_RETRIEVAL_ONLY = """
+## Benchmark Mode Override: SEARCHER retrieval-only benchmark mode
+
+You are running a retrieval-only skill benchmark.
+
+1. Read `/data_path.txt` to get the workspace directory.
+2. Read `/benchmark_case.json` to get the exact benchmark case payload.
+3. Extract `search_context` from that file and write it to `/search_context.json`.
+4. Run `search_literature_dynamic` using:
+   - `genes=search_context["genes"]`
+   - `pathways=search_context["pathways"]`
+   - `celltypes=search_context["celltypes"]`
+   - `disease=search_context["disease"]`
+   - `output_path="papers_raw.json"`
+   - `data_dir=data_path.strip()`
+5. Finish only after `/papers_raw.json` exists.
+6. Do not call `create_literature_handoff`.
+7. Do not write `/citation_candidates.json`.
+8. Do not write a filtered `/papers.json`.
+
+The benchmark runner will apply the same posthoc direct/context filter to both
+arms after retrieval. Your job in this mode is retrieval only.
+""".strip()
+
+
+BENCHMARK_RETRIEVAL_ONLY_BASE = """
+You are a biomedical literature retrieval agent running in a benchmark harness.
+
+## Retrieval-Only Contract
+- Retrieve raw candidate papers for the benchmark case.
+- Write the raw retrieval artifact to `/papers_raw.json`.
+- Do not bucket, filter, cap, or prepare interpreter handoff artifacts.
+- Do not call production handoff tools.
+
+## Tool and File Rules
+- Read `/data_path.txt` to get the workspace directory.
+- Read `/benchmark_case.json` to get the benchmark case payload.
+- Write `/search_context.json` with the extracted benchmark `search_context`.
+- Use `search_literature_dynamic` as the primary retrieval tool.
+- Use `search_literature` or `search_pubmed_advanced` only for raw follow-up retrieval gaps.
+- When using `output_path`, pass `data_dir` from `/data_path.txt`.
+""".strip()
+
+
 # Legacy alias — preserve backward compat for any external caller still using
 # the old name. Points to the B'/C variant (current default mode="C").
 BENCHMARK_APPENDIX = BENCHMARK_APPENDIX_BPRIME_C
 
-HARDCODED_SKILL_BLOCK = """## MANDATORY: Skill Evaluation Protocol
+HARDCODED_SKILL_BLOCK = """## Skill Evaluation Protocol
 The Skill Activator will prompt you to evaluate available skills at the start.
 Follow the 3-phase protocol:
 - Phase 1: QUICK SCREEN — answer YES (literature search requires skill guides)
 - Phase 2: EVALUATE — mark `biomedical-literature-search` as YES, then call
   `read_skill_file(skill_path="<path from harness prompt>")` to load the workflow
-- Phase 3: IMPLEMENT — proceed with the 4-phase search workflow from the loaded SKILL.md
+- Phase 3: IMPLEMENT — follow the active workflow from the loaded SKILL.md
 
 **IMPORTANT: Tool distinction**
 - `read_skill_file` — for skill documents only (e.g., SKILL.md files)
@@ -134,37 +179,19 @@ Do NOT use `read_file` to load skill documents.
 """
 
 
-# Reframe B': strip kwarg hints from the production SEARCHER_PROMPT so the LLM
-# must decide on its own whether to activate the advanced retrieval kwargs.
-# Skill ON arm reintroduces them via BENCHMARK_SKILL_KWARG_HINT below; skill
-# OFF arm sees no kwarg guidance and falls back to defaults (False).
-_SEARCHER_PROMPT_KWARG_STRIPS: tuple[str, ...] = (
-    (
-        ",\n"
-        "    enable_lr_pair_queries=True,   # SEARCHER opts in to L-R pair query injection\n"
-        "    coverage_weighted_sort=True,   # SEARCHER opts in to coverage-aware truncation (auto-enabled by sentinel, this line is documentation belt-and-suspenders)"
-    ),
-    (
-        "# L-R pair queries are generated ONLY when enable_lr_pair_queries=True (SEARCHER only).\n"
-        "# When enable_lr_pair_queries=True, coverage_weighted_sort is auto-enabled internally\n"
-        "# regardless of caller value (SEARCHER mode sentinel — keeps PLANNER/REPORTER unaffected).\n"
-    ),
-    (
-        " Set `enable_lr_pair_queries=True` to inject L-R pair queries — SEARCHER only;"
-        " PLANNER/REPORTER should leave it default (False)."
-    ),
-    # Architect-flagged behavioral leak: this paragraph describes the exact
-    # skill-gated fan-out without naming the kwarg, so a weak OFF-arm LLM
-    # could infer "the tool always fans out" and emit matching singleton
-    # queries unprompted — contaminating both the ON/OFF signal AND the
-    # detection proxy.
-    (
-        "# Iter-0 also injects deterministic singleton gene queries (one gene per query)\n"
-        "# so every input gene gets its own focused BioMCP search and appears in at least\n"
-        "# one query slot, regardless of LLM compliance with the prompt instruction.\n"
-        "# Iter-0 pathway fan-out is keyword-only: genes=[] plus controlled pathway\n"
-        "# labels/aliases. Pathway stamps are provenance, not evidence by themselves.\n"
-    ),
+# Reframe B': base SEARCHER_PROMPT is now policy-light and no longer carries
+# advanced retrieval kwarg hints. The old substring-stripping list is
+# intentionally empty; prompt cleanliness is guarded by
+# _assert_no_advanced_kwarg_leakage so prompt drift fails explicitly.
+_SEARCHER_PROMPT_KWARG_STRIPS: tuple[str, ...] = ()
+
+_ADVANCED_KWARG_LEAKAGE_TERMS: tuple[str, ...] = (
+    "enable_lr_pair_queries",
+    "coverage_weighted_sort",
+    "LR-pair fan-out",
+    "coverage-weighted",
+    "advanced kwargs",
+    "Advanced Kwargs",
 )
 
 
@@ -182,7 +209,35 @@ full production retrieval pipeline:
 
 These kwargs together trigger production SEARCHER behavior. Do not set them
 if you lack guidance on which kwargs are appropriate for your task.
+
+Detailed coverage loops, including any `recommended_actions` handling, come
+from the active skill documentation rather than the base SEARCHER prompt.
 """.strip()
+
+
+BENCHMARK_RETRIEVAL_ONLY_SKILL_KWARG_HINT = """## Advanced Retrieval Kwargs (activated by biomedical-literature-search skill)
+
+When calling `search_literature_dynamic`, set these kwargs to improve raw
+retrieval diversity and benchmark-case coverage:
+
+- `enable_lr_pair_queries=True` — activates deterministic gene fan-out (one
+  BioMCP query per input gene) and keyword-only pathway query injection.
+  Without this, only LLM-generated queries are used.
+- `coverage_weighted_sort=True` — activates coverage-aware greedy truncation
+  for the raw retrieval candidate set. Without this, pure SJR sort is used.
+
+Use these kwargs only for raw retrieval in this retrieval-only benchmark mode.
+""".strip()
+
+
+def _assert_no_advanced_kwarg_leakage(prompt: str, *, benchmark_mode: str) -> None:
+    """Fail fast if stripped-mode base prompt text leaks skill-only kwarg guidance."""
+    leaked = [term for term in _ADVANCED_KWARG_LEAKAGE_TERMS if term in prompt]
+    if leaked:
+        raise RuntimeError(
+            f"Advanced retrieval kwarg leakage in benchmark_mode={benchmark_mode!r}: "
+            f"{', '.join(leaked)}"
+        )
 
 
 @dataclass(slots=True)
@@ -387,11 +442,28 @@ def compose_searcher_prompt(
         skill_off arm has no hint. OFF arm still sees the full tool schema.
     Mode C: same as B_prime at prompt level; additionally `_searcher_tools`
         applies schema isolation on the OFF arm (handled downstream).
+    Mode retrieval_only: dedicated raw-retrieval-only prompt; skill_on arm gets
+        the kwarg hint, and both arms omit production handoff instructions.
     """
-    if benchmark_mode not in ("B", "B_prime", "C"):
+    if benchmark_mode not in ("B", "B_prime", "C", "retrieval_only"):
         raise ValueError(
-            f"benchmark_mode must be one of 'B', 'B_prime', 'C'; got {benchmark_mode!r}"
+            "benchmark_mode must be one of 'B', 'B_prime', 'C', "
+            f"'retrieval_only'; got {benchmark_mode!r}"
         )
+
+    if benchmark_mode == "retrieval_only":
+        base = BENCHMARK_RETRIEVAL_ONLY_BASE
+        appendix = BENCHMARK_APPENDIX_RETRIEVAL_ONLY
+        prompt_without_skill_hint = f"{base}\n\n{appendix}".strip()
+        _assert_no_advanced_kwarg_leakage(
+            prompt_without_skill_hint,
+            benchmark_mode=benchmark_mode,
+        )
+        if skill_on:
+            harness_prompt = _render_skill_harness_prompt(skill_on)
+            harness_prompt = f"{harness_prompt}\n\n{BENCHMARK_RETRIEVAL_ONLY_SKILL_KWARG_HINT}"
+            return f"{prompt_without_skill_hint}\n\n{harness_prompt}".strip()
+        return prompt_without_skill_hint
 
     base = SUBAGENT_PROMPTS["searcher"].replace(HARDCODED_SKILL_BLOCK, BENCHMARK_SKILL_BLOCK)
 
@@ -409,11 +481,15 @@ def compose_searcher_prompt(
                 raise RuntimeError(
                     "SEARCHER_PROMPT kwarg strip failed — section missing; "
                     "update _SEARCHER_PROMPT_KWARG_STRIPS to match prompts.py."
-                )
+            )
             base = base.replace(section, "")
         base = base.strip()
         appendix = BENCHMARK_APPENDIX_BPRIME_C
         harness_prompt = _render_skill_harness_prompt(skill_on)
+        _assert_no_advanced_kwarg_leakage(
+            f"{base}\n\n{appendix}",
+            benchmark_mode=benchmark_mode,
+        )
         if skill_on:
             harness_prompt = f"{harness_prompt}\n\n{BENCHMARK_SKILL_KWARG_HINT}"
 
@@ -476,7 +552,7 @@ def _make_benchmark_search_tool(skill_on: bool) -> Any:
 
 
 def _searcher_tools(skill_on: bool = True, *, benchmark_mode: str = "C") -> list[Any]:
-    """Return searcher tools, applying schema isolation only in mode C OFF arm.
+    """Return searcher tools, applying schema isolation in restricted OFF arms.
 
     - Mode B: no schema isolation (both arms use full tool; kwargs pinned via
       appendix text — verified via the mode-parameterized tests in P0.4).
@@ -484,8 +560,10 @@ def _searcher_tools(skill_on: bool = True, *, benchmark_mode: str = "C") -> list
       but the prompt strips remove the hints so the OFF arm should default).
     - Mode C: schema isolation active on OFF arm (wrapper forces kwargs to
       False; args_schema hides the two advanced kwargs).
+    - Mode retrieval_only: same schema isolation as mode C on the OFF arm;
+      ON arm keeps the full schema for retrieval-skill-only benchmarking.
     """
-    apply_isolation = benchmark_mode == "C" and not skill_on
+    apply_isolation = benchmark_mode in ("C", "retrieval_only") and not skill_on
     base_tools = []
     for tool in SUBAGENT_CONFIGS["searcher"]["tools"]:
         name = getattr(tool, 'name', '') or ''
@@ -499,7 +577,7 @@ def _searcher_tools(skill_on: bool = True, *, benchmark_mode: str = "C") -> list
     return base_tools + [write_file, read_file]
 
 
-_last_ollama_model: str | None = None
+_last_ollama_target: tuple[str, str] | None = None
 _ollama_lock = threading.Lock()
 
 
@@ -517,18 +595,24 @@ def _ensure_ollama_model_ready(model_label: str) -> None:
     import urllib.error
     import urllib.request
 
-    global _last_ollama_model
+    global _last_ollama_target
     with _ollama_lock:
-        if _last_ollama_model == model_label:
+        base_url = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        target = (base_url, model_label)
+        if _last_ollama_target == target:
             return
 
-        base_url = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        ready_to_cache = True
         try:
             ps_resp = urllib.request.urlopen(f"{base_url}/api/ps", timeout=10).read()
             loaded = json.loads(ps_resp).get("models", [])
         except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-            logger.warning("Ollama /api/ps probe failed (%s); assuming no models loaded.", exc)
+            logger.warning(
+                "Ollama /api/ps probe failed (%s); readiness cache not updated.",
+                exc,
+            )
             loaded = []
+            ready_to_cache = False
 
         for m in loaded:
             name = m.get("name", "")
@@ -542,8 +626,10 @@ def _ensure_ollama_model_ready(model_label: str) -> None:
                     urllib.request.urlopen(req, timeout=30)
                 except (urllib.error.URLError, TimeoutError, OSError) as exc:
                     logger.warning("Ollama unload of %s failed: %s", name, exc)
+                    ready_to_cache = False
 
-        _last_ollama_model = model_label
+        if ready_to_cache:
+            _last_ollama_target = target
 
 
 def build_searcher_for_trial(
@@ -605,10 +691,11 @@ def prepare_trial_workspace(
     return workspace
 
 
-def build_user_prompt(normalized_case: dict[str, Any]) -> str:
+def build_user_prompt(normalized_case: dict[str, Any], *, benchmark_mode: str = "C") -> str:
+    artifact_name = "papers_raw.json" if benchmark_mode == "retrieval_only" else "papers.json"
     return (
         "Read /benchmark_case.json, search literature for that benchmark case, "
-        "and write /papers.json. Use the provided benchmark case context directly."
+        f"and write /{artifact_name}. Use the provided benchmark case context directly."
     )
 
 
@@ -671,6 +758,7 @@ def run_single_trial(
     normalized = normalize_case(case)
     workspace = Path(workspace_root) / f"trial_{trial_index:04d}_{normalized['case_id']}_{condition['condition']}"
     prepare_trial_workspace(workspace_dir=workspace, normalized_case=normalized)
+    artifact_name = "papers_raw.json" if benchmark_mode == "retrieval_only" else "papers.json"
 
     result = SearchTrialResult(
         case_id=normalized["case_id"],
@@ -686,7 +774,7 @@ def run_single_trial(
         benchmark_mode=benchmark_mode,
         cases_sha256=cases_sha256,
         trial_workspace=str(workspace),
-        papers_path=str(workspace / "papers.json"),
+        papers_path=str(workspace / artifact_name),
         search_context_path=str(workspace / "search_context.json"),
     )
 
@@ -697,7 +785,7 @@ def run_single_trial(
         temperature=temperature,
         benchmark_mode=benchmark_mode,
     )
-    prompt = build_user_prompt(normalized)
+    prompt = build_user_prompt(normalized, benchmark_mode=benchmark_mode)
 
     started = time.perf_counter()
     try:
@@ -707,7 +795,7 @@ def run_single_trial(
     finally:
         result.latency_s = round(time.perf_counter() - started, 3)
 
-    papers_file = workspace / "papers.json"
+    papers_file = workspace / artifact_name
     if not papers_file.exists():
         result.error = result.error or "papers_not_written"
         result.biomcp_latency_ms = round(result.latency_s * 1000.0, 2)
@@ -1172,12 +1260,13 @@ def parse_common_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
     # existing callers. Env var BENCHMARK_MODE is an override fallback.
     parser.add_argument(
         "--mode",
-        choices=["B", "B_prime", "C"],
+        choices=["B", "B_prime", "C", "retrieval_only"],
         default=os.environ.get("BENCHMARK_MODE", "C"),
         help=(
             "Benchmark mode: B (null control, kwargs pinned both arms), "
             "B_prime (prompt-level strip + skill-only kwarg hint), "
-            "C (B_prime + tool-schema isolation on OFF arm, default)."
+            "C (B_prime + tool-schema isolation on OFF arm, default), "
+            "retrieval_only (raw retrieval only; no agent-side handoff artifacts)."
         ),
     )
     parser.add_argument(

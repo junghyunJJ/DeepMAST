@@ -18,6 +18,11 @@ from src.agents.deep_interpreter.tools.literature import (
     search_literature_dynamic_async,
     format_references,
 )
+from src.agents.deep_interpreter.tools.literature_handoff import (
+    build_literature_handoff,
+    create_literature_handoff,
+    grade_lr_literature_candidates,
+)
 from src.agents.deep_interpreter.tools.quality import (
     validate_quality,
     validate_claim_literature,
@@ -80,6 +85,9 @@ __all__ = [
     "search_literature_async",
     "search_literature_dynamic_async",
     "format_references",
+    "build_literature_handoff",
+    "create_literature_handoff",
+    "grade_lr_literature_candidates",
     # Quality
     "validate_quality",
     "validate_claim_literature",

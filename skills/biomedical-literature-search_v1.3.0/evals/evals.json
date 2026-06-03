@@ -1,0 +1,29 @@
+{
+  "skill_name": "biomedical-literature-search",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Find PubMed literature for ligand-receptor, pathway, and celltype evidence in a breast cancer ST/CCI analysis and save the grounded result set to /papers.json.",
+      "expected_output": "Triggers the skill, uses the SEARCHER literature workflow, and saves a grounded /papers.json result set.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I need a literature pass for pathway and celltype gaps from an ST/CCI result, and the follow-up should be bundled instead of stopping early on coverage_sufficient.",
+      "expected_output": "Triggers the skill and describes bundled multi-axis follow-up using coverage plus missing pathway/celltype signals.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Run the SEARCHER literature workflow for a high-context breast cancer interaction case and keep the paper set grounded for downstream interpretation.",
+      "expected_output": "Triggers the skill and preserves the SEARCHER-facing manual-wrapper distinction while keeping the workflow grounded.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Write a general overview of breast cancer biology without using a structured literature-search workflow.",
+      "expected_output": "Does not over-trigger the full SEARCHER workflow, or explicitly declines to apply it because the request is out of scope.",
+      "files": []
+    }
+  ]
+}
