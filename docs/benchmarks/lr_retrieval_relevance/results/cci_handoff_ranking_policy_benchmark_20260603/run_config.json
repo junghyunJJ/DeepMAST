@@ -1,0 +1,20 @@
+{
+  "created_at_utc": "2026-06-03T18:45:27Z",
+  "cap": 40,
+  "active_policies": [
+    "baseline_current",
+    "bucket_lr_coverage",
+    "bucket_lr_coverage_journal_tiebreak"
+  ],
+  "candidate_paths": [
+    "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_production_handoff_validation_qwen35b/production_30lr_qwen35b_20260530/citation_candidates.json"
+  ],
+  "candidate_count": 1,
+  "notes": {
+    "direct_quota_policy": "not run; available_direct_count and selected_direct_count are tracked for follow-up",
+    "excluded_buckets": [
+      "disease_only_background",
+      "rejected_weak_evidence"
+    ]
+  }
+}
