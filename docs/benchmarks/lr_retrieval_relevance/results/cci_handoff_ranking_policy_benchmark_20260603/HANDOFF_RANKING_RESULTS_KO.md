@@ -1,6 +1,6 @@
 # Handoff Ranking Policy Benchmark 결과
 
-- 생성 시각(UTC): 2026-06-03T18:18:27Z
+- 생성 시각(UTC): 2026-06-03T18:45:27Z
 - active policies: baseline_current, bucket_lr_coverage, bucket_lr_coverage_journal_tiebreak
 - direct quota policy: 이번 실행에서는 제외. `available_direct_count`와 `selected_direct_count`만 추적.
 - excluded buckets: `disease_only_background`, `rejected_weak_evidence`
@@ -9,7 +9,7 @@
 
 | policy | 후보 파일 | 평균 선택 | direct 평균 | context 평균 | LR coverage | gene | pathway | celltype | journal | receptor HHI | pathway HHI | leakage |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| baseline_current | 1 | 40.00 | 2.00 | 38.00 | 100.00% | 44.68% | 85.71% | 53.85% | 0.500 | 0.055 | 0.238 | 0 |
+| baseline_current | 1 | 40.00 | 2.00 | 38.00 | 100.00% | 42.55% | 85.71% | 53.85% | 0.500 | 0.057 | 0.232 | 0 |
 | bucket_lr_coverage | 1 | 40.00 | 2.00 | 38.00 | 100.00% | 42.55% | 85.71% | 53.85% | 0.500 | 0.057 | 0.232 | 0 |
 | bucket_lr_coverage_journal_tiebreak | 1 | 40.00 | 2.00 | 38.00 | 100.00% | 42.55% | 85.71% | 53.85% | 0.500 | 0.057 | 0.232 | 0 |
 
@@ -17,16 +17,16 @@
 
 | policy A | policy B | overlap | A only | B only | Jaccard |
 | --- | --- | ---: | ---: | ---: | ---: |
-| baseline_current | bucket_lr_coverage | 27 | 13 | 13 | 0.509 |
-| baseline_current | bucket_lr_coverage_journal_tiebreak | 27 | 13 | 13 | 0.509 |
+| baseline_current | bucket_lr_coverage | 40 | 0 | 0 | 1.000 |
+| baseline_current | bucket_lr_coverage_journal_tiebreak | 40 | 0 | 0 | 1.000 |
 | bucket_lr_coverage | bucket_lr_coverage_journal_tiebreak | 40 | 0 | 0 | 1.000 |
 
 ## 해석
 
-- coverage 관점 최고 정책은 `baseline_current`입니다. LR/gene/pathway/celltype coverage를 우선 비교하고, leakage가 0인지 확인했습니다.
+- coverage 관점에서는 모든 active policy가 동률입니다. LR/gene/pathway/celltype coverage와 leakage가 모두 같았습니다.
 - journal quality 평균은 모든 active policy에서 0.500으로 같았습니다. 따라서 이번 후보에서는 journal tie-break가 독립적인 품질 신호를 제공하지 않았습니다.
 - direct 후보는 평균 2.00개였고 coverage-aware policy가 평균 2.00개를 선택했습니다. 이번 실행에서는 direct under-selection이 관찰되지 않았으므로 direct quota policy는 후속 optional로 유지합니다.
-- `bucket_lr_coverage`는 baseline 대비 pathway HHI를 0.238에서 0.232로 낮췄지만, gene coverage는 44.68%에서 42.55%로 낮았습니다.
+- `bucket_lr_coverage`는 production ordering을 반영한 `baseline_current`와 동일한 선택 논문 및 동일한 coverage/concentration metric을 보였습니다.
 - journal tie-break policy는 `bucket_lr_coverage`와 동일한 40편을 선택했습니다. 현재 후보의 journal_quality 값이 구분력을 거의 제공하지 않아 별도 이득을 보이지 않았습니다.
 - `disease_only_background`와 `rejected_weak_evidence`는 모든 policy의 handoff에서 제외되어야 하며, leakage 열이 그 중단 조건을 검증합니다.
 - direct quota는 아직 실행하지 않았습니다. direct 후보가 충분히 있는데도 coverage-aware 정책에서 direct 선택 수가 줄어드는 경우에만 별도 후속 PR로 다루는 것이 좋습니다.

@@ -76,15 +76,37 @@ def test_active_policies_are_limited_to_first_pass_set() -> None:
     )
 
 
-def test_baseline_excludes_ineligible_buckets_and_preserves_bucket_order() -> None:
+def test_baseline_excludes_ineligible_buckets_and_mirrors_production_order() -> None:
     payload = _candidate_payload(
         [
-            _paper("context-1", "receptor_pathway_context_evidence"),
+            _paper(
+                "context-low",
+                "receptor_pathway_context_evidence",
+                supported_lr_pairs=[{"ligand": "TGFB1", "receptor": "TGFBR2"}],
+            ),
             _paper("rejected", "rejected_weak_evidence"),
-            _paper("direct-1", "direct_lr_evidence"),
+            _paper(
+                "direct-low",
+                "direct_lr_evidence",
+                supported_lr_pairs=[{"ligand": "TGFB1", "receptor": "TGFBR2"}],
+            ),
             _paper("background", "disease_only_background"),
-            _paper("context-2", "receptor_pathway_context_evidence"),
-            _paper("direct-2", "direct_lr_evidence"),
+            _paper(
+                "context-high",
+                "receptor_pathway_context_evidence",
+                supported_lr_pairs=[
+                    {"ligand": "TGFB1", "receptor": "TGFBR2"},
+                    {"ligand": "CXCL12", "receptor": "CD4"},
+                ],
+            ),
+            _paper(
+                "direct-high",
+                "direct_lr_evidence",
+                supported_lr_pairs=[
+                    {"ligand": "TGFB1", "receptor": "TGFBR2"},
+                    {"ligand": "CXCL12", "receptor": "CD4"},
+                ],
+            ),
         ]
     )
 
@@ -95,10 +117,10 @@ def test_baseline_excludes_ineligible_buckets_and_preserves_bucket_order() -> No
     )
 
     assert [paper["pmid"] for paper in selected] == [
-        "direct-1",
-        "direct-2",
-        "context-1",
-        "context-2",
+        "direct-high",
+        "direct-low",
+        "context-high",
+        "context-low",
     ]
     assert all(
         paper["evidence_bucket"]
@@ -294,3 +316,15 @@ def test_cli_writes_required_outputs_and_policy_papers_json(tmp_path: Path) -> N
         assert papers_json.exists()
         selected = json.loads(papers_json.read_text(encoding="utf-8"))["papers"]
         assert [paper["pmid"] for paper in selected] == ["direct", "context"]
+
+
+def test_candidate_glob_accepts_absolute_patterns(tmp_path: Path) -> None:
+    candidate_path = tmp_path / "nested" / "citation_candidates.json"
+    candidate_path.parent.mkdir()
+    candidate_path.write_text(json.dumps(_candidate_payload([])), encoding="utf-8")
+
+    args = runner.build_parser().parse_args(
+        ["--candidate-glob", str(tmp_path / "**" / "citation_candidates.json")]
+    )
+
+    assert runner._load_candidate_paths(args) == [candidate_path.resolve()]

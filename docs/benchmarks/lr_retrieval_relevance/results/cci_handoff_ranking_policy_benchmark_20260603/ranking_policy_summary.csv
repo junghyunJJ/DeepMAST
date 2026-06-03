@@ -1,4 +1,4 @@
 policy,candidate_count,mean_available_context_count,mean_available_direct_count,mean_celltype_coverage_pct,mean_gene_coverage_pct,mean_journal_quality,mean_lr_pair_coverage_pct,mean_pathway_coverage_pct,mean_pathway_hhi,mean_receptor_hhi,mean_selected_context_count,mean_selected_count,mean_selected_direct_count,total_leakage_count,unique_selected_pmids
-baseline_current,1,63.0,2.0,53.8462,44.6809,0.5,100.0,85.7143,0.2384,0.0554,38.0,40.0,2.0,0,40
+baseline_current,1,63.0,2.0,53.8462,42.5532,0.5,100.0,85.7143,0.2318,0.0567,38.0,40.0,2.0,0,40
 bucket_lr_coverage,1,63.0,2.0,53.8462,42.5532,0.5,100.0,85.7143,0.2318,0.0567,38.0,40.0,2.0,0,40
 bucket_lr_coverage_journal_tiebreak,1,63.0,2.0,53.8462,42.5532,0.5,100.0,85.7143,0.2318,0.0567,38.0,40.0,2.0,0,40

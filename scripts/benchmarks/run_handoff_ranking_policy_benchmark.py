@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import glob
 import json
 import math
 import re
@@ -364,6 +365,7 @@ def select_policy_papers(
             eligible,
             key=lambda paper: (
                 bucket_rank(paper),
+                -len(paper.get("supported_lr_pairs") or []),
                 int(paper.get("_candidate_original_index", 0)),
             ),
         )
@@ -748,7 +750,11 @@ def _load_candidate_paths(args: argparse.Namespace) -> list[Path]:
     for value in args.candidate_path or []:
         paths.append(Path(value).expanduser().resolve())
     for pattern in args.candidate_glob or []:
-        paths.extend(Path().glob(pattern))
+        expanded = str(Path(pattern).expanduser())
+        paths.extend(
+            Path(match).resolve()
+            for match in sorted(glob.glob(expanded, recursive=True))
+        )
     for rows_path_value in args.runner_rows or []:
         rows_path = Path(rows_path_value).expanduser().resolve()
         for line in rows_path.read_text(encoding="utf-8").splitlines():
@@ -916,22 +922,35 @@ def _write_results_ko(
     coverage = by_policy.get("bucket_lr_coverage")
     journal = by_policy.get("bucket_lr_coverage_journal_tiebreak")
 
-    best_coverage = max(
-        summary_rows,
-        key=lambda row: (
+    def coverage_score(row: dict[str, Any]) -> tuple[float, float, float, float]:
+        return (
             float(row["mean_lr_pair_coverage_pct"]),
             float(row["mean_gene_coverage_pct"]),
             float(row["mean_pathway_coverage_pct"]),
             float(row["mean_celltype_coverage_pct"]),
-        ),
+        )
+
+    best_coverage = max(
+        summary_rows,
+        key=coverage_score,
         default=None,
     )
     lines.extend(["", "## 해석", ""])
     if best_coverage:
-        lines.append(
-            f"- coverage 관점 최고 정책은 `{best_coverage['policy']}`입니다. "
-            "LR/gene/pathway/celltype coverage를 우선 비교하고, leakage가 0인지 확인했습니다."
-        )
+        best_score = coverage_score(best_coverage)
+        tied_policies = [
+            str(row["policy"]) for row in summary_rows if coverage_score(row) == best_score
+        ]
+        if len(tied_policies) == len(summary_rows):
+            lines.append(
+                "- coverage 관점에서는 모든 active policy가 동률입니다. "
+                "LR/gene/pathway/celltype coverage와 leakage가 모두 같았습니다."
+            )
+        else:
+            lines.append(
+                f"- coverage 관점 최고 정책은 `{best_coverage['policy']}`입니다. "
+                "LR/gene/pathway/celltype coverage를 우선 비교하고, leakage가 0인지 확인했습니다."
+            )
     journal_values = {
         str(row["policy"]): float(row["mean_journal_quality"]) for row in summary_rows
     }
@@ -956,13 +975,43 @@ def _write_results_ko(
             f"평균 {direct_selected:.2f}개를 선택했습니다. 이번 실행에서는 direct under-selection이 "
             "관찰되지 않았으므로 direct quota policy는 후속 optional로 유지합니다."
         )
-        lines.append(
-            f"- `bucket_lr_coverage`는 baseline 대비 pathway HHI를 "
-            f"{float(baseline['mean_pathway_hhi']):.3f}에서 "
-            f"{float(coverage['mean_pathway_hhi']):.3f}로 낮췄지만, "
-            f"gene coverage는 {float(baseline['mean_gene_coverage_pct']):.2f}%에서 "
-            f"{float(coverage['mean_gene_coverage_pct']):.2f}%로 낮았습니다."
+        baseline_coverage_overlap = next(
+            (
+                row
+                for row in aggregate_overlap
+                if row.get("policy_a") == "baseline_current"
+                and row.get("policy_b") == "bucket_lr_coverage"
+            ),
+            None,
         )
+        same_selection = bool(
+            baseline_coverage_overlap
+            and int(float(baseline_coverage_overlap.get("overlap_count", 0)))
+            == int(float(coverage.get("mean_selected_count", 0)))
+        )
+        same_metrics = all(
+            abs(float(baseline[key]) - float(coverage[key])) < 0.0001
+            for key in (
+                "mean_gene_coverage_pct",
+                "mean_pathway_coverage_pct",
+                "mean_celltype_coverage_pct",
+                "mean_receptor_hhi",
+                "mean_pathway_hhi",
+            )
+        )
+        if same_selection and same_metrics:
+            lines.append(
+                "- `bucket_lr_coverage`는 production ordering을 반영한 "
+                "`baseline_current`와 동일한 선택 논문 및 동일한 coverage/concentration metric을 보였습니다."
+            )
+        else:
+            lines.append(
+                f"- `bucket_lr_coverage`의 pathway HHI는 "
+                f"{float(baseline['mean_pathway_hhi']):.3f}에서 "
+                f"{float(coverage['mean_pathway_hhi']):.3f}로, "
+                f"gene coverage는 {float(baseline['mean_gene_coverage_pct']):.2f}%에서 "
+                f"{float(coverage['mean_gene_coverage_pct']):.2f}%로 바뀌었습니다."
+            )
     if coverage and journal:
         overlap = next(
             (
