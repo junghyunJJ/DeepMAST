@@ -357,6 +357,13 @@ cell-type context for hypothesis generation:
 - `celltype_resolution.json` is context-only and must not appear in `evidence_references`;
   cite Stage 1 pair files for Census evidence.
 
+If a match has `match_mode="semantic_proxy"`, treat `primary_resolved_celltype`
+as the broader Census proxy used for Stage 1 and treat the original
+`input_celltype` as the biological focus. For example, `Prolif Invasive Tumor`
+may use `malignant cell` as the Stage 1 Census proxy. In retained hypotheses,
+include the original label when biologically relevant and describe the Census
+evidence as proxy validation using the broader resolved label.
+
 For every retained hypothesis, `biological_entities.cell_types` should include
 at least one original interest label when relevant to the mechanism, for example
 `AT2` or `Transitional AT2`, and may also include the resolved Census label
@@ -366,7 +373,7 @@ Do not claim that Census separately validated a lost state modifier. If
 `Transitional AT2` resolved through `state_stripped_alias` with
 `lost_modifiers=["transitional"]`, phrase the mechanism as AT2-focused or
 Transitional-AT2-motivated, and state that the Census validation used the broader
-resolved label.
+resolved label. Do not claim that Census separately validated the original state-specific label when the match mode is `semantic_proxy`.
 
 ### CRITICAL: Stage 1 Eligibility Gate (hard rules)
 

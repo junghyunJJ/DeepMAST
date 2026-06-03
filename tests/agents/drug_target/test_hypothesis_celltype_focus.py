@@ -176,8 +176,14 @@ def test_hypothesis_prompt_requires_interest_celltype_focus() -> None:
     assert "celltype_resolution.json" in text
     assert "interest_celltypes" in text
     assert "lost_modifiers" in text
+    assert "semantic_proxy" in text
+    assert "proxy validation" in text
     assert "biological_entities.cell_types" in text
     assert "Do not claim that Census separately validated a lost state modifier" in text
+    assert (
+        "Do not claim that Census separately validated the original state-specific label"
+        in text
+    )
     assert "must not appear in `evidence_references`" in text
     assert "cite Stage 1 pair files for Census evidence" in text
     assert "AT2" in text
