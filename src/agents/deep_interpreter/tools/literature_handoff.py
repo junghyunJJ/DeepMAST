@@ -376,13 +376,19 @@ def grade_lr_literature_candidates(
 
 
 def _resolve_data_file(data_dir: str, path: str) -> Path:
+    if not path:
+        raise ValueError("path must not be empty")
+
     p = Path(path)
-    if p.is_absolute():
-        return p
     base = Path(data_dir or os.getenv("DEEP_INTERPRETER_DATA_DIR", "")).expanduser()
     if not str(base):
         base = Path.cwd()
-    return (base / p).resolve()
+    base = base.resolve()
+
+    resolved = p.expanduser().resolve() if p.is_absolute() else (base / p).resolve()
+    if not resolved.is_relative_to(base):
+        raise ValueError("path must stay within data_dir")
+    return resolved
 
 
 @tool

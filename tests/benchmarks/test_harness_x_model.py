@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import urllib.request
 from pathlib import Path
@@ -66,6 +67,21 @@ def test_normalize_case_extracts_search_fields(sample_case: dict) -> None:
     assert normalized["pathways"] == ["Hypoxia"]
     assert normalized["celltypes"] == ["DCIS 2", "Endothelial", "Invasive Tumor"]
     assert normalized["disease"] == "breast cancer"
+
+
+def test_single_trial_cli_help_exposes_retrieval_only_mode() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "docs/benchmarks/harness_x_model/run_trial.py",
+            "--help",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "retrieval_only" in result.stdout
 
 
 def test_normalize_case_prefers_enriched_genes_when_present(sample_case: dict) -> None:

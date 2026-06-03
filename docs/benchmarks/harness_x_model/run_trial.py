@@ -38,9 +38,12 @@ def main() -> int:
     # Architect finding #1 to prevent contaminated-row injection at :48 below).
     parser.add_argument(
         "--mode",
-        choices=["B", "B_prime", "C"],
+        choices=["B", "B_prime", "C", "retrieval_only"],
         default=_os.environ.get("BENCHMARK_MODE", "C"),
-        help="Benchmark mode (B, B_prime, C). Default C preserves existing behavior.",
+        help=(
+            "Benchmark mode (B, B_prime, C, retrieval_only). "
+            "Default C preserves existing behavior."
+        ),
     )
     args = parser.parse_args()
     apply_ollama_host_override(args)

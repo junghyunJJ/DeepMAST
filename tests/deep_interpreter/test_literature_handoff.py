@@ -2,6 +2,8 @@
 
 import json
 
+import pytest
+
 
 def _paper(
     pmid: str,
@@ -130,6 +132,36 @@ def test_create_literature_handoff_writes_raw_bucket_audit_and_filtered_handoff(
     assert candidates["counts"]["disease_only_background"] == 1
     assert [paper["pmid"] for paper in handoff["papers"]] == ["direct"]
     assert handoff["papers"][0]["evidence_bucket"] == "direct_lr_evidence"
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["raw_papers_path", "output_path", "citation_candidates_path"],
+)
+def test_create_literature_handoff_rejects_paths_outside_data_dir(
+    tmp_path,
+    field: str,
+) -> None:
+    from src.agents.deep_interpreter.tools.literature_handoff import (
+        create_literature_handoff,
+    )
+
+    (tmp_path / "papers_raw.json").write_text(
+        json.dumps({"papers": []}),
+        encoding="utf-8",
+    )
+    payload = {
+        "raw_papers_path": "papers_raw.json",
+        "output_path": "papers.json",
+        "citation_candidates_path": "citation_candidates.json",
+        "data_dir": str(tmp_path),
+        "disease": "breast cancer",
+        "lr_pairs": [],
+    }
+    payload[field] = "../outside.json"
+
+    with pytest.raises(ValueError, match="within data_dir"):
+        create_literature_handoff.invoke(payload)
 
 
 def test_global_pathway_context_is_not_attributed_to_every_lr_pair() -> None:
