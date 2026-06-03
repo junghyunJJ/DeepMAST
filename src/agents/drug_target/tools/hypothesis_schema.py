@@ -294,6 +294,9 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
         _validate_hypothesis_report_references,
         _validate_hypothesis_report_topn_and_failed_pairs,
     )
+    from src.agents.drug_target.tools.hypothesis_grounding import (
+        validate_hypothesis_grounding,
+    )
 
     diag = _validate_hypothesis_report_topn_and_failed_pairs(canonical, evidence_dir)
     canonical["evidence_coverage_pct"] = diag["evidence_coverage_pct"]
@@ -305,6 +308,14 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
         result["errors"].extend(ref_errors)
         result["topn_coverage"] = diag["topn_coverage"]
         result["failed_pair_violations"] = diag["failed_pair_violations"]
+        return result
+
+    grounding_errors = validate_hypothesis_grounding(canonical, evidence_dir)
+    if grounding_errors:
+        result["errors"].extend(grounding_errors)
+        result["topn_coverage"] = diag["topn_coverage"]
+        result["failed_pair_violations"] = diag["failed_pair_violations"]
+        result["hypothesis_grounding_violations"] = grounding_errors
         return result
 
     if diag["reject_reason"]:
