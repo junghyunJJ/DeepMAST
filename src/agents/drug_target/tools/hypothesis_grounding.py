@@ -41,6 +41,11 @@ def _normal_gene(value: Any) -> str:
     return str(value or "").strip().upper()
 
 
+def _normal_celltype(value: Any) -> str:
+    text = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
+    return " ".join(text.split())
+
+
 def _stage1_token(ref: Any) -> str | None:
     if not isinstance(ref, str):
         return None
@@ -62,15 +67,21 @@ def _stage1_filename(a: str, b: str) -> str:
     return f"stage1_{a}--{b}.json"
 
 
-def _cited_stage1_pairs(hypothesis: dict[str, Any]) -> set[tuple[str, str]]:
-    pairs: set[tuple[str, str]] = set()
+def _cited_stage1_refs(hypothesis: dict[str, Any]) -> list[str]:
     refs = hypothesis.get("evidence_references")
     if not isinstance(refs, list):
-        return pairs
+        return []
+    tokens: list[str] = []
     for ref in refs:
         token = _stage1_token(ref)
-        if not token:
-            continue
+        if token and token not in tokens:
+            tokens.append(token)
+    return tokens
+
+
+def _cited_stage1_pairs(hypothesis: dict[str, Any]) -> set[tuple[str, str]]:
+    pairs: set[tuple[str, str]] = set()
+    for token in _cited_stage1_refs(hypothesis):
         pair = _stage1_pair_from_filename(token)
         if not pair:
             continue
@@ -183,6 +194,79 @@ def _claimed_direct_pairs(hypothesis: dict[str, Any]) -> set[tuple[str, str]]:
     return claimed
 
 
+def _celltype_resolution_tokens(celltype_resolution: Any) -> set[str]:
+    if not isinstance(celltype_resolution, dict):
+        return set()
+
+    tokens: set[str] = set()
+    interest_tokens: set[str] = set()
+
+    interest = celltype_resolution.get("interest_celltypes")
+    if isinstance(interest, list):
+        for value in interest:
+            token = _normal_celltype(value)
+            if token:
+                tokens.add(token)
+                interest_tokens.add(token)
+
+    matches = celltype_resolution.get("matches")
+    if isinstance(matches, list):
+        for match in matches:
+            if not isinstance(match, dict):
+                continue
+            token = _normal_celltype(match.get("input_celltype"))
+            if token:
+                tokens.add(token)
+                interest_tokens.add(token)
+
+    resolved = _normal_celltype(celltype_resolution.get("primary_resolved_celltype"))
+    if resolved:
+        tokens.add(resolved)
+
+    if "at2" in interest_tokens:
+        tokens.add("pulmonary alveolar type 2 cell")
+
+    return tokens
+
+
+def _hypothesis_celltype_tokens(hypothesis: dict[str, Any]) -> set[str]:
+    entities = hypothesis.get("biological_entities")
+    if not isinstance(entities, dict):
+        return set()
+    cell_types = entities.get("cell_types")
+    if not isinstance(cell_types, list):
+        return set()
+    return {
+        token
+        for token in (_normal_celltype(value) for value in cell_types)
+        if token
+    }
+
+
+def _negative_stage1_diffs(payload: Any) -> list[str]:
+    if not isinstance(payload, dict):
+        return []
+    census_validation = payload.get("census_validation")
+    if not isinstance(census_validation, dict):
+        return []
+    target_vs_rest = census_validation.get("target_vs_rest")
+    if not isinstance(target_vs_rest, dict):
+        return []
+
+    values: list[tuple[str, float]] = []
+    for key in ("gene_a", "gene_b", "coexpression"):
+        item = target_vs_rest.get(key)
+        if not isinstance(item, dict):
+            continue
+        diff = item.get("diff")
+        if isinstance(diff, (int, float)):
+            values.append((key, float(diff)))
+
+    if values and all(diff < 0 for _, diff in values):
+        return [key for key, _ in values]
+    return []
+
+
 def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) -> list[str]:
     """Return deterministic grounding violations for a canonical hypothesis report."""
     hypotheses = parsed.get("hypotheses") if isinstance(parsed, dict) else None
@@ -191,9 +275,13 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
 
     errors: list[str] = []
     real = {path.name for path in evidence_dir.iterdir()} if evidence_dir.exists() else set()
+    celltype_tokens = _celltype_resolution_tokens(
+        _load_json(evidence_dir / "celltype_resolution.json")
+    )
     for idx, hypothesis in enumerate(hypotheses):
         if not isinstance(hypothesis, dict):
             continue
+        cited_stage1_refs = _cited_stage1_refs(hypothesis)
         cited_pairs = _cited_stage1_pairs(hypothesis)
         for a, b in sorted(_claimed_direct_pairs(hypothesis)):
             if (a, b) in cited_pairs:
@@ -206,5 +294,31 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
                 f"hypotheses[{idx}] claims direct pair axis '{a}--{b}' "
                 f"without citing a matching passed Stage 1 pair file. Expected "
                 f"{direct_name} or {reverse_name}; available: {available_text}."
+            )
+
+        used_celltype_tokens = sorted(
+            _hypothesis_celltype_tokens(hypothesis) & celltype_tokens
+        )
+        if not used_celltype_tokens or not cited_stage1_refs:
+            continue
+
+        validation_text = _normal_celltype(hypothesis.get("validation_approach"))
+        if not any(token in validation_text for token in celltype_tokens):
+            listed = ", ".join(used_celltype_tokens)
+            errors.append(
+                f"hypotheses[{idx}] lists interest/resolved cell type ({listed}) "
+                "but validation_approach does not mention the original interest label "
+                "or resolved Census cell type."
+            )
+
+        for ref in cited_stage1_refs:
+            negative_keys = _negative_stage1_diffs(_load_json(evidence_dir / ref))
+            if not negative_keys:
+                continue
+            keys_text = ", ".join(negative_keys)
+            errors.append(
+                f"hypotheses[{idx}] uses target-cell-depleted Stage 1 Census evidence "
+                f"as interest-cell support: {ref} has negative target-vs-rest diff "
+                f"values for [{keys_text}]."
             )
     return errors

@@ -461,6 +461,220 @@ def test_save_hypothesis_report_rejects_explicit_pair_axis_missing_from_entities
     assert not (evidence / "hypothesis_report.json").exists()
 
 
+def test_save_hypothesis_report_rejects_at2_celltype_when_validation_omits_at2(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["FN1", "SDC2"])
+    _write_stage1_filter_results(evidence, [("FN1", "SDC2", True)])
+    _write_stage1_pair(evidence, "FN1", "SDC2")
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "AT2 FN1-SDC2 pair hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "FN1--SDC2 is a direct Census-supported pair in the resolved "
+                    "AT2 context."
+                ),
+                "evidence_references": [
+                    "stage1_FN1--SDC2.json",
+                    "stage3_FN1.json",
+                    "stage3_SDC2.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["FN1", "SDC2"],
+                    "pathways": ["integrin signaling"],
+                    "cell_types": ["pulmonary alveolar type 2 cell", "fibroblast"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "FN1 perturbation will alter SDC2-linked epithelial remodeling."
+                ),
+                "validation_approach": (
+                    "Primary IPF fibroblast monoculture with FN1 knockdown and SDC2 "
+                    "readout."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "lists interest/resolved cell type" in error
+        and "validation_approach" in error
+        for error in result["errors"]
+    )
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_target_depleted_stage1_as_at2_support(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["FN1", "SDC2"])
+    _write_stage1_filter_results(evidence, [("FN1", "SDC2", True)])
+    _write_stage1_pair(
+        evidence,
+        "FN1",
+        "SDC2",
+        gene_a_diff=-0.2,
+        gene_b_diff=-0.1,
+        coexpr_diff=-0.05,
+    )
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "AT2 FN1-SDC2 depleted pair hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "FN1--SDC2 is interpreted as support for AT2 remodeling despite "
+                    "negative target-vs-rest direction."
+                ),
+                "evidence_references": [
+                    "stage1_FN1--SDC2.json",
+                    "stage3_FN1.json",
+                    "stage3_SDC2.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["FN1", "SDC2"],
+                    "pathways": ["integrin signaling"],
+                    "cell_types": ["AT2"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": "AT2 FN1 perturbation will change SDC2 signaling.",
+                "validation_approach": (
+                    "Primary IPF AT2 culture with FN1 knockdown and SDC2 readout."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "target-cell-depleted Stage 1 Census evidence" in error
+        and "stage1_FN1--SDC2.json" in error
+        for error in result["errors"]
+    )
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_accepts_at2_grounded_direct_pair_hypothesis(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["FN1", "SDC2"])
+    _write_stage1_filter_results(evidence, [("FN1", "SDC2", True)])
+    _write_stage1_pair(
+        evidence,
+        "FN1",
+        "SDC2",
+        gene_a_diff=0.35,
+        gene_b_diff=0.22,
+        coexpr_diff=0.11,
+    )
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "AT2 FN1-SDC2 enriched pair hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "FN1--SDC2 is a direct Census-supported pair enriched in the "
+                    "resolved AT2 context."
+                ),
+                "evidence_references": [
+                    "stage1_FN1--SDC2.json",
+                    "stage3_FN1.json",
+                    "stage3_SDC2.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["FN1", "SDC2"],
+                    "pathways": ["integrin signaling"],
+                    "cell_types": ["pulmonary alveolar type 2 cell"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": "AT2 FN1 perturbation will change SDC2 signaling.",
+                "validation_approach": (
+                    "Primary IPF AT2 culture with FN1 knockdown and SDC2 readout."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is True
+    assert result["errors"] == []
+    assert (evidence / "hypothesis_report.json").exists()
+
+
 def test_hypothesis_grounding_uses_gene_boundaries_for_loose_pair_cues(
     tmp_path: Path,
 ) -> None:
