@@ -1,12 +1,26 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from src.agents.drug_target.tools import census_batch_core
 from src.agents.drug_target.tools import census_celltype_resolution as resolution
-from src.agents.drug_target.tools.census_celltype_resolution import (
-    resolve_celltype_matches,
-)
+try:
+    from src.agents.drug_target.tools.census_celltype_resolution import (
+        apply_semantic_celltype_proxy_to_result,
+        resolve_celltype_matches,
+    )
+except ImportError as exc:
+    if "apply_semantic_celltype_proxy_to_result" not in str(exc):
+        raise
+    from src.agents.drug_target.tools.census_celltype_resolution import (
+        resolve_celltype_matches,
+    )
+
+    def apply_semantic_celltype_proxy_to_result(*args, **kwargs):
+        raise NotImplementedError(
+            "apply_semantic_celltype_proxy_to_result is not implemented yet."
+        )
 
 
 def test_resolve_celltype_matches_exact_label() -> None:
@@ -176,6 +190,175 @@ def test_resolve_celltype_matches_unresolved_keeps_primary_empty() -> None:
     assert match["confidence"] == "none"
     assert match["warnings"] == [
         "No Census cell_type label matched interest cell type 'AT2'."
+    ]
+
+
+def test_resolve_celltype_matches_returns_compact_preview_not_full_options() -> None:
+    available = {
+        "malignant cell": 576171,
+        "macrophage": 80485,
+        "fibroblast": 62959,
+        "T cell": 75981,
+        "rare label": 1,
+    }
+
+    result = resolve_celltype_matches(
+        ["Prolif Invasive Tumor"],
+        available,
+        disease="breast cancer",
+        organism="homo_sapiens",
+        disease_resolved="breast cancer",
+        disease_resolution_mode="exact",
+        preview_limit=3,
+    )
+
+    assert result["primary_resolved_celltype"] == ""
+    assert result["primary_match_mode"] == "unresolved"
+    assert result["available_cell_type_count"] == 5
+    assert result["available_celltype_preview_limit"] == 3
+    assert result["available_celltype_preview"] == [
+        {"label": "malignant cell", "total_cell_count": 576171},
+        {"label": "macrophage", "total_cell_count": 80485},
+        {"label": "T cell", "total_cell_count": 75981},
+    ]
+    assert "available_celltype_options" not in result
+
+
+def test_resolve_census_celltypes_writes_full_options_artifact_and_returns_preview(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        resolution,
+        "_resolve_disease_for_census",
+        lambda disease, organism: ("breast cancer", "exact", []),
+    )
+    monkeypatch.setattr(
+        resolution,
+        "_query_available_cell_type_counts",
+        lambda *, disease_resolved, organism: (
+            {
+                "malignant cell": 576171,
+                "macrophage": 80485,
+                "fibroblast": 62959,
+                "rare label": 1,
+            },
+            [],
+        ),
+    )
+
+    raw = resolution.resolve_census_celltypes.invoke(
+        {
+            "interest_celltypes": ["Prolif Invasive Tumor"],
+            "disease": "breast cancer",
+            "organism": "human",
+            "data_dir": str(tmp_path),
+            "preview_limit": 2,
+        }
+    )
+    payload = json.loads(raw)
+
+    assert payload["available_cell_type_count"] == 4
+    assert payload["available_celltype_preview"] == [
+        {"label": "malignant cell", "total_cell_count": 576171},
+        {"label": "macrophage", "total_cell_count": 80485},
+    ]
+    assert payload["available_celltype_options_path"] == "evidence/census_celltype_options.json"
+    assert "available_celltype_options_sha256" in payload
+    assert "available_celltype_options" not in payload
+
+    artifact = tmp_path / "evidence" / "census_celltype_options.json"
+    saved = json.loads(artifact.read_text())
+    assert saved["disease_resolved"] == "breast cancer"
+    assert saved["available_celltype_count"] == 4
+    assert saved["available_celltype_options"][0] == {
+        "label": "malignant cell",
+        "total_cell_count": 576171,
+    }
+
+    search_raw = resolution.search_census_celltype_options.invoke(
+        {"data_dir": str(tmp_path), "query": "malignant", "top_k": 5}
+    )
+    search = json.loads(search_raw)
+    assert search["executed"] is True
+    assert search["matches"][0] == {
+        "label": "malignant cell",
+        "total_cell_count": 576171,
+        "score": 1,
+    }
+
+
+def test_apply_semantic_celltype_proxy_accepts_label_from_full_artifact_options() -> None:
+    result = resolve_celltype_matches(
+        ["Prolif Invasive Tumor"],
+        {"malignant cell": 576171, "macrophage": 80485},
+        disease="breast cancer",
+        organism="homo_sapiens",
+        disease_resolved="breast cancer",
+        disease_resolution_mode="exact",
+        preview_limit=1,
+    )
+    full_options = [
+        {"label": "malignant cell", "total_cell_count": 576171},
+        {"label": "macrophage", "total_cell_count": 80485},
+    ]
+
+    updated = apply_semantic_celltype_proxy_to_result(
+        result,
+        available_celltype_options=full_options,
+        input_celltype="Prolif Invasive Tumor",
+        matched_celltype="malignant cell",
+        rationale=(
+            "The ST label denotes tumor cells; malignant cell is the closest "
+            "available Census cell_type label for breast cancer."
+        ),
+        confidence="medium",
+        lost_modifiers=["prolif", "invasive"],
+        candidate_labels_considered=["malignant cell", "macrophage"],
+    )
+
+    assert updated["primary_input_celltype"] == "Prolif Invasive Tumor"
+    assert updated["primary_resolved_celltype"] == "malignant cell"
+    assert updated["primary_match_mode"] == "semantic_proxy"
+    assert updated["errors"] == []
+    match = updated["matches"][0]
+    assert match["matched_celltype"] == "malignant cell"
+    assert match["match_mode"] == "semantic_proxy"
+    assert match["confidence"] == "medium"
+    assert match["literal_exact_match"] is False
+    assert match["literal_substring_match"] is False
+    assert match["lost_modifiers"] == ["prolif", "invasive"]
+    assert match["candidate_labels_considered"] == ["malignant cell", "macrophage"]
+    assert match["semantic_proxy_rationale"].startswith("The ST label denotes")
+    assert "semantic proxy" in match["warnings"][0]
+
+
+def test_apply_semantic_celltype_proxy_rejects_label_not_in_full_options() -> None:
+    result = resolve_celltype_matches(
+        ["Prolif Invasive Tumor"],
+        {"macrophage": 80485},
+        disease="breast cancer",
+        organism="homo_sapiens",
+        disease_resolved="breast cancer",
+        disease_resolution_mode="exact",
+    )
+
+    updated = apply_semantic_celltype_proxy_to_result(
+        result,
+        available_celltype_options=[{"label": "macrophage", "total_cell_count": 80485}],
+        input_celltype="Prolif Invasive Tumor",
+        matched_celltype="malignant cell",
+        rationale="The agent attempted a malignant-cell proxy.",
+        confidence="medium",
+        lost_modifiers=["prolif", "invasive"],
+        candidate_labels_considered=["malignant cell"],
+    )
+
+    assert updated["primary_resolved_celltype"] == ""
+    assert updated["primary_match_mode"] == "unresolved"
+    assert updated["matches"][0]["matched_celltype"] == ""
+    assert updated["errors"] == [
+        "Semantic proxy label 'malignant cell' is not present in available Census cell_type labels."
     ]
 
 
