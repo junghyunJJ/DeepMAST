@@ -578,6 +578,12 @@ def normalize_stage1_record(
         for key in ("input_disease", "disease_fallback_used", "disease_resolution_mode"):
             if key in existing_census:
                 normalized["census_validation"].setdefault(key, existing_census[key])
+        if existing_census.get("source") == "single_pair_fallback":
+            normalized["census_validation"]["source"] = "single_pair_fallback"
+            if "batch_error" in existing_census:
+                normalized["census_validation"]["batch_error"] = existing_census["batch_error"]
+            if "csv_file" in existing_census:
+                normalized["census_validation"].setdefault("csv_file", existing_census["csv_file"])
 
     # Remove legacy fields no longer used
     normalized.pop("cellxgene", None)

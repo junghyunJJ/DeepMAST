@@ -2346,6 +2346,7 @@ class TestStage1Batch:
 
         result = json.loads(raw)
         stage1 = json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text())
+        stage1_evidence = json.loads((evidence_dir / "stage1_evidence.json").read_text())
         disease_context = json.loads((evidence_dir / "disease_context.json").read_text())
         assessment = json.loads((evidence_dir / "assessment_results.json").read_text())
 
@@ -2366,6 +2367,9 @@ class TestStage1Batch:
         assert stage1["census_validation"]["source"] == "single_pair_fallback"
         assert stage1["census_validation"]["batch_error"].startswith(batch_error)
         assert stage1["census_validation"]["target_vs_rest"]["coexpression"]["risk_ratio"] == 7.5
+        aggregate_validation = stage1_evidence["EGFR^MET"]["census_validation"]
+        assert aggregate_validation["source"] == "single_pair_fallback"
+        assert aggregate_validation["batch_error"].startswith(batch_error)
         stage1_context = result["disease_context"]["stage1"]
         assert stage1_context["census_status"] == "completed_with_single_pair_fallback"
         assert stage1_context["census_batch_error"].startswith(batch_error)
@@ -2708,6 +2712,7 @@ class TestStage1Batch:
 
         batch_error = "Census query returned 1101430 cells; max allowed is 1000000"
         csv_path = evidence_dir / "census_egfr_met_malignant_cell.csv"
+        finalize_single_pair_calls = []
 
         def fake_initial_single_pair(args):
             Path(args["output_csv"]).write_text(
@@ -2729,6 +2734,15 @@ class TestStage1Batch:
             })
 
         def fake_finalize_single_pair(args):
+            finalize_single_pair_calls.append(args)
+            Path(args["output_csv"]).write_text(
+                "\n".join([
+                    "cell_type,n_cells,gene_a_pos,gene_a_pct,gene_b_pos,gene_b_pct,coexp_pos,coexp_pct",
+                    "malignant cell,100,20,20.0,30,30.0,15,15.0",
+                    "other,100,5,5.0,10,10.0,2,2.0",
+                ]) + "\n",
+                encoding="utf-8",
+            )
             return json.dumps({
                 "gene_a": args["gene_a"],
                 "gene_b": args["gene_b"],
@@ -2808,6 +2822,7 @@ class TestStage1Batch:
             "single-pair census refused to run" in error
             for error in result["errors"]
         )
+        assert finalize_single_pair_calls == []
         assert not csv_path.exists()
         assert census_validation.get("source") not in {
             "csv_integration",

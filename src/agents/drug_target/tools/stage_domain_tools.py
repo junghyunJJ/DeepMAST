@@ -1712,7 +1712,7 @@ def run_stage1_batch(
                 data_dir,
                 disease=disease,
                 target_cell_type=target_cell_type or None,
-                rerun_missing_census=enable_census,
+                rerun_missing_census=enable_census and not bool(census_single_fallback),
                 pair_subset=list(featured_pairs),
             )
             if census_single_fallback and census_batch_error:
