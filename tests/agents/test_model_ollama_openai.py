@@ -325,3 +325,54 @@ def test_create_ollama_openai_llm_extra_body_uses_popped_values():
         opts = kwargs.get("model_kwargs", {}).get("extra_body", {}).get("options", {})
     assert opts["num_ctx"] == 4096
     assert opts["num_predict"] == 512
+
+
+def test_create_ollama_llm_forwards_reasoning_false_kwarg():
+    """Benchmark qwen runs must send Ollama's native think=false flag."""
+    from src.agents.model import _ChatOllamaWithThink
+
+    with patch("src.agents.model._ChatOllamaWithThink", autospec=True) as mock_chatollama:
+        mock_chatollama.return_value = MagicMock(spec=_ChatOllamaWithThink)
+        _ = create_llm(
+            provider="ollama",
+            model="qwen3.5:35b",
+            base_url="http://localhost:7000",
+            reasoning=False,
+        )
+        kwargs = mock_chatollama.call_args.kwargs
+
+    assert kwargs["model"] == "qwen3.5:35b"
+    assert kwargs["base_url"] == "http://localhost:7000"
+    assert kwargs["think"] is False
+
+
+def test_create_ollama_llm_reads_ollama_reasoning_false_env(monkeypatch):
+    """OLLAMA_REASONING=false should map to Ollama think=false."""
+    from src.agents.model import _ChatOllamaWithThink
+
+    monkeypatch.setenv("OLLAMA_REASONING", "false")
+    with patch("src.agents.model._ChatOllamaWithThink", autospec=True) as mock_chatollama:
+        mock_chatollama.return_value = MagicMock(spec=_ChatOllamaWithThink)
+        _ = create_llm(
+            provider="ollama",
+            model="qwen3.5:35b",
+            base_url="http://localhost:7000",
+        )
+        kwargs = mock_chatollama.call_args.kwargs
+
+    assert kwargs["think"] is False
+
+
+def test_chat_ollama_with_think_injects_native_payload_flag():
+    """The compatibility wrapper must put `think` at Ollama /api/chat top level."""
+    from langchain_core.messages import HumanMessage
+    from src.agents.model import _ChatOllamaWithThink
+
+    llm = _ChatOllamaWithThink(
+        model="qwen3.5:35b",
+        base_url="http://localhost:7000",
+        think=False,
+    )
+    params = llm._chat_params([HumanMessage(content="Return OK")])
+
+    assert params["think"] is False

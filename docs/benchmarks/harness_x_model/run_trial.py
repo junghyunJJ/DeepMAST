@@ -14,6 +14,7 @@ import os as _os
 from docs.benchmarks.harness_x_model.common import (
     CONDITIONS,
     append_jsonl,
+    apply_ollama_host_override,
     check_mode_coherence,
     compute_cases_sha256,
     load_cases,
@@ -32,15 +33,20 @@ def main() -> int:
     parser.add_argument("--workspace-root", required=True)
     parser.add_argument("--results-dir", required=True)
     parser.add_argument("--temperature", type=float, default=0.3)
+    parser.add_argument("--ollama-host", default=None)
     # P0.8 — benchmark_mode toggle (single-trial variant; mode-only guard per
     # Architect finding #1 to prevent contaminated-row injection at :48 below).
     parser.add_argument(
         "--mode",
-        choices=["B", "B_prime", "C"],
+        choices=["B", "B_prime", "C", "retrieval_only"],
         default=_os.environ.get("BENCHMARK_MODE", "C"),
-        help="Benchmark mode (B, B_prime, C). Default C preserves existing behavior.",
+        help=(
+            "Benchmark mode (B, B_prime, C, retrieval_only). "
+            "Default C preserves existing behavior."
+        ),
     )
     args = parser.parse_args()
+    apply_ollama_host_override(args)
 
     cases = {case["case_id"]: case for case in load_cases(args.cases_file)}
     if args.case_id not in cases:

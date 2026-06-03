@@ -20,6 +20,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import Runnable
 
 from src.agents.deep_interpreter.tools import (
+    create_literature_handoff,
     search_literature,
     search_literature_dynamic,
 )
@@ -31,7 +32,7 @@ from src.agents.deep_interpreter.tools import (
 LITERATURE_SEARCHER_SYSTEM_PROMPT = """You are an autonomous biomedical literature search agent.
 
 Your role is to PROACTIVELY find PubMed references BEFORE interpretation generation
-using the BioMCP workflow: think-assisted search → search → coverage-driven follow-up.
+using the BioMCP workflow: search → coverage-driven follow-up → filtered handoff.
 
 ## CRITICAL: PROACTIVE SEARCH (Literature FIRST)
 
@@ -41,7 +42,7 @@ used by the interpreter to generate literature-grounded interpretations.
 ## BioMCP Workflow
 
 ### Phase 1: Analyze Search Context
-1. Read /partN_search_context.json for extracted biological terms
+1. Read /search_context.json for extracted biological terms
 2. Use those terms to build the initial search
 3. search_literature_dynamic will call BioMCP think internally to optimize the search strategy
 
@@ -51,7 +52,8 @@ Use search_literature_dynamic with:
 - pathways: Prioritized pathway list
 - celltypes: Relevant cell types
 - disease: Disease context
-- max_results: Number of results (default 20)
+- max_results: 100
+- output_path: "papers_raw.json"
 
 ### Phase 3: Coverage-Driven Follow-Up
 1. Check the search result's coverage_sufficient and recommended_actions fields:
@@ -61,42 +63,15 @@ Use search_literature_dynamic with:
 2. If coverage < 60% genes or < 50% pathways:
    - Identify gaps from recommended_actions
    - Execute targeted follow-up searches directly
-   - Repeat validation
+   - Merge any returned papers into /papers_raw.json
 3. Maximum 3 search iterations
 
-### Phase 4: Output
-Write comprehensive /partN_papers.json with:
-- All found papers (pmid, title, abstract)
-- Coverage analysis
-- Search queries used
-
-## Output Format for /partN_papers.json
-```json
-{
-  "papers": [
-    {
-      "pmid": "12345678",
-      "title": "E-cadherin loss promotes EMT in breast cancer",
-      "abstract": "...",
-      "search_type": "gene_disease",
-      "relevance_to_context": "Directly discusses CDH1 role in EMT"
-    }
-  ],
-  "coverage": {
-    "genes_covered": ["CDH1", "TGFB1", "VIM"],
-    "genes_missing": ["SNAI1"],
-    "pathways_covered": ["EMT", "TGFB"],
-    "pathways_missing": [],
-    "celltypes_covered": ["Tumor", "Fibroblast"],
-    "total_papers": 25,
-    "coverage_score": 0.85
-  },
-  "search_iterations": 2,
-  "search_queries": [
-    "\\"CDH1\\"[Gene] AND \\"breast cancer\\"[Title/Abstract]"
-  ]
-}
-```
+### Phase 4: Bucket And Filter Output
+Call create_literature_handoff with raw_papers_path="papers_raw.json",
+citation_candidates_path="citation_candidates.json", output_path="papers.json",
+and cap=40. /citation_candidates.json is the full audit artifact. /papers.json is
+the filtered interpreter handoff with direct_lr_evidence and
+receptor_pathway_context_evidence only.
 
 ## Quality Criteria
 - Aim for >= 15 papers per part
@@ -108,6 +83,7 @@ Write comprehensive /partN_papers.json with:
 ## Available Tools
 - search_literature: For targeted single-query searches (follow-up gaps)
 - search_literature_dynamic: LLM-powered iterative search with coverage targets and internal fallback
+- create_literature_handoff: Bucket /papers_raw.json and write filtered /papers.json
 """
 
 
@@ -131,6 +107,7 @@ def create_literature_searcher_agent(
     tools = [
         search_literature,
         search_literature_dynamic,
+        create_literature_handoff,
     ]
 
     # Create agent with optional backend

@@ -13,6 +13,32 @@ from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
 
+class _ChatOllamaWithThink(ChatOllama):
+    """ChatOllama variant that can send Ollama's native `think` flag."""
+
+    think: bool | None = None
+
+    def _chat_params(self, messages, stop=None, **kwargs) -> dict[str, Any]:
+        params = super()._chat_params(messages, stop=stop, **kwargs)
+        if self.think is not None and "think" not in params:
+            params["think"] = self.think
+        return params
+
+
+def _parse_optional_bool(value: Any) -> bool | None:
+    """Parse optional env-style booleans; None means leave provider default intact."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"Invalid boolean value: {value!r}")
+
+
 def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
     """
     Create LLM based on provider (default: openrouter with moonshotai/kimi-k2.5)
@@ -86,8 +112,10 @@ def create_claude_llm(**kwargs) -> ChatAnthropic:
     temperature = kwargs.get("temperature", 0)
 
     return ChatAnthropic(
-        model=model,
+        model_name=model,
         temperature=temperature,
+        timeout=None,
+        stop=None,
     )
 
 
@@ -124,14 +152,16 @@ def create_ollama_llm(**kwargs) -> ChatOllama:
     
     num_ctx = kwargs.get("num_ctx", 98304) # default to 98K
     num_predict = kwargs.get("num_predict", -1)  # unlimited; prevents truncated tool call JSON (#14570)
+    reasoning = _parse_optional_bool(kwargs.get("reasoning", os.getenv("OLLAMA_REASONING")))
 
-    llm = ChatOllama(
+    llm = _ChatOllamaWithThink(
         model=model,
         base_url=base_url,
         temperature=temperature,
         keep_alive="24h",
         num_ctx=num_ctx,
         num_predict=num_predict,
+        think=reasoning,
         disable_streaming=True,
         client_kwargs={
             "timeout": 7200,
@@ -226,9 +256,9 @@ def create_ollama_openai_llm(**kwargs: Any) -> ChatOpenAI:
         base_url=base_url,
         api_key="ollama",  # placeholder — Ollama ignores, OpenAI SDK requires non-empty
         temperature=temperature,
-        request_timeout=7200,  # D8: kwarg name verified — request_timeout, NOT timeout
+        request_timeout=7200,  # pyright: ignore[reportCallIssue]  # D8: verified request_timeout, NOT timeout
         streaming=False,  # D7: explicit (matches ChatOpenAI default; defends against accidental enable)
-        parallel_tool_calls=False,  # D10 / CP-P1-002: prevent uncertain Ollama OpenAI-compat parallel-call behavior
+        parallel_tool_calls=False,  # pyright: ignore[reportCallIssue]  # D10 / CP-P1-002: prevent uncertain Ollama OpenAI-compat parallel-call behavior
         # Codex P2 #1: forward Ollama-native options to server. CURRENTLY A NO-OP
         # in Ollama 0.20.6 (verified 2026-05-03 — see docstring KNOWN LIMITATION
         # block). Kept for future-proofing; the syntax is per Ollama's OpenAI-
@@ -260,7 +290,7 @@ def create_openrouter_llm(**kwargs) -> ChatOpenAI:
     temperature = kwargs.get("temperature", 0)
     max_tokens = kwargs.get("max_tokens")
 
-    init_kwargs = dict(
+    init_kwargs: dict[str, Any] = dict(
         model=model,
         base_url="https://openrouter.ai/api/v1",
         api_key=os.getenv("OPENROUTER_API_KEY"),
@@ -355,4 +385,3 @@ def create_llm_from_config(
     model_name = (configurable.get("llm_model") or "").strip() or None
     kwargs = {"model": model_name} if model_name else {}
     return create_llm(provider=provider, **kwargs)
-

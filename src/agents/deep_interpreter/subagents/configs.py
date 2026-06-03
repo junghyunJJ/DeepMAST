@@ -19,6 +19,7 @@ from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
 from src.agents.deep_interpreter.middleware import WriteFileArgGuardMiddleware
 from src.agents.deep_interpreter.tools import (
     load_analysis_data,
+    create_literature_handoff,
     search_literature,
     search_literature_dynamic,
     search_pubmed_advanced,
@@ -73,7 +74,9 @@ SUBAGENT_CONFIGS = {
         "description": (
             "Literature search agent. Searches PubMed BEFORE interpretation. "
             "Uses unified search_context (genes + pathways + celltypes) for ALL parts. "
-            "Performs a single search, outputs /papers.json shared by all interpreters. "
+            "Builds a large raw pool, buckets LR relevance, and outputs filtered "
+            "/papers.json shared by all interpreters plus /papers_raw.json and "
+            "/citation_candidates.json audit artifacts. "
             "Uses search_literature_dynamic (LLM-powered) with automatic internal fallback. "
             "Papers will be the ONLY citation source for interpreter - this prevents hallucination."
         ),
@@ -81,6 +84,7 @@ SUBAGENT_CONFIGS = {
         "tools": [
             load_analysis_data,
             search_literature_dynamic,   # PRIMARY: LLM-powered (내부 자동 fallback 포함)
+            create_literature_handoff,   # Bucket raw pool and write interpreter-facing papers.json
             search_literature,           # Follow-up: Single query search
             search_pubmed_advanced,      # E-utilities (MeSH/날짜/pub type)
             read_skill_file,
@@ -90,7 +94,7 @@ SUBAGENT_CONFIGS = {
         "name": "interpreter",
         "description": (
             "Interpretation agent with inline validation and RAG support. For each Part (1, 2, 3): "
-            "reads /partN_papers.json, optionally downloads full-text papers for RAG search, "
+            "reads filtered /papers.json, optionally downloads full-text papers for RAG search, "
             "generates literature-grounded interpretation with full-text context, "
             "validates each claim against cited papers (using full-text if available). "
             "Phase 4 reflection/quality policy (Steps A-E, MANDATORY ordering): "
@@ -278,14 +282,16 @@ Deep Interpreter 4-Agent Workflow:
 2. SEARCHER (context-analyzer + literature-searcher consolidated)
    - Single unified search for ALL parts:
      a. Extract unified search_context (genes + pathways + celltypes) from load_analysis_data
-     b. Search PubMed ONCE (single search covers all parts, saves API calls)
+     b. Search PubMed ONCE into /papers_raw.json (single raw pool covers all parts)
      c. Ensure coverage: >= 60% genes, >= 50% pathways, >= 15 papers
-     d. Output: /papers.json (shared by all Parts)
-   - Total Outputs: /papers.json (1 file)
+     d. Run bounded gap-fill when needed and merge returned papers into /papers_raw.json
+     e. Bucket LR relevance into /citation_candidates.json
+     f. Output filtered /papers.json for INTERPRETER (direct/context buckets only)
+   - Total Outputs: /papers_raw.json, /citation_candidates.json, /papers.json
 
 3. INTERPRETER (part1/2/3-interpreter + claim-validator + quality-reviewer consolidated)
    - For EACH Part (1, 2, 3):
-     a. Read /papers.json (ONLY citation source)
+     a. Read filtered /papers.json (ONLY citation source)
      b. Generate literature-grounded interpretation
      c. Inline claim validation (every PMID checked)
      d. Inline quality check (score >= 0.7, max 3 iterations)

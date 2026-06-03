@@ -35,12 +35,22 @@ def _get_project_root() -> Path:
     return Path.cwd()
 
 
+def _normalize_virtual_path(file_path: str) -> str:
+    """Map common container-style workspace paths into virtual FS paths."""
+    if file_path == "/workspace":
+        return "/"
+    if file_path.startswith("/workspace/"):
+        return file_path[len("/workspace") :]
+    return file_path
+
+
 @tool
 def write_file(file_path: str, content: str) -> str:
     """Write content to a file. Virtual paths (e.g., /data_path.txt) resolve to workspace."""
     # Ollama may pass raw dict/list instead of JSON string
     if isinstance(content, (dict, list)):
         content = json.dumps(content, indent=2)
+    file_path = _normalize_virtual_path(file_path)
     backend = _get_backend()
     if not file_path.startswith("/"):
         file_path = f"/{file_path}"
@@ -51,8 +61,9 @@ def write_file(file_path: str, content: str) -> str:
 
 
 @tool
-def read_file(file_path: str, offset: int = 0, limit: int = 2000) -> str:
+def read_file(file_path: str, offset: int = 0, limit: int = 2000) -> object:
     """Read a file. Virtual paths resolve to workspace; 'skills/...' resolves to project root."""
+    file_path = _normalize_virtual_path(file_path)
     # Handle project-relative paths (skills/)
     if file_path.startswith("skills/"):
         project_root = _get_project_root()

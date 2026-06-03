@@ -50,6 +50,93 @@ def _sync_save_json(dir_path: str, file_path: str, data: dict) -> None:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
+def _effective_literature_data_dir(data_dir: str = "") -> str:
+    """Return explicit or env literature data dir as an absolute path."""
+    env_dir = os.getenv("DEEP_INTERPRETER_DATA_DIR", "")
+    # Standalone benchmark agents use virtual filesystem paths such as
+    # `/workspace`, while the literature tool writes to the host filesystem.
+    # Map that virtual root back to the real benchmark workspace.
+    raw_dir = env_dir if data_dir == "/workspace" and env_dir else data_dir or env_dir
+    if not raw_dir:
+        return ""
+    return str(Path(raw_dir).expanduser().resolve())
+
+
+def _resolve_literature_output_path(save_dir: str, output_path: str) -> Path:
+    """Resolve a safe literature output path under save_dir."""
+    if not output_path:
+        raise ValueError("output_path must not be empty")
+
+    relative_path = Path(output_path)
+    if relative_path.is_absolute():
+        raise ValueError("output_path must be relative to data_dir")
+
+    base_dir = Path(save_dir).expanduser().resolve()
+    resolved_path = (base_dir / relative_path).resolve()
+    if not resolved_path.is_relative_to(base_dir):
+        raise ValueError("output_path must stay within data_dir")
+    return resolved_path
+
+
+async def _maybe_save_literature_result(
+    full_result: dict,
+    output_path: str,
+    data_dir: str,
+) -> dict:
+    """Save full literature result when requested and return compact summary."""
+    if not output_path:
+        return full_result
+
+    save_dir = _effective_literature_data_dir(data_dir)
+    if not save_dir:
+        logger.warning(
+            "output_path='%s' specified but data_dir not set "
+            "(param or DEEP_INTERPRETER_DATA_DIR env). Auto-save SKIPPED.",
+            output_path,
+        )
+        return {
+            **full_result,
+            "error": "AUTO_SAVE_FAILED",
+            "auto_save": False,
+            "error_detail": (
+                f"output_path='{output_path}' specified but data_dir not available. "
+                f"Set DEEP_INTERPRETER_DATA_DIR env var or pass data_dir parameter."
+            ),
+        }
+
+    real_path = _resolve_literature_output_path(save_dir, output_path)
+    papers = full_result.get("papers", [])
+    try:
+        await asyncio.to_thread(_sync_save_json, save_dir, str(real_path), full_result)
+        logger.info("Auto-saved %d papers to %s", len(papers), real_path)
+        return {
+            "saved_to": str(real_path),
+            "output_path": output_path,
+            "total_papers": len(papers),
+            "coverage": full_result.get("coverage", {}),
+            "paper_titles": [
+                p.get("title", "")[:100] for p in papers[:10]
+            ],
+            "search_method": full_result.get("search_method"),
+            "iterations": full_result.get("iterations", 0),
+            "coverage_sufficient": full_result.get("coverage_sufficient"),
+            "recommended_actions": full_result.get("recommended_actions", []),
+            "filter_stage": full_result.get("filter_stage"),
+            "rerank_applied_count": int(full_result.get("rerank_applied_count", 0)),
+            "rerank_dropped_count": int(full_result.get("rerank_dropped_count", 0)),
+            "message": (
+                f"Full results ({len(papers)} papers) saved to "
+                f"{output_path}. Use read_file('/{output_path}') to "
+                f"access complete data."
+            ),
+        }
+    except ValueError:
+        raise
+    except Exception as e:
+        logger.warning("Auto-save to %s failed: %s", real_path, e)
+        return full_result
+
+
 # =============================================================================
 # MCP Payload Sanitization
 # =============================================================================
@@ -983,9 +1070,7 @@ async def _llm_disease_relevance_filter(
     try:
         llm = create_llm()
         response = await llm.ainvoke([HumanMessage(content=prompt)])
-        response_text = (
-            response.content if hasattr(response, "content") else str(response)
-        )
+        response_text = str(response.content) if hasattr(response, "content") else str(response)
 
         text = _strip_code_fence(response_text)
         if "[" in text and "]" in text:
@@ -2608,12 +2693,13 @@ def search_literature_dynamic(
         pathways: List of pathways identified (e.g., ["EMT", "TGFB", "WNT"])
         celltypes: List of cell types in analysis (e.g., ["Tumor", "Fibroblast"])
         disease: Disease context (e.g., "breast cancer")
-        max_results: Maximum number of papers to return (default 30)
+        max_results: Maximum number of papers to return. SEARCHER handoff calls
+            pass 100 explicitly for the raw pool.
         target_gene_coverage: Target gene coverage percentage (default 0.6 = 60%)
         target_pathway_coverage: Target pathway coverage percentage (default 0.5 = 50%)
         max_iterations: Maximum search iterations (default 3)
         enforce_disease_match: Whether to post-filter papers by disease context
-        output_path: If provided (e.g., "papers.json"), saves complete results
+        output_path: If provided (e.g., "papers_raw.json"), saves complete results
             to data_dir/output_path. Returns compact summary.
         data_dir: Directory for saving output files. SEARCHER should read this from
             /data_path.txt (written by PLANNER). Falls back to contextvars if empty.
@@ -2638,8 +2724,9 @@ def search_literature_dynamic(
     # (prevents silent pair injection for PLANNER/REPORTER which pass data_dir for
     # save-path purposes only — fixes Codex adversarial review finding #1)
     _lr_pairs = None
-    if enable_lr_pair_queries and data_dir:
-        _lr_pairs_file = Path(data_dir) / "lr_pairs_search.json"
+    _effective_data_dir = _effective_literature_data_dir(data_dir)
+    if enable_lr_pair_queries and _effective_data_dir:
+        _lr_pairs_file = Path(_effective_data_dir) / "lr_pairs_search.json"
         if _lr_pairs_file.exists():
             try:
                 with open(_lr_pairs_file) as f:
@@ -2709,7 +2796,8 @@ async def search_literature_dynamic_async(
         pathways: List of pathways identified
         celltypes: List of cell types in analysis
         disease: Disease context
-        max_results: Maximum papers to return (default 30)
+        max_results: Maximum papers to return. SEARCHER handoff calls pass 100
+            explicitly for the raw pool.
         target_gene_coverage: Target gene coverage percentage (default 0.6)
         target_pathway_coverage: Target pathway coverage percentage (default 0.5)
         max_iterations: Maximum search iterations (default 3)
@@ -2845,6 +2933,8 @@ async def search_literature_dynamic_async(
 
     for iteration in range(max_iterations):
         logger.info(f"=== Async Iteration {iteration + 1}/{max_iterations} ===")
+        prompt_text = ""
+        validated_queries: list[dict[str, Any]] = []
 
         # Calculate current coverage
         current_coverage = _calculate_coverage(
@@ -2922,11 +3012,11 @@ async def search_literature_dynamic_async(
             # Generate queries using LLM
             try:
                 response = await llm.ainvoke([HumanMessage(content=prompt_text)])
-                response_text = response.content if hasattr(response, "content") else str(response)
+                response_text = str(response.content) if hasattr(response, "content") else str(response)
             except Exception as e:
                 logger.error(f"LLM query generation failed at iteration {iteration}: {e}")
                 if iteration == 0:
-                    return await _execute_fixed_strategy_search_async(
+                    fallback_result = await _execute_fixed_strategy_search_async(
                         genes=genes,
                         pathways=pathways,
                         celltypes=celltypes,
@@ -2939,6 +3029,9 @@ async def search_literature_dynamic_async(
                         rerank_min_confidence=rerank_min_confidence,
                         rerank_stats=rerank_totals,
                     )
+                    return await _maybe_save_literature_result(
+                        fallback_result, output_path, data_dir
+                    )
                 break
 
             # Parse and validate queries
@@ -2948,7 +3041,7 @@ async def search_literature_dynamic_async(
             if not validated_queries:
                 if iteration == 0:
                     logger.warning("No valid queries on first iteration, falling back")
-                    return await _execute_fixed_strategy_search_async(
+                    fallback_result = await _execute_fixed_strategy_search_async(
                         genes=genes,
                         pathways=pathways,
                         celltypes=celltypes,
@@ -2960,6 +3053,9 @@ async def search_literature_dynamic_async(
                         rerank_top_n=rerank_top_n,
                         rerank_min_confidence=rerank_min_confidence,
                         rerank_stats=rerank_totals,
+                    )
+                    return await _maybe_save_literature_result(
+                        fallback_result, output_path, data_dir
                     )
                 logger.warning(f"No valid queries at iteration {iteration}, stopping")
                 break
@@ -3318,55 +3414,4 @@ async def search_literature_dynamic_async(
     if record_queries and recorded_iter0_queries:
         full_result["query_cache"] = recorded_iter0_queries
 
-    # Auto-save: write full results to file, return compact summary to LLM
-    if output_path:
-        save_dir = data_dir or os.getenv("DEEP_INTERPRETER_DATA_DIR", "")
-        if save_dir:
-            save_dir = str(Path(save_dir).expanduser().resolve())
-            real_path = os.path.join(save_dir, output_path)
-            try:
-                await asyncio.to_thread(_sync_save_json, save_dir, real_path, full_result)
-                logger.info(
-                    f"Auto-saved {len(final_papers)} papers to {real_path}"
-                )
-                return {
-                    "saved_to": real_path,
-                    "output_path": output_path,
-                    "total_papers": len(final_papers),
-                    "coverage": final_coverage,
-                    "paper_titles": [
-                        p.get("title", "")[:100] for p in final_papers[:10]
-                    ],
-                    "search_method": "search_literature_dynamic",
-                    "iterations": len(coverage_history) - 1,
-                    "coverage_sufficient": coverage_sufficient,
-                    "recommended_actions": recommended_actions,
-                    "filter_stage": filter_stage,
-                    "rerank_applied_count": int(rerank_totals.get("applied_count", 0)),
-                    "rerank_dropped_count": int(rerank_totals.get("dropped_count", 0)),
-                    "message": (
-                        f"Full results ({len(final_papers)} papers) saved to "
-                        f"{output_path}. Use read_file('/{output_path}') to "
-                        f"access complete data."
-                    ),
-                }
-            except Exception as e:
-                logger.warning(f"Auto-save to {real_path} failed: {e}")
-                # Fall through to return full_result
-        else:
-            logger.warning(
-                "output_path='%s' specified but data_dir not set "
-                "(param or DEEP_INTERPRETER_DATA_DIR env). Auto-save SKIPPED.",
-                output_path,
-            )
-            return {
-                **full_result,
-                "error": "AUTO_SAVE_FAILED",
-                "auto_save": False,
-                "error_detail": (
-                    f"output_path='{output_path}' specified but data_dir not available. "
-                    f"Set DEEP_INTERPRETER_DATA_DIR env var or pass data_dir parameter."
-                ),
-            }
-
-    return full_result
+    return await _maybe_save_literature_result(full_result, output_path, data_dir)

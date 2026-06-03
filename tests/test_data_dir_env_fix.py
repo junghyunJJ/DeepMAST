@@ -178,6 +178,25 @@ class TestReaderSites:
         backend = sf._get_backend()
         assert str(backend.cwd) == "/reader/test/path"
 
+    def test_standalone_fs_normalizes_workspace_virtual_path(self, monkeypatch, tmp_path):
+        """`/workspace/...` should resolve to the virtual root workspace."""
+        monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", str(tmp_path))
+
+        import importlib
+        import src.agents.deep_interpreter.tools.standalone_fs as sf
+
+        sf._backend = None
+        importlib.reload(sf)
+
+        write_result = sf.write_file.invoke(
+            {"file_path": "/workspace/papers_raw.json", "content": "{}"}
+        )
+        read_result = sf.read_file.invoke({"file_path": "/workspace/papers_raw.json"})
+
+        assert "Updated file" in write_result
+        assert "{}" in read_result
+        assert (tmp_path / "papers_raw.json").exists()
+
     def test_report_tool_reads_env(self, monkeypatch):
         """report.py should use env var for output path resolution."""
         monkeypatch.setenv("DEEP_INTERPRETER_DATA_DIR", "/report/test")

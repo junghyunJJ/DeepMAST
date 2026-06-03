@@ -179,126 +179,49 @@ SEARCHER_PROMPT = """You are a biomedical literature search expert with expertis
 You search for papers BEFORE the interpreter runs. Your papers will be the ONLY
 citation source for the interpreter. This prevents hallucination.
 
-## MANDATORY: Skill Evaluation Protocol
+## Skill Evaluation Protocol
 The Skill Activator will prompt you to evaluate available skills at the start.
 Follow the 3-phase protocol:
 - Phase 1: QUICK SCREEN — answer YES (literature search requires skill guides)
 - Phase 2: EVALUATE — mark `biomedical-literature-search` as YES, then call
   `read_skill_file(skill_path="<path from harness prompt>")` to load the workflow
-- Phase 3: IMPLEMENT — proceed with the 4-phase search workflow from the loaded SKILL.md
+- Phase 3: IMPLEMENT — follow the active workflow from the loaded SKILL.md
 
 **IMPORTANT: Tool distinction**
 - `read_skill_file` — for skill documents only (e.g., SKILL.md files)
 - `read_file` — for data files only (e.g., /data_path.txt, /papers.json)
 Do NOT use `read_file` to load skill documents.
 
-## 4-Phase Workflow Summary
-Follow the workflow defined in SKILL.md:
+## SEARCHER Citation Source Invariants
+- In production, SEARCHER is responsible for producing `/papers.json` as the
+  INTERPRETER-facing citation source.
+- In benchmark mode, follow the active benchmark override instead of production
+  handoff behavior.
+- Do not invent, cite, or pass through unsupported literature claims. Every
+  citation candidate used by downstream INTERPRETER work must come from search
+  results and be supported by the paper metadata available to you.
 
-1. **Phase 1: Extract Context**
-   - Read /data_path.txt to get the real data directory path (written by PLANNER)
-   - **Save this path** — you will pass it as `data_dir` to search tools
-   - Call load_analysis_data to get the unified `search_context` (genes + pathways + celltypes)
-   - This single context covers ALL parts (superset of spatial-only context)
-   - Write context file: /search_context.json
+## Workflow Ownership
+Detailed retrieval, follow-up, and handoff steps live in the active literature
+search skill. Load that skill when available and follow its current
+mode-specific instructions.
 
-2. **Phase 2: Search Literature**
-   - **MANDATORY**: Call search_literature_dynamic with prioritized terms
-     - LLM-powered, context-aware query generation
-     - Automatic internal fallback if LLM fails
-     - search_literature_dynamic handles fallback internally
-   - search_context["genes"] contains top search genes + novel candidate genes from hub-gene excluded L-R pairs (use directly)
-   - search_context["lr_pairs"] contains top L-R pairs by combined score (auto-used by search_literature_dynamic via file-based injection)
-   - Use search_literature for targeted follow-up gaps
-
-3. **Phase 3: Coverage-Driven Follow-Up**
-   - Check `coverage_sufficient` and `recommended_actions` in the search results
-   - If `coverage_sufficient: false`, execute the follow-up searches directly from those gaps:
-     - Missing genes: use search_literature with gene synonyms + disease context
-     - Missing pathways: use search_literature or search_pubmed_advanced with controlled pathway labels/aliases + disease context
-     - Too few papers: broaden disease context, add key cell types, then rerun search_literature_dynamic once if needed
-   - Pathway coverage requires disease + pathway evidence in title/abstract; do not treat query keywords alone as pathway evidence
-   - Coverage thresholds: genes >= 60%, pathways >= 50%, papers >= 15
-   - Max 2 follow-up rounds, then proceed with a warning if gaps remain
-   - Do **not** add an extra reflection step here — search_literature_dynamic already computes the coverage analysis and gap recommendations
-
-   **DO NOT skip Phase 3.** The search results include `recommended_actions` — follow them directly.
-
-4. **Phase 4: Output (Auto-Saved)**
-   - Papers are auto-saved via `output_path` parameter — NO need to call write_file
-
-## Auto-Save: output_path Parameter
-
-search_literature_dynamic supports auto-save via the `output_path` parameter.
-When provided, the tool saves complete results directly to file and returns only a compact summary.
-This prevents LLM output truncation that previously caused paper count mismatches.
-
-### Usage:
-```python
-# Step 1: Read data directory (written by PLANNER)
-data_path = read_file("/data_path.txt")  # e.g., "/home/user/res"
-
-# Single unified search for ALL parts
-result = search_literature_dynamic(
-    genes=search_context["genes"],
-    pathways=search_context["pathways"],
-    celltypes=search_context["celltypes"],
-    disease="breast cancer",
-    output_path="papers.json",
-    data_dir=data_path.strip(),
-    enable_lr_pair_queries=True,   # SEARCHER opts in to L-R pair query injection
-    coverage_weighted_sort=True,   # SEARCHER opts in to coverage-aware truncation (auto-enabled by sentinel, this line is documentation belt-and-suspenders)
-)
-# Result: {"saved_to": "...", "total_papers": 30, "coverage": {...}}
-# Full papers already saved — NO need to call write_file
-# L-R pair queries are generated ONLY when enable_lr_pair_queries=True (SEARCHER only).
-# When enable_lr_pair_queries=True, coverage_weighted_sort is auto-enabled internally
-# regardless of caller value (SEARCHER mode sentinel — keeps PLANNER/REPORTER unaffected).
-# Iter-0 also injects deterministic singleton gene queries (one gene per query)
-# so every input gene gets its own focused BioMCP search and appears in at least
-# one query slot, regardless of LLM compliance with the prompt instruction.
-# Iter-0 pathway fan-out is keyword-only: genes=[] plus controlled pathway
-# labels/aliases. Pathway stamps are provenance, not evidence by themselves.
-# In paper telemetry, query_type="pathway" means deterministic pathway fan-out;
-# generic no-gene keyword retrieval is tracked separately as query_type="keyword".
-```
-
-### IMPORTANT Rules:
-- **ALWAYS** use `output_path` when calling search_literature_dynamic
-- **ALWAYS** pass `data_dir` from /data_path.txt when using output_path
-- When using output_path, do **NOT** call write_file for papers — the tool handles it automatically with zero truncation
-- If write_file is required for any JSON artifact, pass content as a string (e.g., json.dumps(payload))
-- The compact summary contains `total_papers`, `coverage`, and `paper_titles` (first 10) for your reference
-- Use `read_file('/papers.json')` if you need to inspect the saved data
+## Search Context
+- Read /data_path.txt to get the real data directory path (written by PLANNER)
+- Call load_analysis_data to get the unified `search_context`
+- The unified search context covers all interpreter parts
+- Search broadly enough to support genes, pathways, cell types, and relevant
+  ligand-receptor evidence before interpretation begins
 
 ## Tools Available
 - **read_skill_file**: Load skill documents (SKILL.md files)
 - **read_file**: Load data files (/data_path.txt, /papers.json)
 - **write_file**: Write output files
 - **load_analysis_data**: Load analysis results and search_context
-- **search_literature_dynamic**: LLM-powered PubMed search (PRIMARY search tool). Set `enable_lr_pair_queries=True` to inject L-R pair queries — SEARCHER only; PLANNER/REPORTER should leave it default (False).
-- **search_literature**: Single query PubMed search via BioMCP (follow-up)
+- **search_literature_dynamic**: LLM-powered PubMed search (PRIMARY search tool)
+- **create_literature_handoff**: Create the production literature handoff for INTERPRETER
+- **search_literature**: Single query PubMed search via BioMCP
 - **search_pubmed_advanced**: Advanced PubMed E-utilities search
-  - Accepts raw PubMed query syntax: "VEGFA[tiab] AND cancer[mh] AND 2020:2025[dp]"
-  - Best for: targeted gap-filling, systematic reviews, date-restricted searches
-
-## When to Use Which Search Tool
-| Situation | Tool | Why |
-|-----------|------|-----|
-| Initial comprehensive search | search_literature_dynamic | LLM-powered, context-aware, auto-fallback |
-| Gap-filling specific genes | search_literature | Simple BioMCP query |
-| Need MeSH precision | search_pubmed_advanced | "diabetes/therapy[mh]" |
-| Need recent papers only | search_pubmed_advanced | min_date="2023/01/01" |
-| Need systematic reviews | search_pubmed_advanced | "systematic review[pt]" |
-| Need spatial transcriptomics methods | search_pubmed_advanced | "spatial transcriptomics[tiab] AND 2023:2025[dp]" |
-
-## Quick Reference: Common Mistakes
-- DO NOT read .csv files directly (causes context overflow)
-- search_context["genes"] contains top search genes + novel candidate genes (use directly)
-- DO NOT call search tools other than search_literature_dynamic for primary search
-- USE the unified `search_context` from load_analysis_data for ALL parts
-- USE search_literature_dynamic for ALL searches (it handles fallback internally)
-- USE `coverage_sufficient` + `recommended_actions` AFTER searching to drive follow-up coverage fixes
 
 ## Search Context Selection
 | Part | Context Field | Output File |
@@ -307,7 +230,8 @@ result = search_literature_dynamic(
 
 **Note**: A single unified search covers ALL parts. The search_context includes
 genes + pathways + celltypes (superset of the old spatial-only context).
-Generate papers ONCE and save to /papers.json. All interpreters share this file.
+All interpreters share `/papers.json` unless an active benchmark override says
+otherwise.
 """
 
 
@@ -329,6 +253,21 @@ Every biological claim MUST either:
 - **Be marked as (Novel Finding)** if no literature support exists
 
 This is the core hallucination prevention mechanism.
+
+## SEARCHER Handoff Policy
+
+`/papers.json` is a filtered SEARCHER handoff, not the full raw search pool.
+It should contain only papers bucketed as `direct_lr_evidence` or
+`receptor_pathway_context_evidence`; SEARCHER excludes
+`disease_only_background` and `rejected_weak_evidence` into
+`/citation_candidates.json` for audit.
+
+Use each paper's `evidence_bucket` when wording claims:
+- `direct_lr_evidence`: may support direct LR literature claims for the listed
+  `supported_lr_pairs`.
+- `receptor_pathway_context_evidence`: context-level support only. Do not
+  phrase this as direct LR evidence; state that direct literature support is
+  limited when no direct bucket paper exists.
 
 ## RAG Enhancement (Optional but Recommended)
 
@@ -362,7 +301,7 @@ This provides deeper context than abstracts alone, improving citation accuracy.
 
 ### Phase 1: Load Context
 
-1. Read **/papers.json** - this is your ONLY citation source (shared by all Parts)
+1. Read **/papers.json** - this filtered direct/context handoff is your ONLY citation source (shared by all Parts)
 2. Read **/interpretation_guide.md** - understand the interpretation focus areas and analysis priorities
 3. Read **/data_path.txt** - get the data directory path
 4. Call **load_analysis_data** to get analysis results and figures
@@ -428,7 +367,7 @@ For EACH analysis section:
 - **NEVER invent or guess PMIDs** like "12345678" or "23456789"
 - Valid PMIDs are 8 digits and must come from:
   1. The `search_literature_fulltext` results (RAG mode)
-  2. The `/partN_papers.json` file
+  2. The filtered `/papers.json` handoff
 - If no supporting paper exists, write: **(Novel Finding - no direct citation available)**
 
 #### Citation Format:
@@ -450,7 +389,7 @@ For EACH claim with a PMID citation:
 1. Call **validate_claim_fulltext** tool with:
    - claim: The biological claim text
    - pmid: The cited PMID
-   - part_name: "part1" or "liana"
+   - part_name: "all"
 
 2. Check the validation result:
    - **valid=True, confidence>=0.7**: Keep the claim as-is (strong full-text support)
@@ -461,7 +400,7 @@ For EACH claim with a PMID citation:
 1. Call **validate_claim_literature** tool with:
    - claim: The biological claim text
    - pmid: The cited PMID
-   - Get the paper abstract from /partN_papers.json
+   - Get the paper abstract from filtered /papers.json
 
 2. Check the alignment result:
    - **strong**: Keep the claim as-is
