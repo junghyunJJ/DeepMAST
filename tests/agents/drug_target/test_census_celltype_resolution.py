@@ -5,22 +5,10 @@ from pathlib import Path
 
 from src.agents.drug_target.tools import census_batch_core
 from src.agents.drug_target.tools import census_celltype_resolution as resolution
-try:
-    from src.agents.drug_target.tools.census_celltype_resolution import (
-        apply_semantic_celltype_proxy_to_result,
-        resolve_celltype_matches,
-    )
-except ImportError as exc:
-    if "apply_semantic_celltype_proxy_to_result" not in str(exc):
-        raise
-    from src.agents.drug_target.tools.census_celltype_resolution import (
-        resolve_celltype_matches,
-    )
-
-    def apply_semantic_celltype_proxy_to_result(*args, **kwargs):
-        raise NotImplementedError(
-            "apply_semantic_celltype_proxy_to_result is not implemented yet."
-        )
+from src.agents.drug_target.tools.census_celltype_resolution import (
+    apply_semantic_celltype_proxy_to_result,
+    resolve_celltype_matches,
+)
 
 
 def test_resolve_celltype_matches_exact_label() -> None:
