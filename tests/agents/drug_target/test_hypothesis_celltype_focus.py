@@ -9,6 +9,9 @@ from src.agents.drug_target.tools.evidence_loader import (
     load_evidence_files,
     validate_evidence_references,
 )
+from src.agents.drug_target.tools.hypothesis_grounding import (
+    validate_hypothesis_grounding,
+)
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -395,3 +398,89 @@ def test_save_hypothesis_report_rejects_direct_pair_axis_without_matching_stage1
         for error in result["errors"]
     )
     assert not (evidence / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_explicit_pair_axis_missing_from_entities(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["FN1", "ITGB2"])
+    _write_stage1_filter_results(evidence, [("FN1", "SDC2", True)])
+    _write_stage1_pair(evidence, "FN1", "SDC2")
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "FN1-ITGB2 Integrin Axis Drives Fibroblast Activation in IPF",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "FN1-ITGB2 is a direct pair axis in IPF, but the cited Stage 1 "
+                    "evidence is FN1--SDC2."
+                ),
+                "evidence_references": [
+                    "stage1_FN1--SDC2.json",
+                    "stage3_FN1.json",
+                    "stage3_ITGB2.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["FN1", "SDC2"],
+                    "pathways": ["integrin signaling"],
+                    "cell_types": ["pulmonary alveolar type 2 cell", "fibroblast"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": "FN1 knockdown will alter adhesion.",
+                "validation_approach": "Primary IPF AT2 co-culture with FN1 knockdown.",
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 3,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any("claims direct pair axis 'FN1--ITGB2'" in error for error in result["errors"])
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
+def test_hypothesis_grounding_uses_gene_boundaries_for_loose_pair_cues(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    report = {
+        "hypotheses": [
+            {
+                "title": "Fibroblast SDC2 axis",
+                "core_claim": "Fibroblast activation involves an SDC2 signaling axis.",
+                "falsifiable_prediction": "",
+                "evidence_references": [],
+                "biological_entities": {
+                    "genes": ["F", "SDC2"],
+                    "pathways": [],
+                    "cell_types": ["fibroblast"],
+                    "drugs": [],
+                },
+            }
+        ]
+    }
+
+    assert validate_hypothesis_grounding(report, evidence) == []

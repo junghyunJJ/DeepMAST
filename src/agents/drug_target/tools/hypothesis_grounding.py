@@ -18,6 +18,15 @@ _PAIR_CUE_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_GENE_SYMBOL_RE = r"[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)?"
+_EXPLICIT_PAIR_RE = re.compile(
+    rf"(?<![A-Za-z0-9])({_GENE_SYMBOL_RE})\s*(?:--|/|[–—])\s*"
+    rf"({_GENE_SYMBOL_RE})(?![A-Za-z0-9])"
+)
+_EXPLICIT_SINGLE_HYPHEN_PAIR_RE = re.compile(
+    r"(?<![A-Za-z0-9])([A-Z][A-Z0-9]{1,11})-([A-Z][A-Z0-9]{1,11})"
+    r"(?![A-Za-z0-9])"
+)
 
 
 def _load_json(path: Path) -> Any:
@@ -101,13 +110,33 @@ def _direct_pair_pattern(a: str, b: str) -> re.Pattern[str]:
     )
 
 
+def _gene_occurs(gene: str, text: str) -> bool:
+    return re.search(
+        rf"(?<![A-Za-z0-9]){re.escape(gene)}(?![A-Za-z0-9])",
+        text,
+        re.IGNORECASE,
+    ) is not None
+
+
+def _explicit_direct_pairs(text: str) -> set[tuple[str, str]]:
+    claimed: set[tuple[str, str]] = set()
+    for match in _EXPLICIT_PAIR_RE.finditer(text):
+        claimed.add((_normal_gene(match.group(1)), _normal_gene(match.group(2))))
+    for match in _EXPLICIT_SINGLE_HYPHEN_PAIR_RE.finditer(text):
+        claimed.add((_normal_gene(match.group(1)), _normal_gene(match.group(2))))
+    return claimed
+
+
 def _claimed_direct_pairs(hypothesis: dict[str, Any]) -> set[tuple[str, str]]:
     genes = _entity_genes(hypothesis)
     text = _pair_text(hypothesis)
-    if len(genes) < 2 or not text:
+    if not text:
         return set()
 
-    claimed: set[tuple[str, str]] = set()
+    claimed = _explicit_direct_pairs(text)
+    if len(genes) < 2:
+        return claimed
+
     clauses = [clause.strip() for clause in re.split(r"[\n.;:]+", text) if clause.strip()]
     for a, b in combinations(genes, 2):
         direct = _direct_pair_pattern(a, b).search(text)
@@ -119,8 +148,8 @@ def _claimed_direct_pairs(hypothesis: dict[str, Any]) -> set[tuple[str, str]]:
             claimed.add((b, a))
             continue
         if any(
-            a in clause.upper()
-            and b in clause.upper()
+            _gene_occurs(a, clause)
+            and _gene_occurs(b, clause)
             and _PAIR_CUE_RE.search(clause)
             for clause in clauses
         ):
