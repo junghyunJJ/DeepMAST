@@ -315,6 +315,35 @@ def test_resolve_census_celltypes_writes_full_options_artifact_and_returns_previ
     }
 
 
+def test_search_census_celltype_options_rejects_mutated_artifact_hash(
+    tmp_path: Path,
+) -> None:
+    options = [
+        {"label": "malignant cell", "total_cell_count": 576171},
+        {"label": "macrophage", "total_cell_count": 80485},
+    ]
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "census_celltype_options.json").write_text(
+        json.dumps(
+            {
+                "available_celltype_options_sha256": "not-the-options-hash",
+                "available_celltype_options": options,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    raw = resolution.search_census_celltype_options.invoke(
+        {"data_dir": str(tmp_path), "query": "malignant", "top_k": 5}
+    )
+    payload = json.loads(raw)
+
+    assert payload["executed"] is False
+    assert payload["matches"] == []
+    assert any("hash mismatch" in error for error in payload["errors"])
+
+
 def test_apply_semantic_celltype_proxy_accepts_label_from_full_artifact_options() -> None:
     result = resolve_celltype_matches(
         ["Prolif Invasive Tumor"],
@@ -363,15 +392,19 @@ def test_apply_semantic_celltype_proxy_accepts_label_from_full_artifact_options(
 def test_apply_semantic_celltype_proxy_tool_reads_full_artifact_options(
     tmp_path: Path,
 ) -> None:
+    options = [
+        {"label": "malignant cell", "total_cell_count": 576171},
+        {"label": "macrophage", "total_cell_count": 80485},
+    ]
     evidence_dir = tmp_path / "evidence"
     evidence_dir.mkdir()
     (evidence_dir / "census_celltype_options.json").write_text(
         json.dumps(
             {
-                "available_celltype_options": [
-                    {"label": "malignant cell", "total_cell_count": 576171},
-                    {"label": "macrophage", "total_cell_count": 80485},
-                ],
+                "available_celltype_options_sha256": resolution._options_sha256(
+                    options
+                ),
+                "available_celltype_options": options,
             }
         ),
         encoding="utf-8",
@@ -401,6 +434,54 @@ def test_apply_semantic_celltype_proxy_tool_reads_full_artifact_options(
     assert payload["primary_resolved_celltype"] == "malignant cell"
     assert payload["primary_match_mode"] == "semantic_proxy"
     assert payload["matches"][0]["match_mode"] == "semantic_proxy"
+
+
+def test_apply_semantic_celltype_proxy_rejects_stale_artifact_hash(
+    tmp_path: Path,
+) -> None:
+    result = resolve_celltype_matches(
+        ["Prolif Invasive Tumor"],
+        {"macrophage": 80485},
+        disease="breast cancer",
+        organism="homo_sapiens",
+        disease_resolved="breast cancer",
+        disease_resolution_mode="exact",
+        preview_limit=1,
+    )
+    options = [{"label": "malignant cell", "total_cell_count": 576171}]
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "census_celltype_options.json").write_text(
+        json.dumps(
+            {
+                "available_celltype_options_sha256": resolution._options_sha256(
+                    options
+                ),
+                "available_celltype_options": options,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    raw = resolution.apply_semantic_celltype_proxy.invoke(
+        {
+            "resolution_result": result,
+            "data_dir": str(tmp_path),
+            "input_celltype": "Prolif Invasive Tumor",
+            "matched_celltype": "malignant cell",
+            "rationale": "Agent selected malignant cell from saved Census options.",
+            "confidence": "medium",
+        }
+    )
+    payload = json.loads(raw)
+
+    assert payload["primary_resolved_celltype"] == ""
+    assert payload["primary_match_mode"] == "unresolved"
+    assert payload["matches"][0]["matched_celltype"] == ""
+    assert any(
+        "artifact hash does not match resolver result" in error
+        for error in payload["errors"]
+    )
 
 
 def test_apply_semantic_celltype_proxy_rejects_label_not_in_full_options() -> None:

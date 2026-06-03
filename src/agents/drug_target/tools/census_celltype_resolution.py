@@ -334,6 +334,67 @@ def _load_celltype_options_artifact(data_dir: str) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _validate_celltype_options_artifact(
+    artifact: dict[str, Any],
+) -> tuple[list[dict[str, Any]], str, str]:
+    options = artifact.get("available_celltype_options")
+    if not isinstance(options, list):
+        return (
+            [],
+            "",
+            "Census cell_type options artifact is invalid: "
+            "available_celltype_options must be a list.",
+        )
+
+    recomputed_sha256 = _options_sha256(options)
+    stored_sha256 = str(artifact.get("available_celltype_options_sha256", "") or "")
+    if not stored_sha256:
+        return (
+            options,
+            recomputed_sha256,
+            "Census cell_type options artifact hash missing: "
+            "available_celltype_options_sha256 is required.",
+        )
+    if stored_sha256 != recomputed_sha256:
+        return (
+            options,
+            recomputed_sha256,
+            "Census cell_type options artifact hash mismatch: "
+            "stored available_celltype_options_sha256 does not match "
+            "available_celltype_options.",
+        )
+    return options, recomputed_sha256, ""
+
+
+def _validate_celltype_options_artifact_for_result(
+    artifact: dict[str, Any],
+    resolution_result: dict[str, Any],
+) -> tuple[list[dict[str, Any]], str]:
+    options, recomputed_sha256, artifact_error = _validate_celltype_options_artifact(
+        artifact
+    )
+    if artifact_error:
+        return options, artifact_error
+
+    resolver_sha256 = str(
+        resolution_result.get("available_celltype_options_sha256", "") or ""
+    )
+    if not resolver_sha256:
+        return (
+            options,
+            "Census cell_type options artifact hash does not match resolver result: "
+            "resolver result is missing available_celltype_options_sha256.",
+        )
+    if recomputed_sha256 != resolver_sha256:
+        return (
+            options,
+            "Census cell_type options artifact hash does not match resolver result: "
+            "artifact available_celltype_options_sha256 differs from resolver "
+            "result available_celltype_options_sha256.",
+        )
+    return options, ""
+
+
 def _resolve_disease_for_census(
     disease: str,
     organism: str,
@@ -455,7 +516,6 @@ def search_census_celltype_options(
     """Search saved disease-scoped Census cell_type options without returning the full set."""
     try:
         payload = _load_celltype_options_artifact(data_dir)
-        options = payload.get("available_celltype_options", [])
     except Exception as exc:
         return json.dumps(
             {
@@ -463,6 +523,20 @@ def search_census_celltype_options(
                 "query": query,
                 "matches": [],
                 "errors": [f"Census cell_type options artifact read failed: {exc}"],
+            },
+            indent=2,
+        )
+
+    options, _options_hash, artifact_error = _validate_celltype_options_artifact(
+        payload
+    )
+    if artifact_error:
+        return json.dumps(
+            {
+                "executed": False,
+                "query": query,
+                "matches": [],
+                "errors": [artifact_error],
             },
             indent=2,
         )
@@ -615,11 +689,20 @@ def apply_semantic_celltype_proxy(
     """Validate and record an agent-selected semantic Census cell_type proxy."""
     try:
         artifact = _load_celltype_options_artifact(data_dir)
-        options = artifact.get("available_celltype_options", [])
     except Exception as exc:
         result = _clone_resolution_result(resolution_result)
         result.setdefault("errors", [])
         result["errors"].append(f"Census cell_type options artifact read failed: {exc}")
+        return json.dumps(result, indent=2)
+
+    options, artifact_error = _validate_celltype_options_artifact_for_result(
+        artifact,
+        resolution_result,
+    )
+    if artifact_error:
+        result = _clone_resolution_result(resolution_result)
+        result.setdefault("errors", [])
+        result["errors"].append(artifact_error)
         return json.dumps(result, indent=2)
 
     result = apply_semantic_celltype_proxy_to_result(
