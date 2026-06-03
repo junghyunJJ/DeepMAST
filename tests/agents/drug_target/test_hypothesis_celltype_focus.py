@@ -331,6 +331,11 @@ def test_hypothesis_prompt_requires_interest_celltype_focus() -> None:
     assert "cite Stage 1 pair files for Census evidence" in text
     assert "AT2" in text
     assert "Transitional AT2" in text
+    assert "Direct pair-axis claims require direct Stage 1 pair evidence" in text
+    assert "Do not title a hypothesis `A-B axis` unless" in text
+    assert "target-vs-rest direction" in text
+    assert "target-cell-depleted" in text
+    assert "validation_approach must mention" in text
 
 
 def test_save_hypothesis_report_rejects_direct_pair_axis_without_matching_stage1_file(

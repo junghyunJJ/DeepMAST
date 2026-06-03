@@ -375,6 +375,26 @@ Do not claim that Census separately validated a lost state modifier. If
 Transitional-AT2-motivated, and state that the Census validation used the broader
 resolved label. Do not claim that Census separately validated the original state-specific label when the match mode is `semantic_proxy`.
 
+### Cell-Type Grounding Rules
+
+Direct pair-axis claims require direct Stage 1 pair evidence. A claim about an
+`A-B axis` must cite a matching passed `stage1_A--B.json` or `stage1_B--A.json`;
+Stage 3 files or different Stage 1 pairs do not support that A-B axis.
+Do not title a hypothesis `A-B axis` unless that matching passed pair file is
+cited.
+
+When using Stage 1 Census evidence for the interest celltype, inspect
+`census_validation.target_vs_rest`; p-value alone is not enough. Report the
+target-vs-rest direction. If `gene_a.diff`, `gene_b.diff`, and
+`coexpression.diff` are all negative, the pair is target-cell-depleted and must
+not be presented as support for an AT2/resolved-celltype-focused mechanism.
+
+If `biological_entities.cell_types` includes original interest labels such as
+`AT2`/`Transitional AT2` or resolved labels such as
+`pulmonary alveolar type 2 cell`, validation_approach must mention one of those
+labels or a direct assay context using that cell type. Fibroblast-only,
+endothelial-only, macrophage-only, or immune-only validation is not enough.
+
 ### CRITICAL: Stage 1 Eligibility Gate (hard rules)
 
 Before referencing ANY stage1 L-R pair in a hypothesis, you MUST check its status
