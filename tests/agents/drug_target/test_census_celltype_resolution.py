@@ -86,6 +86,45 @@ def test_resolve_celltype_matches_type_ii_alias() -> None:
     assert match["match_mode"] == "alias"
 
 
+def test_tumor_cell_requires_explicit_semantic_proxy() -> None:
+    available = {
+        "malignant cell": 576171,
+        "macrophage": 80485,
+    }
+
+    result = resolve_celltype_matches(
+        ["tumor cell"],
+        available,
+        disease="breast cancer",
+        organism="homo_sapiens",
+        disease_resolved="breast cancer",
+        disease_resolution_mode="exact",
+    )
+
+    match = result["matches"][0]
+    assert result["primary_resolved_celltype"] == ""
+    assert result["primary_match_mode"] == "unresolved"
+    assert match["matched_celltype"] == ""
+    assert match["match_mode"] == "unresolved"
+
+    updated = apply_semantic_celltype_proxy_to_result(
+        result,
+        available_celltype_options=[
+            {"label": "malignant cell", "total_cell_count": 576171},
+            {"label": "macrophage", "total_cell_count": 80485},
+        ],
+        input_celltype="tumor cell",
+        matched_celltype="malignant cell",
+        rationale="Agent selected malignant cell from saved Census options.",
+        confidence="medium",
+        candidate_labels_considered=["malignant cell"],
+    )
+
+    assert updated["primary_resolved_celltype"] == "malignant cell"
+    assert updated["primary_match_mode"] == "semantic_proxy"
+    assert updated["errors"] == []
+
+
 def test_resolve_celltype_matches_transitional_at2_records_lost_modifier() -> None:
     available = {
         "pulmonary alveolar type 2 cell": 7545,

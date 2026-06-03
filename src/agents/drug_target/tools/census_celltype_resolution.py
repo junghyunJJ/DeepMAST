@@ -28,9 +28,6 @@ _ALIAS_CANONICAL_LABELS = {
     "type 2 pneumocyte": "pulmonary alveolar type 2 cell",
     "type ii pneumocyte": "pulmonary alveolar type 2 cell",
     "pulmonary alveolar type 2": "pulmonary alveolar type 2 cell",
-    "tumor cell": "malignant cell",
-    "tumour cell": "malignant cell",
-    "immune cell": "leukocyte",
 }
 
 _STATE_MODIFIERS = {
