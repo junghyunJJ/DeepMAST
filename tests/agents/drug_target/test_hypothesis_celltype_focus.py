@@ -531,6 +531,71 @@ def test_save_hypothesis_report_rejects_at2_celltype_when_validation_omits_at2(
     assert not (evidence / "hypothesis_report.json").exists()
 
 
+def test_save_hypothesis_report_rejects_at2_substring_gene_in_validation(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["FN1", "SDC2"])
+    _write_stage1_filter_results(evidence, [("FN1", "SDC2", True)])
+    _write_stage1_pair(evidence, "FN1", "SDC2")
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "AT2 FN1-SDC2 pair hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "FN1--SDC2 is a direct Census-supported pair in the resolved "
+                    "AT2 context."
+                ),
+                "evidence_references": [
+                    "stage1_FN1--SDC2.json",
+                    "stage3_FN1.json",
+                    "stage3_SDC2.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["FN1", "SDC2"],
+                    "pathways": ["integrin signaling"],
+                    "cell_types": ["AT2"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": "AT2 FN1 perturbation will change SDC2 signaling.",
+                "validation_approach": "STAT2 knockdown in fibroblast monoculture.",
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "lists interest/resolved cell type" in error
+        and "validation_approach" in error
+        for error in result["errors"]
+    )
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
 def test_save_hypothesis_report_rejects_target_depleted_stage1_as_at2_support(
     tmp_path: Path,
 ) -> None:

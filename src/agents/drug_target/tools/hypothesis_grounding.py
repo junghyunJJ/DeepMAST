@@ -243,6 +243,10 @@ def _hypothesis_celltype_tokens(hypothesis: dict[str, Any]) -> set[str]:
     }
 
 
+def _contains_normalized_phrase(text: str, phrase: str) -> bool:
+    return f" {phrase} " in f" {text} "
+
+
 def _negative_stage1_diffs(payload: Any) -> list[str]:
     if not isinstance(payload, dict):
         return []
@@ -303,7 +307,10 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
             continue
 
         validation_text = _normal_celltype(hypothesis.get("validation_approach"))
-        if not any(token in validation_text for token in celltype_tokens):
+        if not any(
+            _contains_normalized_phrase(validation_text, token)
+            for token in celltype_tokens
+        ):
             listed = ", ".join(used_celltype_tokens)
             errors.append(
                 f"hypotheses[{idx}] lists interest/resolved cell type ({listed}) "
