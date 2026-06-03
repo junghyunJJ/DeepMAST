@@ -2221,6 +2221,8 @@ class TestStage1Batch:
 
         result = json.loads(raw)
         stage1 = json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text())
+        disease_context = json.loads((evidence_dir / "disease_context.json").read_text())
+        assessment = json.loads((evidence_dir / "assessment_results.json").read_text())
 
         assert result["success"] is True
         assert result["census_batch"] == "completed_from_existing_csv"
@@ -2233,6 +2235,13 @@ class TestStage1Batch:
         assert stage1["census_validation"]["source"] == "csv_integration"
         assert stage1["census_validation"]["csv_file"] == "census_egfr_met_malignant_cell.csv"
         assert stage1["census_validation"]["target_vs_rest"]["coexpression"]["risk_ratio"] == 7.5
+        stage1_context = result["disease_context"]["stage1"]
+        assert stage1_context["census_status"] == "completed_from_existing_csv"
+        assert stage1_context["census_reused_csv"] == ["census_egfr_met_malignant_cell.csv"]
+        assert "census_batch_error" not in stage1_context
+        assert "census_single_fallback" not in stage1_context
+        assert disease_context["stage1"] == stage1_context
+        assert assessment["disease_context"]["stage1"] == stage1_context
 
     def test_run_stage1_batch_falls_back_to_single_pair_when_batch_hits_cap(self, tmp_path):
         from src.agents.drug_target.tools.disease_context import initialize_disease_context
@@ -2337,6 +2346,8 @@ class TestStage1Batch:
 
         result = json.loads(raw)
         stage1 = json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text())
+        disease_context = json.loads((evidence_dir / "disease_context.json").read_text())
+        assessment = json.loads((evidence_dir / "assessment_results.json").read_text())
 
         assert result["success"] is True
         assert result["census_batch"] == "completed_with_single_pair_fallback"
@@ -2355,6 +2366,13 @@ class TestStage1Batch:
         assert stage1["census_validation"]["source"] == "single_pair_fallback"
         assert stage1["census_validation"]["batch_error"].startswith(batch_error)
         assert stage1["census_validation"]["target_vs_rest"]["coexpression"]["risk_ratio"] == 7.5
+        stage1_context = result["disease_context"]["stage1"]
+        assert stage1_context["census_status"] == "completed_with_single_pair_fallback"
+        assert stage1_context["census_batch_error"].startswith(batch_error)
+        assert stage1_context["census_single_fallback"] == result["census_single_fallback"]
+        assert "census_reused_csv" not in stage1_context
+        assert disease_context["stage1"] == stage1_context
+        assert assessment["disease_context"]["stage1"] == stage1_context
 
     def test_run_stage1_batch_reports_partial_when_one_single_pair_fallback_fails(
         self,
@@ -2479,6 +2497,8 @@ class TestStage1Batch:
         result = json.loads(raw)
         successful_stage1 = json.loads((evidence_dir / "stage1_EGFR--MET.json").read_text())
         failed_stage1 = json.loads((evidence_dir / "stage1_KDR--FLT1.json").read_text())
+        disease_context = json.loads((evidence_dir / "disease_context.json").read_text())
+        assessment = json.loads((evidence_dir / "assessment_results.json").read_text())
 
         assert result["success"] is False
         assert result["census_batch"] == "partial_with_single_pair_fallback"
@@ -2514,6 +2534,13 @@ class TestStage1Batch:
             "csv_integration",
         }
         assert not (evidence_dir / "census_kdr_flt1_malignant_cell.csv").exists()
+        stage1_context = result["disease_context"]["stage1"]
+        assert stage1_context["census_status"] == "partial_with_single_pair_fallback"
+        assert stage1_context["census_batch_error"].startswith(batch_error)
+        assert stage1_context["census_single_fallback"] == result["census_single_fallback"]
+        assert "census_reused_csv" not in stage1_context
+        assert disease_context["stage1"] == stage1_context
+        assert assessment["disease_context"]["stage1"] == stage1_context
 
     def test_run_stage1_batch_does_not_treat_stale_single_pair_csv_as_success(
         self,

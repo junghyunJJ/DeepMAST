@@ -1768,6 +1768,12 @@ def run_stage1_batch(
         "target_cell_type": target_cell_type,
         "census_status": census_status,
     }
+    if census_batch_error:
+        stage1_disease_metadata["census_batch_error"] = census_batch_error
+    if census_reused_csv:
+        stage1_disease_metadata["census_reused_csv"] = census_reused_csv
+    if census_single_fallback:
+        stage1_disease_metadata["census_single_fallback"] = census_single_fallback
     disease_context = merge_disease_context(
         evidence_dir,
         input_disease=input_disease,
