@@ -19,7 +19,7 @@ import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from langchain_core.tools import BaseTool
 from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -158,7 +158,7 @@ async def _get_cached_tools(
     # Tool discovery is a one-time handshake; bound it so a hung MCP server
     # cannot stall every caller for the full HTTP default (~30s). Fail-closed.
     try:
-        client = MultiServerMCPClient({server_key: server_config})
+        client = MultiServerMCPClient(cast(Any, {server_key: server_config}))
         tools = await asyncio.wait_for(client.get_tools(), timeout=10.0)
     except asyncio.TimeoutError:
         with _CLIENT_LOCK:
@@ -353,7 +353,13 @@ async def get_biomcp_tools(
 # =============================================================================
 
 
-def run_async(coro: Any, timeout: int = 60) -> Any:
+def _run_coroutine_with_timeout(coro: Any, timeout: float | None) -> Any:
+    if timeout is None:
+        return asyncio.run(coro)
+    return asyncio.run(asyncio.wait_for(coro, timeout=timeout))
+
+
+def run_async(coro: Any, timeout: float | None = 60) -> Any:
     """Run an async coroutine from a sync context, handling event loop detection.
 
     Detects whether an event loop is already running and uses the appropriate
@@ -373,7 +379,7 @@ def run_async(coro: Any, timeout: int = 60) -> Any:
         is_running = False
 
     if is_running:
-        future = get_executor().submit(asyncio.run, coro)
+        future = get_executor().submit(_run_coroutine_with_timeout, coro, timeout)
         return future.result(timeout=timeout)
     else:
-        return asyncio.run(coro)
+        return _run_coroutine_with_timeout(coro, timeout)

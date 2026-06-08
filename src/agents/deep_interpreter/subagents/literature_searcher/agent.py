@@ -69,7 +69,7 @@ Use search_literature_dynamic with:
 ### Phase 4: Bucket And Filter Output
 Call create_literature_handoff with raw_papers_path="papers_raw.json",
 citation_candidates_path="citation_candidates.json", output_path="papers.json",
-and cap=40. /citation_candidates.json is the full audit artifact. /papers.json is
+and cap=100. /citation_candidates.json is the full audit artifact. /papers.json is
 the filtered interpreter handoff with direct_lr_evidence and
 receptor_pathway_context_evidence only.
 

@@ -91,20 +91,49 @@ def _validate_handoff(run_dir: Path, cap: int) -> dict[str, Any]:
         raise RuntimeError(f"handoff cap exceeded: {len(handoff_papers)} > {cap}")
 
     counts = candidates.get("counts", {})
+    direct_count = int(counts.get(DIRECT_BUCKET, 0) or 0)
+    context_count = int(counts.get(CONTEXT_BUCKET, 0) or 0)
+    eligible_count = direct_count + context_count
+    expected_selected = min(eligible_count, max(0, int(cap)))
+    if len(handoff_papers) != expected_selected:
+        raise RuntimeError(
+            f"handoff selected count mismatch: {len(handoff_papers)} != "
+            f"min({eligible_count}, {cap})"
+        )
+    selected_direct = sum(
+        1 for paper in handoff_papers if paper.get("evidence_bucket") == DIRECT_BUCKET
+    )
+    selected_context = sum(
+        1 for paper in handoff_papers if paper.get("evidence_bucket") == CONTEXT_BUCKET
+    )
+    if direct_count <= cap and selected_direct != direct_count:
+        raise RuntimeError(
+            f"direct evidence was not fully preserved: {selected_direct} != {direct_count}"
+        )
+    policy = handoff.get("policy", {}) if isinstance(handoff.get("policy"), dict) else {}
+    eligible_all_selected = eligible_count <= cap
+    if policy and policy.get("eligible_all_selected") != eligible_all_selected:
+        raise RuntimeError("handoff eligible_all_selected metadata mismatch")
+    if policy and int(policy.get("unused_capacity_count", 0) or 0) != (
+        max(0, cap - eligible_count) if eligible_all_selected else 0
+    ):
+        raise RuntimeError("handoff unused_capacity_count metadata mismatch")
+
     return {
         "raw_papers": len(raw.get("papers", []) or []),
         "candidate_unique_papers": candidates.get("source", {}).get("unique_papers", 0),
-        "direct_papers": counts.get(DIRECT_BUCKET, 0),
-        "context_papers": counts.get(CONTEXT_BUCKET, 0),
+        "eligible_count": eligible_count,
+        "eligible_all_selected": eligible_all_selected,
+        "unused_capacity_count": max(0, cap - eligible_count)
+        if eligible_all_selected
+        else 0,
+        "direct_papers": direct_count,
+        "context_papers": context_count,
         "disease_only_papers": counts.get("disease_only_background", 0),
         "rejected_papers": counts.get("rejected_weak_evidence", 0),
         "handoff_papers": len(handoff_papers),
-        "handoff_direct_papers": sum(
-            1 for paper in handoff_papers if paper.get("evidence_bucket") == DIRECT_BUCKET
-        ),
-        "handoff_context_papers": sum(
-            1 for paper in handoff_papers if paper.get("evidence_bucket") == CONTEXT_BUCKET
-        ),
+        "handoff_direct_papers": selected_direct,
+        "handoff_context_papers": selected_context,
     }
 
 
@@ -159,7 +188,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--case-limit", type=int, default=0)
     parser.add_argument("--max-results", type=int, default=100)
     parser.add_argument("--max-iterations", type=int, default=1)
-    parser.add_argument("--cap", type=int, default=40)
+    parser.add_argument("--cap", type=int, default=100)
     parser.add_argument("--enforce-disease-match", type=_parse_bool_arg, default=True)
     parser.add_argument("--rerank-mode", choices=["off", "llm"], default="off")
     parser.add_argument("--sort-by-journal-quality", type=_parse_bool_arg, default=True)
@@ -251,6 +280,9 @@ def main(argv: list[str] | None = None) -> int:
     for key in [
         "raw_papers",
         "candidate_unique_papers",
+        "eligible_count",
+        "eligible_all_selected",
+        "unused_capacity_count",
         "direct_papers",
         "context_papers",
         "disease_only_papers",

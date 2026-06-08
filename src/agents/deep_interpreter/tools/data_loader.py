@@ -201,6 +201,23 @@ def _extract_metadata_from_csv(
         pass
 
 
+def _load_existing_lr_candidate_pairs(data_path: Path) -> list[dict]:
+    candidates_file = data_path / "lr_candidates.json"
+    if not candidates_file.exists():
+        return []
+    try:
+        payload = json.loads(candidates_file.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    if isinstance(payload, dict):
+        pairs = payload.get("pairs", [])
+    elif isinstance(payload, list):
+        pairs = payload
+    else:
+        pairs = []
+    return [pair for pair in pairs if isinstance(pair, dict)]
+
+
 @tool
 def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     """Load CCI analysis results from a directory and AUTOMATICALLY save to filesystem.
@@ -364,12 +381,14 @@ def load_analysis_data(data_dir: str, config: dict = None) -> dict:
     # prioritize_top_lr_pairs reads CSV + optional top_search_genes.json
     # If top_search_genes.json is missing, prioritizer skips novelty exclusion
     try:
-        from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
-        lr_result_json = prioritize_top_lr_pairs.invoke(
-            {"data_dir": str(data_path), "candidate_count": 30}
-        )
-        lr_result = json.loads(lr_result_json)                    # FIX #1: use module-level json
-        candidate_pairs = lr_result.get("pairs", [])
+        candidate_pairs = _load_existing_lr_candidate_pairs(data_path)
+        if not candidate_pairs:
+            from src.agents.deep_interpreter.tools.lr_prioritizer import prioritize_top_lr_pairs
+            lr_result_json = prioritize_top_lr_pairs.invoke(
+                {"data_dir": str(data_path), "candidate_count": 30}
+            )
+            lr_result = json.loads(lr_result_json)                    # FIX #1: use module-level json
+            candidate_pairs = lr_result.get("pairs", [])
 
         # Extract novel genes from candidate pairs
         # Complex receptor names in LIANA use underscore (e.g., ITGA2_ITGB1)

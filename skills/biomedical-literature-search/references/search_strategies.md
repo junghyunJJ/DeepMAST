@@ -16,8 +16,10 @@ into deterministic citation buckets.
 
 `papers.json` is the canonical SEARCHER-to-INTERPRETER citation source only in
 SEARCHER Production Mode. PLANNER and REPORTER must not overwrite it. Retrieval-
-only benchmark runs leave filtering to the benchmark runner, which applies the
-same direct/context cap-40 filter to skill ON and skill OFF arms after retrieval.
+only benchmark runs leave filtering to the benchmark runner. Legacy retrieval-
+only diagnostics may apply the same direct/context cap-40 filter to skill ON and
+skill OFF arms after retrieval; this benchmark-local filter is not the current
+SEARCHER Production handoff cap.
 REPORTER synthesis citations should use the same direct/context bucket filtering
 when producing `synthesis_papers.json`.
 
@@ -48,7 +50,7 @@ handoff = create_literature_handoff(
     lr_pairs=search_context["lr_pairs"],
     pathways=search_context.get("pathways", []),
     celltypes=search_context.get("celltypes", []),
-    cap=40,
+    cap=100,
 )
 ```
 
@@ -133,10 +135,12 @@ Each graded paper keeps original paper fields and adds:
 ## Handoff Contract
 
 `papers.json` is the INTERPRETER-facing handoff. It contains only
-`direct_lr_evidence` and `receptor_pathway_context_evidence` papers, capped at 40
-by default. This canonical `papers.json` handoff is written only by SEARCHER
-Production Mode. `papers_raw.json` and `citation_candidates.json` remain complete
-audit artifacts.
+`direct_lr_evidence` and `receptor_pathway_context_evidence` papers, capped at
+100 by default. The cap is an upper bound: if fewer than 100 eligible
+direct/context papers exist, select all eligible papers and record the unused
+capacity. This canonical `papers.json` handoff is written only by SEARCHER
+Production Mode. `papers_raw.json` and `citation_candidates.json` remain
+complete audit artifacts.
 
 This handoff style evaluates the skill as an evidence-handling protocol, not as a
 new retrieval backend. Keep `papers_raw.json` and `citation_candidates.json`
