@@ -2881,13 +2881,17 @@ async def search_literature_dynamic_async(
     # set enable_lr_pair_queries) retain the original signature defaults
     # byte-for-byte. Signature defaults remain False at literature.py:2116, 2222.
     #
-    # Final paper cap: SEARCHER writes the full ranked raw pool to
+    # Final paper cap: SEARCHER writes the full ranked raw pool only to
     # papers_raw.json; create_literature_handoff applies the caller-facing
-    # max_results cap later when producing papers.json. The retrieval loop's
-    # candidate pool is separately enlarged below so deterministic singleton
-    # fan-out (30 hub gene queries x ~5 papers each) can run to completion before
-    # the per-iter early break fires.
+    # max_results cap later when producing papers.json. Other output paths keep
+    # the legacy max_results cap. The retrieval loop's candidate pool is
+    # separately enlarged below so deterministic singleton fan-out (30 hub gene
+    # queries x ~5 papers each) can run to completion before the per-iter early
+    # break fires.
     _final_paper_cap = max_results
+    _preserve_full_raw_pool = (
+        enable_lr_pair_queries and Path(output_path).name == "papers_raw.json"
+    )
     # Internal candidate pool size for the retrieval loop. In non-SEARCHER mode
     # this equals the caller-facing cap. In SEARCHER mode it is inflated below
     # to absorb deterministic fan-out. Kept as a SEPARATE variable from
@@ -3419,9 +3423,9 @@ async def search_literature_dynamic_async(
                 )
                 continue
 
-    # Ranking: coverage-weighted greedy sort or pure SJR sort. SEARCHER mode
-    # preserves the full ranked raw pool here; create_literature_handoff applies
-    # the user-facing papers.json cap later.
+    # Ranking: coverage-weighted greedy sort or pure SJR sort. SEARCHER-mode
+    # papers_raw.json preserves the full ranked raw pool here;
+    # create_literature_handoff applies the user-facing papers.json cap later.
     if sort_by_journal_quality:
         await _ensure_sjr_cache_loaded()
         if coverage_weighted_sort:
@@ -3435,7 +3439,7 @@ async def search_literature_dynamic_async(
     else:
         ranked_papers = all_papers
 
-    if enable_lr_pair_queries:
+    if _preserve_full_raw_pool:
         final_papers = ranked_papers
         raw_pool_policy = {
             "name": "preserve_all_unique_retrieved_candidates",

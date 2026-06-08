@@ -154,6 +154,53 @@ async def test_searcher_mode_saves_full_raw_pool_before_handoff_cap(
 
 
 @pytest.mark.asyncio
+async def test_lr_pair_mode_papers_json_preserves_max_results_cap(
+    monkeypatch, tmp_path, isolated_literature
+):
+    async def _fake_search_with_biomcp(**kwargs):
+        genes = kwargs.get("genes") or []
+        gene = genes[0] if genes else "NO_GENE"
+        return [
+            {
+                "pmid": f"{gene}-{index}",
+                "title": f"{gene} paper {index}",
+                "abstract": f"{gene} signaling in cancer.",
+            }
+            for index in range(2)
+        ]
+
+    monkeypatch.setattr(lit, "_search_with_biomcp", _fake_search_with_biomcp)
+    monkeypatch.setattr(lit, "create_llm", lambda **_kwargs: _MockLLM("[]"))
+
+    result = await lit.search_literature_dynamic_async(
+        genes=["G1", "G2", "G3", "G4"],
+        pathways=[],
+        celltypes=[],
+        disease="cancer",
+        max_results=3,
+        max_iterations=1,
+        query_cache=[
+            {"genes": ["G1"], "diseases": ["cancer"], "keywords": []},
+            {"genes": ["G2"], "diseases": ["cancer"], "keywords": []},
+            {"genes": ["G3"], "diseases": ["cancer"], "keywords": []},
+            {"genes": ["G4"], "diseases": ["cancer"], "keywords": []},
+        ],
+        enable_lr_pair_queries=True,
+        output_path="papers.json",
+        data_dir=str(tmp_path),
+        sort_by_journal_quality=False,
+    )
+
+    saved = json.loads((tmp_path / "papers.json").read_text())
+
+    assert result["total_papers"] == 3
+    assert len(saved["papers"]) == 3
+    assert saved["raw_pool_policy"]["name"] == "legacy_max_results_truncation"
+    assert saved["raw_pool_policy"]["requested_max_results"] == 3
+    assert saved["raw_pool_policy"]["saved_raw_count"] == 3
+
+
+@pytest.mark.asyncio
 async def test_searcher_cache_replay_empty_cache_injects_gene_and_lr_fanout(
     monkeypatch, tmp_path, isolated_literature
 ):
