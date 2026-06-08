@@ -37,6 +37,9 @@ from src.agents.deep_interpreter.tools.mcp_clients import (
     get_biomcp_tools,
     invalidate_client,
 )
+from src.agents.deep_interpreter.tools.literature_handoff import (
+    load_searcher_lr_pairs,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -1587,6 +1590,36 @@ def _build_deterministic_gene_queries(
     return queries
 
 
+def _build_deterministic_lr_pair_queries(
+    lr_pairs: list[dict] | None,
+    disease: str,
+) -> list[dict]:
+    """Build one trusted SEARCHER query per ligand-receptor pair."""
+    if not lr_pairs:
+        return []
+
+    queries: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for pair in lr_pairs:
+        if not isinstance(pair, dict):
+            continue
+        ligand = str(pair.get("ligand") or "").strip()
+        receptor = str(pair.get("receptor") or "").strip()
+        if not ligand or not receptor:
+            continue
+        key = (ligand.upper(), receptor.upper())
+        if key in seen:
+            continue
+        seen.add(key)
+        queries.append({
+            "genes": [ligand, receptor],
+            "diseases": [disease] if disease else [],
+            "keywords": ["ligand receptor", "cell-cell interaction", "signaling"],
+            "query_intent": "deterministic_lr_pair",
+        })
+    return queries
+
+
 def _normalize_pathway_token(value: str) -> str:
     """Normalize pathway labels for conservative vocabulary lookup."""
     value = value.lower()
@@ -1703,6 +1736,8 @@ def _build_deterministic_pathway_queries(
 
 def _classify_literature_query(query: dict[str, Any]) -> str:
     """Classify a literature query by trusted intent, not by genes=[] alone."""
+    if query.get("query_intent") == "deterministic_lr_pair":
+        return "deterministic_lr_pair"
     if query.get("genes"):
         return "gene"
     if query.get("query_intent") == "deterministic_pathway":
@@ -1721,7 +1756,7 @@ def _partition_literature_queries(
     for index, query in enumerate(validated_queries):
         intent = _classify_literature_query(query)
         record = (index, query, intent)
-        if intent == "gene":
+        if intent in {"gene", "deterministic_lr_pair"}:
             gene_records.append(record)
         elif intent == "deterministic_pathway":
             pathway_records.append(record)
@@ -2650,8 +2685,17 @@ def _format_lr_pairs_for_prompt(pairs: list[dict] | None) -> str:
         return "None"
     return ", ".join(
         f"{p.get('ligand', '')}-{p.get('receptor', '')}" + (f" (score: {p['score']:.2f})" if 'score' in p else "")
-        for p in pairs[:10]  # Limit to 10 in prompt for token control
+        for p in pairs[:30]
     )
+
+
+def _literature_query_generation_timeout() -> float:
+    raw_timeout = os.getenv("LITERATURE_QUERY_GENERATION_TIMEOUT", "120")
+    try:
+        timeout = float(raw_timeout)
+    except (TypeError, ValueError):
+        return 120.0
+    return timeout if timeout > 0 else 120.0
 
 
 @tool
@@ -2720,20 +2764,21 @@ def search_literature_dynamic(
         If output_path is provided: Compact summary with saved_to, total_papers,
         coverage, paper_titles (first 10), and a message.
     """
-    # Auto-read lr_pairs from data_dir ONLY if caller explicitly opted in
+    # Auto-read lr_pairs from data_dir ONLY if caller explicitly opted in.
+    # Prefer lr_candidates.json (drug-target selected set, usually 30 pairs);
+    # fall back to lr_pairs_search.json (load_analysis_data's compact top set).
     # (prevents silent pair injection for PLANNER/REPORTER which pass data_dir for
     # save-path purposes only — fixes Codex adversarial review finding #1)
     _lr_pairs = None
     _effective_data_dir = _effective_literature_data_dir(data_dir)
     if enable_lr_pair_queries and _effective_data_dir:
-        _lr_pairs_file = Path(_effective_data_dir) / "lr_pairs_search.json"
-        if _lr_pairs_file.exists():
-            try:
-                with open(_lr_pairs_file) as f:
-                    _lr_pairs = json.load(f).get("pairs", [])
-                logger.debug(f"Auto-loaded {len(_lr_pairs)} L-R pairs from {_lr_pairs_file}")
-            except Exception:
-                pass  # Non-critical: search proceeds without pair data
+        _lr_pairs, _lr_pairs_source = load_searcher_lr_pairs(_effective_data_dir)
+        if _lr_pairs:
+            logger.debug(
+                "Auto-loaded %d L-R pairs from %s",
+                len(_lr_pairs),
+                _lr_pairs_source,
+            )
 
     return run_async(
         search_literature_dynamic_async(
@@ -2836,12 +2881,12 @@ async def search_literature_dynamic_async(
     # set enable_lr_pair_queries) retain the original signature defaults
     # byte-for-byte. Signature defaults remain False at literature.py:2116, 2222.
     #
-    # Final paper cap: SEARCHER's INTERPRETER consumer expects max_results papers
-    # in the saved papers.json. The candidate pool for the retrieval loop is
-    # separately enlarged below so deterministic singleton fan-out (30 hub gene
-    # queries × ~5 papers each) can run to completion before the per-iter early
-    # break fires. _greedy_coverage_sort then truncates the candidate pool back
-    # down to _final_paper_cap.
+    # Final paper cap: SEARCHER writes the full ranked raw pool to
+    # papers_raw.json; create_literature_handoff applies the caller-facing
+    # max_results cap later when producing papers.json. The retrieval loop's
+    # candidate pool is separately enlarged below so deterministic singleton
+    # fan-out (30 hub gene queries x ~5 papers each) can run to completion before
+    # the per-iter early break fires.
     _final_paper_cap = max_results
     # Internal candidate pool size for the retrieval loop. In non-SEARCHER mode
     # this equals the caller-facing cap. In SEARCHER mode it is inflated below
@@ -2857,13 +2902,13 @@ async def search_literature_dynamic_async(
         )
         coverage_weighted_sort = True
     if enable_lr_pair_queries:
-        # SEARCHER mode candidate pool: ~5x the final cap, floor at 300 (REV-A1)
+        # SEARCHER mode candidate pool: ~5x the handoff cap, floor at 300 (REV-A1)
         # to absorb keyword-only pathway fan-out (~13 extra queries) plus the
         # singleton gene fan-out (~30 gene queries), so deterministic retrieval
-        # can fully run before early break and _greedy_coverage_sort has enough
-        # material to maximize per-gene + per-pathway coverage in the final
-        # truncation. Math: 13 pathway × 6 + 30 gene singleton × 5 + 8 LLM × 5
-        # ≈ 268 papers; 300 leaves 32-paper headroom before final cap.
+        # can fully run before early break and final ranking has enough material
+        # for create_literature_handoff to cap papers.json later. Math: 13
+        # pathway x 6 + 30 gene singleton x 5 + 8 LLM x 5 ~= 268 papers; 300
+        # leaves headroom before handoff capping.
         _internal_pool_size = max(max_results * 5, 300)
         logger.info(
             f"SEARCHER mode candidate pool: internal pool size "
@@ -2930,6 +2975,8 @@ async def search_literature_dynamic_async(
 
     llm = create_llm(provider=llm_provider) if llm_provider else create_llm()
     recorded_iter0_queries: list[dict] = []
+    query_generation_status = "cache_replay" if query_cache is not None else "llm_success"
+    query_generation_error = ""
 
     for iteration in range(max_iterations):
         logger.info(f"=== Async Iteration {iteration + 1}/{max_iterations} ===")
@@ -2968,7 +3015,6 @@ async def search_literature_dynamic_async(
             if query_cache is not None:
                 # REPLAY: use cached queries, skip LLM entirely
                 validated_queries = _normalize_replayed_queries(query_cache)
-                all_queries.extend(validated_queries)
                 logger.info(
                     f"Replaying {len(validated_queries)} cached iteration-0 queries"
                 )
@@ -3010,12 +3056,26 @@ async def search_literature_dynamic_async(
             pass  # validated_queries already set above from cache
         else:
             # Generate queries using LLM
+            llm_generation_failed = False
+            response_text = ""
             try:
-                response = await llm.ainvoke([HumanMessage(content=prompt_text)])
+                response = await asyncio.wait_for(
+                    llm.ainvoke([HumanMessage(content=prompt_text)]),
+                    timeout=_literature_query_generation_timeout(),
+                )
                 response_text = str(response.content) if hasattr(response, "content") else str(response)
             except Exception as e:
                 logger.error(f"LLM query generation failed at iteration {iteration}: {e}")
-                if iteration == 0:
+                if iteration == 0 and enable_lr_pair_queries:
+                    logger.warning(
+                        "Continuing SEARCHER retrieval with deterministic gene/LR/pathway "
+                        "queries after LLM query generation failure"
+                    )
+                    validated_queries = []
+                    llm_generation_failed = True
+                    query_generation_status = "llm_failed_deterministic_fallback"
+                    query_generation_error = str(e)
+                elif iteration == 0:
                     fallback_result = await _execute_fixed_strategy_search_async(
                         genes=genes,
                         pathways=pathways,
@@ -3032,75 +3092,109 @@ async def search_literature_dynamic_async(
                     return await _maybe_save_literature_result(
                         fallback_result, output_path, data_dir
                     )
-                break
+                else:
+                    query_generation_status = "llm_failed_gap_fill"
+                    query_generation_error = f"iteration={iteration}: {e}"
+                    break
 
             # Parse and validate queries
-            raw_queries = _parse_llm_queries(response_text)
-            validated_queries = _validate_generated_queries(raw_queries)
+            if not llm_generation_failed:
+                raw_queries = _parse_llm_queries(response_text)
+                validated_queries = _validate_generated_queries(raw_queries)
 
-            if not validated_queries:
-                if iteration == 0:
-                    logger.warning("No valid queries on first iteration, falling back")
-                    fallback_result = await _execute_fixed_strategy_search_async(
-                        genes=genes,
-                        pathways=pathways,
-                        celltypes=celltypes,
-                        disease=disease,
-                        max_results=max_results,
-                        enforce_disease_match=enforce_disease_match,
-                        biomcp_url=biomcp_url,
-                        rerank_mode=normalized_rerank_mode,
-                        rerank_top_n=rerank_top_n,
-                        rerank_min_confidence=rerank_min_confidence,
-                        rerank_stats=rerank_totals,
-                    )
-                    return await _maybe_save_literature_result(
-                        fallback_result, output_path, data_dir
-                    )
-                logger.warning(f"No valid queries at iteration {iteration}, stopping")
-                break
+                if not validated_queries:
+                    if iteration == 0 and enable_lr_pair_queries:
+                        logger.warning(
+                            "No valid LLM queries on first SEARCHER iteration; "
+                            "continuing with deterministic gene/LR/pathway queries"
+                        )
+                        query_generation_status = "llm_empty_deterministic_fallback"
+                        query_generation_error = "no_valid_llm_queries"
+                    elif iteration == 0:
+                        logger.warning("No valid queries on first iteration, falling back")
+                        fallback_result = await _execute_fixed_strategy_search_async(
+                            genes=genes,
+                            pathways=pathways,
+                            celltypes=celltypes,
+                            disease=disease,
+                            max_results=max_results,
+                            enforce_disease_match=enforce_disease_match,
+                            biomcp_url=biomcp_url,
+                            rerank_mode=normalized_rerank_mode,
+                            rerank_top_n=rerank_top_n,
+                            rerank_min_confidence=rerank_min_confidence,
+                            rerank_stats=rerank_totals,
+                        )
+                        return await _maybe_save_literature_result(
+                            fallback_result, output_path, data_dir
+                        )
+                    else:
+                        logger.warning(f"No valid queries at iteration {iteration}, stopping")
+                        query_generation_status = "llm_empty_gap_fill"
+                        query_generation_error = f"iteration={iteration}: no_valid_llm_queries"
+                        break
 
-            # Iter-0 deterministic gene fan-out: prepend gene-singleton queries
-            # so every input gene gets its own focused BioMCP query, regardless of
-            # LLM compliance with the "2 gene-centric queries" prompt instruction.
-            # chunk_size=1 (singleton) — empirically validated by Diagnostic 1 to
-            # achieve 100% per-gene retrieval ceiling. Multi-gene chunks (5×) caused
-            # BioMCP to return papers concentrated on the most-popular gene per
-            # chunk, leaving ~60% of input genes uncovered in title/abstract regex
-            # matching even though the queries technically ran.
-            if iteration == 0:
-                deterministic = _build_deterministic_gene_queries(
-                    genes=genes, disease=disease, chunk_size=1,
+            if iteration > 0:
+                all_queries.extend(validated_queries)
+                logger.info(
+                    f"Generated {len(validated_queries)} queries for iteration {iteration + 1}"
                 )
-                if deterministic:
-                    # Exact-set dedup: drop ONLY LLM queries that are byte-identical
-                    # to a deterministic chunk AND add no keywords. Biologically
-                    # enriched queries (e.g., {genes:[TGFB1,SMAD4], keywords:[EMT]})
-                    # always pass through. Supersets of a chunk also pass through.
-                    det_gene_sets = [
-                        frozenset(q.get("genes", [])) for q in deterministic
-                    ]
-                    llm_kept = []
-                    for q in validated_queries:
-                        q_gene_set = frozenset(q.get("genes", []) or [])
-                        has_keywords = bool(q.get("keywords"))
-                        is_redundant = q_gene_set in det_gene_sets and not has_keywords
-                        if not is_redundant:
-                            llm_kept.append(q)
-                    validated_queries = deterministic + llm_kept
-                    det_total_slots = sum(len(q["genes"]) for q in deterministic)
-                    logger.info(
-                        f"Iter-0 fan-out: +{len(deterministic)} deterministic gene queries "
-                        f"({det_total_slots}/{len(genes)} gene slots), "
-                        f"{len(llm_kept)} LLM queries retained"
+
+        # Iter-0 deterministic gene/L-R fan-out. Gene singleton fan-out is
+        # legacy behavior for LLM-generated queries and also runs for SEARCHER
+        # cache replay; L-R fan-out remains SEARCHER-only.
+        if iteration == 0 and (query_cache is None or enable_lr_pair_queries):
+            deterministic = _build_deterministic_gene_queries(
+                genes=genes, disease=disease, chunk_size=1,
+            )
+            if deterministic:
+                # Exact-set dedup: drop ONLY prior queries that are byte-identical
+                # to a deterministic chunk AND add no keywords. Biologically
+                # enriched queries (e.g., {genes:[TGFB1,SMAD4], keywords:[EMT]})
+                # always pass through. Supersets of a chunk also pass through.
+                det_gene_sets = [
+                    frozenset(q.get("genes", [])) for q in deterministic
+                ]
+                kept_queries = []
+                for q in validated_queries:
+                    q_gene_set = frozenset(q.get("genes", []) or [])
+                    has_keywords = bool(q.get("keywords"))
+                    is_redundant = q_gene_set in det_gene_sets and not has_keywords
+                    if not is_redundant:
+                        kept_queries.append(q)
+                validated_queries = deterministic + kept_queries
+                det_total_slots = sum(len(q["genes"]) for q in deterministic)
+                logger.info(
+                    f"Iter-0 fan-out: +{len(deterministic)} deterministic gene queries "
+                    f"({det_total_slots}/{len(genes)} gene slots), "
+                    f"{len(kept_queries)} prior queries retained"
+                )
+
+            deterministic_lr = (
+                _build_deterministic_lr_pair_queries(
+                    lr_pairs=lr_pairs, disease=disease,
+                )
+                if enable_lr_pair_queries
+                else []
+            )
+            if deterministic_lr:
+                det_lr_sets = {
+                    frozenset(q.get("genes", []) or []) for q in deterministic_lr
+                }
+                lr_kept = []
+                for q in validated_queries:
+                    q_gene_set = frozenset(q.get("genes", []) or [])
+                    has_keywords = bool(q.get("keywords"))
+                    is_redundant_lr = (
+                        q_gene_set in det_lr_sets and not has_keywords
                     )
-
-            all_queries.extend(validated_queries)
-            logger.info(f"Generated {len(validated_queries)} queries for iteration {iteration + 1}")
-
-            # Record iteration-0 queries if requested
-            if iteration == 0 and record_queries:
-                recorded_iter0_queries = list(validated_queries)
+                    if not is_redundant_lr:
+                        lr_kept.append(q)
+                validated_queries = deterministic_lr + lr_kept
+                logger.info(
+                    f"Iter-0 LR-pair fan-out: +{len(deterministic_lr)} "
+                    f"deterministic pair queries, {len(lr_kept)} prior queries retained"
+                )
 
         # Iter-0 keyword-only pathway fan-out.
         # Runs in BOTH cache-replay AND LLM-generation paths so deterministic
@@ -3126,19 +3220,20 @@ async def search_literature_dynamic_async(
                     if not is_redundant_pw:
                         pw_kept.append(q)
                 validated_queries = deterministic_pw + pw_kept
-                # Sync all_queries with post-dedup state. At iter 0, all_queries
-                # contains only iter-0 entries (extended by either the replay
-                # branch at the outer cache-if/else or the LLM else-branch above);
-                # rebuilding it keeps telemetry consistent with what executes.
-                all_queries.clear()
-                all_queries.extend(validated_queries)
-                if record_queries:
-                    recorded_iter0_queries = list(validated_queries)
                 logger.info(
                     f"Iter-0 pathway fan-out: +{len(deterministic_pw)} keyword-only "
                     f"pathway queries ({len(pathways)} pathways), "
                     f"{len(pw_kept)} LLM queries retained"
                 )
+
+        if iteration == 0:
+            all_queries.clear()
+            all_queries.extend(validated_queries)
+            logger.info(
+                f"Generated {len(validated_queries)} queries for iteration {iteration + 1}"
+            )
+            if record_queries:
+                recorded_iter0_queries = list(validated_queries)
 
         # Separate gene, deterministic pathway, and generic keyword queries.
         # genes=[] alone is not pathway intent; only trusted deterministic
@@ -3208,7 +3303,11 @@ async def search_literature_dynamic_async(
                         seen_pmids.add(pmid)
                         paper["query_index"] = query_base_index + local_index
                         paper["iteration"] = iteration
-                        paper["query_type"] = "gene"
+                        paper["query_type"] = (
+                            "lr_pair"
+                            if intent == "deterministic_lr_pair"
+                            else "gene"
+                        )
                         mvq = paper.get("matched_via_query")
                         if isinstance(mvq, dict):
                             mvq["query_intent"] = intent
@@ -3320,24 +3419,41 @@ async def search_literature_dynamic_async(
                 )
                 continue
 
-    # Truncation: coverage-weighted greedy sort or pure SJR sort.
-    # _final_paper_cap is the user-facing output cap. In SEARCHER mode, the
-    # retrieval loop used _internal_pool_size so the candidate pool
-    # (`all_papers`) is much larger than the cap; the final selection happens
-    # here. In non-SEARCHER mode, _final_paper_cap == _internal_pool_size
-    # (no-op).
+    # Ranking: coverage-weighted greedy sort or pure SJR sort. SEARCHER mode
+    # preserves the full ranked raw pool here; create_literature_handoff applies
+    # the user-facing papers.json cap later.
     if sort_by_journal_quality:
         await _ensure_sjr_cache_loaded()
         if coverage_weighted_sort:
-            final_papers = _greedy_coverage_sort(
+            ranked_papers = _greedy_coverage_sort(
                 all_papers, genes, pathways, celltypes,
-                max_results=_final_paper_cap, alpha=0.4,
+                max_results=len(all_papers), alpha=0.4,
             )
         else:
             all_papers.sort(key=lambda p: p.get("journal_quality", _SJR_DEFAULT_SCORE), reverse=True)
-            final_papers = all_papers[:_final_paper_cap]
+            ranked_papers = all_papers
     else:
-        final_papers = all_papers[:_final_paper_cap]
+        ranked_papers = all_papers
+
+    if enable_lr_pair_queries:
+        final_papers = ranked_papers
+        raw_pool_policy = {
+            "name": "preserve_all_unique_retrieved_candidates",
+            "requested_max_results": _final_paper_cap,
+            "internal_pool_size": _internal_pool_size,
+            "saved_raw_count": len(final_papers),
+            "handoff_cap_applied_in": "create_literature_handoff",
+        }
+    else:
+        final_papers = ranked_papers[:_final_paper_cap]
+        raw_pool_policy = {
+            "name": "legacy_max_results_truncation",
+            "requested_max_results": _final_paper_cap,
+            "internal_pool_size": _internal_pool_size,
+            "saved_raw_count": len(final_papers),
+            "handoff_cap_applied_in": "",
+        }
+
     final_coverage = _calculate_coverage(
         final_papers, genes, pathways, celltypes,
         lr_pairs=lr_pairs, use_retrieval_tags=_use_retrieval_tags,
@@ -3409,6 +3525,9 @@ async def search_literature_dynamic_async(
         "filter_stage": filter_stage,
         "rerank_applied_count": int(rerank_totals.get("applied_count", 0)),
         "rerank_dropped_count": int(rerank_totals.get("dropped_count", 0)),
+        "raw_pool_policy": raw_pool_policy,
+        "query_generation_status": query_generation_status,
+        "query_generation_error": query_generation_error,
     }
 
     if record_queries and recorded_iter0_queries:

@@ -30,7 +30,6 @@ from docs.benchmarks.harness_x_model.common import (
 )
 from src.agents.deep_interpreter.tools.literature_handoff import (
     CONTEXT_BUCKET,
-    DEFAULT_HANDOFF_CAP,
     DIRECT_BUCKET,
     create_literature_handoff,
 )
@@ -40,6 +39,7 @@ MODEL_HOSTS = {
     "qwen3.5:35b": "http://localhost:7000",
     "qwen3.5:122b": "http://localhost:6000",
 }
+LEGACY_HANDOFF_CAP = 40
 
 CSV_FIELD_ORDER = [
     "trial_index",
@@ -199,7 +199,7 @@ def _run_handoff(
             "lr_pairs": _lr_pairs_for_case(case),
             "pathways": normalized.get("pathways", []),
             "celltypes": normalized.get("celltypes", []),
-            "cap": DEFAULT_HANDOFF_CAP,
+            "cap": LEGACY_HANDOFF_CAP,
         }
     )
     filtered_path = data_dir / "papers_filtered.json"

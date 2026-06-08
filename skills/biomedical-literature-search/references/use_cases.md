@@ -45,7 +45,7 @@ create_literature_handoff(
     lr_pairs=search_context.get("lr_pairs", []),
     pathways=search_context.get("pathways", []),
     celltypes=search_context.get("celltypes", []),
-    cap=40,
+    cap=100,
 )
 ```
 

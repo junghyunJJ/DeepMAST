@@ -28,8 +28,9 @@ retrieval backend and should not be described as improving PubMed search itself.
 2. **Disease-anchored.** Always pass the disease or tissue context when known.
 3. **Modifiers stay secondary.** Pathways and celltypes refine the context; they do
    not replace the LR pair or disease anchor.
-4. **Saved evidence is the source of truth.** Grade from saved `papers_raw.json`,
-   not from the compact tool return.
+4. **Saved evidence is the source of truth.** Save the full unique raw retrieval
+   pool to `papers_raw.json` and grade from that file, not from the compact tool
+   return.
 5. **No unvalidated expansion.** Do not extract new uppercase symbols from abstracts
    for follow-up searches in the default workflow.
 6. **Handoff stays selective.** Send INTERPRETER only direct LR evidence and
@@ -67,7 +68,10 @@ SEARCHER-to-INTERPRETER citation source only in this mode.
 
 Before calling the tool, normalize inputs:
 
-- `lr_pairs`: list of `{ligand, receptor}` dictionaries for SEARCHER unified mode
+- `lr_pairs`: list of `{ligand, receptor}` dictionaries for SEARCHER unified mode.
+  Prefer the workspace `lr_candidates.json` pairs when present; fall back to
+  `search_context["lr_pairs"]` / `lr_pairs_search.json` only when
+  `lr_candidates.json` is missing or invalid.
 - `genes`: shared search context genes, including LR symbols and prioritized modifiers
 - `ligand`, `receptor`: official upper-case symbols for single-pair use
 - `disease`: one concise phrase
@@ -81,13 +85,21 @@ search_context["lr_pairs"] = [{"ligand": ligand, "receptor": receptor}]
 ```
 
 Use that same `search_context["lr_pairs"]` list for both retrieval context and the
-handoff helper. Do not rely on `genes` alone to imply the LR pair.
+handoff helper in single-pair mode. In unified SEARCHER production mode, the tools
+auto-load `lr_candidates.json` pairs for LR-pair query injection when
+`enable_lr_pair_queries=True`; if `lr_candidates.json` is missing or invalid, they
+fall back to `lr_pairs_search.json`. Do not rely on `genes` alone to imply the LR
+pair.
 
 ### Step 1: Retrieve One Broad Raw Paper Pool
 
 Call `search_literature_dynamic` for broad raw retrieval with `max_results=100`.
 In SEARCHER unified mode, use the complete `search_context` and opt into LR-pair
-query injection. Save the raw retrieval to `papers_raw.json`.
+query injection. Save the full unique raw retrieval pool to `papers_raw.json`.
+Do not apply the `max_results` or handoff cap to `papers_raw.json`; the cap is
+applied later by `create_literature_handoff` when writing `papers.json`.
+The tool will use `lr_candidates.json` pairs for LR-pair query injection when that
+file is present in `workspace`; otherwise it falls back to `lr_pairs_search.json`.
 
 ```python
 result = search_literature_dynamic(
@@ -110,7 +122,9 @@ manually only if the saved `papers_raw.json` is missing or empty.
 ### Step 2: Create Bucketed Handoff Artifacts
 
 Run the production handoff helper after raw retrieval. The default handoff cap is
-`40`.
+`100`. The cap 100 is an upper bound, not a target that must be filled: if fewer than
+100 eligible direct/context papers exist, `papers.json` should contain all
+eligible papers.
 
 ```python
 handoff = create_literature_handoff(
@@ -122,7 +136,7 @@ handoff = create_literature_handoff(
     lr_pairs=search_context["lr_pairs"],
     pathways=search_context.get("pathways", []),
     celltypes=search_context.get("celltypes", []),
-    cap=40,
+    cap=100,
 )
 ```
 
@@ -133,8 +147,9 @@ artifacts with the available file tools.
 
 ### Step 3: Use The Bucketed Output
 
-`citation_candidates.json` is the complete audit artifact. It keeps all unique raw
-papers after grading:
+`citation_candidates.json` is the complete audit artifact. SEARCHER grading/QC
+grades all raw candidates from `papers_raw.json` into this file and keeps all
+unique raw papers after grading:
 
 ```json
 {
@@ -157,11 +172,21 @@ Each graded paper keeps its original paper fields and adds `evidence_bucket`,
 `supported_lr_pairs`, `direct_lr_pairs`, `context_lr_pairs`,
 `matched_terms_by_pair`, and `bucket_reasons_by_pair`.
 
-`papers.json` is the filtered INTERPRETER handoff. It contains only papers from
-`direct_lr_evidence` and `receptor_pathway_context_evidence`, capped at 40 by
-default, and preserves `evidence_bucket` plus `supported_lr_pairs` metadata. Do
-not include `disease_only_background` or `rejected_weak_evidence` in INTERPRETER
-RAG context by default.
+`papers.json` is the filtered INTERPRETER handoff. INTERPRETER handoff selection
+uses only papers from `direct_lr_evidence` and
+`receptor_pathway_context_evidence`, preserves `evidence_bucket` plus
+`supported_lr_pairs` metadata, and applies `cap=100` only if eligible
+direct/context papers exceed 100. If eligible direct/context papers are below the
+cap, select all eligible papers and record unused capacity as normal. Do not
+include `disease_only_background` or `rejected_weak_evidence` in INTERPRETER RAG
+context by default, and do not expand raw retrieval solely to fill all 100 slots.
+
+When eligible direct/context papers exceed 100, the production selection policy is
+`direct_all_pair_round_robin_100`: preserve direct evidence first; if direct
+evidence alone exceeds the cap, truncate direct papers by LR-pair round-robin;
+otherwise fill remaining slots with context papers by LR-pair round-robin and use
+unpaired context only as a fallback. Keep `papers_raw.json` and
+`citation_candidates.json` as larger audit artifacts.
 
 Bucket rules:
 
@@ -188,8 +213,9 @@ Purpose: isolate retrieval skill effects.
 - Do not call `create_literature_handoff`.
 - Do not write `citation_candidates.json`.
 - Do not write filtered `papers.json`.
-- The benchmark runner applies the same direct/context cap-40 filter to skill ON
-  and skill OFF arms after retrieval.
+- The legacy retrieval-only benchmark runner may apply the same diagnostic
+  direct/context cap-40 filter to skill ON and skill OFF arms after retrieval.
+  This is benchmark-local and is not the current SEARCHER Production handoff cap.
 
 ## REPORTER Mode
 
@@ -290,7 +316,7 @@ handoff = create_literature_handoff(
     lr_pairs=search_context["lr_pairs"],
     pathways=search_context["pathways"],
     celltypes=search_context["celltypes"],
-    cap=40,
+    cap=100,
 )
 ```
 

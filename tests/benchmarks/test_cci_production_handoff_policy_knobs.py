@@ -44,6 +44,7 @@ def _patch_fake_tools(monkeypatch, calls: dict[str, dict]) -> None:
         )
 
     def fake_handoff(payload):
+        calls["handoff"] = payload
         data_dir = Path(payload["data_dir"])
         (data_dir / payload["citation_candidates_path"]).write_text(
             json.dumps(
@@ -154,6 +155,8 @@ def test_default_policy_knobs_and_trimmed_provider_are_forwarded(tmp_path, monke
     for key, value in expected_defaults.items():
         assert calls["search"][key] == value
         assert run_config[key] == value
+    assert calls["handoff"]["cap"] == 100
+    assert run_config["cap"] == 100
     assert calls["search"]["llm_provider"] == "ollama"
     assert run_config["llm_provider"] == "ollama"
 

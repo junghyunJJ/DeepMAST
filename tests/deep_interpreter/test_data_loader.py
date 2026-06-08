@@ -256,6 +256,33 @@ class TestLoadAnalysisDataGeneAugmentation:
         assert "pairs" in candidates
         assert len(candidates["pairs"]) > 0
 
+    def test_existing_lr_candidates_json_is_preserved(self, analysis_dir):
+        """Existing drug-target lr_candidates.json should not be overwritten."""
+        from src.agents.deep_interpreter.tools.data_loader import load_analysis_data
+
+        existing_payload = {
+            "selection_mode": "external_test_fixture",
+            "pairs": [
+                {
+                    "ligand": "PRESERVELIG",
+                    "receptor": "PRESERVEREC",
+                    "rank": 1,
+                }
+            ],
+        }
+        candidates_file = analysis_dir / "lr_candidates.json"
+        candidates_file.write_text(json.dumps(existing_payload), encoding="utf-8")
+
+        with patch(
+            "src.agents.deep_interpreter.tools.lr_prioritizer.prioritize_top_lr_pairs"
+        ) as mock_prioritizer:
+            result = load_analysis_data.invoke({"data_dir": str(analysis_dir)})
+
+        assert mock_prioritizer.invoke.call_count == 0
+        assert json.loads(candidates_file.read_text(encoding="utf-8")) == existing_payload
+        assert "PRESERVELIG" in result["search_context"].get("candidate_genes", [])
+        assert "PRESERVEREC" in result["search_context"].get("candidate_genes", [])
+
     def test_top_search_genes_json_created(self, analysis_dir):
         """top_search_genes.json should be created during load_analysis_data."""
         from src.agents.deep_interpreter.tools.data_loader import load_analysis_data

@@ -33,7 +33,59 @@ BUCKET_SCORE = {
     BACKGROUND_BUCKET: 40,
     REJECTED_BUCKET: 0,
 }
-DEFAULT_HANDOFF_CAP = 40
+DEFAULT_HANDOFF_CAP = 100
+HANDOFF_POLICY_NAME = "direct_all_pair_round_robin_100"
+LR_CANDIDATES_FILE = "lr_candidates.json"
+LR_PAIR_SEARCH_FILE = "lr_pairs_search.json"
+
+
+def _normalize_lr_pairs(pairs: Any) -> list[dict[str, Any]]:
+    normalized = []
+    for pair in pairs or []:
+        if not isinstance(pair, dict):
+            continue
+        ligand = str(pair.get("ligand") or "").strip()
+        receptor = str(pair.get("receptor") or "").strip()
+        if not ligand or not receptor:
+            continue
+        normalized.append({**pair, "ligand": ligand, "receptor": receptor})
+    return normalized
+
+
+def _extract_lr_pairs_from_payload(payload: Any) -> list[dict[str, Any]]:
+    if isinstance(payload, dict):
+        pairs = (
+            payload.get("pairs")
+            or payload.get("lr_pairs")
+            or payload.get("candidate_pairs")
+            or []
+        )
+    elif isinstance(payload, list):
+        pairs = payload
+    else:
+        pairs = []
+    return _normalize_lr_pairs(pairs)
+
+
+def load_searcher_lr_pairs(data_dir: str) -> tuple[list[dict[str, Any]], str]:
+    """Load SEARCHER LR pairs from workspace, preferring lr_candidates.json."""
+    if not data_dir:
+        return [], ""
+
+    base = Path(data_dir).expanduser().resolve()
+    for file_name in (LR_CANDIDATES_FILE, LR_PAIR_SEARCH_FILE):
+        pair_file = base / file_name
+        if not pair_file.exists():
+            continue
+        try:
+            pairs = _extract_lr_pairs_from_payload(
+                json.loads(pair_file.read_text(encoding="utf-8"))
+            )
+        except Exception:
+            continue
+        if pairs:
+            return pairs, str(pair_file)
+    return [], ""
 
 
 def _normalize_text(value: Any) -> str:
@@ -189,6 +241,12 @@ def _pair_metadata(pair: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _pair_key(pair: dict[str, Any]) -> str:
+    ligand = str(pair.get("ligand") or "").strip().upper()
+    receptor = str(pair.get("receptor") or "").strip().upper()
+    return f"{ligand}^{receptor}" if ligand or receptor else ""
+
+
 def _dedup_papers(papers: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
     seen: set[str] = set()
     unique: list[dict[str, Any]] = []
@@ -204,21 +262,194 @@ def _dedup_papers(papers: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], i
     return unique, duplicates
 
 
-def _sort_handoff_papers(papers: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    indexed = list(enumerate(papers))
-    indexed.sort(
-        key=lambda item: (
-            0 if item[1].get("evidence_bucket") == DIRECT_BUCKET else 1,
-            -len(item[1].get("supported_lr_pairs") or []),
-            item[0],
+def _selection_key(index: int, paper: dict[str, Any]) -> str:
+    return _dedup_key(paper) or f"index:{index}"
+
+
+def _paper_pair_keys(paper: dict[str, Any], fields: tuple[str, ...]) -> set[str]:
+    keys: set[str] = set()
+    for field in fields:
+        pairs = paper.get(field) or []
+        if not isinstance(pairs, list):
+            continue
+        for pair in pairs:
+            if not isinstance(pair, dict):
+                continue
+            key = _pair_key(pair)
+            if key:
+                keys.add(key)
+    return keys
+
+
+def _ordered_pair_keys(
+    lr_pairs: list[dict[str, Any]] | None,
+    papers: list[dict[str, Any]],
+    fields: tuple[str, ...],
+) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for pair in lr_pairs or []:
+        if not isinstance(pair, dict):
+            continue
+        key = _pair_key(pair)
+        if key and key not in seen:
+            seen.add(key)
+            ordered.append(key)
+    for paper in papers:
+        for field in fields:
+            pairs = paper.get(field) or []
+            if not isinstance(pairs, list):
+                continue
+            for pair in pairs:
+                if not isinstance(pair, dict):
+                    continue
+                key = _pair_key(pair)
+                if key and key not in seen:
+                    seen.add(key)
+                    ordered.append(key)
+    return ordered
+
+
+def _round_robin_by_lr_pair(
+    papers: list[dict[str, Any]],
+    *,
+    cap: int,
+    lr_pairs: list[dict[str, Any]] | None,
+    pair_fields: tuple[str, ...],
+) -> list[dict[str, Any]]:
+    if cap <= 0:
+        return []
+
+    pair_order = _ordered_pair_keys(lr_pairs, papers, pair_fields)
+    pair_queues: dict[str, list[tuple[str, dict[str, Any]]]] = {
+        key: [] for key in pair_order
+    }
+    fallback: list[tuple[str, dict[str, Any]]] = []
+
+    for index, paper in enumerate(papers):
+        item = (_selection_key(index, paper), paper)
+        keys = _paper_pair_keys(paper, pair_fields)
+        if not keys:
+            fallback.append(item)
+            continue
+        for key in pair_order:
+            if key in keys:
+                pair_queues[key].append(item)
+
+    selected: list[dict[str, Any]] = []
+    selected_keys: set[str] = set()
+    queue_offsets = {key: 0 for key in pair_order}
+    while len(selected) < cap:
+        progressed = False
+        for key in pair_order:
+            queue = pair_queues[key]
+            offset = queue_offsets[key]
+            while offset < len(queue) and queue[offset][0] in selected_keys:
+                offset += 1
+            queue_offsets[key] = offset
+            if offset >= len(queue):
+                continue
+            paper_key, paper = queue[offset]
+            queue_offsets[key] = offset + 1
+            if paper_key in selected_keys:
+                continue
+            selected_keys.add(paper_key)
+            selected.append(paper)
+            progressed = True
+            if len(selected) >= cap:
+                break
+        if not progressed:
+            break
+
+    for paper_key, paper in fallback:
+        if len(selected) >= cap:
+            break
+        if paper_key in selected_keys:
+            continue
+        selected_keys.add(paper_key)
+        selected.append(paper)
+    return selected
+
+
+def select_literature_handoff_papers(
+    candidates: list[dict[str, Any]],
+    *,
+    cap: int = DEFAULT_HANDOFF_CAP,
+    lr_pairs: list[dict[str, Any]] | None = None,
+    policy: str = HANDOFF_POLICY_NAME,
+) -> dict[str, Any]:
+    """Select RAG-ready INTERPRETER handoff papers from bucketed candidates."""
+    if policy != HANDOFF_POLICY_NAME:
+        raise ValueError(f"unknown literature handoff policy: {policy}")
+
+    effective_cap = max(0, int(cap))
+    eligible = [
+        paper
+        for paper in candidates
+        if paper.get("evidence_bucket") in ELIGIBLE_BUCKETS
+    ]
+    direct = [
+        paper for paper in eligible if paper.get("evidence_bucket") == DIRECT_BUCKET
+    ]
+    context = [
+        paper for paper in eligible if paper.get("evidence_bucket") == CONTEXT_BUCKET
+    ]
+
+    if len(direct) > effective_cap:
+        selected = _round_robin_by_lr_pair(
+            direct,
+            cap=effective_cap,
+            lr_pairs=lr_pairs,
+            pair_fields=("direct_lr_pairs", "supported_lr_pairs"),
         )
+    else:
+        selected = list(direct)
+        selected.extend(
+            _round_robin_by_lr_pair(
+                context,
+                cap=effective_cap - len(selected),
+                lr_pairs=lr_pairs,
+                pair_fields=("context_lr_pairs", "supported_lr_pairs"),
+            )
+        )
+
+    selected_direct = sum(
+        1 for paper in selected if paper.get("evidence_bucket") == DIRECT_BUCKET
     )
-    return [paper for _, paper in indexed]
+    selected_context = sum(
+        1 for paper in selected if paper.get("evidence_bucket") == CONTEXT_BUCKET
+    )
+    eligible_count = len(eligible)
+    eligible_all_selected = eligible_count <= effective_cap
+    return {
+        "papers": selected,
+        "policy": {
+            "name": policy,
+            "included_buckets": [DIRECT_BUCKET, CONTEXT_BUCKET],
+            "excluded_buckets": [BACKGROUND_BUCKET, REJECTED_BUCKET],
+            "cap": effective_cap,
+            "eligible_count": eligible_count,
+            "eligible_all_selected": eligible_all_selected,
+            "unused_capacity_count": (
+                max(0, effective_cap - eligible_count) if eligible_all_selected else 0
+            ),
+            "available_direct_count": len(direct),
+            "available_context_count": len(context),
+            "selected_count": len(selected),
+            "selected_direct_count": selected_direct,
+            "selected_context_count": selected_context,
+            "direct_truncated_count": max(0, len(direct) - selected_direct),
+            "context_truncated_count": max(0, len(context) - selected_context),
+            "truncated_count": max(0, eligible_count - len(selected)),
+        },
+    }
 
 
 def build_literature_handoff(
     raw_papers: list[dict[str, Any]],
     cap: int = DEFAULT_HANDOFF_CAP,
+    lr_pairs: list[dict[str, Any]] | None = None,
+    policy: str = HANDOFF_POLICY_NAME,
 ) -> dict[str, Any]:
     """Filter already-bucketed papers for INTERPRETER handoff.
 
@@ -226,23 +457,20 @@ def build_literature_handoff(
     tool after pair-aware grading has attached `evidence_bucket` metadata.
     """
     unique, duplicates = _dedup_papers([p for p in raw_papers if isinstance(p, dict)])
-    eligible = [
-        paper
-        for paper in unique
-        if paper.get("evidence_bucket") in ELIGIBLE_BUCKETS
-    ]
-    selected = _sort_handoff_papers(eligible)[: max(0, int(cap))]
+    selection = select_literature_handoff_papers(
+        unique,
+        cap=cap,
+        lr_pairs=lr_pairs,
+        policy=policy,
+    )
+    selected = selection["papers"]
     counts = {bucket: 0 for bucket in BUCKET_ORDER}
     for paper in unique:
         bucket = str(paper.get("evidence_bucket") or REJECTED_BUCKET)
         counts[bucket if bucket in counts else REJECTED_BUCKET] += 1
     return {
         "schema_version": "deep_interpreter_literature_handoff_v1",
-        "policy": {
-            "included_buckets": [DIRECT_BUCKET, CONTEXT_BUCKET],
-            "excluded_buckets": [BACKGROUND_BUCKET, REJECTED_BUCKET],
-            "cap": cap,
-        },
+        "policy": selection["policy"],
         "source": {
             "total_papers": len(raw_papers),
             "unique_papers": len(unique),
@@ -415,13 +643,17 @@ def create_literature_handoff(
     if not isinstance(payload, dict):
         raise ValueError("raw papers JSON must be an object")
 
-    pairs = lr_pairs
+    pairs = _normalize_lr_pairs(lr_pairs)
     if not pairs:
-        pair_file = _resolve_data_file(data_dir, "lr_pairs_search.json")
-        if pair_file.exists():
-            pair_payload = json.loads(pair_file.read_text(encoding="utf-8"))
-            pairs = pair_payload.get("pairs", [])
-    pairs = [pair for pair in pairs or [] if isinstance(pair, dict)]
+        effective_data_dir = data_dir or os.getenv("DEEP_INTERPRETER_DATA_DIR", "")
+        pair_search_dir = (
+            str(Path(effective_data_dir).expanduser().resolve())
+            if effective_data_dir
+            else str(raw_path.parent)
+        )
+        pairs, _pair_source = load_searcher_lr_pairs(pair_search_dir)
+        if not pairs and raw_path.parent:
+            pairs, _pair_source = load_searcher_lr_pairs(str(raw_path.parent))
 
     candidates = grade_lr_literature_candidates(
         payload,
@@ -430,7 +662,7 @@ def create_literature_handoff(
         pathways=pathways,
         celltypes=celltypes,
     )
-    handoff = build_literature_handoff(candidates["papers"], cap=cap)
+    handoff = build_literature_handoff(candidates["papers"], cap=cap, lr_pairs=pairs)
     handoff["source"]["raw_papers_path"] = str(raw_path)
     handoff["source"]["citation_candidates_path"] = str(candidates_path)
     handoff["search_method"] = payload.get("search_method", "")

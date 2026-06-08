@@ -84,19 +84,40 @@ def test_biomedical_literature_search_role_modes_load() -> None:
     assert "create_literature_handoff" in production
     assert "citation_candidates.json" in production
     assert "filtered INTERPRETER handoff" in production
+    assert "full unique raw retrieval pool to papers_raw.json" in production_normalized
+    assert (
+        "Do not apply the max_results or handoff cap to papers_raw.json"
+    ) in production_normalized
+    assert (
+        "the cap is applied later by create_literature_handoff when writing "
+        "papers.json"
+    ) in production_normalized
+    assert (
+        "SEARCHER grading/QC grades all raw candidates from papers_raw.json"
+    ) in production_normalized
     assert (
         "papers.json is the canonical SEARCHER-to-INTERPRETER citation source "
         "only in this mode"
     ) in production_normalized
     assert "direct_lr_evidence" in production
     assert "receptor_pathway_context_evidence" in production
-    assert "cap=40" in production or "capped at 40" in production
+    assert "cap=100" in production
+    assert "cap 100 is an upper bound" in production_normalized
+    assert (
+        "applies cap=100 only if eligible direct/context papers exceed 100"
+    ) in production_normalized
+    assert "all eligible papers" in production_normalized
+    assert "do not expand raw retrieval solely to fill all 100 slots" in production_normalized
 
     assert "papers_raw.json" in retrieval_only
     assert "Do not call create_literature_handoff" in retrieval_normalized
     assert "Do not write citation_candidates.json" in retrieval_normalized
     assert "Do not write filtered papers.json" in retrieval_normalized
-    assert "same direct/context cap-40 filter" in retrieval_normalized
+    assert "legacy retrieval-only benchmark runner" in retrieval_normalized
+    assert "diagnostic direct/context cap-40 filter" in retrieval_normalized
+    assert (
+        "not the current SEARCHER Production handoff cap"
+    ) in retrieval_normalized
 
     assert "synthesis_papers_raw.json" in reporter
     assert "synthesis_citation_candidates.json" in reporter
