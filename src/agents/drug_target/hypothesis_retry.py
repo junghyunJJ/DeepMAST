@@ -81,15 +81,18 @@ def _direct_pair_axis_guidance(errors: list[dict] | None) -> str:
     text = _flatten_error_text(errors)
     if "claims direct pair axis" not in text:
         return ""
-    available_files = sorted(
-        set(
-            re.findall(
-                r"available:[^.;]*?(stage1_[A-Za-z0-9-]+--[A-Za-z0-9-]+\.json)",
-                text,
-            )
-        )
-    )
-    available_text = ""
+    available_files: list[str] = []
+    for filename in re.findall(
+        r"canonical_existing=(stage1_[A-Za-z0-9-]+--[A-Za-z0-9-]+\.json)",
+        text,
+    ):
+        if filename not in available_files:
+            available_files.append(filename)
+    for available_text in re.findall(r"available:\s*([^.;]+)", text):
+        for filename in re.findall(r"stage1_[A-Za-z0-9-]+--[A-Za-z0-9-]+\.json", available_text):
+            if filename not in available_files:
+                available_files.append(filename)
+    available_guidance = ""
     if available_files:
         available_text = (
             " When the rejection names an available matching file, cite that exact "

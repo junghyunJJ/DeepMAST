@@ -387,11 +387,12 @@ resolved label. Do not claim that Census separately validated the original state
 
 Direct pair-axis claims require direct Stage 1 pair evidence. A claim about an
 `A-B axis` must cite a matching passed `stage1_A--B.json` or `stage1_B--A.json`;
-Stage 3 files or different Stage 1 pairs do not support that A-B axis.
-Stage 1 pair filenames may be ligand-receptor ordered and can be reverse of
-the prose order. Cite the actual filename returned by `load_evidence_files` or
-`validate_evidence_references`, not a normalized filename you invent. Do not
-title a hypothesis `A-B axis` unless that matching passed pair file is cited.
+Stage 1 pair filenames may be ligand-receptor ordered and reverse of the prose
+order, so cite the actual passed filename returned by `load_evidence_files` or
+`validate_evidence_references`. Stage 3 files or different Stage 1 pairs do not
+support that A-B axis.
+Do not title a hypothesis `A-B axis` unless that matching passed pair file is
+cited.
 
 Use the Stage 1 usage whitelist from `load_evidence_files` or
 `validate_evidence_references`:
@@ -807,10 +808,10 @@ you MUST follow this retry policy:
    deterministic repair before retrying:
    - `claims direct pair axis 'A--B' without citing a matching passed Stage 1 pair file`:
      remove the `A-B axis` wording from title/core/prediction, or replace it
-     only with a directly cited passed `stage1_A--B.json`/`stage1_B--A.json`.
-     If the rejection says the available matching file is the reverse-order
-     `stage1_B--A.json`, cite that exact available file or remove the direct
-     pair-axis wording.
+     only with the exact directly cited passed `stage1_A--B.json`/`stage1_B--A.json`
+     filename returned by `load_evidence_files` or `validate_evidence_references`;
+     if the rejection names an available reverse file, cite that exact file or
+     remove the direct axis wording.
      Do not build combinatorial axes from one hub's separate partners.
    - `target-cell-depleted Stage 1 Census evidence as interest-cell support`:
      if the hypothesis mentions AT2, Transitional AT2, pulmonary/alveolar
