@@ -670,6 +670,53 @@ class TestHypothesisScopeLoader:
         assert "skipped: non-featured" in stub.get("_note", "")
         assert "gene" not in stub  # full body not present
 
+    def test_hypothesis_scope_compacts_runtime_payloads(self, tmp_path):
+        from src.agents.drug_target.tools.evidence_loader import load_evidence_files
+
+        ev = self._make_dir(tmp_path)
+        assessment = {
+            "schema_version": 3,
+            "disease": "idiopathic pulmonary fibrosis",
+            "stage1_filter_applied": True,
+            "stage3_candidates": [{"gene": "CD4", "combined_total": 16}],
+            "summary": {"stage3_count": 1},
+            "all_genes_matrix": [{"gene": f"G{i}", "payload": "x" * 1000} for i in range(80)],
+            "rubric_assessment": [{"gene": f"G{i}", "payload": "y" * 1000} for i in range(80)],
+        }
+        (ev / "assessment_results.json").write_text(json.dumps(assessment))
+        (ev / "stage1_filter_results.json").write_text(json.dumps([]))
+        (ev / "ot_CD4.json").write_text(
+            json.dumps({
+                "gene": "CD4",
+                "associations": [
+                    {"disease": {"id": f"EFO_{i}"}, "score": i / 10}
+                    for i in range(100)
+                ],
+                "disease_evidence": [
+                    {"datasourceId": "europepmc", "score": i / 10}
+                    for i in range(100)
+                ],
+            })
+        )
+        (ev / "census_celltype_options.json").write_text(json.dumps({"rows": ["z" * 1000] * 80}))
+
+        raw = load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "hypothesis"})
+        result = json.loads(raw)
+
+        assert len(raw) < 50_000
+        assessment_out = result["files"]["assessment_results.json"]
+        assert assessment_out["stage3_candidates"] == [{"gene": "CD4", "combined_total": 16}]
+        assert "all_genes_matrix" not in assessment_out
+        assert "rubric_assessment" not in assessment_out
+        ot_out = result["files"]["ot_CD4.json"]
+        assert ot_out["gene"] == "CD4"
+        assert "associations" not in ot_out
+        assert len(ot_out["associations_summary"]["top"]) == 3
+        assert len(ot_out["disease_evidence_summary"]["top"]) == 3
+        assert result["files"]["census_celltype_options.json"]["_note"].startswith(
+            "content omitted"
+        )
+
     def test_hypothesis_scope_stubs_stale_stage3(self, tmp_path):
         """Codex F2: stage3_<GENE>.json not in current featured set is stubbed."""
         from src.agents.drug_target.tools.evidence_loader import load_evidence_files

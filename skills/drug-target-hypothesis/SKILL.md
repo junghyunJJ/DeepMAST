@@ -59,6 +59,8 @@ Result: The runtime bypasses hypothesis generation cleanly instead of inventing 
 The active runtime contract is:
 - Load evidence only through `load_evidence_files(data_dir, scope="hypothesis")`
 - Do not use `read_file`, `write_file`, or `ls` as the persistence path for hypothesis output
+- Do not call `grep` on `/large_tool_results/` paths. After `load_evidence_files`,
+  use the returned evidence payload; do not search for `stage3_candidates` with grep.
 - Validate all cited filenames with `validate_evidence_references(data_dir, [...])`
 - Persist through `save_hypothesis_report(data_dir=data_dir, report=report)`; do not use `save_evidence` as the primary persistence path.
 

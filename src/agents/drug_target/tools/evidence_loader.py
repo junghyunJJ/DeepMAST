@@ -239,6 +239,217 @@ def _size_metadata_summary(data, size_bytes: int, content_limit: int) -> dict:
     return summary
 
 
+def _compact_assessment_for_hypothesis(data: object) -> object:
+    """Return the hypothesis-writer subset of assessment_results.json."""
+    if not isinstance(data, dict):
+        return data
+
+    compact: dict = {}
+    for key in (
+        "schema_version",
+        "assessment_date",
+        "disease",
+        "summary",
+        "stage1_filter_applied",
+    ):
+        if key in data:
+            compact[key] = data[key]
+
+    disease_context = data.get("disease_context")
+    if isinstance(disease_context, dict):
+        compact["disease_context"] = {
+            key: disease_context.get(key)
+            for key in (
+                "input_disease",
+                "canonical_disease",
+                "disease_type",
+                "oncology_flag",
+            )
+            if key in disease_context
+        }
+
+    candidates = data.get("stage3_candidates")
+    compact["stage3_candidates"] = candidates if isinstance(candidates, list) else []
+    return compact
+
+
+def _compact_ot_for_hypothesis(data: object, gene: str) -> object:
+    """Return target-disease/actionability context without large OT lists."""
+    if not isinstance(data, dict):
+        return data
+
+    compact: dict = {
+        "gene": data.get("gene") or data.get("gene_symbol") or gene,
+        "gene_symbol": data.get("gene_symbol") or data.get("gene") or gene,
+    }
+    for key in (
+        "disease",
+        "executed",
+        "ensembl_id",
+        "efo_id",
+        "matched_disease",
+        "errors",
+    ):
+        if key in data:
+            compact[key] = data[key]
+
+    target_info = data.get("target_info")
+    if isinstance(target_info, dict):
+        compact["target_info"] = {
+            key: target_info.get(key)
+            for key in ("id", "approvedSymbol", "approvedName", "biotype")
+            if key in target_info
+        }
+        descriptions = target_info.get("functionDescriptions")
+        if isinstance(descriptions, list):
+            compact["target_info"]["functionDescriptions"] = [
+                str(value)[:300] for value in descriptions[:2]
+            ]
+
+    disease_context = data.get("disease_context")
+    if isinstance(disease_context, dict):
+        compact["disease_context"] = {
+            key: disease_context.get(key)
+            for key in (
+                "requested_disease",
+                "disease_used",
+                "efo_id",
+                "match_label",
+                "exact_match",
+                "fallback_used",
+            )
+            if key in disease_context
+        }
+
+    evidence = data.get("disease_evidence")
+    if isinstance(evidence, list):
+        compact["disease_evidence_summary"] = {
+            "count": len(evidence),
+            "top": [
+                {
+                    key: row.get(key)
+                    for key in (
+                        "datasourceId",
+                        "datatypeId",
+                        "score",
+                        "targetFromSourceId",
+                        "studyId",
+                    )
+                    if isinstance(row, dict) and key in row
+                }
+                for row in evidence[:3]
+                if isinstance(row, dict)
+            ],
+        }
+
+    associations = data.get("associations")
+    if isinstance(associations, list):
+        compact["associations_summary"] = {
+            "total_count": data.get("associations_total_count", len(associations)),
+            "truncated": data.get("associations_truncated"),
+            "top": [
+                {
+                    "disease": row.get("disease"),
+                    "score": row.get("score"),
+                    "datatypeScores": row.get("datatypeScores", [])[:3]
+                    if isinstance(row.get("datatypeScores"), list)
+                    else row.get("datatypeScores"),
+                }
+                for row in associations[:3]
+                if isinstance(row, dict)
+            ],
+        }
+
+    target_drugs = data.get("target_drugs")
+    if isinstance(target_drugs, dict):
+        rows = target_drugs.get("rows")
+        compact["target_drugs_summary"] = {
+            "count": target_drugs.get("count"),
+            "rows": [_compact_ot_drug_row(row) for row in rows[:3]]
+            if isinstance(rows, list)
+            else [],
+        }
+
+    return compact
+
+
+def _compact_ot_drug_row(row: object) -> dict:
+    if not isinstance(row, dict):
+        return {}
+    drug = row.get("drug")
+    target = row.get("target")
+    diseases = row.get("diseases")
+    return {
+        "drug": {
+            key: drug.get(key)
+            for key in ("id", "name", "maximumClinicalStage", "drugType")
+            if isinstance(drug, dict) and key in drug
+        },
+        "target": {
+            key: target.get(key)
+            for key in ("id", "approvedSymbol")
+            if isinstance(target, dict) and key in target
+        },
+        "phase": row.get("phase") or row.get("maxClinicalStage"),
+        "mechanismOfAction": row.get("mechanismOfAction"),
+        "disease": diseases[0].get("diseaseFromSource")
+        if isinstance(diseases, list) and diseases and isinstance(diseases[0], dict)
+        else row.get("diseaseFromSource"),
+    }
+
+
+def _compact_known_drugs_for_hypothesis(data: object) -> object:
+    """Return disease-level drug context without full landscape tables."""
+    if not isinstance(data, dict):
+        return data
+    compact = {
+        key: data.get(key)
+        for key in (
+            "disease",
+            "executed",
+            "efo_id",
+            "matched_disease",
+            "errors",
+        )
+        if key in data
+    }
+    drugs = data.get("drugs")
+    if isinstance(drugs, dict):
+        rows = drugs.get("rows")
+        compact["drugs"] = {
+            "uniqueDrugs": drugs.get("uniqueDrugs"),
+            "uniqueTargets": drugs.get("uniqueTargets"),
+            "rows": rows[:3] if isinstance(rows, list) else [],
+        }
+    target_linked_rows = data.get("target_linked_rows")
+    if isinstance(target_linked_rows, list):
+        compact["target_linked_rows"] = target_linked_rows[:3]
+    landscape = data.get("disease_landscape")
+    if isinstance(landscape, dict):
+        compact["disease_landscape"] = {"count": landscape.get("count")}
+    return compact
+
+
+def _compact_hypothesis_scope_payload(
+    name: str,
+    data: object,
+    *,
+    size_bytes: int,
+    content_limit: int,
+) -> object:
+    """Keep hypothesis-scope tool output small enough to avoid grep-only artifacts."""
+    if name == "assessment_results.json":
+        return _compact_assessment_for_hypothesis(data)
+    if name == "known_drugs.json":
+        return _compact_known_drugs_for_hypothesis(data)
+    if name == "census_celltype_options.json":
+        return _size_metadata_summary(data, size_bytes, content_limit)
+    match = _OT_NAME_RE.match(name)
+    if match:
+        return _compact_ot_for_hypothesis(data, match.group(1).upper())
+    return data
+
+
 def _load_featured_set(evidence_dir: Path) -> tuple[set[str], str | None]:
     """Return (uppercase featured-gene set, error_message_or_None).
 
@@ -481,6 +692,13 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
             result["excluded_files"].append({"name": name, "reason": reason or ""})
             result["contrast_count"] += 1
         elif action == "full":
+            if hypothesis_scope:
+                data = _compact_hypothesis_scope_payload(
+                    name,
+                    data,
+                    size_bytes=size_bytes,
+                    content_limit=CONTENT_SIZE_LIMIT,
+                )
             result["files"][name] = data
         elif action == "stub_stale_stage3" or action == "stub_nonfeatured_ot":
             stub: dict = {"size_bytes": size_bytes, "_note": reason or ""}
@@ -488,7 +706,13 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
                 stub["top_keys"] = list(data.keys())[:5]
             result["files"][name] = stub
         else:  # "fallback" — size-based behavior (preserves scope=all logic)
-            if size_bytes <= CONTENT_SIZE_LIMIT:
+            if hypothesis_scope:
+                result["files"][name] = _size_metadata_summary(
+                    data,
+                    size_bytes,
+                    CONTENT_SIZE_LIMIT,
+                )
+            elif size_bytes <= CONTENT_SIZE_LIMIT:
                 result["files"][name] = data
             else:
                 result["files"][name] = _size_metadata_summary(data, size_bytes, CONTENT_SIZE_LIMIT)
@@ -506,6 +730,8 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
         )
         result.update(_stage1_pair_usage_guidance(evidence_dir, stage1_pair_files))
 
+    if hypothesis_scope:
+        return json.dumps(result, separators=(",", ":"))
     return json.dumps(result, indent=2)
 
 

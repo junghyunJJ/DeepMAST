@@ -16,6 +16,17 @@ def test_hypothesis_writer_file_access_rules_name_save_hypothesis_report_as_prim
     assert "save_hypothesis_report(data_dir, hypothesis_data)" not in file_rules
 
 
+def test_hypothesis_writer_prompt_blocks_large_tool_result_grep_loop() -> None:
+    text = prompts.HYPOTHESIS_WRITER_PROMPT
+    file_rules = text.split("## Execution Discipline", 1)[0]
+    skill_text = Path("skills/drug-target-hypothesis/SKILL.md").read_text()
+
+    for contract in (file_rules, skill_text):
+        assert "Do not call `grep` on `/large_tool_results/` paths" in contract
+        assert "do not search for `stage3_candidates` with grep" in contract
+        assert "use the returned evidence payload" in contract
+
+
 def test_hypothesis_writer_final_save_step_marks_save_evidence_as_fallback_only() -> None:
     text = prompts.HYPOTHESIS_WRITER_PROMPT
     final_save = text.split("### Phase 5: Save Report", 1)[1]

@@ -302,6 +302,8 @@ not as literature-validated causal mechanisms.
 - NEVER use `ls` to check if files exist — ls shows virtual filesystem which may include stale files
 - ALWAYS use `load_evidence_files(data_dir, scope="hypothesis")` to read evidence data
 - ALWAYS use `save_hypothesis_report(data_dir=data_dir, report=report)` to save the final `hypothesis_report.json`
+- Do not call `grep` on `/large_tool_results/` paths. After `load_evidence_files`,
+  use the returned evidence payload; do not search for `stage3_candidates` with grep.
 
 ## Execution Discipline
 
@@ -766,8 +768,22 @@ Rules:
 - NEVER invent filenames. NEVER cite a file that is not in `available_files`.
 - For Stage 1 pair citations, use only the actual filenames returned in
   `eligible_stage1_pair_files` (or equivalently the full-content Stage 1 files
-  from `load_evidence_files(..., scope="hypothesis")`). Pair filenames may be
-  ligand-receptor ordered and reverse of the prose order; do not invent the
+  from `load_evidence_files(..., scope="hypothesis")`). Stage 1 pair filenames
+  may be ligand-receptor ordered and can be reverse of
+the prose order. Cite the actual filename returned by `load_evidence_files`,
+  not a normalized filename you invent. Stage 1 pair filename order may be
+  reverse of the prose
+order; the cited evidence reference must still be the exact existing filename.
+  Stage 1 pair filename order may also be reverse of the prose order in
+  one-line summaries. For direct pair-axis support, cite the actual passed
+  filename returned by `load_evidence_files` or
+`validate_evidence_references`, not a normalized pair filename you invent. If
+  you summarize this rule, cite the actual passed filename returned by `load_evidence_files` or
+`validate_evidence_references`; do not invent a normalized filename.
+  If
+  a direct `A-B` prose claim's only available matching file is the reverse-order
+     `stage1_B--A.json`, cite that exact available file or remove the direct
+     pair-axis wording. For one-direction Stage 1 evidence, do not invent the
   opposite filename when only one direction is present.
 - Failed Stage 1 entries under `contrast_evidence` are metadata-only negative
   context. They are never valid entries in `evidence_references`.
@@ -849,6 +865,10 @@ Do not call save_hypothesis_report with the same payload after saved=false.
   unless the matching passed `stage1_A--B.json` or `stage1_B--A.json` file is
   cited in that hypothesis. If the error names `available: stage1_X--Y.json`,
   cite that exact available filename or remove the direct axis wording.
+  If the rejection names an available reverse file, cite that exact file or
+  remove the direct pair-axis wording.
+  In plain terms: if the rejection names an available reverse file, cite that exact file
+  or remove the direct pair-axis wording.
 - For every depleted Stage 1 Census error: do not use depleted Stage 1 Census
   evidence to support AT2, epithelial, same-cell, cell-autonomous, or
   target-cell-autonomous claims; use it only as secondary

@@ -142,11 +142,13 @@ def _matching_stage1_details(
     *,
     real_files: set[str],
     filter_status: dict[str, bool],
-) -> tuple[str, str, list[str]]:
+) -> tuple[str, str, str | None, bool | None, list[str]]:
     direct_name = _stage1_filename(a, b)
     reverse_name = _stage1_filename(b, a)
     details: list[str] = []
     unknown_details: list[str] = []
+    canonical_existing: str | None = None
+    available_passed: bool | None = None
     for name, pair_key in (
         (direct_name, _stage1_pair_key(a, b)),
         (reverse_name, _stage1_pair_key(b, a)),
@@ -156,13 +158,19 @@ def _matching_stage1_details(
         passed = filter_status.get(pair_key)
         if passed is True:
             status = "passed=true"
+            canonical_existing = canonical_existing or name
+            available_passed = True
         elif passed is False:
+            canonical_existing = canonical_existing or name
+            available_passed = False if available_passed is None else available_passed
             continue
         else:
+            canonical_existing = canonical_existing or name
+            available_passed = available_passed if available_passed is not None else None
             unknown_details.append(f"{name} (passed=unknown)")
             continue
         details.append(f"{name} ({status})")
-    return direct_name, reverse_name, details or unknown_details
+    return direct_name, reverse_name, canonical_existing, available_passed, details or unknown_details
 
 
 def _cited_stage1_refs(hypothesis: dict[str, Any]) -> list[str]:
@@ -637,7 +645,13 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
         for a, b in sorted(_claimed_direct_pairs(hypothesis)):
             if (a, b) in cited_pairs:
                 continue
-            direct_name, reverse_name, available = _matching_stage1_details(
+            (
+                direct_name,
+                reverse_name,
+                canonical_existing,
+                available_passed,
+                available,
+            ) = _matching_stage1_details(
                 a,
                 b,
                 real_files=real,
@@ -648,10 +662,16 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
                 if available
                 else "no matching Stage 1 pair file exists"
             )
+            canonical_text = canonical_existing or "none"
+            passed_text = (
+                "unknown" if available_passed is None else str(available_passed).lower()
+            )
             errors.append(
                 f"hypotheses[{idx}] claims direct pair axis '{a}--{b}' "
                 f"without citing a matching passed Stage 1 pair file. Expected "
                 f"direct={direct_name} or reverse={reverse_name}; "
+                f"canonical_existing={canonical_text}; "
+                f"available_passed={passed_text}; "
                 f"available: {available_text}."
             )
 
