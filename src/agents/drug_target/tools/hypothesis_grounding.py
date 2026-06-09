@@ -121,75 +121,50 @@ def _stage1_filename(a: str, b: str) -> str:
 
 
 def _pair_key(a: str, b: str) -> tuple[str, str]:
-    """Return an unordered canonical key while preserving claimed order elsewhere."""
+    """Return a deterministic unordered key for pair-support comparisons."""
     return tuple(sorted((_normal_gene(a), _normal_gene(b))))
 
 
-def _stage1_filter_rows_to_pass_map(rows: Any) -> dict[tuple[str, str], bool]:
-    if not isinstance(rows, list):
+def _stage1_pair_status(evidence_dir: Path) -> dict[tuple[str, str], bool]:
+    """Return Stage 1 pass/fail status keyed by unordered gene pair."""
+    try:
+        from src.agents.drug_target.tools.evidence_loader import (
+            _load_stage1_filter_results_status,
+        )
+
+        rows, _ = _load_stage1_filter_results_status(evidence_dir)
+    except Exception:
         return {}
-    passed: dict[tuple[str, str], bool] = {}
-    for row in rows:
-        if not isinstance(row, dict):
+    status: dict[tuple[str, str], bool] = {}
+    for pair, passed in rows.items():
+        parsed = _stage1_pair_from_filename(f"stage1_{pair}.json")
+        if not parsed:
             continue
-        ligand = _normal_gene(row.get("ligand"))
-        receptor = _normal_gene(row.get("receptor"))
-        if not ligand or not receptor:
-            pair = str(row.get("pair") or row.get("pair_id") or "").upper()
-            if "--" in pair:
-                ligand, receptor = pair.split("--", 1)
-                ligand = ligand.strip()
-                receptor = receptor.strip()
-        if ligand and receptor:
-            passed[_pair_key(ligand, receptor)] = bool(row.get("passed"))
-    return passed
-
-
-def _load_stage1_pass_map(evidence_dir: Path) -> dict[tuple[str, str], bool]:
-    json_path = evidence_dir / "stage1_filter_results.json"
-    if json_path.exists():
-        return _stage1_filter_rows_to_pass_map(_load_json(json_path))
-    csv_path = evidence_dir / "stage1_filter_results.csv"
-    if csv_path.exists():
-        import csv
-
-        try:
-            with open(csv_path, encoding="utf-8") as handle:
-                return _stage1_filter_rows_to_pass_map(
-                    [
-                        {
-                            "ligand": row.get("ligand"),
-                            "receptor": row.get("receptor"),
-                            "passed": str(row.get("passed", "")).lower()
-                            in ("true", "1", "yes"),
-                        }
-                        for row in csv.DictReader(handle)
-                    ]
-                )
-        except Exception:
-            return {}
-    return {}
+        status[_pair_key(*parsed)] = passed
+    return status
 
 
 def _matching_stage1_names(
     a: str,
     b: str,
     real_files: set[str],
-    pass_map: dict[tuple[str, str], bool],
-) -> dict[str, Any]:
+    stage1_status: dict[tuple[str, str], bool],
+) -> tuple[str, str, list[str]]:
+    """Return expected direct/reverse filenames plus matching existing files."""
     direct_name = _stage1_filename(a, b)
     reverse_name = _stage1_filename(b, a)
-    expected = (direct_name, reverse_name)
-    existing = [name for name in expected if name in real_files]
-    passed = pass_map.get(_pair_key(a, b))
-    passed_text = "unknown" if passed is None else str(passed).lower()
-    return {
-        "direct_name": direct_name,
-        "reverse_name": reverse_name,
-        "existing": existing,
-        "canonical_existing": existing[0] if existing else None,
-        "passed_text": passed_text,
-    }
+    passed = stage1_status.get(_pair_key(a, b))
+    available = []
+    for name in (direct_name, reverse_name):
+        if name not in real_files:
+            continue
+        suffix = ""
+        if passed is True:
+            suffix = " (passed=true)"
+        elif passed is False:
+            suffix = " (passed=false)"
+        available.append(f"{name}{suffix}")
+    return direct_name, reverse_name, available
 
 
 def _cited_stage1_refs(hypothesis: dict[str, Any]) -> list[str]:
@@ -624,7 +599,7 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
 
     errors: list[str] = []
     real = {path.name for path in evidence_dir.iterdir()} if evidence_dir.exists() else set()
-    stage1_pass_map = _load_stage1_pass_map(evidence_dir)
+    stage1_status = _stage1_pair_status(evidence_dir)
     celltype_tokens = _celltype_resolution_tokens(
         _load_json(evidence_dir / "celltype_resolution.json")
     ) | _stage1_celltype_tokens(evidence_dir)
@@ -664,23 +639,18 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
         for a, b in sorted(_claimed_direct_pairs(hypothesis)):
             if (a, b) in cited_pairs:
                 continue
-            matching = _matching_stage1_names(a, b, real, stage1_pass_map)
-            available_text = (
-                ", ".join(matching["existing"])
-                if matching["existing"]
-                else "no matching Stage 1 pair file exists"
+            direct_name, reverse_name, available = _matching_stage1_names(
+                a,
+                b,
+                real,
+                stage1_status,
             )
-            canonical_text = matching["canonical_existing"] or "none"
+            available_text = ", ".join(available) if available else "no matching Stage 1 pair file exists"
             errors.append(
                 f"hypotheses[{idx}] claims direct pair axis '{a}--{b}' "
                 f"without citing a matching passed Stage 1 pair file. Expected "
-                f"{matching['direct_name']} or {matching['reverse_name']}; "
-                f"claimed_pair={a}--{b}; "
-                f"expected_direct={matching['direct_name']}; "
-                f"expected_reverse={matching['reverse_name']}; "
-                f"canonical_existing={canonical_text}; "
-                f"available: {available_text}; "
-                f"available_passed={matching['passed_text']}."
+                f"direct={direct_name} or reverse={reverse_name}; "
+                f"available: {available_text}."
             )
 
         used_celltype_tokens = sorted(
