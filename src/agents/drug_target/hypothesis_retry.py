@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 
@@ -80,31 +81,30 @@ def _direct_pair_axis_guidance(errors: list[dict] | None) -> str:
     text = _flatten_error_text(errors)
     if "claims direct pair axis" not in text:
         return ""
-    available_files = sorted(
-        set(
-            re.findall(
-                r"available:[^.;]*?(stage1_[A-Za-z0-9-]+--[A-Za-z0-9-]+\.json)",
-                text,
-            )
-        )
-    )
-    available_text = ""
+    available_files: list[str] = []
+    for available_text in re.findall(r"available:\s*([^.;]+)", text):
+        for filename in re.findall(r"stage1_[A-Za-z0-9-]+--[A-Za-z0-9-]+\.json", available_text):
+            if filename not in available_files:
+                available_files.append(filename)
+    available_guidance = ""
     if available_files:
-        available_text = (
-            " When the rejection names an available matching file, cite that exact "
-            f"filename in evidence_references ({', '.join(available_files)}) or "
-            "remove the direct pair-axis wording."
+        available_guidance = (
+            " The rejection names an available matching Stage 1 file: "
+            f"{', '.join(available_files)}. Cite that exact filename in "
+            "evidence_references for the rejected hypothesis, or remove the "
+            "direct pair-axis wording from that hypothesis."
         )
     return (
         " Direct pair-axis repair: Do not invent a direct pair axis from separate "
         "hub-partner evidence. Use `A--B axis`, `A-B axis`, direct interaction, "
         "or paired readout wording only when a matching passed `stage1_A--B.json` "
-        "or `stage1_B--A.json` exists and is cited. The two filename orders are "
-        "equivalent for direct pair support only when the actual cited file is a "
-        "passed Stage 1 file and is present in evidence_references."
-        f"{available_text} Do not use synergy or "
+        "or `stage1_B--A.json` exists and is cited. Stage 1 pair filenames may "
+        "be ligand-receptor ordered and reverse of the prose order; the reverse "
+        "file is equivalent for direct pair support only when that exact passed "
+        "file is present in evidence_references. Do not use synergy or "
         "synergistic effects unless direct combination evidence is cited; prefer "
-        "`additive or non-additive effects`. Otherwise rewrite as co-observed "
+        "`additive or non-additive effects`."
+        f"{available_guidance} Otherwise rewrite as co-observed "
         "genes, convergent programs, or separate follow-up recommendations."
     )
 
