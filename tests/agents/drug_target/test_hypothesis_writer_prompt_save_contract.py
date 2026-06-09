@@ -225,6 +225,17 @@ def test_hypothesis_writer_prompt_forbids_false_missing_stage1_support() -> None
     ) in text
     assert "eligible_stage1_pair_files" in text
     assert "interest_cell_intrinsic_stage1_pair_files" in text
+
+
+def test_hypothesis_writer_prompt_documents_reverse_stage1_filename_contract() -> None:
+    text = prompts.HYPOTHESIS_WRITER_PROMPT
+
+    assert "Stage 1 pair filenames may be ligand-receptor ordered" in text
+    assert "reverse of the prose order" in text
+    assert "Cite the actual filename returned by `load_evidence_files`" in text
+    assert "do not invent the\n  opposite filename when only one direction is present" in text
+    assert "If the rejection says `available: stage1_X--Y.json`" in text
+    assert "cite that exact available filename" in text
     assert "spatial_niche_only_stage1_pair_files" in text
 
 
