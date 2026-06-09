@@ -228,6 +228,17 @@ def test_hypothesis_writer_prompt_forbids_false_missing_stage1_support() -> None
     assert "spatial_niche_only_stage1_pair_files" in text
 
 
+def test_hypothesis_writer_prompt_requires_actual_reverse_stage1_filename_after_rejection() -> None:
+    text = prompts.HYPOTHESIS_WRITER_PROMPT
+
+    assert "Stage 1 pair filenames may be ligand-receptor ordered" in text
+    assert "can be reverse of\n" "the prose order" in text
+    assert "Cite the actual filename returned by `load_evidence_files`" in text
+    assert "not a normalized filename you invent" in text
+    assert "available matching file is the reverse-order\n     `stage1_B--A.json`" in text
+    assert "cite that exact available file or remove the direct\n     pair-axis wording" in text
+
+
 def test_hypothesis_writer_prompt_requires_pre_save_repair_checklist() -> None:
     text = prompts.HYPOTHESIS_WRITER_PROMPT
 
@@ -239,6 +250,7 @@ def test_hypothesis_writer_prompt_requires_pre_save_repair_checklist() -> None:
     assert "Do not call save_hypothesis_report with the same payload after saved=false" in text
     assert "For every GENE_LEVEL_EVIDENCE_REFERENCE_MISSING error" in text
     assert "For every unsupported direct pair-axis error" in text
+    assert "If the rejection names an available reverse file" in text
     assert "For every depleted Stage 1 Census error" in text
     assert "If the last rejection mentions a specific hypothesis index" in text
 
