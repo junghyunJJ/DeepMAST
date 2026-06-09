@@ -131,19 +131,40 @@ def _depleted_stage1_guidance(errors: list[dict] | None) -> str:
         " Depleted Stage 1 repair: remove AT2, Transitional AT2, "
         "pulmonary/alveolar epithelial, resolved Census cell-type, "
         "epithelial-intrinsic, same-cell, and target-cell-autonomous wording "
-        "from recommendations citing depleted Stage 1 files, use the depleted Stage 1 "
-        "file only as secondary spatial-niche/cross-cell framing when the pair "
-        "concept is named, and support target/actionability with exact "
-        "stage3_<GENE>.json and ot_<GENE>.json citations. For a "
+        "from recommendations citing depleted Stage 1 files. A depleted Stage 1 "
+        "file cannot support primary AT2/epithelial intrinsic, interest-cell, "
+        "same-cell, or target-cell-autonomous wording. For a "
         "`target-cell-depleted Stage 1 Census evidence as interest-cell support` "
         "error, choose exactly one repair path for the named hypothesis: "
         "(A) keep the depleted Stage 1 pair file only after rewriting the title, "
         "core_claim, prediction, validation_approach, and biological_entities.cell_types "
-        "as secondary spatial-niche/cross-cell or non-interest-cell context; or "
-        "(B) remove that Stage 1 pair citation entirely and rewrite the hypothesis "
+        "as secondary cross-cell or non-interest-cell context; use spatial-niche only "
+        "if cited Stage 1 or spatial evidence directly supports spatial/niche context; "
+        "or (B) remove that Stage 1 pair citation entirely and rewrite the hypothesis "
         "as gene-level/actionability-only using available ot_<GENE>.json and "
         "stage3_<GENE>.json evidence. Do not leave the depleted Stage 1 file in a "
         "primary AT2/epithelial, interest-cell, same-cell, or intrinsic recommendation."
+    )
+
+
+def _evidence_scope_guardrails() -> str:
+    return (
+        " Evidence scope guardrails: Every recommendation section must be written "
+        "only from cited Evidence References. If no Stage 1 Census or spatial file "
+        "is cited for a recommendation, do not call the recommendation "
+        "spatial-niche, AT2/epithelial intrinsic, same-cell, interest-cell grounded, "
+        "or resolved Census cell-type grounded; call it gene-level follow-up or "
+        "actionability follow-up. If only one gene in a pair has ot_<GENE>.json or "
+        "stage3_<GENE>.json evidence, state target-disease support or actionability "
+        "only for that gene. Do not describe both genes as equally actionable unless "
+        "both genes cite exact ot_<GENE>.json or stage3_<GENE>.json files. Prefer "
+        "`perturbation/actionability follow-up candidate` over `therapeutic "
+        "intervention candidate`. Prefer `additive or non-additive effects` over "
+        "`synergistic effects` unless direct combination evidence is cited. For "
+        "CD47 or other target perturbations, write `test whether perturbation "
+        "changes cited cellular readouts`; do not state that perturbation alters "
+        "fibrosis resolution unless a cited evidence file directly supports that "
+        "claim."
     )
 
 
@@ -169,6 +190,7 @@ def _format_quality_errors_for_instruction(quality_errors: list[dict] | None) ->
         + _direct_pair_axis_guidance(quality_errors)
         + _featured_gene_reference_guidance(quality_errors)
         + _depleted_stage1_guidance(quality_errors)
+        + _evidence_scope_guardrails()
     )
 
 

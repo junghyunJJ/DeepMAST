@@ -188,16 +188,8 @@ def test_retry_message_includes_depleted_stage1_repair_guidance() -> None:
     assert "resolved Census cell-type, epithelial-intrinsic, same-cell" in message
     assert "target-cell-autonomous wording" in message
     assert "from recommendations citing depleted Stage 1 files" in message
-    assert (
-        "use the depleted Stage 1 file only as secondary "
-        "spatial-niche/cross-cell framing"
-        in message
-    )
-    assert (
-        "support target/actionability with exact stage3_<GENE>.json and "
-        "ot_<GENE>.json citations"
-        in message
-    )
+    assert "cannot support primary AT2/epithelial intrinsic" in message
+    assert "same-cell, or target-cell-autonomous wording" in message
     assert (
         "`target-cell-depleted Stage 1 Census evidence as interest-cell support` "
         "error"
@@ -205,7 +197,8 @@ def test_retry_message_includes_depleted_stage1_repair_guidance() -> None:
     )
     assert "choose exactly one repair path for the named hypothesis" in message
     assert "keep the depleted Stage 1 pair file only after rewriting" in message
-    assert "secondary spatial-niche/cross-cell or non-interest-cell context" in message
+    assert "secondary cross-cell or non-interest-cell context" in message
+    assert "use spatial-niche only if cited Stage 1 or spatial evidence" in message
     assert "remove that Stage 1 pair citation entirely" in message
     assert "gene-level/actionability-only" in message
     assert (
@@ -250,6 +243,44 @@ def test_retry_message_names_res3_final_depleted_stage1_blocker() -> None:
     assert "stage1_FN1--SDC2.json" in message
     assert "target-cell-depleted Stage 1 Census evidence as interest-cell support" in message
     assert "choose exactly one repair path for the named hypothesis" in message
-    assert "secondary spatial-niche/cross-cell or non-interest-cell context" in message
+    assert "secondary cross-cell or non-interest-cell context" in message
+    assert "use spatial-niche only if cited Stage 1 or spatial evidence" in message
     assert "remove that Stage 1 pair citation entirely" in message
     assert "gene-level/actionability-only" in message
+
+
+def test_retry_message_includes_evidence_scope_guardrails() -> None:
+    message = build_hypothesis_retry_message(
+        "res_ipf_drugtarget3",
+        "idiopathic pulmonary fibrosis",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_GROUNDING_VIOLATION",
+                "message": "One or more hypotheses make claims that are not grounded by cited evidence.",
+                "details": {
+                    "hypothesis_grounding_violations": [
+                        (
+                            "hypotheses[0] labels gene-level evidence as spatial/Stage1 "
+                            "without citing Stage 1/spatial support."
+                        )
+                    ]
+                },
+            }
+        ],
+        attempt=1,
+        max_attempts=3,
+    )
+
+    assert "Evidence scope guardrails" in message
+    assert "Every recommendation section must be written only from cited Evidence References" in message
+    assert "If no Stage 1 Census or spatial file is cited" in message
+    assert "do not call the recommendation spatial-niche" in message
+    assert "gene-level follow-up or actionability follow-up" in message
+    assert "If only one gene in a pair has ot_<GENE>.json or stage3_<GENE>.json evidence" in message
+    assert "state target-disease support or actionability only for that gene" in message
+    assert "Do not describe both genes as equally actionable" in message
+    assert "perturbation/actionability follow-up candidate" in message
+    assert "therapeutic intervention candidate" in message
+    assert "additive or non-additive effects" in message
+    assert "synergistic effects" in message
+    assert "test whether perturbation changes cited cellular readouts" in message
