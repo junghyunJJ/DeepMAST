@@ -279,8 +279,14 @@ def test_retry_message_includes_evidence_scope_guardrails() -> None:
     assert "If only one gene in a pair has ot_<GENE>.json or stage3_<GENE>.json evidence" in message
     assert "state target-disease support or actionability only for that gene" in message
     assert "Do not describe both genes as equally actionable" in message
-    assert "perturbation/actionability follow-up candidate" in message
-    assert "therapeutic intervention candidate" in message
-    assert "additive or non-additive effects" in message
-    assert "synergistic effects" in message
+    assert (
+        "Prefer `perturbation/actionability follow-up candidate` over "
+        "`therapeutic intervention candidate`"
+        in message
+    )
+    assert (
+        "Prefer `additive or non-additive effects` over `synergistic effects` "
+        "unless direct combination evidence is cited"
+        in message
+    )
     assert "test whether perturbation changes cited cellular readouts" in message
