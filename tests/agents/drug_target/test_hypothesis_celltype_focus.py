@@ -1639,7 +1639,10 @@ def test_save_hypothesis_report_rejects_failed_reverse_stage1_pair_guardrail(
     )
 
     assert result["saved"] is False
-    assert any("failed Stage 1 pair 'ICAM1--ITGB2'" in error for error in result["errors"])
+    assert any(
+        "failed Stage 1 pair 'ICAM1--ITGB2'" in error
+        for error in result["failed_pair_violations"]
+    )
     assert not (evidence / "hypothesis_report.json").exists()
 
 

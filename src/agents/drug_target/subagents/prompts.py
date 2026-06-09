@@ -387,11 +387,10 @@ resolved label. Do not claim that Census separately validated the original state
 
 Direct pair-axis claims require direct Stage 1 pair evidence. A claim about an
 `A-B axis` must cite a matching passed `stage1_A--B.json` or `stage1_B--A.json`;
-Stage 1 pair filenames may be ligand-receptor ordered and can be reverse of the
-prose order. Cite the actual filename returned by `load_evidence_files` or
-`validate_evidence_references`; Stage 3 files or different Stage 1 pairs do not
-support that A-B axis. Do not title a hypothesis `A-B axis` unless that matching
-passed pair file is cited.
+Stage 3 files or different Stage 1 pairs do not support that A-B axis.
+Stage 1 pair filenames may be ligand-receptor ordered and can be reverse of
+the prose order. Cite the actual filename returned by `load_evidence_files` or
+`validate_evidence_references`, not a normalized filename you invent. Do not title a hypothesis `A-B axis` unless that matching passed pair file is cited.
 
 Use the Stage 1 usage whitelist from `load_evidence_files` or
 `validate_evidence_references`:
