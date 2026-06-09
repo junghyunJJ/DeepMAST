@@ -1247,6 +1247,280 @@ def test_save_hypothesis_report_accepts_at2_grounded_direct_pair_hypothesis(
     assert (evidence / "hypothesis_report.json").exists()
 
 
+def test_save_hypothesis_report_accepts_reverse_order_stage1_pair_citation(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ITGB2", "ICAM1"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "ITGB2", True)])
+    _write_stage1_pair(
+        evidence,
+        "ICAM1",
+        "ITGB2",
+        gene_a_diff=0.35,
+        gene_b_diff=0.22,
+        coexpr_diff=0.11,
+    )
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "AT2 ITGB2-ICAM1 enriched pair hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "ITGB2--ICAM1 is a direct Census-supported pair enriched in "
+                    "the resolved AT2 context from stage1_ICAM1--ITGB2.json."
+                ),
+                "evidence_references": [
+                    "stage1_ICAM1--ITGB2.json",
+                    "stage3_ITGB2.json",
+                    "stage3_ICAM1.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ITGB2", "ICAM1"],
+                    "pathways": ["adhesion"],
+                    "cell_types": ["pulmonary alveolar type 2 cell"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "AT2 ITGB2 perturbation will change ICAM1-linked adhesion readouts."
+                ),
+                "validation_approach": (
+                    "Primary IPF AT2 culture with ITGB2 perturbation and ICAM1 readout."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is True
+    assert result["errors"] == []
+    assert (evidence / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_reverse_order_pair_when_matching_stage1_not_cited(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ITGB2", "ICAM1"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "ITGB2", True)])
+    _write_stage1_pair(evidence, "ICAM1", "ITGB2")
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "ITGB2-ICAM1 direct pair hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "ITGB2--ICAM1 is a direct pair axis in IPF, but no matching "
+                    "Stage 1 pair file is cited."
+                ),
+                "evidence_references": ["stage3_ITGB2.json", "stage3_ICAM1.json"],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ITGB2", "ICAM1"],
+                    "pathways": ["adhesion"],
+                    "cell_types": ["pulmonary alveolar type 2 cell"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "ITGB2 perturbation will change ICAM1-linked adhesion readouts."
+                ),
+                "validation_approach": "Primary IPF AT2 culture with ITGB2 perturbation.",
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 2,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "claims direct pair axis 'ITGB2--ICAM1'" in error
+        and "direct=stage1_ITGB2--ICAM1.json" in error
+        and "reverse=stage1_ICAM1--ITGB2.json" in error
+        and "available: stage1_ICAM1--ITGB2.json (passed=true)" in error
+        for error in result["errors"]
+    )
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_failed_reverse_order_stage1_pair_citation(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ITGB2", "ICAM1"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "ITGB2", False)])
+    _write_stage1_pair(evidence, "ICAM1", "ITGB2", passed=False)
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "ITGB2-ICAM1 direct pair hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "ITGB2--ICAM1 is a direct pair axis in IPF from "
+                    "stage1_ICAM1--ITGB2.json."
+                ),
+                "evidence_references": [
+                    "stage1_ICAM1--ITGB2.json",
+                    "stage3_ITGB2.json",
+                    "stage3_ICAM1.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ITGB2", "ICAM1"],
+                    "pathways": ["adhesion"],
+                    "cell_types": ["pulmonary alveolar type 2 cell"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "ITGB2 perturbation will change ICAM1-linked adhesion readouts."
+                ),
+                "validation_approach": "Primary IPF AT2 culture with ITGB2 perturbation.",
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any("failed Stage 1 pair 'ICAM1--ITGB2'" in error for error in result["errors"])
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_depleted_reverse_order_pair_as_at2_intrinsic(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ITGB2", "ICAM1"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "ITGB2", True)])
+    _write_stage1_pair(
+        evidence,
+        "ICAM1",
+        "ITGB2",
+        gene_a_diff=0.3,
+        gene_b_diff=-0.2,
+        coexpr_diff=-0.05,
+    )
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "AT2 ITGB2-ICAM1 same-cell pair hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "ITGB2--ICAM1 is a direct AT2-intrinsic same-cell pair from "
+                    "stage1_ICAM1--ITGB2.json."
+                ),
+                "evidence_references": [
+                    "stage1_ICAM1--ITGB2.json",
+                    "stage3_ITGB2.json",
+                    "stage3_ICAM1.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ITGB2", "ICAM1"],
+                    "pathways": ["adhesion"],
+                    "cell_types": ["pulmonary alveolar type 2 cell"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "AT2 ITGB2 perturbation will change ICAM1 same-cell readouts."
+                ),
+                "validation_approach": "Primary IPF AT2 culture with ITGB2 perturbation.",
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "coexpression-depleted Stage 1 Census evidence" in error
+        and "stage1_ICAM1--ITGB2.json" in error
+        for error in result["errors"]
+    )
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
 def test_save_hypothesis_report_rejects_cited_but_unverified_numeric_prediction(
     tmp_path: Path,
 ) -> None:
