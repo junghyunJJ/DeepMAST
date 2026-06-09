@@ -348,7 +348,7 @@ If `save_hypothesis_report` returns `saved: false`:
 - For `topn_coverage.missing`, add one `[FEATURED-GAP]` hypothesis per missing FEATURED gene
 - For `failed_pair_violations`, remove the failed pair citation/claim or rebuild the hypothesis from passed pair or Stage 3 gene evidence
 - For `hypothesis_grounding_violations`, apply the exact deterministic repair before retrying:
-  - Direct pair-axis violation: remove the unsupported `A-B axis` wording, or cite a matching passed `stage1_A--B.json`/`stage1_B--A.json`. Do not infer combinatorial axes from separate hub-partner files.
+  - Direct pair-axis violation: remove the unsupported `A-B axis` wording, or cite a matching passed `stage1_A--B.json`/`stage1_B--A.json`. Stage 1 pair filenames may be ligand-receptor ordered and reverse of the prose order; cite the actual available filename returned by validation/load evidence, not a normalized filename you invent. If the rejection names an available reverse-order file, cite that exact file or remove the direct pair-axis wording. Do not infer combinatorial axes from separate hub-partner files.
   - Target-cell-depleted Stage 1 used as interest-cell support: if the hypothesis mentions AT2, Transitional AT2, pulmonary/alveolar epithelial, or the resolved Census cell type anywhere, remove that Stage 1 citation and support the FEATURED gene with `stage3_<GENE>.json`/`ot_<GENE>.json`; otherwise rewrite as non-interest-cell spatial niche evidence.
   - Coexpression-depleted Stage 1 used as intrinsic same-cell support: remove same-cell/intrinsic/AT2-intrinsic wording and AT2 validation, or remove that Stage 1 citation.
   - Target-cell-depleted gene expression claim: remove any statement that the depleted gene is expressed on/in AT2, Transitional AT2, pulmonary alveolar type 2, alveolar epithelial, or pulmonary epithelial cells.
@@ -364,7 +364,8 @@ Repair the exact saved=false errors before saving again:
 - Rebuild only the rejected hypothesis or fields when an index/path is provided.
 - Cite real gene-level evidence files or remove unsupported gene mentions.
 - Remove unsupported pair-axis wording unless the matching passed Stage 1 pair
-  file is cited.
+  file is cited. If the rejection names an available reverse-order matching file,
+  cite that exact available filename or remove the direct pair-axis wording.
 - Reframe depleted Stage 1 Census evidence as secondary spatial-niche/cross-cell
   context only when the named pair concept is retained.
 - For `target-cell-depleted Stage 1 Census evidence as interest-cell support`,

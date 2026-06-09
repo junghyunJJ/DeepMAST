@@ -275,6 +275,11 @@ def test_hypothesis_skill_documents_rejection_sidecar_recovery() -> None:
         "The graph-level retry may surface this sidecar as HYPOTHESIS_LAST_SAVE_REJECTION"
         in text
     )
+    assert "Stage 1 pair filenames may be ligand-receptor ordered" in text
+    assert "cite the actual available filename returned by validation/load evidence" in text
+    assert "If the rejection names an available reverse-order file" in text
+    assert "cite that exact file or remove the direct pair-axis wording" in text
+    assert "If the rejection names an available reverse-order matching file" in text
     assert "Repair the exact saved=false errors before saving again" in text
     assert "Do not repeat a rejected payload" in text
 
