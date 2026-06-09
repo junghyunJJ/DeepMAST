@@ -526,6 +526,205 @@ def test_save_hypothesis_report_rejects_direct_pair_axis_without_matching_stage1
     assert not (evidence / "hypothesis_report.json").exists()
 
 
+def test_save_hypothesis_report_accepts_reverse_stage1_pair_citation_for_direct_claim(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ICAM1", "ITGB2"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "ITGB2", True)])
+    _write_stage1_pair(evidence, "ICAM1", "ITGB2")
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "AT2 epithelial ITGB2-ICAM1 axis follow-up hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "The ITGB2--ICAM1 direct pair axis is supported by the cited "
+                    "reverse-ordered Stage 1 file and motivates AT2 epithelial "
+                    "follow-up testing."
+                ),
+                "evidence_references": [
+                    "stage1_ICAM1--ITGB2.json",
+                    "stage3_ICAM1.json",
+                    "stage3_ITGB2.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ITGB2", "ICAM1"],
+                    "pathways": ["adhesion"],
+                    "cell_types": ["AT2", "pulmonary alveolar type 2 cell"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "ITGB2 perturbation will change ICAM1-linked epithelial adhesion readouts."
+                ),
+                "validation_approach": (
+                    "Primary IPF pulmonary alveolar type 2 cell assay with ITGB2 "
+                    "perturbation and ICAM1 readout."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is True, result
+
+
+def test_save_hypothesis_report_rejects_missing_reverse_stage1_citation_names_available_file(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ICAM1", "ITGB2"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "ITGB2", True)])
+    _write_stage1_pair(evidence, "ICAM1", "ITGB2")
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "ITGB2-ICAM1 axis follow-up hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "The ITGB2--ICAM1 direct pair axis is proposed, but the "
+                    "matching reverse Stage 1 file is not cited."
+                ),
+                "evidence_references": [
+                    "stage3_ICAM1.json",
+                    "stage3_ITGB2.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ITGB2", "ICAM1"],
+                    "pathways": ["adhesion"],
+                    "cell_types": ["fibroblast"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "ITGB2 perturbation will change ICAM1-linked adhesion readouts."
+                ),
+                "validation_approach": "Primary IPF fibroblast co-culture assay.",
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 2,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "claims direct pair axis 'ITGB2--ICAM1'" in error
+        and "canonical_existing=stage1_ICAM1--ITGB2.json" in error
+        and "available_passed=true" in error
+        for error in result["errors"]
+    )
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_reverse_stage1_pair_when_filter_failed(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ICAM1", "ITGB2"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "ITGB2", False)])
+    _write_stage1_pair(evidence, "ICAM1", "ITGB2", passed=False)
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "ITGB2-ICAM1 failed pair axis hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "The ITGB2--ICAM1 direct pair axis is claimed despite a failed "
+                    "reverse Stage 1 filter result."
+                ),
+                "evidence_references": [
+                    "stage1_ICAM1--ITGB2.json",
+                    "stage3_ICAM1.json",
+                    "stage3_ITGB2.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ITGB2", "ICAM1"],
+                    "pathways": ["adhesion"],
+                    "cell_types": ["fibroblast"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "ITGB2 perturbation will change ICAM1-linked adhesion readouts."
+                ),
+                "validation_approach": "Primary IPF fibroblast co-culture assay.",
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "ICAM1--ITGB2" in error and "without proven passed=true status" in error
+        for error in result["errors"]
+    )
+    assert any("ICAM1--ITGB2" in v for v in result.get("failed_pair_violations", []))
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
 def test_hypothesis_quality_reports_grounding_violations_for_existing_artifact(
     tmp_path: Path,
 ) -> None:

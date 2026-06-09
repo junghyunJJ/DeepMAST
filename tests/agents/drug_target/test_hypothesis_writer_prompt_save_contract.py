@@ -86,6 +86,13 @@ def test_hypothesis_writer_prompt_requires_evidence_vs_inference_wording() -> No
     assert "spatial_niche_only_stage1_pair_files` are Stage 1 PASS files but must not be\n  used as AT2-intrinsic" in text
     assert "cite these files only as secondary spatial-niche/cross-cell" in text
     assert "A file being in `eligible_stage1_pair_files` only means Stage 1 PASS" in text
+    assert "reverse of the prose\norder" in text
+    assert (
+        "cite the actual passed filename returned by `load_evidence_files` or\n"
+        "`validate_evidence_references`"
+        in text
+    )
+    assert "if the rejection names an available reverse file, cite that exact file" in text
 
 
 def test_hypothesis_writer_prompt_prefers_conservative_perturbation_language() -> None:

@@ -131,7 +131,7 @@ def test_retry_message_includes_last_save_rejection_details() -> None:
     )
 
 
-def test_retry_message_cites_available_reverse_stage1_file_for_direct_pair_axis() -> None:
+def test_retry_message_direct_pair_axis_names_available_reverse_stage1_file() -> None:
     message = build_hypothesis_retry_message(
         "res_ipf_drugtarget1",
         "idiopathic pulmonary fibrosis",
@@ -140,39 +140,25 @@ def test_retry_message_cites_available_reverse_stage1_file_for_direct_pair_axis(
                 "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
                 "message": "The last save_hypothesis_report attempt was rejected.",
                 "details": {
-                    "errors": [
-                        (
-                            "hypotheses[3] claims direct pair axis 'ITGB2--ICAM1' "
-                            "without citing a matching passed Stage 1 pair file. "
-                            "Expected direct=stage1_ITGB2--ICAM1.json or "
-                            "reverse=stage1_ICAM1--ITGB2.json; available: "
-                            "stage1_ICAM1--ITGB2.json (passed=true)."
-                        )
-                    ],
                     "hypothesis_grounding_violations": [
-                        (
-                            "hypotheses[3] claims direct pair axis 'ITGB2--ICAM1' "
-                            "without citing a matching passed Stage 1 pair file. "
-                            "Expected direct=stage1_ITGB2--ICAM1.json or "
-                            "reverse=stage1_ICAM1--ITGB2.json; available: "
-                            "stage1_ICAM1--ITGB2.json (passed=true)."
-                        )
+                        "hypotheses[3] claims direct pair axis 'ITGB2--ICAM1' "
+                        "without citing a matching passed Stage 1 pair file. "
+                        "Expected stage1_ITGB2--ICAM1.json or "
+                        "stage1_ICAM1--ITGB2.json; claimed_pair=ITGB2--ICAM1; "
+                        "expected_direct=stage1_ITGB2--ICAM1.json; "
+                        "expected_reverse=stage1_ICAM1--ITGB2.json; "
+                        "canonical_existing=stage1_ICAM1--ITGB2.json; "
+                        "available: stage1_ICAM1--ITGB2.json; available_passed=true."
                     ],
                 },
             }
         ],
-        attempt=1,
-        max_attempts=3,
     )
 
-    assert "ITGB2--ICAM1" in message
     assert "stage1_ICAM1--ITGB2.json" in message
-    assert "cite that exact filename in evidence_references" in message
+    assert "Cite that exact filename in evidence_references" in message
     assert "remove the direct pair-axis wording" in message
-    assert (
-        "equivalent for direct pair support only when the actual cited file is a "
-        "passed Stage 1 file"
-    ) in message
+    assert "reverse of the prose order" in message
 
 
 def test_retry_message_includes_depleted_stage1_repair_guidance() -> None:
