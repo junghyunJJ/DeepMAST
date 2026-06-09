@@ -387,12 +387,11 @@ resolved label. Do not claim that Census separately validated the original state
 
 Direct pair-axis claims require direct Stage 1 pair evidence. A claim about an
 `A-B axis` must cite a matching passed `stage1_A--B.json` or `stage1_B--A.json`;
-Stage 1 pair filenames may be ligand-receptor ordered and reverse of the prose
-order, so cite the actual passed filename returned by `load_evidence_files` or
-`validate_evidence_references`. Stage 3 files or different Stage 1 pairs do not
-support that A-B axis.
-Do not title a hypothesis `A-B axis` unless that matching passed pair file is
-cited.
+Stage 1 pair filenames may be ligand-receptor ordered and can be reverse of the
+prose order. Cite the actual filename returned by `load_evidence_files` or
+`validate_evidence_references`; Stage 3 files or different Stage 1 pairs do not
+support that A-B axis. Do not title a hypothesis `A-B axis` unless that matching
+passed pair file is cited.
 
 Use the Stage 1 usage whitelist from `load_evidence_files` or
 `validate_evidence_references`:
@@ -766,9 +765,11 @@ Rules:
     (a) replacing it with a real filename from `available_files`, or
     (b) removing the citation entirely if no real file supports the claim.
 - NEVER invent filenames. NEVER cite a file that is not in `available_files`.
-- For Stage 1 pair citations, use only filenames returned in
+- For Stage 1 pair citations, use only the actual filenames returned in
   `eligible_stage1_pair_files` (or equivalently the full-content Stage 1 files
-  from `load_evidence_files(..., scope="hypothesis")`).
+  from `load_evidence_files(..., scope="hypothesis")`). Pair filenames may be
+  ligand-receptor ordered and reverse of the prose order; do not invent the
+  opposite filename when only one direction is present.
 - Failed Stage 1 entries under `contrast_evidence` are metadata-only negative
   context. They are never valid entries in `evidence_references`.
 - Stage 1 L-R pair files use the convention `stage1_<LIG>--<REC>.json` with
@@ -808,10 +809,9 @@ you MUST follow this retry policy:
    deterministic repair before retrying:
    - `claims direct pair axis 'A--B' without citing a matching passed Stage 1 pair file`:
      remove the `A-B axis` wording from title/core/prediction, or replace it
-     only with the exact directly cited passed `stage1_A--B.json`/`stage1_B--A.json`
-     filename returned by `load_evidence_files` or `validate_evidence_references`;
-     if the rejection names an available reverse file, cite that exact file or
-     remove the direct axis wording.
+     only with a directly cited passed `stage1_A--B.json`/`stage1_B--A.json`.
+     If the rejection says `available: stage1_X--Y.json`, cite that exact
+     available filename in the rejected hypothesis or remove the direct axis wording.
      Do not build combinatorial axes from one hub's separate partners.
    - `target-cell-depleted Stage 1 Census evidence as interest-cell support`:
      if the hypothesis mentions AT2, Transitional AT2, pulmonary/alveolar
@@ -848,9 +848,8 @@ Do not call save_hypothesis_report with the same payload after saved=false.
   falsifiable_prediction, and validation_approach.
 - For every unsupported direct pair-axis error: remove direct pair-axis wording
   unless the matching passed `stage1_A--B.json` or `stage1_B--A.json` file is
-  cited in that hypothesis. If the rejection names an available reverse file,
-  cite that exact available filename from `load_evidence_files` or
-  `validate_evidence_references`, or remove the direct pair-axis wording.
+  cited in that hypothesis. If the error names `available: stage1_X--Y.json`,
+  cite that exact available filename or remove the direct axis wording.
 - For every depleted Stage 1 Census error: do not use depleted Stage 1 Census
   evidence to support AT2, epithelial, same-cell, cell-autonomous, or
   target-cell-autonomous claims; use it only as secondary
