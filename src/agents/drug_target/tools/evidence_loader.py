@@ -497,6 +497,15 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
             result["file_count"] += 1
             result["total_size_bytes"] += size_bytes
 
+    if hypothesis_scope:
+        stage1_pair_files = sorted(
+            name
+            for name in result["files"]
+            if _STAGE1_PAIR_NAME_RE.match(name)
+            and filter_map.get(name[len("stage1_"):-len(".json")].upper()) is True
+        )
+        result.update(_stage1_pair_usage_guidance(evidence_dir, stage1_pair_files))
+
     return json.dumps(result, indent=2)
 
 
@@ -505,6 +514,102 @@ def _list_real_evidence_filenames(evidence_dir: Path) -> set[str]:
     if not evidence_dir.exists():
         return set()
     return {p.name for p in evidence_dir.iterdir() if not p.name.startswith(".")}
+
+
+def _stage1_metric_direction(metric: object) -> str:
+    if not isinstance(metric, dict):
+        return "not_determined"
+    risk_ratio = metric.get("risk_ratio")
+    if isinstance(risk_ratio, (int, float)):
+        if risk_ratio > 1:
+            return "enriched"
+        if risk_ratio < 1:
+            return "depleted"
+    diff = metric.get("diff")
+    if isinstance(diff, (int, float)):
+        if diff > 0:
+            return "enriched"
+        if diff < 0:
+            return "depleted"
+    return "not_determined"
+
+
+def _stage1_target_vs_rest(payload: object) -> dict:
+    census = payload.get("census_validation") if isinstance(payload, dict) else None
+    if not isinstance(census, dict):
+        return {}
+    target_vs_rest = census.get("target_vs_rest")
+    return target_vs_rest if isinstance(target_vs_rest, dict) else {}
+
+
+def _stage1_usage_record(filename: str, payload: object) -> dict:
+    """Classify a passed Stage 1 pair for hypothesis-writer cell-type usage."""
+    pair_key = filename[len("stage1_"):-len(".json")].upper()
+    target_vs_rest = _stage1_target_vs_rest(payload)
+    directions = {
+        key: _stage1_metric_direction(target_vs_rest.get(key))
+        for key in ("gene_a", "gene_b", "coexpression")
+    }
+    target_cell_intrinsic = (
+        directions["coexpression"] == "enriched"
+        and directions["gene_a"] != "depleted"
+        and directions["gene_b"] != "depleted"
+    )
+    target_cell_depleted_metrics = [
+        key for key, direction in directions.items() if direction == "depleted"
+    ]
+    usage = "interest_cell_intrinsic" if target_cell_intrinsic else "spatial_niche_only"
+    if target_cell_intrinsic:
+        citation_policy = (
+            "May support interest-cell intrinsic or resolved-Census-cell "
+            "coexpression claims when the hypothesis names that cell type and "
+            "the validation approach tests that cell context."
+        )
+    else:
+        citation_policy = (
+            "Passed Stage 1 pair, but not interest-cell intrinsic by "
+            "target-vs-rest direction. Do not cite as AT2, Transitional AT2, "
+            "pulmonary/alveolar epithelial, or resolved-Census-cell support; "
+            "use only as secondary non-interest-cell spatial-niche/cross-cell "
+            "framing, or cover the gene with stage3/ot evidence instead."
+        )
+    return {
+        "filename": filename,
+        "pair_key": pair_key,
+        "usage": usage,
+        "target_cell_intrinsic": target_cell_intrinsic,
+        "target_vs_rest_directions": directions,
+        "target_cell_depleted_metrics": target_cell_depleted_metrics,
+        "citation_policy": citation_policy,
+    }
+
+
+def _stage1_pair_usage_guidance(
+    evidence_dir: Path,
+    stage1_pair_files: list[str],
+) -> dict:
+    records: list[dict] = []
+    for filename in stage1_pair_files:
+        path = evidence_dir / filename
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            payload = {}
+        records.append(_stage1_usage_record(filename, payload))
+
+    return {
+        "stage1_pair_usage_guidance": records,
+        "interest_cell_intrinsic_stage1_pair_files": [
+            record["filename"]
+            for record in records
+            if record["usage"] == "interest_cell_intrinsic"
+        ],
+        "spatial_niche_only_stage1_pair_files": [
+            record["filename"]
+            for record in records
+            if record["usage"] == "spatial_niche_only"
+        ],
+    }
 
 
 def _validate_hypothesis_report_references(
@@ -1120,6 +1225,7 @@ def _tag_hypothesis_prediction_grounding(
         "grounded": 0,
         "qualitative": 0,
         "unverified": 0,
+        "grounded_indices": [],
         "unverified_indices": [],
     }
     hypotheses = parsed.get("hypotheses") if isinstance(parsed, dict) else None
@@ -1138,6 +1244,8 @@ def _tag_hypothesis_prediction_grounding(
         if cited:
             hyp["prediction_cited_files"] = cited
         summary[label] = summary.get(label, 0) + 1
+        if label == "grounded":
+            summary["grounded_indices"].append(idx)
         if label == "unverified":
             summary["unverified_indices"].append(idx)
     return summary
@@ -1395,6 +1503,7 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
         and f.endswith(".json")
         and filter_results.get(f[len("stage1_"):-len(".json")].upper()) is True
     )
+    usage_guidance = _stage1_pair_usage_guidance(evidence_dir, stage1_pair_files)
 
     return json.dumps({
         "valid": len(invalid) == 0,
@@ -1404,6 +1513,7 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
         "available_files": sorted(real),
         "stage1_pair_files": stage1_pair_files,
         "eligible_stage1_pair_files": stage1_pair_files,
+        **usage_guidance,
         "naming_convention": (
             "Stage 1 L-R pair evidence files use the convention "
             "`stage1_<LIGAND>--<RECEPTOR>.json` with TWO HYPHENS "

@@ -1,6 +1,6 @@
 ---
 name: drug-target-hypothesis
-description: Generate evidence-backed biological mechanism hypotheses from completed drug target assessment evidence. Use when Stage 1-3 evidence is present, `assessment_results.json.stage3_candidates` is non-empty, and the hypothesis writer needs to produce `evidence/hypothesis_report.json` for downstream reporting. Do not use for general literature-driven hypothesis ideation or dataset classification.
+description: Generate evidence-backed follow-up recommendations from completed drug target assessment evidence. Use when Stage 1-3 evidence is present, `assessment_results.json.stage3_candidates` is non-empty, and the hypothesis writer needs to produce `evidence/hypothesis_report.json` for downstream reporting. Do not use for general literature-driven hypothesis ideation or dataset classification.
 metadata:
     skill-author: Junghyun Jung
     version: 1.0.0
@@ -10,16 +10,16 @@ metadata:
 
 ## Overview
 
-Generate testable biological mechanism hypotheses from multi-stage drug target assessment evidence. This skill is specialized for the Drug Target Agent's hypothesis-writer runtime: it reads hypothesis-scope evidence, generates mechanism hypotheses across four thematic categories, validates every cited filename, and persists a structured `hypothesis_report.json` artifact for downstream report writing.
+Generate conservative evidence-grounded follow-up recommendations from multi-stage drug target assessment evidence. This skill is specialized for the Drug Target Agent's hypothesis-writer runtime: it reads hypothesis-scope evidence, generates downstream experimental or analysis priorities across four thematic categories, validates every cited filename, and persists a structured `hypothesis_report.json` artifact for downstream report writing.
 
-Unlike the general `hypothesis-generation` skill or `hypogenic`, this skill is not a free-form ideation workflow. It is a runtime-aligned contract for evidence-backed hypothesis generation with deterministic save gates.
+Unlike the general `hypothesis-generation` skill or `hypogenic`, this skill is not a free-form ideation workflow. It is a runtime-aligned contract for evidence-backed follow-up recommendation generation with deterministic save gates.
 
 ## When to Use This Skill
 
 Use this skill when:
 - Stage 1-3 evidence has already been generated in `{data_dir}/evidence/`
 - `assessment_results.json.stage3_candidates` is present and non-empty
-- The goal is to produce mechanistic drug-target hypotheses for downstream reporting
+- The goal is to produce conservative drug-target follow-up recommendations for downstream reporting
 - The runtime can call `load_evidence_files(data_dir, scope="hypothesis")`, `validate_evidence_references(...)`, and `save_hypothesis_report(...)`
 
 Do not use this skill when:
@@ -34,8 +34,8 @@ Use Case: Runtime hypothesis writer on a completed evidence bundle
 Trigger: "Generate `evidence/hypothesis_report.json` from the saved Stage 1-3 evidence" or "Run the hypothesis-writer step for this completed drug-target assessment"
 Steps:
 1. Load hypothesis-scope evidence with `load_evidence_files(data_dir, scope="hypothesis")`
-2. Build retained hypotheses from the returned files and validate all cited filenames
-3. Persist the structured result through `save_hypothesis_report(data_dir, hypothesis_data)`
+2. Build retained follow-up recommendations from the returned files and validate all cited filenames
+3. Persist the structured result through `save_hypothesis_report(data_dir=data_dir, report=report)`
 Result: A runtime-aligned JSON hypothesis artifact is saved for downstream reporting
 
 Use Case: Deterministic retry after citation rejection
@@ -60,7 +60,7 @@ The active runtime contract is:
 - Load evidence only through `load_evidence_files(data_dir, scope="hypothesis")`
 - Do not use `read_file`, `write_file`, or `ls` as the persistence path for hypothesis output
 - Validate all cited filenames with `validate_evidence_references(data_dir, [...])`
-- Persist through `save_hypothesis_report(data_dir, hypothesis_data)`; `save_evidence(data_dir, "hypothesis_report.json", ...)` is a compatibility wrapper over the same canonicalizer
+- Persist through `save_hypothesis_report(data_dir=data_dir, report=report)`; do not use `save_evidence` as the primary persistence path.
 
 Treat `src/agents/drug_target/subagents/prompts.py` and `src/agents/drug_target/tools/evidence_loader.py` as the source of truth when this skill and repo docs disagree.
 
@@ -150,37 +150,94 @@ The strict Stage 1 pass condition uses all of the following:
 
 Rules:
 - Only `passed=true` Stage 1 pairs may be used as hypothesis evidence.
+- A `passed=true` Stage 1 pair is not automatically AT2/resolved-cell intrinsic
+  support. Read `stage1_pair_usage_guidance`,
+  `interest_cell_intrinsic_stage1_pair_files`, and
+  `spatial_niche_only_stage1_pair_files` from `load_evidence_files` or
+  `validate_evidence_references`.
+- Only files in `interest_cell_intrinsic_stage1_pair_files` may support AT2,
+  Transitional AT2, pulmonary/alveolar epithelial, or resolved-Census-cell
+  intrinsic coexpression claims.
+- Files in `spatial_niche_only_stage1_pair_files` must not be used as
+  AT2-intrinsic, Transitional-AT2-intrinsic, pulmonary/alveolar
+  epithelial-intrinsic, resolved-Census-cell-intrinsic, same-cell, or
+  target-cell-autonomous support. If a recommendation mentions the interest
+  labels or resolved Census cell type, cite these files only as secondary
+  spatial-niche/cross-cell framing evidence with explicit constraints. Cover
+  those FEATURED genes with `stage3_<GENE>.json` and `ot_<GENE>.json`; use the
+  Stage 1 pair only as constrained secondary framing when the recommendation
+  names that pair concept.
 - A `passed=false` pair cannot be cited, cannot support a core mechanism claim, and cannot be used as an L-R axis in the title, core claim, or prediction.
 - If a failed pair appears in citations or as a primary pair claim, `save_hypothesis_report` rejects the payload with `failed_pair_violations`.
 - Fix failed-pair rejections by removing that evidence or rebuilding the hypothesis around a passed pair or gene-level Stage 3 evidence.
+- For any passed Stage 1 pair, inspect `census_validation.target_vs_rest` before using it as interest-cell evidence. If coexpression is depleted, or all target-vs-rest diff values are negative, cite that Stage 1 pair only as secondary spatial-niche/cross-cell framing evidence. It must not support AT2, Transitional AT2, pulmonary/alveolar epithelial, resolved-Census-cell intrinsic, same-cell, epithelial-cell-autonomous, or target-cell-autonomous claims. Cover the relevant FEATURED gene with `stage3_<GENE>.json` and `ot_<GENE>.json` for target/actionability support, and use the depleted Stage 1 pair only to constrain the spatial-niche framing.
+- Passed but target-cell-depleted Stage 1 pair files may still be cited as secondary spatial-niche/cross-cell framing evidence when the recommendation names that pair concept. They are not AT2-intrinsic support and must not be used for same-cell, epithelial-cell-autonomous, or target-cell-autonomous claims.
+- The report renderer uses those secondary citations to populate a secondary Stage 1 framing evidence table, so cite depleted Stage 1 pair files when the recommendation names that pair concept, but only as framing evidence and not as AT2-intrinsic support.
 
 ---
 
-### Phase 2: Hypothesis Generation
+### Phase 2: Evidence-Grounded Follow-up Recommendation Generation
 
-Generate an initial set of 4-6 hypotheses across four mandatory thematic categories.
+Generate an initial set of 4-6 evidence-grounded follow-up recommendations across four mandatory thematic categories. Keep the existing `hypothesis_report.json` schema, but write the content as conservative downstream experimental or analysis recommendations rather than literature-validated causal mechanisms.
+
+Every recommendation should be written so the report can expose four fixed fields:
+- **Biological Grounding**: Stage 1/spatial/Census support and the cell-type interpretation.
+- **Target-Disease Support**: Stage 2 OpenTargets target-disease support, not causal biology.
+- **Actionability**: Stage 3 ChEMBL/drug evidence for actionability, perturbability, or repurposing context, not biological causality.
+- **Interpretation Constraint**: primary AT2/epithelial intrinsic support versus secondary spatial-niche/cross-cell framing.
 
 | Category | Focus | Minimum Count |
 |----------|-------|:-------------:|
-| **Mechanism of Action** | How a target mechanistically drives disease biology | 1 |
-| **Therapeutic Strategy** | How to intervene with a target or modality | 1 |
-| **Cross-Target Interaction** | Multi-target synergies or pathway convergence | 1 |
-| **Novel Pathway** | Unexpected biology revealed by the evidence | 1 |
+| **Mechanism of Action** | What mechanism should be tested next, without claiming causality unless directly supported | 1 |
+| **Therapeutic Strategy** | What intervention or tractability follow-up is worth testing | 1 |
+| **Cross-Target Interaction** | Co-observed targets or pathway convergence to evaluate; do not claim synergy without direct evidence | 1 |
+| **Novel Pathway** | Unexpected evidence-grounded analysis direction or biological context to investigate | 1 |
 
-Each hypothesis must include all seven elements:
-1. Title
+Each recommendation must include all seven schema elements:
+1. Title with conservative wording
 2. Thematic category
-3. Core claim
+3. Core claim as a conservative interpretation
 4. Supporting evidence references
 5. Key biological entities
-6. Falsifiable prediction
+6. Falsifiable prediction as a recommended follow-up test
 7. Proposed validation approach
 
 Generation guidance:
 - Start with FEATURED genes first
-- Use hub genes and convergent pathways for cross-target hypotheses
-- Use distinctive non-featured genes for novel pathway hypotheses
-- Prefer hypotheses that integrate multiple evidence types
+- Use hub genes and convergent pathways for cross-target follow-up recommendations
+- Use distinctive non-featured genes for novel pathway follow-up recommendations
+- Prefer recommendations that integrate multiple evidence types
+- Lower intervention-success wording:
+  - Avoid `therapeutic intervention candidate` unless clinical/intervention evidence directly supports it; prefer `perturbation/actionability follow-up candidate`.
+  - Avoid `synergistic effects` unless direct combination evidence is cited; prefer `additive or non-additive effects`.
+  - Avoid statements such as `CD47 blockade alters fibrosis resolution`; prefer `test whether CD47 perturbation changes macrophage-fibroblast readouts`.
+- For interest-cell focused reports, mentally split retained recommendations into
+  three support classes even though the JSON schema does not require a separate
+  tier field:
+  - **Primary epithelial/AT2-intrinsic follow-up recommendations**: cite at
+    least one `interest_cell_intrinsic_stage1_pair_files` entry and include AT2
+    or epithelial validation context.
+  - **Secondary epithelial-associated spatial-niche follow-up recommendations**:
+    cite at least one Stage 1/spatial pair file that is spatial-niche-only or
+    depleted in the resolved epithelial/AT2 cell context. Use this only as
+    cross-cell or non-AT2 niche framing, not as epithelial-cell-intrinsic
+    target mechanisms.
+  - **Gene-level/actionability-only follow-up recommendations**: cite only
+    `ot_<GENE>.json`, `stage3_<GENE>.json`, known-drug, or disease-level files.
+    If Biological Grounding is `No Stage 1/spatial grounding reference cited`,
+    do not label it as spatial-niche. Use title phrases such as `gene-level
+    follow-up candidate`, `actionability follow-up candidate`, or
+    `perturbation-development candidate`.
+- Only use `spatial-niche` when a Stage 1/spatial pair file is cited as
+  Biological Grounding or constrained secondary framing evidence.
+- Primary epithelial/AT2-intrinsic titles should use language such as `prioritizes`, `nominates`, `follow-up axis`, or `program candidate`.
+- Secondary epithelial-associated spatial-niche titles should use language such as `spatial-niche follow-up candidate`, `cross-cell candidate`, or `non-AT2 niche context`.
+- Gene-level/actionability-only titles should use language such as `gene-level follow-up candidate`, `actionability follow-up candidate`, or `perturbation-development candidate`.
+- Avoid unsupported title phrases such as `drives`, `dysregulation via`, `blockade for reducing`, `barrier dysfunction`, `complex assembly`, and `activation and matrix deposition`.
+- In `falsifiable_prediction`, prefer `test whether ... changes` over `should reduce` or `should alter` unless a cited file directly supports that expected direction.
+- For asymmetric Stage 2/3 support in a Stage 1 pair, write the recommendation as `<SUPPORTED_GENE>-anchored`. The supported gene is the perturbation or actionability anchor; the unsupported partner is a coexpression-context partner or readout.
+- Do not treat the unsupported partner as independently druggable, target-disease-supported, or perturbation-prioritized unless its exact gene-level evidence file is cited.
+- Include `Not yet established:` when the recommendation extends beyond direct Stage 1, Stage 3, OpenTargets, ChEMBL, or spatial evidence.
 
 ---
 
@@ -222,8 +279,8 @@ Filtering rules:
 1. Remove any hypothesis with Specificity below 0.5
 2. Remove any hypothesis with composite score below 0.4
 3. Rank surviving hypotheses by composite score
-4. Keep the top `max(5, len(stage3_candidates))` hypotheses after initial ranking
-5. Maintain at least three thematic categories in the retained set
+4. Keep 4-6 retained recommendations after initial ranking, unless FEATURED coverage requires the lower bound in Phase 4.75
+5. Maintain all four thematic categories in the retained set: Mechanism of Action, Therapeutic Strategy, Cross-Target Interaction, and Novel Pathway
 
 If too few retained hypotheses remain to satisfy FEATURED coverage, generate additional hypotheses before rescoring rather than forcing the same underspecified set through save.
 
@@ -239,12 +296,15 @@ validate_evidence_references(data_dir, all_cited_filenames)
 
 Rules:
 - Pass one flat combined list containing every filename cited across all hypotheses
+- Read `interest_cell_intrinsic_stage1_pair_files` and
+  `spatial_niche_only_stage1_pair_files` from the response before saving; these
+  are the authoritative whitelist for interest-cell intrinsic Stage 1 usage.
 - If validation returns invalid references, replace or remove them
 - Never invent filenames
 - Stage 1 filenames use the `stage1_<LIGAND>--<RECEPTOR>.json` pattern with two hyphens between the gene symbols
 - Re-run validation until it returns `valid: true`
 
-Do not proceed to `save_evidence` until filename validation is clean.
+Do not proceed to `save_hypothesis_report` until filename validation is clean.
 
 ### Phase 4.75: TOP-N Coverage Gate (DETERMINISTIC)
 
@@ -252,7 +312,9 @@ After ranking and filtering, ensure every gene in `assessment_results.json.stage
 
 Rules:
 - For every uncovered FEATURED gene, add one `[FEATURED-GAP]` hypothesis that explicitly includes that gene
-- The final retained set must contain at least `max(4, len(FEATURED))` hypotheses
+- The final retained set must contain 4-6 retained recommendations while covering every FEATURED gene
+- Use 6 retained recommendations only when needed for FEATURED coverage or mandatory category balance
+- If FEATURED coverage cannot be satisfied within 6 retained recommendations, stop and report the deterministic blocker instead of saving an incomplete payload
 - `save_hypothesis_report` computes `topn_coverage` deterministically and rejects the payload if `topn_coverage.missing` is non-empty
 
 This gate is independent from the general orphan-evidence `[GAP]` logic.
@@ -264,7 +326,7 @@ This gate is independent from the general orphan-evidence `[GAP]` logic.
 Persist the output only as structured JSON:
 
 ```python
-save_hypothesis_report(data_dir, hypothesis_data)
+save_hypothesis_report(data_dir=data_dir, report=report)
 ```
 
 Do not use `write_file`.
@@ -281,12 +343,40 @@ Required top-level payload fields include:
 
 ### Phase 5.5: Retry Policy on Deterministic Rejection
 
-If `save_evidence` returns `saved: false`:
+If `save_hypothesis_report` returns `saved: false`:
 - For `invalid_references`, remove or replace invalid filenames and validate again
 - For `topn_coverage.missing`, add one `[FEATURED-GAP]` hypothesis per missing FEATURED gene
 - For `failed_pair_violations`, remove the failed pair citation/claim or rebuild the hypothesis from passed pair or Stage 3 gene evidence
+- For `hypothesis_grounding_violations`, apply the exact deterministic repair before retrying:
+  - Direct pair-axis violation: remove the unsupported `A-B axis` wording, or cite a matching passed `stage1_A--B.json`/`stage1_B--A.json`. Do not infer combinatorial axes from separate hub-partner files.
+  - Target-cell-depleted Stage 1 used as interest-cell support: if the hypothesis mentions AT2, Transitional AT2, pulmonary/alveolar epithelial, or the resolved Census cell type anywhere, remove that Stage 1 citation and support the FEATURED gene with `stage3_<GENE>.json`/`ot_<GENE>.json`; otherwise rewrite as non-interest-cell spatial niche evidence.
+  - Coexpression-depleted Stage 1 used as intrinsic same-cell support: remove same-cell/intrinsic/AT2-intrinsic wording and AT2 validation, or remove that Stage 1 citation.
+  - Target-cell-depleted gene expression claim: remove any statement that the depleted gene is expressed on/in AT2, Transitional AT2, pulmonary alveolar type 2, alveolar epithelial, or pulmonary epithelial cells.
 
 Do not retry the same payload after a deterministic rejection. Change the payload first, then retry.
+
+### Phase 5.6: Last Rejection Sidecar
+
+If a previous save failed, inspect `hypothesis_report_last_rejection.json` when
+it is present in the evidence directory. The graph-level retry may surface this sidecar as HYPOTHESIS_LAST_SAVE_REJECTION in the next hypothesis-writer prompt.
+
+Repair the exact saved=false errors before saving again:
+- Rebuild only the rejected hypothesis or fields when an index/path is provided.
+- Cite real gene-level evidence files or remove unsupported gene mentions.
+- Remove unsupported pair-axis wording unless the matching passed Stage 1 pair
+  file is cited.
+- Reframe depleted Stage 1 Census evidence as secondary spatial-niche/cross-cell
+  context only when the named pair concept is retained.
+- For `target-cell-depleted Stage 1 Census evidence as interest-cell support`,
+  choose one repair path for the named hypothesis: keep the depleted Stage 1
+  file only after rewriting title, core_claim, prediction, validation_approach,
+  and biological_entities.cell_types as secondary spatial-niche/cross-cell or
+  non-interest-cell context; or remove that Stage 1 citation and rewrite the
+  hypothesis as gene-level/actionability-only. Do not leave depleted Stage 1 in
+  a primary AT2/epithelial, interest-cell, same-cell, or intrinsic recommendation.
+
+Do not repeat a rejected payload. Validate references again, then save only the
+repaired report.
 
 ---
 
@@ -304,7 +394,7 @@ validate_evidence_references(data_dir, [
     "ot_ICAM1.json",
 ])
 
-save_evidence(data_dir, "hypothesis_report.json", {
+save_hypothesis_report(data_dir=data_dir, report={
     "disease": "Idiopathic Pulmonary Fibrosis",
     "evidence_coverage_pct": 0,
     "hypotheses_generated": 6,
@@ -327,7 +417,7 @@ validate_evidence_references(data_dir, [
     "stage3_TGFB1.json",
 ])
 
-save_evidence(...)
+save_hypothesis_report(data_dir=data_dir, report=report)
 # returns saved: false with failed_pair_violations
 ```
 
@@ -360,11 +450,11 @@ Hypothesis generation should stop. This is a zero-featured bypass case, not a re
 
 Remove or replace the bad filenames. Do not invent new ones. Stage 1 pair filenames always use two hyphens between ligand and receptor.
 
-### `save_evidence` returns `topn_coverage.missing`
+### `save_hypothesis_report` returns `topn_coverage.missing`
 
 One or more FEATURED genes are uncovered. Add a `[FEATURED-GAP]` hypothesis for each missing gene before retrying.
 
-### `save_evidence` returns `failed_pair_violations`
+### `save_hypothesis_report` returns `failed_pair_violations`
 
 You cited a failed Stage 1 pair or made it the primary mechanism. Remove the failed pair evidence or rebuild the hypothesis from passed evidence.
 

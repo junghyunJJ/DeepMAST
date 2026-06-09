@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -247,6 +249,38 @@ def test_provider_from_config_allows_live_llm_with_explicit_provider(
 
     assert provider is not None
     assert calls == [{"configurable": {"llm_provider": "ollama"}}]
+
+
+def test_part4_candidate_selector_timeout_resolves_config_env_and_default(
+    monkeypatch,
+) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        DEFAULT_PART4_CANDIDATE_SELECTOR_TIMEOUT_SECONDS,
+        PART4_CANDIDATE_SELECTOR_TIMEOUT_CONFIG_KEY,
+        PART4_CANDIDATE_SELECTOR_TIMEOUT_ENV,
+        part4_candidate_selector_timeout_seconds,
+    )
+
+    monkeypatch.delenv(PART4_CANDIDATE_SELECTOR_TIMEOUT_ENV, raising=False)
+
+    assert (
+        part4_candidate_selector_timeout_seconds({})
+        == DEFAULT_PART4_CANDIDATE_SELECTOR_TIMEOUT_SECONDS
+    )
+    assert (
+        part4_candidate_selector_timeout_seconds(
+            {
+                "configurable": {
+                    PART4_CANDIDATE_SELECTOR_TIMEOUT_CONFIG_KEY: 0.25,
+                }
+            }
+        )
+        == 0.25
+    )
+
+    monkeypatch.setenv(PART4_CANDIDATE_SELECTOR_TIMEOUT_ENV, "0.5")
+
+    assert part4_candidate_selector_timeout_seconds({}) == 0.5
 
 
 def test_context_uses_only_stage3_pool_and_excludes_non_stage3_cxcr4(
@@ -784,3 +818,75 @@ async def test_generate_candidate_selection_falls_back_on_provider_error(
         payload["attempt_history"][0]["issues"][0]["code"]
         == "PART4_SELECTOR_PROVIDER_ERROR"
     )
+
+
+@pytest.mark.asyncio
+async def test_generate_candidate_selection_falls_back_on_provider_timeout(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        PART4_CANDIDATE_SELECTOR_TIMEOUT_CONFIG_KEY,
+        generate_part4_candidate_selection,
+    )
+
+    async def provider(_prompt: str) -> str:
+        await asyncio.sleep(0.05)
+        return "{}"
+
+    payload = await generate_part4_candidate_selection(
+        _minimal_report_data(),
+        deterministic_selected_genes=["ICAM1", "ITGB2", "CD47"],
+        provider=provider,
+        data_dir=tmp_path,
+        config={
+            "configurable": {
+                PART4_CANDIDATE_SELECTOR_TIMEOUT_CONFIG_KEY: 0.001,
+            }
+        },
+    )
+
+    assert payload["status"] == "fallback"
+    assert payload["fallback_reason"] == "provider_timeout"
+    assert payload["selected_genes"] == ["ICAM1", "ITGB2", "CD47"]
+    assert payload["attempt_history"] == [
+        {
+            "attempt": 1,
+            "status": "provider_timeout",
+            "issues": [{"code": "PART4_SELECTOR_PROVIDER_TIMEOUT"}],
+        }
+    ]
+    assert payload["validation_issues"] == [
+        {"code": "PART4_SELECTOR_PROVIDER_TIMEOUT"}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_generate_candidate_selection_times_out_blocking_sync_provider(
+    tmp_path: Path,
+) -> None:
+    from src.agents.drug_target.part4_candidate_selector import (
+        PART4_CANDIDATE_SELECTOR_TIMEOUT_CONFIG_KEY,
+        generate_part4_candidate_selection,
+    )
+
+    def provider(_prompt: str) -> str:
+        time.sleep(0.05)
+        return "{}"
+
+    payload = await generate_part4_candidate_selection(
+        _minimal_report_data(),
+        deterministic_selected_genes=["ICAM1", "ITGB2", "CD47"],
+        provider=provider,
+        data_dir=tmp_path,
+        config={
+            "configurable": {
+                PART4_CANDIDATE_SELECTOR_TIMEOUT_CONFIG_KEY: 0.001,
+            }
+        },
+    )
+
+    assert payload["status"] == "fallback"
+    assert payload["fallback_reason"] == "provider_timeout"
+    assert payload["validation_issues"] == [
+        {"code": "PART4_SELECTOR_PROVIDER_TIMEOUT"}
+    ]

@@ -245,6 +245,85 @@ def test_celltype_resolution_is_loaded_but_denied_as_support_citation(
     ]
 
 
+def test_hypothesis_scope_classifies_passed_stage1_celltype_usage(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ICAM1", "MUC1", "ITGB2", "FN1", "SDC2"])
+    _write_stage1_filter_results(
+        evidence,
+        [
+            ("ICAM1", "MUC1", True),
+            ("ICAM1", "ITGB2", True),
+            ("FN1", "SDC2", True),
+        ],
+    )
+    _write_stage1_pair(
+        evidence,
+        "ICAM1",
+        "MUC1",
+        gene_a_diff=0.2,
+        gene_b_diff=0.3,
+        coexpr_diff=0.4,
+    )
+    _write_stage1_pair(
+        evidence,
+        "ICAM1",
+        "ITGB2",
+        gene_a_diff=0.2,
+        gene_b_diff=-0.3,
+        coexpr_diff=-0.2,
+    )
+    _write_stage1_pair(
+        evidence,
+        "FN1",
+        "SDC2",
+        gene_a_diff=-0.4,
+        gene_b_diff=-0.3,
+        coexpr_diff=-0.2,
+    )
+
+    loaded = json.loads(
+        load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "hypothesis"})
+    )
+    validation = json.loads(
+        validate_evidence_references.invoke({
+            "data_dir": str(tmp_path),
+            "references": [
+                "stage1_ICAM1--MUC1.json",
+                "stage1_ICAM1--ITGB2.json",
+                "stage1_FN1--SDC2.json",
+            ],
+        })
+    )
+
+    assert loaded["interest_cell_intrinsic_stage1_pair_files"] == [
+        "stage1_ICAM1--MUC1.json"
+    ]
+    assert loaded["spatial_niche_only_stage1_pair_files"] == [
+        "stage1_FN1--SDC2.json",
+        "stage1_ICAM1--ITGB2.json",
+    ]
+    assert validation["interest_cell_intrinsic_stage1_pair_files"] == [
+        "stage1_ICAM1--MUC1.json"
+    ]
+    policy = {
+        item["filename"]: item
+        for item in validation["stage1_pair_usage_guidance"]
+    }
+    assert policy["stage1_ICAM1--MUC1.json"]["usage"] == "interest_cell_intrinsic"
+    assert policy["stage1_ICAM1--ITGB2.json"]["usage"] == "spatial_niche_only"
+    assert policy["stage1_ICAM1--ITGB2.json"]["target_cell_depleted_metrics"] == [
+        "gene_b",
+        "coexpression",
+    ]
+    assert policy["stage1_FN1--SDC2.json"]["target_cell_depleted_metrics"] == [
+        "gene_a",
+        "gene_b",
+        "coexpression",
+    ]
+
+
 def test_save_hypothesis_report_rejects_celltype_resolution_support_citation(
     tmp_path: Path,
 ) -> None:
@@ -336,6 +415,45 @@ def test_hypothesis_prompt_requires_interest_celltype_focus() -> None:
     assert "target-vs-rest direction" in text
     assert "target-cell-depleted" in text
     assert "validation_approach must mention" in text
+    assert "Biological Grounding" in text
+    assert "Target-Disease Support" in text
+    assert "Actionability" in text
+    assert "Interpretation Constraint" in text
+    assert "Stage 2 OpenTargets" in text
+    assert "target-disease support, not causal biology" in text
+    assert "Stage 3" in text
+    assert "actionability" in text
+    assert "not biological causality" in text
+    assert "Primary epithelial/AT2-intrinsic follow-up recommendations" in text
+    assert (
+        "Secondary epithelial-associated spatial-niche follow-up recommendations"
+        in text
+    )
+    assert "epithelial-cell-intrinsic" in text
+    assert "target mechanisms" in text
+    assert "Evidence-Grounded Follow-up Recommendation Generation" in text
+    assert "Conservative Interpretation" in text
+    assert "Recommended Follow-up Test" in text
+    assert "Not yet established:" in text
+    assert "functional axis" in text
+    assert "major source" in text
+    assert "synergistic" in text
+    assert "Stage 1 Census coexpression supports enrichment/depletion" in text
+    assert "prioritizes" in text
+    assert "nominates" in text
+    assert "spatial-niche follow-up candidate" in text
+    assert "cross-cell candidate" in text
+    assert "test whether ... changes" in text
+    assert "should reduce" in text
+    assert "blockade for reducing" in text
+    assert "barrier dysfunction" in text
+    assert "secondary Stage 1 framing evidence table" in text
+    assert (
+        "cite depleted Stage 1 pair files when the recommendation names that pair concept"
+        in text
+    )
+    assert "not as AT2-intrinsic support" in text
+    assert "target-cell-depleted Stage 1 pair files may appear" in text
 
 
 def test_save_hypothesis_report_rejects_direct_pair_axis_without_matching_stage1_file(
@@ -829,6 +947,236 @@ def test_save_hypothesis_report_rejects_target_depleted_stage1_as_at2_support(
     assert not (evidence / "hypothesis_report.json").exists()
 
 
+def test_save_hypothesis_report_rejects_coexpr_depleted_pair_as_at2_intrinsic(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ICAM1", "ITGB2"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "ITGB2", True)])
+    _write_stage1_pair(
+        evidence,
+        "ICAM1",
+        "ITGB2",
+        gene_a_diff=0.3,
+        gene_b_diff=0.1,
+        coexpr_diff=-0.05,
+    )
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "AT2 ICAM1-ITGB2 intrinsic coexpression hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "ICAM1--ITGB2 is interpreted as an AT2-intrinsic "
+                    "same-cell coexpression axis in IPF."
+                ),
+                "evidence_references": [
+                    "stage1_ICAM1--ITGB2.json",
+                    "stage3_ICAM1.json",
+                    "stage3_ITGB2.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ICAM1", "ITGB2"],
+                    "pathways": ["adhesion"],
+                    "cell_types": ["AT2"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "AT2 ICAM1 perturbation will change same-cell ITGB2 signaling."
+                ),
+                "validation_approach": (
+                    "Primary IPF AT2 culture with ICAM1 knockdown and ITGB2 readout."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "coexpression-depleted Stage 1 Census evidence" in error
+        and "stage1_ICAM1--ITGB2.json" in error
+        for error in result["errors"]
+    )
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_mixed_cross_cell_intrinsic_depleted_pair(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ICAM1", "ITGB2"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "ITGB2", True)])
+    _write_stage1_pair(
+        evidence,
+        "ICAM1",
+        "ITGB2",
+        gene_a_diff=0.3,
+        gene_b_diff=0.1,
+        coexpr_diff=-0.05,
+    )
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "AT2 ICAM1-ITGB2 mixed spatial hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "ICAM1--ITGB2 is a cross-cell spatial niche signal, but also "
+                    "an AT2-intrinsic same-cell coexpression axis in IPF."
+                ),
+                "evidence_references": [
+                    "stage1_ICAM1--ITGB2.json",
+                    "stage3_ICAM1.json",
+                    "stage3_ITGB2.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ICAM1", "ITGB2"],
+                    "pathways": ["adhesion"],
+                    "cell_types": ["AT2"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "AT2 ICAM1 perturbation will change same-cell ITGB2 signaling."
+                ),
+                "validation_approach": (
+                    "Primary IPF AT2 culture with ICAM1 knockdown and ITGB2 readout."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "coexpression-depleted Stage 1 Census evidence" in error
+        and "stage1_ICAM1--ITGB2.json" in error
+        for error in result["errors"]
+    )
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_depleted_gene_on_interest_cell_claim(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ICAM1", "ITGB2"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "ITGB2", True)])
+    _write_stage1_pair(
+        evidence,
+        "ICAM1",
+        "ITGB2",
+        gene_a_diff=0.3,
+        gene_b_diff=-0.1,
+        coexpr_diff=0.05,
+    )
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "ICAM1-ITGB2 epithelial localization hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "ICAM1 expressed in AT2 cells binds ITGB2 on pulmonary "
+                    "alveolar type 2 cells to drive epithelial remodeling."
+                ),
+                "evidence_references": [
+                    "stage1_ICAM1--ITGB2.json",
+                    "stage3_ICAM1.json",
+                    "stage3_ITGB2.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ICAM1", "ITGB2"],
+                    "pathways": ["adhesion"],
+                    "cell_types": ["pulmonary alveolar type 2 cell"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "AT2 ICAM1 perturbation will change ITGB2 localization."
+                ),
+                "validation_approach": (
+                    "Primary IPF pulmonary alveolar type 2 cell culture with "
+                    "ICAM1 knockdown and ITGB2 readout."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "target-cell-depleted gene expression claim" in error
+        and "ITGB2" in error
+        and "stage1_ICAM1--ITGB2.json" in error
+        for error in result["errors"]
+    )
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
 def test_save_hypothesis_report_accepts_at2_grounded_direct_pair_hypothesis(
     tmp_path: Path,
 ) -> None:
@@ -873,6 +1221,517 @@ def test_save_hypothesis_report_accepts_at2_grounded_direct_pair_hypothesis(
                 "falsifiable_prediction": "AT2 FN1 perturbation will change SDC2 signaling.",
                 "validation_approach": (
                     "Primary IPF AT2 culture with FN1 knockdown and SDC2 readout."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is True
+    assert result["errors"] == []
+    assert (evidence / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_cited_but_unverified_numeric_prediction(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["FN1", "SDC2"])
+    _write_stage1_filter_results(evidence, [("FN1", "SDC2", True)])
+    _write_stage1_pair(
+        evidence,
+        "FN1",
+        "SDC2",
+        gene_a_diff=0.35,
+        gene_b_diff=0.22,
+        coexpr_diff=0.11,
+    )
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "AT2 FN1-SDC2 enriched pair hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "FN1--SDC2 is a direct Census-supported pair enriched in the "
+                    "resolved AT2 context."
+                ),
+                "evidence_references": [
+                    "stage1_FN1--SDC2.json",
+                    "stage3_FN1.json",
+                    "stage3_SDC2.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["FN1", "SDC2"],
+                    "pathways": ["integrin signaling"],
+                    "cell_types": ["pulmonary alveolar type 2 cell"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "from stage1_FN1--SDC2.json, FN1 perturbation will reduce "
+                    "SDC2 signaling by at least 70% versus controls."
+                ),
+                "validation_approach": (
+                    "Primary IPF AT2 culture with FN1 knockdown and SDC2 readout."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any("fabricated or non-evidence-derived numeric" in error for error in result["errors"])
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_accepts_depleted_pair_as_secondary_spatial_niche(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ICAM1", "ITGB2"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "ITGB2", True)])
+    _write_stage1_pair(
+        evidence,
+        "ICAM1",
+        "ITGB2",
+        gene_a_diff=0.3,
+        gene_b_diff=-0.2,
+        coexpr_diff=-0.05,
+    )
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "ICAM1-ITGB2 spatial-niche follow-up candidate",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "stage1_ICAM1--ITGB2.json shows AT2 coexpression is depleted, "
+                    "so this pair is retained as cross-cell spatial-niche framing "
+                    "evidence, not as AT2-intrinsic support. Not yet established: "
+                    "whether ICAM1 and ITGB2 mark interacting epithelial and "
+                    "leukocyte neighborhoods."
+                ),
+                "evidence_references": [
+                    "stage1_ICAM1--ITGB2.json",
+                    "stage3_ICAM1.json",
+                    "stage3_ITGB2.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ICAM1", "ITGB2"],
+                    "pathways": ["adhesion"],
+                    "cell_types": ["leukocyte", "epithelial-associated niche"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "test whether ICAM1-high epithelial neighborhoods change "
+                    "adjacency to ITGB2-positive leukocytes in spatial data."
+                ),
+                "validation_approach": (
+                    "Spatial neighborhood analysis and leukocyte-epithelial "
+                    "co-culture assays without treating the pair as AT2 same-cell "
+                    "coexpression."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is True, result
+    assert result["errors"] == []
+    assert (evidence / "hypothesis_report.json").exists()
+
+
+def test_hypothesis_grounding_rejects_unsupported_success_title_wording(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    report = {
+        "hypotheses": [
+            {
+                "title": "ITGB2 integrin blockade for reducing leukocyte infiltration in IPF",
+                "core_claim": "Stage 3 target evidence nominates ITGB2 for follow-up.",
+                "falsifiable_prediction": "test whether ITGB2 perturbation changes migration.",
+                "evidence_references": ["stage3_ITGB2.json"],
+                "biological_entities": {
+                    "genes": ["ITGB2"],
+                    "pathways": ["cell adhesion"],
+                    "cell_types": ["leukocyte"],
+                    "drugs": [],
+                },
+            }
+        ]
+    }
+
+    errors = validate_hypothesis_grounding(report, evidence)
+
+    assert any("unsupported causal or therapeutic-success wording" in error for error in errors)
+    assert any("blockade for reducing" in error for error in errors)
+
+
+def test_hypothesis_grounding_allows_overclaim_phrase_inside_caveat(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    report = {
+        "hypotheses": [
+            {
+                "title": "ITGB2 leukocyte-adhesion gene-level follow-up candidate",
+                "core_claim": (
+                    "Stage 3 target evidence nominates ITGB2 for follow-up. "
+                    "Not yet established: whether ITGB2 blockade for reducing "
+                    "leukocyte infiltration would work in IPF."
+                ),
+                "falsifiable_prediction": "test whether ITGB2 perturbation changes migration.",
+                "evidence_references": ["stage3_ITGB2.json"],
+                "biological_entities": {
+                    "genes": ["ITGB2"],
+                    "pathways": ["cell adhesion"],
+                    "cell_types": ["leukocyte"],
+                    "drugs": [],
+                },
+            }
+        ]
+    }
+
+    assert validate_hypothesis_grounding(report, evidence) == []
+
+
+def test_hypothesis_grounding_rejects_nonconservative_followup_language(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    report = {
+        "hypotheses": [
+            {
+                "title": (
+                    "CD47 macrophage-fibroblast crosstalk therapeutic strategy "
+                    "with fibrosis resolution readouts"
+                ),
+                "core_claim": (
+                    "Stage 3 target evidence nominates CD47 for follow-up. "
+                    "Not yet established: whether CD47 blockade alters fibrosis "
+                    "resolution or requires combination approaches."
+                ),
+                "falsifiable_prediction": (
+                    "Test whether CD47 perturbation changes macrophage-fibroblast "
+                    "readouts."
+                ),
+                "validation_approach": (
+                    "Evaluate additive vs. synergistic effects in co-culture."
+                ),
+                "evidence_references": ["stage3_CD47.json", "ot_CD47.json"],
+                "biological_entities": {
+                    "genes": ["CD47"],
+                    "pathways": ["macrophage-fibroblast crosstalk"],
+                    "cell_types": ["macrophage", "fibroblast"],
+                    "drugs": [],
+                },
+            }
+        ]
+    }
+
+    errors = validate_hypothesis_grounding(report, evidence)
+
+    assert any("non-conservative follow-up wording" in error for error in errors)
+    assert any("therapeutic strategy" in error for error in errors)
+    assert any("cd47 blockade alters fibrosis resolution" in error for error in errors)
+    assert any("synergistic effects" in error for error in errors)
+
+
+def test_hypothesis_grounding_rejects_spatial_niche_without_stage1_reference(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    report = {
+        "hypotheses": [
+            {
+                "title": "CD4 epithelial-immune interface spatial-niche follow-up candidate",
+                "core_claim": (
+                    "CD4 has Stage 3 evidence and appears in Stage 1 pair context. "
+                    "This is a gene-level follow-up candidate."
+                ),
+                "falsifiable_prediction": (
+                    "Test whether CD4+ T cell activation changes fibroblast readouts."
+                ),
+                "validation_approach": "Immune-fibroblast co-culture readouts.",
+                "evidence_references": ["stage3_CD4.json", "ot_CD4.json"],
+                "biological_entities": {
+                    "genes": ["CD4"],
+                    "pathways": ["T cell activation"],
+                    "cell_types": ["T cell"],
+                    "drugs": [],
+                },
+            }
+        ]
+    }
+
+    errors = validate_hypothesis_grounding(report, evidence)
+
+    assert any("gene-level evidence as spatial" in error for error in errors)
+    assert any("spatial-niche label without Stage 1" in error for error in errors)
+    assert any("Stage 1 pair context without cited Stage 1" in error for error in errors)
+
+
+def test_save_hypothesis_report_rejects_intrinsic_pair_as_fibroblast_only(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ICAM1", "MUC1"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "MUC1", True)])
+    _write_stage1_pair(
+        evidence,
+        "ICAM1",
+        "MUC1",
+        gene_a_diff=0.35,
+        gene_b_diff=0.28,
+        coexpr_diff=0.18,
+    )
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "ICAM1-MUC1 fibroblast feedback hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "ICAM1--MUC1 is interpreted as a fibroblast feedback loop "
+                    "despite being target-cell-intrinsic Stage 1 evidence."
+                ),
+                "evidence_references": [
+                    "stage1_ICAM1--MUC1.json",
+                    "stage3_ICAM1.json",
+                    "stage3_MUC1.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ICAM1", "MUC1"],
+                    "pathways": ["NF-kB signaling"],
+                    "cell_types": ["fibroblast"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "MUC1 knockdown will reduce ICAM1 activation in IPF fibroblasts."
+                ),
+                "validation_approach": (
+                    "Primary IPF fibroblast monoculture with MUC1 knockdown and "
+                    "ICAM1 readout."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "target-cell-intrinsic Stage 1 evidence" in error for error in result["errors"]
+    )
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_intrinsic_pair_with_unrelated_epithelial_validation(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ICAM1", "MUC1"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "MUC1", True)])
+    _write_stage1_pair(
+        evidence,
+        "ICAM1",
+        "MUC1",
+        gene_a_diff=0.35,
+        gene_b_diff=0.28,
+        coexpr_diff=0.18,
+    )
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "ICAM1-MUC1 unrelated epithelial hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "ICAM1--MUC1 is interpreted as a generic epithelial cell "
+                    "program without anchoring the AT2 pulmonary epithelial context."
+                ),
+                "evidence_references": [
+                    "stage1_ICAM1--MUC1.json",
+                    "stage3_ICAM1.json",
+                    "stage3_MUC1.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ICAM1", "MUC1"],
+                    "pathways": ["NF-kB signaling"],
+                    "cell_types": ["intestinal epithelial cells"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "MUC1 perturbation will alter ICAM1-linked inflammatory signaling."
+                ),
+                "validation_approach": (
+                    "Intestinal epithelial cells with MUC1 knockdown and ICAM1 readout."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 4,
+            "referenced_files": 3,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "target-cell-intrinsic Stage 1 evidence" in error
+        and "stage1_ICAM1--MUC1.json" in error
+        for error in result["errors"]
+    )
+    assert not (evidence / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_accepts_intrinsic_pair_with_epithelial_validation(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ICAM1", "MUC1"])
+    _write_stage1_filter_results(evidence, [("ICAM1", "MUC1", True)])
+    _write_stage1_pair(
+        evidence,
+        "ICAM1",
+        "MUC1",
+        gene_a_diff=0.35,
+        gene_b_diff=0.28,
+        coexpr_diff=0.18,
+    )
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": "ICAM1-MUC1 epithelial program hypothesis",
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "ICAM1--MUC1 is interpreted as an AT2 epithelial spatial "
+                    "program in pulmonary fibrosis."
+                ),
+                "evidence_references": [
+                    "stage1_ICAM1--MUC1.json",
+                    "stage3_ICAM1.json",
+                    "stage3_MUC1.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ICAM1", "MUC1"],
+                    "pathways": ["NF-kB signaling"],
+                    "cell_types": ["alveolar epithelial cells", "fibroblast"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "MUC1 perturbation will alter ICAM1-linked inflammatory "
+                    "signaling in AT2 epithelial cells."
+                ),
+                "validation_approach": (
+                    "IPF-derived alveolar epithelial cells co-cultured with "
+                    "fibroblasts, with MUC1 knockdown and ICAM1/NF-kB readouts."
                 ),
                 "scores": {
                     "evidence_coverage": 0.8,

@@ -295,6 +295,19 @@ async def validate_and_maybe_retry_hypothesis(
                     run_started_at=state.get("deep_agent_started_at"),
                 )
             except TimeoutError as exc:
+                quality = validate_hypothesis_report_quality(
+                    state["data_dir"],
+                    run_started_at=state.get("deep_agent_started_at"),
+                )
+                if quality["valid"]:
+                    return {
+                        "hypothesis_quality_valid": True,
+                        "hypothesis_quality_errors": [],
+                        "hypothesis_retry_attempted": True,
+                        "hypothesis_retry_attempts": attempts,
+                        "hypothesis_retry_status": "success_after_timeout",
+                        "hypothesis_retry_error": None,
+                    }
                 return {
                     "hypothesis_quality_valid": False,
                     "hypothesis_quality_errors": quality.get("errors", []),

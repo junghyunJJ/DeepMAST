@@ -35,6 +35,32 @@ def _write_hypothesis_evidence(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _add_intrinsic_stage1_evidence(data_dir: Path) -> None:
+    evidence_dir = data_dir / "evidence"
+    filter_path = evidence_dir / "stage1_filter_results.json"
+    rows = json.loads(filter_path.read_text(encoding="utf-8"))
+    rows.insert(0, {"ligand": "ICAM1", "receptor": "MUC1", "passed": True})
+    filter_path.write_text(json.dumps(rows), encoding="utf-8")
+    (evidence_dir / "stage1_ICAM1--MUC1.json").write_text(
+        json.dumps({
+            "pair_id": "ICAM1--MUC1",
+            "status": "PASS",
+            "census_validation": {
+                "risk_ratio": 17.863,
+                "p_value": 0.0,
+                "requested_cell_type": "AT2",
+                "resolved_cell_type": "pulmonary alveolar type 2 cell",
+                "target_vs_rest": {
+                    "gene_a": {"direction": "enriched", "risk_ratio": 2.0},
+                    "gene_b": {"direction": "enriched", "risk_ratio": 2.0},
+                    "coexpression": {"direction": "enriched", "risk_ratio": 2.0},
+                },
+            },
+        }),
+        encoding="utf-8",
+    )
+
+
 def _strict_report() -> dict:
     return {
         "schema_version": "hypothesis_report.v2",
@@ -79,6 +105,572 @@ def _strict_report() -> dict:
 
 def _clone_report() -> dict:
     return json.loads(json.dumps(_strict_report()))
+
+
+def _write_featured_gene_reference_evidence(
+    tmp_path: Path,
+    *,
+    featured: list[str],
+    pair: tuple[str, str],
+    gene_files: set[str],
+) -> Path:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    ligand, receptor = pair
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps({"stage3_candidates": [{"gene": gene} for gene in featured]}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage1_filter_results.json").write_text(
+        json.dumps([{"ligand": ligand, "receptor": receptor, "passed": True}]),
+        encoding="utf-8",
+    )
+    (evidence_dir / f"stage1_{ligand}--{receptor}.json").write_text(
+        json.dumps({
+            "pair_id": f"{ligand}--{receptor}",
+            "status": "PASS",
+            "census_validation": {
+                "requested_cell_type": "pulmonary alveolar type 2 cell",
+                "resolved_cell_type": "pulmonary alveolar type 2 cell",
+                "target_vs_rest": {
+                    "gene_a": {"direction": "enriched", "risk_ratio": 2.0},
+                    "gene_b": {"direction": "enriched", "risk_ratio": 2.0},
+                    "coexpression": {"direction": "enriched", "risk_ratio": 4.0},
+                },
+            },
+            "stage1_filter": {
+                "passed": True,
+                "string_combined": 0.99,
+                "census_coexpr_pvalue": 0.0,
+                "census_gene_a_pvalue": 0.0,
+                "census_gene_b_pvalue": 0.0,
+            },
+        }),
+        encoding="utf-8",
+    )
+    for filename in sorted(gene_files):
+        (evidence_dir / filename).write_text(
+            json.dumps({"gene_symbol": filename.split("_", 1)[1].split(".", 1)[0]}),
+            encoding="utf-8",
+        )
+    return tmp_path
+
+
+def _pair_report(
+    *,
+    title: str,
+    core_claim: str,
+    refs: list[str],
+    genes: list[str],
+    validation: str,
+) -> dict:
+    return {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "IPF",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": title,
+                "category": "Mechanism of Action",
+                "gap_type": "none",
+                "core_claim": core_claim,
+                "evidence_references": refs,
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": genes,
+                    "pathways": ["cell adhesion"],
+                    "cell_types": ["pulmonary alveolar type 2 cell"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "Test whether the cited genes change epithelial readouts."
+                ),
+                "validation_approach": validation,
+                "scores": {
+                    "evidence_coverage": 1.0,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.75,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 0,
+            "referenced_files": 0,
+            "orphan_files": [],
+        },
+    }
+
+
+def test_failed_hypothesis_save_writes_rejection_sidecar(tmp_path: Path) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    bad_report = _clone_report()
+    bad_report["hypotheses"][0]["evidence_references"] = [
+        "stage1_FN1--CD4.json",
+        "stage3_FN1.json",
+    ]
+
+    result = json.loads(
+        save_hypothesis_report.invoke({
+            "data_dir": str(data_dir),
+            "report": bad_report,
+        })
+    )
+
+    assert result["saved"] is False
+    sidecar = data_dir / "evidence" / "hypothesis_report_last_rejection.json"
+    assert sidecar.exists()
+    payload = json.loads(sidecar.read_text(encoding="utf-8"))
+    assert payload["saved"] is False
+    assert payload["stage"] == "save_hypothesis_report"
+    assert payload["errors"] == result["errors"]
+    assert payload["topn_coverage"] == result["topn_coverage"]
+    assert "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING" in payload["errors"][0]
+    assert payload["created_at"]
+
+
+def test_successful_hypothesis_save_removes_rejection_sidecar(tmp_path: Path) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    sidecar = data_dir / "evidence" / "hypothesis_report_last_rejection.json"
+    sidecar.write_text(
+        json.dumps({
+            "saved": False,
+            "stage": "save_hypothesis_report",
+            "errors": ["old rejection"],
+            "created_at": "2026-06-08T00:00:00Z",
+        }),
+        encoding="utf-8",
+    )
+
+    result = json.loads(
+        save_hypothesis_report.invoke({
+            "data_dir": str(data_dir),
+            "report": _clone_report(),
+        })
+    )
+
+    assert result["saved"] is True
+    assert not sidecar.exists()
+
+
+def test_hypothesis_rejection_sidecar_write_failure_preserves_rejection_result(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    bad_report = _clone_report()
+    bad_report["hypotheses"][0]["evidence_references"] = [
+        "stage1_FN1--CD4.json",
+        "stage3_FN1.json",
+    ]
+    sidecar = data_dir / "evidence" / "hypothesis_report_last_rejection.json"
+    original_write_text = Path.write_text
+
+    def fail_sidecar_write(path: Path, *args, **kwargs):
+        if path.name == "hypothesis_report_last_rejection.json":
+            raise OSError("sidecar write failed")
+        return original_write_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", fail_sidecar_write)
+
+    result = json.loads(
+        save_hypothesis_report.invoke({
+            "data_dir": str(data_dir),
+            "report": bad_report,
+        })
+    )
+
+    assert result["saved"] is False
+    assert "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING" in result["errors"][0]
+    assert not sidecar.exists()
+
+
+def test_hypothesis_rejection_sidecar_cleanup_failure_preserves_success_result(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    sidecar = data_dir / "evidence" / "hypothesis_report_last_rejection.json"
+    sidecar.write_text(
+        json.dumps({
+            "saved": False,
+            "stage": "save_hypothesis_report",
+            "errors": ["old rejection"],
+            "created_at": "2026-06-08T00:00:00Z",
+        }),
+        encoding="utf-8",
+    )
+    original_unlink = Path.unlink
+
+    def fail_sidecar_unlink(path: Path, *args, **kwargs):
+        if path.name == "hypothesis_report_last_rejection.json":
+            raise OSError("sidecar cleanup failed")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fail_sidecar_unlink)
+
+    result = json.loads(
+        save_hypothesis_report.invoke({
+            "data_dir": str(data_dir),
+            "report": _clone_report(),
+        })
+    )
+
+    assert result["saved"] is True
+    assert (data_dir / "evidence" / "hypothesis_report.json").exists()
+    assert sidecar.exists()
+
+
+def test_save_hypothesis_report_rejects_missing_featured_gene_level_refs_when_files_exist(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_featured_gene_reference_evidence(
+        tmp_path,
+        featured=["ICAM1", "MUC1"],
+        pair=("ICAM1", "MUC1"),
+        gene_files={
+            "ot_ICAM1.json",
+            "ot_MUC1.json",
+            "stage3_ICAM1.json",
+            "stage3_MUC1.json",
+        },
+    )
+    report = _pair_report(
+        title="ICAM1-MUC1 coexpression nominates epithelial follow-up axis",
+        core_claim=(
+            "ICAM1-MUC1 is an AT2 epithelial follow-up candidate with Stage 3 "
+            "support but missing OpenTargets citations."
+        ),
+        refs=[
+            "stage1_ICAM1--MUC1.json",
+            "stage3_ICAM1.json",
+            "stage3_MUC1.json",
+        ],
+        genes=["ICAM1", "MUC1"],
+        validation="Test ICAM1 and MUC1 in pulmonary alveolar type 2 cell models.",
+    )
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING" in error
+        for error in result["errors"]
+    )
+    assert any(
+        "ot_ICAM1.json" in error and "ot_MUC1.json" in error
+        for error in result["errors"]
+    )
+    assert not (data_dir / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_accepts_asymmetric_pair_with_supported_featured_gene_refs(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_featured_gene_reference_evidence(
+        tmp_path,
+        featured=["ICAM1"],
+        pair=("ICAM1", "EZR"),
+        gene_files={
+            "ot_ICAM1.json",
+            "stage3_ICAM1.json",
+            "ot_EZR.json",
+        },
+    )
+    report = _pair_report(
+        title=(
+            "ICAM1-EZR coexpression nominates an ICAM1-anchored epithelial "
+            "follow-up axis"
+        ),
+        core_claim=(
+            "ICAM1 is the FEATURED gene with cited gene-level support, while EZR "
+            "is a Stage 1 coexpression-context partner."
+        ),
+        refs=[
+            "stage1_ICAM1--EZR.json",
+            "ot_ICAM1.json",
+            "stage3_ICAM1.json",
+        ],
+        genes=["ICAM1", "EZR"],
+        validation="Test ICAM1 and EZR in pulmonary alveolar type 2 cell models.",
+    )
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is True, result
+    saved = json.loads((data_dir / "evidence" / "hypothesis_report.json").read_text())
+    refs = saved["hypotheses"][0]["evidence_references"]
+    assert refs == [
+        "stage1_ICAM1--EZR.json",
+        "ot_ICAM1.json",
+        "stage3_ICAM1.json",
+    ]
+    assert "ot_EZR.json" not in refs
+
+
+def test_save_hypothesis_report_ignores_text_mentioned_featured_gene_absent_from_entities(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_featured_gene_reference_evidence(
+        tmp_path,
+        featured=["ICAM1"],
+        pair=("ICAM1", "EZR"),
+        gene_files={
+            "ot_ICAM1.json",
+            "stage3_ICAM1.json",
+        },
+    )
+    report = _pair_report(
+        title="EZR follow-up keeps ICAM1 as background context only",
+        core_claim=(
+            "EZR is the nominated target; ICAM1 is mentioned only as upstream "
+            "context and is not part of the hypothesis gene entity list."
+        ),
+        refs=["stage1_ICAM1--EZR.json"],
+        genes=["EZR"],
+        validation=(
+            "Test the EZR-centered readout in pulmonary alveolar type 2 cell models."
+        ),
+    )
+    icam1_hypothesis = json.loads(json.dumps(report["hypotheses"][0]))
+    icam1_hypothesis.update({
+        "rank": 2,
+        "title": "ICAM1 cited featured coverage hypothesis",
+        "core_claim": "ICAM1 has cited gene-level support for follow-up.",
+        "evidence_references": [
+            "stage1_ICAM1--EZR.json",
+            "ot_ICAM1.json",
+            "stage3_ICAM1.json",
+        ],
+        "biological_entities": {
+            "genes": ["ICAM1"],
+            "pathways": ["cell adhesion"],
+            "cell_types": ["pulmonary alveolar type 2 cell"],
+            "drugs": [],
+        },
+        "validation_approach": (
+            "Test ICAM1 in pulmonary alveolar type 2 cell models."
+        ),
+    })
+    report["hypotheses"].append(icam1_hypothesis)
+    report["hypotheses_generated"] = 2
+    report["hypotheses_retained"] = 2
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is True, result
+
+
+def test_save_hypothesis_report_treats_hyphenated_pair_as_featured_gene_mentions(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_featured_gene_reference_evidence(
+        tmp_path,
+        featured=["ICAM1", "MUC1"],
+        pair=("ICAM1", "MUC1"),
+        gene_files={
+            "ot_ICAM1.json",
+            "ot_MUC1.json",
+            "stage3_ICAM1.json",
+            "stage3_MUC1.json",
+        },
+    )
+    report = _pair_report(
+        title="ICAM1-MUC1 coexpression nominates epithelial follow-up axis",
+        core_claim=(
+            "The ICAM1-MUC1 pair is an AT2 epithelial follow-up candidate with "
+            "Stage 3 support but omitted OpenTargets citations."
+        ),
+        refs=[
+            "stage1_ICAM1--MUC1.json",
+            "stage3_ICAM1.json",
+            "stage3_MUC1.json",
+        ],
+        genes=["ICAM1", "MUC1"],
+        validation="Test the paired axis in pulmonary alveolar type 2 cell models.",
+    )
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING" in error
+        for error in result["errors"]
+    )
+    assert any(
+        "ot_ICAM1.json" in error and "ot_MUC1.json" in error
+        for error in result["errors"]
+    )
+    assert not (data_dir / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_malformed_assessment_for_gene_ref_gate(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_featured_gene_reference_evidence(
+        tmp_path,
+        featured=["ICAM1"],
+        pair=("ICAM1", "MUC1"),
+        gene_files={
+            "ot_ICAM1.json",
+            "stage3_ICAM1.json",
+        },
+    )
+    (data_dir / "evidence" / "assessment_results.json").write_text(
+        "{not-json",
+        encoding="utf-8",
+    )
+    report = _pair_report(
+        title="ICAM1 cited featured coverage hypothesis",
+        core_claim="ICAM1 has cited gene-level support for follow-up.",
+        refs=[
+            "stage1_ICAM1--MUC1.json",
+            "ot_ICAM1.json",
+            "stage3_ICAM1.json",
+        ],
+        genes=["ICAM1"],
+        validation="Test ICAM1 in pulmonary alveolar type 2 cell models.",
+    )
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING" in error
+        for error in result["errors"]
+    )
+    assert any("assessment_results.json" in error for error in result["errors"])
+    assert not (data_dir / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_non_list_stage3_candidates_for_gene_ref_gate(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_featured_gene_reference_evidence(
+        tmp_path,
+        featured=["ICAM1"],
+        pair=("ICAM1", "MUC1"),
+        gene_files={
+            "ot_ICAM1.json",
+            "stage3_ICAM1.json",
+        },
+    )
+    (data_dir / "evidence" / "assessment_results.json").write_text(
+        json.dumps({"stage3_candidates": "ICAM1"}),
+        encoding="utf-8",
+    )
+    report = _pair_report(
+        title="ICAM1 cited featured coverage hypothesis",
+        core_claim="ICAM1 has cited gene-level support for follow-up.",
+        refs=[
+            "stage1_ICAM1--MUC1.json",
+            "ot_ICAM1.json",
+            "stage3_ICAM1.json",
+        ],
+        genes=["ICAM1"],
+        validation="Test ICAM1 in pulmonary alveolar type 2 cell models.",
+    )
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert any(
+        "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING" in error
+        for error in result["errors"]
+    )
+    assert any("stage3_candidates" in error for error in result["errors"])
+    assert not (data_dir / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_missing_primary_epithelial_intrinsic_coverage(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    _add_intrinsic_stage1_evidence(data_dir)
+    report = _clone_report()
+    hyp = report["hypotheses"][0]
+    hyp["title"] = "AT2 epithelial CD4 contrast hypothesis"
+    hyp["core_claim"] = (
+        "AT2 epithelial CD4 biology is testable, but the intrinsic Stage 1 "
+        "evidence is not cited."
+    )
+    hyp["biological_entities"]["cell_types"] = ["AT2 epithelial"]
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert "PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING" in result["errors"]
+    assert not (data_dir / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_rejects_missing_intrinsic_coverage_with_stale_stage1_pair_files(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    _add_intrinsic_stage1_evidence(data_dir)
+    report = _clone_report()
+    report["stage1_pair_files"] = ["stage1_FN1--CD4.json"]
+    hyp = report["hypotheses"][0]
+    hyp["title"] = "AT2 epithelial CD4 contrast hypothesis"
+    hyp["core_claim"] = (
+        "AT2 epithelial CD4 biology is testable, but the intrinsic Stage 1 "
+        "evidence available on disk is not cited."
+    )
+    hyp["biological_entities"]["cell_types"] = ["AT2 epithelial"]
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert "PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING" in result["errors"]
+    assert not (data_dir / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_accepts_primary_epithelial_intrinsic_coverage(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    _add_intrinsic_stage1_evidence(data_dir)
+    report = _clone_report()
+    report["stage1_pair_files"] = ["stage1_ICAM1--MUC1.json"]
+    hyp = report["hypotheses"][0]
+    hyp["title"] = "Primary AT2 epithelial ICAM1-MUC1 hypothesis"
+    hyp["core_claim"] = (
+        "ICAM1-MUC1 supports a primary AT2 epithelial follow-up mechanism."
+    )
+    hyp["evidence_references"] = [
+        "stage3_CD4.json",
+        "stage3_FN1.json",
+        "stage1_FN1--CD4.json",
+        "stage1_ICAM1--MUC1.json",
+    ]
+    hyp["biological_entities"]["genes"] = ["ICAM1", "MUC1", "CD4", "FN1"]
+    hyp["biological_entities"]["cell_types"] = ["AT2 epithelial"]
+    hyp["validation_approach"] = "Test ICAM1-MUC1 perturbation in AT2 epithelial cells."
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is True, result
 
 
 def test_save_hypothesis_report_canonicalizes_labels_and_refs(tmp_path: Path) -> None:

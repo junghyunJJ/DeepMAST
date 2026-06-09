@@ -401,11 +401,11 @@ def _hypothesis_budget_exceeded(
 
 
 def _hypothesis_stream_budget_seconds() -> int:
-    raw = os.environ.get("DRUG_TARGET_HYPOTHESIS_STREAM_BUDGET_SECONDS", "120")
+    raw = os.environ.get("DRUG_TARGET_HYPOTHESIS_STREAM_BUDGET_SECONDS", "900")
     try:
         return max(1, int(raw))
     except ValueError:
-        return 120
+        return 900
 
 
 def _annotation_field(source_field: object) -> str:
@@ -590,6 +590,37 @@ def _stage1_filename(ligand: str, receptor: str) -> str:
     return f"stage1_{ligand.upper()}--{receptor.upper()}.json"
 
 
+def _host_metric_direction(metric: object) -> str:
+    if not isinstance(metric, dict):
+        return "not_determined"
+    risk_ratio = metric.get("risk_ratio")
+    if isinstance(risk_ratio, (int, float)):
+        if risk_ratio > 1:
+            return "enriched"
+        if risk_ratio < 1:
+            return "depleted"
+    diff = metric.get("diff")
+    if isinstance(diff, (int, float)):
+        if diff > 0:
+            return "enriched"
+        if diff < 0:
+            return "depleted"
+    return "not_determined"
+
+
+def _host_stage1_is_target_cell_intrinsic(payload: object) -> bool:
+    census = payload.get("census_validation") if isinstance(payload, dict) else None
+    target_vs_rest = census.get("target_vs_rest") if isinstance(census, dict) else None
+    if not isinstance(target_vs_rest, dict):
+        return False
+    if _host_metric_direction(target_vs_rest.get("coexpression")) != "enriched":
+        return False
+    return all(
+        _host_metric_direction(target_vs_rest.get(metric_key)) != "depleted"
+        for metric_key in ("gene_a", "gene_b")
+    )
+
+
 def _host_hypothesis_refs_for_gene(
     gene: str,
     evidence_dir: Path,
@@ -628,6 +659,24 @@ def _host_hypothesis_refs_for_gene(
     return refs, details
 
 
+def _host_stage1_cell_types_for_refs(evidence_dir: Path, refs: list[str]) -> list[str]:
+    cell_types: list[str] = []
+    for ref in refs:
+        if not ref.startswith("stage1_"):
+            continue
+        payload = _load_json_or_default(evidence_dir / ref, {})
+        if not _host_stage1_is_target_cell_intrinsic(payload):
+            continue
+        census = payload.get("census_validation") if isinstance(payload, dict) else None
+        if not isinstance(census, dict):
+            continue
+        for key in ("resolved_cell_type", "requested_cell_type", "target_cell_type"):
+            cell_type = str(census.get(key) or "").strip()
+            if cell_type and cell_type not in cell_types:
+                cell_types.append(cell_type)
+    return cell_types
+
+
 def _build_host_hypothesis_report(data_dir: Path, disease: str) -> dict:
     evidence_dir = data_dir / "evidence"
     assessment = _load_json_or_default(evidence_dir / "assessment_results.json", {})
@@ -651,6 +700,12 @@ def _build_host_hypothesis_report(data_dir: Path, disease: str) -> dict:
     for index, gene in enumerate(featured_genes, start=1):
         refs, details = _host_hypothesis_refs_for_gene(gene, evidence_dir, passed_rows)
         referenced.update(refs)
+        cell_types = _host_stage1_cell_types_for_refs(evidence_dir, refs)
+        validation_context = (
+            f"{', '.join(cell_types)} models"
+            if cell_types
+            else "disease-relevant cell models"
+        )
         category = categories[(index - 1) % len(categories)]
         hypotheses.append(
             {
@@ -669,7 +724,7 @@ def _build_host_hypothesis_report(data_dir: Path, disease: str) -> dict:
                 "biological_entities": {
                     "genes": [gene],
                     "pathways": [],
-                    "cell_types": [],
+                    "cell_types": cell_types,
                     "drugs": [],
                 },
                 "falsifiable_prediction": (
@@ -677,7 +732,7 @@ def _build_host_hypothesis_report(data_dir: Path, disease: str) -> dict:
                     "phenotype change compared with matched controls."
                 ),
                 "validation_approach": (
-                    f"Test {gene} perturbation in disease-relevant cell models with "
+                    f"Test {gene} perturbation in {validation_context} with "
                     "matched negative controls and orthogonal readouts."
                 ),
                 "scores": {

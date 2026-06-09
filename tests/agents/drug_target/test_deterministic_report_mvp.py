@@ -103,6 +103,52 @@ def _write_opentargets_drug_evidence(workspace: Path, gene: str = "FN1") -> None
     )
 
 
+def _stage1_pair_payload(
+    ligand: str,
+    receptor: str,
+    *,
+    passed: bool,
+    string_score: float,
+    gene_a_rr: float,
+    gene_b_rr: float,
+    coexpr_rr: float,
+    coexpr_p: float = 0.0,
+    resolved_celltype: str = "pulmonary alveolar type 2 cell",
+) -> dict:
+    return {
+        "ligand": ligand,
+        "receptor": receptor,
+        "string_ppi": {
+            "interaction_found": True,
+            "max_combined_score": string_score,
+        },
+        "census_validation": {
+            "resolved_cell_type": resolved_celltype,
+            "target_vs_rest": {
+                "gene_a": {
+                    "risk_ratio": gene_a_rr,
+                    "diff": gene_a_rr - 1.0,
+                    "p_value": 0.0,
+                },
+                "gene_b": {
+                    "risk_ratio": gene_b_rr,
+                    "diff": gene_b_rr - 1.0,
+                    "p_value": 0.0,
+                },
+                "coexpression": {
+                    "risk_ratio": coexpr_rr,
+                    "diff": coexpr_rr - 1.0,
+                    "p_value": coexpr_p,
+                },
+            },
+        },
+        "stage1_filter": {
+            "passed": passed,
+            "string_combined": string_score,
+        },
+    }
+
+
 def test_report_mvp_renders_without_llm(tmp_path: Path) -> None:
     from src.agents.drug_target.deterministic_report import finalize_report_mvp
 
@@ -490,7 +536,7 @@ def test_report_mvp_markdown_has_required_sections(tmp_path: Path) -> None:
     assert "## 1. Executive Summary" in markdown
     assert "## 2. Gene & L-R Pair Prioritization" in markdown
     assert "## 3. Featured Candidate Deep Dives" in markdown
-    assert "## 4. Hypothesis-Driven Analysis" in markdown
+    assert "## 4. Evidence-Grounded Follow-up Recommendations" in markdown
     assert "## 5. Pipeline Execution Summary & Recommendations" in markdown
     assert "EXPAND" not in markdown
 
@@ -680,6 +726,780 @@ def test_report_mvp_dedupes_preclinical_drugs_already_clinical(
     fn1_section = markdown.split("### FN1", 1)[1].split("\n### ", 1)[0]
     assert fn1_section.count("CHEMBL2095222") == 1
     assert "FN1 PRECLINICAL TOOL" in fn1_section
+
+
+def test_report_mvp_renders_stage1_biological_context_table_with_spatial_note() -> None:
+    from src.agents.drug_target.deterministic_report import render_report_markdown
+
+    report_data = {
+        "disease": "idiopathic pulmonary fibrosis",
+        "candidates": [
+            {
+                "gene": "FN1",
+                "classification": "exploratory_target",
+                "priority": "high",
+                "stage3_candidate": True,
+                "scores": {"combined_total": 12, "combined_rank_score": 12},
+                "clinical_drugs": [],
+                "preclinical_drugs": [],
+            }
+        ],
+        "template_context": {
+            "stage1_filter_results": [
+                {"ligand": "FN1", "receptor": "MUC1", "passed": True},
+                {"ligand": "FN1", "receptor": "SDC2", "passed": True},
+                {"ligand": "FN1", "receptor": "PLAUR", "passed": False},
+            ],
+            "stage1_pairs": {
+                "FN1_MUC1": _stage1_pair_payload(
+                    "FN1",
+                    "MUC1",
+                    passed=True,
+                    string_score=0.993,
+                    gene_a_rr=3.36,
+                    gene_b_rr=9.83,
+                    coexpr_rr=17.86,
+                ),
+                "FN1_SDC2": _stage1_pair_payload(
+                    "FN1",
+                    "SDC2",
+                    passed=True,
+                    string_score=0.959,
+                    gene_a_rr=0.24,
+                    gene_b_rr=0.31,
+                    coexpr_rr=0.2258,
+                ),
+                "FN1_PLAUR": _stage1_pair_payload(
+                    "FN1",
+                    "PLAUR",
+                    passed=False,
+                    string_score=0.697,
+                    gene_a_rr=0.24,
+                    gene_b_rr=0.40,
+                    coexpr_rr=0.1557,
+                ),
+            },
+            "hypothesis_data": {"hypotheses": []},
+        },
+    }
+
+    markdown = render_report_markdown(report_data)
+    fn1_section = markdown.split("### FN1", 1)[1].split("\n### ", 1)[0]
+
+    assert (
+        "| Pair | Stage 1 / STRING | Census coexpression in pulmonary alveolar type 2 cell |"
+        in fn1_section
+    )
+    assert (
+        "| **FN1-MUC1** | PASS; STRING=0.993; confirmed | RR=17.86, p=0.0; enriched | FN1 enriched; MUC1 enriched |"
+        in fn1_section
+    )
+    assert "Primary AT2-intrinsic support" in fn1_section
+    assert (
+        "| **FN1-SDC2** | PASS; STRING=0.959; confirmed | RR=0.2258, p=0.0; depleted | FN1 depleted; SDC2 depleted |"
+        in fn1_section
+    )
+    assert "Cross-cell/non-AT2 framing only" in fn1_section
+    assert (
+        "| **FN1-PLAUR** | FAIL; STRING=0.697; confirmed | RR=0.1557, p=0.0; depleted | FN1 depleted; PLAUR depleted |"
+        in fn1_section
+    )
+    assert "Negative/contrast only" in fn1_section
+    assert (
+        "**Spatial context:** All ligand-receptor pairs listed above originated from significant LIANA+ spatial co-localization results"
+        in fn1_section
+    )
+    assert "Moran" not in fn1_section
+
+
+def test_report_mvp_splits_hypotheses_by_epithelial_intrinsic_support() -> None:
+    from src.agents.drug_target.deterministic_report import render_report_markdown
+
+    report_data = {
+        "disease": "idiopathic pulmonary fibrosis",
+        "candidates": [
+            {
+                "gene": "ICAM1",
+                "classification": "exploratory_target",
+                "priority": "high",
+                "stage3_candidate": True,
+                "scores": {"combined_total": 12, "combined_rank_score": 12},
+                "clinical_drugs": [],
+                "preclinical_drugs": [],
+            }
+        ],
+        "template_context": {
+            "stage1_filter_results": [
+                {"ligand": "ICAM1", "receptor": "MUC1", "passed": True},
+                {"ligand": "FN1", "receptor": "SDC2", "passed": True},
+            ],
+            "stage1_pairs": {
+                "ICAM1_MUC1": _stage1_pair_payload(
+                    "ICAM1",
+                    "MUC1",
+                    passed=True,
+                    string_score=0.993,
+                    gene_a_rr=3.36,
+                    gene_b_rr=9.83,
+                    coexpr_rr=17.86,
+                ),
+                "FN1_SDC2": _stage1_pair_payload(
+                    "FN1",
+                    "SDC2",
+                    passed=True,
+                    string_score=0.959,
+                    gene_a_rr=0.24,
+                    gene_b_rr=0.31,
+                    coexpr_rr=0.2258,
+                ),
+            },
+            "hypothesis_data": {
+                "evidence_coverage_pct": 80.0,
+                "hypotheses_generated": 2,
+                "hypotheses_retained": 2,
+                "gap_analysis": {
+                    "referenced_files": 3,
+                    "total_evidence_files": 5,
+                    "orphan_files": [
+                        "stage1_FN1--SDC2.json",
+                        "stage1_ICAM1--PECAM1.json",
+                    ],
+                },
+                "hypotheses": [
+                    {
+                        "rank": 1,
+                        "title": "FN1-SDC2 spatial-niche follow-up candidate",
+                        "category": "Mechanism of Action",
+                        "core_claim": "FN1-SDC2 is a fibroblast niche signal.",
+                        "evidence_references": [
+                            "stage1_FN1--SDC2.json",
+                            "ot_FN1.json",
+                            "stage3_FN1.json",
+                        ],
+                        "biological_entities": {
+                            "genes": ["FN1", "SDC2"],
+                            "pathways": ["ECM"],
+                            "cell_types": ["fibroblast"],
+                            "drugs": [],
+                        },
+                        "falsifiable_prediction": "FN1 perturbation will alter SDC2 signaling.",
+                        "validation_approach": "Fibroblast culture assay.",
+                    },
+                    {
+                        "rank": 2,
+                        "title": "ICAM1-MUC1 nominates an AT2 epithelial program candidate",
+                        "category": "Therapeutic Strategy",
+                        "core_claim": "ICAM1-MUC1 is an AT2 epithelial program.",
+                        "evidence_references": [
+                            "stage1_ICAM1--MUC1.json",
+                            "ot_ICAM1.json",
+                            "stage3_ICAM1.json",
+                        ],
+                        "biological_entities": {
+                            "genes": ["ICAM1", "MUC1"],
+                            "pathways": ["inflammatory signaling"],
+                            "cell_types": ["pulmonary alveolar type 2 cell"],
+                            "drugs": [],
+                        },
+                        "falsifiable_prediction": "AT2 perturbation will alter ICAM1 signaling.",
+                        "validation_approach": "IPF-derived AT2 epithelial culture assay.",
+                    },
+                ],
+            },
+        },
+    }
+
+    markdown = render_report_markdown(report_data)
+
+    primary_heading = "### 4.1. Primary AT2/Epithelial Follow-up Candidates"
+    secondary_heading = "### 4.2. Secondary Spatial-Niche Follow-up Candidates"
+    assert primary_heading in markdown
+    assert secondary_heading in markdown
+    assert markdown.index(primary_heading) < markdown.index(secondary_heading)
+    assert "#### 4.1.1. ICAM1-MUC1 nominates an AT2 epithelial program candidate" in markdown
+    assert "#### 4.2.1. FN1-SDC2 spatial-niche follow-up candidate" in markdown
+    assert "Primary epithelial/AT2-intrinsic" in markdown
+    assert "Secondary epithelial-associated niche" in markdown
+    assert (
+        "not as epithelial-cell-intrinsic target mechanisms"
+        in markdown
+    )
+    assert "**Biological Grounding:**" in markdown
+    assert "**Target-Disease Support:**" in markdown
+    assert "**Actionability:**" in markdown
+    assert "**Interpretation Constraint:**" in markdown
+    assert "#### Secondary Stage 1 Framing Evidence" in markdown
+    assert "| Pair | Census direction | Usage | Source |" in markdown
+    assert "FN1-SDC2" in markdown
+    assert "stage1_FN1--SDC2.json" in markdown
+    assert "Cross-cell/spatial-niche framing only" in markdown
+    assert "not AT2-intrinsic support" in markdown
+    gap_section = markdown.split("### Gap Analysis", 1)[1]
+    assert "stage1_FN1--SDC2.json" not in gap_section
+    assert (
+        "framing evidence for non-AT2 or cross-cell follow-up, not as "
+        "AT2-intrinsic support"
+    ) in markdown
+
+
+def test_report_mvp_renders_asymmetric_stage2_stage3_refs_for_primary_pair() -> None:
+    from src.agents.drug_target.deterministic_report import render_report_markdown
+
+    report_data = {
+        "disease": "idiopathic pulmonary fibrosis",
+        "candidates": [],
+        "template_context": {
+            "stage1_filter_results": [
+                {"ligand": "ICAM1", "receptor": "EZR", "passed": True},
+            ],
+            "stage1_pairs": {
+                "ICAM1_EZR": _stage1_pair_payload(
+                    "ICAM1",
+                    "EZR",
+                    passed=True,
+                    string_score=0.998,
+                    gene_a_rr=3.36,
+                    gene_b_rr=1.13,
+                    coexpr_rr=4.49,
+                ),
+            },
+            "hypothesis_data": {
+                "evidence_coverage_pct": 100.0,
+                "hypotheses_generated": 1,
+                "hypotheses_retained": 1,
+                "gap_analysis": {
+                    "referenced_files": 3,
+                    "total_evidence_files": 3,
+                    "orphan_files": [],
+                },
+                "hypotheses": [
+                    {
+                        "rank": 1,
+                        "title": "ICAM1-EZR coexpression nominates an ICAM1-anchored epithelial follow-up axis",
+                        "category": "Mechanism of Action",
+                        "core_claim": (
+                            "Stage 1 Census evidence shows ICAM1--EZR passed the filter in the resolved epithelial cell type. "
+                            "ICAM1 has cited Stage 2/3 support, while EZR is a Stage 1 coexpression-context partner. "
+                            "Not yet established: whether ICAM1-EZR coexpression is causal or marks an epithelial stress state."
+                        ),
+                        "evidence_references": [
+                            "stage1_ICAM1--EZR.json",
+                            "ot_ICAM1.json",
+                            "stage3_ICAM1.json",
+                        ],
+                        "biological_entities": {
+                            "genes": ["ICAM1", "EZR"],
+                            "pathways": ["cell adhesion"],
+                            "cell_types": ["pulmonary alveolar type 2 cell"],
+                            "drugs": [],
+                        },
+                        "falsifiable_prediction": (
+                            "Test whether ICAM1-centered perturbation changes epithelial injury, "
+                            "adhesion, or cell-state readouts while measuring EZR localization or "
+                            "coexpression as a secondary readout."
+                        ),
+                        "validation_approach": (
+                            "Perturb ICAM1 in AT2-enriched models and measure epithelial readouts; "
+                            "measure EZR only as a contextual coexpression or localization readout."
+                        ),
+                    },
+                ],
+            },
+        },
+    }
+
+    markdown = render_report_markdown(report_data)
+    heading = (
+        "#### 4.1.1. ICAM1-EZR coexpression nominates an ICAM1-anchored epithelial follow-up axis"
+    )
+    section = heading + markdown.split(heading, 1)[1].split("---", 1)[0]
+
+    assert "ICAM1-anchored" in section
+    assert "Treat ICAM1 as the Stage 2/3-supported anchor" in section
+    assert "EZR as a coexpression-context partner" in section
+    assert (
+        "do not infer gene-level target-disease support or drug actionability for EZR"
+        in section
+    )
+    assert "ICAM1-centered" in section
+    assert "EZR localization or coexpression as a secondary readout" in section
+    assert "**Target-Disease Support:** ot_ICAM1.json" in section
+    assert "**Actionability:** stage3_ICAM1.json" in section
+    assert "- stage1_ICAM1--EZR.json" in section
+    assert "- ot_ICAM1.json" in section
+    assert "- stage3_ICAM1.json" in section
+    assert "ot_EZR.json" not in section
+    assert "stage3_EZR.json" not in section
+    assert "No Stage 2 OpenTargets evidence cited" not in section
+    assert "No Stage 3 druggability evidence cited" not in section
+
+
+def test_report_mvp_asymmetric_primary_constraint_ignores_failed_pair() -> None:
+    from src.agents.drug_target.deterministic_report import render_report_markdown
+
+    report_data = {
+        "disease": "idiopathic pulmonary fibrosis",
+        "candidates": [],
+        "template_context": {
+            "stage1_filter_results": [
+                {"ligand": "FGFR1", "receptor": "FZD2", "passed": False},
+                {"ligand": "ICAM1", "receptor": "EZR", "passed": True},
+            ],
+            "stage1_pairs": {
+                "FGFR1_FZD2": _stage1_pair_payload(
+                    "FGFR1",
+                    "FZD2",
+                    passed=False,
+                    string_score=0.42,
+                    gene_a_rr=3.0,
+                    gene_b_rr=1.4,
+                    coexpr_rr=4.2,
+                ),
+                "ICAM1_EZR": _stage1_pair_payload(
+                    "ICAM1",
+                    "EZR",
+                    passed=True,
+                    string_score=0.998,
+                    gene_a_rr=3.36,
+                    gene_b_rr=1.13,
+                    coexpr_rr=4.49,
+                ),
+            },
+            "hypothesis_data": {
+                "hypotheses_generated": 1,
+                "hypotheses_retained": 1,
+                "hypotheses": [
+                    {
+                        "rank": 1,
+                        "title": "Mixed evidence keeps ICAM1 as the epithelial anchor",
+                        "category": "Mechanism of Action",
+                        "core_claim": (
+                            "ICAM1--EZR is the primary epithelial pair; "
+                            "FGFR1--FZD2 is cited only as failed contrast."
+                        ),
+                        "evidence_references": [
+                            "stage1_FGFR1--FZD2.json",
+                            "ot_FGFR1.json",
+                            "stage3_FGFR1.json",
+                            "stage1_ICAM1--EZR.json",
+                            "ot_ICAM1.json",
+                            "stage3_ICAM1.json",
+                        ],
+                        "biological_entities": {
+                            "genes": ["ICAM1", "EZR", "FGFR1", "FZD2"],
+                            "pathways": [],
+                            "cell_types": ["pulmonary alveolar type 2 cell"],
+                            "drugs": [],
+                        },
+                        "falsifiable_prediction": "Test ICAM1-centered epithelial readouts.",
+                        "validation_approach": "Perturb ICAM1 in AT2-enriched models.",
+                    },
+                ],
+            },
+        },
+    }
+
+    markdown = render_report_markdown(report_data)
+    heading = "#### 4.1.1. Mixed evidence keeps ICAM1 as the epithelial anchor"
+    section = heading + markdown.split(heading, 1)[1].split("---", 1)[0]
+    constraint = next(
+        line
+        for line in section.splitlines()
+        if line.startswith("**Interpretation Constraint:**")
+    )
+
+    assert "Treat ICAM1 as the Stage 2/3-supported anchor" in constraint
+    assert (
+        "do not infer gene-level target-disease support or drug actionability for EZR"
+        in constraint
+    )
+    assert "Treat FGFR1 as the Stage 2/3-supported anchor" not in constraint
+    assert (
+        "do not infer gene-level target-disease support or drug actionability for FZD2"
+        not in constraint
+    )
+
+
+def test_report_mvp_renders_both_section4_headings_with_single_tier() -> None:
+    from src.agents.drug_target.deterministic_report import render_report_markdown
+
+    report_data = {
+        "disease": "idiopathic pulmonary fibrosis",
+        "candidates": [],
+        "template_context": {
+            "stage1_filter_results": [
+                {"ligand": "FN1", "receptor": "SDC2", "passed": True},
+            ],
+            "stage1_pairs": {
+                "FN1_SDC2": _stage1_pair_payload(
+                    "FN1",
+                    "SDC2",
+                    passed=True,
+                    string_score=0.959,
+                    gene_a_rr=0.24,
+                    gene_b_rr=0.31,
+                    coexpr_rr=0.2258,
+                ),
+            },
+            "hypothesis_data": {
+                "hypotheses": [
+                    {
+                        "rank": 1,
+                        "title": "FN1-SDC2 spatial-niche follow-up candidate",
+                        "category": "Mechanism of Action",
+                        "core_claim": "FN1-SDC2 is a fibroblast niche signal.",
+                        "evidence_references": ["stage1_FN1--SDC2.json"],
+                        "biological_entities": {
+                            "genes": ["FN1", "SDC2"],
+                            "pathways": ["ECM"],
+                            "cell_types": ["fibroblast"],
+                            "drugs": [],
+                        },
+                        "falsifiable_prediction": "FN1 perturbation will alter SDC2 signaling.",
+                        "validation_approach": "Fibroblast culture assay.",
+                    },
+                ],
+            },
+        },
+    }
+
+    markdown = render_report_markdown(report_data)
+
+    assert "### 4.1. Primary AT2/Epithelial Follow-up Candidates" in markdown
+    assert "### 4.2. Secondary Spatial-Niche Follow-up Candidates" in markdown
+    assert (
+        "No primary AT2/epithelial follow-up candidates met the Stage 1 "
+        "intrinsic-support criteria."
+    ) in markdown
+    assert "#### 4.2.1. FN1-SDC2 spatial-niche follow-up candidate" in markdown
+
+
+def test_report_mvp_excludes_failed_stage1_pairs_from_secondary_framing() -> None:
+    from src.agents.drug_target.deterministic_report import render_report_markdown
+
+    report_data = {
+        "disease": "idiopathic pulmonary fibrosis",
+        "candidates": [],
+        "template_context": {
+            "stage1_filter_results": [
+                {"ligand": "FN1", "receptor": "SDC2", "passed": False},
+            ],
+            "stage1_pairs": {
+                "FN1_SDC2": _stage1_pair_payload(
+                    "FN1",
+                    "SDC2",
+                    passed=False,
+                    string_score=0.759,
+                    gene_a_rr=0.24,
+                    gene_b_rr=0.31,
+                    coexpr_rr=0.2258,
+                ),
+            },
+            "hypothesis_data": {
+                "hypotheses": [
+                    {
+                        "rank": 1,
+                        "title": "FN1-SDC2 spatial-niche follow-up candidate",
+                        "category": "Mechanism of Action",
+                        "core_claim": "FN1-SDC2 is a fibroblast niche signal.",
+                        "evidence_references": ["stage1_FN1--SDC2.json"],
+                        "biological_entities": {
+                            "genes": ["FN1", "SDC2"],
+                            "pathways": ["ECM"],
+                            "cell_types": ["fibroblast"],
+                            "drugs": [],
+                        },
+                        "falsifiable_prediction": "FN1 perturbation will alter SDC2 signaling.",
+                        "validation_approach": "Fibroblast culture assay.",
+                    },
+                ],
+            },
+        },
+    }
+
+    markdown = render_report_markdown(report_data)
+
+    assert "#### 4.2.1. FN1-SDC2 spatial-niche follow-up candidate" in markdown
+    assert "#### Secondary Stage 1 Framing Evidence" not in markdown
+    assert "| FN1-SDC2 |" not in markdown
+
+
+def test_report_mvp_does_not_add_uncited_stage1_pairs_to_secondary_framing() -> None:
+    from src.agents.drug_target.deterministic_report import render_report_markdown
+
+    report_data = {
+        "disease": "idiopathic pulmonary fibrosis",
+        "candidates": [],
+        "template_context": {
+            "stage1_filter_results": [
+                {"ligand": "FN1", "receptor": "SDC2", "passed": True},
+            ],
+            "stage1_pairs": {
+                "FN1_SDC2": _stage1_pair_payload(
+                    "FN1",
+                    "SDC2",
+                    passed=True,
+                    string_score=0.959,
+                    gene_a_rr=0.24,
+                    gene_b_rr=0.31,
+                    coexpr_rr=0.2258,
+                ),
+            },
+            "hypothesis_data": {
+                "evidence_coverage_pct": 50.0,
+                "hypotheses_generated": 1,
+                "hypotheses_retained": 1,
+                "gap_analysis": {
+                    "referenced_files": 1,
+                    "total_evidence_files": 2,
+                    "orphan_files": ["stage1_FN1--SDC2.json"],
+                },
+                "hypotheses": [
+                    {
+                        "rank": 1,
+                        "title": "FN1-SDC2 spatial-niche follow-up candidate",
+                        "category": "Mechanism of Action",
+                        "core_claim": "FN1-SDC2 is a fibroblast niche signal.",
+                        "evidence_references": ["stage3_FN1.json"],
+                        "biological_entities": {
+                            "genes": ["FN1", "SDC2"],
+                            "pathways": ["ECM"],
+                            "cell_types": ["fibroblast"],
+                            "drugs": [],
+                        },
+                        "falsifiable_prediction": "FN1 perturbation will alter SDC2 signaling.",
+                        "validation_approach": "Fibroblast culture assay.",
+                    },
+                ],
+            },
+        },
+    }
+
+    markdown = render_report_markdown(report_data)
+
+    assert "### 4.3. Gene-Level/Actionability Follow-up Candidates" in markdown
+    assert "#### 4.3.1. FN1-SDC2 spatial-niche follow-up candidate" in markdown
+    assert "### 4.2. Secondary Spatial-Niche Follow-up Candidates" not in markdown
+    assert "#### Secondary Stage 1 Framing Evidence" not in markdown
+    recommendation = markdown.split(
+        "#### 4.3.1. FN1-SDC2 spatial-niche follow-up candidate",
+        1,
+    )[1]
+    assert (
+        "**Biological Grounding:** No Stage 1/spatial grounding reference cited."
+        in recommendation
+    )
+    gap_section = markdown.split("### Gap Analysis", 1)[1]
+    assert "stage1_FN1--SDC2.json" in gap_section
+
+
+def test_report_mvp_labels_gene_level_only_candidates_without_spatial_niche() -> None:
+    from src.agents.drug_target.deterministic_report import render_report_markdown
+    from src.agents.drug_target.tools.drug_report_html import (
+        parse_drug_md,
+        render_drug_html,
+    )
+
+    report_data = {
+        "disease": "idiopathic pulmonary fibrosis",
+        "candidates": [],
+        "template_context": {
+            "hypothesis_data": {
+                "hypotheses_generated": 1,
+                "hypotheses_retained": 1,
+                "hypotheses": [
+                    {
+                        "rank": 1,
+                        "title": "CD47 actionability follow-up candidate",
+                        "category": "Therapeutic Strategy",
+                        "core_claim": (
+                            "CD47 has cited gene-level actionability support. "
+                            "Not yet established: whether CD47 perturbation "
+                            "changes IPF-relevant macrophage-fibroblast readouts."
+                        ),
+                        "evidence_references": ["stage3_CD47.json", "ot_CD47.json"],
+                        "biological_entities": {
+                            "genes": ["CD47"],
+                            "pathways": ["immune modulation"],
+                            "cell_types": ["macrophage"],
+                            "drugs": [],
+                        },
+                        "falsifiable_prediction": (
+                            "Test whether CD47 perturbation changes "
+                            "macrophage-fibroblast readouts."
+                        ),
+                        "validation_approach": (
+                            "Use macrophage-fibroblast co-culture and measure "
+                            "qualitative activation readouts."
+                        ),
+                    }
+                ],
+            },
+        },
+    }
+
+    markdown = render_report_markdown(report_data)
+
+    gene_level_heading = "### 4.3. Gene-Level/Actionability Follow-up Candidates"
+    cd47_heading = "#### 4.3.1. CD47 actionability follow-up candidate"
+
+    assert gene_level_heading in markdown
+    assert cd47_heading in markdown
+    assert markdown.index(gene_level_heading) < markdown.index(cd47_heading)
+    assert "### 4.2. Secondary Spatial-Niche Follow-up Candidates" not in markdown
+    assert "#### 4.2.1. CD47 actionability follow-up candidate" not in markdown
+    assert "Gene-level/actionability follow-up" in markdown
+    assert "No Stage 1/spatial grounding reference cited" in markdown
+    assert "do not interpret as AT2-intrinsic or spatial-niche evidence" in markdown
+    assert "Secondary epithelial-associated niche" not in markdown
+
+    context = parse_drug_md(markdown)
+    html = render_drug_html(context)
+
+    assert len(context["gene_level_hypotheses"]) == 1
+    assert len(context["secondary_hypotheses"]) == 0
+    assert "4.3. Gene-Level/Actionability Follow-up Candidates" in html
+    assert "4.2. Secondary Spatial-Niche Follow-up Candidates" not in html
+
+
+def test_render_drug_md_buckets_raw_gene_level_only_candidate() -> None:
+    from src.agents.drug_target.tools.drug_report_html import render_drug_md
+
+    markdown = render_drug_md(
+        disease="idiopathic pulmonary fibrosis",
+        stage3_genes=[],
+        featured_cards=[],
+        all_genes_matrix=[],
+        stage1_data={},
+        stage1_filter_results=[],
+        hypothesis_data={
+            "hypotheses_generated": 1,
+            "hypotheses_retained": 1,
+            "hypotheses": [
+                {
+                    "rank": 1,
+                    "title": "CD47 actionability follow-up candidate",
+                    "category": "Therapeutic Strategy",
+                    "core_claim": (
+                        "CD47 has cited gene-level actionability support. "
+                        "Not yet established: whether CD47 perturbation changes "
+                        "IPF-relevant macrophage-fibroblast readouts."
+                    ),
+                    "evidence_references": ["stage3_CD47.json", "ot_CD47.json"],
+                    "biological_entities": {
+                        "genes": ["CD47"],
+                        "pathways": ["immune modulation"],
+                        "cell_types": ["macrophage"],
+                        "drugs": [],
+                    },
+                    "falsifiable_prediction": (
+                        "Test whether CD47 perturbation changes "
+                        "macrophage-fibroblast readouts."
+                    ),
+                    "validation_approach": (
+                        "Use macrophage-fibroblast co-culture and measure "
+                        "qualitative activation readouts."
+                    ),
+                }
+            ],
+        },
+    )
+
+    gene_level_heading = "### 4.3. Gene-Level/Actionability Follow-up Candidates"
+    cd47_heading = "#### 4.3.1. CD47 actionability follow-up candidate"
+
+    assert gene_level_heading in markdown
+    assert cd47_heading in markdown
+    assert markdown.index(gene_level_heading) < markdown.index(cd47_heading)
+    assert "#### 4.1. CD47 actionability follow-up candidate" not in markdown
+    assert "### 4.2. Secondary Spatial-Niche Follow-up Candidates" not in markdown
+    assert "#### 4.2.1. CD47 actionability follow-up candidate" not in markdown
+
+
+def test_drug_report_html_preserves_section4_tier_split_and_framing_table() -> None:
+    from src.agents.drug_target.deterministic_report import render_report_markdown
+    from src.agents.drug_target.tools.drug_report_html import (
+        parse_drug_md,
+        render_drug_html,
+    )
+
+    report_data = {
+        "disease": "idiopathic pulmonary fibrosis",
+        "candidates": [],
+        "template_context": {
+            "stage1_filter_results": [
+                {"ligand": "ICAM1", "receptor": "MUC1", "passed": True},
+                {"ligand": "FN1", "receptor": "SDC2", "passed": True},
+            ],
+            "stage1_pairs": {
+                "ICAM1_MUC1": _stage1_pair_payload(
+                    "ICAM1",
+                    "MUC1",
+                    passed=True,
+                    string_score=0.993,
+                    gene_a_rr=3.36,
+                    gene_b_rr=9.83,
+                    coexpr_rr=17.86,
+                ),
+                "FN1_SDC2": _stage1_pair_payload(
+                    "FN1",
+                    "SDC2",
+                    passed=True,
+                    string_score=0.959,
+                    gene_a_rr=0.24,
+                    gene_b_rr=0.31,
+                    coexpr_rr=0.2258,
+                ),
+            },
+            "hypothesis_data": {
+                "hypotheses": [
+                    {
+                        "rank": 1,
+                        "title": "ICAM1-MUC1 nominates an AT2 epithelial program candidate",
+                        "category": "Therapeutic Strategy",
+                        "core_claim": "ICAM1-MUC1 is an AT2 epithelial program.",
+                        "evidence_references": ["stage1_ICAM1--MUC1.json"],
+                        "biological_entities": {
+                            "genes": ["ICAM1", "MUC1"],
+                            "pathways": ["inflammatory signaling"],
+                            "cell_types": ["pulmonary alveolar type 2 cell"],
+                            "drugs": [],
+                        },
+                        "falsifiable_prediction": "AT2 perturbation will alter ICAM1 signaling.",
+                        "validation_approach": "IPF-derived AT2 epithelial culture assay.",
+                    },
+                    {
+                        "rank": 2,
+                        "title": "FN1-SDC2 spatial-niche follow-up candidate",
+                        "category": "Mechanism of Action",
+                        "core_claim": "FN1-SDC2 is a fibroblast niche signal.",
+                        "evidence_references": ["stage1_FN1--SDC2.json"],
+                        "biological_entities": {
+                            "genes": ["FN1", "SDC2"],
+                            "pathways": ["ECM"],
+                            "cell_types": ["fibroblast"],
+                            "drugs": [],
+                        },
+                        "falsifiable_prediction": "FN1 perturbation will alter SDC2 signaling.",
+                        "validation_approach": "Fibroblast culture assay.",
+                    },
+                ],
+            },
+        },
+    }
+
+    context = parse_drug_md(render_report_markdown(report_data))
+    html = render_drug_html(context)
+
+    assert len(context["primary_hypotheses"]) == 1
+    assert len(context["secondary_hypotheses"]) == 1
+    assert context["secondary_stage1_framing_pairs"][0]["source"] == (
+        "stage1_FN1--SDC2.json"
+    )
+    assert "4.1. Primary AT2/Epithelial Follow-up Candidates" in html
+    assert "4.2. Secondary Spatial-Niche Follow-up Candidates" in html
+    assert "Secondary Stage 1 Framing Evidence" in html
+    assert "stage1_FN1--SDC2.json" in html
 
 
 def test_report_mvp_ignores_malformed_optional_evidence(tmp_path: Path) -> None:

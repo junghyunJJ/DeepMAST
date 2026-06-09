@@ -187,6 +187,24 @@ def test_hypothesis_stream_budget_only_applies_after_hypothesis_writer_starts():
     assert not traced._is_hypothesis_writer_stream_node("report_writer", "summarizer")
 
 
+def test_hypothesis_stream_budget_defaults_to_900(monkeypatch):
+    monkeypatch.delenv("DRUG_TARGET_HYPOTHESIS_STREAM_BUDGET_SECONDS", raising=False)
+
+    assert traced._hypothesis_stream_budget_seconds() == 900
+
+
+def test_hypothesis_stream_budget_respects_env_override(monkeypatch):
+    monkeypatch.setenv("DRUG_TARGET_HYPOTHESIS_STREAM_BUDGET_SECONDS", "1200")
+
+    assert traced._hypothesis_stream_budget_seconds() == 1200
+
+
+def test_hypothesis_stream_budget_invalid_env_falls_back_to_900(monkeypatch):
+    monkeypatch.setenv("DRUG_TARGET_HYPOTHESIS_STREAM_BUDGET_SECONDS", "not-a-number")
+
+    assert traced._hypothesis_stream_budget_seconds() == 900
+
+
 def test_evidence_ready_for_hypothesis_requires_stage3_candidates_and_files(tmp_path):
     evidence_dir = tmp_path / "evidence"
     evidence_dir.mkdir()

@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,55 @@ REQUIRED_HYPOTHESIS_CATEGORIES = set(_CATEGORIES)
 _GAP_PREFIX_RE = re.compile(r"^\s*(\[(?:FEATURED-GAP|GAP)\])\s*(.*)$")
 _JSON_REF_RE = re.compile(r"([A-Za-z0-9_.\-]+\.json)(?:_FAILED)?")
 _STAGE1_REF_RE = re.compile(r"^stage1_([A-Za-z0-9-]+)--([A-Za-z0-9-]+)\.json$")
+_EPITHELIAL_ANCHOR_RE = re.compile(
+    r"\b(AT2|transitional\s+AT2|alveolar\s+type\s+2|alveolar\s+epithelial|pulmonary\s+epithelial|epithelial)\b",
+    re.IGNORECASE,
+)
+_PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING = (
+    "PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING"
+)
+_GENE_LEVEL_EVIDENCE_REFERENCE_MISSING = "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING"
+_HYPOTHESIS_REJECTION_FILENAME = "hypothesis_report_last_rejection.json"
+
+
+def _hypothesis_rejection_path(evidence_dir: Path) -> Path:
+    return evidence_dir / _HYPOTHESIS_REJECTION_FILENAME
+
+
+def _write_hypothesis_rejection(
+    evidence_dir: Path,
+    result: dict,
+    *,
+    stage: str = "save_hypothesis_report",
+) -> None:
+    payload = {
+        "saved": False,
+        "stage": stage,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "errors": result.get("errors", []),
+        "diagnostics": result.get("diagnostics", []),
+        "topn_coverage": result.get("topn_coverage"),
+        "failed_pair_violations": result.get("failed_pair_violations", []),
+        "hypothesis_grounding_violations": result.get(
+            "hypothesis_grounding_violations",
+            [],
+        ),
+        "prediction_grounding_summary": result.get("prediction_grounding_summary"),
+    }
+    try:
+        _hypothesis_rejection_path(evidence_dir).write_text(
+            json.dumps(payload, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+    except OSError:
+        return
+
+
+def _clear_hypothesis_rejection(evidence_dir: Path) -> None:
+    try:
+        _hypothesis_rejection_path(evidence_dir).unlink()
+    except OSError:
+        return
 
 
 def _parse_report(report: Any) -> tuple[dict | None, list[str]]:
@@ -101,6 +151,131 @@ def _canonical_entities(raw: Any) -> dict[str, list[str]]:
             cleaned = [v.upper() for v in cleaned]
         out[key] = cleaned
     return out
+
+
+def _load_featured_gene_symbols(evidence_dir: Path) -> tuple[set[str], list[str]]:
+    path = evidence_dir / "assessment_results.json"
+    if not path.exists():
+        return set(), []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return set(), [
+            f"{_GENE_LEVEL_EVIDENCE_REFERENCE_MISSING}: could not parse "
+            f"assessment_results.json for FEATURED gene-level evidence "
+            f"reference validation: {exc}"
+        ]
+    if not isinstance(payload, dict):
+        return set(), [
+            f"{_GENE_LEVEL_EVIDENCE_REFERENCE_MISSING}: assessment_results.json "
+            "must be a JSON object for FEATURED gene-level evidence reference "
+            "validation."
+        ]
+    if "stage3_candidates" not in payload:
+        return set(), []
+    candidates = payload["stage3_candidates"]
+    if not isinstance(candidates, list):
+        return set(), [
+            f"{_GENE_LEVEL_EVIDENCE_REFERENCE_MISSING}: assessment_results.json "
+            "stage3_candidates must be a list for FEATURED gene-level evidence "
+            "reference validation."
+        ]
+    genes: set[str] = set()
+    for item in candidates:
+        if not isinstance(item, dict):
+            continue
+        gene = str(item.get("gene") or item.get("gene_symbol") or "").strip().upper()
+        if gene:
+            genes.add(gene)
+    return genes, []
+
+
+def _hypothesis_text_mentions_gene(hypothesis: dict[str, Any], gene: str) -> bool:
+    text = " ".join(
+        str(hypothesis.get(field) or "")
+        for field in (
+            "title",
+            "core_claim",
+            "falsifiable_prediction",
+            "validation_approach",
+        )
+    )
+    if not text:
+        return False
+    pattern = re.compile(
+        rf"(?<![A-Za-z0-9]){re.escape(gene)}(?![A-Za-z0-9])",
+        re.IGNORECASE,
+    )
+    return bool(pattern.search(text))
+
+
+def _hypothesis_entity_gene_symbols(hypothesis: dict[str, Any]) -> set[str]:
+    entities = hypothesis.get("biological_entities")
+    genes = entities.get("genes") if isinstance(entities, dict) else []
+    if not isinstance(genes, list):
+        return set()
+    return {gene for item in genes if (gene := str(item).strip().upper())}
+
+
+def _hypothesis_reference_tokens(hypothesis: dict[str, Any]) -> set[str]:
+    refs = hypothesis.get("evidence_references")
+    if not isinstance(refs, list):
+        return set()
+    tokens: set[str] = set()
+    for ref in refs:
+        match = _JSON_REF_RE.search(str(ref))
+        if match:
+            tokens.add(match.group(1))
+    return tokens
+
+
+def _available_gene_level_references(evidence_dir: Path, gene: str) -> list[str]:
+    return [
+        filename
+        for filename in (f"ot_{gene}.json", f"stage3_{gene}.json")
+        if (evidence_dir / filename).exists()
+    ]
+
+
+def _validate_featured_gene_level_references(
+    canonical: dict,
+    evidence_dir: Path,
+) -> list[str]:
+    featured_genes, errors = _load_featured_gene_symbols(evidence_dir)
+    if errors:
+        return errors
+    if not featured_genes:
+        return []
+
+    hypotheses = canonical.get("hypotheses")
+    if not isinstance(hypotheses, list):
+        return errors
+
+    for idx, hypothesis in enumerate(hypotheses):
+        if not isinstance(hypothesis, dict):
+            continue
+        cited_refs = _hypothesis_reference_tokens(hypothesis)
+        entity_genes = _hypothesis_entity_gene_symbols(hypothesis)
+        missing_by_gene: dict[str, list[str]] = {}
+        for gene in sorted(featured_genes & entity_genes):
+            if not _hypothesis_text_mentions_gene(hypothesis, gene):
+                continue
+            available_refs = _available_gene_level_references(evidence_dir, gene)
+            missing_refs = [ref for ref in available_refs if ref not in cited_refs]
+            if missing_refs:
+                missing_by_gene[gene] = missing_refs
+        if missing_by_gene:
+            grouped = "; ".join(
+                f"{gene}: {', '.join(missing_refs)}"
+                for gene, missing_refs in missing_by_gene.items()
+            )
+            errors.append(
+                f"{_GENE_LEVEL_EVIDENCE_REFERENCE_MISSING}: hypotheses[{idx}] "
+                f"missing available gene-level evidence references for FEATURED genes: "
+                f"{grouped}"
+            )
+
+    return errors
 
 
 def _canonical_reference_detail(
@@ -267,6 +442,96 @@ def canonicalize_hypothesis_report(
     return canonical, errors, diagnostics
 
 
+def _hypothesis_has_epithelial_anchor(hypothesis: dict[str, Any]) -> bool:
+    fields = [
+        hypothesis.get("title"),
+        hypothesis.get("core_claim"),
+        hypothesis.get("mechanism"),
+        hypothesis.get("patient_context"),
+        hypothesis.get("experimental_test"),
+        hypothesis.get("falsifiable_prediction"),
+    ]
+    raw_cell_types = hypothesis.get("cell_types")
+    cell_types: list[Any] = raw_cell_types if isinstance(raw_cell_types, list) else []
+    entities = hypothesis.get("biological_entities")
+    entity_cell_types: list[Any] = []
+    if isinstance(entities, dict):
+        raw_entity_cell_types = entities.get("cell_types")
+        if isinstance(raw_entity_cell_types, list):
+            entity_cell_types = raw_entity_cell_types
+    text = " ".join(
+        str(value)
+        for value in [*fields, *cell_types, *entity_cell_types]
+        if value
+    )
+    return bool(_EPITHELIAL_ANCHOR_RE.search(text))
+
+
+def _stage1_pair_files_for_intrinsic_coverage(
+    canonical: dict[str, Any],
+    evidence_dir: Path,
+) -> list[str]:
+    stage1_pair_files: set[str] = set()
+    explicit = canonical.get("stage1_pair_files")
+    if isinstance(explicit, list):
+        stage1_pair_files.update(
+            filename
+            for item in explicit
+            if _STAGE1_REF_RE.match(filename := str(item).strip())
+        )
+
+    from src.agents.drug_target.tools.evidence_loader import (
+        _list_real_evidence_filenames,
+        _load_stage1_filter_results_status,
+    )
+
+    filter_results, filter_err = _load_stage1_filter_results_status(evidence_dir)
+    if filter_err:
+        return sorted(stage1_pair_files)
+
+    for filename in sorted(_list_real_evidence_filenames(evidence_dir)):
+        match = _STAGE1_REF_RE.match(filename)
+        if not match:
+            continue
+        pair_key = f"{match.group(1).upper()}--{match.group(2).upper()}"
+        if filter_results.get(pair_key) is True:
+            stage1_pair_files.add(filename)
+    return sorted(stage1_pair_files)
+
+
+def _validate_primary_epithelial_intrinsic_coverage(
+    canonical: dict[str, Any],
+    evidence_dir: str | Path,
+) -> list[str]:
+    from src.agents.drug_target.tools.evidence_loader import (
+        _stage1_pair_usage_guidance,
+    )
+
+    evidence_path = Path(evidence_dir)
+    guidance = _stage1_pair_usage_guidance(
+        evidence_path,
+        _stage1_pair_files_for_intrinsic_coverage(canonical, evidence_path),
+    )
+    intrinsic_files = set(
+        guidance.get("interest_cell_intrinsic_stage1_pair_files") or []
+    )
+    if not intrinsic_files:
+        return []
+
+    for hypothesis in canonical.get("hypotheses") or []:
+        if not isinstance(hypothesis, dict):
+            continue
+        refs = hypothesis.get("evidence_references")
+        if not isinstance(refs, list):
+            continue
+        if intrinsic_files.intersection(str(ref) for ref in refs) and (
+            _hypothesis_has_epithelial_anchor(hypothesis)
+        ):
+            return []
+
+    return [_PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING]
+
+
 def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
     """Validate, canonicalize, and write evidence/hypothesis_report.json."""
     base = Path(data_dir).expanduser().resolve()
@@ -289,6 +554,7 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
         "diagnostics": diagnostics,
     }
     if canonical is None:
+        _write_hypothesis_rejection(evidence_dir, result)
         return result
 
     from src.agents.drug_target.tools.evidence_loader import (
@@ -302,37 +568,60 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
     canonical["topn_coverage"] = diag["topn_coverage"]
     canonical["gap_analysis"] = diag["gap_analysis"]
 
+    deterministic_errors: list[str] = []
     ref_errors = _validate_hypothesis_report_references(canonical, evidence_dir)
-    if ref_errors:
-        result["errors"].extend(ref_errors)
-        result["topn_coverage"] = diag["topn_coverage"]
-        result["failed_pair_violations"] = diag["failed_pair_violations"]
-        return result
-
+    deterministic_errors.extend(ref_errors)
+    gene_ref_errors = _validate_featured_gene_level_references(canonical, evidence_dir)
+    deterministic_errors.extend(gene_ref_errors)
     grounding_errors = validate_hypothesis_grounding(canonical, evidence_dir)
-    if grounding_errors:
-        result["errors"].extend(grounding_errors)
-        result["topn_coverage"] = diag["topn_coverage"]
-        result["failed_pair_violations"] = diag["failed_pair_violations"]
-        result["hypothesis_grounding_violations"] = grounding_errors
-        return result
-
+    deterministic_errors.extend(grounding_errors)
+    primary_coverage_errors = _validate_primary_epithelial_intrinsic_coverage(
+        canonical,
+        evidence_dir,
+    )
+    deterministic_errors.extend(primary_coverage_errors)
     if diag["reject_reason"]:
-        result["errors"].append(diag["reject_reason"])
+        deterministic_errors.append(diag["reject_reason"])
+    if deterministic_errors:
+        result["errors"].extend(deterministic_errors)
         result["topn_coverage"] = diag["topn_coverage"]
         result["failed_pair_violations"] = diag["failed_pair_violations"]
+        if grounding_errors:
+            result["hypothesis_grounding_violations"] = grounding_errors
+        _write_hypothesis_rejection(evidence_dir, result)
         return result
 
-    canonical["prediction_grounding_summary"] = _tag_hypothesis_prediction_grounding(
+    prediction_grounding = _tag_hypothesis_prediction_grounding(
         canonical,
         evidence_dir=evidence_dir,
     )
+    canonical["prediction_grounding_summary"] = prediction_grounding
+    if prediction_grounding.get("grounded", 0) > 0:
+        result["errors"].append(
+            "One or more falsifiable predictions contain fabricated or "
+            "non-evidence-derived numeric values. Use qualitative wording unless "
+            "the numeric value appears in a cited evidence file."
+        )
+        result["prediction_grounding_summary"] = prediction_grounding
+        _write_hypothesis_rejection(evidence_dir, result)
+        return result
+    if prediction_grounding.get("unverified", 0) > 0:
+        result["errors"].append(
+            "One or more falsifiable predictions contain unverified numeric values. "
+            "Use qualitative wording unless the numeric value appears in a cited "
+            "evidence file."
+        )
+        result["prediction_grounding_summary"] = prediction_grounding
+        _write_hypothesis_rejection(evidence_dir, result)
+        return result
 
     if result["errors"]:
+        _write_hypothesis_rejection(evidence_dir, result)
         return result
 
     path = evidence_dir / "hypothesis_report.json"
     path.write_text(json.dumps(canonical, indent=2, ensure_ascii=False), encoding="utf-8")
+    _clear_hypothesis_rejection(evidence_dir)
     result["saved"] = True
     result["diagnostics"] = diagnostics
     return result
@@ -343,6 +632,42 @@ def _quality_error(code: str, message: str, **details: Any) -> dict[str, Any]:
     if details:
         err["details"] = details
     return err
+
+
+def _load_hypothesis_rejection(evidence_dir: Path) -> dict | None:
+    path = _hypothesis_rejection_path(evidence_dir)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "errors": [f"Could not parse {_HYPOTHESIS_REJECTION_FILENAME}: {exc}"],
+        }
+    return payload if isinstance(payload, dict) else {
+        "errors": [f"{_HYPOTHESIS_REJECTION_FILENAME} did not contain a JSON object"],
+    }
+
+
+def _append_last_rejection_quality_error(result: dict, evidence_dir: Path) -> None:
+    rejection = _load_hypothesis_rejection(evidence_dir)
+    if not rejection:
+        return
+    errors = rejection.get("errors")
+    if not isinstance(errors, list) or not errors:
+        return
+    details = dict(rejection)
+    if "code" in details:
+        details["sidecar_code"] = details.pop("code")
+    if "message" in details:
+        details["sidecar_message"] = details.pop("message")
+    result["errors"].append(
+        _quality_error(
+            "HYPOTHESIS_LAST_SAVE_REJECTION",
+            "The last save_hypothesis_report attempt was rejected; use these details for retry repair.",
+            **details,
+        )
+    )
 
 
 def validate_hypothesis_report_quality(
@@ -378,6 +703,7 @@ def validate_hypothesis_report_quality(
                 "evidence/hypothesis_report.json is missing.",
             )
         )
+        _append_last_rejection_quality_error(result, evidence_dir)
         return result
 
     try:
@@ -389,6 +715,7 @@ def validate_hypothesis_report_quality(
                 f"Could not inspect hypothesis_report.json: {exc}",
             )
         )
+        _append_last_rejection_quality_error(result, evidence_dir)
         return result
     if run_started_at is not None and mtime < run_started_at:
         result["errors"].append(
@@ -399,6 +726,7 @@ def validate_hypothesis_report_quality(
                 run_started_at=run_started_at,
             )
         )
+        _append_last_rejection_quality_error(result, evidence_dir)
         return result
 
     try:
@@ -410,6 +738,7 @@ def validate_hypothesis_report_quality(
                 f"hypothesis_report.json is not valid JSON: {exc}",
             )
         )
+        _append_last_rejection_quality_error(result, evidence_dir)
         return result
 
     canonical, errors, diagnostics = canonicalize_hypothesis_report(
@@ -426,6 +755,7 @@ def validate_hypothesis_report_quality(
                 errors=errors,
             )
         )
+        _append_last_rejection_quality_error(result, evidence_dir)
         return result
     if errors:
         result["errors"].append(
@@ -490,6 +820,15 @@ def validate_hypothesis_report_quality(
                 errors=ref_errors,
             )
         )
+    gene_ref_errors = _validate_featured_gene_level_references(canonical, evidence_dir)
+    if gene_ref_errors:
+        result["errors"].append(
+            _quality_error(
+                _GENE_LEVEL_EVIDENCE_REFERENCE_MISSING,
+                "; ".join(gene_ref_errors),
+                errors=gene_ref_errors,
+            )
+        )
     grounding_errors = validate_hypothesis_grounding(canonical, evidence_dir)
     result["hypothesis_grounding_violations"] = grounding_errors
     if grounding_errors:
@@ -498,6 +837,19 @@ def validate_hypothesis_report_quality(
                 "HYPOTHESIS_GROUNDING_VIOLATION",
                 "; ".join(grounding_errors),
                 errors=grounding_errors,
+            )
+        )
+    primary_coverage_errors = _validate_primary_epithelial_intrinsic_coverage(
+        canonical,
+        evidence_dir,
+    )
+    for error_code in primary_coverage_errors:
+        result["errors"].append(
+            _quality_error(
+                error_code,
+                "At least one hypothesis must cite an intrinsic Stage 1 pair file "
+                "and name an AT2, alveolar epithelial, pulmonary epithelial, or "
+                "epithelial context.",
             )
         )
     if diag["failed_pair_violations"]:
@@ -519,6 +871,16 @@ def validate_hypothesis_report_quality(
 
     grounding = _tag_hypothesis_prediction_grounding(canonical, evidence_dir=evidence_dir)
     result["prediction_grounding_summary"] = grounding
+    if grounding.get("grounded", 0) > 0:
+        result["errors"].append(
+            _quality_error(
+                "NON_EVIDENCE_DERIVED_NUMERIC_PREDICTION",
+                "One or more falsifiable predictions contain fabricated or "
+                "non-evidence-derived numeric values. Use qualitative wording "
+                "unless the numeric value appears in a cited evidence file.",
+                grounded_indices=grounding.get("grounded_indices", []),
+            )
+        )
     if grounding.get("unverified", 0) > 0:
         result["errors"].append(
             _quality_error(
@@ -527,6 +889,9 @@ def validate_hypothesis_report_quality(
                 unverified_indices=grounding.get("unverified_indices", []),
             )
         )
+
+    if result["errors"]:
+        _append_last_rejection_quality_error(result, evidence_dir)
 
     result["valid"] = not result["errors"]
     return result

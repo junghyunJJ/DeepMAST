@@ -28,6 +28,59 @@ _EXPLICIT_SINGLE_HYPHEN_PAIR_RE = re.compile(
     r"(?<![A-Za-z0-9])([A-Z][A-Z0-9]{1,11})-([A-Z][A-Z0-9]{1,11})"
     r"(?![A-Za-z0-9])"
 )
+_TARGET_CELL_INTRINSIC_RE = re.compile(
+    r"\b("
+    r"at2[-\s]?intrinsic|target[-\s]?cell[-\s]?intrinsic|same[-\s]?cell|"
+    r"cell[-\s]?autonomous|co[-\s]?express(?:ion|ed|es|ing)?"
+    r")\b",
+    re.IGNORECASE,
+)
+_CROSS_CELL_FRAMING_RE = re.compile(
+    r"\b("
+    r"cross[-\s]?cell|non[-\s]?at2|non[-\s]?target[-\s]?cell|"
+    r"spatial niche|paracrine|between cells"
+    r")\b",
+    re.IGNORECASE,
+)
+_INTRINSIC_NEGATION_RE = re.compile(
+    r"\b("
+    r"not|no|without|does not|do not|did not|should not|must not|cannot|"
+    r"can not|can't|is not|isn't|are not|aren't|non"
+    r")\b(?:\s+\w+){0,6}$",
+    re.IGNORECASE,
+)
+_POST_INTRINSIC_NONCLAIM_RE = re.compile(
+    r"^[\s-]*(?:(?:is|are|was|were)\s+)?(?:depleted|negative|low|reduced)\b",
+    re.IGNORECASE,
+)
+_UNSUPPORTED_OVERCLAIM_RE = re.compile(
+    r"\b("
+    r"blockade\s+for\s+reducing|"
+    r"dysregulation\s+via|"
+    r"barrier\s+dysfunction|"
+    r"complex\s+assembly|"
+    r"activation\s+and\s+matrix\s+deposition|"
+    r"restores\s+fibrosis\s+resolution|"
+    r"blocks\s+fibrosis|"
+    r"drives\s+(?:disease|fibrosis|fibrotic\s+\w+)"
+    r")\b",
+    re.IGNORECASE,
+)
+_FORBIDDEN_CONSERVATIVE_LANGUAGE_RE = re.compile(
+    r"\b("
+    r"therapeutic\s+intervention\s+candidate|"
+    r"therapeutic\s+strategy|"
+    r"synergistic\s+effects?|"
+    r"(?:cd47\s+)?blockade\s+alters\s+fibrosis\s+resolution|"
+    r"alters\s+fibrosis\s+resolution"
+    r")\b",
+    re.IGNORECASE,
+)
+_SPATIAL_NICHE_LABEL_RE = re.compile(r"\bspatial[-\s]+niche\b", re.IGNORECASE)
+_UNSUPPORTED_STAGE1_CONTEXT_RE = re.compile(
+    r"\b(?:appears\s+in\s+)?stage\s*1\s+pair\s+context\b",
+    re.IGNORECASE,
+)
 
 
 def _load_json(path: Path) -> Any:
@@ -137,6 +190,16 @@ def _pair_text(hypothesis: dict[str, Any]) -> str:
     return "\n".join(str(field) for field in fields if field)
 
 
+def _policy_text(hypothesis: dict[str, Any]) -> str:
+    fields = (
+        hypothesis.get("title", ""),
+        hypothesis.get("core_claim", ""),
+        hypothesis.get("falsifiable_prediction", ""),
+        hypothesis.get("validation_approach", ""),
+    )
+    return "\n".join(str(field) for field in fields if field)
+
+
 def _direct_pair_pattern(a: str, b: str) -> re.Pattern[str]:
     sep = r"(?:\s*(?:--|[-/–—])\s*|\s+)"
     return re.compile(
@@ -229,6 +292,25 @@ def _celltype_resolution_tokens(celltype_resolution: Any) -> set[str]:
     return tokens
 
 
+def _stage1_celltype_tokens(evidence_dir: Path) -> set[str]:
+    if not evidence_dir.exists():
+        return set()
+
+    tokens: set[str] = set()
+    for path in evidence_dir.glob("stage1_*.json"):
+        payload = _load_json(path)
+        census_validation = (
+            payload.get("census_validation") if isinstance(payload, dict) else None
+        )
+        if not isinstance(census_validation, dict):
+            continue
+        for key in ("requested_cell_type", "resolved_cell_type", "target_cell_type"):
+            token = _normal_celltype(census_validation.get(key))
+            if token:
+                tokens.add(token)
+    return tokens
+
+
 def _hypothesis_celltype_tokens(hypothesis: dict[str, Any]) -> set[str]:
     entities = hypothesis.get("biological_entities")
     if not isinstance(entities, dict):
@@ -271,6 +353,197 @@ def _negative_stage1_diffs(payload: Any) -> list[str]:
     return []
 
 
+def _metric_direction(metric: Any) -> str:
+    if not isinstance(metric, dict):
+        return "not_determined"
+    risk_ratio = metric.get("risk_ratio")
+    if isinstance(risk_ratio, (int, float)):
+        if risk_ratio > 1:
+            return "enriched"
+        if risk_ratio < 1:
+            return "depleted"
+    diff = metric.get("diff")
+    if isinstance(diff, (int, float)):
+        if diff > 0:
+            return "enriched"
+        if diff < 0:
+            return "depleted"
+    return "not_determined"
+
+
+def _stage1_target_vs_rest(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {}
+    census_validation = payload.get("census_validation")
+    if not isinstance(census_validation, dict):
+        return {}
+    target_vs_rest = census_validation.get("target_vs_rest")
+    return target_vs_rest if isinstance(target_vs_rest, dict) else {}
+
+
+def _stage1_gene_names(payload: Any, filename: str) -> dict[str, str]:
+    pair = _stage1_pair_from_filename(filename) or ("", "")
+    ligand = _normal_gene(
+        payload.get("ligand") if isinstance(payload, dict) else ""
+    ) or pair[0]
+    receptor = _normal_gene(
+        payload.get("receptor") if isinstance(payload, dict) else ""
+    ) or pair[1]
+    return {"gene_a": ligand, "gene_b": receptor}
+
+
+def _claims_target_cell_intrinsic_pair(hypothesis: dict[str, Any]) -> bool:
+    text = _pair_text(hypothesis)
+    if not text:
+        return False
+    for match in _TARGET_CELL_INTRINSIC_RE.finditer(text):
+        prefix = text[max(0, match.start() - 80) : match.start()]
+        suffix = text[match.end() : match.end() + 40]
+        if _INTRINSIC_NEGATION_RE.search(_normal_celltype(prefix)):
+            continue
+        if _POST_INTRINSIC_NONCLAIM_RE.search(suffix):
+            continue
+        return True
+    return False
+
+
+def _unsupported_overclaim_phrases(hypothesis: dict[str, Any]) -> list[str]:
+    text = _pair_text(hypothesis)
+    if not text:
+        return []
+
+    phrases: list[str] = []
+    for clause in re.split(r"[\n.;]+", text):
+        normalized = _normal_celltype(clause)
+        if not normalized or "not yet established" in normalized:
+            continue
+        for match in _UNSUPPORTED_OVERCLAIM_RE.finditer(clause):
+            phrase = " ".join(match.group(1).lower().split())
+            if phrase not in phrases:
+                phrases.append(phrase)
+    return phrases
+
+
+def _forbidden_conservative_language_phrases(
+    hypothesis: dict[str, Any],
+) -> list[str]:
+    text = _policy_text(hypothesis)
+    if not text:
+        return []
+
+    phrases: list[str] = []
+    for match in _FORBIDDEN_CONSERVATIVE_LANGUAGE_RE.finditer(text):
+        phrase = " ".join(match.group(1).lower().split())
+        if phrase not in phrases:
+            phrases.append(phrase)
+    return phrases
+
+
+def _unsupported_gene_level_spatial_language(
+    hypothesis: dict[str, Any],
+    *,
+    cited_stage1_refs: list[str],
+) -> list[str]:
+    if cited_stage1_refs:
+        return []
+
+    text = _policy_text(hypothesis)
+    if not text:
+        return []
+
+    violations: list[str] = []
+    if _SPATIAL_NICHE_LABEL_RE.search(text):
+        violations.append("spatial-niche label without Stage 1/spatial grounding")
+    if _UNSUPPORTED_STAGE1_CONTEXT_RE.search(text):
+        violations.append("Stage 1 pair context without cited Stage 1 reference")
+    return violations
+
+
+def _celltype_term_variants(tokens: set[str]) -> set[str]:
+    terms = set(tokens)
+    for token in list(tokens):
+        if token.endswith(" cell"):
+            terms.add(f"{token}s")
+        if token == "at2":
+            terms.update({"at2 cell", "at2 cells", "at2 epithelial cell", "at2 epithelial cells"})
+        if token == "pulmonary alveolar type 2 cell":
+            terms.add("pulmonary alveolar type 2 cells")
+            terms.update({
+                "at2",
+                "at2 cell",
+                "at2 cells",
+                "at2 epithelial cell",
+                "at2 epithelial cells",
+                "alveolar epithelial cell",
+                "alveolar epithelial cells",
+                "alveolar type 2 cell",
+                "alveolar type 2 cells",
+                "pulmonary epithelial cell",
+                "pulmonary epithelial cells",
+            })
+    return {term for term in terms if term}
+
+
+def _claims_depleted_gene_on_target_cell(
+    hypothesis: dict[str, Any],
+    *,
+    gene: str,
+    celltype_tokens: set[str],
+) -> bool:
+    text = _normal_celltype(_pair_text(hypothesis))
+    if not text or gene.lower() not in text:
+        return False
+    gene_pattern = re.escape(gene.lower())
+    for term in _celltype_term_variants(celltype_tokens):
+        term_pattern = re.escape(term)
+        gene_to_cell = re.compile(
+            rf"\b{gene_pattern}\b(?:\s+\w+){{0,8}}\s+"
+            rf"(?:on|in|within|expressed|expression|localized|localised|present)"
+            rf"(?:\s+\w+){{0,6}}\s+\b{term_pattern}\b"
+        )
+        cell_to_gene = re.compile(
+            rf"\b{term_pattern}\b(?:\s+\w+){{0,8}}\s+"
+            rf"(?:express(?:ed|es|ion)?|has|shows|contains|presents)"
+            rf"(?:\s+\w+){{0,6}}\s+\b{gene_pattern}\b"
+        )
+        if gene_to_cell.search(text) or cell_to_gene.search(text):
+            return True
+    return False
+
+
+def _mentions_interest_celltype(text: Any, celltype_tokens: set[str]) -> bool:
+    normalized = _normal_celltype(text)
+    if not normalized:
+        return False
+    return any(
+        _contains_normalized_phrase(normalized, term)
+        for term in _celltype_term_variants(celltype_tokens)
+    )
+
+
+def _declares_interest_celltype(
+    hypothesis: dict[str, Any],
+    celltype_tokens: set[str],
+) -> bool:
+    entities = hypothesis.get("biological_entities")
+    if not isinstance(entities, dict):
+        return False
+    cell_types = entities.get("cell_types")
+    if not isinstance(cell_types, list):
+        return False
+    return _mentions_interest_celltype(" ".join(str(value) for value in cell_types), celltype_tokens)
+
+
+def _is_target_cell_intrinsic_stage1(payload: Any) -> bool:
+    target_vs_rest = _stage1_target_vs_rest(payload)
+    if _metric_direction(target_vs_rest.get("coexpression", {})) != "enriched":
+        return False
+    return all(
+        _metric_direction(target_vs_rest.get(metric_key, {})) != "depleted"
+        for metric_key in ("gene_a", "gene_b")
+    )
+
+
 def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) -> list[str]:
     """Return deterministic grounding violations for a canonical hypothesis report."""
     hypotheses = parsed.get("hypotheses") if isinstance(parsed, dict) else None
@@ -281,12 +554,40 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
     real = {path.name for path in evidence_dir.iterdir()} if evidence_dir.exists() else set()
     celltype_tokens = _celltype_resolution_tokens(
         _load_json(evidence_dir / "celltype_resolution.json")
-    )
+    ) | _stage1_celltype_tokens(evidence_dir)
     for idx, hypothesis in enumerate(hypotheses):
         if not isinstance(hypothesis, dict):
             continue
         cited_stage1_refs = _cited_stage1_refs(hypothesis)
         cited_pairs = _cited_stage1_pairs(hypothesis)
+        overclaim_phrases = _unsupported_overclaim_phrases(hypothesis)
+        if overclaim_phrases:
+            phrases_text = ", ".join(overclaim_phrases)
+            errors.append(
+                f"hypotheses[{idx}] uses unsupported causal or therapeutic-success "
+                f"wording [{phrases_text}]. Reframe as a conservative follow-up "
+                "`test whether` candidate unless the cited evidence directly "
+                "establishes that mechanism."
+            )
+        forbidden_phrases = _forbidden_conservative_language_phrases(hypothesis)
+        if forbidden_phrases:
+            phrases_text = ", ".join(forbidden_phrases)
+            errors.append(
+                f"hypotheses[{idx}] uses non-conservative follow-up wording "
+                f"[{phrases_text}]. Reframe as evidence-grounded perturbation, "
+                "actionability, additive/non-additive, or readout-testing language."
+            )
+        gene_level_spatial_violations = _unsupported_gene_level_spatial_language(
+            hypothesis,
+            cited_stage1_refs=cited_stage1_refs,
+        )
+        if gene_level_spatial_violations:
+            violations_text = ", ".join(gene_level_spatial_violations)
+            errors.append(
+                f"hypotheses[{idx}] labels gene-level evidence as spatial or "
+                f"Stage 1 grounded without citing Stage 1/spatial evidence "
+                f"[{violations_text}]. Use gene-level/actionability-only framing."
+            )
         for a, b in sorted(_claimed_direct_pairs(hypothesis)):
             if (a, b) in cited_pairs:
                 continue
@@ -303,29 +604,89 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
         used_celltype_tokens = sorted(
             _hypothesis_celltype_tokens(hypothesis) & celltype_tokens
         )
-        if not used_celltype_tokens or not cited_stage1_refs:
+        if not cited_stage1_refs:
             continue
 
-        validation_text = _normal_celltype(hypothesis.get("validation_approach"))
-        if not any(
-            _contains_normalized_phrase(validation_text, token)
-            for token in celltype_tokens
-        ):
-            listed = ", ".join(used_celltype_tokens)
-            errors.append(
-                f"hypotheses[{idx}] lists interest/resolved cell type ({listed}) "
-                "but validation_approach does not mention the original interest label "
-                "or resolved Census cell type."
+        if used_celltype_tokens:
+            validation_text = _normal_celltype(hypothesis.get("validation_approach"))
+            if not any(
+                _contains_normalized_phrase(validation_text, token)
+                for token in celltype_tokens
+            ):
+                listed = ", ".join(used_celltype_tokens)
+                errors.append(
+                    f"hypotheses[{idx}] lists interest/resolved cell type ({listed}) "
+                    "but validation_approach does not mention the original interest label "
+                    "or resolved Census cell type."
+                )
+
+        claims_interest_cell_context = (
+            _declares_interest_celltype(hypothesis, celltype_tokens)
+            or _mentions_interest_celltype(_pair_text(hypothesis), celltype_tokens)
+            or _mentions_interest_celltype(
+                hypothesis.get("validation_approach"),
+                celltype_tokens,
             )
+            or _claims_target_cell_intrinsic_pair(hypothesis)
+        )
 
         for ref in cited_stage1_refs:
-            negative_keys = _negative_stage1_diffs(_load_json(evidence_dir / ref))
-            if not negative_keys:
-                continue
-            keys_text = ", ".join(negative_keys)
-            errors.append(
-                f"hypotheses[{idx}] uses target-cell-depleted Stage 1 Census evidence "
-                f"as interest-cell support: {ref} has negative target-vs-rest diff "
-                f"values for [{keys_text}]."
-            )
+            stage1_payload = _load_json(evidence_dir / ref)
+            negative_keys = _negative_stage1_diffs(stage1_payload)
+            target_vs_rest = _stage1_target_vs_rest(stage1_payload)
+            if negative_keys and claims_interest_cell_context:
+                keys_text = ", ".join(negative_keys)
+                errors.append(
+                    f"hypotheses[{idx}] uses target-cell-depleted Stage 1 Census evidence "
+                    f"as interest-cell support: {ref} has negative target-vs-rest diff "
+                    f"values for [{keys_text}]."
+                )
+
+            if _is_target_cell_intrinsic_stage1(stage1_payload):
+                if not _declares_interest_celltype(hypothesis, celltype_tokens):
+                    errors.append(
+                        f"hypotheses[{idx}] cites target-cell-intrinsic Stage 1 "
+                        f"evidence ({ref}) but biological_entities.cell_types does "
+                        "not include the original interest label, resolved Census "
+                        "cell type, or pulmonary/alveolar epithelial equivalent."
+                    )
+                if not _mentions_interest_celltype(
+                    hypothesis.get("validation_approach"),
+                    celltype_tokens,
+                ):
+                    errors.append(
+                        f"hypotheses[{idx}] cites target-cell-intrinsic Stage 1 "
+                        f"evidence ({ref}) but validation_approach does not test "
+                        "the original interest label, resolved Census cell type, "
+                        "or pulmonary/alveolar epithelial equivalent."
+                    )
+
+            coexpression = target_vs_rest.get("coexpression", {})
+            if (
+                _metric_direction(coexpression) == "depleted"
+                and _claims_target_cell_intrinsic_pair(hypothesis)
+            ):
+                errors.append(
+                    f"hypotheses[{idx}] uses coexpression-depleted Stage 1 Census "
+                    f"evidence as an interest-cell intrinsic same-cell claim: {ref}."
+                )
+
+            gene_names = _stage1_gene_names(stage1_payload, ref)
+            for metric_key in ("gene_a", "gene_b"):
+                gene = gene_names.get(metric_key, "")
+                if not gene:
+                    continue
+                metric = target_vs_rest.get(metric_key, {})
+                if _metric_direction(metric) != "depleted":
+                    continue
+                if _claims_depleted_gene_on_target_cell(
+                    hypothesis,
+                    gene=gene,
+                    celltype_tokens=celltype_tokens,
+                ):
+                    errors.append(
+                        f"hypotheses[{idx}] makes a target-cell-depleted gene "
+                        f"expression claim for {gene}: {ref} shows {metric_key} "
+                        "is depleted in target-vs-rest Census evidence."
+                    )
     return errors

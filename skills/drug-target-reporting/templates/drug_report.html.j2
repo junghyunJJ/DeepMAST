@@ -291,7 +291,7 @@
         <button class="tab-button active" onclick="openTab(event, 'overview')">Overview</button>
         <button class="tab-button" onclick="openTab(event, 'matrix')">Druggability Matrix</button>
         <button class="tab-button" onclick="openTab(event, 'deepdives')">Candidate Deep Dives</button>
-        <button class="tab-button" onclick="openTab(event, 'hypothesis')">Hypothesis Analysis</button>
+        <button class="tab-button" onclick="openTab(event, 'hypothesis')">Follow-up Recommendations</button>
         <button class="tab-button" onclick="openTab(event, 'recommendations')">Recommendations</button>
     </div>
 
@@ -569,19 +569,43 @@
         </details>
     </div>
 
-    {# ===== Tab 4: Hypothesis Analysis ===== #}
+    {# ===== Tab 4: Evidence-Grounded Follow-up Recommendations ===== #}
     <div id="hypothesis" class="tab-content">
-        <h2>Hypothesis-Driven Analysis</h2>
+        <h2>Evidence-Grounded Follow-up Recommendations</h2>
 
         {% if hypothesis %}
-        {% for h in hypothesis %}
+        {% set primary = primary_hypotheses | default([]) %}
+        {% set secondary = secondary_hypotheses | default([]) %}
+        {% set gene_level = gene_level_hypotheses | default([]) %}
+        {% set unbucketed = unbucketed_hypotheses | default([]) %}
+        {% if primary or secondary %}
+        <h3>4.1. Primary AT2/Epithelial Follow-up Candidates</h3>
+        <p style="color: var(--text-secondary);">These recommendations cite Stage 1 Census support for same-cell coexpression enrichment in the resolved epithelial/AT2 cell context.</p>
+        {% if primary %}
+        {% for h in primary %}
         <div class="analysis-section">
-            <h3>{{ h.rank }}. {{ h.title }}</h3>
+            <h3>4.1.{{ h._tier_rank | default(loop.index) }}. {{ h.title }}</h3>
+            {% if h._tier_label %}<p><strong>Interpretation Tier:</strong> {{ h._tier_label }}</p>{% endif %}
             <span class="phase-badge phase-badge-2" style="margin-bottom: 12px; display: inline-block;">{{ h.category }}</span>
 
             <div class="interpretation">
+                <h4>Conservative Interpretation</h4>
                 <p>{{ h.core_claim }}</p>
             </div>
+
+            {% if h.biological_grounding or h.target_disease_support or h.actionability or h.interpretation_constraint %}
+            <h4>Evidence Layer Summary</h4>
+            <div class="table-container">
+                <table>
+                    <tbody>
+                        <tr><td><strong>Biological Grounding</strong></td><td>{{ h.biological_grounding or 'No Stage 1/spatial grounding reference cited.' }}</td></tr>
+                        <tr><td><strong>Target-Disease Support</strong></td><td>{{ h.target_disease_support or 'No Stage 2 OpenTargets evidence cited for this recommendation.' }}</td></tr>
+                        <tr><td><strong>Actionability</strong></td><td>{{ h.actionability or 'No Stage 3 druggability evidence cited; treat as analysis or perturbation-development follow-up.' }}</td></tr>
+                        <tr><td><strong>Interpretation Constraint</strong></td><td>{{ h.interpretation_constraint or 'Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism.' }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
 
             {% if h.genes %}
             <h4>Biological Entities</h4>
@@ -596,12 +620,12 @@
             {% endif %}
 
             {% if h.falsifiable_prediction %}
-            <h4>Falsifiable Prediction</h4>
+            <h4>Recommended Follow-up Test</h4>
             <div class="interpretation"><p>{{ h.falsifiable_prediction }}</p></div>
             {% endif %}
 
             {% if h.validation_approach %}
-            <h4>Validation Approach</h4>
+            <h4>Suggested Validation Approach</h4>
             <div class="interpretation"><p>{{ h.validation_approach }}</p></div>
             {% endif %}
         </div>
@@ -609,7 +633,192 @@
         {% if not loop.last %}<hr class="gene-divider">{% endif %}
         {% endfor %}
         {% else %}
-        <p style="color: var(--text-secondary);"><em>No hypothesis analysis available.</em></p>
+        <p style="color: var(--text-secondary);"><em>No primary AT2/epithelial follow-up candidates met the Stage 1 intrinsic-support criteria.</em></p>
+        {% endif %}
+
+        <h3>4.2. Secondary Spatial-Niche Follow-up Candidates</h3>
+        <p style="color: var(--text-secondary);">These recommendations retain spatially colocalized ligand-receptor evidence as epithelial-associated spatial-niche or cross-cell follow-up candidates, not as epithelial-cell-intrinsic target mechanisms.</p>
+        {% if secondary_stage1_framing_pairs | default([]) %}
+        <h4>Secondary Stage 1 Framing Evidence</h4>
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Pair</th><th>Census direction</th><th>Usage</th><th>Source</th></tr></thead>
+                <tbody>
+                {% for pair in secondary_stage1_framing_pairs %}
+                    <tr>
+                        <td>{{ pair.pair }}</td>
+                        <td>{{ pair.census_direction }}</td>
+                        <td>{{ pair.usage }}</td>
+                        <td><code>{{ pair.source }}</code></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        {% if secondary %}
+        {% for h in secondary %}
+        <div class="analysis-section">
+            <h3>4.2.{{ h._tier_rank | default(loop.index) }}. {{ h.title }}</h3>
+            {% if h._tier_label %}<p><strong>Interpretation Tier:</strong> {{ h._tier_label }}</p>{% endif %}
+            <span class="phase-badge phase-badge-2" style="margin-bottom: 12px; display: inline-block;">{{ h.category }}</span>
+
+            <div class="interpretation">
+                <h4>Conservative Interpretation</h4>
+                <p>{{ h.core_claim }}</p>
+            </div>
+
+            {% if h.biological_grounding or h.target_disease_support or h.actionability or h.interpretation_constraint %}
+            <h4>Evidence Layer Summary</h4>
+            <div class="table-container">
+                <table>
+                    <tbody>
+                        <tr><td><strong>Biological Grounding</strong></td><td>{{ h.biological_grounding or 'No Stage 1/spatial grounding reference cited.' }}</td></tr>
+                        <tr><td><strong>Target-Disease Support</strong></td><td>{{ h.target_disease_support or 'No Stage 2 OpenTargets evidence cited for this recommendation.' }}</td></tr>
+                        <tr><td><strong>Actionability</strong></td><td>{{ h.actionability or 'No Stage 3 druggability evidence cited; treat as analysis or perturbation-development follow-up.' }}</td></tr>
+                        <tr><td><strong>Interpretation Constraint</strong></td><td>{{ h.interpretation_constraint or 'Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism.' }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            {% if h.genes %}
+            <h4>Biological Entities</h4>
+            <div class="table-container">
+                <table>
+                    <tr><td><strong>Genes</strong></td><td>{{ h.genes | join(', ') }}</td></tr>
+                    {% if h.pathways %}<tr><td><strong>Pathways</strong></td><td>{{ h.pathways | join(', ') }}</td></tr>{% endif %}
+                    {% if h.cell_types %}<tr><td><strong>Cell Types</strong></td><td>{{ h.cell_types | join(', ') }}</td></tr>{% endif %}
+                    {% if h.drugs %}<tr><td><strong>Drugs</strong></td><td>{{ h.drugs | join(', ') }}</td></tr>{% endif %}
+                </table>
+            </div>
+            {% endif %}
+
+            {% if h.falsifiable_prediction %}
+            <h4>Recommended Follow-up Test</h4>
+            <div class="interpretation"><p>{{ h.falsifiable_prediction }}</p></div>
+            {% endif %}
+
+            {% if h.validation_approach %}
+            <h4>Suggested Validation Approach</h4>
+            <div class="interpretation"><p>{{ h.validation_approach }}</p></div>
+            {% endif %}
+        </div>
+
+        {% if not loop.last %}<hr class="gene-divider">{% endif %}
+        {% endfor %}
+        {% else %}
+        <p style="color: var(--text-secondary);"><em>No secondary spatial-niche follow-up candidates were retained.</em></p>
+        {% endif %}
+        {% endif %}
+        {% if gene_level %}
+        <h3>4.3. Gene-Level/Actionability Follow-up Candidates</h3>
+        <p style="color: var(--text-secondary);">These recommendations cite target-disease or actionability evidence but no Stage 1/spatial grounding. Treat them as gene-level follow-up candidates, not spatial-niche or AT2-intrinsic evidence.</p>
+        {% for h in gene_level %}
+        <div class="analysis-section">
+            <h3>4.3.{{ h._tier_rank | default(loop.index) }}. {{ h.title }}</h3>
+            {% if h._tier_label %}<p><strong>Interpretation Tier:</strong> {{ h._tier_label }}</p>{% endif %}
+            <span class="phase-badge phase-badge-2" style="margin-bottom: 12px; display: inline-block;">{{ h.category }}</span>
+
+            <div class="interpretation">
+                <h4>Conservative Interpretation</h4>
+                <p>{{ h.core_claim }}</p>
+            </div>
+
+            {% if h.biological_grounding or h.target_disease_support or h.actionability or h.interpretation_constraint %}
+            <h4>Evidence Layer Summary</h4>
+            <div class="table-container">
+                <table>
+                    <tbody>
+                        <tr><td><strong>Biological Grounding</strong></td><td>{{ h.biological_grounding or 'No Stage 1/spatial grounding reference cited.' }}</td></tr>
+                        <tr><td><strong>Target-Disease Support</strong></td><td>{{ h.target_disease_support or 'No Stage 2 OpenTargets evidence cited for this recommendation.' }}</td></tr>
+                        <tr><td><strong>Actionability</strong></td><td>{{ h.actionability or 'No Stage 3 druggability evidence cited; treat as analysis or perturbation-development follow-up.' }}</td></tr>
+                        <tr><td><strong>Interpretation Constraint</strong></td><td>{{ h.interpretation_constraint or 'Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism.' }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            {% if h.genes %}
+            <h4>Biological Entities</h4>
+            <div class="table-container">
+                <table>
+                    <tr><td><strong>Genes</strong></td><td>{{ h.genes | join(', ') }}</td></tr>
+                    {% if h.pathways %}<tr><td><strong>Pathways</strong></td><td>{{ h.pathways | join(', ') }}</td></tr>{% endif %}
+                    {% if h.cell_types %}<tr><td><strong>Cell Types</strong></td><td>{{ h.cell_types | join(', ') }}</td></tr>{% endif %}
+                    {% if h.drugs %}<tr><td><strong>Drugs</strong></td><td>{{ h.drugs | join(', ') }}</td></tr>{% endif %}
+                </table>
+            </div>
+            {% endif %}
+
+            {% if h.falsifiable_prediction %}
+            <h4>Recommended Follow-up Test</h4>
+            <div class="interpretation"><p>{{ h.falsifiable_prediction }}</p></div>
+            {% endif %}
+
+            {% if h.validation_approach %}
+            <h4>Suggested Validation Approach</h4>
+            <div class="interpretation"><p>{{ h.validation_approach }}</p></div>
+            {% endif %}
+        </div>
+
+        {% if not loop.last %}<hr class="gene-divider">{% endif %}
+        {% endfor %}
+        {% endif %}
+        {% if unbucketed or (not primary and not secondary and not gene_level) %}
+        {% set generic_hypotheses = unbucketed if unbucketed else hypothesis %}
+        {% for h in generic_hypotheses %}
+        <div class="analysis-section">
+            <h3>{{ h.rank }}. {{ h.title }}</h3>
+            <span class="phase-badge phase-badge-2" style="margin-bottom: 12px; display: inline-block;">{{ h.category }}</span>
+
+            <div class="interpretation">
+                <h4>Conservative Interpretation</h4>
+                <p>{{ h.core_claim }}</p>
+            </div>
+
+            {% if h.biological_grounding or h.target_disease_support or h.actionability or h.interpretation_constraint %}
+            <h4>Evidence Layer Summary</h4>
+            <div class="table-container">
+                <table>
+                    <tbody>
+                        <tr><td><strong>Biological Grounding</strong></td><td>{{ h.biological_grounding or 'No Stage 1/spatial grounding reference cited.' }}</td></tr>
+                        <tr><td><strong>Target-Disease Support</strong></td><td>{{ h.target_disease_support or 'No Stage 2 OpenTargets evidence cited for this recommendation.' }}</td></tr>
+                        <tr><td><strong>Actionability</strong></td><td>{{ h.actionability or 'No Stage 3 druggability evidence cited; treat as analysis or perturbation-development follow-up.' }}</td></tr>
+                        <tr><td><strong>Interpretation Constraint</strong></td><td>{{ h.interpretation_constraint or 'Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism.' }}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            {% if h.genes %}
+            <h4>Biological Entities</h4>
+            <div class="table-container">
+                <table>
+                    <tr><td><strong>Genes</strong></td><td>{{ h.genes | join(', ') }}</td></tr>
+                    {% if h.pathways %}<tr><td><strong>Pathways</strong></td><td>{{ h.pathways | join(', ') }}</td></tr>{% endif %}
+                    {% if h.cell_types %}<tr><td><strong>Cell Types</strong></td><td>{{ h.cell_types | join(', ') }}</td></tr>{% endif %}
+                    {% if h.drugs %}<tr><td><strong>Drugs</strong></td><td>{{ h.drugs | join(', ') }}</td></tr>{% endif %}
+                </table>
+            </div>
+            {% endif %}
+
+            {% if h.falsifiable_prediction %}
+            <h4>Recommended Follow-up Test</h4>
+            <div class="interpretation"><p>{{ h.falsifiable_prediction }}</p></div>
+            {% endif %}
+
+            {% if h.validation_approach %}
+            <h4>Suggested Validation Approach</h4>
+            <div class="interpretation"><p>{{ h.validation_approach }}</p></div>
+            {% endif %}
+        </div>
+
+        {% if not loop.last %}<hr class="gene-divider">{% endif %}
+        {% endfor %}
+        {% endif %}
+        {% else %}
+        <p style="color: var(--text-secondary);"><em>No follow-up recommendation analysis available.</em></p>
         {% endif %}
     </div>
 

@@ -36,6 +36,32 @@ def _write_hypothesis_evidence(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _add_intrinsic_stage1_evidence(data_dir: Path) -> None:
+    evidence_dir = data_dir / "evidence"
+    filter_path = evidence_dir / "stage1_filter_results.json"
+    rows = json.loads(filter_path.read_text(encoding="utf-8"))
+    rows.insert(0, {"ligand": "ICAM1", "receptor": "MUC1", "passed": True})
+    filter_path.write_text(json.dumps(rows), encoding="utf-8")
+    (evidence_dir / "stage1_ICAM1--MUC1.json").write_text(
+        json.dumps({
+            "pair_id": "ICAM1--MUC1",
+            "status": "PASS",
+            "census_validation": {
+                "risk_ratio": 17.863,
+                "p_value": 0.0,
+                "requested_cell_type": "AT2",
+                "resolved_cell_type": "pulmonary alveolar type 2 cell",
+                "target_vs_rest": {
+                    "gene_a": {"direction": "enriched", "risk_ratio": 2.0},
+                    "gene_b": {"direction": "enriched", "risk_ratio": 2.0},
+                    "coexpression": {"direction": "enriched", "risk_ratio": 2.0},
+                },
+            },
+        }),
+        encoding="utf-8",
+    )
+
+
 def _hypothesis(rank: int, category: str, title: str, refs: list[str], genes: list[str]) -> dict:
     return {
         "rank": rank,
@@ -74,13 +100,13 @@ def _valid_report() -> dict:
                 1,
                 "Mechanism of Action",
                 "FN1-CD4 mechanism",
-                ["stage1_FN1--CD4.json", "stage3_CD4.json"],
+                ["stage1_FN1--CD4.json", "stage3_FN1.json", "stage3_CD4.json"],
                 ["FN1", "CD4"],
             ),
             _hypothesis(
                 2,
                 "Therapeutic Strategy",
-                "FN1 therapeutic strategy",
+                "FN1 actionability follow-up",
                 ["stage1_FN1--SDC2.json", "stage3_FN1.json"],
                 ["FN1", "SDC2"],
             ),
@@ -88,7 +114,7 @@ def _valid_report() -> dict:
                 3,
                 "Cross-Target Interaction",
                 "FN1-CD4 cross target",
-                ["stage1_FN1--CD4.json"],
+                ["stage1_FN1--CD4.json", "stage3_FN1.json", "stage3_CD4.json"],
                 ["FN1", "CD4"],
             ),
             _hypothesis(
@@ -116,6 +142,64 @@ def test_quality_gate_reports_missing_hypothesis_report(tmp_path: Path) -> None:
     assert "HYPOTHESIS_REPORT_MISSING" in _codes(result)
 
 
+def test_quality_gate_includes_last_rejection_when_report_missing(tmp_path: Path) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    sidecar = data_dir / "evidence" / "hypothesis_report_last_rejection.json"
+    sidecar.write_text(
+        json.dumps({
+            "saved": False,
+            "stage": "save_hypothesis_report",
+            "created_at": "2026-06-08T10:00:00+00:00",
+            "errors": [
+                "hypotheses[5] claims direct pair axis 'EZR--MUC1' without citing a matching passed Stage 1 pair file.",
+            ],
+            "hypothesis_grounding_violations": [
+                "hypotheses[5] claims direct pair axis 'EZR--MUC1' without citing a matching passed Stage 1 pair file.",
+            ],
+        }),
+        encoding="utf-8",
+    )
+
+    result = validate_hypothesis_report_quality(data_dir)
+
+    assert result["valid"] is False
+    assert "HYPOTHESIS_REPORT_MISSING" in _codes(result)
+    assert "HYPOTHESIS_LAST_SAVE_REJECTION" in _codes(result)
+    rejection_errors = [
+        err for err in result["errors"]
+        if err["code"] == "HYPOTHESIS_LAST_SAVE_REJECTION"
+    ]
+    assert "EZR--MUC1" in rejection_errors[0]["details"]["errors"][0]
+
+
+def test_quality_gate_sanitizes_reserved_keys_in_last_rejection_sidecar(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    sidecar = data_dir / "evidence" / "hypothesis_report_last_rejection.json"
+    sidecar.write_text(
+        json.dumps({
+            "code": "SIDE_CODE",
+            "message": "side message",
+            "errors": ["sidecar rejection"],
+        }),
+        encoding="utf-8",
+    )
+
+    result = validate_hypothesis_report_quality(data_dir)
+
+    assert result["valid"] is False
+    assert "HYPOTHESIS_REPORT_MISSING" in _codes(result)
+    assert "HYPOTHESIS_LAST_SAVE_REJECTION" in _codes(result)
+    rejection = [
+        err for err in result["errors"]
+        if err["code"] == "HYPOTHESIS_LAST_SAVE_REJECTION"
+    ][0]
+    assert rejection["details"]["errors"] == ["sidecar rejection"]
+    assert rejection["details"]["sidecar_code"] == "SIDE_CODE"
+    assert rejection["details"]["sidecar_message"] == "side message"
+
+
 def test_quality_gate_reports_stale_hypothesis_report(tmp_path: Path) -> None:
     data_dir = _write_hypothesis_evidence(tmp_path)
     report = _valid_report()
@@ -132,6 +216,45 @@ def test_quality_gate_reports_stale_hypothesis_report(tmp_path: Path) -> None:
     assert "HYPOTHESIS_REPORT_STALE" in _codes(result)
 
 
+def test_quality_gate_includes_last_rejection_when_report_stale(tmp_path: Path) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    save_result = json.loads(
+        save_hypothesis_report.invoke({
+            "data_dir": str(data_dir),
+            "report": _valid_report(),
+        })
+    )
+    assert save_result["saved"] is True
+    sidecar = data_dir / "evidence" / "hypothesis_report_last_rejection.json"
+    sidecar.write_text(
+        json.dumps({
+            "saved": False,
+            "stage": "save_hypothesis_report",
+            "created_at": "2026-06-08T10:00:00+00:00",
+            "errors": [
+                "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING: hypotheses[3] missing available gene-level evidence references for FEATURED genes: ICAM1: ot_ICAM1.json, stage3_ICAM1.json",
+            ],
+        }),
+        encoding="utf-8",
+    )
+    hyp_path = data_dir / "evidence" / "hypothesis_report.json"
+    run_started_at = hyp_path.stat().st_mtime + 10
+
+    result = validate_hypothesis_report_quality(data_dir, run_started_at=run_started_at)
+
+    assert result["valid"] is False
+    assert "HYPOTHESIS_REPORT_STALE" in _codes(result)
+    assert "HYPOTHESIS_LAST_SAVE_REJECTION" in _codes(result)
+    rejection_errors = [
+        err for err in result["errors"]
+        if err["code"] == "HYPOTHESIS_LAST_SAVE_REJECTION"
+    ]
+    assert (
+        "ICAM1: ot_ICAM1.json, stage3_ICAM1.json"
+        in rejection_errors[0]["details"]["errors"][0]
+    )
+
+
 def test_quality_gate_accepts_valid_report_with_all_required_categories(tmp_path: Path) -> None:
     data_dir = _write_hypothesis_evidence(tmp_path)
     save_result = json.loads(
@@ -145,6 +268,171 @@ def test_quality_gate_accepts_valid_report_with_all_required_categories(tmp_path
     assert result["hypothesis_count"] == 4
     assert set(result["category_coverage"]["present"]) == REQUIRED_HYPOTHESIS_CATEGORIES
     assert result["category_coverage"]["missing"] == []
+
+
+def test_quality_gate_reports_missing_featured_gene_level_refs_in_stale_report(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    report = _valid_report()
+    report["hypotheses"][0]["evidence_references"] = [
+        "stage1_FN1--CD4.json",
+        "stage3_FN1.json",
+    ]
+    (data_dir / "evidence" / "hypothesis_report.json").write_text(
+        json.dumps(report),
+        encoding="utf-8",
+    )
+
+    result = validate_hypothesis_report_quality(data_dir)
+
+    assert result["valid"] is False
+    assert "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING" in _codes(result)
+    gene_ref_errors = [
+        error
+        for error in result["errors"]
+        if error["code"] == "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING"
+    ]
+    assert any(
+        "stage3_CD4.json" in item
+        for error in gene_ref_errors
+        for item in error["details"]["errors"]
+    )
+
+
+def test_quality_gate_reports_malformed_assessment_for_gene_ref_gate(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    (data_dir / "evidence" / "assessment_results.json").write_text(
+        "{not-json",
+        encoding="utf-8",
+    )
+    (data_dir / "evidence" / "hypothesis_report.json").write_text(
+        json.dumps(_valid_report()),
+        encoding="utf-8",
+    )
+
+    result = validate_hypothesis_report_quality(data_dir)
+
+    assert result["valid"] is False
+    assert "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING" in _codes(result)
+    gene_ref_errors = [
+        error
+        for error in result["errors"]
+        if error["code"] == "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING"
+    ]
+    assert any(
+        "assessment_results.json" in item
+        for error in gene_ref_errors
+        for item in error["details"]["errors"]
+    )
+
+
+def test_quality_gate_reports_non_list_stage3_candidates_for_gene_ref_gate(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    (data_dir / "evidence" / "assessment_results.json").write_text(
+        json.dumps({"stage3_candidates": "ICAM1"}),
+        encoding="utf-8",
+    )
+    (data_dir / "evidence" / "hypothesis_report.json").write_text(
+        json.dumps(_valid_report()),
+        encoding="utf-8",
+    )
+
+    result = validate_hypothesis_report_quality(data_dir)
+
+    assert result["valid"] is False
+    assert "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING" in _codes(result)
+    gene_ref_errors = [
+        error
+        for error in result["errors"]
+        if error["code"] == "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING"
+    ]
+    assert any(
+        "stage3_candidates" in item
+        for error in gene_ref_errors
+        for item in error["details"]["errors"]
+    )
+
+
+def test_quality_gate_rejects_missing_primary_epithelial_intrinsic_coverage(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    _add_intrinsic_stage1_evidence(data_dir)
+    report = _valid_report()
+    report["hypotheses"][0]["title"] = "AT2 epithelial FN1-CD4 mechanism"
+    report["hypotheses"][0]["core_claim"] = (
+        "AT2 epithelial FN1-CD4 biology is testable while intrinsic Stage 1 "
+        "support is available."
+    )
+    report["hypotheses"][0]["biological_entities"]["cell_types"] = ["AT2 epithelial"]
+    (data_dir / "evidence" / "hypothesis_report.json").write_text(
+        json.dumps(report),
+        encoding="utf-8",
+    )
+
+    result = validate_hypothesis_report_quality(data_dir)
+
+    assert result["valid"] is False
+    assert "PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING" in _codes(result)
+
+
+def test_quality_gate_rejects_missing_intrinsic_coverage_with_stale_stage1_pair_files(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    _add_intrinsic_stage1_evidence(data_dir)
+    report = _valid_report()
+    report["stage1_pair_files"] = ["stage1_FN1--CD4.json"]
+    report["hypotheses"][0]["title"] = "AT2 epithelial FN1-CD4 mechanism"
+    report["hypotheses"][0]["core_claim"] = (
+        "AT2 epithelial FN1-CD4 biology is testable while intrinsic Stage 1 "
+        "support is available on disk but uncited."
+    )
+    report["hypotheses"][0]["biological_entities"]["cell_types"] = ["AT2 epithelial"]
+    (data_dir / "evidence" / "hypothesis_report.json").write_text(
+        json.dumps(report),
+        encoding="utf-8",
+    )
+
+    result = validate_hypothesis_report_quality(data_dir)
+
+    assert result["valid"] is False
+    assert "PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING" in _codes(result)
+
+
+def test_quality_gate_accepts_primary_epithelial_intrinsic_coverage(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    _add_intrinsic_stage1_evidence(data_dir)
+    report = _valid_report()
+    report["stage1_pair_files"] = ["stage1_ICAM1--MUC1.json"]
+    hyp = report["hypotheses"][0]
+    hyp["title"] = "Primary AT2 epithelial ICAM1-MUC1 mechanism"
+    hyp["core_claim"] = (
+        "ICAM1-MUC1 supports a primary AT2 epithelial follow-up mechanism."
+    )
+    hyp["evidence_references"] = [
+        "stage1_ICAM1--MUC1.json",
+        "stage3_CD4.json",
+    ]
+    hyp["biological_entities"]["genes"] = ["ICAM1", "MUC1", "CD4"]
+    hyp["biological_entities"]["cell_types"] = ["AT2 epithelial"]
+    hyp["validation_approach"] = "Test ICAM1-MUC1 perturbation in AT2 epithelial cells."
+    save_result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+    assert save_result["saved"] is True, save_result
+
+    result = validate_hypothesis_report_quality(data_dir)
+
+    assert result["valid"] is True
+    assert "PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING" not in _codes(result)
 
 
 def test_quality_gate_rejects_missing_required_category(tmp_path: Path) -> None:
@@ -211,7 +499,15 @@ def test_quality_gate_rejects_unverified_numeric_prediction(tmp_path: Path) -> N
     save_result = json.loads(
         save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
     )
-    assert save_result["saved"] is True
+    assert save_result["saved"] is False
+    assert any("unverified numeric values" in error for error in save_result["errors"])
+
+    # Existing/stale artifacts can still be audited by the quality gate even when
+    # the normal save path would reject the same payload.
+    (data_dir / "evidence" / "hypothesis_report.json").write_text(
+        json.dumps(report),
+        encoding="utf-8",
+    )
 
     result = validate_hypothesis_report_quality(data_dir)
 
