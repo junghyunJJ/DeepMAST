@@ -308,6 +308,8 @@ async def validate_and_maybe_retry_hypothesis(
                         "hypothesis_retry_status": "success_after_timeout",
                         "hypothesis_retry_error": None,
                     }
+                if attempt < max_attempts:
+                    continue
                 return {
                     "hypothesis_quality_valid": False,
                     "hypothesis_quality_errors": quality.get("errors", []),

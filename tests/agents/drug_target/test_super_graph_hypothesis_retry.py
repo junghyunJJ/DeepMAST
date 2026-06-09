@@ -353,6 +353,81 @@ async def test_retry_timeout_accepts_valid_report_saved_before_timeout(
 
 
 @pytest.mark.asyncio
+async def test_retry_timeout_continues_to_next_attempt_and_can_succeed(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    monkeypatch.setenv("DRUG_TARGET_HYPOTHESIS_MAX_QUALITY_RETRIES", "2")
+    attempts: list[int] = []
+
+    async def timeout_then_save_valid(state, config, quality_errors, *, attempt, max_attempts):
+        attempts.append(attempt)
+        if attempt == 1:
+            raise TimeoutError("first retry timed out")
+        result = json.loads(
+            save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": _valid_report()})
+        )
+        assert result["saved"] is True
+
+    monkeypatch.setattr(
+        "src.agents.drug_target.super_graph._invoke_hypothesis_retry",
+        timeout_then_save_valid,
+    )
+
+    from src.agents.drug_target.super_graph import validate_and_maybe_retry_hypothesis
+
+    result = await validate_and_maybe_retry_hypothesis(
+        _state(data_dir),
+        {"recursion_limit": 10000, "configurable": {}},
+    )
+
+    assert attempts == [1, 2]
+    assert result["hypothesis_quality_valid"] is True
+    assert result["hypothesis_retry_attempted"] is True
+    assert result["hypothesis_retry_attempts"] == 2
+    assert result["hypothesis_retry_status"] == "success"
+    assert result["hypothesis_retry_error"] is None
+    assert "report_finalization_error" not in result
+
+
+@pytest.mark.asyncio
+async def test_retry_timeout_is_terminal_only_after_configured_attempts(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    monkeypatch.setenv("DRUG_TARGET_HYPOTHESIS_MAX_QUALITY_RETRIES", "2")
+    attempts: list[int] = []
+
+    async def always_timeout(state, config, quality_errors, *, attempt, max_attempts):
+        attempts.append(attempt)
+        raise TimeoutError(f"retry attempt {attempt} timed out")
+
+    monkeypatch.setattr(
+        "src.agents.drug_target.super_graph._invoke_hypothesis_retry",
+        always_timeout,
+    )
+
+    from src.agents.drug_target.super_graph import validate_and_maybe_retry_hypothesis
+
+    result = await validate_and_maybe_retry_hypothesis(
+        _state(data_dir),
+        {"recursion_limit": 10000, "configurable": {}},
+    )
+
+    assert attempts == [1, 2]
+    assert result["hypothesis_quality_valid"] is False
+    assert result["hypothesis_retry_attempted"] is True
+    assert result["hypothesis_retry_attempts"] == 2
+    assert result["hypothesis_retry_status"] == "timeout"
+    assert result["hypothesis_retry_error"] == "retry attempt 2 timed out"
+    assert result["report_finalization_error"] == (
+        "HYPOTHESIS_QUALITY_GATE_FAILED: hypothesis retry timed out"
+    )
+
+
+@pytest.mark.asyncio
 async def test_retry_disabled_hard_blocks_finalize(tmp_path: Path, monkeypatch) -> None:
     data_dir = _write_hypothesis_evidence(tmp_path)
     monkeypatch.setenv("DRUG_TARGET_GRAPH_HYPOTHESIS_RETRY", "0")
