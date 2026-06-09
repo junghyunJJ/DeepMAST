@@ -120,51 +120,49 @@ def _stage1_filename(a: str, b: str) -> str:
     return f"stage1_{a}--{b}.json"
 
 
-def _pair_key(a: str, b: str) -> tuple[str, str]:
-    """Return a deterministic unordered key for pair-support comparisons."""
-    return tuple(sorted((_normal_gene(a), _normal_gene(b))))
+def _stage1_pair_key(a: str, b: str) -> str:
+    return f"{_normal_gene(a)}--{_normal_gene(b)}"
 
 
-def _stage1_pair_status(evidence_dir: Path) -> dict[tuple[str, str], bool]:
-    """Return Stage 1 pass/fail status keyed by unordered gene pair."""
+def _load_stage1_filter_status(evidence_dir: Path) -> dict[str, bool]:
     try:
         from src.agents.drug_target.tools.evidence_loader import (
             _load_stage1_filter_results_status,
         )
 
-        rows, _ = _load_stage1_filter_results_status(evidence_dir)
+        results, _ = _load_stage1_filter_results_status(evidence_dir)
     except Exception:
         return {}
-    status: dict[tuple[str, str], bool] = {}
-    for pair, passed in rows.items():
-        parsed = _stage1_pair_from_filename(f"stage1_{pair}.json")
-        if not parsed:
-            continue
-        status[_pair_key(*parsed)] = passed
-    return status
+    return results
 
 
-def _matching_stage1_names(
+def _matching_stage1_details(
     a: str,
     b: str,
+    *,
     real_files: set[str],
-    stage1_status: dict[tuple[str, str], bool],
+    filter_status: dict[str, bool],
 ) -> tuple[str, str, list[str]]:
-    """Return expected direct/reverse filenames plus matching existing files."""
     direct_name = _stage1_filename(a, b)
     reverse_name = _stage1_filename(b, a)
-    passed = stage1_status.get(_pair_key(a, b))
-    available = []
-    for name in (direct_name, reverse_name):
+    details: list[str] = []
+    unknown_details: list[str] = []
+    for name, pair_key in (
+        (direct_name, _stage1_pair_key(a, b)),
+        (reverse_name, _stage1_pair_key(b, a)),
+    ):
         if name not in real_files:
             continue
-        suffix = ""
+        passed = filter_status.get(pair_key)
         if passed is True:
-            suffix = " (passed=true)"
+            status = "passed=true"
         elif passed is False:
-            suffix = " (passed=false)"
-        available.append(f"{name}{suffix}")
-    return direct_name, reverse_name, available
+            continue
+        else:
+            unknown_details.append(f"{name} (passed=unknown)")
+            continue
+        details.append(f"{name} ({status})")
+    return direct_name, reverse_name, details or unknown_details
 
 
 def _cited_stage1_refs(hypothesis: dict[str, Any]) -> list[str]:
@@ -599,7 +597,7 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
 
     errors: list[str] = []
     real = {path.name for path in evidence_dir.iterdir()} if evidence_dir.exists() else set()
-    stage1_status = _stage1_pair_status(evidence_dir)
+    filter_status = _load_stage1_filter_status(evidence_dir)
     celltype_tokens = _celltype_resolution_tokens(
         _load_json(evidence_dir / "celltype_resolution.json")
     ) | _stage1_celltype_tokens(evidence_dir)
@@ -639,13 +637,17 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
         for a, b in sorted(_claimed_direct_pairs(hypothesis)):
             if (a, b) in cited_pairs:
                 continue
-            direct_name, reverse_name, available = _matching_stage1_names(
+            direct_name, reverse_name, available = _matching_stage1_details(
                 a,
                 b,
-                real,
-                stage1_status,
+                real_files=real,
+                filter_status=filter_status,
             )
-            available_text = ", ".join(available) if available else "no matching Stage 1 pair file exists"
+            available_text = (
+                ", ".join(available)
+                if available
+                else "no matching Stage 1 pair file exists"
+            )
             errors.append(
                 f"hypotheses[{idx}] claims direct pair axis '{a}--{b}' "
                 f"without citing a matching passed Stage 1 pair file. Expected "
