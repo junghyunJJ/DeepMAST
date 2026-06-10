@@ -159,6 +159,43 @@ def test_run_drug_target_traced_parse_args_accepts_activation_flags() -> None:
     assert args.activation_trace_json == "/tmp/example/activation_trace.json"
 
 
+def test_activation_matrix_default_plan_has_12_trials() -> None:
+    from docs.benchmarks.hypothesis_generation_consistency.run_activation_matrix import (
+        build_trial_plan,
+    )
+
+    trials = build_trial_plan(
+        models=("qwen3.5:35b", "qwen3.5:122b"),
+        ports=(5000, 6000, 7000),
+        modes=("middleware_only", "middleware_plus_activator"),
+    )
+
+    assert len(trials) == 12
+    assert trials[0] == {
+        "model": "qwen3.5:35b",
+        "port": 5000,
+        "mode": "middleware_only",
+        "run_id": "qwen35b_middleware_only_port5000",
+    }
+    assert trials[-1] == {
+        "model": "qwen3.5:122b",
+        "port": 7000,
+        "mode": "middleware_plus_activator",
+        "run_id": "qwen122b_middleware_plus_activator_port7000",
+    }
+
+
+def test_activation_matrix_unload_request_payload() -> None:
+    from docs.benchmarks.hypothesis_generation_consistency.run_activation_matrix import (
+        build_ollama_unload_payload,
+    )
+
+    assert build_ollama_unload_payload("qwen3.5:122b") == {
+        "model": "qwen3.5:122b",
+        "keep_alive": 0,
+    }
+
+
 def _report_one() -> dict:
     return {
         "schema_version": "hypothesis_report.v2",
