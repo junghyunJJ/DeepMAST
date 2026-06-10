@@ -52,6 +52,7 @@ from dotenv import load_dotenv
 from langchain_core.runnables import RunnableConfig
 
 from docs.benchmarks.hypothesis_generation_consistency.activation_trace import (
+    extract_hypothesis_writer_read_skill_file_calls,
     extract_read_skill_file_calls,
     summarize_activation_trace,
 )
@@ -1308,12 +1309,12 @@ async def run_traced(args: argparse.Namespace) -> int:
                 trace_log_fp.flush()
 
                 hypothesis_writer_read_skill_calls.extend(
-                    extract_read_skill_file_calls(
+                    extract_hypothesis_writer_read_skill_file_calls(
                         node_path=node_path,
                         node_name=node_name,
                         node_data=node_data,
                         exposed_skill_names=hypothesis_writer_skill_names,
-                        scope="hypothesis_writer",
+                        infer_unscoped_registered=args.skip_evidence_assessor,
                     )
                 )
                 all_read_skill_calls.extend(

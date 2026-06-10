@@ -138,6 +138,76 @@ def test_extract_hypothesis_writer_read_skill_calls_ignores_other_nodes() -> Non
     ) == []
 
 
+def test_extract_hypothesis_writer_read_skill_file_calls_keeps_unscoped_strict_by_default() -> None:
+    from langchain_core.messages import AIMessage
+
+    from docs.benchmarks.hypothesis_generation_consistency.activation_trace import (
+        extract_hypothesis_writer_read_skill_file_calls,
+    )
+
+    message = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "read_skill_file",
+                "args": {"skill_path": "skills/drug-target-hypothesis/SKILL.md"},
+                "id": "call_1",
+            }
+        ],
+    )
+
+    assert (
+        extract_hypothesis_writer_read_skill_file_calls(
+            node_path="tools:3af27d",
+            node_name="model",
+            node_data={"messages": [message]},
+            exposed_skill_names=("drug-target-hypothesis",),
+        )
+        == []
+    )
+
+
+def test_extract_hypothesis_writer_read_skill_file_calls_can_infer_registered_unscoped_call() -> None:
+    from langchain_core.messages import AIMessage
+
+    from docs.benchmarks.hypothesis_generation_consistency.activation_trace import (
+        extract_hypothesis_writer_read_skill_file_calls,
+    )
+
+    message = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "read_skill_file",
+                "args": {"skill_path": "skills/drug-target-hypothesis/SKILL.md"},
+                "id": "call_1",
+            },
+            {
+                "name": "read_skill_file",
+                "args": {"skill_path": "skills/unregistered-skill/SKILL.md"},
+                "id": "call_2",
+            },
+        ],
+    )
+
+    assert extract_hypothesis_writer_read_skill_file_calls(
+        node_path="tools:3af27d",
+        node_name="model",
+        node_data={"messages": [message]},
+        exposed_skill_names=("drug-target-hypothesis",),
+        infer_unscoped_registered=True,
+    ) == [
+        {
+            "skill_name": "drug-target-hypothesis",
+            "skill_path": "skills/drug-target-hypothesis/SKILL.md",
+            "tool_call_id": "call_1",
+            "node_path": "tools:3af27d",
+            "node_name": "model",
+            "registered": True,
+        }
+    ]
+
+
 def test_run_drug_target_traced_parse_args_accepts_activation_flags() -> None:
     from scripts.run_drug_target_traced import parse_args as parse_traced_args
 

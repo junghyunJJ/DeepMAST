@@ -66,6 +66,37 @@ def extract_read_skill_file_calls(
     return calls
 
 
+def extract_hypothesis_writer_read_skill_file_calls(
+    *,
+    node_path: str,
+    node_name: str,
+    node_data: Any,
+    exposed_skill_names: Sequence[str],
+    infer_unscoped_registered: bool = False,
+) -> list[dict[str, Any]]:
+    scoped_calls = extract_read_skill_file_calls(
+        node_path=node_path,
+        node_name=node_name,
+        node_data=node_data,
+        exposed_skill_names=exposed_skill_names,
+        scope="hypothesis_writer",
+    )
+    if scoped_calls or not infer_unscoped_registered:
+        return scoped_calls
+
+    return [
+        call
+        for call in extract_read_skill_file_calls(
+            node_path=node_path,
+            node_name=node_name,
+            node_data=node_data,
+            exposed_skill_names=exposed_skill_names,
+            scope="",
+        )
+        if call.get("registered") is True
+    ]
+
+
 def summarize_activation_trace(
     *,
     exposed_skill_names: Sequence[str],
