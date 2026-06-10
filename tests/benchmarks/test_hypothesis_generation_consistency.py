@@ -447,6 +447,7 @@ def test_prepare_trial_workspace_removes_prior_report_artifacts(
 
 def test_hypothesis_writer_resume_message_preserves_output_guards() -> None:
     assert "save_hypothesis_report" in HYPOTHESIS_WRITER_RESUME_MESSAGE
+    assert "write_todos" in HYPOTHESIS_WRITER_RESUME_MESSAGE
     assert "write_file" in HYPOTHESIS_WRITER_RESUME_MESSAGE
     assert "/tmp" in HYPOTHESIS_WRITER_RESUME_MESSAGE
     assert "evidence/hypothesis_report.json" in HYPOTHESIS_WRITER_RESUME_MESSAGE

@@ -83,7 +83,9 @@ HYPOTHESIS_WRITER_SKILL_SETS = {
 HYPOTHESIS_WRITER_RESUME_MESSAGE = (
     "Run resume-mode hypothesis generation only using the hypothesis_writer subagent. "
     "Load evidence with load_evidence_files(data_dir=data_dir, scope='hypothesis'). "
-    "Do not use write_file, read_file, ls, or /tmp for hypothesis output. "
+    "Do not use write_todos, write_file, read_file, ls, or /tmp for hypothesis output. "
+    "Do not loop on planning updates; produce the report payload and call "
+    "save_hypothesis_report as soon as evidence references are checked. "
     "If Stage 1 Census evidence is target-cell-depleted, do not use it as "
     "interest-cell support and do not claim depleted genes are enriched; frame it "
     "only as depleted/cross-cell context or omit that Stage 1 reference. "
