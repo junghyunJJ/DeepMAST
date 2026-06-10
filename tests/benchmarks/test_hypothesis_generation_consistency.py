@@ -404,6 +404,11 @@ def test_prepare_trial_workspace_removes_prior_report_artifacts(
         json.dumps({"schema_version": "hypothesis_report.v2"}),
         encoding="utf-8",
     )
+    (evidence / "hypothesis_report_last_rejection.json").write_text(
+        "{}",
+        encoding="utf-8",
+    )
+    (evidence / "hypothesis_draft.json").write_text("{}", encoding="utf-8")
 
     workspace = prepare_trial_workspace(
         source,
@@ -432,7 +437,11 @@ def test_prepare_trial_workspace_removes_prior_report_artifacts(
     assert not (workspace / "token_usage_20260528_113442.json").exists()
     assert not (workspace / "conversation_history").exists()
     assert not (workspace / "large_tool_results").exists()
+    assert not (workspace / "evidence" / "hypothesis_draft.json").exists()
     assert not (workspace / "evidence" / "hypothesis_report.json").exists()
+    assert not (
+        workspace / "evidence" / "hypothesis_report_last_rejection.json"
+    ).exists()
 
 
 def test_hypothesis_writer_resume_message_preserves_output_guards() -> None:
@@ -477,6 +486,14 @@ def test_clean_hypothesis_benchmark_workspace_reports_removed_artifacts(
         "{}",
         encoding="utf-8",
     )
+    (workspace / "evidence" / "hypothesis_report_last_rejection.json").write_text(
+        "{}",
+        encoding="utf-8",
+    )
+    (workspace / "evidence" / "hypothesis_draft.json").write_text(
+        "{}",
+        encoding="utf-8",
+    )
 
     removed = clean_hypothesis_benchmark_workspace(workspace)
 
@@ -488,7 +505,9 @@ def test_clean_hypothesis_benchmark_workspace_reports_removed_artifacts(
         "target_assessment.json",
         "report_data.json",
         "report_validation.json",
+        "evidence/hypothesis_draft.json",
         "evidence/hypothesis_report.json",
+        "evidence/hypothesis_report_last_rejection.json",
         "conversation_history/",
         "large_tool_results/",
         "hypothesis_report.json",
@@ -513,7 +532,11 @@ def test_clean_hypothesis_benchmark_workspace_reports_removed_artifacts(
     assert not (workspace / "large_tool_results").exists()
     assert not (workspace / "token_usage_20260528_113442.json").exists()
     assert not (workspace / "trace_20260528_113442.log").exists()
+    assert not (workspace / "evidence" / "hypothesis_draft.json").exists()
     assert not (workspace / "evidence" / "hypothesis_report.json").exists()
+    assert not (
+        workspace / "evidence" / "hypothesis_report_last_rejection.json"
+    ).exists()
 
 
 @pytest.mark.parametrize("run_id", ["absolute", "../escaped"])

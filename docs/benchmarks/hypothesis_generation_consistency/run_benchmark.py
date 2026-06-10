@@ -46,7 +46,9 @@ HYPOTHESIS_BENCHMARK_CLEAN_FILES = (
     "target_assessment.json",
     "report_data.json",
     "report_validation.json",
+    "evidence/hypothesis_draft.json",
     "evidence/hypothesis_report.json",
+    "evidence/hypothesis_report_last_rejection.json",
 )
 HYPOTHESIS_BENCHMARK_CLEAN_DIRS = (
     "conversation_history",
