@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from argparse import Namespace
 from pathlib import Path
 
@@ -373,6 +374,140 @@ def test_activation_matrix_unload_request_payload() -> None:
     }
 
 
+def test_activation_matrix_parse_args_defaults_to_monitored_mode() -> None:
+    from docs.benchmarks.hypothesis_generation_consistency.run_activation_matrix import (
+        DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
+        parse_args as parse_activation_matrix_args,
+    )
+
+    args = parse_activation_matrix_args([])
+    assert args.wait_for_completion is False
+    assert args.activation_trace_grace_seconds == DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS
+
+    wait_args = parse_activation_matrix_args(
+        ["--wait-for-completion", "--activation-trace-grace-seconds", "0.25"]
+    )
+    assert wait_args.wait_for_completion is True
+    assert wait_args.activation_trace_grace_seconds == 0.25
+
+
+def test_monitored_activation_command_stops_after_trace_and_writes_logs(
+    tmp_path: Path,
+) -> None:
+    from docs.benchmarks.hypothesis_generation_consistency.run_activation_matrix import (
+        run_monitored_activation_command,
+    )
+
+    activation_trace_path = tmp_path / "activation_trace.json"
+    stdout_path = tmp_path / "stdout.log"
+    stderr_path = tmp_path / "stderr.log"
+    child_code = """
+import json
+import sys
+import time
+from pathlib import Path
+
+trace_path = Path(sys.argv[1])
+print("child stdout before trace", flush=True)
+print("child stderr before trace", file=sys.stderr, flush=True)
+trace_path.write_text(
+    json.dumps({"activated_skill_names": ["drug-target-hypothesis"]}),
+    encoding="utf-8",
+)
+time.sleep(30)
+"""
+
+    started = time.monotonic()
+    returncode, error = run_monitored_activation_command(
+        command=[sys.executable, "-c", child_code, str(activation_trace_path)],
+        cwd=tmp_path,
+        env=os.environ.copy(),
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+        timeout_seconds=10,
+        activation_trace_path=activation_trace_path,
+        activation_trace_grace_seconds=0.1,
+        poll_interval_seconds=0.01,
+    )
+    elapsed_s = time.monotonic() - started
+
+    assert elapsed_s < 3
+    assert returncode is not None
+    assert error == f"stopped_after_activation_trace: {activation_trace_path}"
+    assert json.loads(activation_trace_path.read_text(encoding="utf-8")) == {
+        "activated_skill_names": ["drug-target-hypothesis"]
+    }
+    assert "child stdout before trace" in stdout_path.read_text(encoding="utf-8")
+    assert "child stderr before trace" in stderr_path.read_text(encoding="utf-8")
+
+
+def test_monitored_activation_command_terminates_descendant_processes(
+    tmp_path: Path,
+) -> None:
+    if not hasattr(os, "killpg"):
+        pytest.skip("process-group termination is POSIX-specific")
+
+    from docs.benchmarks.hypothesis_generation_consistency.run_activation_matrix import (
+        run_monitored_activation_command,
+    )
+
+    activation_trace_path = tmp_path / "activation_trace.json"
+    grandchild_pid_path = tmp_path / "grandchild.pid"
+    stdout_path = tmp_path / "stdout.log"
+    stderr_path = tmp_path / "stderr.log"
+    child_code = """
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+trace_path = Path(sys.argv[1])
+pid_path = Path(sys.argv[2])
+grandchild = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+pid_path.write_text(str(grandchild.pid), encoding="utf-8")
+trace_path.write_text(json.dumps({"activated_skill_names": ["drug-target-hypothesis"]}), encoding="utf-8")
+time.sleep(30)
+"""
+
+    returncode, error = run_monitored_activation_command(
+        command=[
+            sys.executable,
+            "-c",
+            child_code,
+            str(activation_trace_path),
+            str(grandchild_pid_path),
+        ],
+        cwd=tmp_path,
+        env=os.environ.copy(),
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+        timeout_seconds=10,
+        activation_trace_path=activation_trace_path,
+        activation_trace_grace_seconds=0.1,
+        poll_interval_seconds=0.01,
+    )
+
+    grandchild_pid = int(grandchild_pid_path.read_text(encoding="utf-8"))
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline and _pid_exists(grandchild_pid):
+        time.sleep(0.05)
+
+    assert returncode is not None
+    assert error == f"stopped_after_activation_trace: {activation_trace_path}"
+    assert not _pid_exists(grandchild_pid)
+
+
+def _pid_exists(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def test_activation_matrix_marks_missing_trace_invalid(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -514,11 +649,41 @@ def test_activation_matrix_aggregate_excludes_invalid_trace_denominator() -> Non
     assert group["runs"] == 2
     assert group["successes"] == 2
     assert group["validation_passes"] == 2
+    assert group["activation_trace_checkpoint_runs"] == 0
     assert group["activation_trace_valid_runs"] == 1
     assert group["activation_trace_invalid_runs"] == 1
     assert group["mean_activation_count"] == 1.0
     assert group["skill_activation_rates"] == {"string-database": 1.0}
     assert group["added_skill_activation_rates"] == {"string-database": 1.0}
+
+
+def test_activation_matrix_aggregate_counts_checkpoint_runs_separately() -> None:
+    from docs.benchmarks.hypothesis_generation_consistency.run_activation_matrix import (
+        aggregate_activation,
+    )
+
+    aggregate = aggregate_activation(
+        [
+            {
+                "model": "qwen3.5:35b",
+                "mode": "middleware_only",
+                "returncode": -15,
+                "completion_mode": "activation_trace_checkpoint",
+                "validation": {"validation_passed": False},
+                "activation_trace_valid": True,
+                "activated_skill_names": ["drug-target-hypothesis"],
+                "activated_added_skill_names": [],
+            }
+        ]
+    )
+
+    group = aggregate["groups"]["qwen3.5:35b::middleware_only"]
+    assert group["runs"] == 1
+    assert group["successes"] == 0
+    assert group["validation_passes"] == 0
+    assert group["activation_trace_checkpoint_runs"] == 1
+    assert group["activation_trace_valid_runs"] == 1
+    assert group["skill_activation_rates"] == {"drug-target-hypothesis": 1.0}
 
 
 def test_activation_matrix_unloads_active_model_when_trial_raises(

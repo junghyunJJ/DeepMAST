@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import shutil
 import subprocess
 import sys
@@ -30,6 +31,7 @@ DEFAULT_SOURCE = Path(
 DEFAULT_MODELS = ("qwen3.5:35b", "qwen3.5:122b")
 DEFAULT_PORTS = (5000, 6000, 7000)
 DEFAULT_MODES = ("middleware_only", "middleware_plus_activator")
+DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS = 10.0
 
 
 def model_slug(model: str) -> str:
@@ -126,6 +128,96 @@ def load_activation_trace(path: Path) -> tuple[dict[str, Any], bool, str | None]
     return payload, True, None
 
 
+def terminate_process_gracefully(
+    process: subprocess.Popen,
+    *,
+    terminate_timeout_s: float = 5.0,
+) -> int | None:
+    killpg = getattr(os, "killpg", None)
+    if killpg is None:
+        process.terminate()
+    else:
+        try:
+            killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return process.poll()
+        except OSError:
+            process.terminate()
+    try:
+        return process.wait(timeout=terminate_timeout_s)
+    except subprocess.TimeoutExpired:
+        if killpg is None:
+            process.kill()
+        else:
+            try:
+                killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                return process.poll()
+            except OSError:
+                process.kill()
+        return process.wait()
+
+
+def run_monitored_activation_command(
+    *,
+    command: Sequence[str],
+    cwd: Path,
+    env: dict[str, str],
+    stdout_path: Path,
+    stderr_path: Path,
+    timeout_seconds: float,
+    activation_trace_path: Path,
+    activation_trace_grace_seconds: float = DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
+    poll_interval_seconds: float = 0.2,
+) -> tuple[int | None, str | None]:
+    deadline = time.monotonic() + timeout_seconds
+    trace_seen = False
+
+    with stdout_path.open("w", encoding="utf-8") as stdout_handle, stderr_path.open(
+        "w", encoding="utf-8"
+    ) as stderr_handle:
+        process = subprocess.Popen(
+            list(command),
+            cwd=cwd,
+            env=env,
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+            text=True,
+            start_new_session=True,
+        )
+
+        while True:
+            returncode = process.poll()
+            if returncode is not None:
+                return returncode, None
+
+            if activation_trace_path.exists():
+                trace_seen = True
+                break
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                returncode = terminate_process_gracefully(process)
+                return (
+                    returncode,
+                    f"TimeoutExpired: exceeded {timeout_seconds:g} seconds",
+                )
+
+            time.sleep(min(poll_interval_seconds, remaining))
+
+        try:
+            returncode = process.wait(
+                timeout=max(0.0, activation_trace_grace_seconds)
+            )
+            return returncode, None
+        except subprocess.TimeoutExpired:
+            returncode = terminate_process_gracefully(process)
+
+    if trace_seen:
+        return returncode, f"stopped_after_activation_trace: {activation_trace_path}"
+    return returncode, None
+
+
 def run_one_trial(
     *,
     trial: dict[str, Any],
@@ -135,6 +227,8 @@ def run_one_trial(
     disease: str,
     timeout_minutes: int,
     force: bool,
+    monitor_activation_trace: bool = False,
+    activation_trace_grace_seconds: float = DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
 ) -> dict[str, Any]:
     run_id = str(trial["run_id"])
     workspace = workspace_root / run_id
@@ -181,33 +275,55 @@ def run_one_trial(
         str(activation_trace_path),
     ]
 
-    stdout = ""
-    stderr = ""
     returncode: int | None = None
     error: str | None = None
-    try:
-        completed = subprocess.run(
-            command,
+    completion_mode = "completed"
+    if monitor_activation_trace:
+        returncode, error = run_monitored_activation_command(
+            command=command,
             cwd=PROJECT_ROOT,
             env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=timeout_minutes * 60,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            timeout_seconds=timeout_minutes * 60,
+            activation_trace_path=activation_trace_path,
+            activation_trace_grace_seconds=activation_trace_grace_seconds,
         )
-        stdout = completed.stdout
-        stderr = completed.stderr
-        returncode = completed.returncode
-        if completed.returncode != 0:
-            error = f"returncode={completed.returncode}"
-    except subprocess.TimeoutExpired as exc:
-        stdout = exc.stdout if isinstance(exc.stdout, str) else ""
-        stderr = exc.stderr if isinstance(exc.stderr, str) else ""
-        returncode = None
-        error = f"TimeoutExpired: exceeded {timeout_minutes} minutes"
+        if error and error.startswith("stopped_after_activation_trace:"):
+            completion_mode = "activation_trace_checkpoint"
+        elif error and error.startswith("TimeoutExpired:"):
+            completion_mode = "timeout"
+        if error is None and returncode not in (0, None):
+            error = f"returncode={returncode}"
+            completion_mode = "error"
+    else:
+        stdout = ""
+        stderr = ""
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=PROJECT_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=timeout_minutes * 60,
+            )
+            stdout = completed.stdout
+            stderr = completed.stderr
+            returncode = completed.returncode
+            if completed.returncode != 0:
+                error = f"returncode={completed.returncode}"
+                completion_mode = "error"
+        except subprocess.TimeoutExpired as exc:
+            stdout = exc.stdout if isinstance(exc.stdout, str) else ""
+            stderr = exc.stderr if isinstance(exc.stderr, str) else ""
+            returncode = None
+            error = f"TimeoutExpired: exceeded {timeout_minutes} minutes"
+            completion_mode = "timeout"
 
-    stdout_path.write_text(stdout, encoding="utf-8")
-    stderr_path.write_text(stderr, encoding="utf-8")
+        stdout_path.write_text(stdout, encoding="utf-8")
+        stderr_path.write_text(stderr, encoding="utf-8")
 
     elapsed_s = time.time() - started
     validation = validate_trial_output(
@@ -227,6 +343,7 @@ def run_one_trial(
         "stdout_log": str(stdout_path),
         "stderr_log": str(stderr_path),
         "returncode": returncode,
+        "completion_mode": completion_mode,
         "elapsed_s": round(elapsed_s, 3),
         "validation": validation,
         "activation_trace_valid": activation_trace_valid,
@@ -276,6 +393,11 @@ def aggregate_activation(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
                 1
                 for row in group_rows
                 if row.get("validation", {}).get("validation_passed")
+            ),
+            "activation_trace_checkpoint_runs": sum(
+                1
+                for row in group_rows
+                if row.get("completion_mode") == "activation_trace_checkpoint"
             ),
             "activation_trace_valid_runs": valid_runs,
             "activation_trace_invalid_runs": runs - valid_runs,
@@ -352,6 +474,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--workspace-root", default="")
     parser.add_argument("--disease", default="pulmonary fibrosis")
     parser.add_argument("--timeout-minutes", type=int, default=120)
+    parser.add_argument(
+        "--activation-trace-grace-seconds",
+        type=float,
+        default=DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
+    )
+    parser.add_argument(
+        "--wait-for-completion",
+        action="store_true",
+        help="Wait for each traced command to finish instead of stopping after activation trace.",
+    )
     parser.add_argument("--force", action="store_true")
     return parser.parse_args(argv)
 
@@ -424,6 +556,16 @@ def main() -> int:
                 disease=args.disease,
                 timeout_minutes=args.timeout_minutes,
                 force=args.force,
+                monitor_activation_trace=not getattr(
+                    args,
+                    "wait_for_completion",
+                    False,
+                ),
+                activation_trace_grace_seconds=getattr(
+                    args,
+                    "activation_trace_grace_seconds",
+                    DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
+                ),
             )
             rows.append(row)
             with (output_root / "trials.jsonl").open("a", encoding="utf-8") as handle:
