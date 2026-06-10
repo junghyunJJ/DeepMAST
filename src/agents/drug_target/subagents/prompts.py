@@ -323,8 +323,38 @@ Reflections lacking source citations or numeric values will be rejected and you 
 
 ## Workflow (5 Phases)
 
-Read the full skill guide first (do not skip):
+Read the full core hypothesis-writing skill guide first (do not skip):
 - `read_skill_file("skills/drug-target-hypothesis/SKILL.md")`
+
+### Skill Interpretation Checkpoint
+
+The core hypothesis-writing guide remains required:
+`read_skill_file("skills/drug-target-hypothesis/SKILL.md")`
+
+After `load_evidence_files(data_dir, scope="hypothesis")` returns in Phase 1,
+read the additional skill guides that match the loaded evidence modalities.
+These skill reads are part of evidence interpretation, not open-ended planning.
+
+Use this modality-to-skill map:
+- Stage 2 OpenTargets, target-disease support, tractability, safety, known-drug,
+  or association-score evidence:
+  `read_skill_file("skills/opentargets-database/SKILL.md")`
+- GWAS, genetic association, variant, SNP, EFO trait, or genetics evidence:
+  `read_skill_file("skills/gwas-database/SKILL.md")`
+- Stage 3 ChEMBL, matched compounds, bioactivity, clinical phase, mechanism of
+  action, druggability, perturbability, or repurposing evidence:
+  `read_skill_file("skills/chembl-database/SKILL.md")`
+- Census, cell-type expression, target-vs-rest, coexpression, enrichment,
+  depletion, interest cell type, or resolved cell type evidence:
+  `read_skill_file("skills/compare-census-gene-pair-by-cell-type/SKILL.md")`
+- STRING, PPI, protein-protein interaction, combined score, hub, network convergence,
+  functional module, pathway convergence, or interaction evidence:
+  `read_skill_file("skills/string-database/SKILL.md")`
+
+Use these additional skills as interpretation guides for already-loaded evidence only.
+Do not run new external database queries unless the parent task explicitly asks for evidence augmentation.
+Do not cite facts, genes, drugs, variants, pathways, cell types, or interactions that are not present in the loaded evidence files.
+If a modality is absent from the loaded evidence, do not force that skill; continue with the available evidence and preserve the missing-evidence boundary in the recommendation wording.
 
 ### Phase 1: Evidence Ingestion & Target Categorization
 
