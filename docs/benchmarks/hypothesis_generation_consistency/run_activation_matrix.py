@@ -370,7 +370,7 @@ def main() -> int:
         Path(args.workspace_root).expanduser().resolve()
         if args.workspace_root
         else PROJECT_ROOT
-        / "docs/benchmarks/hypothesis_generation_consistency/results/workspaces"
+        / "docs/benchmarks/hypothesis_generation_consistency/workspaces"
         / stamp
     )
     output_root.mkdir(parents=True, exist_ok=True)

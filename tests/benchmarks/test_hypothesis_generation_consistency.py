@@ -421,6 +421,50 @@ def test_activation_matrix_direct_script_help_works() -> None:
     assert "Run expanded6 activation comparison" in completed.stdout
 
 
+def test_activation_matrix_default_workspace_root_is_sibling_to_results(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from docs.benchmarks.hypothesis_generation_consistency import run_activation_matrix
+
+    source = tmp_path / "source"
+    source.mkdir()
+    monkeypatch.setattr(run_activation_matrix, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(run_activation_matrix.time, "strftime", lambda _: "expanded6_activation_fixed")
+    monkeypatch.setattr(
+        run_activation_matrix,
+        "parse_args",
+        lambda: Namespace(
+            source=str(source),
+            output_root="",
+            workspace_root="",
+            disease="pulmonary fibrosis",
+            timeout_minutes=1,
+            force=True,
+        ),
+    )
+    monkeypatch.setattr(
+        run_activation_matrix,
+        "build_trial_plan",
+        lambda *, models, ports, modes: [],
+    )
+
+    assert run_activation_matrix.main() == 0
+
+    assert (
+        tmp_path
+        / "docs/benchmarks/hypothesis_generation_consistency/results/expanded6_activation_fixed"
+    ).is_dir()
+    assert (
+        tmp_path
+        / "docs/benchmarks/hypothesis_generation_consistency/workspaces/expanded6_activation_fixed"
+    ).is_dir()
+    assert not (
+        tmp_path
+        / "docs/benchmarks/hypothesis_generation_consistency/results/workspaces/expanded6_activation_fixed"
+    ).exists()
+
+
 def _report_one() -> dict:
     return {
         "schema_version": "hypothesis_report.v2",
