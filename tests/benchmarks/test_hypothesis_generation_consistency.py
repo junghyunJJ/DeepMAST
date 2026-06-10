@@ -160,6 +160,112 @@ def test_run_drug_target_traced_parse_args_accepts_activation_flags() -> None:
     assert args.activation_trace_json == "/tmp/example/activation_trace.json"
 
 
+def test_run_drug_target_traced_writes_activation_trace_without_final_report(
+    tmp_path: Path,
+) -> None:
+    from scripts.run_drug_target_traced import write_activation_trace_json
+
+    output_path = tmp_path / "activation_trace.json"
+    trace_log_path = tmp_path / "trace.log"
+    writer_calls = [
+        {
+            "skill_name": "drug-target-hypothesis",
+            "skill_path": "skills/drug-target-hypothesis/SKILL.md",
+            "tool_call_id": "call_1",
+            "node_path": "orchestrator > hypothesis_writer",
+            "node_name": "hypothesis_writer",
+            "registered": True,
+        },
+        {
+            "skill_name": "string-database",
+            "skill_path": "skills/string-database/SKILL.md",
+            "tool_call_id": "call_2",
+            "node_path": "orchestrator > hypothesis_writer",
+            "node_name": "hypothesis_writer",
+            "registered": True,
+        },
+    ]
+
+    written_path = write_activation_trace_json(
+        activation_trace_path=output_path,
+        exposed_skill_names=EXPANDED6_HYPOTHESIS_WRITER_SKILLS,
+        hypothesis_writer_read_skill_calls=writer_calls,
+        all_read_skill_calls=writer_calls,
+        skill_set="expanded6",
+        skill_activation_mode="middleware_only",
+        model="qwen3.5:35b",
+        ollama_base_url="http://localhost:5000",
+        data_dir=tmp_path,
+        trace_log_path=trace_log_path,
+        report_finalized=False,
+    )
+
+    assert written_path == output_path
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["report_finalized"] is False
+    assert payload["skill_set"] == "expanded6"
+    assert payload["skill_activation_mode"] == "middleware_only"
+    assert payload["model"] == "qwen3.5:35b"
+    assert payload["ollama_base_url"] == "http://localhost:5000"
+    assert payload["data_dir"] == str(tmp_path)
+    assert payload["trace_log"] == str(trace_log_path)
+    assert payload["activated_skill_names"] == [
+        "drug-target-hypothesis",
+        "string-database",
+    ]
+    assert payload["activated_added_skill_names"] == ["string-database"]
+
+
+def test_run_drug_target_traced_writes_checkpoint_to_default_trace_path(
+    tmp_path: Path,
+) -> None:
+    from scripts.run_drug_target_traced import (
+        resolve_activation_trace_path,
+        write_activation_trace_checkpoint,
+    )
+
+    data_dir = tmp_path / "workspace"
+    trace_log_path = tmp_path / "trace.log"
+    timestamp = "20260610_120000"
+    writer_calls = [
+        {
+            "skill_name": "string-database",
+            "skill_path": "skills/string-database/SKILL.md",
+            "tool_call_id": "call_1",
+            "node_path": "orchestrator > hypothesis_writer",
+            "node_name": "hypothesis_writer",
+            "registered": True,
+        },
+    ]
+
+    activation_trace_path = resolve_activation_trace_path(
+        None,
+        data_dir=data_dir,
+        timestamp=timestamp,
+    )
+    written_path = write_activation_trace_checkpoint(
+        activation_trace_path=activation_trace_path,
+        exposed_skill_names=EXPANDED6_HYPOTHESIS_WRITER_SKILLS,
+        hypothesis_writer_read_skill_calls=writer_calls,
+        all_read_skill_calls=writer_calls,
+        skill_set="expanded6",
+        skill_activation_mode="middleware_plus_activator",
+        model="qwen3.5:122b",
+        ollama_base_url="http://localhost:7000",
+        data_dir=data_dir,
+        trace_log_path=trace_log_path,
+    )
+
+    assert written_path == data_dir / f"activation_trace_{timestamp}.json"
+    payload = json.loads(written_path.read_text(encoding="utf-8"))
+    assert payload["report_finalized"] is False
+    assert payload["activated_skill_names"] == ["string-database"]
+    assert payload["activated_added_skill_names"] == ["string-database"]
+    trace_log = trace_log_path.read_text(encoding="utf-8")
+    assert "[ACTIVATION-TRACE-CHECKPOINT]" in trace_log
+    assert "before hypothesis quality/finalize" in trace_log
+
+
 def test_activation_matrix_default_plan_has_12_trials() -> None:
     from docs.benchmarks.hypothesis_generation_consistency.run_activation_matrix import (
         build_trial_plan,
