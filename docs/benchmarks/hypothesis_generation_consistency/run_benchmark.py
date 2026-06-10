@@ -54,6 +54,37 @@ HYPOTHESIS_BENCHMARK_CLEAN_GLOBS = (
     "trace_*.log",
 )
 
+CURRENT4_HYPOTHESIS_WRITER_SKILLS = (
+    "drug-target-hypothesis",
+    "opentargets-database",
+    "gwas-database",
+    "chembl-database",
+)
+
+EXPANDED6_HYPOTHESIS_WRITER_SKILLS = (
+    "drug-target-hypothesis",
+    "opentargets-database",
+    "gwas-database",
+    "chembl-database",
+    "compare-census-gene-pair-by-cell-type",
+    "string-database",
+)
+
+HYPOTHESIS_WRITER_SKILL_SETS = {
+    "current4": CURRENT4_HYPOTHESIS_WRITER_SKILLS,
+    "expanded6": EXPANDED6_HYPOTHESIS_WRITER_SKILLS,
+}
+
+
+def resolve_hypothesis_writer_skill_names(skill_set: str) -> tuple[str, ...]:
+    try:
+        return tuple(list(HYPOTHESIS_WRITER_SKILL_SETS[skill_set]))
+    except KeyError as exc:
+        known = ", ".join(sorted(HYPOTHESIS_WRITER_SKILL_SETS))
+        raise ValueError(
+            f"unknown skill set {skill_set!r}; expected one of: {known}"
+        ) from exc
+
 
 def _is_root_hypothesis_report_artifact(path: Path) -> bool:
     name = path.name.casefold()
@@ -317,6 +348,7 @@ async def run_hypothesis_writer_once(
     disease: str,
     provider: str,
     timeout_s: int,
+    hypothesis_writer_skill_names: tuple[str, ...],
 ) -> None:
     from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
 
@@ -331,6 +363,7 @@ async def run_hypothesis_writer_once(
             data_dir=str(workspace),
             disease=disease,
             use_checkpointer=False,
+            hypothesis_writer_skill_names=hypothesis_writer_skill_names,
         )
         agent, backend = create_drug_target_agent(config)
         try:
@@ -366,6 +399,7 @@ async def run_trial(
     provider: str,
     timeout_s: int,
     force: bool,
+    hypothesis_writer_skill_names: tuple[str, ...],
 ) -> dict[str, Any]:
     workspace = prepare_trial_workspace(source, workspace_root, run_id, force=force)
     started = time.time()
@@ -376,6 +410,7 @@ async def run_trial(
             disease=disease,
             provider=provider,
             timeout_s=timeout_s,
+            hypothesis_writer_skill_names=hypothesis_writer_skill_names,
         )
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
@@ -450,6 +485,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", default=None)
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--skill-set",
+        choices=sorted(HYPOTHESIS_WRITER_SKILL_SETS),
+        default="current4",
+        help=(
+            "Hypothesis-writer skill registry for the run. "
+            "current4 is production default; expanded6 adds compare-census and STRING."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -466,6 +510,9 @@ async def async_main() -> int:
     provider = args.provider.strip()
     if not provider:
         raise SystemExit("--provider must be non-empty for live benchmark runs")
+    hypothesis_writer_skill_names = resolve_hypothesis_writer_skill_names(
+        args.skill_set
+    )
     scope = check_hypothesis_scope(source)
     if scope["errors"]:
         raise SystemExit(f"hypothesis scope loader errors: {scope['errors']}")
@@ -502,6 +549,7 @@ async def async_main() -> int:
             provider=provider,
             timeout_s=args.timeout_s,
             force=args.force,
+            hypothesis_writer_skill_names=hypothesis_writer_skill_names,
         )
         rows.append(row)
         append_jsonl(trials_path, row)
@@ -513,6 +561,8 @@ async def async_main() -> int:
         "provider": provider,
         "disease": args.disease,
         "runs_requested": args.runs,
+        "skill_set": args.skill_set,
+        "hypothesis_writer_skill_names": list(hypothesis_writer_skill_names),
         "hypothesis_scope": scope,
         "aggregate": aggregate,
         "trials": rows,

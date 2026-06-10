@@ -15,12 +15,15 @@ from docs.benchmarks.hypothesis_generation_consistency.analysis import (
     summarize_report,
 )
 from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
+    CURRENT4_HYPOTHESIS_WRITER_SKILLS,
+    EXPANDED6_HYPOTHESIS_WRITER_SKILLS,
     clean_hypothesis_benchmark_workspace,
     check_hypothesis_scope,
     check_hypothesis_scope_untraced,
     find_forbidden_hypothesis_artifacts,
     parse_args,
     prepare_trial_workspace,
+    resolve_hypothesis_writer_skill_names,
     validate_trial_output,
 )
 
@@ -30,6 +33,36 @@ def test_hypothesis_generation_consistency_package_imports() -> None:
         "docs.benchmarks.hypothesis_generation_consistency"
     )
     assert module.__name__ == "docs.benchmarks.hypothesis_generation_consistency"
+
+
+def test_current4_and_expanded6_skill_sets_are_explicit() -> None:
+    assert CURRENT4_HYPOTHESIS_WRITER_SKILLS == (
+        "drug-target-hypothesis",
+        "opentargets-database",
+        "gwas-database",
+        "chembl-database",
+    )
+    assert EXPANDED6_HYPOTHESIS_WRITER_SKILLS == (
+        "drug-target-hypothesis",
+        "opentargets-database",
+        "gwas-database",
+        "chembl-database",
+        "compare-census-gene-pair-by-cell-type",
+        "string-database",
+    )
+
+
+def test_resolve_hypothesis_writer_skill_names_returns_tuple_copy() -> None:
+    first = resolve_hypothesis_writer_skill_names("expanded6")
+    second = resolve_hypothesis_writer_skill_names("expanded6")
+
+    assert first == EXPANDED6_HYPOTHESIS_WRITER_SKILLS
+    assert first is not second
+
+
+def test_resolve_hypothesis_writer_skill_names_rejects_unknown_name() -> None:
+    with pytest.raises(ValueError, match="unknown skill set"):
+        resolve_hypothesis_writer_skill_names("expanded")
 
 
 def _report_one() -> dict:
@@ -438,6 +471,20 @@ def test_parse_args_uses_ollama_when_provider_env_is_empty(
     args = parse_args()
 
     assert args.provider == "ollama"
+
+
+def test_parse_args_accepts_expanded6_skill_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_benchmark.py", "--skill-set", "expanded6"],
+    )
+
+    args = parse_args()
+
+    assert args.skill_set == "expanded6"
 
 
 def test_validate_trial_output_marks_missing_report_as_failure(
