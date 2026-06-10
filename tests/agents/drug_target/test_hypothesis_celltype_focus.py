@@ -658,6 +658,74 @@ def test_save_hypothesis_report_rejects_missing_reverse_stage1_citation_names_av
     assert not (evidence / "hypothesis_report.json").exists()
 
 
+def test_save_hypothesis_report_accepts_independent_gene_level_multi_gene_hypothesis(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ITGB2", "CD4"])
+
+    report = {
+        "schema_version": "hypothesis_report.v2",
+        "disease": "pulmonary fibrosis",
+        "hypotheses_generated": 1,
+        "hypotheses_retained": 1,
+        "hypotheses": [
+            {
+                "rank": 1,
+                "title": (
+                    "ITGB2 and CD4 independent gene-level actionability "
+                    "follow-up candidates"
+                ),
+                "category": "Mechanism of Action",
+                "core_claim": (
+                    "ITGB2 has gene-level evidence, while CD4 has gene-level "
+                    "evidence. Not yet established: whether ITGB2 or CD4 "
+                    "perturbation changes immune-cell interaction readouts."
+                ),
+                "evidence_references": [
+                    "stage3_ITGB2.json",
+                    "stage3_CD4.json",
+                ],
+                "contrast_references": [],
+                "biological_entities": {
+                    "genes": ["ITGB2", "CD4"],
+                    "pathways": ["immune cell adhesion"],
+                    "cell_types": ["CD4-positive T cell", "alveolar macrophage"],
+                    "drugs": [],
+                },
+                "falsifiable_prediction": (
+                    "Test whether ITGB2-centered perturbation changes immune "
+                    "cell readouts; separately test whether CD4-centered "
+                    "perturbation changes T cell readouts."
+                ),
+                "validation_approach": (
+                    "Gene-level/actionability-only follow-up: test ITGB2 and "
+                    "CD4 perturbations as independent assays in immune "
+                    "cell-enriched contexts."
+                ),
+                "scores": {
+                    "evidence_coverage": 0.8,
+                    "specificity": 0.8,
+                    "novelty": 0.6,
+                    "actionability": 0.7,
+                    "composite": 0.73,
+                },
+            }
+        ],
+        "gap_analysis": {
+            "total_evidence_files": 2,
+            "referenced_files": 2,
+            "orphan_files": [],
+        },
+    }
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(tmp_path), "report": report})
+    )
+
+    assert result["saved"] is True, result
+
+
 def test_save_hypothesis_report_rejects_reverse_stage1_pair_when_filter_failed(
     tmp_path: Path,
 ) -> None:
