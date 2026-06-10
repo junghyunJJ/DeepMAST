@@ -133,6 +133,14 @@ def _codes(result: dict) -> set[str]:
     return {err["code"] for err in result.get("errors", [])}
 
 
+def _warning_codes(result: dict) -> set[str]:
+    return {
+        warning["code"]
+        for warning in result.get("warnings", [])
+        if isinstance(warning, dict) and "code" in warning
+    }
+
+
 def test_quality_gate_reports_missing_hypothesis_report(tmp_path: Path) -> None:
     _write_hypothesis_evidence(tmp_path)
 
@@ -268,6 +276,109 @@ def test_quality_gate_accepts_valid_report_with_all_required_categories(tmp_path
     assert result["hypothesis_count"] == 4
     assert set(result["category_coverage"]["present"]) == REQUIRED_HYPOTHESIS_CATEGORIES
     assert result["category_coverage"]["missing"] == []
+
+
+def test_quality_gate_warns_on_empty_stage3_matched_drug_wording(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    evidence_dir = data_dir / "evidence"
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps({"stage3_candidates": [{"gene": "CD47"}]}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage3_CD47.json").write_text(
+        json.dumps({"gene_symbol": "CD47", "chembl": {"matched_drugs": []}}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "ot_CD47.json").write_text(
+        json.dumps({"known_drugs": [{"name": "MAGROLIMAB"}]}),
+        encoding="utf-8",
+    )
+    report = _valid_report()
+    report["hypotheses"] = [
+        _hypothesis(
+            1,
+            "Mechanism of Action",
+            "CD47 ChEMBL actionability hypothesis",
+            ["stage3_CD47.json", "ot_CD47.json"],
+            ["CD47"],
+        ),
+        _hypothesis(
+            2,
+            "Therapeutic Strategy",
+            "CD47 therapeutic follow-up",
+            ["stage3_CD47.json", "ot_CD47.json"],
+            ["CD47"],
+        ),
+        _hypothesis(
+            3,
+            "Cross-Target Interaction",
+            "CD47 cross-target follow-up",
+            ["stage3_CD47.json", "ot_CD47.json"],
+            ["CD47"],
+        ),
+        _hypothesis(
+            4,
+            "Novel Pathway",
+            "CD47 novel pathway follow-up",
+            ["stage3_CD47.json", "ot_CD47.json"],
+            ["CD47"],
+        ),
+    ]
+    report["hypotheses"][0]["core_claim"] = (
+        "CD47 has Stage 3 ChEMBL drug evidence and OpenTargets known-drug support."
+    )
+    (evidence_dir / "hypothesis_report.json").write_text(
+        json.dumps(report),
+        encoding="utf-8",
+    )
+
+    result = validate_hypothesis_report_quality(data_dir)
+
+    assert result["valid"] is True, result
+    assert "EMPTY_STAGE3_MATCHED_DRUGS_WORDING" in _warning_codes(result)
+
+
+def test_quality_gate_warns_on_entity_gene_without_cited_support(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    report = _valid_report()
+    report["hypotheses"][1]["evidence_references"] = ["stage3_FN1.json"]
+    report["hypotheses"][1]["biological_entities"]["genes"] = ["FN1", "SDC2"]
+    (data_dir / "evidence" / "hypothesis_report.json").write_text(
+        json.dumps(report),
+        encoding="utf-8",
+    )
+
+    result = validate_hypothesis_report_quality(data_dir)
+
+    assert result["valid"] is True, result
+    assert "BIOLOGICAL_ENTITY_GENE_WITHOUT_CITED_SUPPORT" in _warning_codes(result)
+
+
+def test_quality_gate_warns_on_fibrosis_resolution_wording(tmp_path: Path) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    report = _valid_report()
+    report["hypotheses"][3]["title"] = (
+        "FN1 actionability follow-up candidate for fibrosis resolution"
+    )
+    report["hypotheses"][3]["core_claim"] = (
+        "FN1 perturbation may change fibrosis resolution readouts."
+    )
+    report["hypotheses"][3]["validation_approach"] = (
+        "Measure fibrosis resolution endpoints in matched perturbation assays."
+    )
+    (data_dir / "evidence" / "hypothesis_report.json").write_text(
+        json.dumps(report),
+        encoding="utf-8",
+    )
+
+    result = validate_hypothesis_report_quality(data_dir)
+
+    assert result["valid"] is True, result
+    assert "FIBROSIS_RESOLUTION_WORDING" in _warning_codes(result)
 
 
 def test_quality_gate_reports_missing_featured_gene_level_refs_in_stale_report(

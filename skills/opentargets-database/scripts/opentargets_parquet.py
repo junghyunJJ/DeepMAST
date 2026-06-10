@@ -14,6 +14,7 @@ Expected directory layout (relative to project root):
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -23,7 +24,14 @@ import pyarrow.parquet as pq
 logger = logging.getLogger(__name__)
 
 # ── Data directory ────────────────────────────────────────────────────
-DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "ot_data"
+def _resolve_data_dir() -> Path:
+    explicit = os.getenv("OPENTARGETS_DATA_DIR")
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    return Path(__file__).resolve().parents[3] / "data" / "ot_data"
+
+
+DATA_DIR = _resolve_data_dir()
 
 # ── Module-level caches (loaded once on first use) ────────────────────
 _target_df: pd.DataFrame | None = None

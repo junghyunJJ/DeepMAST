@@ -156,6 +156,40 @@ def _write_featured_gene_reference_evidence(
     return tmp_path
 
 
+def _write_semantic_warning_evidence(
+    tmp_path: Path,
+    *,
+    featured: list[str],
+    pairs: list[tuple[str, str]],
+    gene_files: dict[str, dict],
+) -> Path:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps({"stage3_candidates": [{"gene": gene} for gene in featured]}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage1_filter_results.json").write_text(
+        json.dumps([
+            {"ligand": ligand, "receptor": receptor, "passed": True}
+            for ligand, receptor in pairs
+        ]),
+        encoding="utf-8",
+    )
+    for ligand, receptor in pairs:
+        (evidence_dir / f"stage1_{ligand}--{receptor}.json").write_text(
+            json.dumps({
+                "pair_id": f"{ligand}--{receptor}",
+                "status": "PASS",
+                "stage1_filter": {"passed": True},
+            }),
+            encoding="utf-8",
+        )
+    for filename, payload in sorted(gene_files.items()):
+        (evidence_dir / filename).write_text(json.dumps(payload), encoding="utf-8")
+    return tmp_path
+
+
 def _pair_report(
     *,
     title: str,
@@ -618,6 +652,113 @@ def test_save_hypothesis_report_rejects_missing_primary_epithelial_intrinsic_cov
     assert result["saved"] is False
     assert "PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING" in result["errors"]
     assert not (data_dir / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_warns_empty_stage3_matched_drugs_wording(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_semantic_warning_evidence(
+        tmp_path,
+        featured=["CD47"],
+        pairs=[("CD47", "FN1")],
+        gene_files={
+            "ot_CD47.json": {
+                "gene_symbol": "CD47",
+                "known_drugs": [{"drug_name": "magrolimab"}],
+            },
+            "stage3_CD47.json": {"gene_symbol": "CD47", "matched_drugs": []},
+        },
+    )
+    report = _pair_report(
+        title="CD47-FN1 axis nominates a CD47-anchored macrophage follow-up",
+        core_claim=(
+            "CD47 has Stage 3 ChEMBL drug and matched-drug support for IPF "
+            "follow-up."
+        ),
+        refs=["stage1_CD47--FN1.json", "ot_CD47.json", "stage3_CD47.json"],
+        genes=["CD47", "FN1"],
+        validation="Test CD47 perturbation in macrophage-fibroblast coculture.",
+    )
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is True, result
+    assert any(
+        diagnostic.get("code") == "EMPTY_STAGE3_MATCHED_DRUGS_WORDING"
+        and diagnostic.get("hypothesis_index") == 0
+        and diagnostic.get("gene") == "CD47"
+        for diagnostic in result["diagnostics"]
+    )
+
+
+def test_save_hypothesis_report_warns_context_partner_without_cited_support(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_semantic_warning_evidence(
+        tmp_path,
+        featured=["FN1"],
+        pairs=[("FN1", "CD4")],
+        gene_files={
+            "ot_FN1.json": {"gene_symbol": "FN1"},
+            "stage3_FN1.json": {"gene_symbol": "FN1", "matched_drugs": []},
+        },
+    )
+    report = _pair_report(
+        title="FN1-anchored epithelial matrix follow-up",
+        core_claim=(
+            "FN1 is supported by cited evidence, while SDC2 is included as a "
+            "biological entity."
+        ),
+        refs=["stage1_FN1--CD4.json", "ot_FN1.json", "stage3_FN1.json"],
+        genes=["FN1", "SDC2"],
+        validation="Test FN1 perturbation in pulmonary alveolar type 2 cell models.",
+    )
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is True, result
+    assert any(
+        diagnostic.get("code") == "BIOLOGICAL_ENTITY_GENE_WITHOUT_CITED_SUPPORT"
+        and diagnostic.get("hypothesis_index") == 0
+        and diagnostic.get("gene") == "SDC2"
+        for diagnostic in result["diagnostics"]
+    )
+
+
+def test_save_hypothesis_report_warns_fibrosis_resolution_wording(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_semantic_warning_evidence(
+        tmp_path,
+        featured=["FN1"],
+        pairs=[("FN1", "CD4")],
+        gene_files={
+            "ot_FN1.json": {"gene_symbol": "FN1"},
+            "stage3_FN1.json": {"gene_symbol": "FN1", "matched_drugs": []},
+        },
+    )
+    report = _pair_report(
+        title="FN1 axis for fibrosis resolution readouts",
+        core_claim="FN1 has cited evidence for matrix follow-up.",
+        refs=["stage1_FN1--CD4.json", "ot_FN1.json", "stage3_FN1.json"],
+        genes=["FN1", "CD4"],
+        validation="Test FN1 perturbation in pulmonary alveolar type 2 cell models.",
+    )
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is True, result
+    assert any(
+        diagnostic.get("code") == "FIBROSIS_RESOLUTION_WORDING"
+        and diagnostic.get("hypothesis_index") == 0
+        for diagnostic in result["diagnostics"]
+    )
 
 
 def test_save_hypothesis_report_rejects_missing_intrinsic_coverage_with_stale_stage1_pair_files(

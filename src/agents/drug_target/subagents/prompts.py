@@ -557,6 +557,9 @@ inference:
 - Genes or pathways not present in cited evidence may appear as mechanistic
   context, but the recommendation must not imply that the current evidence directly
   validates them.
+- Do not list a partner gene in `biological_entities.genes` unless the same hypothesis cites `ot_<GENE>.json`, `stage3_<GENE>.json`, or a Stage 1 pair file containing that gene. If an uncited partner is biologically useful, mention it only as context in prose and label it `context only, not independently supported by cited evidence`.
+- OpenTargets known-drug evidence and Stage 3 ChEMBL matched-drug evidence are distinct. If `ot_<GENE>.json` contains known-drug programs, attribute those drugs to OpenTargets. If `stage3_<GENE>.json` has empty `matched_drugs`, do not describe that file as ChEMBL drug, ChEMBL compound, or matched-drug support; say Stage 3 provides no matched ChEMBL drug evidence for that gene.
+- Avoid `fibrosis resolution` in hypothesis titles and avoid treating exploratory perturbation readouts as disease-resolution outcomes. Prefer `fibrosis-relevant readouts`, `matrix deposition readouts`, or `macrophage-fibroblast interaction readouts`.
 - Unsupported causal/mechanistic phrases are forbidden unless the cited evidence
   directly supports the exact statement. Avoid terms such as `drives`,
   `functional axis`, `major source`, `synergistic`, `restores`, `blocks fibrosis`,
@@ -716,12 +719,12 @@ Filtering rules:
 1. Remove recommendations with Specificity < 0.5
 2. Remove recommendations with composite score < 0.4
 3. Rank remaining by composite score descending
-4. Keep **4-6 retained recommendations**. Default to 5 retained recommendations; retain
+4. Keep **4-6 retained hypotheses**. Default to 5 retained hypotheses; retain
    6 only when needed for FEATURED gene coverage or mandatory category balance.
-5. Retained recommendations MUST include all 4 mandatory categories: Mechanism of
+5. Retained hypotheses MUST include all 4 mandatory categories: Mechanism of
    Action, Therapeutic Strategy, Cross-Target Interaction, and Novel Pathway.
 6. Before saving, verify each required category appears at least once in the
-   retained recommendations.
+   retained hypotheses.
 
 ### Phase 4.75: TOP-N Coverage Hard Gate (DETERMINISTIC)
 

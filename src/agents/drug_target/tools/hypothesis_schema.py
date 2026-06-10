@@ -44,6 +44,20 @@ _PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING = (
     "PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING"
 )
 _GENE_LEVEL_EVIDENCE_REFERENCE_MISSING = "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING"
+_EMPTY_STAGE3_MATCHED_DRUGS_WORDING = "EMPTY_STAGE3_MATCHED_DRUGS_WORDING"
+_BIOLOGICAL_ENTITY_GENE_WITHOUT_CITED_SUPPORT = (
+    "BIOLOGICAL_ENTITY_GENE_WITHOUT_CITED_SUPPORT"
+)
+_FIBROSIS_RESOLUTION_WORDING = "FIBROSIS_RESOLUTION_WORDING"
+_CHEMBL_DRUG_WORDING_RE = re.compile(
+    r"\b("
+    r"ChEMBL\s+(?:drug|drugs|compound|compounds|matched[- ]drug|matched[- ]drugs|bioactivity)"
+    r"|stage\s*3\s+(?:drug|drugs|compound|compounds|matched[- ]drug|matched[- ]drugs|ChEMBL)"
+    r"|matched_drugs"
+    r")\b",
+    re.IGNORECASE,
+)
+_FIBROSIS_RESOLUTION_RE = re.compile(r"\bfibrosis resolution\b", re.IGNORECASE)
 _HYPOTHESIS_REJECTION_FILENAME = "hypothesis_report_last_rejection.json"
 
 
@@ -235,6 +249,121 @@ def _available_gene_level_references(evidence_dir: Path, gene: str) -> list[str]
         for filename in (f"ot_{gene}.json", f"stage3_{gene}.json")
         if (evidence_dir / filename).exists()
     ]
+
+
+def _hypothesis_semantic_text(hypothesis: dict[str, Any]) -> str:
+    entities = hypothesis.get("biological_entities")
+    entity_drugs: list[Any] = []
+    if isinstance(entities, dict):
+        raw_drugs = entities.get("drugs")
+        if isinstance(raw_drugs, list):
+            entity_drugs = raw_drugs
+    return " ".join(
+        str(value)
+        for value in [
+            hypothesis.get("title"),
+            hypothesis.get("core_claim"),
+            hypothesis.get("falsifiable_prediction"),
+            hypothesis.get("validation_approach"),
+            *entity_drugs,
+        ]
+        if value
+    )
+
+
+def _matched_drugs_count(value: Any) -> int:
+    return len(value) if isinstance(value, list) else 0
+
+
+def _stage3_matched_drug_count(evidence_dir: Path, gene: str) -> int | None:
+    path = evidence_dir / f"stage3_{gene.upper()}.json"
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    chembl = payload.get("chembl")
+    nested = chembl.get("matched_drugs") if isinstance(chembl, dict) else None
+    return max(
+        _matched_drugs_count(payload.get("matched_drugs")),
+        _matched_drugs_count(nested),
+    )
+
+
+def _stage1_reference_contains_gene(filename: str, gene: str) -> bool:
+    match = _STAGE1_REF_RE.match(filename)
+    if not match:
+        return False
+    return gene.upper() in {match.group(1).upper(), match.group(2).upper()}
+
+
+def _gene_has_cited_support(gene: str, cited_refs: set[str]) -> bool:
+    gene = gene.upper()
+    if f"ot_{gene}.json" in cited_refs or f"stage3_{gene}.json" in cited_refs:
+        return True
+    return any(_stage1_reference_contains_gene(ref, gene) for ref in cited_refs)
+
+
+def _semantic_hypothesis_warnings(canonical: dict, evidence_dir: Path) -> list[dict]:
+    warnings: list[dict] = []
+    hypotheses = canonical.get("hypotheses")
+    if not isinstance(hypotheses, list):
+        return warnings
+
+    for idx, hypothesis in enumerate(hypotheses):
+        if not isinstance(hypothesis, dict):
+            continue
+        text = _hypothesis_semantic_text(hypothesis)
+        cited_refs = _hypothesis_reference_tokens(hypothesis)
+        entity_genes = _hypothesis_entity_gene_symbols(hypothesis)
+
+        if _FIBROSIS_RESOLUTION_RE.search(text):
+            warnings.append({
+                "code": _FIBROSIS_RESOLUTION_WORDING,
+                "hypothesis_index": idx,
+                "message": (
+                    "Use fibrosis-relevant, matrix-deposition, or macrophage-fibroblast "
+                    "readouts instead of fibrosis-resolution outcome wording."
+                ),
+            })
+
+        for gene in sorted(entity_genes):
+            if not _gene_has_cited_support(gene, cited_refs):
+                warnings.append({
+                    "code": _BIOLOGICAL_ENTITY_GENE_WITHOUT_CITED_SUPPORT,
+                    "hypothesis_index": idx,
+                    "gene": gene,
+                    "message": (
+                        f"{gene} appears in biological_entities.genes but this "
+                        "hypothesis does not cite an ot/stage3 gene file or a "
+                        "Stage 1 pair containing that gene."
+                    ),
+                })
+
+        if not _CHEMBL_DRUG_WORDING_RE.search(text):
+            continue
+        for ref in sorted(cited_refs):
+            match = re.match(r"^stage3_([A-Za-z0-9-]+)\.json$", ref)
+            if not match:
+                continue
+            gene = match.group(1).upper()
+            if _stage3_matched_drug_count(evidence_dir, gene) == 0:
+                warnings.append({
+                    "code": _EMPTY_STAGE3_MATCHED_DRUGS_WORDING,
+                    "hypothesis_index": idx,
+                    "gene": gene,
+                    "reference": ref,
+                    "message": (
+                        f"{ref} has empty matched_drugs; attribute known-drug "
+                        "programs to ot_<GENE>.json/OpenTargets instead of "
+                        "Stage 3 ChEMBL matched-drug evidence."
+                    ),
+                })
+
+    return warnings
 
 
 def _validate_featured_gene_level_references(
@@ -556,6 +685,7 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
     if canonical is None:
         _write_hypothesis_rejection(evidence_dir, result)
         return result
+    diagnostics.extend(_semantic_hypothesis_warnings(canonical, evidence_dir))
 
     from src.agents.drug_target.tools.evidence_loader import (
         _tag_hypothesis_prediction_grounding,
@@ -757,6 +887,7 @@ def validate_hypothesis_report_quality(
         )
         _append_last_rejection_quality_error(result, evidence_dir)
         return result
+    result["warnings"].extend(_semantic_hypothesis_warnings(canonical, evidence_dir))
     if errors:
         result["errors"].append(
             _quality_error(

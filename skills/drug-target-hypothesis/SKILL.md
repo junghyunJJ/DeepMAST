@@ -239,6 +239,9 @@ Generation guidance:
 - In `falsifiable_prediction`, prefer `test whether ... changes` over `should reduce` or `should alter` unless a cited file directly supports that expected direction.
 - For asymmetric Stage 2/3 support in a Stage 1 pair, write the recommendation as `<SUPPORTED_GENE>-anchored`. The supported gene is the perturbation or actionability anchor; the unsupported partner is a coexpression-context partner or readout.
 - Do not treat the unsupported partner as independently druggable, target-disease-supported, or perturbation-prioritized unless its exact gene-level evidence file is cited.
+- Do not list a partner gene in `biological_entities.genes` unless the same hypothesis cites `ot_<GENE>.json`, `stage3_<GENE>.json`, or a Stage 1 pair file containing that gene. If an uncited partner is biologically useful, mention it only as context in prose and label it `context only, not independently supported by cited evidence`.
+- OpenTargets known-drug evidence and Stage 3 ChEMBL matched-drug evidence are distinct. If `ot_<GENE>.json` contains known-drug programs, attribute those drugs to OpenTargets. If `stage3_<GENE>.json` has empty `matched_drugs`, do not describe that file as ChEMBL drug, ChEMBL compound, or matched-drug support; say Stage 3 provides no matched ChEMBL drug evidence for that gene.
+- Avoid `fibrosis resolution` in hypothesis titles and avoid treating exploratory perturbation readouts as disease-resolution outcomes. Prefer `fibrosis-relevant readouts`, `matrix deposition readouts`, or `macrophage-fibroblast interaction readouts`.
 - Include `Not yet established:` when the recommendation extends beyond direct Stage 1, Stage 3, OpenTargets, ChEMBL, or spatial evidence.
 
 ---

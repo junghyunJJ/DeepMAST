@@ -53,3 +53,41 @@ def test_hypothesis_writer_prompt_requires_category_coverage_before_saving() -> 
         "Before saving, verify each required category appears at least once in the\n"
         "   retained hypotheses."
     ) in text
+
+
+def test_hypothesis_writer_prompt_separates_opentargets_from_stage3_chembl() -> None:
+    text = prompts.HYPOTHESIS_WRITER_PROMPT
+
+    assert (
+        "OpenTargets known-drug evidence and Stage 3 ChEMBL matched-drug "
+        "evidence are distinct"
+    ) in text
+    assert (
+        "If `stage3_<GENE>.json` has empty `matched_drugs`, do not describe "
+        "that file as ChEMBL drug, ChEMBL compound, or matched-drug support"
+    ) in text
+
+
+def test_hypothesis_writer_prompt_requires_context_only_partner_wording() -> None:
+    text = prompts.HYPOTHESIS_WRITER_PROMPT
+
+    assert (
+        "Do not list a partner gene in `biological_entities.genes` unless the "
+        "same hypothesis cites `ot_<GENE>.json`, `stage3_<GENE>.json`, or a "
+        "Stage 1 pair file containing that gene"
+    ) in text
+    assert (
+        "If an uncited partner is biologically useful, mention it only as "
+        "context in prose and label it `context only, not independently "
+        "supported by cited evidence`"
+    ) in text
+
+
+def test_hypothesis_writer_prompt_softens_fibrosis_resolution_wording() -> None:
+    text = prompts.HYPOTHESIS_WRITER_PROMPT
+
+    assert "Avoid `fibrosis resolution` in hypothesis titles" in text
+    assert (
+        "Prefer `fibrosis-relevant readouts`, `matrix deposition readouts`, or "
+        "`macrophage-fibroblast interaction readouts`"
+    ) in text
