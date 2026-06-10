@@ -51,6 +51,15 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from dotenv import load_dotenv
 from langchain_core.runnables import RunnableConfig
 
+from docs.benchmarks.hypothesis_generation_consistency.activation_trace import (
+    extract_read_skill_file_calls,
+    summarize_activation_trace,
+)
+from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
+    HYPOTHESIS_WRITER_SKILL_SETS,
+    resolve_hypothesis_writer_skill_names,
+)
+
 load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 # Re-enforce after dotenv (dotenv won't override, but be explicit)
@@ -151,6 +160,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
              "files are already on disk from a prior partial run. Orchestrator runs only "
              "hypothesis_writer, then the finalize_report node. Sets env var "
              "DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR=1 before agent construction.",
+    )
+    p.add_argument(
+        "--hypothesis-skill-set",
+        choices=sorted(HYPOTHESIS_WRITER_SKILL_SETS),
+        default="current4",
+        help="Hypothesis writer skill set to expose (default: current4).",
+    )
+    p.add_argument(
+        "--skill-activation-mode",
+        choices=("middleware_only", "middleware_plus_activator"),
+        default="middleware_plus_activator",
+        help="Skill activation mode for hypothesis writer skills.",
+    )
+    p.add_argument(
+        "--activation-trace-json",
+        default=None,
+        help="Path for activation trace JSON (default: data_dir/activation_trace_<timestamp>.json).",
     )
     args = p.parse_args(argv)
     if args.port is not None and args.provider.lower() != "ollama":
@@ -996,16 +1022,27 @@ async def run_traced(args: argparse.Namespace) -> int:
         create_drug_target_agent,
     )
 
+    hypothesis_writer_skill_names = resolve_hypothesis_writer_skill_names(
+        args.hypothesis_skill_set
+    )
+    enable_skill_activator = (
+        args.skill_activation_mode == "middleware_plus_activator"
+    )
+
     config = DrugTargetConfig(
         provider=args.provider,
         data_dir=str(data_dir),
         disease=args.disease,
         use_checkpointer=True,
         enable_census=args.census,
+        hypothesis_writer_skill_names=hypothesis_writer_skill_names,
+        enable_skill_activator=enable_skill_activator,
     )
     agent, backend = create_drug_target_agent(config)
     print(f"[CONFIG] Agent created (provider={args.provider})")
     print(f"[CONFIG] Disease: {args.disease}")
+    print(f"[CONFIG] Hypothesis skill set: {args.hypothesis_skill_set}")
+    print(f"[CONFIG] Skill activation mode: {args.skill_activation_mode}")
     print(f"[CONFIG] LLM_PROVIDER env: {os.environ['LLM_PROVIDER']}")
     if ollama_base_url:
         print(f"[CONFIG] Ollama base URL: {ollama_base_url}")
@@ -1037,6 +1074,8 @@ async def run_traced(args: argparse.Namespace) -> int:
     evidence_ready_started_at: float | None = None
     hypothesis_budget_aborted = False
     captured_drug_md_holder = {"content": None}  # Fallback: capture drug.md from Command(files=...)
+    hypothesis_writer_read_skill_calls: list[dict[str, Any]] = []
+    all_read_skill_calls: list[dict[str, Any]] = []
     # Capture finalize_report state fields from stream updates
     captured_finalization_state: dict = {
         "report_finalization_error": None,
@@ -1145,6 +1184,25 @@ async def run_traced(args: argparse.Namespace) -> int:
                 trace_log_fp.write(f"  {_format_update_summary({node_name: node_data})}\n")
                 trace_log_fp.write(f"{'─' * 62}\n")
                 trace_log_fp.flush()
+
+                hypothesis_writer_read_skill_calls.extend(
+                    extract_read_skill_file_calls(
+                        node_path=node_path,
+                        node_name=node_name,
+                        node_data=node_data,
+                        exposed_skill_names=hypothesis_writer_skill_names,
+                        scope="hypothesis_writer",
+                    )
+                )
+                all_read_skill_calls.extend(
+                    extract_read_skill_file_calls(
+                        node_path=node_path,
+                        node_name=node_name,
+                        node_data=node_data,
+                        exposed_skill_names=hypothesis_writer_skill_names,
+                        scope="",
+                    )
+                )
 
                 # Capture drug.md content from Command(files=...) state updates
                 _capture_drug_md_from_update(node_data, captured_drug_md_holder)
@@ -1507,6 +1565,39 @@ async def run_traced(args: argparse.Namespace) -> int:
             "  missing_finalization: "
             + "; ".join(report_status["missing_requirements"])
         )
+    activation_trace = summarize_activation_trace(
+        exposed_skill_names=hypothesis_writer_skill_names,
+        hypothesis_writer_calls=hypothesis_writer_read_skill_calls,
+        all_read_skill_calls=all_read_skill_calls,
+    )
+    activation_trace.update(
+        {
+            "skill_set": args.hypothesis_skill_set,
+            "skill_activation_mode": args.skill_activation_mode,
+            "model": os.getenv("LLM_MODEL") or os.getenv("OLLAMA_MODEL") or "",
+            "ollama_base_url": ollama_base_url,
+            "data_dir": str(data_dir),
+            "trace_log": str(trace_log_path),
+            "report_finalized": report_status["finalized"],
+        }
+    )
+    activation_trace_path = (
+        Path(args.activation_trace_json)
+        if args.activation_trace_json
+        else data_dir / f"activation_trace_{timestamp}.json"
+    )
+    if not activation_trace_path.is_absolute():
+        activation_trace_path = PROJECT_ROOT / activation_trace_path
+    activation_trace_path.parent.mkdir(parents=True, exist_ok=True)
+    activation_trace_path.write_text(
+        json.dumps(activation_trace, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    print(f"  Activation trace:    {activation_trace_path}")
+    print(
+        "  activated_skills:    "
+        + ", ".join(activation_trace["activated_skill_names"])
+    )
     print(f"  Trace log:           {trace_log_path}")
     print(f"  Workspace:           {data_dir}")
     print(f"  Runtime:             {elapsed:.1f}s")

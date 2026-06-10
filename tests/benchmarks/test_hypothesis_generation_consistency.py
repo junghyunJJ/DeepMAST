@@ -137,6 +137,28 @@ def test_extract_hypothesis_writer_read_skill_calls_ignores_other_nodes() -> Non
     ) == []
 
 
+def test_run_drug_target_traced_parse_args_accepts_activation_flags() -> None:
+    from scripts.run_drug_target_traced import parse_args as parse_traced_args
+
+    args = parse_traced_args(
+        [
+            "--data-dir",
+            "/tmp/example",
+            "--skip-evidence-assessor",
+            "--hypothesis-skill-set",
+            "expanded6",
+            "--skill-activation-mode",
+            "middleware_only",
+            "--activation-trace-json",
+            "/tmp/example/activation_trace.json",
+        ]
+    )
+
+    assert args.hypothesis_skill_set == "expanded6"
+    assert args.skill_activation_mode == "middleware_only"
+    assert args.activation_trace_json == "/tmp/example/activation_trace.json"
+
+
 def _report_one() -> dict:
     return {
         "schema_version": "hypothesis_report.v2",
