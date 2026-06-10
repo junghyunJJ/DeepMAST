@@ -20,13 +20,56 @@ def test_retry_message_includes_numeric_prediction_correction() -> None:
 
     assert "Retry attempt 2 of 3" in message
     assert "UNVERIFIED_NUMERIC_PREDICTION" in message
-    assert "unsupported percentages" in message
+    assert "unsupported numeric predicted effects" in message
     assert "fold changes" in message
     assert "p-values" in message
+    assert "effect-size thresholds" in message
+    assert "predictive claims in validation_approach" in message
     assert "rewrite the prediction qualitatively" in message
+    assert "test whether the perturbation changes disease-relevant marker expression" in message
+    assert "Do not remove legitimate protocol or control details" in message
+    assert "doses, timepoints, sample sizes, assay thresholds" in message
+    assert "when they are framed as experimental design rather than predicted effects" in message
+    assert "may appear in experimental protocol outside falsifiable_prediction" in message
     assert "Do not copy failed numeric predictions" in message
     assert "unverified_indices" in message
     assert 'task(subagent_type="hypothesis_writer"' in message
+    assert "from falsifiable_prediction and validation_approach unless" not in message
+
+
+def test_retry_message_includes_numeric_prediction_correction_from_last_rejection() -> None:
+    message = build_hypothesis_retry_message(
+        "res_ipf_drugtarget1",
+        "idiopathic pulmonary fibrosis",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "One or more falsifiable predictions contain unverified numeric values. Use qualitative wording unless the numeric value appears in a cited evidence file."
+                    ],
+                    "prediction_grounding_summary": {
+                        "unverified": 1,
+                        "unverified_indices": [2],
+                    },
+                },
+            }
+        ],
+        attempt=1,
+        max_attempts=3,
+    )
+
+    assert "HYPOTHESIS_LAST_SAVE_REJECTION" in message
+    assert "unsupported numeric predicted effects" in message
+    assert "fold changes" in message
+    assert "predictive claims in validation_approach" in message
+    assert "rewrite the prediction qualitatively" in message
+    assert "test whether the perturbation changes disease-relevant marker expression" in message
+    assert "Do not remove legitimate protocol or control details" in message
+    assert "may appear in experimental protocol outside falsifiable_prediction" in message
+    assert "Do not copy failed numeric predictions" in message
+    assert "unverified_indices" in message
 
 
 def test_retry_message_keeps_validation_feedback_inside_task_instruction() -> None:
@@ -48,3 +91,202 @@ def test_retry_message_keeps_validation_feedback_inside_task_instruction() -> No
         '")\n\nFor auditability'
     )
     assert "Novel Pathway" in message
+    assert "evidence-grounded follow-up recommendations" in message
+    assert "mechanistic hypotheses" not in message
+
+
+def test_retry_message_includes_last_save_rejection_details() -> None:
+    message = build_hypothesis_retry_message(
+        "res_ipf_drugtarget1",
+        "idiopathic pulmonary fibrosis",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "hypotheses[5] claims direct pair axis 'EZR--MUC1' without citing a matching passed Stage 1 pair file.",
+                        "GENE_LEVEL_EVIDENCE_REFERENCE_MISSING: hypotheses[5] missing available gene-level evidence references for FEATURED genes: MUC1: ot_MUC1.json, stage3_MUC1.json",
+                    ],
+                    "hypothesis_grounding_violations": [
+                        "hypotheses[5] claims direct pair axis 'EZR--MUC1' without citing a matching passed Stage 1 pair file.",
+                    ],
+                },
+            }
+        ],
+        attempt=1,
+        max_attempts=3,
+    )
+
+    assert "Last rejected save attempt details" in message
+    assert "EZR--MUC1" in message
+    assert "MUC1: ot_MUC1.json, stage3_MUC1.json" in message
+    assert "Do not invent a direct pair axis from separate hub-partner evidence" in message
+    assert "Do not use synergy or synergistic effects unless direct combination evidence is cited" in message
+    assert "prefer `additive or non-additive effects`" in message
+    assert (
+        "If a FEATURED gene is mentioned in title, core_claim, prediction, "
+        "validation_approach, or biological_entities.genes"
+        in message
+    )
+
+
+def test_retry_message_names_available_reverse_stage1_pair_repair() -> None:
+    message = build_hypothesis_retry_message(
+        "res_ipf_drugtarget1",
+        "idiopathic pulmonary fibrosis",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        (
+                            "hypotheses[0] claims direct pair axis 'ITGB2--ICAM1' "
+                            "without citing a matching passed Stage 1 pair file. "
+                            "Expected stage1_ITGB2--ICAM1.json or "
+                            "stage1_ICAM1--ITGB2.json; available: "
+                            "stage1_ICAM1--ITGB2.json (passed=true)."
+                        )
+                    ],
+                },
+            }
+        ],
+        attempt=1,
+        max_attempts=3,
+    )
+
+    assert "stage1_ICAM1--ITGB2.json" in message
+    assert "cite that exact filename" in message
+    assert "remove the direct pair-axis wording" in message
+    assert "equivalent for direct pair support only when the cited file is a passed" in message
+    assert "present in evidence_references" in message
+
+
+def test_retry_message_includes_depleted_stage1_repair_guidance() -> None:
+    message = build_hypothesis_retry_message(
+        "res_ipf_drugtarget3",
+        "idiopathic pulmonary fibrosis",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "hypotheses[1] uses target-cell-depleted Stage 1 Census evidence as interest-cell support: stage1_FN1--SDC2.json has negative target-vs-rest diff values for [gene_a, gene_b, coexpression].",
+                        "hypotheses[2] uses coexpression-depleted Stage 1 Census evidence as an interest-cell intrinsic same-cell claim: stage1_ICAM1--ITGB2.json.",
+                    ],
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "Depleted Stage 1 repair" in message
+    assert "remove AT2, Transitional AT2, pulmonary/alveolar epithelial" in message
+    assert "resolved Census cell-type, epithelial-intrinsic, same-cell" in message
+    assert "target-cell-autonomous wording" in message
+    assert "from recommendations citing depleted Stage 1 files" in message
+    assert "cannot support primary AT2/epithelial intrinsic" in message
+    assert "same-cell, or target-cell-autonomous wording" in message
+    assert (
+        "`target-cell-depleted Stage 1 Census evidence as interest-cell support` "
+        "error"
+        in message
+    )
+    assert "choose exactly one repair path for the named hypothesis" in message
+    assert "keep the depleted Stage 1 pair file only after rewriting" in message
+    assert "secondary cross-cell or non-interest-cell context" in message
+    assert "use spatial-niche only if cited Stage 1 or spatial evidence" in message
+    assert "remove that Stage 1 pair citation entirely" in message
+    assert "gene-level/actionability-only" in message
+    assert (
+        "Do not leave the depleted Stage 1 file in a primary AT2/epithelial, "
+        "interest-cell, same-cell, or intrinsic recommendation"
+        in message
+    )
+
+
+def test_retry_message_names_res3_final_depleted_stage1_blocker() -> None:
+    message = build_hypothesis_retry_message(
+        "res_ipf_drugtarget3",
+        "idiopathic pulmonary fibrosis",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        (
+                            "hypotheses[2] uses target-cell-depleted Stage 1 "
+                            "Census evidence as interest-cell support: "
+                            "stage1_FN1--SDC2.json has negative target-vs-rest "
+                            "diff values for [gene_a, gene_b, coexpression]."
+                        )
+                    ],
+                    "hypothesis_grounding_violations": [
+                        (
+                            "hypotheses[2] uses target-cell-depleted Stage 1 "
+                            "Census evidence as interest-cell support: "
+                            "stage1_FN1--SDC2.json has negative target-vs-rest "
+                            "diff values for [gene_a, gene_b, coexpression]."
+                        )
+                    ],
+                },
+            }
+        ],
+        attempt=1,
+        max_attempts=1,
+    )
+
+    assert "stage1_FN1--SDC2.json" in message
+    assert "target-cell-depleted Stage 1 Census evidence as interest-cell support" in message
+    assert "choose exactly one repair path for the named hypothesis" in message
+    assert "secondary cross-cell or non-interest-cell context" in message
+    assert "use spatial-niche only if cited Stage 1 or spatial evidence" in message
+    assert "remove that Stage 1 pair citation entirely" in message
+    assert "gene-level/actionability-only" in message
+
+
+def test_retry_message_includes_evidence_scope_guardrails() -> None:
+    message = build_hypothesis_retry_message(
+        "res_ipf_drugtarget3",
+        "idiopathic pulmonary fibrosis",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_GROUNDING_VIOLATION",
+                "message": "One or more hypotheses make claims that are not grounded by cited evidence.",
+                "details": {
+                    "hypothesis_grounding_violations": [
+                        (
+                            "hypotheses[0] labels gene-level evidence as spatial/Stage1 "
+                            "without citing Stage 1/spatial support."
+                        )
+                    ]
+                },
+            }
+        ],
+        attempt=1,
+        max_attempts=3,
+    )
+
+    assert "Evidence scope guardrails" in message
+    assert "Every recommendation section must be written only from cited Evidence References" in message
+    assert "If no Stage 1 Census or spatial file is cited" in message
+    assert "do not call the recommendation spatial-niche" in message
+    assert "gene-level follow-up or actionability follow-up" in message
+    assert "If only one gene in a pair has ot_<GENE>.json or stage3_<GENE>.json evidence" in message
+    assert "state target-disease support or actionability only for that gene" in message
+    assert "Do not describe both genes as equally actionable" in message
+    assert (
+        "Prefer `perturbation/actionability follow-up candidate` over "
+        "`therapeutic intervention candidate`"
+        in message
+    )
+    assert (
+        "Prefer `additive or non-additive effects` over `synergistic effects` "
+        "unless direct combination evidence is cited"
+        in message
+    )
+    assert "test whether perturbation changes cited cellular readouts" in message

@@ -212,8 +212,11 @@ def query_cellxgene_lr_context(
                 {"cell_type": str(name), "count": int(count)}
                 for name, count in vc.items()
             ]
+        feature_names = var.get("feature_name")
         result["available_genes"] = sorted(
-            {str(g).upper() for g in var.get("feature_name", []).tolist()}
+            {str(g).upper() for g in feature_names.tolist()}
+            if feature_names is not None
+            else set()
         )
     except Exception as exc:
         result["errors"].append(f"CELLxGENE query failed: {exc}")
@@ -917,15 +920,393 @@ def _stage1_pair_has_census_validation(
     path: str | os.PathLike[str],
     ligand: str,
     receptor: str,
+    *,
+    disease: str,
+    input_disease: str,
+    target_cell_type: str,
 ) -> bool:
-    """Return True when a Stage 1 pair file already carries Census validation."""
+    """Return True when a Stage 1 pair file carries current Census validation."""
     payload = _load_existing_stage1_pair_payload(path, ligand, receptor)
     if not isinstance(payload, dict):
         return False
     census = payload.get("census_validation")
     if not isinstance(census, dict):
         return False
-    return "executed" in census or "target_vs_rest" in census
+    if census.get("executed") is False:
+        return False
+
+    target_vs_rest = census.get("target_vs_rest")
+    if not isinstance(target_vs_rest, dict) or not target_vs_rest:
+        return False
+
+    census_disease = str(census.get("disease") or "").strip()
+    if not (
+        disease_labels_equal(census_disease, disease)
+        or disease_labels_equal(census_disease, input_disease)
+    ):
+        return False
+
+    requested_cell_type = str(census.get("requested_cell_type") or "").strip()
+    resolved_cell_type = str(census.get("resolved_cell_type") or "").strip()
+    return any(
+        disease_labels_equal(candidate, target_cell_type)
+        for candidate in (requested_cell_type, resolved_cell_type)
+    )
+
+
+def _sanitize_census_token(text: str) -> str:
+    return "".join(ch.lower() if ch.isalnum() else "_" for ch in str(text or "")).strip("_")
+
+
+def _census_csv_name(ligand: str, receptor: str, target_cell_type: str) -> str:
+    return (
+        f"census_{ligand.lower()}_{receptor.lower()}_"
+        f"{_sanitize_census_token(target_cell_type)}.csv"
+    )
+
+
+def _save_census_validation_to_stage1_file(
+    *,
+    evidence_dir: Path,
+    ligand: str,
+    receptor: str,
+    census_validation: dict[str, Any],
+    input_disease: str,
+    stage1_disease_resolution_mode: str,
+) -> bool:
+    json_path = evidence_dir / f"stage1_{ligand}--{receptor}.json"
+    if not json_path.exists():
+        logger.warning(
+            "Cannot integrate Census CSV for %s--%s: Stage 1 JSON missing at %s",
+            ligand,
+            receptor,
+            json_path,
+        )
+        return False
+    try:
+        stage1_data = json.loads(json_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning(
+            "Cannot integrate Census CSV for %s--%s: failed to parse %s: %s",
+            ligand,
+            receptor,
+            json_path,
+            exc,
+        )
+        return False
+    if not isinstance(stage1_data, dict):
+        logger.warning(
+            "Cannot integrate Census CSV for %s--%s: Stage 1 JSON is not an object at %s",
+            ligand,
+            receptor,
+            json_path,
+        )
+        return False
+
+    payload = dict(census_validation)
+    disease_used = str(payload.get("disease") or "")
+    payload.setdefault("input_disease", input_disease)
+    payload.setdefault(
+        "disease_fallback_used",
+        not disease_labels_equal(input_disease, disease_used),
+    )
+    payload.setdefault("disease_resolution_mode", stage1_disease_resolution_mode)
+    stage1_data["census_validation"] = payload
+    json_path.write_text(json.dumps(stage1_data, indent=2), encoding="utf-8")
+    return True
+
+
+def _integrate_existing_census_csvs(
+    *,
+    evidence_dir: Path,
+    pairs: list[tuple[str, str]],
+    disease: str,
+    input_disease: str,
+    existing_disease_context: dict[str, Any],
+    target_cell_type: str,
+    stage1_disease_resolution_mode: str,
+) -> dict[str, Any]:
+    from src.agents.drug_target.tools.stage1_normalization import (
+        build_census_validation_from_csv,
+    )
+
+    if not _census_csv_reuse_provenance_matches(
+        existing_disease_context,
+        input_disease=input_disease,
+        disease=disease,
+        target_cell_type=target_cell_type,
+    ):
+        return {
+            "integrated_pairs": [],
+            "reused_csv": [],
+        }
+
+    integrated_pairs: list[tuple[str, str]] = []
+    reused_csv: list[str] = []
+    for ligand, receptor in pairs:
+        try:
+            validation = build_census_validation_from_csv(
+                evidence_dir,
+                ligand,
+                receptor,
+                csv_target_cell_type=target_cell_type,
+                requested_target_cell_type=target_cell_type,
+                resolved_target_cell_type=target_cell_type,
+                disease=disease,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Skipping Census CSV reuse for %s--%s from likely CSV %s: %s",
+                ligand,
+                receptor,
+                _census_csv_name(ligand, receptor, target_cell_type),
+                exc,
+            )
+            continue
+        if not validation:
+            continue
+        saved = _save_census_validation_to_stage1_file(
+            evidence_dir=evidence_dir,
+            ligand=ligand,
+            receptor=receptor,
+            census_validation=validation,
+            input_disease=input_disease,
+            stage1_disease_resolution_mode=stage1_disease_resolution_mode,
+        )
+        if saved:
+            integrated_pairs.append((ligand, receptor))
+            reused_csv.append(
+                str(
+                    validation.get("csv_file")
+                    or _census_csv_name(ligand, receptor, target_cell_type)
+                )
+            )
+
+    return {
+        "integrated_pairs": integrated_pairs,
+        "reused_csv": reused_csv,
+    }
+
+
+def _run_single_pair_census_fallback(
+    *,
+    data_dir: Path,
+    evidence_dir: Path,
+    pairs: list[tuple[str, str]],
+    disease: str,
+    input_disease: str,
+    target_cell_type: str,
+    stage1_disease_resolution_mode: str,
+    batch_error: str,
+) -> dict[str, Any]:
+    from src.agents.drug_target.tools.census_lr_validation_tools import (
+        run_compare_census_lr_pair,
+    )
+    from src.agents.drug_target.tools.stage1_normalization import (
+        build_census_validation_from_csv,
+    )
+
+    records: list[dict[str, Any]] = []
+    first_disease_used = ""
+    first_resolution_mode = ""
+    for ligand, receptor in pairs:
+        pair_label = f"{ligand}--{receptor}"
+        csv_name = _census_csv_name(ligand, receptor, target_cell_type)
+        csv_path = evidence_dir / csv_name
+        record: dict[str, Any] = {
+            "pair": pair_label,
+            "executed": False,
+            "csv_file": csv_name,
+        }
+        invoked_single_pair_tool = False
+        try:
+            if csv_path.exists():
+                csv_path.unlink()
+            invoked_single_pair_tool = True
+            raw = run_compare_census_lr_pair.invoke({
+                "data_dir": str(data_dir),
+                "disease": disease,
+                "gene_a": ligand,
+                "gene_b": receptor,
+                "target_cell_type": target_cell_type,
+                "organism": "homo_sapiens",
+                "census_version": _DEFAULT_CENSUS_VERSION,
+                "output_csv": str(csv_path),
+            })
+            if isinstance(raw, str):
+                try:
+                    single_result = json.loads(raw)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(f"single-pair Census returned invalid JSON: {exc}") from exc
+            else:
+                single_result = raw
+            if not isinstance(single_result, dict):
+                raise ValueError(
+                    f"single-pair Census returned non-object result: "
+                    f"{type(single_result).__name__}"
+                )
+            tool_errors = single_result.get("errors")
+            if isinstance(tool_errors, list):
+                normalized_errors = [str(error) for error in tool_errors]
+                if normalized_errors:
+                    record["errors"] = normalized_errors
+            elif tool_errors:
+                record["errors"] = [str(tool_errors)]
+            if single_result.get("message"):
+                record["message"] = str(single_result["message"])
+            if single_result.get("executed") is not True:
+                failure_details = record.get("errors", [])
+                if record.get("message"):
+                    failure_details = [*failure_details, str(record["message"])]
+                detail = "; ".join(failure_details) if failure_details else "executed was not true"
+                raise ValueError(f"single-pair Census did not execute successfully: {detail}")
+
+            disease_used = str(single_result.get("disease") or disease)
+            requested_cell_type = str(
+                single_result.get("requested_cell_type") or target_cell_type
+            )
+            resolved_cell_type = str(
+                single_result.get("resolved_cell_type") or requested_cell_type
+            )
+            validation = build_census_validation_from_csv(
+                evidence_dir,
+                ligand,
+                receptor,
+                csv_target_cell_type=target_cell_type,
+                requested_target_cell_type=requested_cell_type,
+                resolved_target_cell_type=resolved_cell_type,
+                disease=disease_used,
+            )
+            if not validation:
+                raise ValueError(f"single-pair Census CSV was not usable: {csv_name}")
+
+            validation = dict(validation)
+            validation["source"] = "single_pair_fallback"
+            validation["batch_error"] = batch_error
+            resolution_mode = str(
+                single_result.get("disease_resolution_mode")
+                or stage1_disease_resolution_mode
+            )
+            saved = _save_census_validation_to_stage1_file(
+                evidence_dir=evidence_dir,
+                ligand=ligand,
+                receptor=receptor,
+                census_validation=validation,
+                input_disease=input_disease,
+                stage1_disease_resolution_mode=resolution_mode,
+            )
+            if not saved:
+                raise ValueError(f"failed to save single-pair Census validation for {pair_label}")
+
+            record["executed"] = True
+            if not first_disease_used:
+                first_disease_used = disease_used
+            if not first_resolution_mode:
+                first_resolution_mode = resolution_mode
+        except Exception as exc:
+            if invoked_single_pair_tool and csv_path.exists():
+                try:
+                    csv_path.unlink()
+                except OSError as cleanup_exc:
+                    logger.warning(
+                        "Failed to remove rejected single-pair Census CSV %s: %s",
+                        csv_path,
+                        cleanup_exc,
+                    )
+            record["error"] = str(exc)
+            logger.warning(
+                "Single-pair Census fallback failed for %s from %s: %s",
+                pair_label,
+                csv_name,
+                exc,
+            )
+        records.append(record)
+
+    return {
+        "records": records,
+        "all_succeeded": bool(records) and all(record.get("executed") for record in records),
+        "disease_used": first_disease_used,
+        "disease_resolution_mode": first_resolution_mode,
+    }
+
+
+def _restore_single_pair_fallback_provenance(
+    *,
+    evidence_dir: Path,
+    fallback_records: list[dict[str, Any]],
+    batch_error: str,
+    input_disease: str,
+    stage1_disease_resolution_mode: str,
+) -> None:
+    for record in fallback_records:
+        if not record.get("executed"):
+            continue
+        pair_label = str(record.get("pair") or "")
+        if "--" not in pair_label:
+            continue
+        ligand, receptor = pair_label.split("--", 1)
+        json_path = evidence_dir / f"stage1_{ligand}--{receptor}.json"
+        try:
+            stage1_data = json.loads(json_path.read_text(encoding="utf-8"))
+            validation = stage1_data.get("census_validation")
+            if not isinstance(validation, dict):
+                continue
+            validation["source"] = "single_pair_fallback"
+            validation["batch_error"] = batch_error
+            if record.get("csv_file"):
+                validation["csv_file"] = record["csv_file"]
+            _save_census_validation_to_stage1_file(
+                evidence_dir=evidence_dir,
+                ligand=ligand,
+                receptor=receptor,
+                census_validation=validation,
+                input_disease=input_disease,
+                stage1_disease_resolution_mode=stage1_disease_resolution_mode,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to restore single-pair Census fallback provenance for %s: %s",
+                pair_label,
+                exc,
+            )
+
+
+def _census_csv_reuse_provenance_matches(
+    disease_context: dict[str, Any],
+    *,
+    input_disease: str,
+    disease: str,
+    target_cell_type: str,
+) -> bool:
+    """Return True when workspace metadata proves Census CSVs fit this request."""
+    if not disease_context:
+        return False
+
+    labels_to_match = [input_disease, disease]
+    for key in ("input_disease", "canonical_disease"):
+        context_label = disease_context.get(key)
+        if any(disease_labels_equal(context_label, label) for label in labels_to_match):
+            break
+    else:
+        return False
+
+    stage1_meta = disease_context.get("stage1")
+    if not isinstance(stage1_meta, dict):
+        return True
+
+    stage1_target = str(stage1_meta.get("target_cell_type") or "").strip()
+    if stage1_target and not disease_labels_equal(stage1_target, target_cell_type):
+        return False
+
+    requested = stage1_meta.get("requested_disease")
+    if requested and not disease_labels_equal(requested, input_disease):
+        return False
+
+    disease_used = stage1_meta.get("disease_used")
+    if disease_used and not disease_labels_equal(disease_used, disease):
+        return False
+
+    return True
 
 
 def _stage1_aggregate_artifacts_exist(evidence_dir: Path) -> bool:
@@ -1090,9 +1471,10 @@ def run_stage1_batch(
         return _as_json({"success": False, "error": f"Cannot parse assessment_results.json: {exc}"})
 
     existing_disease_context = load_disease_context(evidence_dir)
+    assessment_disease = str(assessment.get("disease") or "").strip()
     input_disease = (
-        str(existing_disease_context.get("input_disease") or "").strip()
-        or str(assessment.get("disease") or "").strip()
+        assessment_disease
+        or str(existing_disease_context.get("input_disease") or "").strip()
         or disease
     )
 
@@ -1182,6 +1564,9 @@ def run_stage1_batch(
     stage1_disease_resolution_mode = (
         "exact" if disease_labels_equal(input_disease, disease) else "provided_fallback"
     )
+    census_reused_csv: list[str] = []
+    census_single_fallback: list[dict[str, Any]] = []
+    census_batch_error = ""
     if enable_census and target_cell_type:
         pairs_requiring_census = [
             (ligand, receptor)
@@ -1190,17 +1575,39 @@ def run_stage1_batch(
                 evidence_dir / f"stage1_{ligand}--{receptor}.json",
                 ligand,
                 receptor,
+                disease=disease,
+                input_disease=input_disease,
+                target_cell_type=target_cell_type,
             )
         ]
+        if pairs_requiring_census:
+            csv_integration = _integrate_existing_census_csvs(
+                evidence_dir=evidence_dir,
+                pairs=pairs_requiring_census,
+                disease=disease,
+                input_disease=input_disease,
+                existing_disease_context=existing_disease_context,
+                target_cell_type=target_cell_type,
+                stage1_disease_resolution_mode=stage1_disease_resolution_mode,
+            )
+            census_reused_csv = list(csv_integration["reused_csv"])
+            integrated_pair_set = set(csv_integration["integrated_pairs"])
+            pairs_requiring_census = [
+                pair for pair in pairs_requiring_census if pair not in integrated_pair_set
+            ]
+
         if not pairs_requiring_census:
-            census_status = "skipped_existing"
+            census_status = (
+                "completed_from_existing_csv"
+                if census_reused_csv
+                else "skipped_existing"
+            )
         else:
             try:
                 from src.agents.drug_target.tools.census_batch_core import (
                     batch_census_lr_pairs,
                     write_census_csv,
                 )
-                pairs_list = [list(pair) for pair in pairs_requiring_census]
                 # Create lightweight LLM for cell type / disease semantic matching
                 try:
                     from src.agents.model import create_llm as _create_llm
@@ -1208,7 +1615,7 @@ def run_stage1_batch(
                 except Exception:
                     _census_llm = None
                 _batch_results, csv_results = batch_census_lr_pairs(
-                    pairs_list,
+                    pairs_requiring_census,
                     disease=disease,
                     target_cell_type=target_cell_type,
                     organism="homo_sapiens",
@@ -1283,8 +1690,38 @@ def run_stage1_batch(
                     )
                 census_status = "completed"
             except Exception as exc:
-                errors.append(f"Census batch: {exc}")
-                census_status = f"failed: {exc}"
+                census_batch_error = str(exc)
+                fallback = _run_single_pair_census_fallback(
+                    data_dir=base,
+                    evidence_dir=evidence_dir,
+                    pairs=pairs_requiring_census,
+                    disease=disease,
+                    input_disease=input_disease,
+                    target_cell_type=target_cell_type,
+                    stage1_disease_resolution_mode=stage1_disease_resolution_mode,
+                    batch_error=census_batch_error,
+                )
+                census_single_fallback = list(fallback["records"])
+                if fallback.get("disease_used"):
+                    stage1_disease_used = str(fallback["disease_used"])
+                if fallback.get("disease_resolution_mode"):
+                    stage1_disease_resolution_mode = str(fallback["disease_resolution_mode"])
+                if fallback["all_succeeded"]:
+                    census_status = "completed_with_single_pair_fallback"
+                else:
+                    any_fallback_succeeded = any(
+                        record.get("executed") for record in census_single_fallback
+                    )
+                    if not any_fallback_succeeded:
+                        errors.append(f"Census batch: {exc}")
+                    for record in census_single_fallback:
+                        if record.get("executed"):
+                            continue
+                        errors.append(
+                            f"Census single-pair fallback {record.get('pair')}: "
+                            f"{record.get('error', 'unknown error')}"
+                        )
+                    census_status = "partial_with_single_pair_fallback"
 
     workspace_reused = (
         not saved_files
@@ -1304,9 +1741,17 @@ def run_stage1_batch(
                 data_dir,
                 disease=disease,
                 target_cell_type=target_cell_type or None,
-                rerun_missing_census=enable_census,
+                rerun_missing_census=enable_census and not bool(census_single_fallback),
                 pair_subset=list(featured_pairs),
             )
+            if census_single_fallback and census_batch_error:
+                _restore_single_pair_fallback_provenance(
+                    evidence_dir=evidence_dir,
+                    fallback_records=census_single_fallback,
+                    batch_error=census_batch_error,
+                    input_disease=input_disease,
+                    stage1_disease_resolution_mode=stage1_disease_resolution_mode,
+                )
             finalize_status = "completed"
         except Exception as exc:
             errors.append(f"finalize_stage1_artifacts: {exc}")
@@ -1352,6 +1797,12 @@ def run_stage1_batch(
         "target_cell_type": target_cell_type,
         "census_status": census_status,
     }
+    if census_batch_error:
+        stage1_disease_metadata["census_batch_error"] = census_batch_error
+    if census_reused_csv:
+        stage1_disease_metadata["census_reused_csv"] = census_reused_csv
+    if census_single_fallback:
+        stage1_disease_metadata["census_single_fallback"] = census_single_fallback
     disease_context = merge_disease_context(
         evidence_dir,
         input_disease=input_disease,
@@ -1384,6 +1835,9 @@ def run_stage1_batch(
         "pairs_processed": len(featured_pairs),
         "saved_files": saved_files,
         "skipped_existing": skipped_existing,
+        "census_reused_csv": census_reused_csv,
+        "census_single_fallback": census_single_fallback,
+        "census_batch_error": census_batch_error,
         "census_batch": census_status,
         "finalize": finalize_status,
         "finalize_status": finalize_status,
@@ -1413,7 +1867,6 @@ __all__ = [
     "query_gwas_gene_trait",
     "query_stage2_gene_panel",
     "query_chembl_target_profile",
-    "query_pubmed_clinical_limitations",
     "run_stage1_batch",
     "run_stage3_batch",
 ]

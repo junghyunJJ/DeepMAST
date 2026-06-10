@@ -41,6 +41,45 @@ def _load_opk():
     return mod
 
 
+def _load_gwas_parquet():
+    spec = importlib.util.spec_from_file_location(
+        "gwas_parquet",
+        REPO_ROOT / "skills/gwas-database/scripts/gwas_parquet.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_opentargets_parquet_data_dir_env_override(monkeypatch, tmp_path: Path) -> None:
+    ot_data = tmp_path / "ot_data"
+    for subdir in ("target", "disease", "evidence"):
+        (ot_data / subdir).mkdir(parents=True)
+    (ot_data / "target" / "target.parquet").touch()
+    (ot_data / "disease" / "disease.parquet").touch()
+    (ot_data / "evidence" / "part.parquet").touch()
+
+    monkeypatch.setenv("OPENTARGETS_DATA_DIR", str(ot_data))
+    opk = _load_opk()
+
+    assert opk.DATA_DIR == ot_data.resolve()
+    assert opk.is_available() is True
+
+
+def test_gwas_parquet_data_dir_env_override(monkeypatch, tmp_path: Path) -> None:
+    gwas_data = tmp_path / "gwas_data"
+    gwas_data.mkdir()
+    (gwas_data / "associations.parquet").touch()
+    (gwas_data / "traits.parquet").touch()
+
+    monkeypatch.setenv("GWAS_DATA_DIR", str(gwas_data))
+    gwas_parquet = _load_gwas_parquet()
+
+    assert gwas_parquet.DATA_DIR == gwas_data.resolve()
+    assert gwas_parquet.is_available() is True
+
+
 # ---------------------------------------------------------------------------
 # Commit A0 — GraphQL page_size 100 -> 500
 # ---------------------------------------------------------------------------

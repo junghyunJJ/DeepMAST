@@ -55,6 +55,11 @@ def parse_drug_md(md_text: str) -> dict[str, Any]:
         "matrix": {"headers": [], "rows": [], "legend": {}},
         "deep_dives": [],
         "hypothesis": [],
+        "primary_hypotheses": [],
+        "secondary_hypotheses": [],
+        "gene_level_hypotheses": [],
+        "unbucketed_hypotheses": [],
+        "secondary_stage1_framing_pairs": [],
         "pipeline_summary": {},
     }
 
@@ -68,8 +73,31 @@ def parse_drug_md(md_text: str) -> dict[str, Any]:
             context["matrix"] = _parse_druggability_matrix(body)
         elif header_line.startswith("3."):
             context["deep_dives"] = _parse_deep_dives(body)
-        elif header_line.startswith("4.") and "Hypothesis" in header_line:
+        elif header_line.startswith("4.") and (
+            "Hypothesis" in header_line or "Follow-up" in header_line
+        ):
             context["hypothesis"] = _parse_hypothesis_section(body)
+            context["primary_hypotheses"] = [
+                h
+                for h in context["hypothesis"]
+                if h.get("_tier") == "primary_epithelial_intrinsic"
+            ]
+            context["secondary_hypotheses"] = [
+                h
+                for h in context["hypothesis"]
+                if h.get("_tier") == "secondary_epithelial_associated_niche"
+            ]
+            context["gene_level_hypotheses"] = [
+                h
+                for h in context["hypothesis"]
+                if h.get("_tier") == "gene_level_actionability"
+            ]
+            context["unbucketed_hypotheses"] = [
+                h for h in context["hypothesis"] if not h.get("_tier")
+            ]
+            context["secondary_stage1_framing_pairs"] = (
+                _parse_secondary_stage1_framing_pairs(body)
+            )
         elif header_line.startswith("4."):
             context["pipeline_summary"] = _parse_pipeline_summary(body)
         elif header_line.startswith("5."):
@@ -551,11 +579,23 @@ def _parse_rubric_assessment(body: str) -> dict[str, Any]:
 
 
 def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
-    """Parse section 4 (Hypothesis-Driven Analysis) into structured list."""
+    """Parse section 4 follow-up recommendation entries into a structured list."""
     hypotheses: list[dict[str, Any]] = []
 
-    # Split on ### 4.N. headings
-    h_sections = re.split(r"^### \d+\.\d+\.\s+", body, flags=re.MULTILINE)
+    # New reports render individual entries as #### 4.1.1.; retain a fallback
+    # for older reports that used ### 4.N. entry headings.
+    if re.search(
+        r"^#### \d+\.\d+(?:\.\d+)?\.\s+",
+        body,
+        flags=re.MULTILINE,
+    ):
+        h_sections = re.split(
+            r"^#### \d+\.\d+(?:\.\d+)?\.\s+",
+            body,
+            flags=re.MULTILINE,
+        )
+    else:
+        h_sections = re.split(r"^### \d+\.\d+\.\s+", body, flags=re.MULTILINE)
 
     for i, sec in enumerate(h_sections):
         if not sec.strip() or i == 0:
@@ -563,11 +603,45 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
 
         lines = sec.strip()
         title = lines.split("\n", 1)[0].strip()
+        source_heading = re.search(
+            rf"^####\s+(\d+\.(?P<tier>[123])\.(?P<tier_rank>\d+))\.\s+{re.escape(title)}\s*$",
+            body,
+            flags=re.MULTILINE,
+        )
+        tier = ""
+        tier_label = ""
+        if source_heading:
+            if source_heading.group("tier") == "1":
+                tier = "primary_epithelial_intrinsic"
+                tier_label = "Primary epithelial/AT2-intrinsic"
+            elif source_heading.group("tier") == "2":
+                tier = "secondary_epithelial_associated_niche"
+                tier_label = "Secondary epithelial-associated niche"
+            elif source_heading.group("tier") == "3":
+                tier = "gene_level_actionability"
+                tier_label = "Gene-level/actionability follow-up"
 
         category_m = re.search(r"\*\*Category:\*\*\s*(.+)", lines)
-        claim_m = re.search(r"\*\*Core Claim:\*\*\s*(.+)", lines)
-        prediction_m = re.search(r"\*\*Falsifiable Prediction:\*\*\s*(.+)", lines)
-        validation_m = re.search(r"\*\*Validation Approach:\*\*\s*(.+)", lines)
+        tier_label_m = re.search(r"\*\*Interpretation Tier:\*\*\s*(.+)", lines)
+        claim_m = re.search(
+            r"\*\*(?:Core Claim|Conservative Interpretation):\*\*\s*(.+)", lines
+        )
+        biological_grounding_m = re.search(r"\*\*Biological Grounding:\*\*\s*(.+)", lines)
+        target_disease_support_m = re.search(
+            r"\*\*Target-Disease Support:\*\*\s*(.+)", lines
+        )
+        actionability_m = re.search(r"\*\*Actionability:\*\*\s*(.+)", lines)
+        interpretation_constraint_m = re.search(
+            r"\*\*Interpretation Constraint:\*\*\s*(.+)", lines
+        )
+        prediction_m = re.search(
+            r"\*\*(?:Falsifiable Prediction|Recommended Follow-up Test):\*\*\s*(.+)",
+            lines,
+        )
+        validation_m = re.search(
+            r"\*\*(?:Validation Approach|Suggested Validation Approach):\*\*\s*(.+)",
+            lines,
+        )
 
         # Parse biological entities
         genes: list[str] = []
@@ -588,20 +662,69 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
         if drugs_m:
             drugs = [d.strip() for d in drugs_m.group(1).split(",")]
 
-        hypotheses.append({
+        hypothesis = {
             "rank": i,
             "title": title,
             "category": category_m.group(1).strip() if category_m else "",
+            "_tier": tier,
+            "_tier_label": tier_label,
+            "_tier_rank": (
+                int(source_heading.group("tier_rank")) if source_heading else i
+            ),
             "core_claim": claim_m.group(1).strip() if claim_m else "",
+            "biological_grounding": (
+                biological_grounding_m.group(1).strip()
+                if biological_grounding_m
+                else ""
+            ),
+            "target_disease_support": (
+                target_disease_support_m.group(1).strip()
+                if target_disease_support_m
+                else ""
+            ),
+            "actionability": actionability_m.group(1).strip() if actionability_m else "",
+            "interpretation_constraint": (
+                interpretation_constraint_m.group(1).strip()
+                if interpretation_constraint_m
+                else ""
+            ),
             "falsifiable_prediction": prediction_m.group(1).strip() if prediction_m else "",
             "validation_approach": validation_m.group(1).strip() if validation_m else "",
             "genes": genes,
             "pathways": pathways,
             "cell_types": cell_types,
             "drugs": drugs,
-        })
+        }
+        if tier_label_m:
+            hypothesis["_tier_label"] = tier_label_m.group(1).strip()
+        hypotheses.append(hypothesis)
 
     return hypotheses
+
+
+def _parse_secondary_stage1_framing_pairs(body: str) -> list[dict[str, str]]:
+    """Parse the secondary Stage 1 framing table from markdown Section 4."""
+    match = re.search(
+        r"^#### Secondary Stage 1 Framing Evidence\s*\n(?P<table>.*?)(?:\n\n|\Z)",
+        body,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    if not match:
+        return []
+    pairs: list[dict[str, str]] = []
+    for line in match.group("table").splitlines():
+        if not line.startswith("|") or "---" in line or "Pair" in line:
+            continue
+        cells = [cell.strip().strip("`") for cell in line.strip("|").split("|")]
+        if len(cells) < 4:
+            continue
+        pairs.append({
+            "pair": cells[0],
+            "census_direction": cells[1],
+            "usage": cells[2],
+            "source": cells[3],
+        })
+    return pairs
 
 
 def _parse_pipeline_summary(body: str) -> dict[str, Any]:
@@ -848,6 +971,9 @@ def render_drug_md(
     # Pre-format complex nested data for template consumption
     preformatted_cards = _preformat_cards(featured_cards, stage1_filter_results)
     formatted_filter = _format_filter_results(stage1_filter_results)
+    normalized_hypothesis_data = _normalize_hypothesis_data_for_md(
+        hypothesis_data or {}
+    )
 
     return tmpl.render(
         disease=disease,
@@ -858,12 +984,109 @@ def render_drug_md(
         featured_rows=featured_rows,
         other_rows=other_rows,
         stage1_filter_results=formatted_filter,
-        hypothesis_data=hypothesis_data or {},
+        hypothesis_data=normalized_hypothesis_data,
         disease_scope=disease_scope or {},
         data_limitations=data_limitations or [],
         interpretations=interpretations or {},
         novelty_opportunity_legend=novelty_opportunity_legend,
     )
+
+
+def _normalize_hypothesis_data_for_md(hypothesis_data: dict) -> dict:
+    """Add gene-level buckets for raw hypothesis data before markdown rendering."""
+    if not isinstance(hypothesis_data, dict):
+        return {}
+    normalized = dict(hypothesis_data)
+    bucket_keys = (
+        "primary_hypotheses",
+        "secondary_hypotheses",
+        "gene_level_hypotheses",
+    )
+    if any(key in normalized for key in bucket_keys):
+        return normalized
+    hypotheses = normalized.get("hypotheses")
+    if not isinstance(hypotheses, list):
+        return normalized
+
+    rendered_hypotheses: list[Any] = []
+    gene_level_hypotheses: list[dict[str, Any]] = []
+    unbucketed_hypotheses: list[dict[str, Any]] = []
+    for hypothesis in hypotheses:
+        if not isinstance(hypothesis, dict):
+            rendered_hypotheses.append(hypothesis)
+            continue
+        references = _hypothesis_reference_list(hypothesis)
+        biological_grounding_refs = [
+            ref for ref in references if _is_stage1_or_spatial_ref(ref)
+        ]
+        if biological_grounding_refs:
+            rendered_hypotheses.append(hypothesis)
+            unbucketed_hypotheses.append(hypothesis)
+            continue
+
+        rendered_hypothesis = dict(hypothesis)
+        rendered_hypothesis["_tier"] = "gene_level_actionability"
+        rendered_hypothesis["_tier_label"] = "Gene-level/actionability follow-up"
+        rendered_hypothesis["_tier_note"] = (
+            "Cited evidence provides target-disease or actionability context, "
+            "but no Stage 1/spatial grounding was cited."
+        )
+        rendered_hypothesis["_interpretation_constraint"] = (
+            "Gene-level support only; do not interpret as AT2-intrinsic or "
+            "spatial-niche evidence."
+        )
+        rendered_hypothesis["_biological_grounding_refs"] = []
+        rendered_hypothesis["_target_disease_support_refs"] = [
+            ref for ref in references if _is_target_disease_ref(ref)
+        ]
+        rendered_hypothesis["_actionability_refs"] = [
+            ref for ref in references if _is_actionability_ref(ref)
+        ]
+        gene_level_hypotheses.append(rendered_hypothesis)
+        rendered_hypotheses.append(rendered_hypothesis)
+
+    if not gene_level_hypotheses:
+        return normalized
+
+    for index, hypothesis in enumerate(gene_level_hypotheses, start=1):
+        hypothesis["_tier_rank"] = index
+    normalized["hypotheses"] = rendered_hypotheses
+    normalized["primary_hypotheses"] = []
+    normalized["secondary_hypotheses"] = []
+    normalized["gene_level_hypotheses"] = gene_level_hypotheses
+    normalized["unbucketed_hypotheses"] = unbucketed_hypotheses
+    return normalized
+
+
+def _hypothesis_reference_list(hypothesis: dict[str, Any]) -> list[str]:
+    refs = hypothesis.get("evidence_references")
+    if not isinstance(refs, list):
+        return []
+    return [ref.strip() for ref in refs if isinstance(ref, str) and ref.strip()]
+
+
+def _is_stage1_or_spatial_ref(ref: str) -> bool:
+    normalized = ref.strip().lower()
+    return (
+        normalized.startswith("stage1_") and normalized.endswith(".json")
+    ) or "spatial" in normalized
+
+
+def _is_target_disease_ref(ref: str) -> bool:
+    normalized = ref.strip()
+    return normalized.endswith(".json") and (
+        normalized.startswith("ot_")
+        or normalized.startswith("gwas_")
+        or normalized.startswith("genetics_")
+    )
+
+
+def _is_actionability_ref(ref: str) -> bool:
+    normalized = ref.strip()
+    return normalized.startswith("stage3_") or normalized in {
+        "known_drugs.json",
+        "resolved_drugs.json",
+    }
 
 
 def _preformat_cards(
@@ -1046,6 +1269,10 @@ def build_drug_html_context(data_dir: str) -> dict[str, Any]:
                         "title": h.get("title", ""),
                         "category": h.get("category", ""),
                         "core_claim": h.get("core_claim", ""),
+                        "biological_grounding": "",
+                        "target_disease_support": "",
+                        "actionability": "",
+                        "interpretation_constraint": "",
                         "falsifiable_prediction": h.get("falsifiable_prediction", ""),
                         "validation_approach": h.get("validation_approach", ""),
                         "genes": h.get("biological_entities", {}).get("genes", []),
@@ -1055,6 +1282,20 @@ def build_drug_html_context(data_dir: str) -> dict[str, Any]:
                     }
                     for i, h in enumerate(hyp_data.get("hypotheses", []))
                 ]
+                context["primary_hypotheses"] = hyp_data.get("primary_hypotheses", [])
+                context["secondary_hypotheses"] = hyp_data.get("secondary_hypotheses", [])
+                context["gene_level_hypotheses"] = hyp_data.get(
+                    "gene_level_hypotheses",
+                    [],
+                )
+                context["unbucketed_hypotheses"] = hyp_data.get(
+                    "unbucketed_hypotheses",
+                    [],
+                )
+                context["secondary_stage1_framing_pairs"] = hyp_data.get(
+                    "secondary_stage1_framing_pairs",
+                    [],
+                )
             except Exception:
                 pass
 

@@ -44,6 +44,11 @@ from src.agents.drug_target.tools.stage_domain_tools import (
     run_stage1_batch,
     run_stage3_batch,
 )
+from src.agents.drug_target.tools.census_celltype_resolution import (
+    apply_semantic_celltype_proxy,
+    resolve_census_celltypes,
+    search_census_celltype_options,
+)
 from src.agents.drug_target.tools.census_lr_validation_tools import (
     run_compare_census_lr_pair,
     run_batch_census_lr_pairs,
@@ -92,6 +97,9 @@ __all__ = [
     "query_cellxgene_lr_context",
     "list_census_diseases",
     "list_census_cell_types",
+    "resolve_census_celltypes",
+    "search_census_celltype_options",
+    "apply_semantic_celltype_proxy",
     "query_kegg_pathways",
     "query_reactome_pathways",
     "query_string_ppi_pair",

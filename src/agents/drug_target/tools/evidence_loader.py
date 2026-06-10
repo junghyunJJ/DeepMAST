@@ -39,9 +39,17 @@ _HYPOTHESIS_DENIED_CITATIONS: frozenset[str] = frozenset({
     "stage1_evidence.json",
 })
 
+_HYPOTHESIS_CONTEXT_ONLY_CITATION_REASON = (
+    "context-only cell-type resolution; cite Stage 1 pair files for Census evidence."
+)
+_HYPOTHESIS_CONTEXT_ONLY_CITATIONS: frozenset[str] = frozenset({
+    "celltype_resolution.json",
+})
+
 # Files always loaded in full for hypothesis scope regardless of gene filter.
 _HYPOTHESIS_ALWAYS_FULL: frozenset[str] = frozenset({
     "assessment_results.json",
+    "celltype_resolution.json",
     "stage1_filter.json",
     "stage1_filter_results.json",
     "gene_manifest.json",
@@ -229,6 +237,217 @@ def _size_metadata_summary(data, size_bytes: int, content_limit: int) -> dict:
     else:
         summary["record_count"] = 1
     return summary
+
+
+def _compact_assessment_for_hypothesis(data: object) -> object:
+    """Return the hypothesis-writer subset of assessment_results.json."""
+    if not isinstance(data, dict):
+        return data
+
+    compact: dict = {}
+    for key in (
+        "schema_version",
+        "assessment_date",
+        "disease",
+        "summary",
+        "stage1_filter_applied",
+    ):
+        if key in data:
+            compact[key] = data[key]
+
+    disease_context = data.get("disease_context")
+    if isinstance(disease_context, dict):
+        compact["disease_context"] = {
+            key: disease_context.get(key)
+            for key in (
+                "input_disease",
+                "canonical_disease",
+                "disease_type",
+                "oncology_flag",
+            )
+            if key in disease_context
+        }
+
+    candidates = data.get("stage3_candidates")
+    compact["stage3_candidates"] = candidates if isinstance(candidates, list) else []
+    return compact
+
+
+def _compact_ot_for_hypothesis(data: object, gene: str) -> object:
+    """Return target-disease/actionability context without large OT lists."""
+    if not isinstance(data, dict):
+        return data
+
+    compact: dict = {
+        "gene": data.get("gene") or data.get("gene_symbol") or gene,
+        "gene_symbol": data.get("gene_symbol") or data.get("gene") or gene,
+    }
+    for key in (
+        "disease",
+        "executed",
+        "ensembl_id",
+        "efo_id",
+        "matched_disease",
+        "errors",
+    ):
+        if key in data:
+            compact[key] = data[key]
+
+    target_info = data.get("target_info")
+    if isinstance(target_info, dict):
+        compact["target_info"] = {
+            key: target_info.get(key)
+            for key in ("id", "approvedSymbol", "approvedName", "biotype")
+            if key in target_info
+        }
+        descriptions = target_info.get("functionDescriptions")
+        if isinstance(descriptions, list):
+            compact["target_info"]["functionDescriptions"] = [
+                str(value)[:300] for value in descriptions[:2]
+            ]
+
+    disease_context = data.get("disease_context")
+    if isinstance(disease_context, dict):
+        compact["disease_context"] = {
+            key: disease_context.get(key)
+            for key in (
+                "requested_disease",
+                "disease_used",
+                "efo_id",
+                "match_label",
+                "exact_match",
+                "fallback_used",
+            )
+            if key in disease_context
+        }
+
+    evidence = data.get("disease_evidence")
+    if isinstance(evidence, list):
+        compact["disease_evidence_summary"] = {
+            "count": len(evidence),
+            "top": [
+                {
+                    key: row.get(key)
+                    for key in (
+                        "datasourceId",
+                        "datatypeId",
+                        "score",
+                        "targetFromSourceId",
+                        "studyId",
+                    )
+                    if isinstance(row, dict) and key in row
+                }
+                for row in evidence[:3]
+                if isinstance(row, dict)
+            ],
+        }
+
+    associations = data.get("associations")
+    if isinstance(associations, list):
+        compact["associations_summary"] = {
+            "total_count": data.get("associations_total_count", len(associations)),
+            "truncated": data.get("associations_truncated"),
+            "top": [
+                {
+                    "disease": row.get("disease"),
+                    "score": row.get("score"),
+                    "datatypeScores": row.get("datatypeScores", [])[:3]
+                    if isinstance(row.get("datatypeScores"), list)
+                    else row.get("datatypeScores"),
+                }
+                for row in associations[:3]
+                if isinstance(row, dict)
+            ],
+        }
+
+    target_drugs = data.get("target_drugs")
+    if isinstance(target_drugs, dict):
+        rows = target_drugs.get("rows")
+        compact["target_drugs_summary"] = {
+            "count": target_drugs.get("count"),
+            "rows": [_compact_ot_drug_row(row) for row in rows[:3]]
+            if isinstance(rows, list)
+            else [],
+        }
+
+    return compact
+
+
+def _compact_ot_drug_row(row: object) -> dict:
+    if not isinstance(row, dict):
+        return {}
+    drug = row.get("drug")
+    target = row.get("target")
+    diseases = row.get("diseases")
+    return {
+        "drug": {
+            key: drug.get(key)
+            for key in ("id", "name", "maximumClinicalStage", "drugType")
+            if isinstance(drug, dict) and key in drug
+        },
+        "target": {
+            key: target.get(key)
+            for key in ("id", "approvedSymbol")
+            if isinstance(target, dict) and key in target
+        },
+        "phase": row.get("phase") or row.get("maxClinicalStage"),
+        "mechanismOfAction": row.get("mechanismOfAction"),
+        "disease": diseases[0].get("diseaseFromSource")
+        if isinstance(diseases, list) and diseases and isinstance(diseases[0], dict)
+        else row.get("diseaseFromSource"),
+    }
+
+
+def _compact_known_drugs_for_hypothesis(data: object) -> object:
+    """Return disease-level drug context without full landscape tables."""
+    if not isinstance(data, dict):
+        return data
+    compact = {
+        key: data.get(key)
+        for key in (
+            "disease",
+            "executed",
+            "efo_id",
+            "matched_disease",
+            "errors",
+        )
+        if key in data
+    }
+    drugs = data.get("drugs")
+    if isinstance(drugs, dict):
+        rows = drugs.get("rows")
+        compact["drugs"] = {
+            "uniqueDrugs": drugs.get("uniqueDrugs"),
+            "uniqueTargets": drugs.get("uniqueTargets"),
+            "rows": rows[:3] if isinstance(rows, list) else [],
+        }
+    target_linked_rows = data.get("target_linked_rows")
+    if isinstance(target_linked_rows, list):
+        compact["target_linked_rows"] = target_linked_rows[:3]
+    landscape = data.get("disease_landscape")
+    if isinstance(landscape, dict):
+        compact["disease_landscape"] = {"count": landscape.get("count")}
+    return compact
+
+
+def _compact_hypothesis_scope_payload(
+    name: str,
+    data: object,
+    *,
+    size_bytes: int,
+    content_limit: int,
+) -> object:
+    """Keep hypothesis-scope tool output small enough to avoid grep-only artifacts."""
+    if name == "assessment_results.json":
+        return _compact_assessment_for_hypothesis(data)
+    if name == "known_drugs.json":
+        return _compact_known_drugs_for_hypothesis(data)
+    if name == "census_celltype_options.json":
+        return _size_metadata_summary(data, size_bytes, content_limit)
+    match = _OT_NAME_RE.match(name)
+    if match:
+        return _compact_ot_for_hypothesis(data, match.group(1).upper())
+    return data
 
 
 def _load_featured_set(evidence_dir: Path) -> tuple[set[str], str | None]:
@@ -473,6 +692,13 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
             result["excluded_files"].append({"name": name, "reason": reason or ""})
             result["contrast_count"] += 1
         elif action == "full":
+            if hypothesis_scope:
+                data = _compact_hypothesis_scope_payload(
+                    name,
+                    data,
+                    size_bytes=size_bytes,
+                    content_limit=CONTENT_SIZE_LIMIT,
+                )
             result["files"][name] = data
         elif action == "stub_stale_stage3" or action == "stub_nonfeatured_ot":
             stub: dict = {"size_bytes": size_bytes, "_note": reason or ""}
@@ -480,7 +706,13 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
                 stub["top_keys"] = list(data.keys())[:5]
             result["files"][name] = stub
         else:  # "fallback" — size-based behavior (preserves scope=all logic)
-            if size_bytes <= CONTENT_SIZE_LIMIT:
+            if hypothesis_scope:
+                result["files"][name] = _size_metadata_summary(
+                    data,
+                    size_bytes,
+                    CONTENT_SIZE_LIMIT,
+                )
+            elif size_bytes <= CONTENT_SIZE_LIMIT:
                 result["files"][name] = data
             else:
                 result["files"][name] = _size_metadata_summary(data, size_bytes, CONTENT_SIZE_LIMIT)
@@ -489,6 +721,17 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
             result["file_count"] += 1
             result["total_size_bytes"] += size_bytes
 
+    if hypothesis_scope:
+        stage1_pair_files = sorted(
+            name
+            for name in result["files"]
+            if _STAGE1_PAIR_NAME_RE.match(name)
+            and filter_map.get(name[len("stage1_"):-len(".json")].upper()) is True
+        )
+        result.update(_stage1_pair_usage_guidance(evidence_dir, stage1_pair_files))
+
+    if hypothesis_scope:
+        return json.dumps(result, separators=(",", ":"))
     return json.dumps(result, indent=2)
 
 
@@ -497,6 +740,102 @@ def _list_real_evidence_filenames(evidence_dir: Path) -> set[str]:
     if not evidence_dir.exists():
         return set()
     return {p.name for p in evidence_dir.iterdir() if not p.name.startswith(".")}
+
+
+def _stage1_metric_direction(metric: object) -> str:
+    if not isinstance(metric, dict):
+        return "not_determined"
+    risk_ratio = metric.get("risk_ratio")
+    if isinstance(risk_ratio, (int, float)):
+        if risk_ratio > 1:
+            return "enriched"
+        if risk_ratio < 1:
+            return "depleted"
+    diff = metric.get("diff")
+    if isinstance(diff, (int, float)):
+        if diff > 0:
+            return "enriched"
+        if diff < 0:
+            return "depleted"
+    return "not_determined"
+
+
+def _stage1_target_vs_rest(payload: object) -> dict:
+    census = payload.get("census_validation") if isinstance(payload, dict) else None
+    if not isinstance(census, dict):
+        return {}
+    target_vs_rest = census.get("target_vs_rest")
+    return target_vs_rest if isinstance(target_vs_rest, dict) else {}
+
+
+def _stage1_usage_record(filename: str, payload: object) -> dict:
+    """Classify a passed Stage 1 pair for hypothesis-writer cell-type usage."""
+    pair_key = filename[len("stage1_"):-len(".json")].upper()
+    target_vs_rest = _stage1_target_vs_rest(payload)
+    directions = {
+        key: _stage1_metric_direction(target_vs_rest.get(key))
+        for key in ("gene_a", "gene_b", "coexpression")
+    }
+    target_cell_intrinsic = (
+        directions["coexpression"] == "enriched"
+        and directions["gene_a"] != "depleted"
+        and directions["gene_b"] != "depleted"
+    )
+    target_cell_depleted_metrics = [
+        key for key, direction in directions.items() if direction == "depleted"
+    ]
+    usage = "interest_cell_intrinsic" if target_cell_intrinsic else "spatial_niche_only"
+    if target_cell_intrinsic:
+        citation_policy = (
+            "May support interest-cell intrinsic or resolved-Census-cell "
+            "coexpression claims when the hypothesis names that cell type and "
+            "the validation approach tests that cell context."
+        )
+    else:
+        citation_policy = (
+            "Passed Stage 1 pair, but not interest-cell intrinsic by "
+            "target-vs-rest direction. Do not cite as AT2, Transitional AT2, "
+            "pulmonary/alveolar epithelial, or resolved-Census-cell support; "
+            "use only as secondary non-interest-cell spatial-niche/cross-cell "
+            "framing, or cover the gene with stage3/ot evidence instead."
+        )
+    return {
+        "filename": filename,
+        "pair_key": pair_key,
+        "usage": usage,
+        "target_cell_intrinsic": target_cell_intrinsic,
+        "target_vs_rest_directions": directions,
+        "target_cell_depleted_metrics": target_cell_depleted_metrics,
+        "citation_policy": citation_policy,
+    }
+
+
+def _stage1_pair_usage_guidance(
+    evidence_dir: Path,
+    stage1_pair_files: list[str],
+) -> dict:
+    records: list[dict] = []
+    for filename in stage1_pair_files:
+        path = evidence_dir / filename
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            payload = {}
+        records.append(_stage1_usage_record(filename, payload))
+
+    return {
+        "stage1_pair_usage_guidance": records,
+        "interest_cell_intrinsic_stage1_pair_files": [
+            record["filename"]
+            for record in records
+            if record["usage"] == "interest_cell_intrinsic"
+        ],
+        "spatial_niche_only_stage1_pair_files": [
+            record["filename"]
+            for record in records
+            if record["usage"] == "spatial_niche_only"
+        ],
+    }
 
 
 def _validate_hypothesis_report_references(
@@ -549,6 +888,12 @@ def _validate_hypothesis_report_references(
                     f"hypotheses[{idx}].evidence_references cites '{token}' "
                     "which is a legacy aggregate or prior-run output forbidden "
                     "as hypothesis input."
+                )
+                continue
+            if token in _HYPOTHESIS_CONTEXT_ONLY_CITATIONS:
+                errors.append(
+                    f"hypotheses[{idx}].evidence_references cites '{token}' "
+                    f"which is {_HYPOTHESIS_CONTEXT_ONLY_CITATION_REASON}"
                 )
                 continue
             m = _STAGE1_PAIR_NAME_RE.match(token)
@@ -712,6 +1057,23 @@ _PAIR_INTERACTION_CUE_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_PAIR_CUE_NEGATION_PREFIX_RE = re.compile(
+    r"\b("
+    r"no|without|not|does\s+not|do\s+not|did\s+not|is\s+not|are\s+not|"
+    r"was\s+not|were\s+not|isn't|aren't|cannot|can't|should\s+not|must\s+not"
+    r")\b[\w\s/-]{0,80}$",
+    re.IGNORECASE,
+)
+_NOT_ONLY_RE = re.compile(r"\bnot\s+only\b", re.IGNORECASE)
+
+
+def _has_unnegated_pair_interaction_cue(clause: str) -> bool:
+    for match in _PAIR_INTERACTION_CUE_RE.finditer(clause):
+        prefix = clause[: match.start()]
+        if _PAIR_CUE_NEGATION_PREFIX_RE.search(prefix) and not _NOT_ONLY_RE.search(prefix):
+            continue
+        return True
+    return False
 
 
 def _failed_pair_text_pattern(ligand: str, receptor: str) -> re.Pattern[str]:
@@ -795,7 +1157,7 @@ def _validate_failed_pair_claims(
             related_clause = any(
                 ligand in clause.upper()
                 and receptor in clause.upper()
-                and _PAIR_INTERACTION_CUE_RE.search(clause)
+                and _has_unnegated_pair_interaction_cue(clause)
                 for clause in text_clauses
             )
             if ligand in entity_genes and receptor in entity_genes and related_clause:
@@ -1106,6 +1468,7 @@ def _tag_hypothesis_prediction_grounding(
         "grounded": 0,
         "qualitative": 0,
         "unverified": 0,
+        "grounded_indices": [],
         "unverified_indices": [],
     }
     hypotheses = parsed.get("hypotheses") if isinstance(parsed, dict) else None
@@ -1124,6 +1487,8 @@ def _tag_hypothesis_prediction_grounding(
         if cited:
             hyp["prediction_cited_files"] = cited
         summary[label] = summary.get(label, 0) + 1
+        if label == "grounded":
+            summary["grounded_indices"].append(idx)
         if label == "unverified":
             summary["unverified_indices"].append(idx)
     return summary
@@ -1344,6 +1709,14 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
                 ),
             })
             continue
+        if token in _HYPOTHESIS_CONTEXT_ONLY_CITATIONS:
+            invalid.append(ref)
+            denied.append({
+                "reference": ref,
+                "token": token,
+                "reason": _HYPOTHESIS_CONTEXT_ONLY_CITATION_REASON,
+            })
+            continue
         m = _STAGE1_PAIR_NAME_RE.match(token)
         if m:
             pair_key = f"{m.group(1).upper()}--{m.group(2).upper()}"
@@ -1373,6 +1746,7 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
         and f.endswith(".json")
         and filter_results.get(f[len("stage1_"):-len(".json")].upper()) is True
     )
+    usage_guidance = _stage1_pair_usage_guidance(evidence_dir, stage1_pair_files)
 
     return json.dumps({
         "valid": len(invalid) == 0,
@@ -1382,6 +1756,7 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
         "available_files": sorted(real),
         "stage1_pair_files": stage1_pair_files,
         "eligible_stage1_pair_files": stage1_pair_files,
+        **usage_guidance,
         "naming_convention": (
             "Stage 1 L-R pair evidence files use the convention "
             "`stage1_<LIGAND>--<RECEPTOR>.json` with TWO HYPHENS "

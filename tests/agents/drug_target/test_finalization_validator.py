@@ -481,7 +481,7 @@ def test_stale_hypothesis_report_newer_than_drug_md_fails(tmp_path):
     )
     drug_md_path = d / "drug.md"
     drug_md_path.write_text(
-        "## 4. Hypothesis-Driven Analysis\n\n"
+        "## 4. Evidence-Grounded Follow-up Recommendations\n\n"
         "No hypothesis_report.json content was loaded in the local evidence bundle.\n",
         encoding="utf-8",
     )

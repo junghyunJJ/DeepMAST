@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import json
 import os
@@ -22,6 +23,13 @@ PART4_CANDIDATE_SELECTION_FILENAME = "part4_candidate_selection.json"
 ENABLE_PART4_CANDIDATE_SELECTOR_ENV = "DEEPMAST_ENABLE_PART4_CANDIDATE_SELECTOR"
 ENABLE_PART4_CANDIDATE_SELECTOR_CONFIG_KEY = "enable_part4_candidate_selector"
 PART4_CANDIDATE_SELECTOR_PROVIDER_CONFIG_KEY = "part4_candidate_selector_provider"
+DEFAULT_PART4_CANDIDATE_SELECTOR_TIMEOUT_SECONDS = 120
+PART4_CANDIDATE_SELECTOR_TIMEOUT_ENV = (
+    "DEEPMAST_PART4_CANDIDATE_SELECTOR_TIMEOUT_SECONDS"
+)
+PART4_CANDIDATE_SELECTOR_TIMEOUT_CONFIG_KEY = (
+    "part4_candidate_selector_timeout_seconds"
+)
 MAX_RATIONALE_CHARS = 500
 MAX_EXCLUDED_RATIONALE_CHARS = 500
 MAX_DRUG_MD_EXCERPT_CHARS = 6000
@@ -100,6 +108,31 @@ def part4_candidate_selector_provider_from_config(
         return _provider_creation_error_provider(exc)
 
     return _live_llm_selector_provider(llm)
+
+
+def part4_candidate_selector_timeout_seconds(
+    config: Mapping[str, Any] | None,
+) -> float:
+    """Resolve the Part 4 selector provider timeout from config or environment."""
+
+    configurable = config.get("configurable") if isinstance(config, Mapping) else None
+    if (
+        isinstance(configurable, Mapping)
+        and PART4_CANDIDATE_SELECTOR_TIMEOUT_CONFIG_KEY in configurable
+    ):
+        return _positive_float(
+            configurable.get(PART4_CANDIDATE_SELECTOR_TIMEOUT_CONFIG_KEY),
+            default=DEFAULT_PART4_CANDIDATE_SELECTOR_TIMEOUT_SECONDS,
+        )
+
+    env_value = os.getenv(PART4_CANDIDATE_SELECTOR_TIMEOUT_ENV)
+    if env_value is not None:
+        return _positive_float(
+            env_value,
+            default=DEFAULT_PART4_CANDIDATE_SELECTOR_TIMEOUT_SECONDS,
+        )
+
+    return float(DEFAULT_PART4_CANDIDATE_SELECTOR_TIMEOUT_SECONDS)
 
 
 def _live_llm_selector_configured(config: Mapping[str, Any] | None) -> bool:
@@ -349,6 +382,7 @@ async def generate_part4_candidate_selection(
     deterministic_selected_genes: list[str],
     provider: Callable[[str], object] | None,
     data_dir: str | Path | None,
+    config: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Generate accepted LLM selector audit or deterministic fallback payload."""
 
@@ -373,7 +407,21 @@ async def generate_part4_candidate_selection(
 
     prompt = build_part4_candidate_selection_prompt(context)
     try:
-        raw_output = await _call_provider(provider, prompt)
+        raw_output = await asyncio.wait_for(
+            _call_provider(provider, prompt),
+            timeout=part4_candidate_selector_timeout_seconds(config),
+        )
+    except asyncio.TimeoutError:
+        issue = _validation_issue("PART4_SELECTOR_PROVIDER_TIMEOUT")
+        return build_part4_candidate_selection_fallback(
+            allowed_candidates=allowed_candidates,
+            deterministic_selected_genes=deterministic_selected_genes,
+            fallback_reason="provider_timeout",
+            validation_issues=[issue],
+            attempt_history=[
+                {"attempt": 1, "status": "provider_timeout", "issues": [issue]}
+            ],
+        )
     except Exception as exc:  # noqa: BLE001
         issue = _validation_issue(
             "PART4_SELECTOR_PROVIDER_ERROR",
@@ -450,7 +498,10 @@ def _live_llm_selector_provider(llm: object) -> Callable[[str], object]:
                 messages
             )
         elif callable(invoke):
-            response = cast(Callable[[object], object], invoke)(messages)
+            response = await asyncio.to_thread(
+                cast(Callable[[object], object], invoke),
+                messages,
+            )
         else:
             raise TypeError("part4 candidate selector LLM provider has no invoke method")
         return _message_content_to_text(response)
@@ -459,7 +510,10 @@ def _live_llm_selector_provider(llm: object) -> Callable[[str], object]:
 
 
 async def _call_provider(provider: Callable[[str], object], prompt: str) -> object:
-    result = provider(prompt)
+    if inspect.iscoroutinefunction(provider):
+        result = provider(prompt)
+    else:
+        result = await asyncio.to_thread(provider, prompt)
     if inspect.isawaitable(result):
         return await cast(Awaitable[object], result)
     return result
@@ -616,6 +670,13 @@ def _safe_float(value: object, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _positive_float(value: object, *, default: float) -> float:
+    number = _safe_float(value, default=default)
+    if number <= 0:
+        return default
+    return number
 
 
 def _gene_text(value: object) -> str:

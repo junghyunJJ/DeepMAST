@@ -21,6 +21,7 @@ from typing import Callable, Sequence
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
+from langchain_core.tools.structured import StructuredTool
 
 from src.agents.deep_interpreter.middleware.write_file_guard import (
     ReadFileBlockMiddleware,
@@ -29,6 +30,7 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
 from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
 from src.agents.drug_target.middleware import HypothesisRetryLoopMiddleware
 from src.agents.drug_target.tools import (
+    apply_semantic_celltype_proxy,
     compute_rubric_scores,
     finalize_stage1_artifacts,
     list_census_cell_types,
@@ -41,6 +43,8 @@ from src.agents.drug_target.tools import (
     query_stage2_gene_panel,
     query_string_ppi_pair,
     read_skill_file,
+    resolve_census_celltypes,
+    search_census_celltype_options,
     run_stage3_batch,
     run_batch_census_lr_pairs,
     run_compare_census_lr_pair,
@@ -93,6 +97,43 @@ def _sanitize_prompt_value(value: str | None) -> str:
 
 # Backwards-compatible alias so existing callers and tests continue to work.
 _sanitize_data_dir = _sanitize_prompt_value
+
+
+def _disabled_census_stage1_batch_tool() -> StructuredTool:
+    """Return a run_stage1_batch variant that cannot enable Census queries."""
+
+    def _run_stage1_batch_census_disabled(
+        data_dir: str,
+        disease: str,
+        target_cell_type: str = "",
+        enable_census: bool = False,
+    ):
+        func = getattr(run_stage1_batch, "func", None)
+        if func is None:
+            return run_stage1_batch.invoke(
+                {
+                    "data_dir": data_dir,
+                    "disease": disease,
+                    "target_cell_type": target_cell_type,
+                    "enable_census": False,
+                }
+            )
+        return func(
+            data_dir=data_dir,
+            disease=disease,
+            target_cell_type=target_cell_type,
+            enable_census=False,
+        )
+
+    return StructuredTool.from_function(
+        func=_run_stage1_batch_census_disabled,
+        name="run_stage1_batch",
+        description=(
+            f"{run_stage1_batch.description}\n\n"
+            "Census is disabled for this run; this wrapper always forwards "
+            "enable_census=False even if the caller omits it or passes true."
+        ),
+    )
 
 
 def _strip_failed_suffix_in_strings(node: object) -> tuple[object, int]:
@@ -214,6 +255,9 @@ SUBAGENT_CONFIGS = {
             # Phase 0: Disease vocabulary matching
             list_census_diseases,
             list_census_cell_types,
+            resolve_census_celltypes,
+            search_census_celltype_options,
+            apply_semantic_celltype_proxy,
             # Stage 2: Target Validation (runs FIRST — batch all genes)
             query_stage2_gene_panel,
             query_ensembl_vep_consequence,
@@ -363,24 +407,34 @@ def get_subagents(
         _census_tool_names = {
             "query_cellxgene_lr_context",
             "list_census_diseases",
+            "list_census_cell_types",
+            "resolve_census_celltypes",
+            "search_census_celltype_options",
+            "apply_semantic_celltype_proxy",
             "run_compare_census_lr_pair",
             "run_batch_census_lr_pairs",
         }
         for subagent in subagents:
             if subagent["name"] == "evidence_assessor":
                 subagent["tools"] = [
-                    t for t in subagent["tools"]
+                    _disabled_census_stage1_batch_tool()
+                    if getattr(t, "name", None) == "run_stage1_batch"
+                    else t
+                    for t in subagent["tools"]
                     if getattr(t, "name", None) not in _census_tool_names
                 ]
                 subagent["system_prompt"] += (
                     "\n\n## Census API: DISABLED\n"
                     "Census tools (`query_cellxgene_lr_context`, `list_census_diseases`, "
-                    "`list_census_cell_types`, `run_compare_census_lr_pair`, "
+                    "`list_census_cell_types`, `resolve_census_celltypes`, "
+                    "`search_census_celltype_options`, `apply_semantic_celltype_proxy`, "
+                    "`run_compare_census_lr_pair`, "
                     "`run_batch_census_lr_pairs`) are NOT available in this run.\n"
                     "- Skip Phase 0 Census disease/cell-type matching entirely.\n"
                     "- In Stage 1, rely on STRING-only validation via run_stage1_batch(enable_census=false).\n"
-                    "- Do NOT call query_cellxgene_lr_context, run_compare_census_lr_pair, "
-                    "or run_batch_census_lr_pairs.\n"
+                    "- Do NOT call query_cellxgene_lr_context, search_census_celltype_options, "
+                    "apply_semantic_celltype_proxy, run_compare_census_lr_pair, or "
+                    "run_batch_census_lr_pairs.\n"
                 )
 
     # Apply per-subagent model overrides

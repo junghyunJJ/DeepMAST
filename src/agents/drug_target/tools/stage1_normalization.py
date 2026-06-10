@@ -257,6 +257,7 @@ def resolve_stage1_context(
             "Could not resolve disease for Stage1 context from CLI or metadata. "
             "Provide --disease or populate lr_candidates.json / target_assessment.json / evidence/known_drugs.json."
         )
+    assert resolved_disease is not None
 
     requested_target_cell_type, requested_source = _pick_first_nonempty(
         (target_cell_type, "cli"),
@@ -282,6 +283,7 @@ def resolve_stage1_context(
             "Could not resolve target cell type for Stage1 context from CLI or metadata. "
             "Provide --target-cell-type or populate targets.json with interest_celltypes."
         )
+    assert requested_target_cell_type is not None
 
     resolved_target_cell_type, resolved_source = _pick_first_nonempty(
         (target_cell_type, "cli"),
@@ -299,6 +301,8 @@ def resolve_stage1_context(
         ),
         (resolved_target_cell_type, resolved_source or "resolved_target_cell_type"),
     )
+    assert resolved_target_cell_type is not None
+    assert csv_target_cell_type is not None
 
     return {
         "disease": resolved_disease,
@@ -552,15 +556,24 @@ def normalize_stage1_record(
         else {}
     )
 
-    latest_census = build_census_validation_from_csv(
-        evidence_dir,
-        ligand,
-        receptor,
-        csv_target_cell_type=csv_target_cell_type,
-        requested_target_cell_type=requested_target_cell_type,
-        resolved_target_cell_type=resolved_target_cell_type,
-        disease=disease,
-    )
+    try:
+        latest_census = build_census_validation_from_csv(
+            evidence_dir,
+            ligand,
+            receptor,
+            csv_target_cell_type=csv_target_cell_type,
+            requested_target_cell_type=requested_target_cell_type,
+            resolved_target_cell_type=resolved_target_cell_type,
+            disease=disease,
+        )
+    except Exception as exc:
+        latest_census = None
+        logger.warning(
+            "Skipping latest Census CSV refresh for %s--%s during Stage1 normalization: %s",
+            ligand,
+            receptor,
+            exc,
+        )
     if latest_census is not None:
         normalized["census_validation"] = latest_census
     else:
@@ -569,6 +582,12 @@ def normalize_stage1_record(
         for key in ("input_disease", "disease_fallback_used", "disease_resolution_mode"):
             if key in existing_census:
                 normalized["census_validation"].setdefault(key, existing_census[key])
+        if existing_census.get("source") == "single_pair_fallback":
+            normalized["census_validation"]["source"] = "single_pair_fallback"
+            if "batch_error" in existing_census:
+                normalized["census_validation"]["batch_error"] = existing_census["batch_error"]
+            if "csv_file" in existing_census:
+                normalized["census_validation"].setdefault("csv_file", existing_census["csv_file"])
 
     # Remove legacy fields no longer used
     normalized.pop("cellxgene", None)

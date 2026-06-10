@@ -6,7 +6,7 @@ import hashlib
 import json
 import os
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
@@ -390,6 +390,12 @@ def _format_rr(value: object) -> str:
     return f"{numeric:.2f}"
 
 
+def _format_stage1_scalar(value: object) -> str:
+    if value in (None, ""):
+        return "N/A"
+    return str(value)
+
+
 def _format_float(value: object, digits: int = 4) -> str:
     numeric = _float_or_none(value)
     if numeric is None:
@@ -496,6 +502,110 @@ def _pathway_parts(pathway_data: dict[str, Any]) -> list[dict[str, str]]:
     return parts
 
 
+def _direction_from_metric(metric: dict[str, Any]) -> str:
+    risk_ratio = _float_or_none(metric.get("risk_ratio"))
+    if risk_ratio is not None:
+        if risk_ratio > 1:
+            return "enriched"
+        if risk_ratio < 1:
+            return "depleted"
+
+    diff = _float_or_none(metric.get("diff"))
+    if diff is not None:
+        if diff > 0:
+            return "enriched"
+        if diff < 0:
+            return "depleted"
+
+    return "not determined"
+
+
+def _stage1_metric_text(metric: dict[str, Any]) -> str:
+    return (
+        f"RR={_format_stage1_scalar(metric.get('risk_ratio'))}, "
+        f"p={_format_stage1_scalar(metric.get('p_value'))}; "
+        f"{_direction_from_metric(metric)}"
+    )
+
+
+def _stage1_gene_direction_text(
+    ligand: str,
+    receptor: str,
+    gene_a: dict[str, Any],
+    gene_b: dict[str, Any],
+) -> str:
+    return "; ".join(
+        [
+            f"{ligand} {_direction_from_metric(gene_a)}",
+            f"{receptor} {_direction_from_metric(gene_b)}",
+        ]
+    )
+
+
+def _is_at2_celltype(celltype: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", " ", celltype.lower())
+    return "at2" in normalized.split() or "alveolar type 2" in normalized
+
+
+def _hypothesis_use_class(
+    *,
+    passed: bool | None,
+    coexpression_direction: str,
+    celltype: str,
+) -> str:
+    if passed is False:
+        return "Negative/contrast only"
+    at2 = _is_at2_celltype(celltype)
+    if coexpression_direction == "enriched":
+        return "Primary AT2-intrinsic support" if at2 else "Primary target-cell intrinsic support"
+    if coexpression_direction == "depleted":
+        return "Cross-cell/non-AT2 framing only" if at2 else "Cross-cell/non-target-cell framing only"
+    return "Cautious support only"
+
+
+def _is_epithelial_anchor_text(value: Any) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
+    normalized = " ".join(normalized.split())
+    if not normalized:
+        return False
+    tokens = set(normalized.split())
+    return (
+        "at2" in tokens
+        or "pulmonary alveolar type 2" in normalized
+        or "alveolar type 2" in normalized
+        or "alveolar epithelial" in normalized
+        or "pulmonary epithelial" in normalized
+    )
+
+
+def _stage1_interpretation(
+    *,
+    passed: bool | None,
+    coexpression_direction: str,
+    celltype: str,
+) -> str:
+    if passed is False:
+        return (
+            "Failed Stage 1 eligibility. Do not use as primary support; "
+            "retain only as negative or contrast evidence."
+        )
+    if coexpression_direction == "enriched":
+        return (
+            f"Stage 1 eligible and same-cell coexpression-enriched in {celltype}. "
+            "Interpret as a target-cell intrinsic spatial program candidate."
+        )
+    if coexpression_direction == "depleted":
+        return (
+            f"Stage 1 eligible, but same-cell coexpression is depleted in {celltype}. "
+            "Interpret as cross-cell or non-target-cell spatial niche signal."
+        )
+    return (
+        "Stage 1 eligibility is available, but Census coexpression direction is "
+        "not determined. Avoid target-cell intrinsic same-cell claims without "
+        "additional support."
+    )
+
+
 def _pair_genes(pair_key: str, pair_data: dict[str, Any]) -> tuple[str, str]:
     ligand = _safe_text(pair_data.get("ligand"), "")
     receptor = _safe_text(pair_data.get("receptor"), "")
@@ -520,8 +630,24 @@ def _template_pair(
     census_validation = census_validation if isinstance(census_validation, dict) else {}
     target_vs_rest = census_validation.get("target_vs_rest", {})
     target_vs_rest = target_vs_rest if isinstance(target_vs_rest, dict) else {}
+    gene_a = target_vs_rest.get("gene_a", {})
+    gene_a = gene_a if isinstance(gene_a, dict) else {}
+    gene_b = target_vs_rest.get("gene_b", {})
+    gene_b = gene_b if isinstance(gene_b, dict) else {}
     coexpression = target_vs_rest.get("coexpression", {})
     coexpression = coexpression if isinstance(coexpression, dict) else {}
+    resolved_celltype = _safe_text(
+        census_validation.get("resolved_cell_type")
+        or census_validation.get("requested_cell_type"),
+        "resolved interest cell type",
+    )
+    lookup_key = (_normalize_gene(ligand), _normalize_gene(receptor))
+    stage1_filter = pair_data.get("stage1_filter", {})
+    stage1_filter = stage1_filter if isinstance(stage1_filter, dict) else {}
+    passed = filter_lookup.get(lookup_key)
+    if passed is None and "passed" in stage1_filter:
+        passed = _is_true(stage1_filter.get("passed"))
+    coexpression_direction = _direction_from_metric(coexpression)
 
     pair = {
         "ligand": ligand,
@@ -543,11 +669,370 @@ def _template_pair(
         ),
         "census_rr": coexpression.get("risk_ratio"),
         "census_p": coexpression.get("p_value", "N/A"),
+        "resolved_celltype": resolved_celltype,
+        "stage1_status": "PASS" if passed else "FAIL" if passed is False else "N/A",
+        "stage1_string": (
+            f"{'PASS' if passed else 'FAIL' if passed is False else 'N/A'}; "
+            f"STRING={_format_stage1_scalar(ppi.get('max_combined_score'))}; "
+            f"{'confirmed' if _is_true(ppi.get('interaction_found')) else 'not found'}"
+        ),
+        "census_coexpression": _stage1_metric_text(coexpression),
+        "_coexpression_direction": coexpression_direction,
+        "gene_direction": _stage1_gene_direction_text(ligand, receptor, gene_a, gene_b),
+        "interpretation": _stage1_interpretation(
+            passed=passed,
+            coexpression_direction=coexpression_direction,
+            celltype=resolved_celltype,
+        ),
+        "hypothesis_use": _hypothesis_use_class(
+            passed=passed,
+            coexpression_direction=coexpression_direction,
+            celltype=resolved_celltype,
+        ),
+        "_epithelial_intrinsic_support": (
+            passed is not False
+            and coexpression_direction == "enriched"
+            and _is_epithelial_anchor_text(resolved_celltype)
+        ),
     }
-    lookup_key = (_normalize_gene(ligand), _normalize_gene(receptor))
-    if lookup_key in filter_lookup:
-        pair["_passed"] = filter_lookup[lookup_key]
+    if passed is not None:
+        pair["_passed"] = passed
     return pair
+
+
+_STAGE1_REPORT_REF_RE = re.compile(
+    r"(stage1_[A-Za-z0-9-]+--[A-Za-z0-9-]+\.json)"
+)
+
+
+def _stage1_ref_token(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    match = _STAGE1_REPORT_REF_RE.search(value)
+    return match.group(1) if match else None
+
+
+def _stage1_pair_file_lookup(
+    stage1_pairs: dict[str, Any],
+    filter_lookup: dict[tuple[str, str], bool],
+) -> dict[str, dict[str, Any]]:
+    lookup: dict[str, dict[str, Any]] = {}
+    for pair_key, pair_data in stage1_pairs.items():
+        if not isinstance(pair_data, dict):
+            continue
+        pair = _template_pair(pair_key, pair_data, filter_lookup)
+        ligand = _safe_text(pair.get("ligand"), "")
+        receptor = _safe_text(pair.get("receptor"), "")
+        if not ligand or not receptor:
+            continue
+        lookup[f"stage1_{ligand}--{receptor}.json"] = pair
+        lookup[f"stage1_{receptor}--{ligand}.json"] = pair
+    return lookup
+
+
+def _hypothesis_mentions_epithelial_anchor(hypothesis: dict[str, Any]) -> bool:
+    entities = hypothesis.get("biological_entities")
+    if isinstance(entities, dict):
+        cell_types = entities.get("cell_types")
+        if isinstance(cell_types, list) and any(
+            _is_epithelial_anchor_text(cell_type) for cell_type in cell_types
+        ):
+            return True
+    fields = (
+        hypothesis.get("title", ""),
+        hypothesis.get("core_claim", ""),
+        hypothesis.get("falsifiable_prediction", ""),
+        hypothesis.get("validation_approach", ""),
+    )
+    return any(_is_epithelial_anchor_text(field) for field in fields)
+
+
+def _hypothesis_stage1_pairs(
+    hypothesis: dict[str, Any],
+    stage1_pair_lookup: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    refs = hypothesis.get("evidence_references")
+    if not isinstance(refs, list):
+        return []
+    pairs: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for ref in refs:
+        token = _stage1_ref_token(ref)
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        pair = stage1_pair_lookup.get(token)
+        if pair:
+            pairs.append(pair)
+    return pairs
+
+
+def _reference_list(hypothesis: dict[str, Any]) -> list[str]:
+    refs = hypothesis.get("evidence_references")
+    if not isinstance(refs, list):
+        return []
+    return [ref for ref in refs if isinstance(ref, str) and ref.strip()]
+
+
+def _ref_is_stage1(ref: str) -> bool:
+    return bool(_stage1_ref_token(ref))
+
+
+def _ref_is_stage2(ref: str) -> bool:
+    normalized = ref.strip()
+    return normalized.endswith(".json") and (
+        normalized.startswith("ot_")
+        or normalized.startswith("gwas_")
+        or normalized.startswith("genetics_")
+    )
+
+
+def _ref_is_stage3(ref: str) -> bool:
+    normalized = ref.strip()
+    return normalized.startswith("stage3_") or normalized in {
+        "known_drugs.json",
+        "resolved_drugs.json",
+    }
+
+
+def _gene_from_gene_level_ref(ref: str) -> str | None:
+    name = Path(ref.strip()).name
+    if not name.endswith(".json"):
+        return None
+    stem = name.removesuffix(".json")
+    for prefix in ("ot_", "gwas_", "genetics_", "stage3_"):
+        if stem.startswith(prefix) and len(stem) > len(prefix):
+            return stem[len(prefix) :]
+    return None
+
+
+def _asymmetric_gene_level_support_constraint(
+    stage1_pair_evidence: list[dict[str, Any]],
+    references: list[str],
+) -> str | None:
+    support_labels_by_gene: dict[str, set[str]] = {}
+    for ref in references:
+        gene = _gene_from_gene_level_ref(ref)
+        if not gene:
+            continue
+        labels = support_labels_by_gene.setdefault(_normalize_gene(gene), set())
+        if _ref_is_stage2(ref):
+            labels.add("Stage 2")
+        if _ref_is_stage3(ref):
+            labels.add("Stage 3")
+
+    for pair in stage1_pair_evidence:
+        if pair.get("_passed") is not True:
+            continue
+        if not _is_true(pair.get("_epithelial_intrinsic_support")):
+            continue
+        ligand = _safe_text(pair.get("ligand"), "")
+        receptor = _safe_text(pair.get("receptor"), "")
+        if not ligand or not receptor:
+            continue
+        ligand_labels = support_labels_by_gene.get(_normalize_gene(ligand), set())
+        receptor_labels = support_labels_by_gene.get(_normalize_gene(receptor), set())
+        if bool(ligand_labels) == bool(receptor_labels):
+            continue
+        anchor, context = (
+            (ligand, receptor) if ligand_labels else (receptor, ligand)
+        )
+        anchor_labels = ligand_labels or receptor_labels
+        if {"Stage 2", "Stage 3"}.issubset(anchor_labels):
+            support_label = "Stage 2/3-supported"
+        else:
+            support_label = f"{' and '.join(sorted(anchor_labels))}-supported"
+        return (
+            f"Treat {anchor} as the {support_label} anchor and {context} as a "
+            f"coexpression-context partner/readout; do not infer gene-level "
+            f"target-disease support or drug actionability for {context} from "
+            "this pair."
+        )
+    return None
+
+
+def _remove_framing_pairs_from_gap_analysis(
+    hypothesis_data: dict[str, Any],
+    framing_pairs: list[dict[str, str]],
+) -> None:
+    gap_analysis = hypothesis_data.get("gap_analysis")
+    if not isinstance(gap_analysis, dict) or not framing_pairs:
+        return
+    covered_sources = {
+        pair.get("source", "") for pair in framing_pairs if pair.get("source")
+    }
+    orphan_files = gap_analysis.get("orphan_files")
+    if not isinstance(orphan_files, list):
+        return
+    filtered_orphans = [
+        orphan for orphan in orphan_files if str(orphan) not in covered_sources
+    ]
+    removed_count = len(orphan_files) - len(filtered_orphans)
+    if removed_count <= 0:
+        return
+    gap_analysis = dict(gap_analysis)
+    gap_analysis["orphan_files"] = filtered_orphans
+    referenced_files = _float_or_none(gap_analysis.get("referenced_files"))
+    total_files = _float_or_none(gap_analysis.get("total_evidence_files"))
+    if referenced_files is not None:
+        gap_analysis["referenced_files"] = int(referenced_files) + removed_count
+    if total_files:
+        gap_analysis["evidence_coverage_pct"] = round(
+            100.0 * float(gap_analysis.get("referenced_files", 0)) / total_files,
+            2,
+        )
+        hypothesis_data["evidence_coverage_pct"] = gap_analysis[
+            "evidence_coverage_pct"
+        ]
+    hypothesis_data["gap_analysis"] = gap_analysis
+
+
+def _secondary_stage1_framing_pair(pair: dict[str, Any]) -> dict[str, str] | None:
+    if pair.get("_passed") is not True:
+        return None
+    if _is_true(pair.get("_epithelial_intrinsic_support")):
+        return None
+    source = _safe_text(pair.get("pair_file"), "")
+    if not source:
+        return None
+    usage = "Cross-cell/spatial-niche framing only; not AT2-intrinsic support"
+    ligand = _safe_text(pair.get("ligand"), "")
+    receptor = _safe_text(pair.get("receptor"), "")
+    return {
+        "pair": f"{ligand}-{receptor}" if ligand and receptor else source,
+        "census_direction": _safe_text(
+            pair.get("_coexpression_direction"),
+            "not determined",
+        ),
+        "usage": usage,
+        "source": source,
+    }
+
+
+def _annotate_hypothesis_tiers(
+    hypotheses: list[Any],
+    *,
+    stage1_pair_lookup: dict[str, dict[str, Any]],
+    hypothesis_interpretations: dict[str, Any],
+) -> tuple[
+    list[Any],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, str]],
+]:
+    rendered_hypotheses: list[Any] = []
+    primary: list[dict[str, Any]] = []
+    secondary: list[dict[str, Any]] = []
+    gene_level: list[dict[str, Any]] = []
+    secondary_stage1_framing_pairs: list[dict[str, str]] = []
+    seen_secondary_sources: set[str] = set()
+    for hypothesis in hypotheses:
+        if not isinstance(hypothesis, dict):
+            rendered_hypotheses.append(hypothesis)
+            continue
+        rendered_hypothesis = dict(hypothesis)
+        rank = str(rendered_hypothesis.get("rank") or "")
+        snippets = hypothesis_interpretations.get(rank, {})
+        snippets = snippets if isinstance(snippets, dict) else {}
+        implication = snippets.get("implication")
+        if isinstance(implication, str) and implication.strip():
+            rendered_hypothesis["_interpretation"] = implication
+
+        stage1_pair_evidence = _hypothesis_stage1_pairs(
+            rendered_hypothesis,
+            stage1_pair_lookup,
+        )
+        references = _reference_list(rendered_hypothesis)
+        biological_grounding_refs = [
+            ref for ref in references if _ref_is_stage1(ref) or "spatial" in ref.lower()
+        ]
+        target_disease_support_refs = [ref for ref in references if _ref_is_stage2(ref)]
+        actionability_refs = [ref for ref in references if _ref_is_stage3(ref)]
+        rendered_hypothesis["_biological_grounding_refs"] = biological_grounding_refs
+        rendered_hypothesis["_target_disease_support_refs"] = target_disease_support_refs
+        rendered_hypothesis["_actionability_refs"] = actionability_refs
+        has_primary_epithelial_support = any(
+            _is_true(pair.get("_epithelial_intrinsic_support"))
+            for pair in stage1_pair_evidence
+        )
+        has_epithelial_anchor = _hypothesis_mentions_epithelial_anchor(
+            rendered_hypothesis
+        )
+        if has_primary_epithelial_support and has_epithelial_anchor:
+            rendered_hypothesis["_tier"] = "primary_epithelial_intrinsic"
+            rendered_hypothesis["_tier_label"] = "Primary epithelial/AT2-intrinsic"
+            rendered_hypothesis["_tier_note"] = (
+                "Cited Stage 1 Census evidence supports same-cell coexpression "
+                "enrichment in the resolved epithelial/AT2 cell context."
+            )
+            interpretation_constraint = (
+                "AT2/epithelial same-cell coexpression enrichment supports "
+                "target-cell context, but not causal mechanism."
+            )
+            asymmetric_constraint = _asymmetric_gene_level_support_constraint(
+                stage1_pair_evidence,
+                references,
+            )
+            if asymmetric_constraint:
+                interpretation_constraint = (
+                    f"{interpretation_constraint} {asymmetric_constraint}"
+                )
+            rendered_hypothesis["_interpretation_constraint"] = (
+                interpretation_constraint
+            )
+            primary.append(rendered_hypothesis)
+        elif not biological_grounding_refs:
+            rendered_hypothesis["_tier"] = "gene_level_actionability"
+            rendered_hypothesis["_tier_label"] = (
+                "Gene-level/actionability follow-up"
+            )
+            rendered_hypothesis["_tier_note"] = (
+                "Cited evidence provides target-disease or actionability "
+                "context, but no Stage 1/spatial grounding was cited."
+            )
+            rendered_hypothesis["_interpretation_constraint"] = (
+                "Gene-level support only; do not interpret as AT2-intrinsic "
+                "or spatial-niche evidence."
+            )
+            gene_level.append(rendered_hypothesis)
+        else:
+            rendered_hypothesis["_tier"] = "secondary_epithelial_associated_niche"
+            rendered_hypothesis["_tier_label"] = "Secondary epithelial-associated niche"
+            rendered_hypothesis["_tier_note"] = (
+                "Treat as spatially colocalized non-epithelial or cross-cell "
+                "niche biology linked to the epithelial program, not as an "
+                "epithelial-cell-intrinsic target mechanism."
+            )
+            rendered_hypothesis["_interpretation_constraint"] = (
+                "Use as cross-cell/spatial-niche follow-up evidence only; do "
+                "not interpret as AT2-intrinsic support."
+            )
+            for pair in stage1_pair_evidence:
+                framing_pair = _secondary_stage1_framing_pair(pair)
+                if not framing_pair:
+                    continue
+                source = framing_pair["source"]
+                if source in seen_secondary_sources:
+                    continue
+                seen_secondary_sources.add(source)
+                secondary_stage1_framing_pairs.append(framing_pair)
+            secondary.append(rendered_hypothesis)
+        rendered_hypotheses.append(rendered_hypothesis)
+
+    for index, hypothesis in enumerate(primary, start=1):
+        hypothesis["_tier_rank"] = index
+    for index, hypothesis in enumerate(secondary, start=1):
+        hypothesis["_tier_rank"] = index
+    for index, hypothesis in enumerate(gene_level, start=1):
+        hypothesis["_tier_rank"] = index
+    return (
+        rendered_hypotheses,
+        primary,
+        secondary,
+        gene_level,
+        secondary_stage1_framing_pairs,
+    )
 
 
 def _template_pairs_for_gene(
@@ -626,6 +1111,7 @@ def _markdown_template_context(
     stage1_pairs = template_context.get("stage1_pairs", {})
     stage1_pairs = stage1_pairs if isinstance(stage1_pairs, dict) else {}
     filter_lookup = _stage1_filter_lookup(stage1_rows)
+    stage1_pair_lookup = _stage1_pair_file_lookup(stage1_pairs, filter_lookup)
 
     featured_cards: list[dict[str, Any]] = []
     for candidate in selected:
@@ -641,12 +1127,22 @@ def _markdown_template_context(
             drugs = _dict_list(candidate.get("drugs", []))
             clinical, preclinical = _split_template_drugs(drugs)
         gene = _safe_text(candidate.get("gene"), "")
+        pairs = _template_pairs_for_gene(gene, stage1_pairs, filter_lookup)
+        stage1_celltype = next(
+            (
+                str(pair.get("resolved_celltype"))
+                for pair in pairs
+                if pair.get("resolved_celltype")
+            ),
+            "resolved interest cell type",
+        )
         card = {
             "gene": gene,
             "rubric": _candidate_row(candidate),
             "_clinical_drugs": clinical,
             "_preclinical_compounds": preclinical,
-            "_pairs": _template_pairs_for_gene(gene, stage1_pairs, filter_lookup),
+            "_pairs": pairs,
+            "_stage1_celltype": stage1_celltype,
         }
         candidate_interpretations = interpretations.get("candidates", {})
         candidate_interpretations = (
@@ -676,20 +1172,30 @@ def _markdown_template_context(
             if isinstance(hypothesis_interpretations, dict)
             else {}
         )
-        rendered_hypotheses: list[Any] = []
-        for hypothesis in hypotheses:
-            if not isinstance(hypothesis, dict):
-                rendered_hypotheses.append(hypothesis)
-                continue
-            rendered_hypothesis = dict(hypothesis)
-            rank = str(rendered_hypothesis.get("rank") or "")
-            snippets = hypothesis_interpretations.get(rank, {})
-            snippets = snippets if isinstance(snippets, dict) else {}
-            implication = snippets.get("implication")
-            if isinstance(implication, str) and implication.strip():
-                rendered_hypothesis["_interpretation"] = implication
-            rendered_hypotheses.append(rendered_hypothesis)
+        (
+            rendered_hypotheses,
+            primary_hypotheses,
+            secondary_hypotheses,
+            gene_level_hypotheses,
+            secondary_stage1_framing_pairs,
+        ) = (
+            _annotate_hypothesis_tiers(
+                hypotheses,
+                stage1_pair_lookup=stage1_pair_lookup,
+                hypothesis_interpretations=hypothesis_interpretations,
+            )
+        )
         hypothesis_data["hypotheses"] = rendered_hypotheses
+        hypothesis_data["primary_hypotheses"] = primary_hypotheses
+        hypothesis_data["secondary_hypotheses"] = secondary_hypotheses
+        hypothesis_data["gene_level_hypotheses"] = gene_level_hypotheses
+        hypothesis_data["secondary_stage1_framing_pairs"] = (
+            secondary_stage1_framing_pairs
+        )
+        _remove_framing_pairs_from_gap_analysis(
+            hypothesis_data,
+            secondary_stage1_framing_pairs,
+        )
     return {
         "disease": _safe_text(report_data.get("disease"), "unspecified disease"),
         "n_genes": len(candidates),
@@ -1506,6 +2012,7 @@ async def finalize_report_mvp(state: dict, config: RunnableConfig) -> dict:
         deterministic_selected_genes=deterministic_selected_genes,
         provider=selector_provider,
         data_dir=base,
+        config=config,
     )
     _write_json(part4_candidate_selection_path, candidate_selection_payload)
 

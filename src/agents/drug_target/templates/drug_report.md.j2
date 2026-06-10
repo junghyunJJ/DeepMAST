@@ -138,18 +138,13 @@ Each gene is scored on two independent tracks reflecting different types of ther
 **B. Biological Context (Stage 1)**
 
 {% if card._pairs %}
-{% for p in card._pairs %}
-- **{{ p.ligand }}–{{ p.receptor }}**{% if '_passed' in p %} **[Stage 1: {{ "PASS" if p._passed else "FAIL" }}]**{% endif %}: STRING PPI score={{ p.score }}, interaction={{ p.interaction }}
-{% for kp in p.kegg %}
-  - KEGG ({{ kp.role }}): {{ kp.pathways }}
+| Pair | Stage 1 / STRING | Census coexpression in {{ card._stage1_celltype }} | Gene-level Census direction | Interpretation | Hypothesis use | Evidence |
+|---|---|---|---|---|---|---|
+{% for p in card._pairs -%}
+| **{{ p.ligand }}-{{ p.receptor }}** | {{ p.stage1_string }} | {{ p.census_coexpression }} | {{ p.gene_direction }} | {{ p.interpretation }} | {{ p.hypothesis_use }} | `{{ p.pair_file }}` |
 {% endfor %}
-{% for rp in p.reactome %}
-  - Reactome ({{ rp.role }}): {{ rp.pathways }}
-{% endfor %}
-{% if p.census_rr is not none %}
-  - Census: risk_ratio={{ p.census_rr }}, p_value={{ p.census_p }} [from {{ p.pair_file }}]
-{% endif %}
-{% endfor %}
+
+**Spatial context:** All ligand-receptor pairs listed above originated from significant LIANA+ spatial co-localization results in the interest region/cell-type program. Stage 1 PASS/FAIL and Census direction are used here to decide whether each pair can support a hypothesis, and what kind of hypothesis is allowed.
 {% else %}
 - No Stage 1 data available for this gene
 {% endif %}
@@ -178,26 +173,38 @@ Each gene is scored on two independent tracks reflecting different types of ther
 ---
 
 {% endfor %}
-## 4. Hypothesis-Driven Analysis
+## 4. Evidence-Grounded Follow-up Recommendations
 
 {% if disease_scope and disease_scope.requires_proxy_note %}
 {{ disease_scope.proxy_note }}
 
 {% endif %}
 {% if hypothesis_data and hypothesis_data.hypotheses %}
-Evidence coverage: {{ hypothesis_data.evidence_coverage_pct }}% ({{ hypothesis_data.hypotheses_retained }} hypotheses retained from {{ hypothesis_data.hypotheses_generated }} generated)
+Evidence coverage: {{ hypothesis_data.evidence_coverage_pct }}% ({{ hypothesis_data.hypotheses_retained }} follow-up recommendations retained from {{ hypothesis_data.hypotheses_generated }} generated)
 
 {% if interpretations.hypotheses_overview %}
 {{ interpretations.hypotheses_overview }}
 {% endif %}
-<!-- EXPAND: Add 2-3 sentences summarizing the hypothesis generation approach and key themes -->
+These recommendations are grounded in the available spatial, Census, OpenTargets, and ChEMBL evidence. They should be read as follow-up experimental or analysis priorities, not as literature-validated causal mechanisms.
 
-{% for h in hypothesis_data.hypotheses %}
-### 4.{{ h.rank }}. {{ h.title }}
+{% macro render_hypothesis(h, prefix) -%}
+#### {{ prefix }}.{{ h._tier_rank | default(h.rank) }}. {{ h.title }}
 
 **Category:** {{ h.category }}
 
-**Core Claim:** {{ h.core_claim }}
+{% if h._tier_label is defined and h._tier_label %}
+**Interpretation Tier:** {{ h._tier_label }}{% if h._tier_note is defined and h._tier_note %} — {{ h._tier_note }}{% endif %}
+
+{% endif %}
+**Conservative Interpretation:** {{ h.core_claim }}
+
+**Biological Grounding:** {% if h._biological_grounding_refs is defined and h._biological_grounding_refs %}{{ h._biological_grounding_refs | join(', ') }}{% else %}No Stage 1/spatial grounding reference cited.{% endif %}
+
+**Target-Disease Support:** {% if h._target_disease_support_refs is defined and h._target_disease_support_refs %}{{ h._target_disease_support_refs | join(', ') }}{% else %}No Stage 2 OpenTargets evidence cited for this recommendation.{% endif %}
+
+**Actionability:** {% if h._actionability_refs is defined and h._actionability_refs %}{{ h._actionability_refs | join(', ') }}{% else %}No Stage 3 druggability evidence cited; treat as analysis or perturbation-development follow-up.{% endif %}
+
+**Interpretation Constraint:** {% if h._interpretation_constraint is defined and h._interpretation_constraint %}{{ h._interpretation_constraint }}{% else %}Interpret as an evidence-grounded follow-up recommendation, not a validated causal mechanism.{% endif %}
 
 **Evidence References:**
 {% for ref in h.evidence_references %}
@@ -212,18 +219,80 @@ Evidence coverage: {{ hypothesis_data.evidence_coverage_pct }}% ({{ hypothesis_d
 - Drugs: {{ h.biological_entities.drugs | join(', ') }}
 {% endif %}
 
-**Falsifiable Prediction:** {{ h.falsifiable_prediction }}
+**Recommended Follow-up Test:** {{ h.falsifiable_prediction }}
 
-**Validation Approach:** {{ h.validation_approach }}
+**Suggested Validation Approach:** {{ h.validation_approach }}
 
 {% if h._interpretation is defined and h._interpretation %}
 {{ h._interpretation }}
 {% endif %}
-<!-- EXPAND: Add 1-2 sentences on therapeutic implications of this hypothesis -->
-
 ---
+{%- endmacro %}
 
+{% set primary_hypotheses = hypothesis_data.primary_hypotheses | default([]) %}
+{% set secondary_hypotheses = hypothesis_data.secondary_hypotheses | default([]) %}
+{% set gene_level_hypotheses = hypothesis_data.gene_level_hypotheses | default([]) %}
+{% set unbucketed_hypotheses = hypothesis_data.unbucketed_hypotheses | default([]) %}
+
+{% if primary_hypotheses or secondary_hypotheses %}
+### 4.1. Primary AT2/Epithelial Follow-up Candidates
+
+These recommendations cite Stage 1 Census support for same-cell coexpression enrichment in the resolved epithelial/AT2 cell context. Treat them as the strongest AT2/epithelial follow-up candidates, while reserving causal mechanism claims for downstream validation.
+
+{% if primary_hypotheses %}
+{% for h in primary_hypotheses %}
+{{ render_hypothesis(h, "4.1") }}
 {% endfor %}
+{% else %}
+No primary AT2/epithelial follow-up candidates met the Stage 1 intrinsic-support criteria.
+
+{% endif %}
+### 4.2. Secondary Spatial-Niche Follow-up Candidates
+
+These recommendations retain spatially colocalized ligand-receptor evidence, but Stage 1 Census does not support them as AT2 same-cell mechanisms. Treat them as epithelial-associated spatial-niche or cross-cell follow-up candidates, not as epithelial-cell-intrinsic target mechanisms.
+When a passed Stage 1 pair is AT2-depleted, its citation constrains interpretation as framing evidence for non-AT2 or cross-cell follow-up, not as AT2-intrinsic support.
+
+{% if hypothesis_data.secondary_stage1_framing_pairs | default([]) %}
+#### Secondary Stage 1 Framing Evidence
+
+| Pair | Census direction | Usage | Source |
+| --- | --- | --- | --- |
+{% for pair in hypothesis_data.secondary_stage1_framing_pairs %}
+| {{ pair.pair }} | {{ pair.census_direction }} | {{ pair.usage }} | `{{ pair.source }}` |
+{% endfor %}
+
+{% endif %}
+{% if secondary_hypotheses %}
+{% for h in secondary_hypotheses %}
+{{ render_hypothesis(h, "4.2") }}
+{% endfor %}
+{% else %}
+No secondary spatial-niche follow-up candidates were retained.
+
+{% endif %}
+{% endif %}
+
+{% if gene_level_hypotheses %}
+### 4.3. Gene-Level/Actionability Follow-up Candidates
+
+These recommendations cite target-disease or actionability evidence but no Stage 1/spatial grounding. Treat them as gene-level follow-up candidates, not spatial-niche or AT2-intrinsic evidence.
+
+{% for h in gene_level_hypotheses %}
+{{ render_hypothesis(h, "4.3") }}
+{% endfor %}
+{% endif %}
+
+{% if unbucketed_hypotheses %}
+{% for h in unbucketed_hypotheses %}
+{{ render_hypothesis(h, "4") }}
+{% endfor %}
+{% endif %}
+
+{% if not primary_hypotheses and not secondary_hypotheses and not gene_level_hypotheses and not unbucketed_hypotheses %}
+{% for h in hypothesis_data.hypotheses %}
+{{ render_hypothesis(h, "4") }}
+{% endfor %}
+{% endif %}
 
 {% if hypothesis_data.gap_analysis %}
 ### Gap Analysis
@@ -239,7 +308,7 @@ Evidence coverage: {{ hypothesis_data.gap_analysis.referenced_files | default(0)
 {% endif %}
 
 {% else %}
-*No hypothesis analysis available. The hypothesis_writer subagent may not have completed.*
+*No follow-up recommendation analysis available. The hypothesis_writer subagent may not have completed.*
 {% endif %}
 
 {% if data_limitations %}
