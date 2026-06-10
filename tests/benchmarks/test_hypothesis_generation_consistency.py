@@ -30,6 +30,7 @@ from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
     find_forbidden_hypothesis_artifacts,
     parse_args,
     prepare_trial_workspace,
+    resolve_trial_sources,
     resolve_hypothesis_writer_skill_names,
     validate_trial_output,
 )
@@ -439,6 +440,9 @@ def test_hypothesis_writer_resume_message_preserves_output_guards() -> None:
     assert "write_file" in HYPOTHESIS_WRITER_RESUME_MESSAGE
     assert "/tmp" in HYPOTHESIS_WRITER_RESUME_MESSAGE
     assert "evidence/hypothesis_report.json" in HYPOTHESIS_WRITER_RESUME_MESSAGE
+    assert "target-cell-depleted" in HYPOTHESIS_WRITER_RESUME_MESSAGE
+    assert "gene-level/actionability-only" in HYPOTHESIS_WRITER_RESUME_MESSAGE
+    assert "ot_<GENE>.json" in HYPOTHESIS_WRITER_RESUME_MESSAGE
 
 
 def test_clean_hypothesis_benchmark_workspace_reports_removed_artifacts(
@@ -634,6 +638,24 @@ def test_parse_args_accepts_expanded6_skill_set(
     args = parse_args()
 
     assert args.skill_set == "expanded6"
+
+
+def test_resolve_trial_sources_repeats_single_source(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+
+    sources = resolve_trial_sources(str(source), None, 3)
+
+    assert sources == [source, source, source]
+
+
+def test_resolve_trial_sources_requires_sources_count_to_match_runs(
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "source1"
+    second = tmp_path / "source2"
+
+    with pytest.raises(ValueError, match="--sources count"):
+        resolve_trial_sources(str(first), [str(first), str(second)], 3)
 
 
 def test_validate_trial_output_marks_missing_report_as_failure(

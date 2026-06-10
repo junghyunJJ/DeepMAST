@@ -82,6 +82,13 @@ HYPOTHESIS_WRITER_RESUME_MESSAGE = (
     "Run resume-mode hypothesis generation only using the hypothesis_writer subagent. "
     "Load evidence with load_evidence_files(data_dir=data_dir, scope='hypothesis'). "
     "Do not use write_file, read_file, ls, or /tmp for hypothesis output. "
+    "If Stage 1 Census evidence is target-cell-depleted, do not use it as "
+    "interest-cell support and do not claim depleted genes are enriched; frame it "
+    "only as depleted/cross-cell context or omit that Stage 1 reference. "
+    "If a hypothesis only has gene-level evidence, use gene-level/actionability-only "
+    "framing and do not call it spatial-niche grounded. "
+    "For every featured gene included in a hypothesis, cite available gene-level "
+    "evidence such as ot_<GENE>.json and stage3_<GENE>.json. "
     "After validate_evidence_references passes, immediately call "
     "save_hypothesis_report(data_dir=data_dir, report=report). "
     "The required artifact is evidence/hypothesis_report.json."
@@ -137,6 +144,34 @@ def utc_stamp() -> str:
 def resolve_path(raw: str) -> Path:
     path = Path(raw)
     return path if path.is_absolute() else PROJECT_ROOT / path
+
+
+def resolve_trial_sources(
+    source: str,
+    sources: list[str] | None,
+    runs: int,
+) -> list[Path]:
+    if runs < 1:
+        raise ValueError("--runs must be at least 1")
+    if sources:
+        if len(sources) != runs:
+            raise ValueError(
+                f"--sources count ({len(sources)}) must match --runs ({runs})"
+            )
+        return [resolve_path(raw) for raw in sources]
+    resolved = resolve_path(source)
+    return [resolved for _ in range(runs)]
+
+
+def unique_paths(paths: list[Path]) -> list[Path]:
+    seen: set[Path] = set()
+    unique: list[Path] = []
+    for path in paths:
+        key = path.resolve()
+        if key not in seen:
+            seen.add(key)
+            unique.append(path)
+    return unique
 
 
 def read_json(path: Path) -> Any:
@@ -486,6 +521,16 @@ def parse_args() -> argparse.Namespace:
         description="Run repeated real hypothesis_writer trials on frozen evidence."
     )
     parser.add_argument("--source", default="res_ipf_ollama_tmp")
+    parser.add_argument(
+        "--sources",
+        nargs="+",
+        default=None,
+        help=(
+            "Optional per-run frozen source workspaces. When provided, the number "
+            "of paths must match --runs; run_01 uses the first path, run_02 the "
+            "second, and so on."
+        ),
+    )
     parser.add_argument("--runs", type=int, default=10)
     parser.add_argument("--disease", default="pulmonary fibrosis")
     parser.add_argument("--provider", default=os.getenv("LLM_PROVIDER") or "ollama")
@@ -508,22 +553,48 @@ def parse_args() -> argparse.Namespace:
 async def async_main() -> int:
     load_benchmark_env()
     args = parse_args()
-    source = resolve_path(args.source)
-    if not source.exists():
-        raise SystemExit(f"source workspace does not exist: {source}")
+    try:
+        trial_sources = resolve_trial_sources(args.source, args.sources, args.runs)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    scope_sources = unique_paths(trial_sources)
+    for source in scope_sources:
+        if not source.exists():
+            raise SystemExit(f"source workspace does not exist: {source}")
+    source_scopes = [
+        {
+            "source": str(source),
+            "hypothesis_scope": check_hypothesis_scope_untraced(source),
+        }
+        for source in scope_sources
+    ]
     if args.dry_run:
-        scope = check_hypothesis_scope_untraced(source)
-        print(json.dumps(scope, indent=2, ensure_ascii=False))
-        return 0 if not scope["errors"] else 1
+        if len(source_scopes) == 1:
+            payload = source_scopes[0]["hypothesis_scope"]
+        else:
+            payload = {"sources": source_scopes}
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+        has_errors = any(
+            item["hypothesis_scope"]["errors"] for item in source_scopes
+        )
+        return 1 if has_errors else 0
     provider = args.provider.strip()
     if not provider:
         raise SystemExit("--provider must be non-empty for live benchmark runs")
     hypothesis_writer_skill_names = resolve_hypothesis_writer_skill_names(
         args.skill_set
     )
-    scope = check_hypothesis_scope(source)
-    if scope["errors"]:
-        raise SystemExit(f"hypothesis scope loader errors: {scope['errors']}")
+    source_scopes = [
+        {"source": str(source), "hypothesis_scope": check_hypothesis_scope(source)}
+        for source in scope_sources
+    ]
+    scope_errors = [
+        {"source": item["source"], "errors": item["hypothesis_scope"]["errors"]}
+        for item in source_scopes
+        if item["hypothesis_scope"]["errors"]
+    ]
+    if scope_errors:
+        raise SystemExit(f"hypothesis scope loader errors: {scope_errors}")
 
     stem = (
         Path(args.output_root).name
@@ -547,7 +618,7 @@ async def async_main() -> int:
 
     trials_path = output_root / "trials.jsonl"
     rows: list[dict[str, Any]] = []
-    for index in range(1, args.runs + 1):
+    for index, source in enumerate(trial_sources, start=1):
         run_id = f"run_{index:02d}"
         row = await run_trial(
             run_id=run_id,
@@ -565,13 +636,19 @@ async def async_main() -> int:
 
     aggregate = aggregate_trial_rows(rows)
     result_payload = {
-        "source": str(source),
+        "source": str(scope_sources[0]) if len(scope_sources) == 1 else None,
+        "sources": [str(source) for source in trial_sources],
         "provider": provider,
         "disease": args.disease,
         "runs_requested": args.runs,
         "skill_set": args.skill_set,
         "hypothesis_writer_skill_names": list(hypothesis_writer_skill_names),
-        "hypothesis_scope": scope,
+        "hypothesis_scope": (
+            source_scopes[0]["hypothesis_scope"]
+            if len(source_scopes) == 1
+            else {"sources": source_scopes}
+        ),
+        "hypothesis_scopes": source_scopes,
         "aggregate": aggregate,
         "trials": rows,
     }
