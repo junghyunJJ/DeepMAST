@@ -28,6 +28,14 @@ _EXPLICIT_SINGLE_HYPHEN_PAIR_RE = re.compile(
     r"(?<![A-Za-z0-9])([A-Z][A-Z0-9]{1,11})-([A-Z][A-Z0-9]{1,11})"
     r"(?![A-Za-z0-9])"
 )
+_PAIR_CUE_NEGATION_PREFIX_RE = re.compile(
+    r"\b("
+    r"no|without|not|does\s+not|do\s+not|did\s+not|is\s+not|are\s+not|"
+    r"was\s+not|were\s+not|isn't|aren't|cannot|can't|should\s+not|must\s+not"
+    r")\b[\w\s/-]{0,80}$",
+    re.IGNORECASE,
+)
+_NOT_ONLY_RE = re.compile(r"\bnot\s+only\b", re.IGNORECASE)
 _TARGET_CELL_INTRINSIC_RE = re.compile(
     r"\b("
     r"at2[-\s]?intrinsic|target[-\s]?cell[-\s]?intrinsic|same[-\s]?cell|"
@@ -280,6 +288,15 @@ def _explicit_direct_pairs(text: str, known_genes: set[str]) -> set[tuple[str, s
     return claimed
 
 
+def _has_unnegated_pair_cue(clause: str) -> bool:
+    for match in _PAIR_CUE_RE.finditer(clause):
+        prefix = clause[: match.start()]
+        if _PAIR_CUE_NEGATION_PREFIX_RE.search(prefix) and not _NOT_ONLY_RE.search(prefix):
+            continue
+        return True
+    return False
+
+
 def _claimed_direct_pairs(hypothesis: dict[str, Any]) -> set[tuple[str, str]]:
     genes = _entity_genes(hypothesis)
     text = _pair_text(hypothesis)
@@ -303,7 +320,7 @@ def _claimed_direct_pairs(hypothesis: dict[str, Any]) -> set[tuple[str, str]]:
         if any(
             _gene_occurs(a, clause)
             and _gene_occurs(b, clause)
-            and _PAIR_CUE_RE.search(clause)
+            and _has_unnegated_pair_cue(clause)
             for clause in clauses
         ):
             claimed.add((a, b))

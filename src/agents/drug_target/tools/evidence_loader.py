@@ -1057,6 +1057,23 @@ _PAIR_INTERACTION_CUE_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_PAIR_CUE_NEGATION_PREFIX_RE = re.compile(
+    r"\b("
+    r"no|without|not|does\s+not|do\s+not|did\s+not|is\s+not|are\s+not|"
+    r"was\s+not|were\s+not|isn't|aren't|cannot|can't|should\s+not|must\s+not"
+    r")\b[\w\s/-]{0,80}$",
+    re.IGNORECASE,
+)
+_NOT_ONLY_RE = re.compile(r"\bnot\s+only\b", re.IGNORECASE)
+
+
+def _has_unnegated_pair_interaction_cue(clause: str) -> bool:
+    for match in _PAIR_INTERACTION_CUE_RE.finditer(clause):
+        prefix = clause[: match.start()]
+        if _PAIR_CUE_NEGATION_PREFIX_RE.search(prefix) and not _NOT_ONLY_RE.search(prefix):
+            continue
+        return True
+    return False
 
 
 def _failed_pair_text_pattern(ligand: str, receptor: str) -> re.Pattern[str]:
@@ -1140,7 +1157,7 @@ def _validate_failed_pair_claims(
             related_clause = any(
                 ligand in clause.upper()
                 and receptor in clause.upper()
-                and _PAIR_INTERACTION_CUE_RE.search(clause)
+                and _has_unnegated_pair_interaction_cue(clause)
                 for clause in text_clauses
             )
             if ligand in entity_genes and receptor in entity_genes and related_clause:

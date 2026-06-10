@@ -986,6 +986,28 @@ def test_save_hypothesis_report_allows_both_failed_pair_genes_without_pair_claim
     assert result["saved"] is True, result
 
 
+def test_save_hypothesis_report_allows_negated_pair_axis_wording(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    report = _clone_report()
+    hyp = report["hypotheses"][0]
+    hyp["title"] = "FN1 and PLAUR gene-level follow-up context"
+    hyp["core_claim"] = (
+        "FN1 and PLAUR are not an L-R axis; they are tracked as separate "
+        "gene-level context. The retained mechanism is grounded in FN1 Stage 3 "
+        "evidence."
+    )
+    hyp["evidence_references"] = ["stage3_FN1.json", "stage3_CD4.json"]
+    hyp["biological_entities"]["genes"] = ["FN1", "PLAUR", "CD4"]
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is True, result
+
+
 def test_save_hypothesis_report_rejects_failed_pair_reference_with_suffix(
     tmp_path: Path,
 ) -> None:
