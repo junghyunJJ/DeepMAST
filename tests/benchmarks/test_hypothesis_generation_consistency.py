@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+from argparse import Namespace
 from pathlib import Path
 
 import pytest
@@ -194,6 +195,230 @@ def test_activation_matrix_unload_request_payload() -> None:
         "model": "qwen3.5:122b",
         "keep_alive": 0,
     }
+
+
+def test_activation_matrix_marks_missing_trace_invalid(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from docs.benchmarks.hypothesis_generation_consistency import run_activation_matrix
+
+    def fake_copy_source_workspace(
+        source: Path,
+        destination: Path,
+        *,
+        force: bool,
+    ) -> None:
+        destination.mkdir(parents=True)
+
+    def fake_run(*args, **kwargs):
+        return subprocess.CompletedProcess(args[0], 0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        run_activation_matrix,
+        "copy_source_workspace",
+        fake_copy_source_workspace,
+    )
+    monkeypatch.setattr(run_activation_matrix.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        run_activation_matrix,
+        "validate_trial_output",
+        lambda run_id, workspace, *, elapsed_s, error: {
+            "run_id": run_id,
+            "validation_passed": True,
+            "error": error,
+        },
+    )
+
+    row = run_activation_matrix.run_one_trial(
+        trial={
+            "model": "qwen3.5:35b",
+            "port": 5000,
+            "mode": "middleware_only",
+            "run_id": "run_missing_trace",
+        },
+        source=tmp_path / "source",
+        workspace_root=tmp_path / "workspaces",
+        output_root=tmp_path,
+        disease="pulmonary fibrosis",
+        timeout_minutes=1,
+        force=True,
+    )
+
+    assert row["activation_trace_valid"] is False
+    assert "activation trace missing" in row["activation_trace_error"]
+    assert row["activated_skill_names"] == []
+    assert row["activated_added_skill_names"] == []
+
+
+def test_activation_matrix_marks_malformed_trace_invalid(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from docs.benchmarks.hypothesis_generation_consistency import run_activation_matrix
+
+    def fake_copy_source_workspace(
+        source: Path,
+        destination: Path,
+        *,
+        force: bool,
+    ) -> None:
+        destination.mkdir(parents=True)
+
+    def fake_run(command, *args, **kwargs):
+        trace_path = Path(command[command.index("--activation-trace-json") + 1])
+        trace_path.write_text("{not json", encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        run_activation_matrix,
+        "copy_source_workspace",
+        fake_copy_source_workspace,
+    )
+    monkeypatch.setattr(run_activation_matrix.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        run_activation_matrix,
+        "validate_trial_output",
+        lambda run_id, workspace, *, elapsed_s, error: {
+            "run_id": run_id,
+            "validation_passed": True,
+            "error": error,
+        },
+    )
+
+    row = run_activation_matrix.run_one_trial(
+        trial={
+            "model": "qwen3.5:35b",
+            "port": 5000,
+            "mode": "middleware_only",
+            "run_id": "run_malformed_trace",
+        },
+        source=tmp_path / "source",
+        workspace_root=tmp_path / "workspaces",
+        output_root=tmp_path,
+        disease="pulmonary fibrosis",
+        timeout_minutes=1,
+        force=True,
+    )
+
+    assert row["activation_trace_valid"] is False
+    assert "JSONDecodeError" in row["activation_trace_error"]
+    assert row["activated_skill_names"] == []
+
+
+def test_activation_matrix_aggregate_excludes_invalid_trace_denominator() -> None:
+    from docs.benchmarks.hypothesis_generation_consistency.run_activation_matrix import (
+        aggregate_activation,
+    )
+
+    aggregate = aggregate_activation(
+        [
+            {
+                "model": "qwen3.5:35b",
+                "mode": "middleware_only",
+                "returncode": 0,
+                "validation": {"validation_passed": True},
+                "activation_trace_valid": True,
+                "activated_skill_names": ["string-database"],
+                "activated_added_skill_names": ["string-database"],
+            },
+            {
+                "model": "qwen3.5:35b",
+                "mode": "middleware_only",
+                "returncode": 0,
+                "validation": {"validation_passed": True},
+                "activation_trace_valid": False,
+                "activated_skill_names": [],
+                "activated_added_skill_names": [],
+            },
+        ]
+    )
+
+    group = aggregate["groups"]["qwen3.5:35b::middleware_only"]
+    assert group["runs"] == 2
+    assert group["successes"] == 2
+    assert group["validation_passes"] == 2
+    assert group["activation_trace_valid_runs"] == 1
+    assert group["activation_trace_invalid_runs"] == 1
+    assert group["mean_activation_count"] == 1.0
+    assert group["skill_activation_rates"] == {"string-database": 1.0}
+    assert group["added_skill_activation_rates"] == {"string-database": 1.0}
+
+
+def test_activation_matrix_unloads_active_model_when_trial_raises(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from docs.benchmarks.hypothesis_generation_consistency import run_activation_matrix
+
+    source = tmp_path / "source"
+    source.mkdir()
+    unload_calls: list[tuple[str, tuple[int, ...]]] = []
+
+    monkeypatch.setattr(
+        run_activation_matrix,
+        "parse_args",
+        lambda: Namespace(
+            source=str(source),
+            output_root=str(tmp_path / "out"),
+            workspace_root=str(tmp_path / "workspaces"),
+            disease="pulmonary fibrosis",
+            timeout_minutes=1,
+            force=True,
+        ),
+    )
+    monkeypatch.setattr(
+        run_activation_matrix,
+        "build_trial_plan",
+        lambda *, models, ports, modes: [
+            {
+                "model": "qwen3.5:35b",
+                "port": 5000,
+                "mode": "middleware_only",
+                "run_id": "run_raises",
+            }
+        ],
+    )
+
+    def fake_run_one_trial(**kwargs):
+        raise RuntimeError("trial failed")
+
+    def fake_unload_model_from_ports(model: str, ports) -> list[dict]:
+        unload_calls.append((model, tuple(ports)))
+        return [{"model": model, "ports": list(ports), "ok": True}]
+
+    monkeypatch.setattr(run_activation_matrix, "run_one_trial", fake_run_one_trial)
+    monkeypatch.setattr(
+        run_activation_matrix,
+        "unload_model_from_ports",
+        fake_unload_model_from_ports,
+    )
+
+    with pytest.raises(RuntimeError, match="trial failed"):
+        run_activation_matrix.main()
+
+    assert unload_calls == [("qwen3.5:35b", (5000, 6000, 7000))]
+    payload = json.loads((tmp_path / "out" / "benchmark_results.json").read_text())
+    assert payload["runner_error"] == "RuntimeError: trial failed"
+    assert payload["unload_events"] == [
+        {"model": "qwen3.5:35b", "ports": [5000, 6000, 7000], "ok": True}
+    ]
+
+
+def test_activation_matrix_direct_script_help_works() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "docs/benchmarks/hypothesis_generation_consistency/run_activation_matrix.py",
+            "--help",
+        ],
+        check=False,
+        capture_output=True,
+        encoding="utf-8",
+    )
+
+    assert completed.returncode == 0
+    assert "Run expanded6 activation comparison" in completed.stdout
 
 
 def _report_one() -> dict:

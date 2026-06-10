@@ -14,13 +14,16 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Sequence
 
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
     clean_hypothesis_benchmark_workspace,
     validate_trial_output,
     write_json,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_SOURCE = Path(
     "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/docs/benchmarks/tmp/res_ipf_drugtarget_tmp"
 )
@@ -108,14 +111,19 @@ def copy_source_workspace(source: Path, destination: Path, *, force: bool) -> No
     clean_hypothesis_benchmark_workspace(destination)
 
 
-def _read_json_or_empty(path: Path) -> dict[str, Any]:
+def load_activation_trace(path: Path) -> tuple[dict[str, Any], bool, str | None]:
     if not path.exists():
-        return {}
+        return {}, False, f"activation trace missing: {path}"
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return payload if isinstance(payload, dict) else {}
+    except Exception as exc:
+        return {}, False, f"{type(exc).__name__}: {exc}"
+    if not isinstance(payload, dict):
+        return {}, False, (
+            "activation trace must be a JSON object; "
+            f"got {type(payload).__name__}"
+        )
+    return payload, True, None
 
 
 def run_one_trial(
@@ -208,7 +216,9 @@ def run_one_trial(
         elapsed_s=elapsed_s,
         error=error,
     )
-    activation_trace = _read_json_or_empty(activation_trace_path)
+    activation_trace, activation_trace_valid, activation_trace_error = (
+        load_activation_trace(activation_trace_path)
+    )
 
     return {
         **trial,
@@ -219,12 +229,22 @@ def run_one_trial(
         "returncode": returncode,
         "elapsed_s": round(elapsed_s, 3),
         "validation": validation,
-        "activated_skill_names": activation_trace.get("activated_skill_names", []),
-        "activated_added_skill_names": activation_trace.get(
-            "activated_added_skill_names", []
+        "activation_trace_valid": activation_trace_valid,
+        "activation_trace_error": activation_trace_error,
+        "activated_skill_names": (
+            activation_trace.get("activated_skill_names", [])
+            if activation_trace_valid
+            else []
         ),
-        "hypothesis_writer_read_skill_file_calls": activation_trace.get(
-            "hypothesis_writer_read_skill_file_calls", []
+        "activated_added_skill_names": (
+            activation_trace.get("activated_added_skill_names", [])
+            if activation_trace_valid
+            else []
+        ),
+        "hypothesis_writer_read_skill_file_calls": (
+            activation_trace.get("hypothesis_writer_read_skill_file_calls", [])
+            if activation_trace_valid
+            else []
         ),
     }
 
@@ -239,12 +259,16 @@ def aggregate_activation(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     for key, group_rows in groups.items():
         skill_counts: dict[str, int] = {}
         added_counts: dict[str, int] = {}
-        for row in group_rows:
+        valid_rows = [
+            row for row in group_rows if row.get("activation_trace_valid") is True
+        ]
+        for row in valid_rows:
             for skill in row.get("activated_skill_names", []):
                 skill_counts[str(skill)] = skill_counts.get(str(skill), 0) + 1
             for skill in row.get("activated_added_skill_names", []):
                 added_counts[str(skill)] = added_counts.get(str(skill), 0) + 1
         runs = len(group_rows)
+        valid_runs = len(valid_rows)
         summaries[key] = {
             "runs": runs,
             "successes": sum(1 for row in group_rows if row.get("returncode") == 0),
@@ -253,21 +277,25 @@ def aggregate_activation(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
                 for row in group_rows
                 if row.get("validation", {}).get("validation_passed")
             ),
+            "activation_trace_valid_runs": valid_runs,
+            "activation_trace_invalid_runs": runs - valid_runs,
             "mean_activation_count": (
-                sum(len(row.get("activated_skill_names", [])) for row in group_rows)
-                / runs
-                if runs
+                sum(len(row.get("activated_skill_names", [])) for row in valid_rows)
+                / valid_runs
+                if valid_runs
                 else 0.0
             ),
             "skill_activation_rates": {
-                skill: count / runs for skill, count in sorted(skill_counts.items())
+                skill: count / valid_runs
+                for skill, count in sorted(skill_counts.items())
             }
-            if runs
+            if valid_runs
             else {},
             "added_skill_activation_rates": {
-                skill: count / runs for skill, count in sorted(added_counts.items())
+                skill: count / valid_runs
+                for skill, count in sorted(added_counts.items())
             }
-            if runs
+            if valid_runs
             else {},
         }
     return {"groups": summaries}
@@ -277,21 +305,29 @@ def render_summary(rows: Sequence[dict[str, Any]], aggregate: dict[str, Any]) ->
     lines = [
         "# Expanded6 Activation Comparison",
         "",
-        "| model | port | mode | returncode | validation | activated skills | added skills |",
-        "| --- | ---: | --- | ---: | --- | --- | --- |",
+        (
+            "| model | port | mode | returncode | validation | activation trace | "
+            "activated skills | added skills |"
+        ),
+        "| --- | ---: | --- | ---: | --- | --- | --- | --- |",
     ]
     for row in rows:
         validation = row.get("validation", {})
         lines.append(
             (
                 "| {model} | {port} | {mode} | {returncode} | {validation} | "
-                "{skills} | {added} |"
+                "{trace} | {skills} | {added} |"
             ).format(
                 model=row["model"],
                 port=row["port"],
                 mode=row["mode"],
                 returncode=row["returncode"],
                 validation=validation.get("validation_passed"),
+                trace=(
+                    "valid"
+                    if row.get("activation_trace_valid")
+                    else f"invalid: {row.get('activation_trace_error')}"
+                ),
                 skills=", ".join(row.get("activated_skill_names", [])) or "-",
                 added=", ".join(row.get("activated_added_skill_names", [])) or "-",
             )
@@ -346,49 +382,60 @@ def main() -> int:
 
     rows: list[dict[str, Any]] = []
     unload_events: list[dict[str, Any]] = []
+    runner_error: str | None = None
     trials = build_trial_plan(
         models=DEFAULT_MODELS,
         ports=DEFAULT_PORTS,
         modes=DEFAULT_MODES,
     )
 
-    active_model = None
-    for trial in trials:
-        model = str(trial["model"])
-        if active_model and active_model != model:
-            unload_events.extend(unload_model_from_ports(active_model, DEFAULT_PORTS))
-        active_model = model
-        row = run_one_trial(
-            trial=trial,
-            source=source,
-            workspace_root=workspace_root,
-            output_root=output_root,
-            disease=args.disease,
-            timeout_minutes=args.timeout_minutes,
-            force=args.force,
+    def write_results() -> None:
+        aggregate = aggregate_activation(rows)
+        payload = {
+            "source": str(source),
+            "models": list(DEFAULT_MODELS),
+            "ports": list(DEFAULT_PORTS),
+            "modes": list(DEFAULT_MODES),
+            "trials": rows,
+            "aggregate": aggregate,
+            "unload_events": unload_events,
+            "runner_error": runner_error,
+        }
+        write_json(output_root / "benchmark_results.json", payload)
+        (output_root / "benchmark_summary.md").write_text(
+            render_summary(rows, aggregate),
+            encoding="utf-8",
         )
-        rows.append(row)
-        with (output_root / "trials.jsonl").open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    if active_model:
-        unload_events.extend(unload_model_from_ports(active_model, DEFAULT_PORTS))
+    active_model = None
+    try:
+        for trial in trials:
+            model = str(trial["model"])
+            if active_model and active_model != model:
+                unload_events.extend(
+                    unload_model_from_ports(active_model, DEFAULT_PORTS)
+                )
+            active_model = model
+            row = run_one_trial(
+                trial=trial,
+                source=source,
+                workspace_root=workspace_root,
+                output_root=output_root,
+                disease=args.disease,
+                timeout_minutes=args.timeout_minutes,
+                force=args.force,
+            )
+            rows.append(row)
+            with (output_root / "trials.jsonl").open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except Exception as exc:
+        runner_error = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        if active_model:
+            unload_events.extend(unload_model_from_ports(active_model, DEFAULT_PORTS))
+        write_results()
 
-    aggregate = aggregate_activation(rows)
-    payload = {
-        "source": str(source),
-        "models": list(DEFAULT_MODELS),
-        "ports": list(DEFAULT_PORTS),
-        "modes": list(DEFAULT_MODES),
-        "trials": rows,
-        "aggregate": aggregate,
-        "unload_events": unload_events,
-    }
-    write_json(output_root / "benchmark_results.json", payload)
-    (output_root / "benchmark_summary.md").write_text(
-        render_summary(rows, aggregate),
-        encoding="utf-8",
-    )
     print(f"wrote {output_root / 'benchmark_results.json'}")
     print(f"wrote {output_root / 'benchmark_summary.md'}")
     return 0
