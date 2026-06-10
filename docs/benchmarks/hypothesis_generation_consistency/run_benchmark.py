@@ -38,7 +38,10 @@ TRACE_DISABLED_ENV = {
 HYPOTHESIS_BENCHMARK_CLEAN_FILES = (
     "drug.md",
     "drug_report.html",
+    "drug_report_render.json",
     "drug_report_reference_card.json",
+    "part4_candidate_selection.json",
+    "part4_therapeutic_synthesis.md",
     "report_expansions.json",
     "target_assessment.json",
     "report_data.json",
@@ -74,6 +77,15 @@ HYPOTHESIS_WRITER_SKILL_SETS = {
     "current4": CURRENT4_HYPOTHESIS_WRITER_SKILLS,
     "expanded6": EXPANDED6_HYPOTHESIS_WRITER_SKILLS,
 }
+
+HYPOTHESIS_WRITER_RESUME_MESSAGE = (
+    "Run resume-mode hypothesis generation only using the hypothesis_writer subagent. "
+    "Load evidence with load_evidence_files(data_dir=data_dir, scope='hypothesis'). "
+    "Do not use write_file, read_file, ls, or /tmp for hypothesis output. "
+    "After validate_evidence_references passes, immediately call "
+    "save_hypothesis_report(data_dir=data_dir, report=report). "
+    "The required artifact is evidence/hypothesis_report.json."
+)
 
 
 def resolve_hypothesis_writer_skill_names(skill_set: str) -> tuple[str, ...]:
@@ -373,11 +385,7 @@ async def run_hypothesis_writer_once(
                         "messages": [
                             {
                                 "role": "user",
-                                "content": (
-                                    "Run resume-mode hypothesis generation only. "
-                                    "Use the hypothesis_writer subagent and save "
-                                    "evidence/hypothesis_report.json."
-                                ),
+                                "content": HYPOTHESIS_WRITER_RESUME_MESSAGE,
                             }
                         ]
                     },

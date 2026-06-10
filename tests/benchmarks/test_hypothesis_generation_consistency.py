@@ -23,6 +23,7 @@ from docs.benchmarks.hypothesis_generation_consistency.compare_skill_sets import
 from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
     CURRENT4_HYPOTHESIS_WRITER_SKILLS,
     EXPANDED6_HYPOTHESIS_WRITER_SKILLS,
+    HYPOTHESIS_WRITER_RESUME_MESSAGE,
     clean_hypothesis_benchmark_workspace,
     check_hypothesis_scope,
     check_hypothesis_scope_untraced,
@@ -375,7 +376,10 @@ def test_prepare_trial_workspace_removes_prior_report_artifacts(
     (source / "lr_candidates.json").write_text("{}", encoding="utf-8")
     (source / "drug.md").write_text("stale drug report", encoding="utf-8")
     (source / "drug_report.html").write_text("<html></html>", encoding="utf-8")
+    (source / "drug_report_render.json").write_text("{}", encoding="utf-8")
     (source / "drug_report_reference_card.json").write_text("{}", encoding="utf-8")
+    (source / "part4_candidate_selection.json").write_text("{}", encoding="utf-8")
+    (source / "part4_therapeutic_synthesis.md").write_text("stale", encoding="utf-8")
     (source / "report_expansions.json").write_text("{}", encoding="utf-8")
     (source / "target_assessment.json").write_text("{}", encoding="utf-8")
     (source / "hypothesis_report.json").write_text("{}", encoding="utf-8")
@@ -411,7 +415,10 @@ def test_prepare_trial_workspace_removes_prior_report_artifacts(
     assert (workspace / "evidence" / "assessment_results.json").exists()
     assert not (workspace / "drug.md").exists()
     assert not (workspace / "drug_report.html").exists()
+    assert not (workspace / "drug_report_render.json").exists()
     assert not (workspace / "drug_report_reference_card.json").exists()
+    assert not (workspace / "part4_candidate_selection.json").exists()
+    assert not (workspace / "part4_therapeutic_synthesis.md").exists()
     assert not (workspace / "report_expansions.json").exists()
     assert not (workspace / "target_assessment.json").exists()
     assert not (workspace / "hypothesis_report.json").exists()
@@ -425,6 +432,13 @@ def test_prepare_trial_workspace_removes_prior_report_artifacts(
     assert not (workspace / "conversation_history").exists()
     assert not (workspace / "large_tool_results").exists()
     assert not (workspace / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_hypothesis_writer_resume_message_preserves_output_guards() -> None:
+    assert "save_hypothesis_report" in HYPOTHESIS_WRITER_RESUME_MESSAGE
+    assert "write_file" in HYPOTHESIS_WRITER_RESUME_MESSAGE
+    assert "/tmp" in HYPOTHESIS_WRITER_RESUME_MESSAGE
+    assert "evidence/hypothesis_report.json" in HYPOTHESIS_WRITER_RESUME_MESSAGE
 
 
 def test_clean_hypothesis_benchmark_workspace_reports_removed_artifacts(
