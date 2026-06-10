@@ -14,6 +14,12 @@ from docs.benchmarks.hypothesis_generation_consistency.analysis import (
     jaccard,
     summarize_report,
 )
+from docs.benchmarks.hypothesis_generation_consistency.compare_skill_sets import (
+    compare_pair,
+    evidence_fingerprint,
+    main as compare_skill_sets_main,
+    render_markdown,
+)
 from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
     CURRENT4_HYPOTHESIS_WRITER_SKILLS,
     EXPANDED6_HYPOTHESIS_WRITER_SKILLS,
@@ -95,6 +101,28 @@ def _report_two() -> dict:
     report["hypotheses"][0]["title"] = "ICAM1-ITGB2 adhesion signaling"
     report["hypotheses"][0]["core_claim"] = "ICAM1 with ITGB2 supports adhesion."
     return report
+
+
+def _write_workspace_report(
+    workspace: Path,
+    report: dict,
+    *,
+    assessment_payload: dict | None = None,
+) -> None:
+    evidence = workspace / "evidence"
+    evidence.mkdir(parents=True)
+    (evidence / "assessment_results.json").write_text(
+        json.dumps(assessment_payload or {"stage3_candidates": [{"gene": "ICAM1"}]}),
+        encoding="utf-8",
+    )
+    (evidence / "stage1_filter_results.json").write_text(
+        json.dumps({"results": []}),
+        encoding="utf-8",
+    )
+    (evidence / "hypothesis_report.json").write_text(
+        json.dumps(report),
+        encoding="utf-8",
+    )
 
 
 def test_jaccard_handles_empty_and_nonempty_sets() -> None:
@@ -198,6 +226,113 @@ def test_aggregate_trial_rows_pairwise_metrics_use_validation_passed_runs() -> N
     assert aggregate["hypothesis_count_values"] == [2]
     assert aggregate["mean_pairwise_title_similarity"] is None
     assert aggregate["mean_pairwise_core_claim_similarity"] is None
+
+
+def test_evidence_fingerprint_ignores_generated_hypothesis_report(
+    tmp_path: Path,
+) -> None:
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    _write_workspace_report(left, _report_one())
+    _write_workspace_report(right, _report_two())
+
+    assert evidence_fingerprint(left) == evidence_fingerprint(right)
+
+
+def test_evidence_fingerprint_detects_non_generated_evidence_mismatch(
+    tmp_path: Path,
+) -> None:
+    current4 = tmp_path / "current4"
+    expanded6 = tmp_path / "expanded6"
+    _write_workspace_report(current4, _report_one())
+    _write_workspace_report(
+        expanded6,
+        _report_one(),
+        assessment_payload={"stage3_candidates": [{"gene": "MUC1"}]},
+    )
+
+    assert evidence_fingerprint(current4)["sha256"] != evidence_fingerprint(
+        expanded6
+    )["sha256"]
+
+    row = compare_pair(
+        {
+            "case_id": "ipf_35b_run1",
+            "current4": str(current4),
+            "expanded6": str(expanded6),
+        }
+    )
+    assert row["evidence_fingerprint_match"] is False
+
+
+def test_compare_pair_reports_summary_deltas(tmp_path: Path) -> None:
+    current4 = tmp_path / "current4"
+    expanded6 = tmp_path / "expanded6"
+    _write_workspace_report(current4, _report_one())
+    _write_workspace_report(expanded6, _report_two())
+
+    row = compare_pair(
+        {
+            "case_id": "ipf_35b_run1",
+            "current4": str(current4),
+            "expanded6": str(expanded6),
+        }
+    )
+
+    assert row["case_id"] == "ipf_35b_run1"
+    assert row["current4_hypothesis_count"] == 2
+    assert row["expanded6_hypothesis_count"] == 2
+    assert row["gene_jaccard"] == 1.0
+    assert row["evidence_ref_jaccard"] == 1.0
+    assert 0.0 < row["title_similarity"] <= 1.0
+    assert row["evidence_fingerprint_match"] is True
+
+
+def test_render_markdown_includes_pairwise_metrics() -> None:
+    markdown = render_markdown(
+        [
+            {
+                "case_id": "ipf_35b_run1",
+                "current4_hypothesis_count": 5,
+                "expanded6_hypothesis_count": 6,
+                "current4_topn_missing": [],
+                "expanded6_topn_missing": [],
+                "gene_jaccard": 0.83,
+                "evidence_ref_jaccard": 0.77,
+                "title_similarity": 0.62,
+                "core_claim_similarity": 0.58,
+                "evidence_fingerprint_match": True,
+            }
+        ]
+    )
+
+    assert "# Current4 vs Expanded6 Hypothesis Comparison" in markdown
+    assert "| ipf_35b_run1 | 5 | 6 | - | - | 0.83 | 0.77 | 0.62 | 0.58 | True |" in markdown
+
+
+def test_compare_skill_sets_main_rejects_non_object_pairs_json(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    pairs_json = tmp_path / "pairs.json"
+    pairs_json.write_text("[]", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "compare_skill_sets.py",
+            "--pairs-json",
+            str(pairs_json),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+    )
+
+    with pytest.raises(
+        SystemExit,
+        match="--pairs-json must contain a JSON object with a non-empty 'pairs' list",
+    ):
+        compare_skill_sets_main()
 
 
 def test_prepare_trial_workspace_copies_source_and_removes_stale_report(
