@@ -74,6 +74,69 @@ def test_resolve_hypothesis_writer_skill_names_rejects_unknown_name() -> None:
         resolve_hypothesis_writer_skill_names("expanded")
 
 
+def test_skill_name_from_read_skill_path_handles_project_relative_path() -> None:
+    from docs.benchmarks.hypothesis_generation_consistency.activation_trace import (
+        skill_name_from_read_skill_path,
+    )
+
+    assert (
+        skill_name_from_read_skill_path("skills/string-database/SKILL.md")
+        == "string-database"
+    )
+    assert (
+        skill_name_from_read_skill_path(
+            "/tmp/worktree/skills/compare-census-gene-pair-by-cell-type/SKILL.md"
+        )
+        == "compare-census-gene-pair-by-cell-type"
+    )
+    assert skill_name_from_read_skill_path("evidence/stage3_ICAM1.json") is None
+
+
+def test_extract_hypothesis_writer_read_skill_calls_ignores_other_nodes() -> None:
+    from langchain_core.messages import AIMessage
+
+    from docs.benchmarks.hypothesis_generation_consistency.activation_trace import (
+        extract_read_skill_file_calls,
+    )
+
+    message = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "read_skill_file",
+                "args": {"skill_path": "skills/string-database/SKILL.md"},
+                "id": "call_1",
+            }
+        ],
+    )
+
+    exposed = ("drug-target-hypothesis", "string-database")
+    assert extract_read_skill_file_calls(
+        node_path="orchestrator > hypothesis_writer",
+        node_name="hypothesis_writer",
+        node_data={"messages": [message]},
+        exposed_skill_names=exposed,
+        scope="hypothesis_writer",
+    ) == [
+        {
+            "skill_name": "string-database",
+            "skill_path": "skills/string-database/SKILL.md",
+            "tool_call_id": "call_1",
+            "node_path": "orchestrator > hypothesis_writer",
+            "node_name": "hypothesis_writer",
+            "registered": True,
+        }
+    ]
+
+    assert extract_read_skill_file_calls(
+        node_path="orchestrator > finalize_report",
+        node_name="finalize_report",
+        node_data={"messages": [message]},
+        exposed_skill_names=exposed,
+        scope="hypothesis_writer",
+    ) == []
+
+
 def _report_one() -> dict:
     return {
         "schema_version": "hypothesis_report.v2",
