@@ -97,6 +97,13 @@ HYPOTHESIS_WRITER_RESUME_MESSAGE = (
 )
 
 
+def build_hypothesis_writer_resume_instruction(data_dir: Path) -> str:
+    return (
+        f"{HYPOTHESIS_WRITER_RESUME_MESSAGE} "
+        f"Use this exact data_dir for all tool calls: {data_dir}."
+    )
+
+
 def resolve_hypothesis_writer_skill_names(skill_set: str) -> tuple[str, ...]:
     try:
         return tuple(list(HYPOTHESIS_WRITER_SKILL_SETS[skill_set]))
@@ -413,6 +420,9 @@ async def run_hypothesis_writer_once(
             disease=disease,
             use_checkpointer=False,
             hypothesis_writer_skill_names=hypothesis_writer_skill_names,
+            hypothesis_writer_resume_instruction=(
+                build_hypothesis_writer_resume_instruction(workspace)
+            ),
         )
         agent, backend = create_drug_target_agent(config)
         try:

@@ -100,7 +100,7 @@ Data directory: {data_dir} | Disease: {disease}
 
 ## Steps (execute in exact order)
 1. Call task(subagent_type="hypothesis_writer",
-            instruction="Generate hypotheses from evidence already on disk. Data dir: {data_dir}")
+            instruction="{hypothesis_writer_resume_instruction}")
 2. Reply with the single line: EVIDENCE_PIPELINE_COMPLETE
 
 ## Rules
@@ -166,6 +166,7 @@ class DrugTargetConfig:
         "gwas-database",
         "chembl-database",
     )
+    hypothesis_writer_resume_instruction: str | None = None
     skills_dir: str | None = None
     subagent_models: dict[str, BaseChatModel | str] | None = None
     # init_chat_model format per subagent, e.g.:
@@ -239,6 +240,17 @@ def _filter_census_skills(
         return tuple(skill_names)
     disabled = {"cellxgene-census", "compare-census-gene-pair-by-cell-type"}
     return tuple(name for name in skill_names if name not in disabled)
+
+
+def _format_hypothesis_writer_resume_instruction(
+    config: DrugTargetConfig,
+    resolved_data_dir: str,
+) -> str:
+    instruction = (
+        config.hypothesis_writer_resume_instruction
+        or f"Generate hypotheses from evidence already on disk. Data dir: {resolved_data_dir}"
+    )
+    return " ".join(instruction.replace('"', "'").split())
 
 
 def _build_subagent_skill_name_map(
@@ -352,6 +364,9 @@ def create_drug_target_agent(
     system_prompt = template.format(
         data_dir=resolved_data_dir,
         disease=config.disease or "(see lr_candidates.json)",
+        hypothesis_writer_resume_instruction=(
+            _format_hypothesis_writer_resume_instruction(config, resolved_data_dir)
+        ),
     )
 
     create_kwargs = dict(

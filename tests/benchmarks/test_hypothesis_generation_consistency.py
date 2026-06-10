@@ -24,6 +24,7 @@ from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
     CURRENT4_HYPOTHESIS_WRITER_SKILLS,
     EXPANDED6_HYPOTHESIS_WRITER_SKILLS,
     HYPOTHESIS_WRITER_RESUME_MESSAGE,
+    build_hypothesis_writer_resume_instruction,
     clean_hypothesis_benchmark_workspace,
     check_hypothesis_scope,
     check_hypothesis_scope_untraced,
@@ -452,6 +453,16 @@ def test_hypothesis_writer_resume_message_preserves_output_guards() -> None:
     assert "target-cell-depleted" in HYPOTHESIS_WRITER_RESUME_MESSAGE
     assert "gene-level/actionability-only" in HYPOTHESIS_WRITER_RESUME_MESSAGE
     assert "ot_<GENE>.json" in HYPOTHESIS_WRITER_RESUME_MESSAGE
+
+
+def test_build_hypothesis_writer_resume_instruction_includes_exact_data_dir(
+    tmp_path: Path,
+) -> None:
+    instruction = build_hypothesis_writer_resume_instruction(tmp_path)
+
+    assert str(tmp_path) in instruction
+    assert "target-cell-depleted" in instruction
+    assert "save_hypothesis_report" in instruction
 
 
 def test_clean_hypothesis_benchmark_workspace_reports_removed_artifacts(
