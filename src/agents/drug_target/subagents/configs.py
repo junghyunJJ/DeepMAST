@@ -360,6 +360,7 @@ def get_subagents(
     skills_dir: str | None = None,
     subagent_skill_names: dict[str, tuple[str, ...]] | None = None,
     subagent_skill_registries: dict[str, dict[str, str]] | None = None,
+    enable_skill_activator: bool = True,
 ) -> list[dict]:
     """Build the two drug-target subagents in workflow order.
 
@@ -386,6 +387,9 @@ def get_subagents(
         skills_dir: Project skills directory for allow-listed SkillsMiddleware.
         subagent_skill_names: Per-subagent allowed skill tuples.
         subagent_skill_registries: Per-subagent registries for SkillActivator.
+        enable_skill_activator: Whether to add SkillActivator after
+            SkillsMiddleware. Set False for passive middleware-only activation
+            benchmarks.
 
     Returns:
         List of three subagent configuration dictionaries.
@@ -492,11 +496,12 @@ def get_subagents(
                     allowed_skill_names=allowed_names,
                 )
             )
-            mw.append(
-                SkillActivator(
-                    skill_registry=subagent_skill_registries.get(subagent["name"], {}),
+            if enable_skill_activator:
+                mw.append(
+                    SkillActivator(
+                        skill_registry=subagent_skill_registries.get(subagent["name"], {}),
+                    )
                 )
-            )
             subagent["middleware"] = mw
     elif skills_sources:
         # Legacy path retained for callers that still use deepagents native

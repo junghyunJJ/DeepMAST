@@ -133,6 +133,9 @@ class DrugTargetConfig:
             to enable container isolation for heavy-dependency tools.
         enable_progressive_disclosure: Whether to expose selected skills metadata
             to the agent and allow on-demand skill reading.
+        enable_skill_activator: Whether to add SkillActivator after
+            SkillsMiddleware. Set False for passive middleware-only activation
+            benchmarks.
         agent_skill_names: Legacy fallback skill tuple retained for registry helpers.
         evidence_assessor_skill_names: Skills exposed to evidence_assessor.
         hypothesis_writer_skill_names: Skills exposed to hypothesis_writer.
@@ -152,6 +155,7 @@ class DrugTargetConfig:
     docker_image: str | None = None
     enable_census: bool = True
     enable_progressive_disclosure: bool = True
+    enable_skill_activator: bool = True
     agent_skill_names: tuple[str, ...] = (
         "drug-target-hypothesis",
         "drug-target-reporting",
@@ -348,6 +352,7 @@ def create_drug_target_agent(
         skills_dir=skills_dir,
         subagent_skill_names=subagent_skill_names,
         subagent_skill_registries=subagent_skill_registries,
+        enable_skill_activator=config.enable_skill_activator,
     )
 
     # 5. Create agent — orchestrator has NO skills (just delegates)

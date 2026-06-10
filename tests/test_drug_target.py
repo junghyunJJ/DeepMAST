@@ -5603,6 +5603,54 @@ class TestIntegration:
             assert not any(isinstance(m, SkillActivator) for m in mw)
             assert not any(isinstance(m, SkillsMiddleware) for m in mw)
 
+
+class TestDrugTargetAgent:
+    @patch("src.agents.drug_target.agent.create_deep_agent")
+    @patch("src.agents.drug_target.agent.create_llm")
+    def test_create_drug_target_agent_can_disable_skill_activator_only(
+        self, mock_create_llm, mock_create_deep_agent, tmp_path
+    ):
+        from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
+        from src.agents.shared.skill_activator import SkillActivator
+        from src.agents.shared.skills_middleware import SkillsMiddleware
+
+        mock_create_llm.return_value = MagicMock()
+        mock_create_deep_agent.return_value = MagicMock()
+
+        config = DrugTargetConfig(
+            data_dir=str(tmp_path),
+            enable_skill_activator=False,
+            hypothesis_writer_skill_names=(
+                "drug-target-hypothesis",
+                "opentargets-database",
+                "gwas-database",
+                "chembl-database",
+                "compare-census-gene-pair-by-cell-type",
+                "string-database",
+            ),
+        )
+        create_drug_target_agent(config)
+
+        subagents = mock_create_deep_agent.call_args.kwargs["subagents"]
+        hypothesis_writer = next(
+            subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
+        )
+        middleware = hypothesis_writer.get("middleware", [])
+
+        skill_middleware = next(
+            item for item in middleware if isinstance(item, SkillsMiddleware)
+        )
+        assert skill_middleware.allowed_skill_names == (
+            "drug-target-hypothesis",
+            "opentargets-database",
+            "gwas-database",
+            "chembl-database",
+            "compare-census-gene-pair-by-cell-type",
+            "string-database",
+        )
+        assert not any(isinstance(item, SkillActivator) for item in middleware)
+
+
 # =========================================================================
 # 9. TestCensusDiseaseTool — list_census_diseases + disease_matched flag
 # =========================================================================
