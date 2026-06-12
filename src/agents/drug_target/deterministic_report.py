@@ -1235,6 +1235,8 @@ def _celltype_context_from_template_context(
     if legacy_at2_fallback:
         context.update(
             {
+                "focus_detail": "epithelial/AT2 cell context",
+                "focus_short": "AT2/epithelial",
                 "primary_heading": "Primary AT2/Epithelial Follow-up Candidates",
                 "primary_tier_label": "Primary epithelial/AT2-intrinsic",
                 "primary_tier_note": (

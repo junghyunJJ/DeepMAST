@@ -921,7 +921,7 @@ def test_report_mvp_splits_hypotheses_by_epithelial_intrinsic_support() -> None:
     assert "Primary epithelial/AT2-intrinsic" in markdown
     assert "Secondary epithelial-associated niche" in markdown
     assert (
-        "not as epithelial-cell-intrinsic target mechanisms"
+        "not as interest-cell-intrinsic target mechanisms"
         in markdown
     )
     assert "**Biological Grounding:**" in markdown
@@ -937,8 +937,8 @@ def test_report_mvp_splits_hypotheses_by_epithelial_intrinsic_support() -> None:
     gap_section = markdown.split("### Gap Analysis", 1)[1]
     assert "stage1_FN1--SDC2.json" not in gap_section
     assert (
-        "framing evidence for non-AT2 or cross-cell follow-up, not as "
-        "AT2-intrinsic support"
+        "framing evidence for non-interest-cell or cross-cell follow-up, not as "
+        "interest-cell-intrinsic support"
     ) in markdown
 
 

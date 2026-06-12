@@ -235,22 +235,22 @@ These recommendations are grounded in the available spatial, Census, OpenTargets
 {% set unbucketed_hypotheses = hypothesis_data.unbucketed_hypotheses | default([]) %}
 
 {% if primary_hypotheses or secondary_hypotheses %}
-### 4.1. Primary AT2/Epithelial Follow-up Candidates
+### 4.1. {{ celltype_context.primary_heading }}
 
-These recommendations cite Stage 1 Census support for same-cell coexpression enrichment in the resolved epithelial/AT2 cell context. Treat them as the strongest AT2/epithelial follow-up candidates, while reserving causal mechanism claims for downstream validation.
+These recommendations cite Stage 1 Census support for same-cell coexpression enrichment in the resolved context ({{ celltype_context.focus_detail }}). Treat them as the strongest {{ celltype_context.focus_short }} follow-up candidates, while reserving causal mechanism claims for downstream validation.
 
 {% if primary_hypotheses %}
 {% for h in primary_hypotheses %}
 {{ render_hypothesis(h, "4.1") }}
 {% endfor %}
 {% else %}
-No primary AT2/epithelial follow-up candidates met the Stage 1 intrinsic-support criteria.
+No primary {{ celltype_context.focus_short }} follow-up candidates met the Stage 1 intrinsic-support criteria.
 
 {% endif %}
 ### 4.2. Secondary Spatial-Niche Follow-up Candidates
 
-These recommendations retain spatially colocalized ligand-receptor evidence, but Stage 1 Census does not support them as AT2 same-cell mechanisms. Treat them as epithelial-associated spatial-niche or cross-cell follow-up candidates, not as epithelial-cell-intrinsic target mechanisms.
-When a passed Stage 1 pair is AT2-depleted, its citation constrains interpretation as framing evidence for non-AT2 or cross-cell follow-up, not as AT2-intrinsic support.
+These recommendations retain spatially colocalized ligand-receptor evidence, but Stage 1 Census does not support them as interest-cell same-cell mechanisms in the resolved context ({{ celltype_context.focus_detail }}). Treat them as spatial-niche or cross-cell follow-up candidates, not as interest-cell-intrinsic target mechanisms.
+When a passed Stage 1 pair is target-cell-depleted or coexpression-depleted, its citation constrains interpretation as framing evidence for non-interest-cell or cross-cell follow-up, not as interest-cell-intrinsic support.
 
 {% if hypothesis_data.secondary_stage1_framing_pairs | default([]) %}
 #### Secondary Stage 1 Framing Evidence
@@ -275,7 +275,7 @@ No secondary spatial-niche follow-up candidates were retained.
 {% if gene_level_hypotheses %}
 ### 4.3. Gene-Level/Actionability Follow-up Candidates
 
-These recommendations cite target-disease or actionability evidence but no Stage 1/spatial grounding. Treat them as gene-level follow-up candidates, not spatial-niche or AT2-intrinsic evidence.
+These recommendations cite target-disease or actionability evidence but no Stage 1/spatial grounding. Treat them as gene-level follow-up candidates, not spatial-niche or interest-cell-intrinsic evidence.
 
 {% for h in gene_level_hypotheses %}
 {{ render_hypothesis(h, "4.3") }}
