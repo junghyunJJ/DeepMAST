@@ -123,3 +123,38 @@ def test_enriched_malignant_stage1_hypothesis_is_primary_target_cell_support() -
     assert "Primary interest-cell intrinsic" in part4
     assert "not interest-cell-intrinsic support" not in part4
     assert "No primary" not in part4
+
+
+def test_build_report_data_carries_celltype_resolution(tmp_path) -> None:
+    import json
+    import shutil
+    from pathlib import Path
+
+    from src.agents.drug_target.deterministic_report import build_report_data
+
+    fixture = (
+        Path(__file__).resolve().parent
+        / "fixtures"
+        / "baseline_hallucinated"
+    )
+    workspace = tmp_path / "workspace"
+    shutil.copytree(fixture, workspace)
+    resolution = {
+        "primary_input_celltype": "Prolif Invasive Tumor",
+        "primary_match_mode": "semantic_proxy",
+        "primary_resolved_celltype": "malignant cell",
+        "interest_celltypes": ["Prolif Invasive Tumor"],
+    }
+    (workspace / "evidence" / "celltype_resolution.json").write_text(
+        json.dumps(resolution),
+        encoding="utf-8",
+    )
+
+    report_data = build_report_data(str(workspace), "breast cancer")
+
+    assert (
+        report_data["template_context"]["celltype_resolution"]
+        ["primary_input_celltype"]
+        == "Prolif Invasive Tumor"
+    )
+    assert "evidence/celltype_resolution.json" in report_data["sources"]

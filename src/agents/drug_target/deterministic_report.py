@@ -1528,6 +1528,12 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
     resolved_path = base / "evidence" / "resolved_drugs.json"
     stage1_filter_results = _load_stage1_filter_results(base)
     stage1_pairs = _load_optional_dict(base / "evidence" / "stage1_evidence.json")
+    celltype_resolution = _load_optional_json(
+        base / "evidence" / "celltype_resolution.json",
+        {},
+    )
+    if not isinstance(celltype_resolution, dict):
+        celltype_resolution = {}
 
     candidates: list[dict[str, Any]] = []
     for row in sorted(
@@ -1637,6 +1643,7 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
         "evidence/stage1_filter_results.json",
         "evidence/stage1_filter_results.csv",
         "evidence/stage1_evidence.json",
+        "evidence/celltype_resolution.json",
     ):
         if (base / optional_source).exists():
             cited_sources.add(optional_source)
@@ -1658,6 +1665,7 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
         "template_context": {
             "stage1_filter_results": stage1_filter_results,
             "stage1_pairs": stage1_pairs,
+            "celltype_resolution": celltype_resolution,
             "hypothesis_data": hypothesis,
         },
         "issues": [],
