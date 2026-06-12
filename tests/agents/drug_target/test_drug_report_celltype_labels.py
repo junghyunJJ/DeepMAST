@@ -263,3 +263,79 @@ def test_legacy_drug_md_renderer_uses_celltype_context() -> None:
     assert "Prolif Invasive Tumor" in part4
     assert "Census proxy: malignant cell" in part4
     assert "AT2" not in part4
+
+
+def test_legacy_celltype_context_normalizes_interest_celltypes_shapes() -> None:
+    from src.agents.drug_target.tools.drug_report_html import (
+        _legacy_celltype_context,
+    )
+
+    cases = [
+        (
+            {"interest_celltypes": "Prolif Invasive Tumor"},
+            "Prolif Invasive Tumor",
+        ),
+        (
+            {"interest_celltypes": ["", "Prolif Invasive Tumor"]},
+            "Prolif Invasive Tumor",
+        ),
+        (
+            {"interest_celltypes": ("", "Prolif Invasive Tumor")},
+            "Prolif Invasive Tumor",
+        ),
+        ({"interest_celltypes": 42}, "resolved interest cell type"),
+        (
+            {"interest_celltypes": {"label": "Prolif Invasive Tumor"}},
+            "resolved interest cell type",
+        ),
+        ({}, "resolved interest cell type"),
+        (None, "resolved interest cell type"),
+        (42, "resolved interest cell type"),
+    ]
+
+    for celltype_resolution, expected_detail in cases:
+        context = _legacy_celltype_context(celltype_resolution, None)
+
+        assert context["focus_detail"] == expected_detail
+
+
+def test_legacy_celltype_context_uses_stage1_census_fallback() -> None:
+    from src.agents.drug_target.tools.drug_report_html import (
+        _legacy_celltype_context,
+    )
+
+    context = _legacy_celltype_context(
+        None,
+        {
+            "EGF_ERBB2": {
+                "census_validation": {
+                    "requested_cell_type": "malignant cell",
+                    "resolved_cell_type": "malignant cell",
+                },
+            },
+        },
+    )
+
+    assert context["focus_detail"] == "malignant cell"
+    assert context["focus_short"] == "interest-cell"
+
+
+def test_render_drug_md_preserves_positional_novelty_legend_argument() -> None:
+    from src.agents.drug_target.tools.drug_report_html import render_drug_md
+
+    custom_legend = "custom positional novelty legend"
+    markdown = render_drug_md(
+        "test disease",
+        [],
+        [],
+        [],
+        {},
+        [],
+        None,
+        None,
+        None,
+        None,
+        custom_legend,
+    )
+
+    assert custom_legend in markdown

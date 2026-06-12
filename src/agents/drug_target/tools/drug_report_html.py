@@ -933,8 +933,8 @@ def render_drug_md(
     disease_scope: dict | None = None,
     data_limitations: list[str] | None = None,
     interpretations: dict[str, Any] | None = None,
-    celltype_resolution: dict | None = None,
     novelty_opportunity_legend: str = NOVELTY_OPPORTUNITY_LEGEND,
+    celltype_resolution: dict | None = None,
 ) -> str:
     """Render drug.md from structured data via Jinja2 template.
 
@@ -1003,13 +1003,13 @@ def _legacy_celltype_context(
     stage1_data: dict[str, dict] | None,
 ) -> dict[str, Any]:
     resolution = celltype_resolution if isinstance(celltype_resolution, dict) else {}
-    input_label = str(
+    input_label = _legacy_celltype_text(
         resolution.get("primary_input_celltype")
-        or next(iter(resolution.get("interest_celltypes", []) or []), "")
-        or ""
-    ).strip()
-    resolved_label = str(resolution.get("primary_resolved_celltype") or "").strip()
-    match_mode = str(resolution.get("primary_match_mode") or "").strip()
+    ) or _legacy_celltype_text(resolution.get("interest_celltypes"))
+    resolved_label = _legacy_celltype_text(
+        resolution.get("primary_resolved_celltype")
+    )
+    match_mode = _legacy_celltype_text(resolution.get("primary_match_mode"))
     if not resolved_label and isinstance(stage1_data, dict):
         for pair in stage1_data.values():
             if not isinstance(pair, dict):
@@ -1017,11 +1017,9 @@ def _legacy_celltype_context(
             census = pair.get("census_validation")
             census = census if isinstance(census, dict) else pair.get("census")
             census = census if isinstance(census, dict) else {}
-            resolved_label = str(
+            resolved_label = _legacy_celltype_text(
                 census.get("resolved_cell_type")
-                or census.get("requested_cell_type")
-                or ""
-            ).strip()
+            ) or _legacy_celltype_text(census.get("requested_cell_type"))
             if resolved_label:
                 break
     proxy = (
@@ -1047,6 +1045,17 @@ def _legacy_celltype_context(
         "focus_short": focus_short,
         "primary_heading": "Primary Interest-Cell Follow-up Candidates",
     }
+
+
+def _legacy_celltype_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            text = _legacy_celltype_text(item)
+            if text:
+                return text
+    return ""
 
 
 def _normalize_hypothesis_data_for_md(hypothesis_data: dict) -> dict:
