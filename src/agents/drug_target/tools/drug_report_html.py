@@ -1009,6 +1009,7 @@ def _legacy_celltype_context(
     resolved_label = _legacy_celltype_text(
         resolution.get("primary_resolved_celltype")
     )
+    has_explicit_celltype_resolution = bool(input_label or resolved_label)
     match_mode = _legacy_celltype_text(resolution.get("primary_match_mode"))
     if not resolved_label and isinstance(stage1_data, dict):
         for pair in stage1_data.values():
@@ -1031,20 +1032,47 @@ def _legacy_celltype_context(
     if proxy:
         focus_detail = f"{input_label}; Census proxy: {resolved_label}"
         focus_short = f"interest-cell / {resolved_label.replace(' ', '-')} proxy"
+        primary_heading = "Primary Interest-Cell Follow-up Candidates"
+    elif (
+        not has_explicit_celltype_resolution
+        and resolved_label
+        and _legacy_is_epithelial_anchor_text(resolved_label)
+    ):
+        focus_detail = "epithelial/AT2 cell context"
+        focus_short = "AT2/epithelial"
+        primary_heading = "Primary AT2/Epithelial Follow-up Candidates"
     elif resolved_label:
         focus_detail = resolved_label
         focus_short = "interest-cell"
+        primary_heading = "Primary Interest-Cell Follow-up Candidates"
     elif input_label:
         focus_detail = input_label
         focus_short = "interest-cell"
+        primary_heading = "Primary Interest-Cell Follow-up Candidates"
     else:
         focus_detail = "resolved interest cell type"
         focus_short = "interest-cell"
+        primary_heading = "Primary Interest-Cell Follow-up Candidates"
     return {
         "focus_detail": focus_detail,
         "focus_short": focus_short,
-        "primary_heading": "Primary Interest-Cell Follow-up Candidates",
+        "primary_heading": primary_heading,
     }
+
+
+def _legacy_is_epithelial_anchor_text(value: Any) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
+    normalized = " ".join(normalized.split())
+    if not normalized:
+        return False
+    tokens = set(normalized.split())
+    return (
+        "at2" in tokens
+        or "pulmonary alveolar type 2" in normalized
+        or "alveolar type 2" in normalized
+        or "alveolar epithelial" in normalized
+        or "pulmonary epithelial" in normalized
+    )
 
 
 def _legacy_celltype_text(value: Any) -> str:

@@ -265,6 +265,55 @@ def test_legacy_drug_md_renderer_uses_celltype_context() -> None:
     assert "AT2" not in part4
 
 
+def test_legacy_drug_md_renderer_preserves_at2_stage1_fallback_context() -> None:
+    from src.agents.drug_target.tools.drug_report_html import render_drug_md
+
+    hypothesis = {
+        "rank": 1,
+        "title": "Synthetic AT2 candidate",
+        "category": "Mechanism of Action",
+        "core_claim": "Synthetic claim.",
+        "evidence_references": ["stage1_ICAM1--MUC1.json"],
+        "biological_entities": {
+            "genes": ["ICAM1", "MUC1"],
+            "pathways": [],
+            "cell_types": ["pulmonary alveolar type 2 cell"],
+            "drugs": [],
+        },
+        "falsifiable_prediction": "Synthetic prediction.",
+        "validation_approach": "Synthetic validation.",
+    }
+    markdown = render_drug_md(
+        disease="idiopathic pulmonary fibrosis",
+        stage3_genes=[],
+        featured_cards=[],
+        all_genes_matrix=[],
+        stage1_data={
+            "ICAM1_MUC1": {
+                "census_validation": {
+                    "requested_cell_type": "pulmonary alveolar type 2 cell",
+                    "resolved_cell_type": "pulmonary alveolar type 2 cell",
+                },
+            },
+        },
+        stage1_filter_results=[],
+        hypothesis_data={
+            "hypotheses_generated": 1,
+            "hypotheses_retained": 1,
+            "evidence_coverage_pct": 0,
+            "hypotheses": [hypothesis],
+            "primary_hypotheses": [hypothesis],
+            "secondary_hypotheses": [],
+            "gene_level_hypotheses": [],
+        },
+    )
+    part4 = _part4(markdown)
+
+    assert "### 4.1. Primary AT2/Epithelial Follow-up Candidates" in part4
+    assert "epithelial/AT2 cell context" in part4
+    assert "AT2/epithelial follow-up candidates" in part4
+
+
 def test_legacy_celltype_context_normalizes_interest_celltypes_shapes() -> None:
     from src.agents.drug_target.tools.drug_report_html import (
         _legacy_celltype_context,
@@ -339,3 +388,40 @@ def test_render_drug_md_preserves_positional_novelty_legend_argument() -> None:
     )
 
     assert custom_legend in markdown
+
+
+def test_build_evidence_summary_ignores_malformed_celltype_resolution_json(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    import json
+
+    from src.agents.drug_target.tools import drug_report_html
+    from src.agents.drug_target.tools.stage_logic import build_evidence_summary
+
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps(
+            {
+                "disease": "test disease",
+                "stage3_candidates": [],
+                "rubric_assessment": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (evidence_dir / "celltype_resolution.json").write_text("{", encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    def fake_render_drug_md(**kwargs):
+        captured["celltype_resolution"] = kwargs["celltype_resolution"]
+        return "# stub drug draft"
+
+    monkeypatch.setattr(drug_report_html, "render_drug_md", fake_render_drug_md)
+
+    raw = build_evidence_summary.func(str(tmp_path))
+
+    result = json.loads(raw)
+    assert captured["celltype_resolution"] == {}
+    assert result["markdown_template"] == "# stub drug draft"
