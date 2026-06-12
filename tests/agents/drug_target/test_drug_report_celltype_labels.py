@@ -342,7 +342,10 @@ def test_html_part4_uses_interest_cell_proxy_labels_not_at2() -> None:
 
 
 def test_parse_drug_md_buckets_old_style_tier_labels_without_numeric_tier_headings() -> None:
-    from src.agents.drug_target.tools.drug_report_html import parse_drug_md
+    from src.agents.drug_target.tools.drug_report_html import (
+        parse_drug_md,
+        render_drug_html,
+    )
 
     markdown = """# Drug Target Assessment Report: test disease
 
@@ -395,6 +398,17 @@ def test_parse_drug_md_buckets_old_style_tier_labels_without_numeric_tier_headin
         "Gene-level actionability candidate",
     ]
     assert context["unbucketed_hypotheses"] == []
+
+    part4_html = _part4_html(render_drug_html(context))
+
+    assert "Primary AT2/Epithelial Follow-up Candidates" in part4_html
+    assert "<h3>4.1. Old AT2 primary candidate</h3>" not in part4_html
+    assert (
+        "<p style=\"color: var(--text-secondary);\">"
+        "**Interpretation Tier:** Primary epithelial/AT2-intrinsic"
+        "</p>"
+        not in part4_html
+    )
 
 
 def test_legacy_drug_md_renderer_preserves_at2_stage1_fallback_context() -> None:

@@ -614,6 +614,9 @@ def _default_hypothesis_section_context() -> dict[str, str]:
 
 def _parse_hypothesis_section_context(body: str) -> dict[str, str]:
     context = _default_hypothesis_section_context()
+    if not re.search(r"^####\s+4\.[123]\.\d+\.\s+", body, flags=re.MULTILINE):
+        return context
+
     primary = _parse_numbered_subsection(body, "4.1")
     if primary:
         context["primary_heading"] = primary["heading"]
