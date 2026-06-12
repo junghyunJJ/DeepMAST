@@ -341,6 +341,62 @@ def test_html_part4_uses_interest_cell_proxy_labels_not_at2() -> None:
     assert "AT2-intrinsic" not in part4_html
 
 
+def test_parse_drug_md_buckets_old_style_tier_labels_without_numeric_tier_headings() -> None:
+    from src.agents.drug_target.tools.drug_report_html import parse_drug_md
+
+    markdown = """# Drug Target Assessment Report: test disease
+
+## 4. Evidence-Grounded Follow-up Recommendations
+
+### 4.1. Old AT2 primary candidate
+
+**Interpretation Tier:** Primary epithelial/AT2-intrinsic
+**Category:** Mechanism of Action
+**Conservative Interpretation:** Primary AT2 claim.
+
+### 4.2. Current interest-cell primary candidate
+
+**Interpretation Tier:** Primary interest-cell intrinsic
+**Category:** Mechanism of Action
+**Conservative Interpretation:** Primary interest-cell claim.
+
+### 4.3. Old epithelial niche candidate
+
+**Interpretation Tier:** Secondary epithelial-associated niche
+**Category:** Spatial Biology
+**Conservative Interpretation:** Secondary epithelial niche claim.
+
+### 4.4. Current spatial niche candidate
+
+**Interpretation Tier:** Secondary spatial-niche/cross-cell
+**Category:** Spatial Biology
+**Conservative Interpretation:** Secondary spatial niche claim.
+
+### 4.5. Gene-level actionability candidate
+
+**Interpretation Tier:** Gene-level/actionability follow-up
+**Category:** Therapeutic Strategy
+**Conservative Interpretation:** Gene-level claim.
+
+## 5. Pipeline Execution Summary
+"""
+
+    context = parse_drug_md(markdown)
+
+    assert [h["title"] for h in context["primary_hypotheses"]] == [
+        "Old AT2 primary candidate",
+        "Current interest-cell primary candidate",
+    ]
+    assert [h["title"] for h in context["secondary_hypotheses"]] == [
+        "Old epithelial niche candidate",
+        "Current spatial niche candidate",
+    ]
+    assert [h["title"] for h in context["gene_level_hypotheses"]] == [
+        "Gene-level actionability candidate",
+    ]
+    assert context["unbucketed_hypotheses"] == []
+
+
 def test_legacy_drug_md_renderer_preserves_at2_stage1_fallback_context() -> None:
     from src.agents.drug_target.tools.drug_report_html import (
         parse_drug_md,

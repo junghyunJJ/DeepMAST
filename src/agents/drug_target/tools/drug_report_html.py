@@ -712,6 +712,10 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
 
         category_m = re.search(r"\*\*Category:\*\*\s*(.+)", lines)
         tier_label_m = re.search(r"\*\*Interpretation Tier:\*\*\s*(.+)", lines)
+        if tier_label_m:
+            tier_label = tier_label_m.group(1).strip()
+            if not tier:
+                tier = _infer_hypothesis_tier_from_label(tier_label)
         claim_m = re.search(
             r"\*\*(?:Core Claim|Conservative Interpretation):\*\*\s*(.+)", lines
         )
@@ -784,11 +788,27 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
             "cell_types": cell_types,
             "drugs": drugs,
         }
-        if tier_label_m:
-            hypothesis["_tier_label"] = tier_label_m.group(1).strip()
         hypotheses.append(hypothesis)
 
     return hypotheses
+
+
+def _infer_hypothesis_tier_from_label(tier_label: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", " ", tier_label.casefold()).strip()
+    normalized = " ".join(normalized.split())
+    if not normalized:
+        return ""
+    if "primary epithelial at2 intrinsic" in normalized:
+        return "primary_epithelial_intrinsic"
+    if "primary interest cell intrinsic" in normalized:
+        return "primary_target_cell_intrinsic"
+    if "secondary epithelial associated niche" in normalized:
+        return "secondary_epithelial_associated_niche"
+    if normalized.startswith("secondary") and "spatial" in normalized:
+        return "secondary_spatial_niche"
+    if "gene level actionability follow up" in normalized:
+        return "gene_level_actionability"
+    return ""
 
 
 def _parse_secondary_stage1_framing_pairs(body: str) -> list[dict[str, str]]:
