@@ -1350,7 +1350,10 @@ def test_report_mvp_labels_gene_level_only_candidates_without_spatial_niche() ->
     assert "#### 4.2.1. CD47 actionability follow-up candidate" not in markdown
     assert "Gene-level/actionability follow-up" in markdown
     assert "No Stage 1/spatial grounding reference cited" in markdown
-    assert "do not interpret as AT2-intrinsic or spatial-niche evidence" in markdown
+    assert (
+        "Gene-level support only; do not interpret as interest-cell-intrinsic "
+        "or spatial-niche evidence for interest cell."
+    ) in markdown
     assert "Secondary epithelial-associated niche" not in markdown
 
     context = parse_drug_md(markdown)
