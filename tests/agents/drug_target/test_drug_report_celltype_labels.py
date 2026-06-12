@@ -100,6 +100,13 @@ def _part4(markdown: str) -> str:
     return markdown.split(PART4_HEADING, 1)[1].split("## 5.", 1)[0]
 
 
+def _part4_html(html: str) -> str:
+    return html.split('<div id="hypothesis"', 1)[1].split(
+        '<div id="recommendations"',
+        1,
+    )[0]
+
+
 def test_part4_uses_interest_cell_proxy_labels_not_at2() -> None:
     from src.agents.drug_target.deterministic_report import render_report_markdown
 
@@ -267,8 +274,79 @@ def test_legacy_drug_md_renderer_uses_celltype_context() -> None:
     assert "AT2" not in part4
 
 
-def test_legacy_drug_md_renderer_preserves_at2_stage1_fallback_context() -> None:
+def test_legacy_raw_gene_level_hypothesis_uses_celltype_context_constraint() -> None:
     from src.agents.drug_target.tools.drug_report_html import render_drug_md
+
+    markdown = render_drug_md(
+        disease="breast cancer",
+        stage3_genes=[],
+        featured_cards=[],
+        all_genes_matrix=[],
+        stage1_data={},
+        stage1_filter_results=[],
+        hypothesis_data={
+            "hypotheses_generated": 1,
+            "hypotheses_retained": 1,
+            "evidence_coverage_pct": 0,
+            "hypotheses": [
+                {
+                    "rank": 1,
+                    "title": "ERBB2 actionability follow-up candidate",
+                    "category": "Therapeutic Strategy",
+                    "core_claim": "Synthetic gene-level claim.",
+                    "evidence_references": ["stage3_ERBB2.json", "ot_ERBB2.json"],
+                    "biological_entities": {
+                        "genes": ["ERBB2"],
+                        "pathways": [],
+                        "cell_types": ["malignant cell"],
+                        "drugs": [],
+                    },
+                    "falsifiable_prediction": "Synthetic prediction.",
+                    "validation_approach": "Synthetic validation.",
+                }
+            ],
+        },
+        celltype_resolution={
+            "primary_input_celltype": "Prolif Invasive Tumor",
+            "primary_match_mode": "semantic_proxy",
+            "primary_resolved_celltype": "malignant cell",
+            "interest_celltypes": ["Prolif Invasive Tumor"],
+        },
+    )
+    part4 = _part4(markdown)
+
+    assert (
+        "Gene-level support only; do not interpret as interest-cell-intrinsic "
+        "or spatial-niche evidence for Prolif Invasive Tumor; Census proxy: "
+        "malignant cell."
+    ) in part4
+    assert "AT2" not in part4
+
+
+def test_html_part4_uses_interest_cell_proxy_labels_not_at2() -> None:
+    from src.agents.drug_target.deterministic_report import render_report_markdown
+    from src.agents.drug_target.tools.drug_report_html import (
+        parse_drug_md,
+        render_drug_html,
+    )
+
+    markdown = render_report_markdown(_breast_cancer_report_data())
+    html = render_drug_html(parse_drug_md(markdown))
+    part4_html = _part4_html(html)
+
+    assert "Primary Interest-Cell Follow-up Candidates" in part4_html
+    assert "Prolif Invasive Tumor" in part4_html
+    assert "Census proxy: malignant cell" in part4_html
+    assert "AT2" not in part4_html
+    assert "AT2-intrinsic" not in part4_html
+
+
+def test_legacy_drug_md_renderer_preserves_at2_stage1_fallback_context() -> None:
+    from src.agents.drug_target.tools.drug_report_html import (
+        parse_drug_md,
+        render_drug_html,
+        render_drug_md,
+    )
 
     hypothesis = {
         "rank": 1,
@@ -314,6 +392,13 @@ def test_legacy_drug_md_renderer_preserves_at2_stage1_fallback_context() -> None
     assert "### 4.1. Primary AT2/Epithelial Follow-up Candidates" in part4
     assert "epithelial/AT2 cell context" in part4
     assert "AT2/epithelial follow-up candidates" in part4
+
+    html = render_drug_html(parse_drug_md(markdown))
+    part4_html = _part4_html(html)
+
+    assert "Primary AT2/Epithelial Follow-up Candidates" in part4_html
+    assert "epithelial/AT2 cell context" in part4_html
+    assert "AT2/epithelial follow-up candidates" in part4_html
 
 
 def test_legacy_celltype_context_normalizes_interest_celltypes_shapes() -> None:
