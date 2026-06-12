@@ -5427,7 +5427,7 @@ def validate_drug_report_finalization(data_dir: str, require_critic: bool = Fals
     drug_md_present = (data_dir_path / "drug.md").exists()
     if drug_md_present:
         try:
-            impl = getattr(validate_drug_md, "func", None) or validate_drug_md
+            impl: Any = getattr(validate_drug_md, "func", None) or validate_drug_md
             raw_json = impl(data_dir_path)
             raw = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
         except Exception as exc:
