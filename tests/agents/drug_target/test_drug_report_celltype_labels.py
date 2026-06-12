@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 
 PART4_HEADING = "## 4. Evidence-Grounded Follow-up Recommendations"
 
@@ -420,7 +422,7 @@ def test_build_evidence_summary_ignores_malformed_celltype_resolution_json(
 
     monkeypatch.setattr(drug_report_html, "render_drug_md", fake_render_drug_md)
 
-    raw = build_evidence_summary.func(str(tmp_path))
+    raw = cast(Any, build_evidence_summary).func(str(tmp_path))
 
     result = json.loads(raw)
     assert captured["celltype_resolution"] == {}
