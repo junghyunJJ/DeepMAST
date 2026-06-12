@@ -933,6 +933,7 @@ def render_drug_md(
     disease_scope: dict | None = None,
     data_limitations: list[str] | None = None,
     interpretations: dict[str, Any] | None = None,
+    celltype_resolution: dict | None = None,
     novelty_opportunity_legend: str = NOVELTY_OPPORTUNITY_LEGEND,
 ) -> str:
     """Render drug.md from structured data via Jinja2 template.
@@ -974,6 +975,10 @@ def render_drug_md(
     normalized_hypothesis_data = _normalize_hypothesis_data_for_md(
         hypothesis_data or {}
     )
+    celltype_context = _legacy_celltype_context(
+        celltype_resolution,
+        stage1_data,
+    )
 
     return tmpl.render(
         disease=disease,
@@ -988,8 +993,60 @@ def render_drug_md(
         disease_scope=disease_scope or {},
         data_limitations=data_limitations or [],
         interpretations=interpretations or {},
+        celltype_context=celltype_context,
         novelty_opportunity_legend=novelty_opportunity_legend,
     )
+
+
+def _legacy_celltype_context(
+    celltype_resolution: dict | None,
+    stage1_data: dict[str, dict] | None,
+) -> dict[str, Any]:
+    resolution = celltype_resolution if isinstance(celltype_resolution, dict) else {}
+    input_label = str(
+        resolution.get("primary_input_celltype")
+        or next(iter(resolution.get("interest_celltypes", []) or []), "")
+        or ""
+    ).strip()
+    resolved_label = str(resolution.get("primary_resolved_celltype") or "").strip()
+    match_mode = str(resolution.get("primary_match_mode") or "").strip()
+    if not resolved_label and isinstance(stage1_data, dict):
+        for pair in stage1_data.values():
+            if not isinstance(pair, dict):
+                continue
+            census = pair.get("census_validation")
+            census = census if isinstance(census, dict) else pair.get("census")
+            census = census if isinstance(census, dict) else {}
+            resolved_label = str(
+                census.get("resolved_cell_type")
+                or census.get("requested_cell_type")
+                or ""
+            ).strip()
+            if resolved_label:
+                break
+    proxy = (
+        bool(input_label)
+        and bool(resolved_label)
+        and match_mode == "semantic_proxy"
+        and input_label.casefold() != resolved_label.casefold()
+    )
+    if proxy:
+        focus_detail = f"{input_label}; Census proxy: {resolved_label}"
+        focus_short = f"interest-cell / {resolved_label.replace(' ', '-')} proxy"
+    elif resolved_label:
+        focus_detail = resolved_label
+        focus_short = "interest-cell"
+    elif input_label:
+        focus_detail = input_label
+        focus_short = "interest-cell"
+    else:
+        focus_detail = "resolved interest cell type"
+        focus_short = "interest-cell"
+    return {
+        "focus_detail": focus_detail,
+        "focus_short": focus_short,
+        "primary_heading": "Primary Interest-Cell Follow-up Candidates",
+    }
 
 
 def _normalize_hypothesis_data_for_md(hypothesis_data: dict) -> dict:

@@ -215,3 +215,51 @@ def test_build_report_data_carries_celltype_resolution(tmp_path) -> None:
         == "Prolif Invasive Tumor"
     )
     assert "evidence/celltype_resolution.json" in report_data["sources"]
+
+
+def test_legacy_drug_md_renderer_uses_celltype_context() -> None:
+    from src.agents.drug_target.tools.drug_report_html import render_drug_md
+
+    hypothesis = {
+        "rank": 1,
+        "title": "Synthetic primary candidate",
+        "category": "Mechanism of Action",
+        "core_claim": "Synthetic claim.",
+        "evidence_references": ["stage1_EGF--ERBB2.json"],
+        "biological_entities": {
+            "genes": ["ERBB2"],
+            "pathways": [],
+            "cell_types": ["malignant cell"],
+            "drugs": [],
+        },
+        "falsifiable_prediction": "Synthetic prediction.",
+        "validation_approach": "Synthetic validation.",
+    }
+    markdown = render_drug_md(
+        disease="breast cancer",
+        stage3_genes=[],
+        featured_cards=[],
+        all_genes_matrix=[],
+        stage1_data={},
+        stage1_filter_results=[],
+        hypothesis_data={
+            "hypotheses_generated": 1,
+            "hypotheses_retained": 1,
+            "evidence_coverage_pct": 0,
+            "hypotheses": [hypothesis],
+            "primary_hypotheses": [hypothesis],
+            "secondary_hypotheses": [],
+            "gene_level_hypotheses": [],
+        },
+        celltype_resolution={
+            "primary_input_celltype": "Prolif Invasive Tumor",
+            "primary_match_mode": "semantic_proxy",
+            "primary_resolved_celltype": "malignant cell",
+            "interest_celltypes": ["Prolif Invasive Tumor"],
+        },
+    )
+    part4 = _part4(markdown)
+
+    assert "Prolif Invasive Tumor" in part4
+    assert "Census proxy: malignant cell" in part4
+    assert "AT2" not in part4
