@@ -555,6 +555,8 @@ def _hypothesis_use_class(
 ) -> str:
     if passed is False:
         return "Negative/contrast only"
+    if passed is None:
+        return "Cautious support only"
     at2 = _is_at2_celltype(celltype)
     if coexpression_direction == "enriched":
         return "Primary AT2-intrinsic support" if at2 else "Primary target-cell intrinsic support"

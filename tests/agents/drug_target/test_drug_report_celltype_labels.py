@@ -128,7 +128,10 @@ def test_enriched_malignant_stage1_hypothesis_is_primary_target_cell_support() -
 def test_missing_stage1_pass_status_is_not_primary_target_cell_support() -> None:
     from copy import deepcopy
 
-    from src.agents.drug_target.deterministic_report import _markdown_template_context
+    from src.agents.drug_target.deterministic_report import (
+        _markdown_template_context,
+        _template_pair,
+    )
 
     report_data = deepcopy(_breast_cancer_report_data())
     template_context = report_data["template_context"]
@@ -136,7 +139,14 @@ def test_missing_stage1_pass_status_is_not_primary_target_cell_support() -> None
     template_context["stage1_pairs"]["EGF_ERBB2"].pop("stage1_filter")
 
     context = _markdown_template_context(report_data)
+    pair = _template_pair(
+        "EGF_ERBB2",
+        template_context["stage1_pairs"]["EGF_ERBB2"],
+        {},
+    )
 
+    assert pair["_target_cell_intrinsic_support"] is False
+    assert "Primary" not in pair["hypothesis_use"]
     assert context["hypothesis_data"]["primary_hypotheses"] == []
     assert len(context["hypothesis_data"]["secondary_hypotheses"]) == 1
 
