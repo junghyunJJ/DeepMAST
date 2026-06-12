@@ -690,7 +690,7 @@ def _template_pair(
             celltype=resolved_celltype,
         ),
         "_target_cell_intrinsic_support": (
-            passed is not False
+            passed is True
             and coexpression_direction == "enriched"
         ),
         "_epithelial_intrinsic_support": (
@@ -1143,6 +1143,7 @@ def _celltype_context_from_template_context(
     resolved_label_raw = _first_text(
         celltype_resolution.get("primary_resolved_celltype")
     )
+    has_explicit_celltype_resolution = bool(input_label_raw or resolved_label_raw)
     match_mode = _first_text(celltype_resolution.get("primary_match_mode"))
 
     if not resolved_label_raw:
@@ -1181,7 +1182,12 @@ def _celltype_context_from_template_context(
         focus_proxy_label = ""
         focus_short = focus_detail.replace(" ", "-")
 
-    return {
+    legacy_at2_fallback = (
+        not has_explicit_celltype_resolution
+        and bool(resolved_label_raw)
+        and _is_epithelial_anchor_text(resolved_label_raw)
+    )
+    context: dict[str, str | bool] = {
         "input_label": input_label,
         "resolved_label": resolved_label,
         "match_mode": match_mode,
@@ -1224,6 +1230,43 @@ def _celltype_context_from_template_context(
             "interest-cell-intrinsic support"
         ),
     }
+    if legacy_at2_fallback:
+        context.update(
+            {
+                "primary_heading": "Primary AT2/Epithelial Follow-up Candidates",
+                "primary_tier_label": "Primary epithelial/AT2-intrinsic",
+                "primary_tier_note": (
+                    "Cited Stage 1 Census evidence supports same-cell "
+                    "coexpression enrichment in the resolved epithelial/AT2 "
+                    "cell context."
+                ),
+                "primary_constraint": (
+                    "AT2/epithelial same-cell coexpression enrichment "
+                    "supports target-cell context, but not causal mechanism."
+                ),
+                "secondary_heading": "Secondary Spatial-Niche Follow-up Candidates",
+                "secondary_tier_label": "Secondary epithelial-associated niche",
+                "secondary_tier_note": (
+                    "Treat as spatially colocalized non-epithelial or "
+                    "cross-cell niche biology linked to the epithelial "
+                    "program, not as an epithelial-cell-intrinsic target "
+                    "mechanism."
+                ),
+                "secondary_constraint": (
+                    "Use as cross-cell/spatial-niche follow-up evidence only; "
+                    "do not interpret as AT2-intrinsic support."
+                ),
+                "gene_level_constraint": (
+                    "Gene-level support only; do not interpret as "
+                    "AT2-intrinsic or spatial-niche evidence."
+                ),
+                "secondary_usage": (
+                    "Cross-cell/spatial-niche framing only; not "
+                    "AT2-intrinsic support"
+                ),
+            }
+        )
+    return context
 
 
 def _markdown_template_context(

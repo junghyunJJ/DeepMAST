@@ -125,6 +125,53 @@ def test_enriched_malignant_stage1_hypothesis_is_primary_target_cell_support() -
     assert "No primary" not in part4
 
 
+def test_missing_stage1_pass_status_is_not_primary_target_cell_support() -> None:
+    from copy import deepcopy
+
+    from src.agents.drug_target.deterministic_report import _markdown_template_context
+
+    report_data = deepcopy(_breast_cancer_report_data())
+    template_context = report_data["template_context"]
+    template_context["stage1_filter_results"] = []
+    template_context["stage1_pairs"]["EGF_ERBB2"].pop("stage1_filter")
+
+    context = _markdown_template_context(report_data)
+
+    assert context["hypothesis_data"]["primary_hypotheses"] == []
+    assert len(context["hypothesis_data"]["secondary_hypotheses"]) == 1
+
+
+def test_legacy_at2_fallback_context_preserves_epithelial_tier_labels() -> None:
+    from copy import deepcopy
+
+    from src.agents.drug_target.deterministic_report import _markdown_template_context
+
+    report_data = deepcopy(_breast_cancer_report_data())
+    template_context = report_data["template_context"]
+    template_context.pop("celltype_resolution")
+    census_validation = template_context["stage1_pairs"]["EGF_ERBB2"][
+        "census_validation"
+    ]
+    census_validation["requested_cell_type"] = "pulmonary alveolar type 2 cell"
+    census_validation["resolved_cell_type"] = "pulmonary alveolar type 2 cell"
+
+    context = _markdown_template_context(report_data)
+    primary = context["hypothesis_data"]["primary_hypotheses"]
+
+    assert context["celltype_context"]["primary_tier_label"] == (
+        "Primary epithelial/AT2-intrinsic"
+    )
+    assert context["celltype_context"]["secondary_tier_label"] == (
+        "Secondary epithelial-associated niche"
+    )
+    assert primary[0]["_tier_label"] == "Primary epithelial/AT2-intrinsic"
+    assert (
+        primary[0]["_interpretation_constraint"]
+        == "AT2/epithelial same-cell coexpression enrichment supports "
+        "target-cell context, but not causal mechanism."
+    )
+
+
 def test_build_report_data_carries_celltype_resolution(tmp_path) -> None:
     import json
     import shutil
