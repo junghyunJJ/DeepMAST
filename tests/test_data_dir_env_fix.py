@@ -194,7 +194,7 @@ class TestReaderSites:
         read_result = sf.read_file.invoke({"file_path": "/workspace/papers_raw.json"})
 
         assert "Updated file" in write_result
-        assert "{}" in read_result
+        assert read_result.file_data["content"] == "{}"
         assert (tmp_path / "papers_raw.json").exists()
 
     def test_report_tool_reads_env(self, monkeypatch):
