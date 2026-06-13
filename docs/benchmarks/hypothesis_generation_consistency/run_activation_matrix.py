@@ -231,6 +231,7 @@ def run_one_trial(
     monitor_activation_trace: bool = False,
     activation_trace_grace_seconds: float = DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
     hypothesis_skill_set: str = "expanded6",
+    host_hypothesis_fallback: str = "off",
 ) -> dict[str, Any]:
     run_id = str(trial["run_id"])
     workspace = workspace_root / run_id
@@ -250,7 +251,9 @@ def run_one_trial(
             "OLLAMA_REASONING": "false",
             "OLLAMA_HOST": f"http://127.0.0.1:{trial['port']}",
             "OLLAMA_BASE_URL": f"http://127.0.0.1:{trial['port']}",
-            "DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK": "",
+            "DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK": (
+                "" if host_hypothesis_fallback == "off" else host_hypothesis_fallback
+            ),
         }
     )
 
@@ -337,10 +340,20 @@ def run_one_trial(
     activation_trace, activation_trace_valid, activation_trace_error = (
         load_activation_trace(activation_trace_path)
     )
+    trace_logs = sorted(workspace.glob("trace_*.log"))
+    trace_log_path = trace_logs[-1] if trace_logs else workspace / "trace.log"
+    trace_text = (
+        trace_log_path.read_text(encoding="utf-8", errors="ignore")
+        if trace_log_path.exists()
+        else ""
+    )
+    host_hypothesis_fallback_used = "host_hypothesis_fallback_used: YES" in trace_text
 
     return {
         **trial,
         "hypothesis_skill_set": hypothesis_skill_set,
+        "host_hypothesis_fallback": host_hypothesis_fallback,
+        "host_hypothesis_fallback_used": host_hypothesis_fallback_used,
         "workspace": str(workspace),
         "activation_trace": str(activation_trace_path),
         "stdout_log": str(stdout_path),
@@ -397,6 +410,18 @@ def aggregate_activation(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
                 for row in group_rows
                 if row.get("validation", {}).get("validation_passed")
             ),
+            "fallback_assisted_successes": sum(
+                1
+                for row in group_rows
+                if row.get("host_hypothesis_fallback_used")
+                and row.get("validation", {}).get("validation_passed")
+            ),
+            "writer_native_successes": sum(
+                1
+                for row in group_rows
+                if not row.get("host_hypothesis_fallback_used")
+                and row.get("validation", {}).get("validation_passed")
+            ),
             "activation_trace_checkpoint_runs": sum(
                 1
                 for row in group_rows
@@ -431,16 +456,17 @@ def render_summary(rows: Sequence[dict[str, Any]], aggregate: dict[str, Any]) ->
         "# Expanded6 Activation Comparison",
         "",
         (
-            "| model | port | mode | returncode | validation | activation trace | "
+            "| model | port | mode | returncode | validation | fallback | activation trace | "
             "activated skills | added skills |"
         ),
-        "| --- | ---: | --- | ---: | --- | --- | --- | --- |",
+        "| --- | ---: | --- | ---: | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
         validation = row.get("validation", {})
         lines.append(
             (
                 "| {model} | {port} | {mode} | {returncode} | {validation} | "
+                "{fallback} | "
                 "{trace} | {skills} | {added} |"
             ).format(
                 model=row["model"],
@@ -448,6 +474,7 @@ def render_summary(rows: Sequence[dict[str, Any]], aggregate: dict[str, Any]) ->
                 mode=row["mode"],
                 returncode=row["returncode"],
                 validation=validation.get("validation_passed"),
+                fallback="yes" if row.get("host_hypothesis_fallback_used") else "-",
                 trace=(
                     "valid"
                     if row.get("activation_trace_valid")
@@ -484,6 +511,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Hypothesis-writer skill registry for traced benchmark runs.",
     )
     parser.add_argument(
+        "--host-hypothesis-fallback",
+        choices=("off", "recovery"),
+        default="off",
+        help=(
+            "Enable deterministic host hypothesis fallback for recovery smokes. "
+            "Use 'off' for pure writer benchmarking and 'recovery' for pipeline "
+            "stability acceptance runs."
+        ),
+    )
+    parser.add_argument(
         "--activation-trace-grace-seconds",
         type=float,
         default=DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
@@ -499,6 +536,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    fallback_mode = getattr(args, "host_hypothesis_fallback", "off")
     stamp = time.strftime("expanded6_activation_%Y%m%d_%H%M%S")
     output_root = (
         Path(args.output_root).expanduser().resolve()
@@ -538,6 +576,7 @@ def main() -> int:
             "ports": list(DEFAULT_PORTS),
             "modes": list(DEFAULT_MODES),
             "hypothesis_skill_set": args.hypothesis_skill_set,
+            "host_hypothesis_fallback": fallback_mode,
             "trials": rows,
             "aggregate": aggregate,
             "unload_events": unload_events,
@@ -577,6 +616,7 @@ def main() -> int:
                     DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
                 ),
                 hypothesis_skill_set=args.hypothesis_skill_set,
+                host_hypothesis_fallback=fallback_mode,
             )
             rows.append(row)
             with (output_root / "trials.jsonl").open("a", encoding="utf-8") as handle:

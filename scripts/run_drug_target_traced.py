@@ -1011,7 +1011,12 @@ def _run_host_hypothesis_fallback(
     1 pair files whose filter row has passed=true, and never restores the
     legacy _FAILED suffix.
     """
-    result: dict = {"saved": False, "errors": [], "path": None}
+    result: dict = {
+        "saved": False,
+        "errors": [],
+        "path": None,
+        "host_hypothesis_fallback_used": False,
+    }
 
     def record(message: str) -> None:
         with open(trace_log_path, "a", encoding="utf-8") as fp:
@@ -1030,6 +1035,7 @@ def _run_host_hypothesis_fallback(
 
         persist_result = persist_hypothesis_report(data_dir, report)
         result.update(persist_result)
+        result["host_hypothesis_fallback_used"] = bool(persist_result.get("saved"))
         if persist_result.get("saved"):
             record(
                 "save_hypothesis_report completed with "
@@ -1546,6 +1552,7 @@ async def run_traced(args: argparse.Namespace) -> int:
             traceback.print_exc()
 
     hypothesis_path = evidence_dir / "hypothesis_report.json"
+    host_hypothesis_fallback_used = False
 
     # ── Host hypothesis fixup: deterministic degraded recovery. This is
     # disabled for normal production runs unless explicitly enabled for smoke
@@ -1590,6 +1597,7 @@ async def run_traced(args: argparse.Namespace) -> int:
                 args.disease,
                 trace_log_path,
             )
+            host_hypothesis_fallback_used = bool(fixup_result.get("saved"))
             if fixup_result.get("saved"):
                 print("[HOST-HYPOTHESIS-FIXUP] SUCCESS — degraded hypothesis_report.json saved")
             else:
@@ -1859,6 +1867,10 @@ async def run_traced(args: argparse.Namespace) -> int:
         f"  hypothesis_quality_errors: "
         f"{_format_hypothesis_quality_errors(hypothesis_quality_errors)}"
     )
+    print(
+        "  host_hypothesis_fallback_used: "
+        f"{'YES' if host_hypothesis_fallback_used else 'NO'}"
+    )
     print(f"  REPORT_FINALIZATION_ERROR: {finalization_error if finalization_error else '—'}")
     print(f"  EVIDENCE_TRUNCATED:  {evidence_truncated}")
     print(f"  report_finalized:    {'YES' if report_status['finalized'] else 'NO'}")
@@ -1937,6 +1949,10 @@ async def run_traced(args: argparse.Namespace) -> int:
             "  hypothesis_quality_errors: "
             + _format_hypothesis_quality_errors(hypothesis_quality_errors)
             + "\n"
+        )
+        fp.write(
+            "  host_hypothesis_fallback_used: "
+            f"{'YES' if host_hypothesis_fallback_used else 'NO'}\n"
         )
         fp.write(
             f"  REPORT_FINALIZATION_ERROR: "

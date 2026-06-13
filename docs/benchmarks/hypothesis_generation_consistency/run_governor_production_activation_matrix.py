@@ -163,6 +163,7 @@ def build_dry_run_payload(
     wait_for_completion: bool,
     hypothesis_skill_set: str,
     hypothesis_scope_errors: Sequence[str],
+    host_hypothesis_fallback: str,
 ) -> dict[str, Any]:
     per_condition: dict[str, int] = {}
     per_port: dict[str, int] = {}
@@ -183,6 +184,7 @@ def build_dry_run_payload(
         "wait_for_completion": wait_for_completion,
         "hypothesis_skill_set": hypothesis_skill_set,
         "hypothesis_scope_errors": list(hypothesis_scope_errors),
+        "host_hypothesis_fallback": host_hypothesis_fallback,
         "per_condition": dict(sorted(per_condition.items())),
         "per_port": dict(sorted(per_port.items())),
     }
@@ -281,6 +283,7 @@ def run_trial_batch_parallel(
     wait_for_completion: bool,
     activation_trace_grace_seconds: float,
     hypothesis_skill_set: str = "expanded6",
+    host_hypothesis_fallback: str = "off",
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     with ThreadPoolExecutor(max_workers=len(batch)) as executor:
@@ -297,6 +300,7 @@ def run_trial_batch_parallel(
                 monitor_activation_trace=not wait_for_completion,
                 activation_trace_grace_seconds=activation_trace_grace_seconds,
                 hypothesis_skill_set=hypothesis_skill_set,
+                host_hypothesis_fallback=host_hypothesis_fallback,
             )
             for trial in batch
         ]
@@ -319,6 +323,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=sorted(HYPOTHESIS_WRITER_SKILL_SETS),
         default="expanded6",
         help="Hypothesis-writer skill registry for traced benchmark runs.",
+    )
+    parser.add_argument(
+        "--host-hypothesis-fallback",
+        choices=("off", "recovery"),
+        default="off",
+        help=(
+            "Enable deterministic host hypothesis fallback for recovery smokes. "
+            "Use 'off' for pure writer benchmarking and 'recovery' for pipeline "
+            "stability acceptance runs."
+        ),
     )
     parser.add_argument(
         "--models",
@@ -367,6 +381,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    fallback_mode = getattr(args, "host_hypothesis_fallback", "off")
     project_root = PROJECT_ROOT
     stamp = time.strftime("governor_production_activation_%Y%m%d_%H%M%S")
     output_root = (
@@ -424,6 +439,7 @@ def main(argv: list[str] | None = None) -> int:
                     wait_for_completion=args.wait_for_completion,
                     hypothesis_skill_set=args.hypothesis_skill_set,
                     hypothesis_scope_errors=scope_errors,
+                    host_hypothesis_fallback=fallback_mode,
                 ),
                 indent=2,
                 ensure_ascii=False,
@@ -470,6 +486,7 @@ def main(argv: list[str] | None = None) -> int:
             "ports": list(selected_ports),
             "modes": list(selected_modes),
             "hypothesis_skill_set": args.hypothesis_skill_set,
+            "host_hypothesis_fallback": fallback_mode,
             "repeats_per_condition": repeats_per_condition,
             "runs_requested": len(trials),
             "resume": args.resume,
@@ -511,6 +528,7 @@ def main(argv: list[str] | None = None) -> int:
                 wait_for_completion=args.wait_for_completion,
                 activation_trace_grace_seconds=args.activation_trace_grace_seconds,
                 hypothesis_skill_set=args.hypothesis_skill_set,
+                host_hypothesis_fallback=fallback_mode,
             )
             rerun_run_ids = {str(row["run_id"]) for row in batch_rows}
             rows = [row for row in rows if str(row.get("run_id")) not in rerun_run_ids]
