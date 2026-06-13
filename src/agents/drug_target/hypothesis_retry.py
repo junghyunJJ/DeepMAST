@@ -264,13 +264,15 @@ def _depleted_stage1_guidance(errors: list[dict] | None) -> str:
 def _legacy_at2_repair_guidance(errors: list[dict] | None) -> str:
     text = _flatten_error_text(errors).casefold()
     legacy_markers = (
-        " at2",
         "transitional at2",
         "pulmonary alveolar type 2",
+        "pulmonary/alveolar epithelial",
         "alveolar epithelial",
         "pulmonary epithelial",
     )
-    if not any(marker in text for marker in legacy_markers):
+    if not re.search(r"\bat2\b", text) and not any(
+        marker in text for marker in legacy_markers
+    ):
         return ""
     if (
         "target-cell-depleted" not in text
@@ -292,7 +294,16 @@ def _legacy_at2_repair_guidance(errors: list[dict] | None) -> str:
 
 def _semantic_proxy_repair_guidance(errors: list[dict] | None) -> str:
     text = _flatten_error_text(errors).casefold()
-    if "malignant cell" not in text and "semantic_proxy" not in text:
+    deterministic_validation_phrases = (
+        "lists interest/resolved cell type",
+        "validation_approach does not mention",
+        "validation_approach does not test",
+        "biological_entities.cell_types does not include",
+    )
+    if "semantic_proxy" not in text and not (
+        "malignant cell" in text
+        and any(phrase in text for phrase in deterministic_validation_phrases)
+    ):
         return ""
     return (
         " Semantic-proxy repair: for Prolif Invasive Tumor -> malignant cell or "

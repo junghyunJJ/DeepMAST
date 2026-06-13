@@ -332,6 +332,28 @@ def test_retry_message_uses_legacy_at2_branch_for_at2_rejections() -> None:
     assert "stage3_<GENE>.json" in message
 
 
+def test_retry_message_uses_legacy_at2_branch_for_parenthetical_at2_rejections() -> None:
+    message = build_hypothesis_retry_message(
+        "res_ipf_drugtarget",
+        "pulmonary fibrosis",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "hypotheses[0] lists interest/resolved cell type (AT2) but validation_approach does not mention the original interest label or resolved Census cell type.",
+                    ]
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "Legacy AT2/Epithelial repair" in message
+
+
 def test_retry_message_uses_semantic_proxy_branch_for_malignant_cell_rejections() -> None:
     message = build_hypothesis_retry_message(
         "res_bc_drugtarget",
@@ -355,6 +377,29 @@ def test_retry_message_uses_semantic_proxy_branch_for_malignant_cell_rejections(
     assert "Prolif Invasive Tumor" in message or "original interest label" in message
     assert "malignant cell" in message
     assert "generic tumor, breast-cancer, epithelial, or disease wording is not enough" in message
+
+
+def test_retry_message_does_not_use_semantic_proxy_branch_for_unrelated_malignant_cell_context() -> None:
+    message = build_hypothesis_retry_message(
+        "res_bc_drugtarget",
+        "breast cancer",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "hypotheses[1].evidence_references cites 'stage3_CD47.json' which is not in evidence/ directory for malignant cell context.",
+                    ]
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "Semantic-proxy repair" not in message
+    assert "Invalid citation repair" in message
 
 
 def test_retry_message_names_res3_final_depleted_stage1_blocker() -> None:
