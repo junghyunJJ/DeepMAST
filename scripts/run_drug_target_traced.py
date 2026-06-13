@@ -676,6 +676,18 @@ def _artifact_predates_run(path: Path, run_started_at: float) -> bool:
         return True
 
 
+def _should_skip_hypothesis_quality_after_budget_abort(
+    *,
+    hypothesis_budget_aborted: bool,
+    hypothesis_path: Path,
+    run_started_at: float,
+) -> bool:
+    return hypothesis_budget_aborted and _artifact_predates_run(
+        hypothesis_path,
+        run_started_at,
+    )
+
+
 def _should_invoke_finalize_report(data_dir: Path, run_started_at: float) -> bool:
     drug_md_path = data_dir / "drug.md"
     hypothesis_path = data_dir / "evidence" / "hypothesis_report.json"
@@ -1525,10 +1537,22 @@ async def run_traced(args: argparse.Namespace) -> int:
     try:
         from src.agents.drug_target.super_graph import validate_and_maybe_retry_hypothesis
 
-        remaining_quality_timeout = _remaining_timeout_seconds(start, timeout_seconds)
+        skip_quality_after_budget_abort = _should_skip_hypothesis_quality_after_budget_abort(
+            hypothesis_budget_aborted=hypothesis_budget_aborted,
+            hypothesis_path=hypothesis_path,
+            run_started_at=start,
+        )
+        remaining_quality_timeout = (
+            0
+            if skip_quality_after_budget_abort
+            else _remaining_timeout_seconds(start, timeout_seconds)
+        )
         if remaining_quality_timeout <= 0:
             timeout_message = (
-                "CLI timeout reached before hypothesis quality gate could run."
+                "hypothesis_writer budget exceeded before a fresh "
+                "hypothesis_report.json was saved."
+                if skip_quality_after_budget_abort
+                else "CLI timeout reached before hypothesis quality gate could run."
             )
             _record_hypothesis_quality_timeout(
                 captured_finalization_state,
