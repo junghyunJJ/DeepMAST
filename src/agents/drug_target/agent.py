@@ -26,7 +26,7 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, cast
 
 from deepagents import create_deep_agent
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -58,6 +58,12 @@ from src.agents.drug_target.tools import (
 )
 
 logger = logging.getLogger(__name__)
+
+SkillActivationMode = Literal[
+    "middleware_only",
+    "middleware_plus_activator",
+    "middleware_plus_governor",
+]
 
 
 # =============================================================================
@@ -100,7 +106,7 @@ Data directory: {data_dir} | Disease: {disease}
 
 ## Steps (execute in exact order)
 1. Call task(subagent_type="hypothesis_writer",
-            instruction="Generate hypotheses from evidence already on disk. Data dir: {data_dir}")
+            instruction="{hypothesis_writer_resume_instruction}")
 2. Reply with the single line: EVIDENCE_PIPELINE_COMPLETE
 
 ## Rules
@@ -133,6 +139,12 @@ class DrugTargetConfig:
             to enable container isolation for heavy-dependency tools.
         enable_progressive_disclosure: Whether to expose selected skills metadata
             to the agent and allow on-demand skill reading.
+        enable_skill_activator: Whether to add SkillActivator after
+            SkillsMiddleware. Set False for passive middleware-only activation
+            benchmarks.
+        skill_activation_mode: Optional explicit skill activation strategy.
+            When omitted, derives from enable_skill_activator for backward
+            compatibility.
         agent_skill_names: Legacy fallback skill tuple retained for registry helpers.
         evidence_assessor_skill_names: Skills exposed to evidence_assessor.
         hypothesis_writer_skill_names: Skills exposed to hypothesis_writer.
@@ -152,6 +164,8 @@ class DrugTargetConfig:
     docker_image: str | None = None
     enable_census: bool = True
     enable_progressive_disclosure: bool = True
+    enable_skill_activator: bool = True
+    skill_activation_mode: SkillActivationMode | None = None
     agent_skill_names: tuple[str, ...] = (
         "drug-target-hypothesis",
         "drug-target-reporting",
@@ -166,6 +180,7 @@ class DrugTargetConfig:
         "gwas-database",
         "chembl-database",
     )
+    hypothesis_writer_resume_instruction: str | None = None
     skills_dir: str | None = None
     subagent_models: dict[str, BaseChatModel | str] | None = None
     # init_chat_model format per subagent, e.g.:
@@ -174,11 +189,14 @@ class DrugTargetConfig:
 
     def __post_init__(self):
         if self.subagent_models is None:
-            self.subagent_models = load_subagent_models_from_env(
-                [
-                    "evidence_assessor",
-                    "hypothesis_writer",
-                ]
+            self.subagent_models = cast(
+                dict[str, BaseChatModel | str] | None,
+                load_subagent_models_from_env(
+                    [
+                        "evidence_assessor",
+                        "hypothesis_writer",
+                    ]
+                ),
             )
 
 
@@ -192,6 +210,9 @@ def _create_docker_backend(
         DockerBackend instance, or None if import fails.
     """
     from src.agents.drug_target.docker_backend import DockerBackend
+
+    if config.docker_image is None:
+        raise ValueError("docker_image is required to create DockerBackend")
 
     skills_dir = str(_resolve_skills_dir(config))
     backend = DockerBackend(
@@ -239,6 +260,17 @@ def _filter_census_skills(
         return tuple(skill_names)
     disabled = {"cellxgene-census", "compare-census-gene-pair-by-cell-type"}
     return tuple(name for name in skill_names if name not in disabled)
+
+
+def _format_hypothesis_writer_resume_instruction(
+    config: DrugTargetConfig,
+    resolved_data_dir: str,
+) -> str:
+    instruction = (
+        config.hypothesis_writer_resume_instruction
+        or f"Generate hypotheses from evidence already on disk. Data dir: {resolved_data_dir}"
+    )
+    return " ".join(instruction.replace('"', "'").split())
 
 
 def _build_subagent_skill_name_map(
@@ -321,9 +353,18 @@ def create_drug_target_agent(
 
     # 3. Create the orchestrator LLM.
     llm = create_llm(provider=config.provider)
+    skill_activation_mode: SkillActivationMode = (
+        config.skill_activation_mode
+        if config.skill_activation_mode is not None
+        else (
+            "middleware_plus_activator"
+            if config.enable_skill_activator
+            else "middleware_only"
+        )
+    )
 
     # 4. Get subagent specs — primary subagents use allow-listed shared
-    #    SkillsMiddleware + SkillActivator instead of deepagents native
+    #    SkillsMiddleware + activation middleware instead of deepagents native
     #    `subagent["skills"]` auto-loading.
     subagent_specs = get_subagents(
         custom_tools=config.custom_tools,
@@ -336,6 +377,8 @@ def create_drug_target_agent(
         skills_dir=skills_dir,
         subagent_skill_names=subagent_skill_names,
         subagent_skill_registries=subagent_skill_registries,
+        enable_skill_activator=config.enable_skill_activator,
+        skill_activation_mode=skill_activation_mode,
     )
 
     # 5. Create agent — orchestrator has NO skills (just delegates)
@@ -352,9 +395,12 @@ def create_drug_target_agent(
     system_prompt = template.format(
         data_dir=resolved_data_dir,
         disease=config.disease or "(see lr_candidates.json)",
+        hypothesis_writer_resume_instruction=(
+            _format_hypothesis_writer_resume_instruction(config, resolved_data_dir)
+        ),
     )
 
-    create_kwargs = dict(
+    create_kwargs: dict[str, Any] = dict(
         model=llm,
         tools=tools,
         subagents=subagent_specs,

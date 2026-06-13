@@ -1525,6 +1525,7 @@ class TestStage2Service:
 
             def query_gene_trait_with_context(self, gene_symbol, disease, *, disease_context=None):
                 self.query_calls += 1
+                assert disease_context is not None
                 return {
                     "gene_symbol": gene_symbol,
                     "disease": disease,
@@ -5602,6 +5603,112 @@ class TestIntegration:
             mw = s.get("middleware", [])
             assert not any(isinstance(m, SkillActivator) for m in mw)
             assert not any(isinstance(m, SkillsMiddleware) for m in mw)
+
+
+class TestDrugTargetAgent:
+    @patch("src.agents.drug_target.agent.create_deep_agent")
+    @patch("src.agents.drug_target.agent.create_llm")
+    def test_create_drug_target_agent_can_disable_skill_activator_only(
+        self, mock_create_llm, mock_create_deep_agent, tmp_path
+    ):
+        from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
+        from src.agents.shared.skill_activator import SkillActivator
+        from src.agents.shared.skills_middleware import SkillsMiddleware
+
+        mock_create_llm.return_value = MagicMock()
+        mock_create_deep_agent.return_value = MagicMock()
+
+        config = DrugTargetConfig(
+            data_dir=str(tmp_path),
+            enable_skill_activator=False,
+            hypothesis_writer_skill_names=(
+                "drug-target-hypothesis",
+                "opentargets-database",
+                "gwas-database",
+                "chembl-database",
+                "compare-census-gene-pair-by-cell-type",
+                "string-database",
+            ),
+        )
+        create_drug_target_agent(config)
+
+        subagents = mock_create_deep_agent.call_args.kwargs["subagents"]
+        hypothesis_writer = next(
+            subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
+        )
+        middleware = hypothesis_writer.get("middleware", [])
+
+        skill_middleware = next(
+            item for item in middleware if isinstance(item, SkillsMiddleware)
+        )
+        assert skill_middleware.allowed_skill_names == (
+            "drug-target-hypothesis",
+            "opentargets-database",
+            "gwas-database",
+            "chembl-database",
+            "compare-census-gene-pair-by-cell-type",
+            "string-database",
+        )
+        assert not any(isinstance(item, SkillActivator) for item in middleware)
+
+    @patch("src.agents.drug_target.agent.create_deep_agent")
+    @patch("src.agents.drug_target.agent.create_llm")
+    def test_create_drug_target_agent_can_use_skill_activation_governor(
+        self, mock_create_llm, mock_create_deep_agent, tmp_path
+    ):
+        from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
+        from src.agents.shared.skill_activation_governor import SkillActivationGovernor
+        from src.agents.shared.skill_activator import SkillActivator
+        from src.agents.shared.skills_middleware import SkillsMiddleware
+
+        mock_create_llm.return_value = MagicMock()
+        mock_create_deep_agent.return_value = MagicMock()
+
+        config = DrugTargetConfig(
+            data_dir=str(tmp_path),
+            skill_activation_mode="middleware_plus_governor",
+            hypothesis_writer_skill_names=(
+                "drug-target-hypothesis",
+                "opentargets-database",
+                "gwas-database",
+                "chembl-database",
+                "compare-census-gene-pair-by-cell-type",
+                "string-database",
+            ),
+        )
+        create_drug_target_agent(config)
+
+        subagents = mock_create_deep_agent.call_args.kwargs["subagents"]
+        hypothesis_writer = next(
+            subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
+        )
+        middleware = hypothesis_writer.get("middleware", [])
+
+        assert any(isinstance(item, SkillsMiddleware) for item in middleware)
+        assert any(isinstance(item, SkillActivationGovernor) for item in middleware)
+        assert not any(isinstance(item, SkillActivator) for item in middleware)
+        governor = next(
+            item for item in middleware if isinstance(item, SkillActivationGovernor)
+        )
+        assert set(governor.skill_registry) == {
+            "drug-target-hypothesis",
+            "opentargets-database",
+            "gwas-database",
+            "chembl-database",
+            "compare-census-gene-pair-by-cell-type",
+            "string-database",
+        }
+        assert governor.hard_required_skill_names == ("drug-target-hypothesis",)
+        assert governor.required_skill_names == ("drug-target-hypothesis",)
+        assert governor.candidate_skill_names == (
+            "opentargets-database",
+            "gwas-database",
+            "chembl-database",
+            "compare-census-gene-pair-by-cell-type",
+            "string-database",
+        )
+        assert governor.artifact_gate == "save_hypothesis_report"
+
 
 # =========================================================================
 # 9. TestCensusDiseaseTool — list_census_diseases + disease_matched flag

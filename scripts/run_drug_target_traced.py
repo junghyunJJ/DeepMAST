@@ -31,7 +31,7 @@ import sys
 import tempfile
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -50,6 +50,17 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from dotenv import load_dotenv
 from langchain_core.runnables import RunnableConfig
+
+from docs.benchmarks.hypothesis_generation_consistency.activation_trace import (
+    extract_hypothesis_writer_read_skill_file_calls,
+    extract_named_tool_calls,
+    extract_read_skill_file_calls,
+    summarize_activation_trace,
+)
+from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
+    HYPOTHESIS_WRITER_SKILL_SETS,
+    resolve_hypothesis_writer_skill_names,
+)
 
 load_dotenv(PROJECT_ROOT / ".env", override=False)
 
@@ -152,6 +163,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
              "hypothesis_writer, then the finalize_report node. Sets env var "
              "DRUG_TARGET_SKIP_EVIDENCE_ASSESSOR=1 before agent construction.",
     )
+    p.add_argument(
+        "--hypothesis-skill-set",
+        choices=sorted(HYPOTHESIS_WRITER_SKILL_SETS),
+        default="current4",
+        help="Hypothesis writer skill set to expose (default: current4).",
+    )
+    p.add_argument(
+        "--skill-activation-mode",
+        choices=(
+            "middleware_only",
+            "middleware_plus_activator",
+            "middleware_plus_governor",
+        ),
+        default="middleware_plus_activator",
+        help="Skill activation mode for hypothesis writer skills.",
+    )
+    p.add_argument(
+        "--activation-trace-json",
+        default=None,
+        help="Path for activation trace JSON (default: data_dir/activation_trace_<timestamp>.json).",
+    )
     args = p.parse_args(argv)
     if args.port is not None and args.provider.lower() != "ollama":
         p.error("--port can only be used with --provider ollama")
@@ -193,6 +225,134 @@ def _setup_mock_data() -> Path:
         json.dumps(MOCK_SELECTED_TOP3, indent=2)
     )
     return data_dir
+
+
+def build_activation_trace_payload(
+    *,
+    exposed_skill_names: Sequence[str],
+    hypothesis_writer_read_skill_calls: Sequence[dict[str, Any]],
+    all_read_skill_calls: Sequence[dict[str, Any]],
+    skill_set: str,
+    skill_activation_mode: str,
+    model: str,
+    ollama_base_url: str | None,
+    data_dir: Path,
+    trace_log_path: Path,
+    report_finalized: bool,
+    artifact_gate_event: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    activation_trace = summarize_activation_trace(
+        exposed_skill_names=exposed_skill_names,
+        hypothesis_writer_calls=hypothesis_writer_read_skill_calls,
+        all_read_skill_calls=all_read_skill_calls,
+    )
+    activation_trace.update(
+        {
+            "skill_set": skill_set,
+            "skill_activation_mode": skill_activation_mode,
+            "model": model,
+            "ollama_base_url": ollama_base_url,
+            "data_dir": str(data_dir),
+            "trace_log": str(trace_log_path),
+            "report_finalized": report_finalized,
+            "artifact_gate_event": artifact_gate_event,
+        }
+    )
+    return activation_trace
+
+
+def resolve_activation_trace_path(
+    activation_trace_json: str | None,
+    *,
+    data_dir: Path,
+    timestamp: str,
+    project_root: Path = PROJECT_ROOT,
+) -> Path:
+    activation_trace_path = (
+        Path(activation_trace_json)
+        if activation_trace_json
+        else data_dir / f"activation_trace_{timestamp}.json"
+    )
+    if not activation_trace_path.is_absolute():
+        activation_trace_path = project_root / activation_trace_path
+    return activation_trace_path
+
+
+def write_activation_trace_json(
+    *,
+    activation_trace_path: Path,
+    exposed_skill_names: Sequence[str],
+    hypothesis_writer_read_skill_calls: Sequence[dict[str, Any]],
+    all_read_skill_calls: Sequence[dict[str, Any]],
+    skill_set: str,
+    skill_activation_mode: str,
+    model: str,
+    ollama_base_url: str | None,
+    data_dir: Path,
+    trace_log_path: Path,
+    report_finalized: bool,
+    artifact_gate_event: dict[str, Any] | None = None,
+    project_root: Path = PROJECT_ROOT,
+) -> Path:
+    if not activation_trace_path.is_absolute():
+        activation_trace_path = project_root / activation_trace_path
+    activation_trace = build_activation_trace_payload(
+        exposed_skill_names=exposed_skill_names,
+        hypothesis_writer_read_skill_calls=hypothesis_writer_read_skill_calls,
+        all_read_skill_calls=all_read_skill_calls,
+        skill_set=skill_set,
+        skill_activation_mode=skill_activation_mode,
+        model=model,
+        ollama_base_url=ollama_base_url,
+        data_dir=data_dir,
+        trace_log_path=trace_log_path,
+        report_finalized=report_finalized,
+        artifact_gate_event=artifact_gate_event,
+    )
+    activation_trace_path.parent.mkdir(parents=True, exist_ok=True)
+    activation_trace_path.write_text(
+        json.dumps(activation_trace, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return activation_trace_path
+
+
+def write_activation_trace_checkpoint(
+    *,
+    activation_trace_path: Path,
+    exposed_skill_names: Sequence[str],
+    hypothesis_writer_read_skill_calls: Sequence[dict[str, Any]],
+    all_read_skill_calls: Sequence[dict[str, Any]],
+    skill_set: str,
+    skill_activation_mode: str,
+    model: str,
+    ollama_base_url: str | None,
+    data_dir: Path,
+    trace_log_path: Path,
+    artifact_gate_event: dict[str, Any] | None = None,
+) -> Path:
+    written_path = write_activation_trace_json(
+        activation_trace_path=activation_trace_path,
+        exposed_skill_names=exposed_skill_names,
+        hypothesis_writer_read_skill_calls=hypothesis_writer_read_skill_calls,
+        all_read_skill_calls=all_read_skill_calls,
+        skill_set=skill_set,
+        skill_activation_mode=skill_activation_mode,
+        model=model,
+        ollama_base_url=ollama_base_url,
+        data_dir=data_dir,
+        trace_log_path=trace_log_path,
+        report_finalized=False,
+        artifact_gate_event=artifact_gate_event,
+    )
+    message = (
+        "[ACTIVATION-TRACE-CHECKPOINT] wrote activation trace before "
+        f"hypothesis quality/finalize: {written_path}"
+    )
+    print(f"\n{message}")
+    with open(trace_log_path, "a") as fp:
+        fp.write(f"\n{message}\n")
+    return written_path
 
 
 def _format_update_summary(update: dict) -> str:
@@ -996,16 +1156,28 @@ async def run_traced(args: argparse.Namespace) -> int:
         create_drug_target_agent,
     )
 
+    hypothesis_writer_skill_names = resolve_hypothesis_writer_skill_names(
+        args.hypothesis_skill_set
+    )
+    enable_skill_activator = (
+        args.skill_activation_mode == "middleware_plus_activator"
+    )
+
     config = DrugTargetConfig(
         provider=args.provider,
         data_dir=str(data_dir),
         disease=args.disease,
         use_checkpointer=True,
         enable_census=args.census,
+        hypothesis_writer_skill_names=hypothesis_writer_skill_names,
+        enable_skill_activator=enable_skill_activator,
+        skill_activation_mode=args.skill_activation_mode,
     )
     agent, backend = create_drug_target_agent(config)
     print(f"[CONFIG] Agent created (provider={args.provider})")
     print(f"[CONFIG] Disease: {args.disease}")
+    print(f"[CONFIG] Hypothesis skill set: {args.hypothesis_skill_set}")
+    print(f"[CONFIG] Skill activation mode: {args.skill_activation_mode}")
     print(f"[CONFIG] LLM_PROVIDER env: {os.environ['LLM_PROVIDER']}")
     if ollama_base_url:
         print(f"[CONFIG] Ollama base URL: {ollama_base_url}")
@@ -1037,6 +1209,9 @@ async def run_traced(args: argparse.Namespace) -> int:
     evidence_ready_started_at: float | None = None
     hypothesis_budget_aborted = False
     captured_drug_md_holder = {"content": None}  # Fallback: capture drug.md from Command(files=...)
+    hypothesis_writer_read_skill_calls: list[dict[str, Any]] = []
+    all_read_skill_calls: list[dict[str, Any]] = []
+    save_hypothesis_report_event: dict[str, Any] | None = None
     # Capture finalize_report state fields from stream updates
     captured_finalization_state: dict = {
         "report_finalization_error": None,
@@ -1145,6 +1320,45 @@ async def run_traced(args: argparse.Namespace) -> int:
                 trace_log_fp.write(f"  {_format_update_summary({node_name: node_data})}\n")
                 trace_log_fp.write(f"{'─' * 62}\n")
                 trace_log_fp.flush()
+
+                writer_read_calls = extract_hypothesis_writer_read_skill_file_calls(
+                    node_path=node_path,
+                    node_name=node_name,
+                    node_data=node_data,
+                    exposed_skill_names=hypothesis_writer_skill_names,
+                    infer_unscoped_registered=args.skip_evidence_assessor,
+                )
+                for call in writer_read_calls:
+                    call["node_counter"] = node_counter
+                    call["elapsed_s"] = round(elapsed, 3)
+                hypothesis_writer_read_skill_calls.extend(writer_read_calls)
+
+                read_calls = extract_read_skill_file_calls(
+                    node_path=node_path,
+                    node_name=node_name,
+                    node_data=node_data,
+                    exposed_skill_names=hypothesis_writer_skill_names,
+                    scope="",
+                )
+                for call in read_calls:
+                    call["node_counter"] = node_counter
+                    call["elapsed_s"] = round(elapsed, 3)
+                all_read_skill_calls.extend(read_calls)
+
+                if save_hypothesis_report_event is None:
+                    save_calls = extract_named_tool_calls(
+                        node_path=node_path,
+                        node_name=node_name,
+                        node_data=node_data,
+                        tool_name="save_hypothesis_report",
+                        scope="hypothesis_writer",
+                    )
+                    if save_calls:
+                        save_hypothesis_report_event = {
+                            **save_calls[0],
+                            "node_counter": node_counter,
+                            "elapsed_s": round(elapsed, 3),
+                        }
 
                 # Capture drug.md content from Command(files=...) state updates
                 _capture_drug_md_from_update(node_data, captured_drug_md_holder)
@@ -1268,6 +1482,25 @@ async def run_traced(args: argparse.Namespace) -> int:
                     "[HOST-HYPOTHESIS-FIXUP] FAILED — "
                     + "; ".join(fixup_result.get("errors", [])[:5])
                 )
+
+    activation_trace_path = resolve_activation_trace_path(
+        args.activation_trace_json,
+        data_dir=data_dir,
+        timestamp=timestamp,
+    )
+    write_activation_trace_checkpoint(
+        activation_trace_path=activation_trace_path,
+        exposed_skill_names=hypothesis_writer_skill_names,
+        hypothesis_writer_read_skill_calls=hypothesis_writer_read_skill_calls,
+        all_read_skill_calls=all_read_skill_calls,
+        skill_set=args.hypothesis_skill_set,
+        skill_activation_mode=args.skill_activation_mode,
+        model=os.getenv("LLM_MODEL") or os.getenv("OLLAMA_MODEL") or "",
+        ollama_base_url=ollama_base_url,
+        data_dir=data_dir,
+        trace_log_path=trace_log_path,
+        artifact_gate_event=save_hypothesis_report_event,
+    )
 
     # ── Hypothesis quality gate — mirror super-graph routing before
     # deterministic report finalization. The traced script streams the inner
@@ -1507,6 +1740,31 @@ async def run_traced(args: argparse.Namespace) -> int:
             "  missing_finalization: "
             + "; ".join(report_status["missing_requirements"])
         )
+    activation_trace_path = resolve_activation_trace_path(
+        args.activation_trace_json,
+        data_dir=data_dir,
+        timestamp=timestamp,
+    )
+    activation_trace_path = write_activation_trace_json(
+        activation_trace_path=activation_trace_path,
+        exposed_skill_names=hypothesis_writer_skill_names,
+        hypothesis_writer_read_skill_calls=hypothesis_writer_read_skill_calls,
+        all_read_skill_calls=all_read_skill_calls,
+        skill_set=args.hypothesis_skill_set,
+        skill_activation_mode=args.skill_activation_mode,
+        model=os.getenv("LLM_MODEL") or os.getenv("OLLAMA_MODEL") or "",
+        ollama_base_url=ollama_base_url,
+        data_dir=data_dir,
+        trace_log_path=trace_log_path,
+        report_finalized=report_status["finalized"],
+        artifact_gate_event=save_hypothesis_report_event,
+    )
+    activation_trace = json.loads(activation_trace_path.read_text(encoding="utf-8"))
+    print(f"  Activation trace:    {activation_trace_path}")
+    print(
+        "  activated_skills:    "
+        + ", ".join(activation_trace["activated_skill_names"])
+    )
     print(f"  Trace log:           {trace_log_path}")
     print(f"  Workspace:           {data_dir}")
     print(f"  Runtime:             {elapsed:.1f}s")
