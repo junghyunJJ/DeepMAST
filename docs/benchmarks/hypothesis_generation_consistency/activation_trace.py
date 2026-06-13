@@ -97,6 +97,36 @@ def extract_hypothesis_writer_read_skill_file_calls(
     ]
 
 
+def extract_named_tool_calls(
+    *,
+    node_path: str,
+    node_name: str,
+    node_data: Any,
+    tool_name: str,
+    scope: str = "hypothesis_writer",
+) -> list[dict[str, Any]]:
+    if scope and scope != node_name and scope not in node_path:
+        return []
+
+    calls: list[dict[str, Any]] = []
+    for message in _messages_from_node_data(node_data):
+        for tool_call in getattr(message, "tool_calls", []) or []:
+            if (
+                not isinstance(tool_call, dict)
+                or tool_call.get("name") != tool_name
+            ):
+                continue
+            calls.append(
+                {
+                    "tool_name": tool_name,
+                    "tool_call_id": tool_call.get("id"),
+                    "node_path": node_path,
+                    "node_name": node_name,
+                }
+            )
+    return calls
+
+
 def summarize_activation_trace(
     *,
     exposed_skill_names: Sequence[str],

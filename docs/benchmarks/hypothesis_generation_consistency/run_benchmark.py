@@ -75,9 +75,21 @@ EXPANDED6_HYPOTHESIS_WRITER_SKILLS = (
     "string-database",
 )
 
+SELECTIVE8_HYPOTHESIS_WRITER_SKILLS = (
+    "drug-target-hypothesis",
+    "opentargets-database",
+    "chembl-database",
+    "compare-census-gene-pair-by-cell-type",
+    "string-database",
+    "gwas-database",
+    "biomedical-literature-search",
+    "html-report-generator",
+)
+
 HYPOTHESIS_WRITER_SKILL_SETS = {
     "current4": CURRENT4_HYPOTHESIS_WRITER_SKILLS,
     "expanded6": EXPANDED6_HYPOTHESIS_WRITER_SKILLS,
+    "selective8": SELECTIVE8_HYPOTHESIS_WRITER_SKILLS,
 }
 
 HYPOTHESIS_WRITER_RESUME_MESSAGE = (
@@ -558,7 +570,8 @@ def parse_args() -> argparse.Namespace:
         default="current4",
         help=(
             "Hypothesis-writer skill registry for the run. "
-            "current4 is production default; expanded6 adds compare-census and STRING."
+            "current4 is production default; expanded6 adds compare-census and STRING; "
+            "selective8 adds negative controls for selective activation benchmarks."
         ),
     )
     return parser.parse_args()

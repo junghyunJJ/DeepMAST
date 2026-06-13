@@ -20,6 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
+    HYPOTHESIS_WRITER_SKILL_SETS,
     clean_hypothesis_benchmark_workspace,
     validate_trial_output,
     write_json,
@@ -229,6 +230,7 @@ def run_one_trial(
     force: bool,
     monitor_activation_trace: bool = False,
     activation_trace_grace_seconds: float = DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
+    hypothesis_skill_set: str = "expanded6",
 ) -> dict[str, Any]:
     run_id = str(trial["run_id"])
     workspace = workspace_root / run_id
@@ -268,7 +270,7 @@ def run_one_trial(
         "--no-debug",
         "--skip-evidence-assessor",
         "--hypothesis-skill-set",
-        "expanded6",
+        hypothesis_skill_set,
         "--skill-activation-mode",
         str(trial["mode"]),
         "--activation-trace-json",
@@ -338,6 +340,7 @@ def run_one_trial(
 
     return {
         **trial,
+        "hypothesis_skill_set": hypothesis_skill_set,
         "workspace": str(workspace),
         "activation_trace": str(activation_trace_path),
         "stdout_log": str(stdout_path),
@@ -475,6 +478,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--disease", default="pulmonary fibrosis")
     parser.add_argument("--timeout-minutes", type=int, default=120)
     parser.add_argument(
+        "--hypothesis-skill-set",
+        choices=sorted(HYPOTHESIS_WRITER_SKILL_SETS),
+        default="expanded6",
+        help="Hypothesis-writer skill registry for traced benchmark runs.",
+    )
+    parser.add_argument(
         "--activation-trace-grace-seconds",
         type=float,
         default=DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
@@ -528,6 +537,7 @@ def main() -> int:
             "models": list(DEFAULT_MODELS),
             "ports": list(DEFAULT_PORTS),
             "modes": list(DEFAULT_MODES),
+            "hypothesis_skill_set": args.hypothesis_skill_set,
             "trials": rows,
             "aggregate": aggregate,
             "unload_events": unload_events,
@@ -566,6 +576,7 @@ def main() -> int:
                     "activation_trace_grace_seconds",
                     DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
                 ),
+                hypothesis_skill_set=args.hypothesis_skill_set,
             )
             rows.append(row)
             with (output_root / "trials.jsonl").open("a", encoding="utf-8") as handle:

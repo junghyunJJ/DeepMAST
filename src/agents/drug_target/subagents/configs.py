@@ -17,7 +17,7 @@ Workflow order: evidence_assessor -> hypothesis_writer
 import json
 import re
 from pathlib import Path
-from typing import Callable, Sequence
+from typing import Callable, Literal, Sequence
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool
@@ -64,6 +64,12 @@ __all__ = [
     "WORKFLOW_ORDER",
     "filter_hypothesis_evidence_files",
     "get_subagents",
+]
+
+SkillActivationMode = Literal[
+    "middleware_only",
+    "middleware_plus_activator",
+    "middleware_plus_governor",
 ]
 
 
@@ -361,6 +367,7 @@ def get_subagents(
     subagent_skill_names: dict[str, tuple[str, ...]] | None = None,
     subagent_skill_registries: dict[str, dict[str, str]] | None = None,
     enable_skill_activator: bool = True,
+    skill_activation_mode: SkillActivationMode | None = None,
 ) -> list[dict]:
     """Build the two drug-target subagents in workflow order.
 
@@ -390,6 +397,8 @@ def get_subagents(
         enable_skill_activator: Whether to add SkillActivator after
             SkillsMiddleware. Set False for passive middleware-only activation
             benchmarks.
+        skill_activation_mode: Optional explicit activation strategy. When
+            omitted, derives from enable_skill_activator for compatibility.
 
     Returns:
         List of three subagent configuration dictionaries.
@@ -480,7 +489,18 @@ def get_subagents(
         mw.insert(0, WriteFileArgGuardMiddleware(backend_root=data_dir))
         subagent["middleware"] = mw
 
-    # Primary subagents use allow-listed shared SkillsMiddleware + SkillActivator.
+    effective_skill_activation_mode: SkillActivationMode = (
+        skill_activation_mode
+        if skill_activation_mode is not None
+        else (
+            "middleware_plus_activator"
+            if enable_skill_activator
+            else "middleware_only"
+        )
+    )
+
+    # Primary subagents use allow-listed shared SkillsMiddleware plus optional
+    # activation middleware.
     if skills_dir and subagent_skill_names and subagent_skill_registries:
         from src.agents.shared.skill_activator import SkillActivator
         from src.agents.shared.skills_middleware import SkillsMiddleware
@@ -496,11 +516,46 @@ def get_subagents(
                     allowed_skill_names=allowed_names,
                 )
             )
-            if enable_skill_activator:
+            if effective_skill_activation_mode == "middleware_plus_activator":
                 mw.append(
                     SkillActivator(
                         skill_registry=subagent_skill_registries.get(subagent["name"], {}),
                     )
+                )
+            elif effective_skill_activation_mode == "middleware_plus_governor":
+                from src.agents.shared.skill_activation_governor import (
+                    SkillActivationGovernor,
+                )
+
+                hard_required_skill_names = (
+                    ("drug-target-hypothesis",)
+                    if (
+                        subagent["name"] == "hypothesis_writer"
+                        and "drug-target-hypothesis" in allowed_names
+                    )
+                    else ()
+                )
+                candidate_skill_names = tuple(
+                    name
+                    for name in allowed_names
+                    if name not in hard_required_skill_names
+                )
+                mw.append(
+                    SkillActivationGovernor(
+                        skill_registry=subagent_skill_registries.get(subagent["name"], {}),
+                        hard_required_skill_names=hard_required_skill_names,
+                        candidate_skill_names=candidate_skill_names,
+                        artifact_gate=(
+                            "save_hypothesis_report"
+                            if subagent["name"] == "hypothesis_writer"
+                            else "final artifact"
+                        ),
+                    )
+                )
+            elif effective_skill_activation_mode != "middleware_only":
+                raise ValueError(
+                    "unknown skill_activation_mode: "
+                    f"{effective_skill_activation_mode!r}"
                 )
             subagent["middleware"] = mw
     elif skills_sources:

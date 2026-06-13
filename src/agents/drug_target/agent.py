@@ -59,6 +59,12 @@ from src.agents.drug_target.tools import (
 
 logger = logging.getLogger(__name__)
 
+SkillActivationMode = Literal[
+    "middleware_only",
+    "middleware_plus_activator",
+    "middleware_plus_governor",
+]
+
 
 # =============================================================================
 # Orchestrator System Prompt
@@ -136,6 +142,9 @@ class DrugTargetConfig:
         enable_skill_activator: Whether to add SkillActivator after
             SkillsMiddleware. Set False for passive middleware-only activation
             benchmarks.
+        skill_activation_mode: Optional explicit skill activation strategy.
+            When omitted, derives from enable_skill_activator for backward
+            compatibility.
         agent_skill_names: Legacy fallback skill tuple retained for registry helpers.
         evidence_assessor_skill_names: Skills exposed to evidence_assessor.
         hypothesis_writer_skill_names: Skills exposed to hypothesis_writer.
@@ -156,6 +165,7 @@ class DrugTargetConfig:
     enable_census: bool = True
     enable_progressive_disclosure: bool = True
     enable_skill_activator: bool = True
+    skill_activation_mode: SkillActivationMode | None = None
     agent_skill_names: tuple[str, ...] = (
         "drug-target-hypothesis",
         "drug-target-reporting",
@@ -337,9 +347,18 @@ def create_drug_target_agent(
 
     # 3. Create the orchestrator LLM.
     llm = create_llm(provider=config.provider)
+    skill_activation_mode: SkillActivationMode = (
+        config.skill_activation_mode
+        if config.skill_activation_mode is not None
+        else (
+            "middleware_plus_activator"
+            if config.enable_skill_activator
+            else "middleware_only"
+        )
+    )
 
     # 4. Get subagent specs — primary subagents use allow-listed shared
-    #    SkillsMiddleware + SkillActivator instead of deepagents native
+    #    SkillsMiddleware + activation middleware instead of deepagents native
     #    `subagent["skills"]` auto-loading.
     subagent_specs = get_subagents(
         custom_tools=config.custom_tools,
@@ -353,6 +372,7 @@ def create_drug_target_agent(
         subagent_skill_names=subagent_skill_names,
         subagent_skill_registries=subagent_skill_registries,
         enable_skill_activator=config.enable_skill_activator,
+        skill_activation_mode=skill_activation_mode,
     )
 
     # 5. Create agent — orchestrator has NO skills (just delegates)

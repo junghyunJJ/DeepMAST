@@ -53,6 +53,7 @@ from langchain_core.runnables import RunnableConfig
 
 from docs.benchmarks.hypothesis_generation_consistency.activation_trace import (
     extract_hypothesis_writer_read_skill_file_calls,
+    extract_named_tool_calls,
     extract_read_skill_file_calls,
     summarize_activation_trace,
 )
@@ -170,7 +171,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p.add_argument(
         "--skill-activation-mode",
-        choices=("middleware_only", "middleware_plus_activator"),
+        choices=(
+            "middleware_only",
+            "middleware_plus_activator",
+            "middleware_plus_governor",
+        ),
         default="middleware_plus_activator",
         help="Skill activation mode for hypothesis writer skills.",
     )
@@ -234,6 +239,7 @@ def build_activation_trace_payload(
     data_dir: Path,
     trace_log_path: Path,
     report_finalized: bool,
+    artifact_gate_event: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     activation_trace = summarize_activation_trace(
         exposed_skill_names=exposed_skill_names,
@@ -249,6 +255,7 @@ def build_activation_trace_payload(
             "data_dir": str(data_dir),
             "trace_log": str(trace_log_path),
             "report_finalized": report_finalized,
+            "artifact_gate_event": artifact_gate_event,
         }
     )
     return activation_trace
@@ -284,6 +291,7 @@ def write_activation_trace_json(
     data_dir: Path,
     trace_log_path: Path,
     report_finalized: bool,
+    artifact_gate_event: dict[str, Any] | None = None,
     project_root: Path = PROJECT_ROOT,
 ) -> Path:
     if not activation_trace_path.is_absolute():
@@ -299,6 +307,7 @@ def write_activation_trace_json(
         data_dir=data_dir,
         trace_log_path=trace_log_path,
         report_finalized=report_finalized,
+        artifact_gate_event=artifact_gate_event,
     )
     activation_trace_path.parent.mkdir(parents=True, exist_ok=True)
     activation_trace_path.write_text(
@@ -320,6 +329,7 @@ def write_activation_trace_checkpoint(
     ollama_base_url: str | None,
     data_dir: Path,
     trace_log_path: Path,
+    artifact_gate_event: dict[str, Any] | None = None,
 ) -> Path:
     written_path = write_activation_trace_json(
         activation_trace_path=activation_trace_path,
@@ -333,6 +343,7 @@ def write_activation_trace_checkpoint(
         data_dir=data_dir,
         trace_log_path=trace_log_path,
         report_finalized=False,
+        artifact_gate_event=artifact_gate_event,
     )
     message = (
         "[ACTIVATION-TRACE-CHECKPOINT] wrote activation trace before "
@@ -1160,6 +1171,7 @@ async def run_traced(args: argparse.Namespace) -> int:
         enable_census=args.census,
         hypothesis_writer_skill_names=hypothesis_writer_skill_names,
         enable_skill_activator=enable_skill_activator,
+        skill_activation_mode=args.skill_activation_mode,
     )
     agent, backend = create_drug_target_agent(config)
     print(f"[CONFIG] Agent created (provider={args.provider})")
@@ -1199,6 +1211,7 @@ async def run_traced(args: argparse.Namespace) -> int:
     captured_drug_md_holder = {"content": None}  # Fallback: capture drug.md from Command(files=...)
     hypothesis_writer_read_skill_calls: list[dict[str, Any]] = []
     all_read_skill_calls: list[dict[str, Any]] = []
+    save_hypothesis_report_event: dict[str, Any] | None = None
     # Capture finalize_report state fields from stream updates
     captured_finalization_state: dict = {
         "report_finalization_error": None,
@@ -1308,24 +1321,44 @@ async def run_traced(args: argparse.Namespace) -> int:
                 trace_log_fp.write(f"{'─' * 62}\n")
                 trace_log_fp.flush()
 
-                hypothesis_writer_read_skill_calls.extend(
-                    extract_hypothesis_writer_read_skill_file_calls(
+                writer_read_calls = extract_hypothesis_writer_read_skill_file_calls(
+                    node_path=node_path,
+                    node_name=node_name,
+                    node_data=node_data,
+                    exposed_skill_names=hypothesis_writer_skill_names,
+                    infer_unscoped_registered=args.skip_evidence_assessor,
+                )
+                for call in writer_read_calls:
+                    call["node_counter"] = node_counter
+                    call["elapsed_s"] = round(elapsed, 3)
+                hypothesis_writer_read_skill_calls.extend(writer_read_calls)
+
+                read_calls = extract_read_skill_file_calls(
+                    node_path=node_path,
+                    node_name=node_name,
+                    node_data=node_data,
+                    exposed_skill_names=hypothesis_writer_skill_names,
+                    scope="",
+                )
+                for call in read_calls:
+                    call["node_counter"] = node_counter
+                    call["elapsed_s"] = round(elapsed, 3)
+                all_read_skill_calls.extend(read_calls)
+
+                if save_hypothesis_report_event is None:
+                    save_calls = extract_named_tool_calls(
                         node_path=node_path,
                         node_name=node_name,
                         node_data=node_data,
-                        exposed_skill_names=hypothesis_writer_skill_names,
-                        infer_unscoped_registered=args.skip_evidence_assessor,
+                        tool_name="save_hypothesis_report",
+                        scope="hypothesis_writer",
                     )
-                )
-                all_read_skill_calls.extend(
-                    extract_read_skill_file_calls(
-                        node_path=node_path,
-                        node_name=node_name,
-                        node_data=node_data,
-                        exposed_skill_names=hypothesis_writer_skill_names,
-                        scope="",
-                    )
-                )
+                    if save_calls:
+                        save_hypothesis_report_event = {
+                            **save_calls[0],
+                            "node_counter": node_counter,
+                            "elapsed_s": round(elapsed, 3),
+                        }
 
                 # Capture drug.md content from Command(files=...) state updates
                 _capture_drug_md_from_update(node_data, captured_drug_md_holder)
@@ -1466,6 +1499,7 @@ async def run_traced(args: argparse.Namespace) -> int:
         ollama_base_url=ollama_base_url,
         data_dir=data_dir,
         trace_log_path=trace_log_path,
+        artifact_gate_event=save_hypothesis_report_event,
     )
 
     # ── Hypothesis quality gate — mirror super-graph routing before
@@ -1723,6 +1757,7 @@ async def run_traced(args: argparse.Namespace) -> int:
         data_dir=data_dir,
         trace_log_path=trace_log_path,
         report_finalized=report_status["finalized"],
+        artifact_gate_event=save_hypothesis_report_event,
     )
     activation_trace = json.loads(activation_trace_path.read_text(encoding="utf-8"))
     print(f"  Activation trace:    {activation_trace_path}")
