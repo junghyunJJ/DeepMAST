@@ -405,9 +405,12 @@ include the original label when biologically relevant and describe the Census
 evidence as proxy validation using the broader resolved label.
 
 For every retained recommendation, `biological_entities.cell_types` should include
-at least one original interest label when relevant to the mechanism, for example
-`AT2` or `Transitional AT2`, and may also include the resolved Census label
-`pulmonary alveolar type 2 cell` when citing Stage 1 Census evidence.
+the original interest label or resolved Census cell type when relevant to the
+mechanism. Legacy IPF examples include `AT2`, `Transitional AT2`, and the
+resolved Census label `pulmonary alveolar type 2 cell` when citing Stage 1
+Census evidence. For semantic proxy contexts such as Prolif Invasive Tumor -> malignant cell,
+use the original interest label or resolved Census cell type consistently in
+`validation_approach` and `biological_entities.cell_types`.
 
 Do not claim that Census separately validated a lost state modifier. If
 `Transitional AT2` resolved through `state_stripped_alias` with
@@ -427,28 +430,29 @@ the prose order. Cite the actual filename returned by `load_evidence_files` or
 Use the Stage 1 usage whitelist from `load_evidence_files` or
 `validate_evidence_references`:
 - `interest_cell_intrinsic_stage1_pair_files` are the only Stage 1 files that
-  may support AT2, Transitional AT2, pulmonary/alveolar epithelial, or resolved
-  Census cell-intrinsic coexpression claims.
+  may support interest-cell-intrinsic coexpression claims, including legacy AT2,
+  Transitional AT2, pulmonary/alveolar epithelial, or resolved Census cell
+  contexts.
 - When `interest_cell_intrinsic_stage1_pair_files` is non-empty, write Primary
-  AT2/Epithelial recommendations first from those files before Secondary
+  Interest-Cell recommendations first from those files before Secondary
   Spatial-Niche recommendations. At least one retained hypothesis must cite an
   intrinsic Stage 1 file from `interest_cell_intrinsic_stage1_pair_files` and
-  frame AT2, alveolar epithelial, or pulmonary epithelial biology.
+  name the original interest cell label, resolved Census cell type, or legacy AT2/epithelial context.
 - `spatial_niche_only_stage1_pair_files` are Stage 1 PASS files but must not be
-  used as AT2-intrinsic, Transitional-AT2-intrinsic, pulmonary/alveolar
-  epithelial-intrinsic, resolved-Census-cell-intrinsic, same-cell, or
-  target-cell-autonomous support. If a recommendation mentions the original
-  interest labels, resolved Census cell type, or pulmonary/alveolar epithelial
-  equivalents, cite these files only as secondary spatial-niche/cross-cell
+  used as interest-cell-intrinsic, AT2-intrinsic, Transitional-AT2-intrinsic,
+  pulmonary/alveolar epithelial-intrinsic, resolved-Census-cell-intrinsic,
+  same-cell, or target-cell-autonomous support. If a recommendation mentions the
+  original interest labels, resolved Census cell type, or pulmonary/alveolar
+  epithelial equivalents, cite these files only as secondary spatial-niche/cross-cell
   framing evidence with explicit constraints; never cite depleted or
-  non-intrinsic pairs as AT2-intrinsic evidence. If a FEATURED gene is only
+  non-intrinsic pairs as same-cell/interest-cell-intrinsic evidence. If a FEATURED gene is only
   covered by spatial-niche-only Stage 1 files, support the FEATURED gene with
   `stage3_<GENE>.json` and `ot_<GENE>.json`; use the Stage 1 pair only as
   constrained secondary framing when the recommendation names that pair concept.
 - Do not describe a pair as lacking passed Stage 1 support when the matching
   `stage1_<GENE_A>--<GENE_B>.json` exists in `files` or
   `eligible_stage1_pair_files`; instead classify its usable support as Primary
-  AT2/Epithelial if it is listed in
+  Interest-Cell intrinsic if it is listed in
   `interest_cell_intrinsic_stage1_pair_files`, or as Secondary Spatial-Niche
   if it is listed in `spatial_niche_only_stage1_pair_files`.
 
@@ -481,13 +485,14 @@ endothelial-only, macrophage-only, or immune-only validation is not enough.
 For interest-cell focused reports, mentally split retained recommendations into
 three support classes even though the JSON schema does not require a separate
 tier field:
-- **Primary epithelial/AT2-intrinsic follow-up recommendations**: cite at least
-  one `interest_cell_intrinsic_stage1_pair_files` entry and include AT2 or
-  epithelial validation context.
-- **Secondary epithelial-associated spatial-niche follow-up recommendations**:
+- **Primary Interest-Cell intrinsic follow-up recommendations**: cite at least
+  one non-depleted `interest_cell_intrinsic_stage1_pair_files` entry and include
+  the original interest label, resolved Census cell type, or legacy AT2/epithelial
+  context in `validation_approach` and `biological_entities.cell_types`.
+- **Secondary interest-cell-associated spatial-niche follow-up recommendations**:
   cite at least one Stage 1/spatial pair file that is spatial-niche-only or
-  depleted in the resolved epithelial/AT2 cell context. Use this only as
-  cross-cell or non-AT2 niche framing, not as epithelial-cell-intrinsic
+  depleted in the resolved interest-cell context. Use this only as cross-cell or
+  non-interest-cell niche framing, not as same-cell/interest-cell-intrinsic
   target mechanisms.
 - **Gene-level/actionability-only follow-up recommendations**: cite only
   `ot_<GENE>.json`, `stage3_<GENE>.json`, known-drug, or disease-level files.
@@ -598,12 +603,12 @@ inference:
   `overexpression` when the evidence only supports
   colocalization, coexpression, enrichment/depletion, target association, or drug
   tractability.
-- Title wording must also be conservative. Primary epithelial/AT2-intrinsic
+- Title wording must also be conservative. Primary Interest-Cell intrinsic
   follow-up recommendation titles should use terms such as `prioritizes`,
   `nominates`, `follow-up axis`, or `program candidate`, not established
-  mechanism language. Secondary epithelial-associated spatial-niche follow-up
+  mechanism language. Secondary interest-cell-associated spatial-niche follow-up
   recommendation titles should use terms such as `spatial-niche follow-up candidate`,
-  `cross-cell candidate`, or `non-AT2 niche context`. Gene-level/actionability-only
+  `cross-cell candidate`, or `non-interest-cell niche context`. Gene-level/actionability-only
   follow-up recommendation titles should use terms such as `gene-level follow-up
   candidate`, `actionability follow-up candidate`, or `perturbation-development
   candidate`.
@@ -631,7 +636,7 @@ Rules:
   `evidence_references` only when the recommendation is written as secondary spatial-niche/cross-cell evidence.
   Cite these files when you name that pair
   concept so they do not become artificial Gap Analysis orphans, but use them as
-  framing evidence, not as AT2-intrinsic support. The report renderer also uses
+  framing evidence, not as same-cell or interest-cell-intrinsic support. The report renderer also uses
   those citations to populate the secondary Stage 1 framing evidence table, so
   cite depleted Stage 1 pair files when the recommendation names that pair concept.
 - A target-cell-depleted Stage 1 pair is not allowed to support same-cell,

@@ -163,6 +163,32 @@ def test_retry_message_names_available_reverse_stage1_pair_repair() -> None:
     assert "present in evidence_references" in message
 
 
+def test_retry_message_includes_topn_missing_repair_guidance() -> None:
+    message = build_hypothesis_retry_message(
+        "res_bc_drugtarget",
+        "breast cancer",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "TOPN_COVERAGE_MISSING: topn_missing=['NECTIN4'] after save_hypothesis_report validation."
+                    ],
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "[FEATURED-GAP]" in message
+    assert "NECTIN4" in message
+    assert "stage3_<GENE>.json" in message
+    assert "ot_<GENE>.json" in message
+    assert "Do NOT retry the same payload" in message
+
+
 def test_retry_message_includes_depleted_stage1_repair_guidance() -> None:
     message = build_hypothesis_retry_message(
         "res_ipf_drugtarget3",
@@ -184,11 +210,13 @@ def test_retry_message_includes_depleted_stage1_repair_guidance() -> None:
     )
 
     assert "Depleted Stage 1 repair" in message
-    assert "remove AT2, Transitional AT2, pulmonary/alveolar epithelial" in message
-    assert "resolved Census cell-type, epithelial-intrinsic, same-cell" in message
+    assert "original interest label" in message
+    assert "resolved Census cell type such as malignant cell" in message
+    assert "legacy AT2, Transitional AT2, pulmonary/alveolar epithelial" in message
+    assert "epithelial-intrinsic, same-cell" in message
     assert "target-cell-autonomous wording" in message
     assert "from recommendations citing depleted Stage 1 files" in message
-    assert "cannot support primary AT2/epithelial intrinsic" in message
+    assert "cannot support primary interest-cell intrinsic" in message
     assert "same-cell, or target-cell-autonomous wording" in message
     assert (
         "`target-cell-depleted Stage 1 Census evidence as interest-cell support` "
@@ -202,8 +230,8 @@ def test_retry_message_includes_depleted_stage1_repair_guidance() -> None:
     assert "remove that Stage 1 pair citation entirely" in message
     assert "gene-level/actionability-only" in message
     assert (
-        "Do not leave the depleted Stage 1 file in a primary AT2/epithelial, "
-        "interest-cell, same-cell, or intrinsic recommendation"
+        "Do not leave the depleted Stage 1 file in a primary interest-cell, "
+        "legacy AT2/epithelial, same-cell, or intrinsic recommendation"
         in message
     )
 

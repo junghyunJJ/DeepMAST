@@ -61,6 +61,69 @@ def _add_intrinsic_stage1_evidence(data_dir: Path) -> None:
     )
 
 
+def _write_malignant_intrinsic_evidence(tmp_path: Path) -> Path:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps({"stage3_candidates": [{"gene": "EGF"}, {"gene": "ERBB2"}]}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage1_filter_results.json").write_text(
+        json.dumps([{"ligand": "EGF", "receptor": "ERBB2", "passed": True}]),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage1_EGF--ERBB2.json").write_text(
+        json.dumps({
+            "pair_id": "EGF--ERBB2",
+            "status": "PASS",
+            "census_validation": {
+                "risk_ratio": 6.25,
+                "p_value": 0.0,
+                "requested_cell_type": "Prolif Invasive Tumor",
+                "resolved_cell_type": "malignant cell",
+                "target_vs_rest": {
+                    "gene_a": {"direction": "enriched", "risk_ratio": 2.0},
+                    "gene_b": {"direction": "enriched", "risk_ratio": 2.0},
+                    "coexpression": {"direction": "enriched", "risk_ratio": 6.25},
+                },
+            },
+            "stage1_filter": {
+                "passed": True,
+                "string_combined": 0.99,
+                "census_coexpr_pvalue": 0.0,
+                "census_gene_a_pvalue": 0.0,
+                "census_gene_b_pvalue": 0.0,
+            },
+        }),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage3_EGF.json").write_text(
+        json.dumps({"gene_symbol": "EGF"}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage3_ERBB2.json").write_text(
+        json.dumps({"gene_symbol": "ERBB2"}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "celltype_resolution.json").write_text(
+        json.dumps({
+            "interest_celltypes": ["Prolif Invasive Tumor"],
+            "primary_input_celltype": "Prolif Invasive Tumor",
+            "primary_resolved_celltype": "malignant cell",
+            "primary_match_mode": "semantic_proxy",
+            "matches": [
+                {
+                    "input_celltype": "Prolif Invasive Tumor",
+                    "matched_celltype": "malignant cell",
+                    "match_mode": "semantic_proxy",
+                }
+            ],
+        }),
+        encoding="utf-8",
+    )
+    return tmp_path
+
+
 def _strict_report() -> dict:
     return {
         "schema_version": "hypothesis_report.v2",
@@ -775,6 +838,68 @@ def test_save_hypothesis_report_rejects_missing_intrinsic_coverage_with_stale_st
         "evidence available on disk is not cited."
     )
     hyp["biological_entities"]["cell_types"] = ["AT2 epithelial"]
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is False
+    assert "PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING" in result["errors"]
+    assert not (data_dir / "evidence" / "hypothesis_report.json").exists()
+
+
+def test_save_hypothesis_report_accepts_primary_interest_cell_intrinsic_coverage(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_malignant_intrinsic_evidence(tmp_path)
+    report = _clone_report()
+    report["disease"] = "breast cancer"
+    report["stage1_pair_files"] = ["stage1_EGF--ERBB2.json"]
+    hyp = report["hypotheses"][0]
+    hyp["title"] = "Primary EGF-ERBB2 intrinsic hypothesis"
+    hyp["core_claim"] = (
+        "EGF-ERBB2 supports a primary interest-cell intrinsic follow-up mechanism "
+        "in resolved malignant cells."
+    )
+    hyp["evidence_references"] = [
+        "stage1_EGF--ERBB2.json",
+        "stage3_EGF.json",
+        "stage3_ERBB2.json",
+    ]
+    hyp["biological_entities"]["genes"] = ["EGF", "ERBB2"]
+    hyp["biological_entities"]["cell_types"] = ["malignant cells"]
+    hyp["validation_approach"] = (
+        "Test EGF-ERBB2 perturbation in malignant cells breast-cancer models."
+    )
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is True, result
+
+
+def test_save_hypothesis_report_rejects_intrinsic_coverage_without_interest_cell_anchor(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_malignant_intrinsic_evidence(tmp_path)
+    report = _clone_report()
+    report["disease"] = "breast cancer"
+    report["stage1_pair_files"] = ["stage1_EGF--ERBB2.json"]
+    hyp = report["hypotheses"][0]
+    hyp["title"] = "Primary EGF-ERBB2 intrinsic hypothesis"
+    hyp["core_claim"] = (
+        "EGF-ERBB2 supports a primary intrinsic follow-up mechanism in the "
+        "disease context."
+    )
+    hyp["evidence_references"] = [
+        "stage1_EGF--ERBB2.json",
+        "stage3_EGF.json",
+        "stage3_ERBB2.json",
+    ]
+    hyp["biological_entities"]["genes"] = ["EGF", "ERBB2"]
+    hyp["biological_entities"]["cell_types"] = []
+    hyp["validation_approach"] = "Test EGF-ERBB2 perturbation in disease models."
 
     result = json.loads(
         save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})

@@ -89,12 +89,12 @@ def test_hypothesis_writer_prompt_requires_evidence_vs_inference_wording() -> No
         "cite depleted Stage 1 pair files when the recommendation names that pair concept"
         in text
     )
-    assert "not as AT2-intrinsic support" in text
+    assert "not as same-cell or interest-cell-intrinsic support" in text
     assert "stage1_pair_usage_guidance" in text
     assert "interest_cell_intrinsic_stage1_pair_files" in text
     assert "spatial_niche_only_stage1_pair_files" in text
     assert "spatial_niche_only_stage1_pair_files` are Stage 1 PASS files but must not be\n  cited" not in text
-    assert "spatial_niche_only_stage1_pair_files` are Stage 1 PASS files but must not be\n  used as AT2-intrinsic" in text
+    assert "spatial_niche_only_stage1_pair_files` are Stage 1 PASS files but must not be\n  used as interest-cell-intrinsic" in text
     assert "cite these files only as secondary spatial-niche/cross-cell" in text
     assert "A file being in `eligible_stage1_pair_files` only means Stage 1 PASS" in text
     assert "reverse of the prose\norder" in text
@@ -198,12 +198,14 @@ def test_hypothesis_writer_prompt_requires_intrinsic_stage1_primary_contract() -
     text = prompts.HYPOTHESIS_WRITER_PROMPT
 
     assert "interest_cell_intrinsic_stage1_pair_files" in text
-    assert "write Primary\n  AT2/Epithelial recommendations first from those files" in text
+    assert "write Primary\n  Interest-Cell recommendations first from those files" in text
     assert "Secondary\n  Spatial-Niche recommendations" in text
     assert "At least one retained hypothesis must cite an\n  intrinsic Stage 1 file" in text
     assert (
-        "frame AT2, alveolar epithelial, or pulmonary epithelial biology" in text
+        "original interest cell label, resolved Census cell type, or legacy AT2/epithelial context"
+        in text
     )
+    assert "For semantic proxy contexts such as Prolif Invasive Tumor -> malignant cell" in text
 
 
 def test_hypothesis_writer_prompt_separates_secondary_spatial_niche_support() -> None:
@@ -211,8 +213,8 @@ def test_hypothesis_writer_prompt_separates_secondary_spatial_niche_support() ->
 
     assert "spatial_niche_only_stage1_pair_files" in text
     assert "secondary spatial-niche/cross-cell\n  framing evidence" in text
-    assert "never cite depleted or\n  non-intrinsic pairs as AT2-intrinsic evidence" in text
-    assert "Primary\n  AT2/Epithelial" in text
+    assert "never cite depleted or\n  non-intrinsic pairs as same-cell/interest-cell-intrinsic evidence" in text
+    assert "Primary\n  Interest-Cell" in text
     assert "Secondary Spatial-Niche" in text
 
 

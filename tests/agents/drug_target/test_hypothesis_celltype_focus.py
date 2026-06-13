@@ -424,12 +424,12 @@ def test_hypothesis_prompt_requires_interest_celltype_focus() -> None:
     assert "Stage 3" in text
     assert "actionability" in text
     assert "not biological causality" in text
-    assert "Primary epithelial/AT2-intrinsic follow-up recommendations" in text
+    assert "Primary Interest-Cell intrinsic follow-up recommendations" in text
     assert (
-        "Secondary epithelial-associated spatial-niche follow-up recommendations"
+        "Secondary interest-cell-associated spatial-niche follow-up recommendations"
         in text
     )
-    assert "epithelial-cell-intrinsic" in text
+    assert "same-cell/interest-cell-intrinsic" in text
     assert "target mechanisms" in text
     assert "Evidence-Grounded Follow-up Recommendation Generation" in text
     assert "Conservative Interpretation" in text
@@ -452,7 +452,7 @@ def test_hypothesis_prompt_requires_interest_celltype_focus() -> None:
         "cite depleted Stage 1 pair files when the recommendation names that pair concept"
         in text
     )
-    assert "not as AT2-intrinsic support" in text
+    assert "not as same-cell or interest-cell-intrinsic support" in text
     assert "target-cell-depleted Stage 1 pair files may appear" in text
 
 

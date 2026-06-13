@@ -5,6 +5,10 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
+
+
+_TOPN_MISSING_RE = re.compile(r"topn_missing\s*=\s*\[([^\]]*)\]", re.IGNORECASE)
 
 
 def _numeric_prediction_guidance(errors: list[dict] | None) -> str:
@@ -119,6 +123,48 @@ def _featured_gene_reference_guidance(errors: list[dict] | None) -> str:
     )
 
 
+def _extract_topn_missing_genes(text: str) -> list[str]:
+    genes: list[str] = []
+    for block in _TOPN_MISSING_RE.findall(text):
+        genes.extend(re.findall(r"[A-Za-z][A-Za-z0-9_.-]*", block))
+    return genes
+
+
+def _collect_missing_gene_strings(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str)]
+    return []
+
+
+def _topn_missing_guidance(errors: list[dict] | None) -> str:
+    genes = set(_extract_topn_missing_genes(_flatten_error_text(errors)))
+    for err in errors or []:
+        if not isinstance(err, dict):
+            continue
+        details = err.get("details")
+        if not isinstance(details, dict):
+            continue
+        genes.update(_collect_missing_gene_strings(details.get("missing")))
+        topn_coverage = details.get("topn_coverage")
+        if isinstance(topn_coverage, dict):
+            genes.update(_collect_missing_gene_strings(topn_coverage.get("missing")))
+
+    if not genes:
+        return ""
+
+    joined = ", ".join(sorted(genes))
+    return (
+        " [FEATURED-GAP] Top-N coverage repair: the previous payload omitted "
+        f"required top-ranked gene(s): {joined}. Do NOT retry the same payload. "
+        "For each missing gene, add or repair a `[FEATURED-GAP]` hypothesis whose "
+        "`biological_entities.genes` includes that gene and cite exact "
+        "`stage3_<GENE>.json` and `ot_<GENE>.json` evidence when present. "
+        "Do not remove other valid hypotheses just to satisfy top-N coverage."
+    )
+
+
 def _depleted_stage1_guidance(errors: list[dict] | None) -> str:
     text = _flatten_error_text(errors)
     if (
@@ -128,11 +174,12 @@ def _depleted_stage1_guidance(errors: list[dict] | None) -> str:
     ):
         return ""
     return (
-        " Depleted Stage 1 repair: remove AT2, Transitional AT2, "
-        "pulmonary/alveolar epithelial, resolved Census cell-type, "
+        " Depleted Stage 1 repair: remove original interest label, resolved "
+        "Census cell type such as malignant cell, legacy AT2, Transitional AT2, "
+        "pulmonary/alveolar epithelial, "
         "epithelial-intrinsic, same-cell, and target-cell-autonomous wording "
         "from recommendations citing depleted Stage 1 files. A depleted Stage 1 "
-        "file cannot support primary AT2/epithelial intrinsic, interest-cell, "
+        "file cannot support primary interest-cell intrinsic, legacy AT2/epithelial, "
         "same-cell, or target-cell-autonomous wording. For a "
         "`target-cell-depleted Stage 1 Census evidence as interest-cell support` "
         "error, choose exactly one repair path for the named hypothesis: "
@@ -143,7 +190,7 @@ def _depleted_stage1_guidance(errors: list[dict] | None) -> str:
         "or (B) remove that Stage 1 pair citation entirely and rewrite the hypothesis "
         "as gene-level/actionability-only using available ot_<GENE>.json and "
         "stage3_<GENE>.json evidence. Do not leave the depleted Stage 1 file in a "
-        "primary AT2/epithelial, interest-cell, same-cell, or intrinsic recommendation."
+        "primary interest-cell, legacy AT2/epithelial, same-cell, or intrinsic recommendation."
     )
 
 
@@ -187,6 +234,7 @@ def _format_quality_errors_for_instruction(quality_errors: list[dict] | None) ->
         + "; ".join(parts)
         + _numeric_prediction_guidance(quality_errors)
         + _last_rejection_guidance(quality_errors)
+        + _topn_missing_guidance(quality_errors)
         + _direct_pair_axis_guidance(quality_errors)
         + _featured_gene_reference_guidance(quality_errors)
         + _depleted_stage1_guidance(quality_errors)

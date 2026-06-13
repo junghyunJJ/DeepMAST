@@ -596,6 +596,97 @@ def _hypothesis_has_epithelial_anchor(hypothesis: dict[str, Any]) -> bool:
     return bool(_EPITHELIAL_ANCHOR_RE.search(text))
 
 
+def _normal_celltype(value: Any) -> str:
+    text = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
+    return " ".join(text.split())
+
+
+def _celltype_resolution_anchor_tokens(evidence_dir: Path) -> set[str]:
+    try:
+        celltype_resolution = json.loads(
+            (evidence_dir / "celltype_resolution.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError):
+        return set()
+    if not isinstance(celltype_resolution, dict):
+        return set()
+
+    raw_tokens: list[str] = []
+    for key in ("primary_input_celltype", "primary_resolved_celltype"):
+        value = celltype_resolution.get(key)
+        if isinstance(value, str):
+            raw_tokens.append(value)
+
+    interest_celltypes = celltype_resolution.get("interest_celltypes")
+    if isinstance(interest_celltypes, list):
+        raw_tokens.extend(
+            value for value in interest_celltypes if isinstance(value, str)
+        )
+
+    matches = celltype_resolution.get("matches")
+    if isinstance(matches, list):
+        for match in matches:
+            if not isinstance(match, dict):
+                continue
+            for key in ("input_celltype", "matched_celltype", "resolved_celltype"):
+                value = match.get(key)
+                if isinstance(value, str):
+                    raw_tokens.append(value)
+
+    return {
+        token
+        for token in (_normal_celltype(value) for value in raw_tokens)
+        if token
+    }
+
+
+def _celltype_anchor_variants(tokens: set[str]) -> set[str]:
+    variants = set(tokens)
+    for token in tokens:
+        if token.endswith(" cell"):
+            variants.add(f"{token}s")
+    return variants
+
+
+def _hypothesis_has_interest_cell_anchor(
+    hypothesis: dict[str, Any],
+    evidence_dir: Path,
+) -> bool:
+    if _hypothesis_has_epithelial_anchor(hypothesis):
+        return True
+
+    fields: list[Any] = [
+        hypothesis.get("title"),
+        hypothesis.get("core_claim"),
+        hypothesis.get("mechanism"),
+        hypothesis.get("patient_context"),
+        hypothesis.get("experimental_test"),
+        hypothesis.get("falsifiable_prediction"),
+        hypothesis.get("validation_approach"),
+    ]
+
+    raw_cell_types = hypothesis.get("cell_types")
+    if isinstance(raw_cell_types, list):
+        fields.extend(raw_cell_types)
+
+    entities = hypothesis.get("biological_entities")
+    if isinstance(entities, dict):
+        raw_entity_cell_types = entities.get("cell_types")
+        if isinstance(raw_entity_cell_types, list):
+            fields.extend(raw_entity_cell_types)
+
+    text = _normal_celltype(" ".join(str(value) for value in fields if value))
+    if not text:
+        return False
+
+    return any(
+        f" {token} " in f" {text} "
+        for token in _celltype_anchor_variants(
+            _celltype_resolution_anchor_tokens(evidence_dir)
+        )
+    )
+
+
 def _stage1_pair_files_for_intrinsic_coverage(
     canonical: dict[str, Any],
     evidence_dir: Path,
@@ -654,7 +745,7 @@ def _validate_primary_epithelial_intrinsic_coverage(
         if not isinstance(refs, list):
             continue
         if intrinsic_files.intersection(str(ref) for ref in refs) and (
-            _hypothesis_has_epithelial_anchor(hypothesis)
+            _hypothesis_has_interest_cell_anchor(hypothesis, evidence_path)
         ):
             return []
 
@@ -979,8 +1070,8 @@ def validate_hypothesis_report_quality(
             _quality_error(
                 error_code,
                 "At least one hypothesis must cite an intrinsic Stage 1 pair file "
-                "and name an AT2, alveolar epithelial, pulmonary epithelial, or "
-                "epithelial context.",
+                "and name the original interest cell label, resolved Census cell "
+                "type, or legacy AT2/epithelial context.",
             )
         )
     if diag["failed_pair_violations"]:
