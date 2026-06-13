@@ -83,3 +83,24 @@ TRACE COMPLETE
     assert summary["validation_passes"] == 2
     assert summary["fallback_assisted_successes"] == 1
     assert summary["writer_native_successes"] == 1
+
+
+def test_trace_fallback_detection_ignores_disabled_failed_and_no_markers() -> None:
+    assert (
+        trace_records_host_hypothesis_fallback(
+            "[HOST-HYPOTHESIS-FIXUP] skipped because fallback is disabled\n"
+        )
+        is False
+    )
+    assert (
+        trace_records_host_hypothesis_fallback(
+            "[HOST-HYPOTHESIS-FIXUP] save_hypothesis_report failed: {...}\n"
+        )
+        is False
+    )
+    assert (
+        trace_records_host_hypothesis_fallback(
+            "TRACE COMPLETE\n  host_hypothesis_fallback_used: NO\n"
+        )
+        is False
+    )
