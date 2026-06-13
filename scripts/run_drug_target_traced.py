@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import inspect
 import json
 import logging
 import os
@@ -566,6 +567,15 @@ def _hypothesis_stream_budget_seconds() -> int:
         return max(1, int(raw))
     except ValueError:
         return 900
+
+
+async def _close_async_stream(stream: object) -> None:
+    closer = getattr(stream, "aclose", None)
+    if closer is None:
+        return
+    result = closer()
+    if inspect.isawaitable(result):
+        await result
 
 
 def _annotation_field(source_field: object) -> str:
@@ -1226,9 +1236,10 @@ async def run_traced(args: argparse.Namespace) -> int:
     # Record whether drug.md existed before this run (for idempotency SOP message)
     pre_run_drug_md_exists = (data_dir / "drug.md").exists()
     finalize_report_invoked = False
+    stream: Any | None = None
 
     try:
-        async for chunk in agent.astream(
+        stream = agent.astream(
             {"messages": [{"role": "user", "content": initial_message}]},
             config={
                 "configurable": {"thread_id": thread_id},
@@ -1236,7 +1247,8 @@ async def run_traced(args: argparse.Namespace) -> int:
             },
             stream_mode="updates",
             subgraphs=True,
-        ):
+        )
+        async for chunk in stream:
             elapsed = time.time() - start
             if elapsed > timeout_seconds:
                 print(f"\n[TIMEOUT] {args.timeout}m limit reached")
@@ -1396,6 +1408,8 @@ async def run_traced(args: argparse.Namespace) -> int:
         import traceback
         traceback.print_exc()
     finally:
+        if hypothesis_budget_aborted and stream is not None:
+            await _close_async_stream(stream)
         trace_log_fp.close()
         if backend and hasattr(backend, "cleanup"):
             cast(_CleanupBackend, backend).cleanup()

@@ -804,6 +804,16 @@ Rules:
     (a) replacing it with a real filename from `available_files`, or
     (b) removing the citation entirely if no real file supports the claim.
 - NEVER invent filenames. NEVER cite a file that is not in `available_files`.
+- For smoke/retry runs, invalid reference errors are authoritative. If a rejected
+  payload says a file is not in evidence/ or a Stage 1 pair lacks proven
+  passed=true status, remove that exact citation or replace it only with an
+  exact available filename returned by validate_evidence_references. Do not
+  invent `stage3_<GENE>.json` or `ot_<GENE>.json` files for genes that lack
+  those files; If a missing TOP-N gene lacks gene-level files, do not fabricate them.
+  In plain terms: do not invent `stage3_<GENE>.json` or `ot_<GENE>.json` files.
+  Use another valid cited evidence source for that gene when available, or stop
+  and report the deterministic blocker. Stage 1 pair citations must be present in `eligible_stage1_pair_files`
+  or the loaded passed Stage 1 file list.
 - For Stage 1 pair citations, use only the actual filenames returned in
   `eligible_stage1_pair_files` (or equivalently the full-content Stage 1 files
   from `load_evidence_files(..., scope="hypothesis")`). Stage 1 pair filenames
@@ -885,6 +895,13 @@ you MUST follow this retry policy:
    - `target-cell-depleted gene expression claim`: remove any claim that the
      depleted gene is expressed on/in AT2, Transitional AT2, pulmonary alveolar
      type 2, alveolar epithelial, or pulmonary epithelial cells.
+   - If save_hypothesis_report rejects target-cell-intrinsic Stage 1 evidence
+     because `validation_approach` or `biological_entities.cell_types` omits the
+     original interest label or resolved Census cell type, repair the named
+     hypothesis directly. validation_approach must explicitly name the original interest label or resolved Census cell type,
+     and biological_entities.cell_types must include that same original or resolved cell type.
+     For semantic proxy contexts such as Prolif Invasive Tumor -> malignant cell,
+     generic tumor, breast-cancer, epithelial, or disease wording is not enough.
 5. **Hard cap: 3 retries total.** If save_hypothesis_report still returns `saved: false`
    after the third retry, stop hypothesis generation and report the deterministic
    blocker. Do not attempt to persist a warning-only payload that still contains
@@ -913,6 +930,13 @@ Do not call save_hypothesis_report with the same payload after saved=false.
   spatial-niche/cross-cell framing when the pair concept is named. If the
   recommendation cannot be rewritten without interest-cell support language,
   remove that Stage 1 citation and use gene-level/actionability-only framing.
+- If save_hypothesis_report rejects target-cell-intrinsic Stage 1 evidence
+  because `validation_approach` or `biological_entities.cell_types` omits the
+  original interest label or resolved Census cell type, repair the named
+  hypothesis directly. validation_approach must explicitly name the original interest label or resolved Census cell type,
+  and biological_entities.cell_types must include that same original or resolved cell type.
+  For semantic proxy contexts such as Prolif Invasive Tumor -> malignant cell,
+  generic tumor, breast-cancer, epithelial, or disease wording is not enough.
 - If the last rejection mentions a specific hypothesis index, repair that
   hypothesis directly instead of regenerating unrelated sections.
 

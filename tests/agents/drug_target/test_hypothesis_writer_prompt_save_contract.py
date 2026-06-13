@@ -208,6 +208,31 @@ def test_hypothesis_writer_prompt_requires_intrinsic_stage1_primary_contract() -
     assert "For semantic proxy contexts such as Prolif Invasive Tumor -> malignant cell" in text
 
 
+def test_hypothesis_writer_prompt_requires_dynamic_celltype_repair_after_save_rejection() -> None:
+    text = prompts.HYPOTHESIS_WRITER_PROMPT
+
+    assert "If save_hypothesis_report rejects target-cell-intrinsic Stage 1 evidence" in text
+    assert (
+        "validation_approach must explicitly name the original interest label or resolved Census cell type"
+        in text
+    )
+    assert (
+        "biological_entities.cell_types must include that same original or resolved cell type"
+        in text
+    )
+    assert "Prolif Invasive Tumor -> malignant cell" in text
+    assert "generic tumor, breast-cancer, epithelial, or disease wording is not enough" in text
+
+
+def test_hypothesis_writer_prompt_forbids_fabricated_smoke_citations() -> None:
+    text = prompts.HYPOTHESIS_WRITER_PROMPT
+
+    assert "NEVER invent filenames" in text
+    assert "do not invent `stage3_<GENE>.json` or `ot_<GENE>.json` files" in text
+    assert "Stage 1 pair citations must be present in `eligible_stage1_pair_files`" in text
+    assert "If a missing TOP-N gene lacks gene-level files, do not fabricate them" in text
+
+
 def test_hypothesis_writer_prompt_separates_secondary_spatial_niche_support() -> None:
     text = prompts.HYPOTHESIS_WRITER_PROMPT
 

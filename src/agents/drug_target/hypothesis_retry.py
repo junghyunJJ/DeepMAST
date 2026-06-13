@@ -123,6 +123,47 @@ def _featured_gene_reference_guidance(errors: list[dict] | None) -> str:
     )
 
 
+def _invalid_citation_guidance(errors: list[dict] | None) -> str:
+    text = _flatten_error_text(errors)
+    if (
+        "which is not in evidence/ directory" not in text
+        and "without proven passed=true status" not in text
+    ):
+        return ""
+    missing_files = sorted(
+        set(
+            re.findall(
+                r"'([^']+\.json)' which is not in evidence/ directory",
+                text,
+            )
+        )
+    )
+    unpassed_pairs = sorted(
+        set(
+            re.findall(
+                r"Stage 1 pair '([A-Za-z0-9-]+--[A-Za-z0-9-]+)' "
+                r"without proven passed=true status",
+                text,
+            )
+        )
+    )
+    details: list[str] = []
+    if missing_files:
+        details.append(f"fabricated or unavailable file(s): {', '.join(missing_files)}")
+    if unpassed_pairs:
+        details.append(f"unpassed Stage 1 pair(s): {', '.join(unpassed_pairs)}")
+    detail_text = f" Specific rejected citations: {'; '.join(details)}." if details else ""
+    return (
+        " Invalid citation repair: before retrying, call `validate_evidence_references` "
+        "with the combined flat list of all proposed evidence_references and repair every "
+        "invalid reference. Use only exact filenames in `available_files`; use Stage 1 "
+        "pair files only when they appear in `eligible_stage1_pair_files` or are otherwise "
+        "confirmed passed=true. NEVER invent filenames, normalized pair directions, "
+        "`stage3_<GENE>.json`, or `ot_<GENE>.json` files that are absent from evidence/."
+        f"{detail_text}"
+    )
+
+
 def _extract_topn_missing_genes(text: str) -> list[str]:
     genes: list[str] = []
     for block in _TOPN_MISSING_RE.findall(text):
@@ -162,6 +203,32 @@ def _topn_missing_guidance(errors: list[dict] | None) -> str:
         "`biological_entities.genes` includes that gene and cite exact "
         "`stage3_<GENE>.json` and `ot_<GENE>.json` evidence when present. "
         "Do not remove other valid hypotheses just to satisfy top-N coverage."
+    )
+
+
+def _interest_cell_validation_guidance(errors: list[dict] | None) -> str:
+    text = _flatten_error_text(errors)
+    triggers = (
+        "validation_approach does not mention the original interest label",
+        "validation_approach does not test the original interest label",
+        "biological_entities.cell_types does not include the original interest label",
+        "lists interest/resolved cell type",
+    )
+    if not any(trigger in text for trigger in triggers):
+        return ""
+    stage1_refs = sorted(
+        set(re.findall(r"stage1_[A-Za-z0-9-]+--[A-Za-z0-9-]+\.json", text))
+    )
+    refs_text = f" Affected Stage 1 file(s): {', '.join(stage1_refs)}." if stage1_refs else ""
+    return (
+        " Interest-cell validation repair: when a hypothesis cites target-cell-intrinsic "
+        "Stage 1 evidence or lists an interest/resolved cell type, rewrite that named "
+        "hypothesis so `biological_entities.cell_types` includes the original interest "
+        "label or resolved Census cell type, and `validation_approach` explicitly names "
+        "that cell context. For this breast-cancer semantic proxy context, use exact "
+        "phrases such as `Prolif Invasive Tumor` or `malignant cell`; do not rely on "
+        "generic disease, tumor, epithelial, or breast-cancer wording alone."
+        f"{refs_text}"
     )
 
 
@@ -234,6 +301,8 @@ def _format_quality_errors_for_instruction(quality_errors: list[dict] | None) ->
         + "; ".join(parts)
         + _numeric_prediction_guidance(quality_errors)
         + _last_rejection_guidance(quality_errors)
+        + _invalid_citation_guidance(quality_errors)
+        + _interest_cell_validation_guidance(quality_errors)
         + _topn_missing_guidance(quality_errors)
         + _direct_pair_axis_guidance(quality_errors)
         + _featured_gene_reference_guidance(quality_errors)

@@ -189,6 +189,76 @@ def test_retry_message_includes_topn_missing_repair_guidance() -> None:
     assert "Do NOT retry the same payload" in message
 
 
+def test_retry_message_includes_interest_cell_validation_repair_guidance() -> None:
+    message = build_hypothesis_retry_message(
+        "res_bc_drugtarget",
+        "breast cancer",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        (
+                            "hypotheses[0] cites target-cell-intrinsic Stage 1 "
+                            "evidence (stage1_CDH1--ERBB3.json) but "
+                            "validation_approach does not test the original "
+                            "interest label, resolved Census cell type, or "
+                            "pulmonary/alveolar epithelial equivalent."
+                        ),
+                        (
+                            "hypotheses[2] cites target-cell-intrinsic Stage 1 "
+                            "evidence (stage1_EGF--ERBB2.json) but "
+                            "biological_entities.cell_types does not include "
+                            "the original interest label, resolved Census cell "
+                            "type, or pulmonary/alveolar epithelial equivalent."
+                        ),
+                    ],
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "Interest-cell validation repair" in message
+    assert "malignant cell" in message
+    assert "Prolif Invasive Tumor" in message
+    assert "validation_approach" in message
+    assert "biological_entities.cell_types" in message
+    assert "stage1_CDH1--ERBB3.json" in message
+    assert "stage1_EGF--ERBB2.json" in message
+
+
+def test_retry_message_includes_invalid_reference_repair_guidance() -> None:
+    message = build_hypothesis_retry_message(
+        "res_bc_drugtarget",
+        "breast cancer",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "hypotheses[1].evidence_references cites 'stage3_CD47.json' which is not in evidence/ directory.",
+                        "hypotheses[2].evidence_references cites Stage 1 pair 'CD47--ERBB3' without proven passed=true status (no passing Stage 1 filter entry found for 'CD47--ERBB3'). Stage 1 pair citations must be eligible hypothesis evidence.",
+                    ],
+                },
+            }
+        ],
+        attempt=1,
+        max_attempts=3,
+    )
+
+    assert "Invalid citation repair" in message
+    assert "validate_evidence_references" in message
+    assert "available_files" in message
+    assert "eligible_stage1_pair_files" in message
+    assert "NEVER invent filenames" in message
+    assert "stage3_CD47.json" in message
+    assert "CD47--ERBB3" in message
+
+
 def test_retry_message_includes_depleted_stage1_repair_guidance() -> None:
     message = build_hypothesis_retry_message(
         "res_ipf_drugtarget3",
