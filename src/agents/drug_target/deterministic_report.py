@@ -555,6 +555,8 @@ def _hypothesis_use_class(
 ) -> str:
     if passed is False:
         return "Negative/contrast only"
+    if passed is None:
+        return "Cautious support only"
     at2 = _is_at2_celltype(celltype)
     if coexpression_direction == "enriched":
         return "Primary AT2-intrinsic support" if at2 else "Primary target-cell intrinsic support"
@@ -689,6 +691,10 @@ def _template_pair(
             coexpression_direction=coexpression_direction,
             celltype=resolved_celltype,
         ),
+        "_target_cell_intrinsic_support": (
+            passed is True
+            and coexpression_direction == "enriched"
+        ),
         "_epithelial_intrinsic_support": (
             passed is not False
             and coexpression_direction == "enriched"
@@ -745,6 +751,63 @@ def _hypothesis_mentions_epithelial_anchor(hypothesis: dict[str, Any]) -> bool:
         hypothesis.get("validation_approach", ""),
     )
     return any(_is_epithelial_anchor_text(field) for field in fields)
+
+
+def _normalized_anchor_text(value: Any) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
+    return " ".join(normalized.split())
+
+
+def _celltype_anchor_labels(celltype_context: dict[str, Any]) -> list[str]:
+    generic_labels = {
+        "interest cell",
+        "resolved interest cell type",
+        "interest cell type",
+        "target cell",
+        "target cell type",
+    }
+    labels: list[str] = []
+    for key in ("input_label", "resolved_label", "focus_proxy_label"):
+        label = _normalized_anchor_text(celltype_context.get(key))
+        if not label or label in generic_labels:
+            continue
+        if label not in labels:
+            labels.append(label)
+    return labels
+
+
+def _hypothesis_mentions_celltype_anchor(
+    hypothesis: dict[str, Any],
+    *,
+    celltype_context: dict[str, Any],
+) -> bool:
+    if _is_true(celltype_context.get("legacy_at2_fallback")):
+        return _hypothesis_mentions_epithelial_anchor(hypothesis)
+
+    anchor_labels = _celltype_anchor_labels(celltype_context)
+    if not anchor_labels:
+        return False
+
+    values: list[Any] = []
+    entities = hypothesis.get("biological_entities")
+    if isinstance(entities, dict):
+        cell_types = entities.get("cell_types")
+        if isinstance(cell_types, list):
+            values.extend(cell_types)
+    values.extend(
+        [
+            hypothesis.get("title", ""),
+            hypothesis.get("core_claim", ""),
+            hypothesis.get("falsifiable_prediction", ""),
+            hypothesis.get("validation_approach", ""),
+        ]
+    )
+
+    for value in values:
+        text = _normalized_anchor_text(value)
+        if text and any(label in text for label in anchor_labels):
+            return True
+    return False
 
 
 def _hypothesis_stage1_pairs(
@@ -824,7 +887,7 @@ def _asymmetric_gene_level_support_constraint(
     for pair in stage1_pair_evidence:
         if pair.get("_passed") is not True:
             continue
-        if not _is_true(pair.get("_epithelial_intrinsic_support")):
+        if not _is_true(pair.get("_target_cell_intrinsic_support")):
             continue
         ligand = _safe_text(pair.get("ligand"), "")
         receptor = _safe_text(pair.get("receptor"), "")
@@ -887,15 +950,22 @@ def _remove_framing_pairs_from_gap_analysis(
     hypothesis_data["gap_analysis"] = gap_analysis
 
 
-def _secondary_stage1_framing_pair(pair: dict[str, Any]) -> dict[str, str] | None:
+def _secondary_stage1_framing_pair(
+    pair: dict[str, Any],
+    *,
+    celltype_context: dict[str, Any],
+) -> dict[str, str] | None:
     if pair.get("_passed") is not True:
         return None
-    if _is_true(pair.get("_epithelial_intrinsic_support")):
+    if _is_true(pair.get("_target_cell_intrinsic_support")):
         return None
     source = _safe_text(pair.get("pair_file"), "")
     if not source:
         return None
-    usage = "Cross-cell/spatial-niche framing only; not AT2-intrinsic support"
+    usage = _safe_text(
+        celltype_context.get("secondary_usage"),
+        "Cross-cell/spatial-niche framing only; not interest-cell-intrinsic support",
+    )
     ligand = _safe_text(pair.get("ligand"), "")
     receptor = _safe_text(pair.get("receptor"), "")
     return {
@@ -914,6 +984,7 @@ def _annotate_hypothesis_tiers(
     *,
     stage1_pair_lookup: dict[str, dict[str, Any]],
     hypothesis_interpretations: dict[str, Any],
+    celltype_context: dict[str, Any],
 ) -> tuple[
     list[Any],
     list[dict[str, Any]],
@@ -952,23 +1023,27 @@ def _annotate_hypothesis_tiers(
         rendered_hypothesis["_biological_grounding_refs"] = biological_grounding_refs
         rendered_hypothesis["_target_disease_support_refs"] = target_disease_support_refs
         rendered_hypothesis["_actionability_refs"] = actionability_refs
-        has_primary_epithelial_support = any(
-            _is_true(pair.get("_epithelial_intrinsic_support"))
+        has_primary_target_cell_support = any(
+            _is_true(pair.get("_target_cell_intrinsic_support"))
             for pair in stage1_pair_evidence
         )
-        has_epithelial_anchor = _hypothesis_mentions_epithelial_anchor(
-            rendered_hypothesis
+        mentions_target_cell_anchor = _hypothesis_mentions_celltype_anchor(
+            rendered_hypothesis,
+            celltype_context=celltype_context,
         )
-        if has_primary_epithelial_support and has_epithelial_anchor:
-            rendered_hypothesis["_tier"] = "primary_epithelial_intrinsic"
-            rendered_hypothesis["_tier_label"] = "Primary epithelial/AT2-intrinsic"
-            rendered_hypothesis["_tier_note"] = (
-                "Cited Stage 1 Census evidence supports same-cell coexpression "
-                "enrichment in the resolved epithelial/AT2 cell context."
+        if has_primary_target_cell_support and mentions_target_cell_anchor:
+            rendered_hypothesis["_tier"] = "primary_target_cell_intrinsic"
+            rendered_hypothesis["_tier_label"] = _safe_text(
+                celltype_context.get("primary_tier_label"),
+                "Primary interest-cell intrinsic",
             )
-            interpretation_constraint = (
-                "AT2/epithelial same-cell coexpression enrichment supports "
-                "target-cell context, but not causal mechanism."
+            rendered_hypothesis["_tier_note"] = _safe_text(
+                celltype_context.get("primary_tier_note"),
+                "Cited Stage 1 Census evidence supports same-cell coexpression enrichment.",
+            )
+            interpretation_constraint = _safe_text(
+                celltype_context.get("primary_constraint"),
+                "Interest-cell same-cell coexpression enrichment supports target-cell context, but not causal mechanism.",
             )
             asymmetric_constraint = _asymmetric_gene_level_support_constraint(
                 stage1_pair_evidence,
@@ -984,32 +1059,39 @@ def _annotate_hypothesis_tiers(
             primary.append(rendered_hypothesis)
         elif not biological_grounding_refs:
             rendered_hypothesis["_tier"] = "gene_level_actionability"
-            rendered_hypothesis["_tier_label"] = (
-                "Gene-level/actionability follow-up"
+            rendered_hypothesis["_tier_label"] = _safe_text(
+                celltype_context.get("gene_level_tier_label"),
+                "Gene-level/actionability follow-up",
             )
-            rendered_hypothesis["_tier_note"] = (
+            rendered_hypothesis["_tier_note"] = _safe_text(
+                celltype_context.get("gene_level_tier_note"),
                 "Cited evidence provides target-disease or actionability "
-                "context, but no Stage 1/spatial grounding was cited."
+                "context, but no Stage 1/spatial grounding was cited.",
             )
-            rendered_hypothesis["_interpretation_constraint"] = (
-                "Gene-level support only; do not interpret as AT2-intrinsic "
-                "or spatial-niche evidence."
+            rendered_hypothesis["_interpretation_constraint"] = _safe_text(
+                celltype_context.get("gene_level_constraint"),
+                "Gene-level support only; do not interpret as interest-cell-intrinsic or spatial-niche evidence.",
             )
             gene_level.append(rendered_hypothesis)
         else:
-            rendered_hypothesis["_tier"] = "secondary_epithelial_associated_niche"
-            rendered_hypothesis["_tier_label"] = "Secondary epithelial-associated niche"
-            rendered_hypothesis["_tier_note"] = (
-                "Treat as spatially colocalized non-epithelial or cross-cell "
-                "niche biology linked to the epithelial program, not as an "
-                "epithelial-cell-intrinsic target mechanism."
+            rendered_hypothesis["_tier"] = "secondary_spatial_niche"
+            rendered_hypothesis["_tier_label"] = _safe_text(
+                celltype_context.get("secondary_tier_label"),
+                "Secondary spatial-niche/cross-cell",
             )
-            rendered_hypothesis["_interpretation_constraint"] = (
-                "Use as cross-cell/spatial-niche follow-up evidence only; do "
-                "not interpret as AT2-intrinsic support."
+            rendered_hypothesis["_tier_note"] = _safe_text(
+                celltype_context.get("secondary_tier_note"),
+                "Treat as spatially colocalized or cross-cell niche biology, not as an interest-cell-intrinsic target mechanism.",
+            )
+            rendered_hypothesis["_interpretation_constraint"] = _safe_text(
+                celltype_context.get("secondary_constraint"),
+                "Use as cross-cell/spatial-niche follow-up evidence only; do not interpret as interest-cell-intrinsic support.",
             )
             for pair in stage1_pair_evidence:
-                framing_pair = _secondary_stage1_framing_pair(pair)
+                framing_pair = _secondary_stage1_framing_pair(
+                    pair,
+                    celltype_context=celltype_context,
+                )
                 if not framing_pair:
                     continue
                 source = framing_pair["source"]
@@ -1088,6 +1170,171 @@ def _normalize_template_interpretations(
     return normalized
 
 
+def _first_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, Sequence) and not isinstance(
+        value,
+        (bytes, bytearray, str),
+    ):
+        for item in value:
+            text = _first_text(item)
+            if text:
+                return text
+        return ""
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _labels_equal(left: str, right: str) -> bool:
+    return " ".join(left.casefold().split()) == " ".join(
+        right.casefold().split()
+    )
+
+
+def _celltype_context_from_template_context(
+    template_context: dict[str, Any],
+) -> dict[str, str | bool]:
+    celltype_resolution = template_context.get("celltype_resolution", {})
+    celltype_resolution = (
+        celltype_resolution if isinstance(celltype_resolution, dict) else {}
+    )
+    input_label_raw = _first_text(
+        celltype_resolution.get("primary_input_celltype")
+    ) or _first_text(celltype_resolution.get("interest_celltypes"))
+    resolved_label_raw = _first_text(
+        celltype_resolution.get("primary_resolved_celltype")
+    )
+    has_explicit_celltype_resolution = bool(input_label_raw or resolved_label_raw)
+    match_mode = _first_text(celltype_resolution.get("primary_match_mode"))
+
+    if not resolved_label_raw:
+        stage1_pairs = template_context.get("stage1_pairs", {})
+        stage1_pairs = stage1_pairs if isinstance(stage1_pairs, dict) else {}
+        for pair_data in stage1_pairs.values():
+            if not isinstance(pair_data, dict):
+                continue
+            census_validation = pair_data.get("census_validation", {})
+            census_validation = (
+                census_validation
+                if isinstance(census_validation, dict)
+                else {}
+            )
+            resolved_label_raw = _first_text(
+                census_validation.get("resolved_cell_type")
+            ) or _first_text(census_validation.get("requested_cell_type"))
+            if resolved_label_raw:
+                break
+
+    default_label = "interest cell"
+    input_label = input_label_raw or default_label
+    resolved_label = resolved_label_raw or input_label_raw or default_label
+    is_proxy = (
+        bool(input_label_raw)
+        and bool(resolved_label_raw)
+        and match_mode == "semantic_proxy"
+        and not _labels_equal(input_label_raw, resolved_label_raw)
+    )
+    if is_proxy:
+        focus_detail = f"{input_label_raw}; Census proxy: {resolved_label_raw}"
+        focus_proxy_label = f"{resolved_label_raw.replace(' ', '-')} proxy"
+        focus_short = f"interest-cell / {focus_proxy_label}"
+    else:
+        focus_detail = resolved_label_raw or input_label_raw or default_label
+        focus_proxy_label = ""
+        focus_short = focus_detail.replace(" ", "-")
+
+    legacy_at2_fallback = (
+        not has_explicit_celltype_resolution
+        and bool(resolved_label_raw)
+        and _is_epithelial_anchor_text(resolved_label_raw)
+    )
+    context: dict[str, str | bool] = {
+        "input_label": input_label,
+        "resolved_label": resolved_label,
+        "match_mode": match_mode,
+        "is_proxy": is_proxy,
+        "focus_detail": focus_detail,
+        "focus_short": focus_short,
+        "focus_proxy_label": focus_proxy_label,
+        "legacy_at2_fallback": legacy_at2_fallback,
+        "primary_heading": "Primary Interest-Cell Follow-up Candidates",
+        "primary_tier_label": "Primary interest-cell intrinsic",
+        "primary_tier_note": (
+            "Cited Stage 1 Census evidence supports same-cell coexpression "
+            f"enrichment for {focus_detail} ({focus_short})."
+        ),
+        "primary_constraint": (
+            f"Same-cell coexpression enrichment for {focus_detail} supports "
+            "target-cell context, but not causal mechanism."
+        ),
+        "secondary_tier_label": "Secondary spatial-niche/cross-cell",
+        "secondary_tier_note": (
+            "Treat as spatially colocalized or cross-cell niche biology "
+            f"linked to {focus_detail}, not as an interest-cell-intrinsic "
+            "target mechanism."
+        ),
+        "secondary_constraint": (
+            "Use as cross-cell/spatial-niche follow-up evidence only; do "
+            "not interpret as interest-cell-intrinsic support."
+        ),
+        "gene_level_tier_label": "Gene-level/actionability follow-up",
+        "gene_level_tier_note": (
+            "Cited evidence provides target-disease or actionability "
+            "context, but no Stage 1/spatial grounding was cited."
+        ),
+        "gene_level_constraint": (
+            "Gene-level support only; do not interpret as "
+            "interest-cell-intrinsic or spatial-niche evidence for "
+            f"{focus_detail}."
+        ),
+        "secondary_usage": (
+            "Cross-cell/spatial-niche framing only; not "
+            "interest-cell-intrinsic support"
+        ),
+    }
+    if legacy_at2_fallback:
+        context.update(
+            {
+                "focus_detail": "epithelial/AT2 cell context",
+                "focus_short": "AT2/epithelial",
+                "primary_heading": "Primary AT2/Epithelial Follow-up Candidates",
+                "primary_tier_label": "Primary epithelial/AT2-intrinsic",
+                "primary_tier_note": (
+                    "Cited Stage 1 Census evidence supports same-cell "
+                    "coexpression enrichment in the resolved epithelial/AT2 "
+                    "cell context."
+                ),
+                "primary_constraint": (
+                    "AT2/epithelial same-cell coexpression enrichment "
+                    "supports target-cell context, but not causal mechanism."
+                ),
+                "secondary_heading": "Secondary Spatial-Niche Follow-up Candidates",
+                "secondary_tier_label": "Secondary epithelial-associated niche",
+                "secondary_tier_note": (
+                    "Treat as spatially colocalized non-epithelial or "
+                    "cross-cell niche biology linked to the epithelial "
+                    "program, not as an epithelial-cell-intrinsic target "
+                    "mechanism."
+                ),
+                "secondary_constraint": (
+                    "Use as cross-cell/spatial-niche follow-up evidence only; "
+                    "do not interpret as AT2-intrinsic support."
+                ),
+                "gene_level_constraint": (
+                    "Gene-level support only; do not interpret as "
+                    "AT2-intrinsic or spatial-niche evidence."
+                ),
+                "secondary_usage": (
+                    "Cross-cell/spatial-niche framing only; not "
+                    "AT2-intrinsic support"
+                ),
+            }
+        )
+    return context
+
+
 def _markdown_template_context(
     report_data: dict[str, Any],
     interpretations: dict[str, Any] | None = None,
@@ -1112,6 +1359,7 @@ def _markdown_template_context(
     stage1_pairs = stage1_pairs if isinstance(stage1_pairs, dict) else {}
     filter_lookup = _stage1_filter_lookup(stage1_rows)
     stage1_pair_lookup = _stage1_pair_file_lookup(stage1_pairs, filter_lookup)
+    celltype_context = _celltype_context_from_template_context(template_context)
 
     featured_cards: list[dict[str, Any]] = []
     for candidate in selected:
@@ -1183,6 +1431,7 @@ def _markdown_template_context(
                 hypotheses,
                 stage1_pair_lookup=stage1_pair_lookup,
                 hypothesis_interpretations=hypothesis_interpretations,
+                celltype_context=celltype_context,
             )
         )
         hypothesis_data["hypotheses"] = rendered_hypotheses
@@ -1210,6 +1459,7 @@ def _markdown_template_context(
         ],
         "stage1_filter_results": _format_stage1_filter_results(stage1_rows),
         "hypothesis_data": hypothesis_data,
+        "celltype_context": celltype_context,
         "disease_scope": {"requires_proxy_note": False},
         "data_limitations": [],
         "novelty_opportunity_legend": NOVELTY_OPPORTUNITY_LEGEND,
@@ -1528,6 +1778,12 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
     resolved_path = base / "evidence" / "resolved_drugs.json"
     stage1_filter_results = _load_stage1_filter_results(base)
     stage1_pairs = _load_optional_dict(base / "evidence" / "stage1_evidence.json")
+    celltype_resolution = _load_optional_json(
+        base / "evidence" / "celltype_resolution.json",
+        {},
+    )
+    if not isinstance(celltype_resolution, dict):
+        celltype_resolution = {}
 
     candidates: list[dict[str, Any]] = []
     for row in sorted(
@@ -1637,6 +1893,7 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
         "evidence/stage1_filter_results.json",
         "evidence/stage1_filter_results.csv",
         "evidence/stage1_evidence.json",
+        "evidence/celltype_resolution.json",
     ):
         if (base / optional_source).exists():
             cited_sources.add(optional_source)
@@ -1658,6 +1915,7 @@ def build_report_data(data_dir: str, disease: str) -> dict[str, Any]:
         "template_context": {
             "stage1_filter_results": stage1_filter_results,
             "stage1_pairs": stage1_pairs,
+            "celltype_resolution": celltype_resolution,
             "hypothesis_data": hypothesis,
         },
         "issues": [],

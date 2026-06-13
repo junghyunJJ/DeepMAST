@@ -578,9 +578,10 @@
         {% set secondary = secondary_hypotheses | default([]) %}
         {% set gene_level = gene_level_hypotheses | default([]) %}
         {% set unbucketed = unbucketed_hypotheses | default([]) %}
+        {% set section = hypothesis_section | default({}) %}
         {% if primary or secondary %}
-        <h3>4.1. Primary AT2/Epithelial Follow-up Candidates</h3>
-        <p style="color: var(--text-secondary);">These recommendations cite Stage 1 Census support for same-cell coexpression enrichment in the resolved epithelial/AT2 cell context.</p>
+        <h3>4.1. {{ section.primary_heading | default('Primary AT2/Epithelial Follow-up Candidates', true) }}</h3>
+        <p style="color: var(--text-secondary);">{{ section.primary_intro | default('These recommendations cite Stage 1 Census support for same-cell coexpression enrichment in the resolved epithelial/AT2 cell context.', true) }}</p>
         {% if primary %}
         {% for h in primary %}
         <div class="analysis-section">
@@ -633,11 +634,11 @@
         {% if not loop.last %}<hr class="gene-divider">{% endif %}
         {% endfor %}
         {% else %}
-        <p style="color: var(--text-secondary);"><em>No primary AT2/epithelial follow-up candidates met the Stage 1 intrinsic-support criteria.</em></p>
+        <p style="color: var(--text-secondary);"><em>{{ section.no_primary_message | default('No primary AT2/epithelial follow-up candidates met the Stage 1 intrinsic-support criteria.', true) }}</em></p>
         {% endif %}
 
-        <h3>4.2. Secondary Spatial-Niche Follow-up Candidates</h3>
-        <p style="color: var(--text-secondary);">These recommendations retain spatially colocalized ligand-receptor evidence as epithelial-associated spatial-niche or cross-cell follow-up candidates, not as epithelial-cell-intrinsic target mechanisms.</p>
+        <h3>4.2. {{ section.secondary_heading | default('Secondary Spatial-Niche Follow-up Candidates', true) }}</h3>
+        <p style="color: var(--text-secondary);">{{ section.secondary_intro | default('These recommendations retain spatially colocalized ligand-receptor evidence as epithelial-associated spatial-niche or cross-cell follow-up candidates, not as epithelial-cell-intrinsic target mechanisms.', true) }}</p>
         {% if secondary_stage1_framing_pairs | default([]) %}
         <h4>Secondary Stage 1 Framing Evidence</h4>
         <div class="table-container">
@@ -713,7 +714,7 @@
         {% endif %}
         {% if gene_level %}
         <h3>4.3. Gene-Level/Actionability Follow-up Candidates</h3>
-        <p style="color: var(--text-secondary);">These recommendations cite target-disease or actionability evidence but no Stage 1/spatial grounding. Treat them as gene-level follow-up candidates, not spatial-niche or AT2-intrinsic evidence.</p>
+        <p style="color: var(--text-secondary);">{{ section.gene_level_intro | default('These recommendations cite target-disease or actionability evidence but no Stage 1/spatial grounding. Treat them as gene-level follow-up candidates, not spatial-niche or AT2-intrinsic evidence.', true) }}</p>
         {% for h in gene_level %}
         <div class="analysis-section">
             <h3>4.3.{{ h._tier_rank | default(loop.index) }}. {{ h.title }}</h3>
