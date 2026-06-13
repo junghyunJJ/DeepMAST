@@ -261,6 +261,49 @@ def _depleted_stage1_guidance(errors: list[dict] | None) -> str:
     )
 
 
+def _legacy_at2_repair_guidance(errors: list[dict] | None) -> str:
+    text = _flatten_error_text(errors).casefold()
+    legacy_markers = (
+        " at2",
+        "transitional at2",
+        "pulmonary alveolar type 2",
+        "alveolar epithelial",
+        "pulmonary epithelial",
+    )
+    if not any(marker in text for marker in legacy_markers):
+        return ""
+    if (
+        "target-cell-depleted" not in text
+        and "coexpression-depleted" not in text
+        and "validation_approach does not" not in text
+    ):
+        return ""
+    return (
+        " Legacy AT2/Epithelial repair: preserve the Primary AT2/Epithelial branch "
+        "only for hypotheses that cite non-depleted files from "
+        "`interest_cell_intrinsic_stage1_pair_files`. For rejected hypotheses citing "
+        "target-cell-depleted or coexpression-depleted Stage 1 files, remove "
+        "AT2-intrinsic wording, remove AT2 validation language, or remove that Stage 1 "
+        "citation and rebuild the hypothesis as gene-level/actionability-only with "
+        "`stage3_<GENE>.json` and `ot_<GENE>.json`. Do not leave depleted Stage 1 "
+        "files in a Primary AT2/Epithelial recommendation."
+    )
+
+
+def _semantic_proxy_repair_guidance(errors: list[dict] | None) -> str:
+    text = _flatten_error_text(errors).casefold()
+    if "malignant cell" not in text and "semantic_proxy" not in text:
+        return ""
+    return (
+        " Semantic-proxy repair: for Prolif Invasive Tumor -> malignant cell or "
+        "similar proxy contexts, validation_approach and biological_entities.cell_types "
+        "must name the original interest label or the resolved Census proxy; generic "
+        "tumor, breast-cancer, epithelial, or disease wording is not enough. If the "
+        "rejected hypothesis cannot be repaired with exact cell-type wording, rewrite "
+        "it as gene-level/actionability-only and remove interest-cell intrinsic claims."
+    )
+
+
 def _evidence_scope_guardrails() -> str:
     return (
         " Evidence scope guardrails: Every recommendation section must be written "
@@ -307,6 +350,8 @@ def _format_quality_errors_for_instruction(quality_errors: list[dict] | None) ->
         + _direct_pair_axis_guidance(quality_errors)
         + _featured_gene_reference_guidance(quality_errors)
         + _depleted_stage1_guidance(quality_errors)
+        + _legacy_at2_repair_guidance(quality_errors)
+        + _semantic_proxy_repair_guidance(quality_errors)
         + _evidence_scope_guardrails()
     )
 

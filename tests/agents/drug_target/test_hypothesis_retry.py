@@ -306,6 +306,57 @@ def test_retry_message_includes_depleted_stage1_repair_guidance() -> None:
     )
 
 
+def test_retry_message_uses_legacy_at2_branch_for_at2_rejections() -> None:
+    message = build_hypothesis_retry_message(
+        "res_ipf_drugtarget",
+        "pulmonary fibrosis",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "hypotheses[1] uses target-cell-depleted Stage 1 Census evidence as interest-cell support: stage1_FN1--SDC2.json has negative target-vs-rest diff values.",
+                        "hypotheses[1] makes a target-cell-depleted gene expression claim for FN1 in AT2 pulmonary alveolar type 2 cell context.",
+                    ]
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "Legacy AT2/Epithelial repair" in message
+    assert "Primary AT2/Epithelial" in message
+    assert "remove AT2-intrinsic wording" in message
+    assert "stage3_<GENE>.json" in message
+
+
+def test_retry_message_uses_semantic_proxy_branch_for_malignant_cell_rejections() -> None:
+    message = build_hypothesis_retry_message(
+        "res_bc_drugtarget",
+        "breast cancer",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "hypotheses[0] lists interest/resolved cell type (malignant cell) but validation_approach does not mention the original interest label or resolved Census cell type.",
+                    ]
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "Semantic-proxy repair" in message
+    assert "Prolif Invasive Tumor" in message or "original interest label" in message
+    assert "malignant cell" in message
+    assert "generic tumor, breast-cancer, epithelial, or disease wording is not enough" in message
+
+
 def test_retry_message_names_res3_final_depleted_stage1_blocker() -> None:
     message = build_hypothesis_retry_message(
         "res_ipf_drugtarget3",
