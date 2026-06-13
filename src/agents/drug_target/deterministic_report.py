@@ -753,6 +753,63 @@ def _hypothesis_mentions_epithelial_anchor(hypothesis: dict[str, Any]) -> bool:
     return any(_is_epithelial_anchor_text(field) for field in fields)
 
 
+def _normalized_anchor_text(value: Any) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
+    return " ".join(normalized.split())
+
+
+def _celltype_anchor_labels(celltype_context: dict[str, Any]) -> list[str]:
+    generic_labels = {
+        "interest cell",
+        "resolved interest cell type",
+        "interest cell type",
+        "target cell",
+        "target cell type",
+    }
+    labels: list[str] = []
+    for key in ("input_label", "resolved_label", "focus_proxy_label"):
+        label = _normalized_anchor_text(celltype_context.get(key))
+        if not label or label in generic_labels:
+            continue
+        if label not in labels:
+            labels.append(label)
+    return labels
+
+
+def _hypothesis_mentions_celltype_anchor(
+    hypothesis: dict[str, Any],
+    *,
+    celltype_context: dict[str, Any],
+) -> bool:
+    if _is_true(celltype_context.get("legacy_at2_fallback")):
+        return _hypothesis_mentions_epithelial_anchor(hypothesis)
+
+    anchor_labels = _celltype_anchor_labels(celltype_context)
+    if not anchor_labels:
+        return False
+
+    values: list[Any] = []
+    entities = hypothesis.get("biological_entities")
+    if isinstance(entities, dict):
+        cell_types = entities.get("cell_types")
+        if isinstance(cell_types, list):
+            values.extend(cell_types)
+    values.extend(
+        [
+            hypothesis.get("title", ""),
+            hypothesis.get("core_claim", ""),
+            hypothesis.get("falsifiable_prediction", ""),
+            hypothesis.get("validation_approach", ""),
+        ]
+    )
+
+    for value in values:
+        text = _normalized_anchor_text(value)
+        if text and any(label in text for label in anchor_labels):
+            return True
+    return False
+
+
 def _hypothesis_stage1_pairs(
     hypothesis: dict[str, Any],
     stage1_pair_lookup: dict[str, dict[str, Any]],
@@ -970,7 +1027,11 @@ def _annotate_hypothesis_tiers(
             _is_true(pair.get("_target_cell_intrinsic_support"))
             for pair in stage1_pair_evidence
         )
-        if has_primary_target_cell_support:
+        mentions_target_cell_anchor = _hypothesis_mentions_celltype_anchor(
+            rendered_hypothesis,
+            celltype_context=celltype_context,
+        )
+        if has_primary_target_cell_support and mentions_target_cell_anchor:
             rendered_hypothesis["_tier"] = "primary_target_cell_intrinsic"
             rendered_hypothesis["_tier_label"] = _safe_text(
                 celltype_context.get("primary_tier_label"),
@@ -1197,6 +1258,7 @@ def _celltype_context_from_template_context(
         "focus_detail": focus_detail,
         "focus_short": focus_short,
         "focus_proxy_label": focus_proxy_label,
+        "legacy_at2_fallback": legacy_at2_fallback,
         "primary_heading": "Primary Interest-Cell Follow-up Candidates",
         "primary_tier_label": "Primary interest-cell intrinsic",
         "primary_tier_note": (

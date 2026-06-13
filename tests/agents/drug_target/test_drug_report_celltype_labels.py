@@ -134,6 +134,43 @@ def test_enriched_malignant_stage1_hypothesis_is_primary_target_cell_support() -
     assert "No primary" not in part4
 
 
+def test_stage1_intrinsic_citation_without_celltype_anchor_stays_secondary() -> None:
+    from copy import deepcopy
+
+    from src.agents.drug_target.deterministic_report import (
+        _markdown_template_context,
+        render_report_markdown,
+    )
+
+    report_data = deepcopy(_breast_cancer_report_data())
+    hypothesis = report_data["template_context"]["hypothesis_data"]["hypotheses"][0]
+    hypothesis["title"] = "ERBB2 actionability follow-up axis"
+    hypothesis["core_claim"] = "ERBB2 has follow-up support from cited evidence."
+    hypothesis["biological_entities"]["cell_types"] = ["tumor ecosystem"]
+    hypothesis["falsifiable_prediction"] = (
+        "ERBB2 perturbation will change proliferation readouts."
+    )
+    hypothesis["validation_approach"] = "Perturb ERBB2 in breast cancer models."
+
+    context = _markdown_template_context(report_data)
+    hypothesis_data = context["hypothesis_data"]
+
+    assert hypothesis_data["primary_hypotheses"] == []
+    assert [h["title"] for h in hypothesis_data["secondary_hypotheses"]] == [
+        "ERBB2 actionability follow-up axis",
+    ]
+
+    markdown = render_report_markdown(report_data)
+    part4 = _part4(markdown)
+
+    assert (
+        "No primary interest-cell / malignant-cell proxy follow-up candidates "
+        "met the Stage 1 intrinsic-support criteria."
+    ) in part4
+    assert "#### 4.2.1. ERBB2 actionability follow-up axis" in part4
+    assert "#### 4.1.1. ERBB2 actionability follow-up axis" not in part4
+
+
 def test_missing_stage1_pass_status_is_not_primary_target_cell_support() -> None:
     from copy import deepcopy
 
@@ -173,6 +210,13 @@ def test_legacy_at2_fallback_context_preserves_epithelial_tier_labels() -> None:
     ]
     census_validation["requested_cell_type"] = "pulmonary alveolar type 2 cell"
     census_validation["resolved_cell_type"] = "pulmonary alveolar type 2 cell"
+    hypothesis = template_context["hypothesis_data"]["hypotheses"][0]
+    hypothesis["biological_entities"]["cell_types"] = [
+        "pulmonary alveolar type 2 cell",
+    ]
+    hypothesis["validation_approach"] = (
+        "Perturb ERBB2 in AT2-enriched breast cancer models."
+    )
 
     context = _markdown_template_context(report_data)
     primary = context["hypothesis_data"]["primary_hypotheses"]
