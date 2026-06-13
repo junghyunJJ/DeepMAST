@@ -215,3 +215,30 @@ class TestReaderSites:
         from src.agents.deep_interpreter.tools.literature_rag import _resolve_papers_path
         result = _resolve_papers_path("/papers.json", data_dir="")
         assert result == str(papers_file.resolve())
+
+
+class TestOverwriteFilesystemBackend:
+    def test_write_tolerates_file_deleted_between_exists_and_unlink(
+        self,
+        monkeypatch,
+        tmp_path,
+    ):
+        from src.agents.deep_interpreter.agent import OverwriteFilesystemBackend
+
+        backend = OverwriteFilesystemBackend(root_dir=str(tmp_path), virtual_mode=True)
+        target = tmp_path / "data_path.txt"
+        target.write_text("old", encoding="utf-8")
+
+        original_unlink = Path.unlink
+
+        def racing_unlink(self, *args, **kwargs):
+            if self == target:
+                original_unlink(self)
+                raise FileNotFoundError(str(self))
+            return original_unlink(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "unlink", racing_unlink)
+
+        backend.write("/data_path.txt", "new")
+
+        assert target.read_text(encoding="utf-8") == "new"

@@ -92,7 +92,10 @@ class OverwriteFilesystemBackend(FilesystemBackend):
     def write(self, file_path: str, content: str) -> WriteResult:
         resolved_path = self._resolve_path(file_path)
         if resolved_path.exists():
-            resolved_path.unlink()
+            try:
+                resolved_path.unlink()
+            except FileNotFoundError:
+                pass
         return super().write(file_path, content)
 
 
