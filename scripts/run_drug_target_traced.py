@@ -1605,6 +1605,11 @@ async def run_traced(args: argparse.Namespace) -> int:
                     "[HOST-HYPOTHESIS-FIXUP] FAILED — "
                     + "; ".join(fixup_result.get("errors", [])[:5])
                 )
+    with open(trace_log_path, "a", encoding="utf-8") as fp:
+        fp.write(
+            "\n[HOST-HYPOTHESIS-FIXUP] host_hypothesis_fallback_used: "
+            f"{'YES' if host_hypothesis_fallback_used else 'NO'}\n"
+        )
 
     activation_trace_path = resolve_activation_trace_path(
         args.activation_trace_json,

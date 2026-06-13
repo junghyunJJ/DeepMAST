@@ -129,6 +129,13 @@ def load_activation_trace(path: Path) -> tuple[dict[str, Any], bool, str | None]
     return payload, True, None
 
 
+def trace_records_host_hypothesis_fallback(trace_text: str) -> bool:
+    return (
+        "host_hypothesis_fallback_used: YES" in trace_text
+        or "[HOST-HYPOTHESIS-FIXUP] save_hypothesis_report completed" in trace_text
+    )
+
+
 def terminate_process_gracefully(
     process: subprocess.Popen,
     *,
@@ -347,7 +354,7 @@ def run_one_trial(
         if trace_log_path.exists()
         else ""
     )
-    host_hypothesis_fallback_used = "host_hypothesis_fallback_used: YES" in trace_text
+    host_hypothesis_fallback_used = trace_records_host_hypothesis_fallback(trace_text)
 
     return {
         **trial,
