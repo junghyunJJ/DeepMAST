@@ -9,7 +9,7 @@ import time
 from argparse import Namespace
 from collections.abc import Sequence
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
@@ -1038,17 +1038,18 @@ def test_governor_production_resume_rerun_failed_state_keeps_failed_pending(
         lambda path: {"errors": []},
     )
 
-    state_calls: list[dict[str, object]] = []
+    state_calls: list[dict[str, Any]] = []
     original_write_runner_state = (
         run_governor_production_activation_matrix.write_runner_state
     )
 
-    def capture_runner_state(**kwargs: object) -> None:
+    def capture_runner_state(**kwargs: Any) -> None:
         state_calls.append(dict(kwargs))
         original_write_runner_state(**kwargs)
 
-    def fake_run_trial_batch_parallel(**kwargs: object) -> list[dict[str, object]]:
-        batch = cast(list[dict[str, object]], kwargs["batch"])
+    def fake_run_trial_batch_parallel(**kwargs: Any) -> list[dict[str, Any]]:
+        batch = cast(list[dict[str, Any]], kwargs["batch"])
+        assert kwargs["force"] is True
         assert [trial["run_id"] for trial in batch] == [failed["run_id"]]
         return [
             {

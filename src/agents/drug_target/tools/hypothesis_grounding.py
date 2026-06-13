@@ -39,8 +39,13 @@ _NOT_ONLY_RE = re.compile(r"\bnot\s+only\b", re.IGNORECASE)
 _NON_PAIR_GENE_LEVEL_CONTEXT_RE = re.compile(
     r"\b("
     r"independent|separate(?:ly)?|individual|gene[-\s]?level|"
-    r"actionability[-\s]?only|not\s+a\s+pair|do\s+not\s+claim|or"
+    r"actionability[-\s]?only|not\s+a\s+pair|do\s+not\s+claim"
     r")\b",
+    re.IGNORECASE,
+)
+_NON_PAIR_GENE_ALTERNATIVE_RE = re.compile(
+    rf"\b(?:whether|either)\s+{_GENE_SYMBOL_RE}\s+or\s+{_GENE_SYMBOL_RE}\s+"
+    r"(?:perturbation|perturbations|expression|inhibition|knockdown|blockade|targeting)\b",
     re.IGNORECASE,
 )
 _TARGET_CELL_INTRINSIC_RE = re.compile(
@@ -296,7 +301,9 @@ def _explicit_direct_pairs(text: str, known_genes: set[str]) -> set[tuple[str, s
 
 
 def _has_unnegated_pair_cue(clause: str) -> bool:
-    if _NON_PAIR_GENE_LEVEL_CONTEXT_RE.search(clause):
+    if _NON_PAIR_GENE_LEVEL_CONTEXT_RE.search(
+        clause
+    ) or _NON_PAIR_GENE_ALTERNATIVE_RE.search(clause):
         return False
     for match in _PAIR_CUE_RE.finditer(clause):
         prefix = clause[: match.start()]
