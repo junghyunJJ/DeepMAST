@@ -198,7 +198,8 @@ def test_hypothesis_writer_prompt_requires_intrinsic_stage1_primary_contract() -
     text = prompts.HYPOTHESIS_WRITER_PROMPT
 
     assert "interest_cell_intrinsic_stage1_pair_files" in text
-    assert "write Primary\n  Interest-Cell recommendations first from those files" in text
+    assert "Primary AT2/Epithelial recommendations" in text
+    assert "Primary Interest-Cell recommendations" in text
     assert "Secondary\n  Spatial-Niche recommendations" in text
     assert "At least one retained hypothesis must cite an\n  intrinsic Stage 1 file" in text
     assert (
@@ -206,6 +207,18 @@ def test_hypothesis_writer_prompt_requires_intrinsic_stage1_primary_contract() -
         in text
     )
     assert "For semantic proxy contexts such as Prolif Invasive Tumor -> malignant cell" in text
+
+
+def test_hypothesis_writer_prompt_splits_legacy_at2_and_semantic_proxy_branches() -> None:
+    text = prompts.HYPOTHESIS_WRITER_PROMPT
+
+    assert "Legacy AT2/Epithelial branch" in text
+    assert "Primary AT2/Epithelial recommendations" in text
+    assert "AT2, Transitional AT2, pulmonary alveolar type 2 cell" in text
+    assert "Dynamic semantic-proxy branch" in text
+    assert "Prolif Invasive Tumor -> malignant cell" in text
+    assert "Primary Interest-Cell recommendations" in text
+    assert "Do not use the semantic-proxy branch for legacy AT2/IPF contexts" in text
 
 
 def test_hypothesis_writer_prompt_requires_dynamic_celltype_repair_after_save_rejection() -> None:

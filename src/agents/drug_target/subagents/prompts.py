@@ -397,20 +397,39 @@ cell-type context for follow-up recommendation generation:
 - `celltype_resolution.json` is context-only and must not appear in `evidence_references`;
   cite Stage 1 pair files for Census evidence.
 
-If a match has `match_mode="semantic_proxy"`, treat `primary_resolved_celltype`
-as the broader Census proxy used for Stage 1 and treat the original
-`input_celltype` as the biological focus. For example, `Prolif Invasive Tumor`
-may use `malignant cell` as the Stage 1 Census proxy. In retained hypotheses,
-include the original label when biologically relevant and describe the Census
-evidence as proxy validation using the broader resolved label.
+### Branch Selection: Legacy AT2/Epithelial vs Dynamic Semantic Proxy
 
-For every retained recommendation, `biological_entities.cell_types` should include
-the original interest label or resolved Census cell type when relevant to the
-mechanism. Legacy IPF examples include `AT2`, `Transitional AT2`, and the
-resolved Census label `pulmonary alveolar type 2 cell` when citing Stage 1
-Census evidence. For semantic proxy contexts such as Prolif Invasive Tumor -> malignant cell,
-use the original interest label or resolved Census cell type consistently in
-`validation_approach` and `biological_entities.cell_types`.
+Use `celltype_resolution.json` to choose one branch before drafting hypotheses.
+
+#### Legacy AT2/Epithelial branch
+
+Use this branch when any original or resolved cell-type label is `AT2`,
+`Transitional AT2`, `pulmonary alveolar type 2 cell`, `alveolar type 2 cell`,
+`alveolar epithelial`, or `pulmonary epithelial`.
+
+- Write `Primary AT2/Epithelial recommendations` first when
+  `interest_cell_intrinsic_stage1_pair_files` is non-empty.
+- At least one retained hypothesis must cite an intrinsic Stage 1 file from
+  `interest_cell_intrinsic_stage1_pair_files` and name AT2, Transitional AT2, pulmonary alveolar type 2 cell, or AT2/Epithelial context in
+  `validation_approach` and `biological_entities.cell_types`.
+- Use the historical IPF wording family: `Primary AT2/Epithelial`,
+  `AT2/Epithelial follow-up candidate`, `AT2-intrinsic`, or
+  `pulmonary alveolar type 2 cell validation`.
+- Do not use the semantic-proxy branch for legacy AT2/IPF contexts.
+
+#### Dynamic semantic-proxy branch
+
+Use this branch when `matches[*].match_mode="semantic_proxy"`, for example
+`Prolif Invasive Tumor -> malignant cell`.
+
+- Treat `primary_resolved_celltype` as the broader Census proxy used for Stage 1.
+- Treat the original `input_celltype` as the biological focus.
+- Describe Census evidence as proxy validation using the broader resolved label.
+- Write `Primary Interest-Cell recommendations` first when
+  `interest_cell_intrinsic_stage1_pair_files` is non-empty.
+- `validation_approach` and `biological_entities.cell_types` must name the
+  original interest label or the resolved Census proxy. Generic disease,
+  tumor, epithelial, or tissue wording is not enough.
 
 Do not claim that Census separately validated a lost state modifier. If
 `Transitional AT2` resolved through `state_stripped_alias` with
@@ -433,8 +452,9 @@ Use the Stage 1 usage whitelist from `load_evidence_files` or
   may support interest-cell-intrinsic coexpression claims, including legacy AT2,
   Transitional AT2, pulmonary/alveolar epithelial, or resolved Census cell
   contexts.
-- When `interest_cell_intrinsic_stage1_pair_files` is non-empty, write Primary
-  Interest-Cell recommendations first from those files before Secondary
+- Choose either `Primary AT2/Epithelial recommendations` or
+  `Primary Interest-Cell recommendations` from the branch rules above before
+  Secondary
   Spatial-Niche recommendations. At least one retained hypothesis must cite an
   intrinsic Stage 1 file from `interest_cell_intrinsic_stage1_pair_files` and
   name the original interest cell label, resolved Census cell type, or legacy AT2/epithelial context.

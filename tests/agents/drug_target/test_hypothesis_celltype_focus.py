@@ -424,7 +424,8 @@ def test_hypothesis_prompt_requires_interest_celltype_focus() -> None:
     assert "Stage 3" in text
     assert "actionability" in text
     assert "not biological causality" in text
-    assert "Primary Interest-Cell intrinsic follow-up recommendations" in text
+    assert "Primary AT2/Epithelial recommendations" in text
+    assert "Primary Interest-Cell recommendations" in text
     assert (
         "Secondary interest-cell-associated spatial-niche follow-up recommendations"
         in text
