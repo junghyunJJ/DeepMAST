@@ -1319,6 +1319,27 @@ def test_celltype_context_detects_legacy_at2_branch(tmp_path: Path) -> None:
     assert "pulmonary alveolar type 2 cell" in context["anchor_tokens"]
 
 
+def test_celltype_context_detects_generic_epithelial_legacy_branch(
+    tmp_path: Path,
+) -> None:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "celltype_resolution.json").write_text(
+        json.dumps({"interest_celltypes": ["Epithelial"]}),
+        encoding="utf-8",
+    )
+
+    from src.agents.drug_target.tools.hypothesis_schema import (
+        _celltype_resolution_context,
+    )
+
+    context = _celltype_resolution_context(evidence_dir)
+
+    assert context["branch"] == "legacy_at2"
+    assert context["legacy_at2"] is True
+    assert "epithelial" in context["anchor_tokens"]
+
+
 def test_celltype_context_detects_semantic_proxy_branch(tmp_path: Path) -> None:
     evidence_dir = tmp_path / "evidence"
     evidence_dir.mkdir()

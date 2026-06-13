@@ -608,6 +608,7 @@ _LEGACY_AT2_TOKENS = {
     "alveolar type 2 cell",
     "alveolar epithelial",
     "pulmonary epithelial",
+    "epithelial",
 }
 
 
