@@ -601,17 +601,40 @@ def _normal_celltype(value: Any) -> str:
     return " ".join(text.split())
 
 
-def _celltype_resolution_anchor_tokens(evidence_dir: Path) -> set[str]:
+_LEGACY_AT2_TOKENS = {
+    "at2",
+    "transitional at2",
+    "pulmonary alveolar type 2 cell",
+    "alveolar type 2 cell",
+    "alveolar epithelial",
+    "pulmonary epithelial",
+}
+
+
+def _celltype_resolution_context(evidence_dir: Path) -> dict[str, Any]:
     try:
         celltype_resolution = json.loads(
             (evidence_dir / "celltype_resolution.json").read_text(encoding="utf-8")
         )
     except (OSError, json.JSONDecodeError):
-        return set()
+        return {
+            "branch": "unknown",
+            "legacy_at2": False,
+            "semantic_proxy": False,
+            "anchor_tokens": set(),
+            "match_modes": set(),
+        }
     if not isinstance(celltype_resolution, dict):
-        return set()
+        return {
+            "branch": "unknown",
+            "legacy_at2": False,
+            "semantic_proxy": False,
+            "anchor_tokens": set(),
+            "match_modes": set(),
+        }
 
     raw_tokens: list[str] = []
+    match_modes: set[str] = set()
     for key in ("primary_input_celltype", "primary_resolved_celltype"):
         value = celltype_resolution.get(key)
         if isinstance(value, str):
@@ -628,16 +651,39 @@ def _celltype_resolution_anchor_tokens(evidence_dir: Path) -> set[str]:
         for match in matches:
             if not isinstance(match, dict):
                 continue
+            match_mode = str(match.get("match_mode") or "").strip()
+            if match_mode:
+                match_modes.add(match_mode)
             for key in ("input_celltype", "matched_celltype", "resolved_celltype"):
                 value = match.get(key)
                 if isinstance(value, str):
                     raw_tokens.append(value)
 
-    return {
+    anchor_tokens = {
         token
         for token in (_normal_celltype(value) for value in raw_tokens)
         if token
     }
+    legacy_at2 = bool(anchor_tokens.intersection(_LEGACY_AT2_TOKENS))
+    semantic_proxy = "semantic_proxy" in match_modes
+    branch = (
+        "legacy_at2"
+        if legacy_at2
+        else "semantic_proxy" if semantic_proxy else "dynamic"
+    )
+    return {
+        "branch": branch,
+        "legacy_at2": legacy_at2,
+        "semantic_proxy": semantic_proxy,
+        "anchor_tokens": anchor_tokens,
+        "match_modes": match_modes,
+    }
+
+
+def _celltype_resolution_anchor_tokens(evidence_dir: Path) -> set[str]:
+    context = _celltype_resolution_context(evidence_dir)
+    tokens = context["anchor_tokens"]
+    return set(tokens) if isinstance(tokens, set) else set()
 
 
 def _celltype_anchor_variants(tokens: set[str]) -> set[str]:

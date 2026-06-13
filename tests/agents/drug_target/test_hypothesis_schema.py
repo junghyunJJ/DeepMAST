@@ -1280,3 +1280,74 @@ def test_save_hypothesis_report_keeps_contrast_details_out_of_primary_refs(
         "display_reference": "stage1_FN1--PLAUR.json",
     }
     assert "_FAILED" not in json.dumps(saved_hyp)
+
+
+def test_celltype_context_detects_legacy_at2_branch(tmp_path: Path) -> None:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "celltype_resolution.json").write_text(
+        json.dumps(
+            {
+                "interest_celltypes": ["AT2", "Transitional AT2"],
+                "primary_resolved_celltype": "pulmonary alveolar type 2 cell",
+                "matches": [
+                    {
+                        "input_celltype": "AT2",
+                        "matched_celltype": "pulmonary alveolar type 2 cell",
+                        "match_mode": "alias",
+                    },
+                    {
+                        "input_celltype": "Transitional AT2",
+                        "matched_celltype": "pulmonary alveolar type 2 cell",
+                        "match_mode": "state_stripped_alias",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    from src.agents.drug_target.tools.hypothesis_schema import (
+        _celltype_resolution_context,
+    )
+
+    context = _celltype_resolution_context(evidence_dir)
+
+    assert context["branch"] == "legacy_at2"
+    assert context["legacy_at2"] is True
+    assert context["semantic_proxy"] is False
+    assert "pulmonary alveolar type 2 cell" in context["anchor_tokens"]
+
+
+def test_celltype_context_detects_semantic_proxy_branch(tmp_path: Path) -> None:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "celltype_resolution.json").write_text(
+        json.dumps(
+            {
+                "interest_celltypes": ["Prolif Invasive Tumor"],
+                "primary_input_celltype": "Prolif Invasive Tumor",
+                "primary_resolved_celltype": "malignant cell",
+                "matches": [
+                    {
+                        "input_celltype": "Prolif Invasive Tumor",
+                        "matched_celltype": "malignant cell",
+                        "match_mode": "semantic_proxy",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    from src.agents.drug_target.tools.hypothesis_schema import (
+        _celltype_resolution_context,
+    )
+
+    context = _celltype_resolution_context(evidence_dir)
+
+    assert context["branch"] == "semantic_proxy"
+    assert context["legacy_at2"] is False
+    assert context["semantic_proxy"] is True
+    assert "malignant cell" in context["anchor_tokens"]
+    assert "prolif invasive tumor" in context["anchor_tokens"]
