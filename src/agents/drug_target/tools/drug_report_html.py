@@ -60,6 +60,7 @@ def parse_drug_md(md_text: str) -> dict[str, Any]:
         "gene_level_hypotheses": [],
         "unbucketed_hypotheses": [],
         "secondary_stage1_framing_pairs": [],
+        "hypothesis_section": _default_hypothesis_section_context(),
         "pipeline_summary": {},
     }
 
@@ -76,16 +77,23 @@ def parse_drug_md(md_text: str) -> dict[str, Any]:
         elif header_line.startswith("4.") and (
             "Hypothesis" in header_line or "Follow-up" in header_line
         ):
+            context["hypothesis_section"] = _parse_hypothesis_section_context(body)
             context["hypothesis"] = _parse_hypothesis_section(body)
             context["primary_hypotheses"] = [
                 h
                 for h in context["hypothesis"]
-                if h.get("_tier") == "primary_epithelial_intrinsic"
+                if h.get("_tier") in {
+                    "primary_epithelial_intrinsic",
+                    "primary_target_cell_intrinsic",
+                }
             ]
             context["secondary_hypotheses"] = [
                 h
                 for h in context["hypothesis"]
-                if h.get("_tier") == "secondary_epithelial_associated_niche"
+                if h.get("_tier") in {
+                    "secondary_epithelial_associated_niche",
+                    "secondary_spatial_niche",
+                }
             ]
             context["gene_level_hypotheses"] = [
                 h
@@ -578,6 +586,90 @@ def _parse_rubric_assessment(body: str) -> dict[str, Any]:
     return rubric
 
 
+def _default_hypothesis_section_context() -> dict[str, str]:
+    return {
+        "primary_heading": "Primary AT2/Epithelial Follow-up Candidates",
+        "primary_intro": (
+            "These recommendations cite Stage 1 Census support for same-cell "
+            "coexpression enrichment in the resolved epithelial/AT2 cell context."
+        ),
+        "no_primary_message": (
+            "No primary AT2/epithelial follow-up candidates met the Stage 1 "
+            "intrinsic-support criteria."
+        ),
+        "secondary_heading": "Secondary Spatial-Niche Follow-up Candidates",
+        "secondary_intro": (
+            "These recommendations retain spatially colocalized ligand-receptor "
+            "evidence as epithelial-associated spatial-niche or cross-cell "
+            "follow-up candidates, not as epithelial-cell-intrinsic target "
+            "mechanisms."
+        ),
+        "gene_level_intro": (
+            "These recommendations cite target-disease or actionability evidence "
+            "but no Stage 1/spatial grounding. Treat them as gene-level follow-up "
+            "candidates, not spatial-niche or AT2-intrinsic evidence."
+        ),
+    }
+
+
+def _parse_hypothesis_section_context(body: str) -> dict[str, str]:
+    context = _default_hypothesis_section_context()
+    if not re.search(r"^####\s+4\.[123]\.\d+\.\s+", body, flags=re.MULTILINE):
+        return context
+
+    primary = _parse_numbered_subsection(body, "4.1")
+    if primary:
+        context["primary_heading"] = primary["heading"]
+        context["primary_intro"] = primary["intro"]
+        no_primary = re.search(r"^No primary .+$", primary["body"], re.MULTILINE)
+        if no_primary:
+            context["no_primary_message"] = no_primary.group(0).strip()
+
+    secondary = _parse_numbered_subsection(body, "4.2")
+    if secondary:
+        context["secondary_heading"] = secondary["heading"]
+        context["secondary_intro"] = secondary["intro"]
+
+    gene_level = _parse_numbered_subsection(body, "4.3")
+    if gene_level:
+        context["gene_level_intro"] = gene_level["intro"]
+
+    return context
+
+
+def _parse_numbered_subsection(body: str, section: str) -> dict[str, str] | None:
+    match = re.search(
+        rf"^###\s+{re.escape(section)}\.\s+(?P<heading>.+?)\s*$",
+        body,
+        flags=re.MULTILINE,
+    )
+    if not match:
+        return None
+    tail = body[match.end():]
+    next_match = re.search(r"^###\s+\d+\.\d+\.\s+", tail, flags=re.MULTILINE)
+    subsection_body = tail[: next_match.start()] if next_match else tail
+    intro = _first_markdown_paragraph(subsection_body)
+    return {
+        "heading": match.group("heading").strip(),
+        "intro": intro,
+        "body": subsection_body,
+    }
+
+
+def _first_markdown_paragraph(markdown: str) -> str:
+    lines: list[str] = []
+    for line in markdown.strip().splitlines():
+        stripped = line.strip()
+        if not stripped:
+            if lines:
+                break
+            continue
+        if stripped.startswith("#"):
+            break
+        lines.append(stripped)
+    return " ".join(lines)
+
+
 def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
     """Parse section 4 follow-up recommendation entries into a structured list."""
     hypotheses: list[dict[str, Any]] = []
@@ -612,17 +704,21 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
         tier_label = ""
         if source_heading:
             if source_heading.group("tier") == "1":
-                tier = "primary_epithelial_intrinsic"
-                tier_label = "Primary epithelial/AT2-intrinsic"
+                tier = "primary_target_cell_intrinsic"
+                tier_label = "Primary interest-cell intrinsic"
             elif source_heading.group("tier") == "2":
-                tier = "secondary_epithelial_associated_niche"
-                tier_label = "Secondary epithelial-associated niche"
+                tier = "secondary_spatial_niche"
+                tier_label = "Secondary spatial-niche/cross-cell"
             elif source_heading.group("tier") == "3":
                 tier = "gene_level_actionability"
                 tier_label = "Gene-level/actionability follow-up"
 
         category_m = re.search(r"\*\*Category:\*\*\s*(.+)", lines)
         tier_label_m = re.search(r"\*\*Interpretation Tier:\*\*\s*(.+)", lines)
+        if tier_label_m:
+            tier_label = tier_label_m.group(1).strip()
+            if not tier:
+                tier = _infer_hypothesis_tier_from_label(tier_label)
         claim_m = re.search(
             r"\*\*(?:Core Claim|Conservative Interpretation):\*\*\s*(.+)", lines
         )
@@ -695,11 +791,27 @@ def _parse_hypothesis_section(body: str) -> list[dict[str, Any]]:
             "cell_types": cell_types,
             "drugs": drugs,
         }
-        if tier_label_m:
-            hypothesis["_tier_label"] = tier_label_m.group(1).strip()
         hypotheses.append(hypothesis)
 
     return hypotheses
+
+
+def _infer_hypothesis_tier_from_label(tier_label: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", " ", tier_label.casefold()).strip()
+    normalized = " ".join(normalized.split())
+    if not normalized:
+        return ""
+    if "primary epithelial at2 intrinsic" in normalized:
+        return "primary_epithelial_intrinsic"
+    if "primary interest cell intrinsic" in normalized:
+        return "primary_target_cell_intrinsic"
+    if "secondary epithelial associated niche" in normalized:
+        return "secondary_epithelial_associated_niche"
+    if normalized.startswith("secondary") and "spatial" in normalized:
+        return "secondary_spatial_niche"
+    if "gene level actionability follow up" in normalized:
+        return "gene_level_actionability"
+    return ""
 
 
 def _parse_secondary_stage1_framing_pairs(body: str) -> list[dict[str, str]]:
@@ -934,6 +1046,7 @@ def render_drug_md(
     data_limitations: list[str] | None = None,
     interpretations: dict[str, Any] | None = None,
     novelty_opportunity_legend: str = NOVELTY_OPPORTUNITY_LEGEND,
+    celltype_resolution: dict | None = None,
 ) -> str:
     """Render drug.md from structured data via Jinja2 template.
 
@@ -971,8 +1084,13 @@ def render_drug_md(
     # Pre-format complex nested data for template consumption
     preformatted_cards = _preformat_cards(featured_cards, stage1_filter_results)
     formatted_filter = _format_filter_results(stage1_filter_results)
+    celltype_context = _legacy_celltype_context(
+        celltype_resolution,
+        stage1_data,
+    )
     normalized_hypothesis_data = _normalize_hypothesis_data_for_md(
-        hypothesis_data or {}
+        hypothesis_data or {},
+        celltype_context=celltype_context,
     )
 
     return tmpl.render(
@@ -988,11 +1106,129 @@ def render_drug_md(
         disease_scope=disease_scope or {},
         data_limitations=data_limitations or [],
         interpretations=interpretations or {},
+        celltype_context=celltype_context,
         novelty_opportunity_legend=novelty_opportunity_legend,
     )
 
 
-def _normalize_hypothesis_data_for_md(hypothesis_data: dict) -> dict:
+def _legacy_celltype_context(
+    celltype_resolution: dict | None,
+    stage1_data: dict[str, dict] | None,
+) -> dict[str, Any]:
+    resolution = celltype_resolution if isinstance(celltype_resolution, dict) else {}
+    input_label = _legacy_celltype_text(
+        resolution.get("primary_input_celltype")
+    ) or _legacy_celltype_text(resolution.get("interest_celltypes"))
+    resolved_label = _legacy_celltype_text(
+        resolution.get("primary_resolved_celltype")
+    )
+    has_explicit_celltype_resolution = bool(input_label or resolved_label)
+    match_mode = _legacy_celltype_text(resolution.get("primary_match_mode"))
+    if not resolved_label and isinstance(stage1_data, dict):
+        for pair in stage1_data.values():
+            if not isinstance(pair, dict):
+                continue
+            census = pair.get("census_validation")
+            census = census if isinstance(census, dict) else pair.get("census")
+            census = census if isinstance(census, dict) else {}
+            resolved_label = _legacy_celltype_text(
+                census.get("resolved_cell_type")
+            ) or _legacy_celltype_text(census.get("requested_cell_type"))
+            if resolved_label:
+                break
+    proxy = (
+        bool(input_label)
+        and bool(resolved_label)
+        and match_mode == "semantic_proxy"
+        and input_label.casefold() != resolved_label.casefold()
+    )
+    if proxy:
+        focus_detail = f"{input_label}; Census proxy: {resolved_label}"
+        focus_short = f"interest-cell / {resolved_label.replace(' ', '-')} proxy"
+        primary_heading = "Primary Interest-Cell Follow-up Candidates"
+        gene_level_constraint = (
+            "Gene-level support only; do not interpret as "
+            "interest-cell-intrinsic or spatial-niche evidence for "
+            f"{focus_detail}."
+        )
+    elif (
+        not has_explicit_celltype_resolution
+        and resolved_label
+        and _legacy_is_epithelial_anchor_text(resolved_label)
+    ):
+        focus_detail = "epithelial/AT2 cell context"
+        focus_short = "AT2/epithelial"
+        primary_heading = "Primary AT2/Epithelial Follow-up Candidates"
+        gene_level_constraint = (
+            "Gene-level support only; do not interpret as AT2-intrinsic or "
+            "spatial-niche evidence."
+        )
+    elif resolved_label:
+        focus_detail = resolved_label
+        focus_short = "interest-cell"
+        primary_heading = "Primary Interest-Cell Follow-up Candidates"
+        gene_level_constraint = (
+            "Gene-level support only; do not interpret as "
+            "interest-cell-intrinsic or spatial-niche evidence for "
+            f"{focus_detail}."
+        )
+    elif input_label:
+        focus_detail = input_label
+        focus_short = "interest-cell"
+        primary_heading = "Primary Interest-Cell Follow-up Candidates"
+        gene_level_constraint = (
+            "Gene-level support only; do not interpret as "
+            "interest-cell-intrinsic or spatial-niche evidence for "
+            f"{focus_detail}."
+        )
+    else:
+        focus_detail = "resolved interest cell type"
+        focus_short = "interest-cell"
+        primary_heading = "Primary Interest-Cell Follow-up Candidates"
+        gene_level_constraint = (
+            "Gene-level support only; do not interpret as "
+            "interest-cell-intrinsic or spatial-niche evidence for "
+            f"{focus_detail}."
+        )
+    return {
+        "focus_detail": focus_detail,
+        "focus_short": focus_short,
+        "primary_heading": primary_heading,
+        "gene_level_constraint": gene_level_constraint,
+    }
+
+
+def _legacy_is_epithelial_anchor_text(value: Any) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
+    normalized = " ".join(normalized.split())
+    if not normalized:
+        return False
+    tokens = set(normalized.split())
+    return (
+        "at2" in tokens
+        or "pulmonary alveolar type 2" in normalized
+        or "alveolar type 2" in normalized
+        or "alveolar epithelial" in normalized
+        or "pulmonary epithelial" in normalized
+    )
+
+
+def _legacy_celltype_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            text = _legacy_celltype_text(item)
+            if text:
+                return text
+    return ""
+
+
+def _normalize_hypothesis_data_for_md(
+    hypothesis_data: dict,
+    *,
+    celltype_context: dict[str, Any] | None = None,
+) -> dict:
     """Add gene-level buckets for raw hypothesis data before markdown rendering."""
     if not isinstance(hypothesis_data, dict):
         return {}
@@ -1031,9 +1267,12 @@ def _normalize_hypothesis_data_for_md(hypothesis_data: dict) -> dict:
             "Cited evidence provides target-disease or actionability context, "
             "but no Stage 1/spatial grounding was cited."
         )
-        rendered_hypothesis["_interpretation_constraint"] = (
-            "Gene-level support only; do not interpret as AT2-intrinsic or "
-            "spatial-niche evidence."
+        rendered_hypothesis["_interpretation_constraint"] = str(
+            (celltype_context or {}).get(
+                "gene_level_constraint",
+                "Gene-level support only; do not interpret as "
+                "interest-cell-intrinsic or spatial-niche evidence.",
+            )
         )
         rendered_hypothesis["_biological_grounding_refs"] = []
         rendered_hypothesis["_target_disease_support_refs"] = [

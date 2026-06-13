@@ -3359,6 +3359,15 @@ def build_evidence_summary(data_dir: str) -> str:
     # Build pre-formatted markdown template
     disease_name = assessment.get("disease", "unknown")
     disease_scope = _build_disease_scope(disease_name, stage1_evidence_diseases)
+    celltype_resolution = {}
+    celltype_resolution_path = evidence_dir / "celltype_resolution.json"
+    if celltype_resolution_path.exists():
+        try:
+            celltype_resolution = json.loads(
+                celltype_resolution_path.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            celltype_resolution = {}
     # Lazy import to avoid circular dependency:
     # stage_logic → drug_report_html → evidence_loader → stage_logic
     from src.agents.drug_target.tools.drug_report_html import render_drug_md
@@ -3373,6 +3382,7 @@ def build_evidence_summary(data_dir: str) -> str:
         hypothesis_data=hypothesis_data,
         disease_scope=disease_scope,
         data_limitations=data_limitations,
+        celltype_resolution=celltype_resolution,
         novelty_opportunity_legend=NOVELTY_OPPORTUNITY_LEGEND,
     )
 
@@ -5417,7 +5427,7 @@ def validate_drug_report_finalization(data_dir: str, require_critic: bool = Fals
     drug_md_present = (data_dir_path / "drug.md").exists()
     if drug_md_present:
         try:
-            impl = getattr(validate_drug_md, "func", None) or validate_drug_md
+            impl: Any = getattr(validate_drug_md, "func", None) or validate_drug_md
             raw_json = impl(data_dir_path)
             raw = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
         except Exception as exc:
