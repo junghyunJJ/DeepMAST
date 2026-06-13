@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import inspect
 import json
 import logging
@@ -688,6 +689,46 @@ def _should_skip_hypothesis_quality_after_budget_abort(
     )
 
 
+def _hypothesis_budget_abort_message(
+    *,
+    data_dir: Path,
+    hypothesis_path: Path,
+    evidence_ready_started_at: float | None,
+    hypothesis_started_at: float | None,
+    now: float,
+    budget_seconds: int,
+    run_started_at: float,
+) -> str | None:
+    if (
+        _hypothesis_budget_exceeded(
+            evidence_ready_started_at,
+            now,
+            budget_seconds,
+        )
+        and _artifact_predates_run(hypothesis_path, run_started_at)
+    ):
+        return (
+            "[HYPOTHESIS-BUDGET] evidence has been ready for "
+            f"{budget_seconds}s but no fresh hypothesis_report.json was saved; "
+            "stopping the stream so the graph-level quality gate can handle recovery."
+        )
+    if (
+        _hypothesis_budget_exceeded(
+            hypothesis_started_at,
+            now,
+            budget_seconds,
+        )
+        and (data_dir / "evidence" / "assessment_results.json").exists()
+        and (data_dir / "evidence" / "stage1_filter_results.json").exists()
+    ):
+        return (
+            "[HYPOTHESIS-BUDGET] hypothesis_writer stream exceeded "
+            f"{budget_seconds}s after deterministic evidence artifacts were written; "
+            "stopping the stream so the graph-level quality gate can handle recovery."
+        )
+    return None
+
+
 def _should_invoke_finalize_report(data_dir: Path, run_started_at: float) -> bool:
     drug_md_path = data_dir / "drug.md"
     hypothesis_path = data_dir / "evidence" / "hypothesis_report.json"
@@ -1260,7 +1301,55 @@ async def run_traced(args: argparse.Namespace) -> int:
             stream_mode="updates",
             subgraphs=True,
         )
-        async for chunk in stream:
+        chunk_wait_seconds = min(30, hypothesis_budget_seconds)
+        stream_iter = stream.__aiter__()
+        pending_chunk: asyncio.Task[Any] | None = None
+        while True:
+            if pending_chunk is None:
+                pending_chunk = asyncio.create_task(anext(stream_iter))
+            done, _ = await asyncio.wait({pending_chunk}, timeout=chunk_wait_seconds)
+            if not done:
+                elapsed = time.time() - start
+                if elapsed > timeout_seconds:
+                    print(f"\n[TIMEOUT] {args.timeout}m limit reached")
+                    pending_chunk.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await pending_chunk
+                    break
+                now = time.time()
+                hypothesis_path = data_dir / "evidence" / "hypothesis_report.json"
+                if (
+                    evidence_ready_started_at is None
+                    and _evidence_ready_for_hypothesis(data_dir)
+                    and _artifact_predates_run(hypothesis_path, start)
+                ):
+                    evidence_ready_started_at = now
+                message = _hypothesis_budget_abort_message(
+                    data_dir=data_dir,
+                    hypothesis_path=hypothesis_path,
+                    evidence_ready_started_at=evidence_ready_started_at,
+                    hypothesis_started_at=hypothesis_started_at,
+                    now=now,
+                    budget_seconds=hypothesis_budget_seconds,
+                    run_started_at=start,
+                )
+                if message:
+                    print(f"\n{message}")
+                    trace_log_fp.write(f"\n{message}\n")
+                    trace_log_fp.flush()
+                    hypothesis_budget_aborted = True
+                    pending_chunk.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await pending_chunk
+                    break
+                continue
+            try:
+                chunk = pending_chunk.result()
+            except StopAsyncIteration:
+                break
+            finally:
+                pending_chunk = None
+
             elapsed = time.time() - start
             if elapsed > timeout_seconds:
                 print(f"\n[TIMEOUT] {args.timeout}m limit reached")
