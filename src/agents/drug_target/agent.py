@@ -26,7 +26,7 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, cast
 
 from deepagents import create_deep_agent
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -189,11 +189,14 @@ class DrugTargetConfig:
 
     def __post_init__(self):
         if self.subagent_models is None:
-            self.subagent_models = load_subagent_models_from_env(
-                [
-                    "evidence_assessor",
-                    "hypothesis_writer",
-                ]
+            self.subagent_models = cast(
+                dict[str, BaseChatModel | str] | None,
+                load_subagent_models_from_env(
+                    [
+                        "evidence_assessor",
+                        "hypothesis_writer",
+                    ]
+                ),
             )
 
 
@@ -207,6 +210,9 @@ def _create_docker_backend(
         DockerBackend instance, or None if import fails.
     """
     from src.agents.drug_target.docker_backend import DockerBackend
+
+    if config.docker_image is None:
+        raise ValueError("docker_image is required to create DockerBackend")
 
     skills_dir = str(_resolve_skills_dir(config))
     backend = DockerBackend(
@@ -394,7 +400,7 @@ def create_drug_target_agent(
         ),
     )
 
-    create_kwargs = dict(
+    create_kwargs: dict[str, Any] = dict(
         model=llm,
         tools=tools,
         subagents=subagent_specs,

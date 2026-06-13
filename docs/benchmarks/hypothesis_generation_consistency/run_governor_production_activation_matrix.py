@@ -52,6 +52,7 @@ def parse_csv_models(raw: str) -> tuple[str, ...]:
 def parse_csv_ports(raw: str) -> tuple[int, ...]:
     values = _split_csv(raw, field_name="--ports")
     ports: list[int] = []
+    seen: set[int] = set()
     for value in values:
         try:
             port = int(value)
@@ -59,6 +60,9 @@ def parse_csv_ports(raw: str) -> tuple[int, ...]:
             raise ValueError(f"invalid port {value!r}") from exc
         if not 1 <= port <= 65535:
             raise ValueError(f"invalid port {value!r}; expected 1..65535")
+        if port in seen:
+            raise ValueError(f"duplicate port {port}; expected unique physical ports")
+        seen.add(port)
         ports.append(port)
     return tuple(ports)
 
@@ -442,9 +446,21 @@ def main(argv: list[str] | None = None) -> int:
         rerun_failed=args.rerun_failed,
     )
     rows: list[dict[str, Any]] = list(existing_rows)
+    remaining_run_ids = {str(trial["run_id"]) for trial in pending_trials}
     skipped_trials = len(trials) - len(pending_trials)
     unload_events: list[dict[str, Any]] = []
     active_model: str | None = None
+
+    def completed_trial_count() -> int:
+        seen_completed: set[str] = set()
+        for row in rows:
+            run_id = row.get("run_id")
+            if run_id is None:
+                continue
+            run_id_text = str(run_id)
+            if run_id_text not in remaining_run_ids:
+                seen_completed.add(run_id_text)
+        return len(seen_completed)
 
     def write_results() -> None:
         aggregate = aggregate_activation(rows)
@@ -472,9 +488,9 @@ def main(argv: list[str] | None = None) -> int:
         write_runner_state(
             output_root=output_root,
             total_trials=len(trials),
-            completed_trials=len(rows),
+            completed_trials=completed_trial_count(),
             skipped_trials=skipped_trials,
-            pending_trials=max(len(trials) - len(rows), 0),
+            pending_trials=len(remaining_run_ids),
             active_model=active_model,
             current_batch_key=None,
         )
@@ -499,6 +515,7 @@ def main(argv: list[str] | None = None) -> int:
             rerun_run_ids = {str(row["run_id"]) for row in batch_rows}
             rows = [row for row in rows if str(row.get("run_id")) not in rerun_run_ids]
             rows.extend(batch_rows)
+            remaining_run_ids.difference_update(rerun_run_ids)
             with (output_root / "trials.jsonl").open("w", encoding="utf-8") as handle:
                 for row in rows:
                     handle.write(json.dumps(row, ensure_ascii=False) + "\n")
@@ -506,9 +523,9 @@ def main(argv: list[str] | None = None) -> int:
             write_runner_state(
                 output_root=output_root,
                 total_trials=len(trials),
-                completed_trials=len(rows),
+                completed_trials=completed_trial_count(),
                 skipped_trials=skipped_trials,
-                pending_trials=max(len(trials) - len(rows), 0),
+                pending_trials=len(remaining_run_ids),
                 active_model=active_model,
                 current_batch_key={
                     "model": str(batch[0]["model"]),
@@ -523,9 +540,9 @@ def main(argv: list[str] | None = None) -> int:
         write_runner_state(
             output_root=output_root,
             total_trials=len(trials),
-            completed_trials=len(rows),
+            completed_trials=completed_trial_count(),
             skipped_trials=skipped_trials,
-            pending_trials=max(len(trials) - len(rows), 0),
+            pending_trials=len(remaining_run_ids),
             active_model=None,
             current_batch_key=None,
         )

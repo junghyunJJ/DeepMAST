@@ -1525,6 +1525,7 @@ class TestStage2Service:
 
             def query_gene_trait_with_context(self, gene_symbol, disease, *, disease_context=None):
                 self.query_calls += 1
+                assert disease_context is not None
                 return {
                     "gene_symbol": gene_symbol,
                     "disease": disease,

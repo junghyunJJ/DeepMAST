@@ -603,6 +603,15 @@ def test_governor_production_selector_rejects_unknown_mode() -> None:
         parse_csv_modes("middleware_only,unknown_mode")
 
 
+def test_governor_production_selector_rejects_duplicate_ports() -> None:
+    from docs.benchmarks.hypothesis_generation_consistency.run_governor_production_activation_matrix import (
+        parse_csv_ports,
+    )
+
+    with pytest.raises(ValueError, match="duplicate port 5000"):
+        parse_csv_ports("5000,5000")
+
+
 def test_governor_production_parse_args_accepts_rerun_controls() -> None:
     from docs.benchmarks.hypothesis_generation_consistency.run_governor_production_activation_matrix import (
         parse_args,
@@ -964,6 +973,118 @@ def test_governor_production_resume_skips_completed_jsonl_rows(
         timed_out["run_id"],
         "qwen35b_middleware_only_rep003_port7000",
     ]
+
+
+def test_governor_production_resume_rerun_failed_state_keeps_failed_pending(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from docs.benchmarks.hypothesis_generation_consistency import (
+        run_governor_production_activation_matrix,
+    )
+
+    source = tmp_path / "source"
+    source.mkdir()
+    output_root = tmp_path / "out"
+    output_root.mkdir()
+    workspace_root = tmp_path / "workspaces"
+    completed = {
+        "run_id": "qwen35b_middleware_only_rep001_port5000",
+        "model": "qwen3.5:35b",
+        "mode": "middleware_only",
+        "port": 5000,
+        "completion_mode": "completed",
+        "returncode": 0,
+        "validation": {"validation_passed": True},
+    }
+    failed = {
+        "run_id": "qwen35b_middleware_only_rep002_port6000",
+        "model": "qwen3.5:35b",
+        "mode": "middleware_only",
+        "port": 6000,
+        "completion_mode": "timeout",
+        "returncode": 124,
+        "validation": {"validation_passed": False},
+    }
+    with (output_root / "trials.jsonl").open("w", encoding="utf-8") as handle:
+        handle.write(json.dumps(completed) + "\n")
+        handle.write(json.dumps(failed) + "\n")
+
+    monkeypatch.setattr(
+        run_governor_production_activation_matrix,
+        "parse_args",
+        lambda argv=None: Namespace(
+            source=str(source),
+            output_root=str(output_root),
+            workspace_root=str(workspace_root),
+            disease="pulmonary fibrosis",
+            timeout_minutes=60,
+            hypothesis_skill_set="selective8",
+            activation_trace_grace_seconds=10.0,
+            wait_for_completion=True,
+            dry_run=False,
+            resume=True,
+            rerun_failed=True,
+            repeats_per_condition=2,
+            force=False,
+            models="qwen3.5:35b",
+            ports="5000,6000",
+            modes="middleware_only",
+        ),
+    )
+    monkeypatch.setattr(
+        run_governor_production_activation_matrix,
+        "check_hypothesis_scope_untraced",
+        lambda path: {"errors": []},
+    )
+
+    state_calls: list[dict[str, object]] = []
+    original_write_runner_state = (
+        run_governor_production_activation_matrix.write_runner_state
+    )
+
+    def capture_runner_state(**kwargs: object) -> None:
+        state_calls.append(dict(kwargs))
+        original_write_runner_state(**kwargs)
+
+    def fake_run_trial_batch_parallel(**kwargs: object) -> list[dict[str, object]]:
+        batch = cast(list[dict[str, object]], kwargs["batch"])
+        assert [trial["run_id"] for trial in batch] == [failed["run_id"]]
+        return [
+            {
+                **batch[0],
+                "completion_mode": "completed",
+                "returncode": 0,
+                "activation_trace_valid": True,
+                "activated_skill_names": [],
+                "activated_added_skill_names": [],
+                "validation": {"validation_passed": True},
+            }
+        ]
+
+    monkeypatch.setattr(
+        run_governor_production_activation_matrix,
+        "write_runner_state",
+        capture_runner_state,
+    )
+    monkeypatch.setattr(
+        run_governor_production_activation_matrix,
+        "run_trial_batch_parallel",
+        fake_run_trial_batch_parallel,
+    )
+    monkeypatch.setattr(
+        run_governor_production_activation_matrix,
+        "unload_model_from_ports",
+        lambda model, ports: [],
+    )
+
+    assert run_governor_production_activation_matrix.main([]) == 0
+
+    assert state_calls[0]["completed_trials"] == 1
+    assert state_calls[0]["pending_trials"] == 1
+    assert state_calls[0]["skipped_trials"] == 1
+    assert state_calls[-1]["completed_trials"] == 2
+    assert state_calls[-1]["pending_trials"] == 0
 
 
 def test_governor_production_runner_state_records_progress(tmp_path: Path) -> None:

@@ -160,7 +160,8 @@ def extract_skills_from_tool_history(
     for entry in tool_history:
         if entry.get("name") != read_skill_file.name:
             continue
-        args = entry.get("args") if isinstance(entry.get("args"), dict) else {}
+        raw_args = entry.get("args")
+        args = raw_args if isinstance(raw_args, dict) else {}
         skill_name = _skill_name_from_path(str(args.get("skill_path", "")))
         if skill_name in registry:
             names.add(skill_name)

@@ -172,9 +172,14 @@ def call_anthropic_judge(*, model: str, report_text: str) -> dict[str, Any]:
         system=RUBRIC_TEXT,
         messages=[{"role": "user", "content": report_text}],
     )
-    text = "".join(
-        block.text for block in response.content if getattr(block, "type", "") == "text"
-    )
+    text_parts: list[str] = []
+    for block in response.content:
+        if getattr(block, "type", "") != "text":
+            continue
+        block_text = getattr(block, "text", "")
+        if isinstance(block_text, str):
+            text_parts.append(block_text)
+    text = "".join(text_parts)
     parsed = _parse_json_text(text)
     usage = response.usage
     return {
