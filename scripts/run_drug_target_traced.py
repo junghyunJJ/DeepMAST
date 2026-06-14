@@ -1085,6 +1085,53 @@ def _run_host_hypothesis_fallback(
         return result
 
 
+def _maybe_run_host_hypothesis_fallback_before_quality(
+    data_dir: Path,
+    disease: str,
+    trace_log_path: Path,
+    run_started_at: float,
+) -> dict:
+    result: dict = {
+        "saved": False,
+        "errors": [],
+        "path": None,
+        "host_hypothesis_fallback_used": False,
+    }
+    hypothesis_path = data_dir / "evidence" / "hypothesis_report.json"
+    if (
+        not _host_hypothesis_fallback_enabled()
+        or _artifact_predates_run(hypothesis_path, run_started_at)
+    ):
+        return result
+
+    try:
+        from src.agents.drug_target.tools.hypothesis_schema import (
+            validate_hypothesis_report_quality,
+        )
+
+        quality = validate_hypothesis_report_quality(str(data_dir))
+    except Exception as exc:
+        quality = {
+            "valid": False,
+            "errors": [
+                {
+                    "code": "HYPOTHESIS_PRE_QUALITY_EXCEPTION",
+                    "message": f"{type(exc).__name__}: {exc}",
+                }
+            ],
+        }
+    if quality.get("valid") is True:
+        return result
+
+    with open(trace_log_path, "a", encoding="utf-8") as fp:
+        fp.write(
+            "\n[HOST-HYPOTHESIS-FIXUP] pre-quality validation failed; "
+            "writing degraded deterministic hypothesis_report.json before "
+            "LLM retry\n"
+        )
+    return _run_host_hypothesis_fallback(data_dir, disease, trace_log_path)
+
+
 def _build_template_expansions(spec_path: Path) -> dict:
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
     fallback_provenance = dict(spec["example_sentence"]["source_provenance"])
@@ -1640,6 +1687,16 @@ async def run_traced(args: argparse.Namespace) -> int:
                     "[HOST-HYPOTHESIS-FIXUP] FAILED — "
                     + "; ".join(fixup_result.get("errors", [])[:5])
                 )
+    if not host_hypothesis_fallback_used:
+        pre_quality_fixup_result = _maybe_run_host_hypothesis_fallback_before_quality(
+            data_dir,
+            args.disease,
+            trace_log_path,
+            start,
+        )
+        host_hypothesis_fallback_used = bool(
+            pre_quality_fixup_result.get("host_hypothesis_fallback_used")
+        )
     with open(trace_log_path, "a", encoding="utf-8") as fp:
         fp.write(
             "\n[HOST-HYPOTHESIS-FIXUP] host_hypothesis_fallback_used: "

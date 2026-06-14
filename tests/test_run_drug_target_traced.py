@@ -397,6 +397,40 @@ def test_host_hypothesis_fallback_rewrites_failed_suffix_fixture(tmp_path):
                 assert pass_map[pair] is True
 
 
+def test_pre_quality_recovery_rewrites_fresh_invalid_native_report(
+    tmp_path,
+    monkeypatch,
+):
+    fixture_evidence = (
+        Path(__file__).resolve().parent
+        / "agents"
+        / "drug_target"
+        / "fixtures"
+        / "baseline_hallucinated"
+        / "evidence"
+    )
+    shutil.copytree(fixture_evidence, tmp_path / "evidence")
+    report_path = tmp_path / "evidence" / "hypothesis_report.json"
+    run_started_at = report_path.stat().st_mtime - 1
+    trace_log = tmp_path / "trace.log"
+    trace_log.write_text("", encoding="utf-8")
+    monkeypatch.setenv("DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK", "recovery")
+
+    result = traced._maybe_run_host_hypothesis_fallback_before_quality(
+        tmp_path,
+        "idiopathic pulmonary fibrosis",
+        trace_log,
+        run_started_at,
+    )
+
+    assert result["host_hypothesis_fallback_used"] is True, result
+    saved = json.loads(report_path.read_text(encoding="utf-8"))
+    assert saved["host_finalized"] is True
+    assert saved["fallback_quality"] == "degraded"
+    assert "_FAILED" not in json.dumps(saved)
+    assert "pre-quality validation failed" in trace_log.read_text(encoding="utf-8")
+
+
 def test_host_hypothesis_fallback_disabled_by_default(monkeypatch):
     monkeypatch.delenv("DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK", raising=False)
 
