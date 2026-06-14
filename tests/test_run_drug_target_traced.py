@@ -359,6 +359,14 @@ def test_host_hypothesis_fallback_rewrites_failed_suffix_fixture(tmp_path):
     assert saved["host_finalized"] is True
     assert saved["fallback_quality"] == "degraded"
     assert "_FAILED" not in json.dumps(saved)
+    assert len(saved["hypotheses"]) <= 6
+
+    from src.agents.drug_target.tools.hypothesis_schema import (
+        validate_hypothesis_report_quality,
+    )
+
+    quality = validate_hypothesis_report_quality(str(tmp_path))
+    assert quality["valid"] is True, quality
 
     candidates = {
         row["gene"].upper()

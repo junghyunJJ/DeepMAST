@@ -877,7 +877,11 @@ def _host_hypothesis_refs_for_gene(
         receptor = str(row.get("receptor") or "").strip().upper()
         if not ligand or not receptor or gene not in {ligand, receptor}:
             continue
-        add_ref(_stage1_filename(ligand, receptor), "supporting")
+        stage1_filename = _stage1_filename(ligand, receptor)
+        stage1_payload = _load_json_or_default(evidence_dir / stage1_filename, {})
+        if not _host_stage1_is_target_cell_intrinsic(stage1_payload):
+            continue
+        add_ref(stage1_filename, "supporting")
 
     return refs, details
 
@@ -900,6 +904,20 @@ def _host_stage1_cell_types_for_refs(evidence_dir: Path, refs: list[str]) -> lis
     return cell_types
 
 
+def _host_hypothesis_gene_groups(
+    featured_genes: list[str],
+    *,
+    max_groups: int = 6,
+) -> list[list[str]]:
+    if len(featured_genes) <= max_groups:
+        return [[gene] for gene in featured_genes]
+
+    groups = [[gene] for gene in featured_genes[:max_groups]]
+    for gene in featured_genes[max_groups:]:
+        groups[-1].append(gene)
+    return groups
+
+
 def _build_host_hypothesis_report(data_dir: Path, disease: str) -> dict:
     evidence_dir = data_dir / "evidence"
     assessment = _load_json_or_default(evidence_dir / "assessment_results.json", {})
@@ -920,8 +938,23 @@ def _build_host_hypothesis_report(data_dir: Path, disease: str) -> dict:
     ]
     hypotheses: list[dict] = []
     referenced: set[str] = set()
-    for index, gene in enumerate(featured_genes, start=1):
-        refs, details = _host_hypothesis_refs_for_gene(gene, evidence_dir, passed_rows)
+    for index, genes in enumerate(_host_hypothesis_gene_groups(featured_genes), start=1):
+        refs: list[str] = []
+        details: list[dict] = []
+        for gene in genes:
+            gene_refs, gene_details = _host_hypothesis_refs_for_gene(
+                gene,
+                evidence_dir,
+                passed_rows,
+            )
+            for ref in gene_refs:
+                if ref not in refs:
+                    refs.append(ref)
+            detail_filenames = {item["filename"] for item in details}
+            for detail in gene_details:
+                if detail["filename"] not in detail_filenames:
+                    details.append(detail)
+                    detail_filenames.add(detail["filename"])
         referenced.update(refs)
         cell_types = _host_stage1_cell_types_for_refs(evidence_dir, refs)
         validation_context = (
@@ -930,13 +963,15 @@ def _build_host_hypothesis_report(data_dir: Path, disease: str) -> dict:
             else "disease-relevant cell models"
         )
         category = categories[(index - 1) % len(categories)]
+        gene_label = " and ".join(genes)
+        gene_phrase = ", ".join(genes)
         hypotheses.append(
             {
                 "rank": index,
-                "title": f"[FEATURED-GAP] {gene} evidence-backed target hypothesis",
+                "title": f"[FEATURED-GAP] {gene_label} evidence-backed target hypothesis",
                 "category": category,
                 "core_claim": (
-                    f"{gene} remains a testable {disease} target because the current "
+                    f"{gene_phrase} remains a testable {disease} target set because the current "
                     "Stage 3 target evidence and eligible Stage 1 support converge on "
                     "a disease-relevant mechanism. Failed Stage 1 pairs are excluded "
                     "from the support set and are not used as mechanistic evidence."
@@ -945,17 +980,17 @@ def _build_host_hypothesis_report(data_dir: Path, disease: str) -> dict:
                 "evidence_reference_details": details,
                 "contrast_references": [],
                 "biological_entities": {
-                    "genes": [gene],
+                    "genes": genes,
                     "pathways": [],
                     "cell_types": cell_types,
                     "drugs": [],
                 },
                 "falsifiable_prediction": (
-                    f"Perturbing {gene} will produce a measurable disease-relevant "
+                    f"Perturbing {gene_phrase} will produce a measurable disease-relevant "
                     "phenotype change compared with matched controls."
                 ),
                 "validation_approach": (
-                    f"Test {gene} perturbation in {validation_context} with "
+                    f"Test {gene_phrase} perturbation in {validation_context} with "
                     "matched negative controls and orthogonal readouts."
                 ),
                 "scores": {
