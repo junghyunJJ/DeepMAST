@@ -3,322 +3,150 @@ from pathlib import Path
 from src.agents.drug_target.subagents import prompts
 
 
-def test_hypothesis_writer_file_access_rules_name_save_hypothesis_report_as_primary() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-    file_rules = text.split("## Execution Discipline", 1)[0]
+def _skill_text() -> str:
+    return Path("skills/drug-target-hypothesis/SKILL.md").read_text()
 
+
+def test_hypothesis_writer_prompt_names_primary_runtime_tools() -> None:
+    text = prompts.HYPOTHESIS_WRITER_PROMPT
+
+    assert 'load_evidence_files(data_dir=data_dir, scope="hypothesis")' in text
+    assert "validate_evidence_references(data_dir, all_cited_filenames)" in text
+    assert "save_hypothesis_report(data_dir=data_dir, report=report)" in text
+    assert "save_evidence(data_dir" not in text
+    assert "save_hypothesis_report(data_dir, hypothesis_data)" not in text
+    assert "Do not use `read_file`, `write_file`, `ls`, grep" in text
+
+
+def test_hypothesis_writer_default_matches_minimal_dth_required_contract() -> None:
+    text = prompts.HYPOTHESIS_WRITER_PROMPT
+    minimal_dth = prompts.render_hypothesis_writer_prompt(
+        "operational_contract_minimal_plus_dth"
+    )
+
+    assert text == minimal_dth
+    assert "production DTH-required operational contract" not in text
+
+
+def test_hypothesis_writer_prompt_keeps_dth_as_only_required_skill() -> None:
+    text = prompts.HYPOTHESIS_WRITER_PROMPT
+
+    assert 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")' in text
+    assert "loaded skill guides may provide extra interpretation guidance" in text
+    assert 'read_skill_file("skills/opentargets-database/SKILL.md")' not in text
+    assert 'read_skill_file("skills/gwas-database/SKILL.md")' not in text
+    assert 'read_skill_file("skills/chembl-database/SKILL.md")' not in text
     assert (
-        "ALWAYS use `save_hypothesis_report(data_dir=data_dir, report=report)`"
-        in file_rules
+        'read_skill_file("skills/compare-census-gene-pair-by-cell-type/SKILL.md")'
+        not in text
     )
-    assert "NEVER use `write_file`" in file_rules
-    assert "`save_evidence(data_dir, filename, data)`" not in file_rules
-    assert "save_hypothesis_report(data_dir, hypothesis_data)" not in file_rules
+    assert 'read_skill_file("skills/string-database/SKILL.md")' not in text
 
 
-def test_hypothesis_writer_prompt_blocks_large_tool_result_grep_loop() -> None:
+def test_hypothesis_writer_prompt_preserves_artifact_shape_and_coverage_contract() -> None:
     text = prompts.HYPOTHESIS_WRITER_PROMPT
-    file_rules = text.split("## Execution Discipline", 1)[0]
-    skill_text = Path("skills/drug-target-hypothesis/SKILL.md").read_text()
 
-    for contract in (file_rules, skill_text):
-        assert "Do not call `grep` on `/large_tool_results/` paths" in contract
-        assert "do not search for `stage3_candidates` with grep" in contract
-        assert "use the returned evidence payload" in contract
+    assert "Generate 4-6 retained recommendations" in text
+    assert "include every FEATURED gene at least once" in text
+    for category in (
+        "Mechanism of Action",
+        "Therapeutic Strategy",
+        "Cross-Target Interaction",
+        "Novel Pathway",
+    ):
+        assert category in text
+
+    for field in (
+        '"disease": DISEASE',
+        '"evidence_coverage_pct": <float>',
+        '"hypotheses_generated": <int>',
+        '"hypotheses_retained": <int>',
+        '"hypotheses": [',
+        '"gap_analysis": {',
+        '"evidence_references": ["...json"]',
+        '"biological_entities": {"genes": [], "pathways": [], "cell_types": [], "drugs": []}',
+    ):
+        assert field in text
 
 
-def test_hypothesis_writer_final_save_step_marks_save_evidence_as_fallback_only() -> None:
+def test_hypothesis_writer_prompt_preserves_minimal_grounding_rules() -> None:
     text = prompts.HYPOTHESIS_WRITER_PROMPT
-    final_save = text.split("### Phase 5: Save Report", 1)[1]
 
-    assert "`save_hypothesis_report(data_dir=data_dir, report=report)`" in final_save
-    assert "Compatibility fallback only" in final_save
-    assert (
-        '`save_evidence(data_dir=data_dir, filename="hypothesis_report.json", data=report)`'
-        in final_save
+    required_phrases = (
+        "FEATURED gene list",
+        "mechanical_save_gate_contract",
+        "direct_pair_axes",
+        "pair_axes_not_listed_policy",
+        "Pre-Save Support Declarations",
+        "direct_pair_axis_file",
+        "cell_context_anchor",
+        "allowed_direct_pair_axes",
+        "matching passed Stage 1 pair file",
+        "Do not cite failed Stage 1 files as positive evidence",
+        "OpenTargets and Stage 3 files provide target support",
+        "Put drug or compound names in `biological_entities.drugs` only when",
+        "target-prioritization follow-up",
+        "Use simple numeric scores between 0 and 1",
     )
-    assert final_save.index(
-        "`save_hypothesis_report(data_dir=data_dir, report=report)`"
-    ) < final_save.index("Compatibility fallback only")
-    assert "save_hypothesis_report(data_dir, hypothesis_data)" not in final_save
+    for phrase in required_phrases:
+        assert phrase in text
 
 
-def test_hypothesis_writer_prompt_requires_evidence_vs_inference_wording() -> None:
+def test_hypothesis_writer_prompt_preserves_bounded_repair_contract() -> None:
     text = prompts.HYPOTHESIS_WRITER_PROMPT
 
-    assert "Evidence-vs-Inference Wording" in text
-    assert "Direct evidence" in text
-    assert "Recommendation-level inference" in text
-    assert "may`, `could`, or `test whether" in text
-    assert "suggests" in text
-    assert "therapeutic benefit" in text
-    assert "restores fibrosis resolution" in text
-    assert "drives disease" in text
-    assert "Do not list anti-* antibodies" in text
-    assert "known_drugs.json" in text
-    assert "resolved_drugs.json" in text
-    assert "stage3_<GENE>.json" in text
-    assert "Biological Grounding" in text
-    assert "Target-Disease Support" in text
-    assert "Actionability" in text
-    assert "Interpretation Constraint" in text
-    assert "Stage 2 OpenTargets" in text
-    assert "target-disease support, not causal biology" in text
-    assert "Stage 3" in text
-    assert "actionability" in text
-    assert "not biological causality" in text
-    assert "validation_approach as perturbation reagents" in text
-    assert (
-        "Genes or pathways not present in cited evidence may appear as mechanistic"
-        in text
+    required_phrases = (
+        "If `save_hypothesis_report` returns `saved: false`",
+        "never resend an identical rejected payload",
+        "missing FEATURED genes",
+        "unsupported pair-axis errors",
+        "invalid references",
+        "Stop after 3 save attempts",
     )
-    assert "functional axis" in text
-    assert "major source" in text
-    assert "synergistic" in text
-    assert "Not yet established:" in text
-    assert "dysregulation via" in text
-    assert "blockade for reducing" in text
-    assert "barrier dysfunction" in text
-    assert "prioritizes" in text
-    assert "nominates" in text
-    assert "spatial-niche follow-up candidate" in text
-    assert "cross-cell candidate" in text
-    assert "test whether ... changes" in text
-    assert "secondary Stage 1 framing evidence table" in text
-    assert (
-        "cite depleted Stage 1 pair files when the recommendation names that pair concept"
-        in text
+    for phrase in required_phrases:
+        assert phrase in text
+
+
+def test_hypothesis_writer_prompt_does_not_embed_dth_interpretation_rubric() -> None:
+    text = prompts.HYPOTHESIS_WRITER_PROMPT
+
+    forbidden_prompt_phrases = (
+        "DTH quality signature",
+        "target rationale",
+        "claim boundary",
+        "Interest-cell intrinsic pair",
+        "Secondary spatial-niche or cross-cell",
+        "Gene-level/actionability-only",
+        "Evidence-vs-Inference Wording",
+        "Quantitative Predictions",
+        "UCB Scoring",
     )
-    assert "not as same-cell or interest-cell-intrinsic support" in text
-    assert "stage1_pair_usage_guidance" in text
-    assert "interest_cell_intrinsic_stage1_pair_files" in text
-    assert "spatial_niche_only_stage1_pair_files" in text
-    assert "spatial_niche_only_stage1_pair_files` are Stage 1 PASS files but must not be\n  cited" not in text
-    assert "spatial_niche_only_stage1_pair_files` are Stage 1 PASS files but must not be\n  used as interest-cell-intrinsic" in text
-    assert "cite these files only as secondary spatial-niche/cross-cell" in text
-    assert "A file being in `eligible_stage1_pair_files` only means Stage 1 PASS" in text
-    assert "reverse of the prose\norder" in text
-    assert (
-        "cite the actual passed filename returned by `load_evidence_files` or\n"
-        "`validate_evidence_references`"
-        in text
+    for phrase in forbidden_prompt_phrases:
+        assert phrase not in text
+
+
+def test_dth_skill_keeps_interpretation_and_repair_rubric() -> None:
+    text = _skill_text()
+
+    required_phrases = (
+        "## Small-Model DTH Decision Card",
+        "Choose exactly one support class for each recommendation",
+        "Interest-cell intrinsic",
+        "Secondary spatial-niche or cross-cell",
+        "Gene-level/actionability-only",
+        "DTH quality signature",
+        "UCB Scoring and Filtering",
+        "Unsupported direct pair axis",
+        "topn_coverage.missing",
+        "Stage 1 pair filenames may be ligand-receptor ordered",
+        "Repair the exact saved=false errors before saving again",
     )
-    assert "if the rejection names an available reverse file, cite that exact file" in text
-
-
-def test_hypothesis_writer_prompt_prefers_conservative_perturbation_language() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-    lower_intervention = text.split("- Lower intervention-success wording:", 1)[
-        1
-    ].split("- Do not list anti-*", 1)[0]
-
-    assert "Avoid `therapeutic intervention candidate`" in lower_intervention
-    assert (
-        "prefer `perturbation/actionability follow-up candidate`"
-        in lower_intervention
-    )
-    assert "Avoid `synergistic effects`" in lower_intervention
-    assert "prefer `additive or non-additive effects`" in lower_intervention
-    assert "Avoid statements such as `CD47 blockade alters fibrosis resolution`" in lower_intervention
-    assert (
-        "prefer `test whether CD47 perturbation changes macrophage-fibroblast readouts`"
-        in lower_intervention
-    )
-    assert lower_intervention.index("Avoid `therapeutic intervention candidate`") < (
-        lower_intervention.index("prefer `perturbation/actionability follow-up candidate`")
-    )
-    assert lower_intervention.index("Avoid `synergistic effects`") < (
-        lower_intervention.index("prefer `additive or non-additive effects`")
-    )
-
-
-def test_hypothesis_writer_prompt_uses_neutral_fallback_readout_language() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-    anti_overclaim = text.split("### Evidence-vs-Inference Wording (ANTI-OVERCLAIM)", 1)[
-        1
-    ].split("Rules:", 1)[0]
-
-    assert 'wording such as "may reduce"' not in anti_overclaim
-    assert "Use qualitative language: \"significant reduction\"" not in text
-    assert "Use neutral qualitative language:" in text
-    assert "`test whether ... changes`" in text
-    assert "`measurable change`" in text
-    assert "`directional change`" in text
-    assert "`response relative to controls`" in text
-    assert "`qualitative readout change`" in text
-    assert "unsupported\ndirectional outcomes" in text
-
-
-def test_hypothesis_writer_prompt_requires_layered_asymmetric_evidence_bounded_prose() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-
-    assert "moderately enriched, evidence-bounded prose" in text
-    assert "three evidence layers" in text
-    assert "Stage 1/pair-level evidence" in text
-    assert "Stage 2/3/gene-level evidence" in text
-    assert "unresolved follow-up boundary" in text
-    assert "When only a subset of genes in a Stage 1 pair has cited Stage 2 or Stage 3 support" in text
-    assert "write the recommendation as `<SUPPORTED_GENE>-anchored`" in text
-    assert "coexpression-context partner" in text
-    assert "Do not imply target-disease support, actionability, tractability, or druggability" in text
-    assert "unless the exact gene-level file is present in `evidence_references`" in text
-
-
-def test_hypothesis_writer_prompt_treats_unsupported_pair_partner_as_context_readout() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-
-    assert "asymmetric Stage 2/3 support" in text
-    assert "supported gene is the perturbation or actionability anchor" in text
-    assert "unsupported partner is a coexpression-context partner or readout" in text
-    assert "Do not perturb or validate the unsupported partner as an independently supported target" in text
-    assert "measure the unsupported partner only as a contextual readout" in text
-    assert "ICAM1-centered perturbation" in text
-    assert "EZR localization or coexpression as a secondary readout" in text
-    assert "ICAM1+MUC1 perturbation" not in text
-
-
-def test_hypothesis_writer_prompt_handles_grounding_rejections() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-
-    assert "hypothesis_grounding_violations" in text
-    assert "claims direct pair axis 'A--B'" in text
-    assert "target-cell-depleted Stage 1 Census evidence as interest-cell support" in text
-    assert (
-        "coexpression-depleted Stage 1 Census evidence as an interest-cell intrinsic same-cell claim"
-        in text
-    )
-    assert "target-cell-depleted gene expression claim" in text
-    assert "Do not build combinatorial axes from one hub's separate partners" in text
-    assert "support the FEATURED gene with `stage3_<GENE>.json`/`ot_<GENE>.json`" in text
-    assert "secondary spatial-niche/cross-cell evidence" in text
-    assert "authoritative whitelist for interest-cell intrinsic Stage 1 usage" in text
-
-
-def test_hypothesis_writer_prompt_requires_intrinsic_stage1_primary_contract() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-
-    assert "interest_cell_intrinsic_stage1_pair_files" in text
-    assert "Primary AT2/Epithelial recommendations" in text
-    assert "Primary Interest-Cell recommendations" in text
-    assert "Secondary\n  Spatial-Niche recommendations" in text
-    assert "At least one retained hypothesis must cite an\n  intrinsic Stage 1 file" in text
-    assert (
-        "original interest cell label, resolved Census cell type, or legacy AT2/epithelial context"
-        in text
-    )
-    assert "For semantic proxy contexts such as Prolif Invasive Tumor -> malignant cell" in text
-
-
-def test_hypothesis_writer_prompt_splits_legacy_at2_and_semantic_proxy_branches() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-
-    assert "Legacy AT2/Epithelial branch" in text
-    assert "Primary AT2/Epithelial recommendations" in text
-    assert "AT2, Transitional AT2, pulmonary alveolar type 2 cell" in text
-    assert "Dynamic semantic-proxy branch" in text
-    assert "Prolif Invasive Tumor -> malignant cell" in text
-    assert "Primary Interest-Cell recommendations" in text
-    assert "Do not use the semantic-proxy branch for legacy AT2/IPF contexts" in text
-
-
-def test_hypothesis_writer_prompt_requires_dynamic_celltype_repair_after_save_rejection() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-
-    assert "If save_hypothesis_report rejects target-cell-intrinsic Stage 1 evidence" in text
-    assert (
-        "validation_approach must explicitly name the original interest label or resolved Census cell type"
-        in text
-    )
-    assert (
-        "biological_entities.cell_types must include that same original or resolved cell type"
-        in text
-    )
-    assert "Prolif Invasive Tumor -> malignant cell" in text
-    assert "generic tumor, breast-cancer, epithelial, or disease wording is not enough" in text
-
-
-def test_hypothesis_writer_prompt_forbids_fabricated_smoke_citations() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-
-    assert "NEVER invent filenames" in text
-    assert "do not invent `stage3_<GENE>.json` or `ot_<GENE>.json` files" in text
-    assert "Stage 1 pair citations must be present in `eligible_stage1_pair_files`" in text
-    assert "If a missing TOP-N gene lacks gene-level files, do not fabricate them" in text
-
-
-def test_hypothesis_writer_prompt_separates_secondary_spatial_niche_support() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-
-    assert "spatial_niche_only_stage1_pair_files" in text
-    assert "secondary spatial-niche/cross-cell\n  framing evidence" in text
-    assert "never cite depleted or\n  non-intrinsic pairs as same-cell/interest-cell-intrinsic evidence" in text
-    assert "Primary\n  Interest-Cell" in text
-    assert "Secondary Spatial-Niche" in text
-
-
-def test_hypothesis_writer_prompt_distinguishes_gene_level_only_from_spatial_niche() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-
-    assert "Gene-level/actionability-only follow-up recommendations" in text
-    assert "No Stage 1/spatial grounding reference cited" in text
-    assert "do not label it as spatial-niche" in text
-    assert "gene-level follow-up candidate" in text
-    assert "actionability follow-up candidate" in text
-    assert "Only use `spatial-niche` when a Stage 1/spatial pair file is cited" in text
-
-
-def test_hypothesis_writer_prompt_forbids_false_missing_stage1_support() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-
-    assert (
-        "Do not describe a pair as lacking passed Stage 1 support when the matching\n"
-        "  `stage1_<GENE_A>--<GENE_B>.json` exists"
-    ) in text
-    assert "eligible_stage1_pair_files" in text
-    assert "interest_cell_intrinsic_stage1_pair_files" in text
-
-
-def test_hypothesis_writer_prompt_documents_reverse_stage1_filename_contract() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-
-    assert "Stage 1 pair filenames may be ligand-receptor ordered" in text
-    assert "reverse of the prose order" in text
-    assert "Cite the actual filename returned by `load_evidence_files`" in text
-    assert "do not invent the\n  opposite filename when only one direction is present" in text
-    assert "If the rejection says `available: stage1_X--Y.json`" in text
-    assert "cite that exact available filename" in text
-    assert "spatial_niche_only_stage1_pair_files" in text
-
-
-def test_hypothesis_writer_prompt_requires_actual_reverse_stage1_filename_after_rejection() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-
-    assert "Stage 1 pair filenames may be ligand-receptor ordered" in text
-    assert "can be reverse of\n" "the prose order" in text
-    assert "Cite the actual filename returned by `load_evidence_files`" in text
-    assert "not a normalized filename you invent" in text
-    assert "available matching file is the reverse-order\n     `stage1_B--A.json`" in text
-    assert "cite that exact available file or remove the direct\n     pair-axis wording" in text
-
-
-def test_hypothesis_writer_prompt_requires_pre_save_repair_checklist() -> None:
-    text = prompts.HYPOTHESIS_WRITER_PROMPT
-
-    assert "### Pre-save deterministic repair checklist" in text
-    assert "### Phase 5: Save Report" in text
-    assert text.index("### Pre-save deterministic repair checklist") < text.index(
-        "### Phase 5: Save Report"
-    )
-    assert "Do not call save_hypothesis_report with the same payload after saved=false" in text
-    assert "For every GENE_LEVEL_EVIDENCE_REFERENCE_MISSING error" in text
-    assert "For every unsupported direct pair-axis error" in text
-    assert "If the rejection names an available reverse file" in text
-    assert "For every depleted Stage 1 Census error" in text
-    assert "If the last rejection mentions a specific hypothesis index" in text
+    for phrase in required_phrases:
+        assert phrase in text
 
 
 def test_hypothesis_skill_documents_rejection_sidecar_recovery() -> None:
-    text = Path("skills/drug-target-hypothesis/SKILL.md").read_text()
+    text = _skill_text()
 
     assert "### Phase 5.6: Last Rejection Sidecar" in text
     assert "hypothesis_report_last_rejection.json" in text
@@ -336,7 +164,7 @@ def test_hypothesis_skill_documents_rejection_sidecar_recovery() -> None:
 
 
 def test_hypothesis_skill_documents_asymmetric_pair_support_contract() -> None:
-    text = Path("skills/drug-target-hypothesis/SKILL.md").read_text()
+    text = _skill_text()
 
     assert "asymmetric Stage 2/3 support" in text
     assert "supported gene is the perturbation or actionability anchor" in text
@@ -345,7 +173,7 @@ def test_hypothesis_skill_documents_asymmetric_pair_support_contract() -> None:
 
 
 def test_hypothesis_skill_documents_gene_level_only_candidate_labeling() -> None:
-    text = Path("skills/drug-target-hypothesis/SKILL.md").read_text()
+    text = _skill_text()
 
     assert "Gene-level/actionability-only follow-up recommendations" in text
     assert "do not label it as spatial-niche" in text
@@ -353,7 +181,7 @@ def test_hypothesis_skill_documents_gene_level_only_candidate_labeling() -> None
 
 
 def test_hypothesis_skill_matches_followup_recommendation_save_contract() -> None:
-    text = Path("skills/drug-target-hypothesis/SKILL.md").read_text()
+    text = _skill_text()
     example = text.split("### Example 1: Happy-path save flow", 1)[1].split(
         "### Example 2:",
         1,

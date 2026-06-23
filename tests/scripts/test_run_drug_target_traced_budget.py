@@ -43,6 +43,23 @@ def test_skip_hypothesis_quality_after_budget_abort_when_report_missing(tmp_path
     )
 
 
+def test_do_not_skip_hypothesis_quality_after_budget_abort_when_retry_opt_in(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("DRUG_TARGET_ALLOW_HYPOTHESIS_RETRY_AFTER_BUDGET_ABORT", "1")
+    report_path = tmp_path / "evidence" / "hypothesis_report.json"
+
+    assert (
+        traced._should_skip_hypothesis_quality_after_budget_abort(
+            hypothesis_budget_aborted=True,
+            hypothesis_path=report_path,
+            run_started_at=time.time(),
+        )
+        is False
+    )
+
+
 def test_do_not_skip_hypothesis_quality_after_budget_abort_when_report_is_fresh(
     tmp_path,
 ) -> None:
@@ -117,10 +134,14 @@ def test_hypothesis_budget_abort_message_detects_stalled_hypothesis_writer(
     assert "graph-level quality gate can handle recovery" in message
 
 
-def test_hypothesis_budget_abort_message_ignores_fresh_report(tmp_path) -> None:
+def test_hypothesis_budget_abort_message_detects_fresh_report_stream_stall(
+    tmp_path,
+) -> None:
     run_started_at = time.time()
     evidence_dir = tmp_path / "evidence"
     evidence_dir.mkdir()
+    (evidence_dir / "assessment_results.json").write_text("{}", encoding="utf-8")
+    (evidence_dir / "stage1_filter_results.json").write_text("[]", encoding="utf-8")
     report_path = evidence_dir / "hypothesis_report.json"
     report_path.write_text("{}", encoding="utf-8")
 
@@ -128,10 +149,12 @@ def test_hypothesis_budget_abort_message_ignores_fresh_report(tmp_path) -> None:
         data_dir=tmp_path,
         hypothesis_path=report_path,
         evidence_ready_started_at=10.0,
-        hypothesis_started_at=10.0,
+        hypothesis_started_at=None,
         now=30.0,
         budget_seconds=10,
         run_started_at=run_started_at,
     )
 
-    assert message is None
+    assert message is not None
+    assert "fresh hypothesis_report.json was saved" in message
+    assert "graph stream did not finish" in message

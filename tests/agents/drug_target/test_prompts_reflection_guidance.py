@@ -40,7 +40,6 @@ _GROUNDING_SECTION_MARKERS = (
 # contain grounding requirements.
 _REFLECT_PROMPTS = [
     ("EVIDENCE_ASSESSOR_PROMPT", _prompts.EVIDENCE_ASSESSOR_PROMPT),
-    ("HYPOTHESIS_WRITER_PROMPT", _prompts.HYPOTHESIS_WRITER_PROMPT),
     ("REPORT_WRITER_PROMPT", _prompts.REPORT_WRITER_PROMPT),
 ]
 
@@ -97,39 +96,12 @@ def test_evidence_assessor_prompt_reflection_requires_next_action() -> None:
     )
 
 
-def test_hypothesis_writer_prompt_reflection_cites_filenames() -> None:
-    """HYPOTHESIS_WRITER_PROMPT must instruct LLM to cite source filenames in
-    think_tool reflections."""
+def test_hypothesis_writer_prompt_omits_template_reflection_section() -> None:
+    """The production hypothesis writer prompt is now a thin DTH contract."""
     text = _lower(_prompts.HYPOTHESIS_WRITER_PROMPT)
-    assert _JSON_EXAMPLE_MARKER in text or any(
-        m in text for m in ("stage3_", "chembl_lookup", "ranked_targets")
-    ), (
-        "HYPOTHESIS_WRITER_PROMPT reflection guidance must include a .json filename "
-        "example to align with R2 grounding check."
-    )
-    assert any(m in text for m in _GROUNDING_SECTION_MARKERS), (
-        "HYPOTHESIS_WRITER_PROMPT missing reflection grounding requirement section."
-    )
 
-
-def test_hypothesis_writer_prompt_reflection_requires_numeric_values() -> None:
-    """HYPOTHESIS_WRITER_PROMPT reflection section must require numeric values."""
-    text = _lower(_prompts.HYPOTHESIS_WRITER_PROMPT)
-    assert any(m in text for m in _GROUNDING_SECTION_MARKERS), (
-        "HYPOTHESIS_WRITER_PROMPT missing reflection grounding requirement section."
-    )
-    assert any(m in text for m in _NUMERIC_MARKERS), (
-        "HYPOTHESIS_WRITER_PROMPT reflection guidance must require numeric values."
-    )
-
-
-def test_hypothesis_writer_prompt_reflection_requires_next_action() -> None:
-    """HYPOTHESIS_WRITER_PROMPT reflection section must require a next-action statement."""
-    text = _lower(_prompts.HYPOTHESIS_WRITER_PROMPT)
-    assert any(m in text for m in _NEXT_ACTION_MARKERS), (
-        "HYPOTHESIS_WRITER_PROMPT reflection guidance must include a next-action "
-        "statement requirement."
-    )
+    assert "think_tool" not in text
+    assert "reflection grounding" not in text
 
 
 def test_report_writer_prompt_reflection_cites_filenames() -> None:

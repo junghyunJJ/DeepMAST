@@ -1,0 +1,17 @@
+{
+  "skill_name": "string-database",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "A hypothesis_report cites a high STRING combined score for ICAM1 and ITGB2. Write the claim boundary without saying the pair causally drives disease.",
+      "expected_output": "The skill supports network convergence or protein-association wording and rejects causal disease or therapeutic synergy claims.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "A STRING edge is mostly text-mining support. Explain how it should affect a drug-target follow-up recommendation.",
+      "expected_output": "The skill treats the edge as low-confidence context and requires validation rather than direct mechanism wording.",
+      "files": []
+    }
+  ]
+}

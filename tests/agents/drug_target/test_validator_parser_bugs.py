@@ -220,6 +220,133 @@ class TestFabricatedDrugNameExclusions:
             f"'Stage' must be in _DRUG_NAME_STOPLIST. Got: {stage_hits}"
         )
 
+    @pytest.mark.parametrize(
+        ("line", "blocked_terms"),
+        [
+            (
+                "These recommendations are grounded in the available spatial, "
+                "Census, OpenTargets, and ChEMBL evidence. They should be read "
+                "as follow-up priorities.",
+                {"They"},
+            ),
+            (
+                "Follow-up interpretation: Treat them as the strongest "
+                "interest-cell / malignant-cell proxy follow-up candidates.",
+                {"Treat"},
+            ),
+            (
+                "These recommendations cite target-disease or actionability "
+                "evidence but no Stage 1/spatial grounding. Treat them as "
+                "gene-level follow-up candidates.",
+                {"Treat"},
+            ),
+        ],
+    )
+    def test_followup_guidance_words_not_flagged(
+        self,
+        line: str,
+        blocked_terms: set[str],
+    ) -> None:
+        """F-E scenario 4: ordinary guidance words are not drug names.
+
+        Follow-up recommendation prose can contain sentence-initial or
+        post-period words like "They" and "Treat". These words must not be
+        interpreted as fabricated drug names.
+        """
+        findings = _check_fabricated_drug_name(line, 1, frozenset())
+        actual_terms = {
+            finding.get("actual", "").split(" not found", 1)[0]
+            for finding in findings
+        }
+
+        assert actual_terms.isdisjoint(blocked_terms), (
+            f"Guidance words were falsely flagged as FABRICATED_DRUG_NAME. "
+            f"Blocked={blocked_terms}; findings={findings}"
+        )
+
+    def test_celltype_resolution_labels_added_to_fabricated_drug_allowlist(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """F-E scenario 5: resolved cell-type labels are not drug names.
+
+        The breast cancer run writes celltype_resolution.json with
+        "Prolif Invasive Tumor" resolved to "malignant cell". Both labels are
+        context labels, not drug names, and must be excluded from
+        FABRICATED_DRUG_NAME checks.
+        """
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "celltype_resolution.json").write_text(
+            json.dumps(
+                {
+                    "interest_celltypes": ["Prolif Invasive Tumor"],
+                    "primary_input_celltype": "Prolif Invasive Tumor",
+                    "primary_resolved_celltype": "malignant cell",
+                    "matches": [
+                        {
+                            "input_celltype": "Prolif Invasive Tumor",
+                            "matched_celltype": "malignant cell",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        allowlist = _build_drug_allowlist(evidence_dir, [])
+
+        assert "prolif invasive tumor" in allowlist
+        assert "malignant cell" in allowlist
+
+    def test_celltype_resolution_labels_not_flagged_end_to_end(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """F-E scenario 6: current breast-cancer guidance sentence is clean."""
+        drug_text = (
+            "## Evidence-Grounded Follow-up Recommendations\n\n"
+            "These recommendations cite Stage 1 Census support for same-cell "
+            "coexpression enrichment in the resolved context (Prolif Invasive "
+            "Tumor; Census proxy: malignant cell). Treat them as the strongest "
+            "interest-cell / malignant-cell proxy follow-up candidates, while "
+            "reserving causal mechanism claims for downstream validation.\n"
+        )
+        data_dir = _write_data_dir(tmp_path, drug_text)
+        evidence_dir = data_dir / "evidence"
+        (evidence_dir / "celltype_resolution.json").write_text(
+            json.dumps(
+                {
+                    "interest_celltypes": ["Prolif Invasive Tumor"],
+                    "primary_input_celltype": "Prolif Invasive Tumor",
+                    "primary_resolved_celltype": "malignant cell",
+                    "matches": [
+                        {
+                            "input_celltype": "Prolif Invasive Tumor",
+                            "matched_celltype": "malignant cell",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = _run_validate(data_dir)
+        fabricated = _findings_of_type(result, "FABRICATED_DRUG_NAME")
+        forbidden_actuals = [
+            finding.get("actual", "")
+            for finding in fabricated
+            if any(
+                token in finding.get("actual", "")
+                for token in ("Prolif Invasive Tumor", "malignant cell", "Treat")
+            )
+        ]
+
+        assert forbidden_actuals == [], (
+            "Cell-type labels and guidance verbs were falsely flagged as "
+            f"FABRICATED_DRUG_NAME. Got: {forbidden_actuals}"
+        )
+
     def test_genuine_fabricated_drug_still_caught(self, tmp_path: Path) -> None:
         """F-E scenario 3 (true positive preserved).
 

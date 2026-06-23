@@ -754,8 +754,8 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
                     errors.append(
                         f"hypotheses[{idx}] cites target-cell-intrinsic Stage 1 "
                         f"evidence ({ref}) but biological_entities.cell_types does "
-                        "not include the original interest label, resolved Census "
-                        "cell type, or pulmonary/alveolar epithelial equivalent."
+                        "not include the original interest label or resolved "
+                        "Census cell type."
                     )
                 if not _mentions_interest_celltype(
                     hypothesis.get("validation_approach"),
@@ -764,8 +764,7 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
                     errors.append(
                         f"hypotheses[{idx}] cites target-cell-intrinsic Stage 1 "
                         f"evidence ({ref}) but validation_approach does not test "
-                        "the original interest label, resolved Census cell type, "
-                        "or pulmonary/alveolar epithelial equivalent."
+                        "the original interest label or resolved Census cell type."
                     )
 
             coexpression = target_vs_rest.get("coexpression", {})

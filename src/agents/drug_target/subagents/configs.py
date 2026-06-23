@@ -27,7 +27,11 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
     ReadFileBlockMiddleware,
     WriteFileArgGuardMiddleware,
 )
-from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
+from src.agents.drug_target.subagents.prompts import (
+    HypothesisWriterPromptMode,
+    SUBAGENT_PROMPTS,
+    render_hypothesis_writer_prompt,
+)
 from src.agents.drug_target.middleware import HypothesisRetryLoopMiddleware
 from src.agents.drug_target.tools import (
     apply_semantic_celltype_proxy,
@@ -319,6 +323,14 @@ WORKFLOW_ORDER = ["evidence_assessor", "hypothesis_writer"]
 
 _TOP_LEVEL_SUBAGENTS = ("evidence_assessor", "hypothesis_writer")
 
+_DTH_SINGLE_READ_PROMPT_MODES = frozenset(
+    {
+        "operational_contract_plus_dth",
+        "operational_contract_minimal_plus_dth",
+    }
+)
+_DTH_SKILL_PATH = "skills/drug-target-hypothesis/SKILL.md"
+
 WORKFLOW_DESCRIPTION = """
 Drug Target Assessment 2-Agent Workflow (Staged Funnel):
 
@@ -368,6 +380,7 @@ def get_subagents(
     subagent_skill_registries: dict[str, dict[str, str]] | None = None,
     enable_skill_activator: bool = True,
     skill_activation_mode: SkillActivationMode | None = None,
+    hypothesis_writer_prompt_mode: HypothesisWriterPromptMode = "default",
 ) -> list[dict]:
     """Build the two drug-target subagents in workflow order.
 
@@ -399,6 +412,10 @@ def get_subagents(
             benchmarks.
         skill_activation_mode: Optional explicit activation strategy. When
             omitted, derives from enable_skill_activator for compatibility.
+        hypothesis_writer_prompt_mode: Prompt variant for hypothesis_writer.
+            ``default`` preserves production prompt-level skill reads;
+            ``progressive_disclosure_only`` removes those benchmark-confounding
+            direct reads so SkillsMiddleware/activator/governor owns selection.
 
     Returns:
         List of three subagent configuration dictionaries.
@@ -410,9 +427,28 @@ def get_subagents(
 
     for subagent in subagents:
         if subagent["name"] == "hypothesis_writer":
+            subagent["system_prompt"] = render_hypothesis_writer_prompt(
+                hypothesis_writer_prompt_mode
+            )
             subagent["middleware"] = [
                 *list(subagent.get("middleware", [])),
-                HypothesisRetryLoopMiddleware(),
+                HypothesisRetryLoopMiddleware(
+                    stop_after_first_save=(
+                        hypothesis_writer_prompt_mode.startswith("thin_basic")
+                    ),
+                    max_hypothesis_save_attempts=(
+                        3
+                        if hypothesis_writer_prompt_mode.startswith(
+                            ("dth_contrast", "operational_contract")
+                        )
+                        else None
+                    ),
+                    single_read_skill_paths=(
+                        (_DTH_SKILL_PATH,)
+                        if hypothesis_writer_prompt_mode in _DTH_SINGLE_READ_PROMPT_MODES
+                        else ()
+                    ),
+                ),
             ]
 
     # Remove Census tools when disabled (too slow for some providers)
@@ -531,6 +567,7 @@ def get_subagents(
                     ("drug-target-hypothesis",)
                     if (
                         subagent["name"] == "hypothesis_writer"
+                        and hypothesis_writer_prompt_mode == "default"
                         and "drug-target-hypothesis" in allowed_names
                     )
                     else ()

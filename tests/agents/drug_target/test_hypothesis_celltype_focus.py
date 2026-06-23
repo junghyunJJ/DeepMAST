@@ -300,6 +300,12 @@ def test_hypothesis_scope_classifies_passed_stage1_celltype_usage(
     assert loaded["interest_cell_intrinsic_stage1_pair_files"] == [
         "stage1_ICAM1--MUC1.json"
     ]
+    assert loaded["hypothesis_writer_contract"]["required_cell_context_anchor"] == (
+        "pulmonary alveolar type 2 cell"
+    )
+    assert loaded["hypothesis_writer_contract"]["allowed_direct_pair_axes"][0][
+        "filename"
+    ] == "stage1_FN1--SDC2.json"
     assert loaded["spatial_niche_only_stage1_pair_files"] == [
         "stage1_FN1--SDC2.json",
         "stage1_ICAM1--ITGB2.json",
@@ -307,6 +313,13 @@ def test_hypothesis_scope_classifies_passed_stage1_celltype_usage(
     assert validation["interest_cell_intrinsic_stage1_pair_files"] == [
         "stage1_ICAM1--MUC1.json"
     ]
+    assert validation["hypothesis_writer_contract"]["required_cell_context_anchor"] == (
+        "pulmonary alveolar type 2 cell"
+    )
+    assert {
+        axis["filename"]
+        for axis in validation["hypothesis_writer_contract"]["secondary_only_pair_axes"]
+    } == {"stage1_FN1--SDC2.json", "stage1_ICAM1--ITGB2.json"}
     policy = {
         item["filename"]: item
         for item in validation["stage1_pair_usage_guidance"]
@@ -322,6 +335,75 @@ def test_hypothesis_scope_classifies_passed_stage1_celltype_usage(
         "gene_b",
         "coexpression",
     ]
+
+
+def test_hypothesis_writer_contract_exposes_machine_readable_save_gate_packet(
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence"
+    _write_hypothesis_context(evidence, ["ICAM1", "MUC1", "ITGB2"])
+    _write_json(evidence / "ot_ICAM1.json", {"approvedSymbol": "ICAM1"})
+    _write_json(evidence / "ot_MUC1.json", {"approvedSymbol": "MUC1"})
+    _write_json(evidence / "ot_ITGB2.json", {"approvedSymbol": "ITGB2"})
+    _write_stage1_filter_results(
+        evidence,
+        [
+            ("ICAM1", "MUC1", True),
+            ("ICAM1", "ITGB2", True),
+        ],
+    )
+    _write_stage1_pair(
+        evidence,
+        "ICAM1",
+        "MUC1",
+        gene_a_diff=0.2,
+        gene_b_diff=0.3,
+        coexpr_diff=0.4,
+    )
+    _write_stage1_pair(
+        evidence,
+        "ICAM1",
+        "ITGB2",
+        gene_a_diff=0.2,
+        gene_b_diff=-0.3,
+        coexpr_diff=-0.2,
+    )
+
+    loaded = json.loads(
+        load_evidence_files.invoke({"data_dir": str(tmp_path), "scope": "hypothesis"})
+    )
+
+    packet = loaded["hypothesis_writer_contract"]["mechanical_save_gate_contract"]
+    assert packet["pair_axes_not_listed_policy"] == "forbidden_as_direct_pair_claim"
+    assert packet["cell_context_anchor"] == "pulmonary alveolar type 2 cell"
+    assert packet["featured_genes"]["ICAM1"] == {
+        "available_gene_level_files": ["ot_ICAM1.json", "stage3_ICAM1.json"],
+        "coverage_rule": (
+            "If this FEATURED gene appears in visible hypothesis fields or "
+            "biological_entities.genes, cite every available file listed here "
+            "in that same hypothesis or remove the gene from that hypothesis."
+        ),
+    }
+    assert packet["direct_pair_axes"]["ICAM1--MUC1"] == {
+        "filename": "stage1_ICAM1--MUC1.json",
+        "support_class": "interest_cell_intrinsic",
+        "allowed_as_direct_pair": True,
+        "requires_cell_context_anchor": "pulmonary alveolar type 2 cell",
+        "forbidden_wording": [],
+    }
+    assert packet["direct_pair_axes"]["ICAM1--ITGB2"] == {
+        "filename": "stage1_ICAM1--ITGB2.json",
+        "support_class": "secondary_spatial_or_cross_cell",
+        "allowed_as_direct_pair": True,
+        "requires_cell_context_anchor": None,
+        "forbidden_wording": [
+            "same-cell",
+            "intrinsic",
+            "cell-autonomous",
+            "target-cell-autonomous",
+            "resolved-cell intrinsic",
+        ],
+    }
 
 
 def test_save_hypothesis_report_rejects_celltype_resolution_support_citation(
@@ -394,67 +476,49 @@ def test_save_hypothesis_report_rejects_celltype_resolution_support_citation(
 
 def test_hypothesis_prompt_requires_interest_celltype_focus() -> None:
     text = prompts.HYPOTHESIS_WRITER_PROMPT
+    skill_text = Path("skills/drug-target-hypothesis/SKILL.md").read_text()
 
-    assert "celltype_resolution.json" in text
-    assert "interest_celltypes" in text
-    assert "lost_modifiers" in text
-    assert "semantic_proxy" in text
-    assert "proxy validation" in text
+    assert "cell_context_anchor" in text
+    assert "allowed_direct_pair_axes" in text
+    assert "exact cell-context phrase required" in text
     assert "biological_entities.cell_types" in text
-    assert "Do not claim that Census separately validated a lost state modifier" in text
-    assert (
-        "Do not claim that Census separately validated the original state-specific label"
-        in text
-    )
-    assert "must not appear in `evidence_references`" in text
-    assert "cite Stage 1 pair files for Census evidence" in text
-    assert "AT2" in text
-    assert "Transitional AT2" in text
-    assert "Direct pair-axis claims require direct Stage 1 pair evidence" in text
-    assert "Do not title a hypothesis `A-B axis` unless" in text
-    assert "target-vs-rest direction" in text
-    assert "target-cell-depleted" in text
-    assert "validation_approach must mention" in text
-    assert "Biological Grounding" in text
-    assert "Target-Disease Support" in text
-    assert "Actionability" in text
-    assert "Interpretation Constraint" in text
-    assert "Stage 2 OpenTargets" in text
-    assert "target-disease support, not causal biology" in text
-    assert "Stage 3" in text
-    assert "actionability" in text
-    assert "not biological causality" in text
-    assert "Primary AT2/Epithelial recommendations" in text
-    assert "Primary Interest-Cell recommendations" in text
+    assert "celltype_resolution.json" in skill_text
+    assert "semantic_proxy" in skill_text
+    assert "proxy validation" in skill_text
+    assert "census_validation.target_vs_rest" in skill_text
+    assert "target-cell-depleted" in skill_text
+    assert "Biological Grounding" in skill_text
+    assert "Target-Disease Support" in skill_text
+    assert "Actionability" in skill_text
+    assert "Interpretation Constraint" in skill_text
+    assert "Stage 2 OpenTargets" in skill_text
+    assert "target-disease support, not causal biology" in skill_text
+    assert "Stage 3" in skill_text
+    assert "actionability" in skill_text
+    assert "not biological causality" in skill_text
     assert (
         "Secondary interest-cell-associated spatial-niche follow-up recommendations"
-        in text
+        in skill_text
     )
-    assert "same-cell/interest-cell-intrinsic" in text
-    assert "target mechanisms" in text
-    assert "Evidence-Grounded Follow-up Recommendation Generation" in text
-    assert "Conservative Interpretation" in text
-    assert "Recommended Follow-up Test" in text
-    assert "Not yet established:" in text
-    assert "functional axis" in text
-    assert "major source" in text
-    assert "synergistic" in text
-    assert "Stage 1 Census coexpression supports enrichment/depletion" in text
-    assert "prioritizes" in text
-    assert "nominates" in text
-    assert "spatial-niche follow-up candidate" in text
-    assert "cross-cell candidate" in text
-    assert "test whether ... changes" in text
-    assert "should reduce" in text
-    assert "blockade for reducing" in text
-    assert "barrier dysfunction" in text
-    assert "secondary Stage 1 framing evidence table" in text
+    assert "Evidence-Grounded Follow-up Recommendation Generation" in skill_text
+    assert "Primary AT2/Epithelial recommendations" not in text
+    assert "Not yet established:" in skill_text
+    assert "synergistic effects" in skill_text
+    assert "prioritizes" in skill_text
+    assert "nominates" in skill_text
+    assert "spatial-niche follow-up candidate" in skill_text
+    assert "cross-cell candidate" in skill_text
+    assert "test whether ... changes" in skill_text
+    assert "should reduce" in skill_text
+    assert "blockade for reducing" in skill_text
+    assert "barrier dysfunction" in skill_text
+    assert "secondary Stage 1 framing evidence table" in skill_text
     assert (
         "cite depleted Stage 1 pair files when the recommendation names that pair concept"
-        in text
+        in skill_text
     )
-    assert "not as same-cell or interest-cell-intrinsic support" in text
-    assert "target-cell-depleted Stage 1 pair files may appear" in text
+    assert "not as interest-cell-intrinsic support" in skill_text
+    assert "target-cell-depleted Stage 1 pair files may still be cited" in skill_text
 
 
 def test_save_hypothesis_report_rejects_direct_pair_axis_without_matching_stage1_file(

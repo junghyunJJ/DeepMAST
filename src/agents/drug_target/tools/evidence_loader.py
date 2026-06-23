@@ -12,7 +12,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 from langchain_core.tools import tool
 from src.agents.drug_target.tools.disease_context import initialize_disease_context
@@ -728,7 +728,12 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
             if _STAGE1_PAIR_NAME_RE.match(name)
             and filter_map.get(name[len("stage1_"):-len(".json")].upper()) is True
         )
-        result.update(_stage1_pair_usage_guidance(evidence_dir, stage1_pair_files))
+        usage_guidance = _stage1_pair_usage_guidance(evidence_dir, stage1_pair_files)
+        result.update(usage_guidance)
+        result["hypothesis_writer_contract"] = _hypothesis_writer_contract(
+            evidence_dir,
+            usage_guidance,
+        )
 
     if hypothesis_scope:
         return json.dumps(result, separators=(",", ":"))
@@ -794,8 +799,8 @@ def _stage1_usage_record(filename: str, payload: object) -> dict:
     else:
         citation_policy = (
             "Passed Stage 1 pair, but not interest-cell intrinsic by "
-            "target-vs-rest direction. Do not cite as AT2, Transitional AT2, "
-            "pulmonary/alveolar epithelial, or resolved-Census-cell support; "
+            "target-vs-rest direction. Do not cite as original interest-cell, "
+            "resolved-Census-cell, same-cell, or cell-autonomous support; "
             "use only as secondary non-interest-cell spatial-niche/cross-cell "
             "framing, or cover the gene with stage3/ot evidence instead."
         )
@@ -835,6 +840,219 @@ def _stage1_pair_usage_guidance(
             for record in records
             if record["usage"] == "spatial_niche_only"
         ],
+    }
+
+
+def _first_nonempty_text(value: object) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            text = _first_nonempty_text(item)
+            if text:
+                return text
+    return ""
+
+
+def _load_celltype_resolution(evidence_dir: Path) -> dict[str, Any]:
+    path = evidence_dir / "celltype_resolution.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _celltype_contract_labels(evidence_dir: Path) -> dict[str, str]:
+    payload = _load_celltype_resolution(evidence_dir)
+    original = _first_nonempty_text(payload.get("primary_input_celltype"))
+    resolved = _first_nonempty_text(payload.get("primary_resolved_celltype"))
+    match_mode = _first_nonempty_text(payload.get("primary_match_mode"))
+
+    if not original:
+        original = _first_nonempty_text(payload.get("interest_celltypes"))
+
+    matches = payload.get("matches")
+    if isinstance(matches, list):
+        for match in matches:
+            if not isinstance(match, dict):
+                continue
+            if not original:
+                original = _first_nonempty_text(match.get("input_celltype"))
+            if not resolved:
+                resolved = (
+                    _first_nonempty_text(match.get("resolved_celltype"))
+                    or _first_nonempty_text(match.get("matched_celltype"))
+                )
+            if not match_mode:
+                match_mode = _first_nonempty_text(match.get("match_mode"))
+            if original and resolved and match_mode:
+                break
+
+    return {
+        "original_interest_label": original,
+        "resolved_census_cell_type": resolved,
+        "match_mode": match_mode,
+        "required_cell_context_anchor": resolved or original,
+    }
+
+
+def _stage1_contract_axis(record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "pair_key": record.get("pair_key"),
+        "filename": record.get("filename"),
+        "usage": record.get("usage"),
+        "target_cell_intrinsic": record.get("target_cell_intrinsic"),
+        "target_vs_rest_directions": record.get("target_vs_rest_directions"),
+        "target_cell_depleted_metrics": record.get("target_cell_depleted_metrics"),
+        "citation_policy": record.get("citation_policy"),
+    }
+
+
+def _featured_gene_names(evidence_dir: Path) -> list[str]:
+    path = evidence_dir / "assessment_results.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        payload = {}
+    candidates = payload.get("stage3_candidates") if isinstance(payload, dict) else None
+    genes: list[str] = []
+    if isinstance(candidates, list):
+        for item in candidates:
+            if isinstance(item, dict):
+                gene = _first_nonempty_text(item.get("gene"))
+                if gene:
+                    genes.append(gene.upper())
+            else:
+                gene = _first_nonempty_text(item)
+                if gene:
+                    genes.append(gene.upper())
+    return sorted(dict.fromkeys(genes))
+
+
+def _available_gene_level_files(evidence_dir: Path, gene: str) -> list[str]:
+    names = [f"ot_{gene}.json", f"stage3_{gene}.json"]
+    return [name for name in names if (evidence_dir / name).exists()]
+
+
+def _featured_gene_contract(evidence_dir: Path) -> dict[str, dict[str, Any]]:
+    coverage_rule = (
+        "If this FEATURED gene appears in visible hypothesis fields or "
+        "biological_entities.genes, cite every available file listed here "
+        "in that same hypothesis or remove the gene from that hypothesis."
+    )
+    return {
+        gene: {
+            "available_gene_level_files": _available_gene_level_files(evidence_dir, gene),
+            "coverage_rule": coverage_rule,
+        }
+        for gene in _featured_gene_names(evidence_dir)
+    }
+
+
+def _direct_pair_axis_contract(
+    axes: list[dict[str, Any]],
+    *,
+    cell_context_anchor: str | None,
+) -> dict[str, dict[str, Any]]:
+    contract: dict[str, dict[str, Any]] = {}
+    for axis in axes:
+        pair_key = _first_nonempty_text(axis.get("pair_key")).upper()
+        if not pair_key:
+            continue
+        usage = _first_nonempty_text(axis.get("usage"))
+        intrinsic = usage == "interest_cell_intrinsic"
+        contract[pair_key] = {
+            "filename": axis.get("filename"),
+            "support_class": (
+                "interest_cell_intrinsic"
+                if intrinsic
+                else "secondary_spatial_or_cross_cell"
+            ),
+            "allowed_as_direct_pair": True,
+            "requires_cell_context_anchor": cell_context_anchor if intrinsic else None,
+            "forbidden_wording": []
+            if intrinsic
+            else [
+                "same-cell",
+                "intrinsic",
+                "cell-autonomous",
+                "target-cell-autonomous",
+                "resolved-cell intrinsic",
+            ],
+        }
+    return contract
+
+
+def _mechanical_save_gate_contract(
+    evidence_dir: Path,
+    axes: list[dict[str, Any]],
+    labels: dict[str, str],
+) -> dict[str, Any]:
+    anchor = labels.get("required_cell_context_anchor") or None
+    return {
+        "cell_context_anchor": anchor,
+        "featured_genes": _featured_gene_contract(evidence_dir),
+        "direct_pair_axes": _direct_pair_axis_contract(
+            axes,
+            cell_context_anchor=anchor,
+        ),
+        "pair_axes_not_listed_policy": "forbidden_as_direct_pair_claim",
+        "topn_coverage_policy": (
+            "Every FEATURED gene must appear in biological_entities.genes across "
+            "the retained set. Prefer a [FEATURED-GAP] gene-level/actionability "
+            "hypothesis when no allowed direct pair axis supports the missing gene."
+        ),
+    }
+
+
+def _hypothesis_writer_contract(
+    evidence_dir: Path,
+    usage_guidance: dict[str, Any],
+) -> dict[str, Any]:
+    labels = _celltype_contract_labels(evidence_dir)
+    records = [
+        record
+        for record in usage_guidance.get("stage1_pair_usage_guidance", [])
+        if isinstance(record, dict)
+    ]
+    axes = [_stage1_contract_axis(record) for record in records]
+    intrinsic_axes = [axis for axis in axes if axis.get("usage") == "interest_cell_intrinsic"]
+    secondary_axes = [axis for axis in axes if axis.get("usage") == "spatial_niche_only"]
+    anchor = labels["required_cell_context_anchor"]
+    return {
+        **labels,
+        "semantic_proxy": labels["match_mode"] == "semantic_proxy",
+        "cell_context_instruction": (
+            "When citing any interest-cell-intrinsic Stage 1 pair, copy "
+            f"`{anchor}` into biological_entities.cell_types and name it in "
+            "validation_approach."
+            if anchor
+            else (
+                "When citing any interest-cell-intrinsic Stage 1 pair, name the "
+                "resolved interest cell context from celltype_resolution.json in "
+                "biological_entities.cell_types and validation_approach."
+            )
+        ),
+        "allowed_direct_pair_axes": axes,
+        "interest_cell_intrinsic_pair_axes": intrinsic_axes,
+        "secondary_only_pair_axes": secondary_axes,
+        "mechanical_save_gate_contract": _mechanical_save_gate_contract(
+            evidence_dir,
+            axes,
+            labels,
+        ),
+        "forbidden_direct_pair_policy": (
+            "Only claim an A--B direct pair axis when that pair_key is listed in "
+            "allowed_direct_pair_axes and the exact matching passed Stage 1 "
+            "filename is cited by the same hypothesis. Do not infer direct axes "
+            "from separate gene files, hub context, pathway overlap, or skill text."
+        ),
+        "secondary_only_policy": (
+            "Pairs in secondary_only_pair_axes may be cited only as secondary "
+            "spatial-niche/cross-cell framing, not as same-cell, intrinsic, "
+            "resolved-cell, cell-autonomous, or target-cell-autonomous support."
+        ),
     }
 
 
@@ -1512,7 +1730,11 @@ def _is_safe_filename(filename: str) -> bool:
 
 
 @tool
-def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) -> str:
+def save_evidence(
+    data_dir: str,
+    filename: str,
+    data: Union[str, dict[str, Any], list[dict[str, Any]]],
+) -> str:
     """Save evidence data as a JSON file in the evidence/ subdirectory.
 
     Creates the evidence/ directory if it doesn't exist.
@@ -1747,6 +1969,7 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
         and filter_results.get(f[len("stage1_"):-len(".json")].upper()) is True
     )
     usage_guidance = _stage1_pair_usage_guidance(evidence_dir, stage1_pair_files)
+    writer_contract = _hypothesis_writer_contract(evidence_dir, usage_guidance)
 
     return json.dumps({
         "valid": len(invalid) == 0,
@@ -1757,6 +1980,7 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
         "stage1_pair_files": stage1_pair_files,
         "eligible_stage1_pair_files": stage1_pair_files,
         **usage_guidance,
+        "hypothesis_writer_contract": writer_contract,
         "naming_convention": (
             "Stage 1 L-R pair evidence files use the convention "
             "`stage1_<LIGAND>--<RECEPTOR>.json` with TWO HYPHENS "

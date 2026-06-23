@@ -1,0 +1,17 @@
+{
+  "skill_name": "chembl-database",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "A stage3_TGFB1.json file includes a Phase II compound from a cancer indication. Repair a hypothesis_report claim that says the compound is an IPF therapy.",
+      "expected_output": "The skill rewrites the claim as repurposing-context/actionability evidence and states that disease-specific efficacy is not established.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "A stage3_EFNB2.json file has empty matched_drugs. Explain how the hypothesis_report should mention ChEMBL support.",
+      "expected_output": "The skill says Stage 3 provides no matched ChEMBL drug evidence for EFNB2 and avoids listing unsupported drug names.",
+      "files": []
+    }
+  ]
+}

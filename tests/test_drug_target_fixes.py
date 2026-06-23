@@ -208,21 +208,14 @@ def test_hypothesis_grounding_tag_summary() -> None:
 
 
 def test_hypothesis_prompt_has_quantitative_constraint() -> None:
-    """Followup B7b rewrote the Quantitative Predictions block with explicit
-    `from <filename>` grammar and 4-tier grounding labels. Validate the
-    prompt still carries those contract anchors."""
+    """The production prompt now prevents numeric prediction fabrication by default."""
     from src.agents.drug_target.subagents import prompts as pmts
 
     p = pmts.HYPOTHESIS_WRITER_PROMPT
-    # Anti-hallucination header + 4-tier labels
-    assert "Quantitative Predictions" in p
-    assert "grounded_verified" in p
-    assert "unverified" in p
-    assert "qualitative" in p
-    # New file-anchored grammar requirement
-    assert "from <filename>" in p or "from stage1_" in p
-    # Concrete good/bad examples to teach Qwen2 the pattern
-    assert "GOOD" in p and "BAD" in p
+    assert "cautious qualitative `falsifiable_prediction` wording" in p
+    assert "rather than numeric" in p
+    assert "clinical-benefit claims" in p
+    assert "grounded_verified" not in p
 
 
 # ---------------------------------------------------------------------------

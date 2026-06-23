@@ -35,6 +35,22 @@ def _write_hypothesis_evidence(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def test_save_hypothesis_report_redirects_virtual_root_to_env_workspace(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.setenv("DRUG_TARGET_DATA_DIR", str(workspace))
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": "/", "report": {"hypotheses": []}})
+    )
+
+    assert result["path"] == str(workspace / "evidence" / "hypothesis_report.json")
+    assert (workspace / "evidence").exists()
+
+
 def _add_intrinsic_stage1_evidence(data_dir: Path) -> None:
     evidence_dir = data_dir / "evidence"
     filter_path = evidence_dir / "stage1_filter_results.json"
@@ -879,7 +895,7 @@ def test_save_hypothesis_report_accepts_primary_interest_cell_intrinsic_coverage
     assert result["saved"] is True, result
 
 
-def test_save_hypothesis_report_rejects_intrinsic_coverage_without_interest_cell_anchor(
+def test_save_hypothesis_report_autofixes_intrinsic_coverage_interest_cell_anchor(
     tmp_path: Path,
 ) -> None:
     data_dir = _write_malignant_intrinsic_evidence(tmp_path)
@@ -905,9 +921,20 @@ def test_save_hypothesis_report_rejects_intrinsic_coverage_without_interest_cell
         save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
     )
 
-    assert result["saved"] is False
-    assert "PRIMARY_EPITHELIAL_INTRINSIC_COVERAGE_MISSING" in result["errors"]
-    assert not (data_dir / "evidence" / "hypothesis_report.json").exists()
+    assert result["saved"] is True, result
+    assert any(
+        diagnostic.get("code") == "INTEREST_CELL_ANCHOR_AUTOFIX"
+        and diagnostic.get("anchor") == "malignant cell"
+        for diagnostic in result["diagnostics"]
+    )
+    saved = json.loads(
+        (data_dir / "evidence" / "hypothesis_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    saved_hyp = saved["hypotheses"][0]
+    assert "malignant cell" in saved_hyp["biological_entities"]["cell_types"]
+    assert "malignant cell" in saved_hyp["validation_approach"]
 
 
 def test_save_hypothesis_report_accepts_primary_epithelial_intrinsic_coverage(

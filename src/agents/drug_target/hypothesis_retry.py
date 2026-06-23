@@ -9,6 +9,11 @@ from typing import Any
 
 
 _TOPN_MISSING_RE = re.compile(r"topn_missing\s*=\s*\[([^\]]*)\]", re.IGNORECASE)
+_HYPOTHESIS_INDEX_RE = re.compile(r"hypotheses\[(\d+)\]")
+_DIRECT_PAIR_AXIS_RE = re.compile(
+    r"(?:direct pair axis|pair axis)\s+['`]([A-Za-z0-9_.-]+--[A-Za-z0-9_.-]+)['`]",
+    re.IGNORECASE,
+)
 
 
 def _numeric_prediction_guidance(errors: list[dict] | None) -> str:
@@ -81,6 +86,50 @@ def _last_rejection_guidance(errors: list[dict] | None) -> str:
     )
 
 
+def _indexed_patch_recipe(errors: list[dict] | None) -> str:
+    text = _flatten_error_text(errors)
+    if not text:
+        return ""
+
+    recipe_lines: list[str] = []
+    direct_pairs = sorted(dict.fromkeys(_DIRECT_PAIR_AXIS_RE.findall(text)))
+    indices = sorted(dict.fromkeys(_HYPOTHESIS_INDEX_RE.findall(text)))
+    topn_genes = sorted(dict.fromkeys(_extract_topn_missing_genes(text)))
+
+    if direct_pairs:
+        location = (
+            f" Edit only hypotheses[{indices[0]}] when possible."
+            if len(indices) == 1
+            else " Edit only the rejected hypotheses named by the validation errors when possible."
+        )
+        recipe_lines.append(location)
+        for pair in direct_pairs:
+            first, second = pair.split("--", 1)
+            recipe_lines.append(
+                f" Remove `{pair}` direct pair wording from title, core_claim, "
+                "falsifiable_prediction, validation_approach, and "
+                "biological_entities.genes unless the same hypothesis cites an exact "
+                f"matching passed Stage 1 file. Do not invent stage1_{first}--{second}.json "
+                f"or stage1_{second}--{first}.json."
+            )
+
+    if topn_genes:
+        for gene in topn_genes:
+            recipe_lines.append(
+                f" Add or revise one [FEATURED-GAP] recommendation for `{gene}`; "
+                "include the gene in biological_entities.genes and cite exact "
+                "available `stage3_<GENE>.json` and `ot_<GENE>.json` files."
+            )
+
+    if not recipe_lines:
+        return ""
+
+    return (
+        " Patch recipe for deterministic save rejection:"
+        + "".join(f" {line}" for line in recipe_lines)
+    )
+
+
 def _direct_pair_axis_guidance(errors: list[dict] | None) -> str:
     text = _flatten_error_text(errors)
     if "claims direct pair axis" not in text:
@@ -104,8 +153,7 @@ def _direct_pair_axis_guidance(errors: list[dict] | None) -> str:
         "Stage 1 file present in evidence_references."
         f"{available_guidance} Do not use synergy or "
         "synergistic effects unless direct combination evidence is cited; prefer "
-        "`additive or non-additive effects`."
-        f"{available_guidance} Otherwise rewrite as co-observed "
+        "`additive or non-additive effects`. Otherwise rewrite as co-observed "
         "genes, convergent programs, or separate follow-up recommendations."
     )
 
@@ -223,11 +271,13 @@ def _interest_cell_validation_guidance(errors: list[dict] | None) -> str:
     return (
         " Interest-cell validation repair: when a hypothesis cites target-cell-intrinsic "
         "Stage 1 evidence or lists an interest/resolved cell type, rewrite that named "
-        "hypothesis so `biological_entities.cell_types` includes the original interest "
-        "label or resolved Census cell type, and `validation_approach` explicitly names "
-        "that cell context. For this breast-cancer semantic proxy context, use exact "
-        "phrases such as `Prolif Invasive Tumor` or `malignant cell`; do not rely on "
-        "generic disease, tumor, epithelial, or breast-cancer wording alone."
+        "hypothesis after reading `hypothesis_writer_contract` from "
+        "`load_evidence_files(data_dir, scope='hypothesis')` or "
+        "`validate_evidence_references`. Copy "
+        "`hypothesis_writer_contract.required_cell_context_anchor` exactly into "
+        "`biological_entities.cell_types` and explicitly name that same cell context "
+        "in `validation_approach`. Do not rely on generic disease, tumor, epithelial, "
+        "or cancer wording alone."
         f"{refs_text}"
     )
 
@@ -242,8 +292,7 @@ def _depleted_stage1_guidance(errors: list[dict] | None) -> str:
         return ""
     return (
         " Depleted Stage 1 repair: remove original interest label, resolved "
-        "Census cell type such as malignant cell, legacy AT2, Transitional AT2, "
-        "pulmonary/alveolar epithelial, "
+        "Census cell type, legacy AT2, Transitional AT2, pulmonary/alveolar epithelial, "
         "epithelial-intrinsic, same-cell, and target-cell-autonomous wording "
         "from recommendations citing depleted Stage 1 files. A depleted Stage 1 "
         "file cannot support primary interest-cell intrinsic, legacy AT2/epithelial, "
@@ -266,7 +315,6 @@ def _legacy_at2_repair_guidance(errors: list[dict] | None) -> str:
     legacy_markers = (
         "transitional at2",
         "pulmonary alveolar type 2",
-        "pulmonary/alveolar epithelial",
         "alveolar epithelial",
         "pulmonary epithelial",
     )
@@ -355,6 +403,7 @@ def _format_quality_errors_for_instruction(quality_errors: list[dict] | None) ->
         + "; ".join(parts)
         + _numeric_prediction_guidance(quality_errors)
         + _last_rejection_guidance(quality_errors)
+        + _indexed_patch_recipe(quality_errors)
         + _invalid_citation_guidance(quality_errors)
         + _interest_cell_validation_guidance(quality_errors)
         + _topn_missing_guidance(quality_errors)

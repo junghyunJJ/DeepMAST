@@ -438,15 +438,10 @@ def test_b7b_prompt_teaches_file_anchored_grammar() -> None:
     from src.agents.drug_target.subagents import prompts as pmts
 
     p = pmts.HYPOTHESIS_WRITER_PROMPT
-    # 4-tier label schema visible in the prompt
-    assert "grounded_verified" in p
-    assert "unverified" in p
-    assert "qualitative" in p
-    # Required grammar pattern
-    assert "from stage1_" in p or "from <filename>" in p
-    # Teaching-by-example section
-    assert "GOOD" in p
-    assert "BAD" in p
+    assert "cautious qualitative `falsifiable_prediction` wording" in p
+    assert "rather than numeric" in p
+    assert "Use simple numeric scores between 0 and 1" in p
+    assert "grounded_verified" not in p
 
 
 # ---------------------------------------------------------------------------

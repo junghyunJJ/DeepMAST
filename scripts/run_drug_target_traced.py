@@ -15,6 +15,13 @@ Usage:
     # Force Ollama on port 6000 for this run
     python scripts/run_drug_target_traced.py --port 6000
 
+    # Force Ollama cloud model on port 7000 for this run
+    python scripts/run_drug_target_traced.py --provider ollama --port 7000 --model qwen3.5:397b-cloud
+
+    # Force a vLLM/OpenAI-compatible local server on port 7001
+    python scripts/run_drug_target_traced.py --provider vllm --port 7001 \
+      --model Qwen/Qwen3.5-122B-A10B-FP8 --max-tokens 16384 --enable-thinking
+
     # Node tracing only (no verbose LLM debug output)
     python scripts/run_drug_target_traced.py --no-debug
 """
@@ -101,6 +108,10 @@ MOCK_SELECTED_TOP3 = [
     {"ligand": "VEGFA", "receptor": "FLT1"},
 ]
 
+DEFAULT_OLLAMA_PORT = 11434
+LOCAL_OPENAI_COMPAT_PROVIDERS = {"ollama-openai", "vllm"}
+LOCAL_PORT_PROVIDERS = {"ollama", *LOCAL_OPENAI_COMPAT_PROVIDERS}
+
 
 class _CleanupBackend(Protocol):
     def cleanup(self) -> None:
@@ -133,10 +144,53 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="LLM provider (default: ollama).",
     )
     p.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Optional model override for this run. For Ollama this sets both "
+            "LLM_MODEL and OLLAMA_MODEL, e.g. qwen3.5:397b-cloud."
+        ),
+    )
+    p.add_argument(
         "--port",
         type=_parse_port,
         default=None,
-        help="Override Ollama port for this run (localhost only, ollama provider only).",
+        help=(
+            "Override localhost model-server port for this run. Supported for "
+            "ollama, ollama-openai, and vllm providers. Native ollama defaults "
+            f"to {DEFAULT_OLLAMA_PORT}; OpenAI-compatible providers use this "
+            "only when explicitly supplied."
+        ),
+    )
+    p.add_argument(
+        "--max-tokens",
+        type=int,
+        default=None,
+        help=(
+            "OpenAI-compatible max_tokens override for ollama-openai/vllm "
+            "providers, e.g. 16384."
+        ),
+    )
+    thinking_group = p.add_mutually_exclusive_group()
+    thinking_group.add_argument(
+        "--enable-thinking",
+        dest="enable_thinking",
+        action="store_true",
+        default=None,
+        help=(
+            "For vLLM/OpenAI-compatible Qwen servers, pass "
+            "chat_template_kwargs.enable_thinking=true."
+        ),
+    )
+    thinking_group.add_argument(
+        "--disable-thinking",
+        dest="enable_thinking",
+        action="store_false",
+        default=None,
+        help=(
+            "For vLLM/OpenAI-compatible Qwen servers, pass "
+            "chat_template_kwargs.enable_thinking=false."
+        ),
     )
     p.add_argument(
         "--no-debug",
@@ -182,36 +236,95 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Skill activation mode for hypothesis writer skills.",
     )
     p.add_argument(
+        "--hypothesis-writer-prompt-mode",
+        choices=(
+            "default",
+            "dth_contrast_no_skill",
+            "dth_contrast_dth_required",
+            "operational_contract_only",
+            "operational_contract_plus_dth",
+            "operational_contract_minimal",
+            "operational_contract_minimal_plus_dth",
+            "thin_basic",
+            "thin_basic_dth_required",
+            "thin_basic_domain4_required",
+            "thin_basic_dth_plus_domain4_required",
+            "dth_only_required",
+            "progressive_disclosure_only",
+            "progressive_disclosure_with_modality_map",
+        ),
+        default="default",
+        help=(
+            "Prompt variant for hypothesis_writer. Use "
+            "'progressive_disclosure_only' for benchmarks that remove "
+            "prompt-level forced skill reads and leave skill selection to "
+            "SkillsMiddleware / activator / governor, or "
+            "'dth_only_required' for DTH-only controlled activation runs, or "
+            "'progressive_disclosure_with_modality_map' to keep soft "
+            "modality-to-skill routing without forcing drug-target-hypothesis."
+        ),
+    )
+    p.add_argument(
         "--activation-trace-json",
         default=None,
         help="Path for activation trace JSON (default: data_dir/activation_trace_<timestamp>.json).",
     )
     args = p.parse_args(argv)
-    if args.port is not None and args.provider.lower() != "ollama":
-        p.error("--port can only be used with --provider ollama")
+    args.provider = str(args.provider).lower()
+    if args.port is not None and args.provider not in LOCAL_PORT_PROVIDERS:
+        p.error("--port can only be used with --provider ollama, ollama-openai, or vllm")
+    if args.provider == "ollama" and args.port is None:
+        args.port = DEFAULT_OLLAMA_PORT
+    if args.max_tokens is not None and args.max_tokens <= 0:
+        p.error("--max-tokens must be positive")
+    if args.enable_thinking is not None and args.provider not in LOCAL_OPENAI_COMPAT_PROVIDERS:
+        p.error("--enable-thinking/--disable-thinking can only be used with ollama-openai or vllm")
     return args
 
 
 def _configure_ollama_port_override(args: argparse.Namespace) -> str | None:
-    """Apply an Ollama localhost port override for the current process."""
-    if args.provider.lower() != "ollama" or args.port is None:
+    """Apply localhost model-server port overrides for the current process."""
+    provider = str(args.provider).lower()
+    if provider not in LOCAL_PORT_PROVIDERS:
+        return None
+    if provider == "ollama" and args.port is None:
+        args.port = DEFAULT_OLLAMA_PORT
+    if args.port is None:
         return None
 
     base_url = f"http://localhost:{args.port}"
     os.environ["OLLAMA_BASE_URL"] = base_url
-    os.environ["OLLAMA_HOST"] = base_url
+    if provider == "ollama":
+        os.environ["OLLAMA_HOST"] = base_url
     return base_url
 
 
 def _configure_provider_env(args: argparse.Namespace) -> None:
     """Keep graph-native retry provider resolution aligned with CLI args."""
-    os.environ["LLM_PROVIDER"] = str(args.provider)
+    provider = str(args.provider).lower()
+    os.environ["LLM_PROVIDER"] = provider
+    max_tokens = getattr(args, "max_tokens", None)
+    if max_tokens is not None:
+        os.environ["VLLM_MAX_TOKENS"] = str(max_tokens)
+        os.environ["OLLAMA_OPENAI_MAX_TOKENS"] = str(max_tokens)
+    enable_thinking = getattr(args, "enable_thinking", None)
+    if enable_thinking is not None:
+        value = "true" if enable_thinking else "false"
+        os.environ["VLLM_ENABLE_THINKING"] = value
+        os.environ["OLLAMA_OPENAI_ENABLE_THINKING"] = value
+    model = str(getattr(args, "model", "") or "").strip()
+    if not model:
+        return
+    os.environ["LLM_MODEL"] = model
+    if provider in LOCAL_PORT_PROVIDERS:
+        os.environ["OLLAMA_MODEL"] = model
 
 
 def _finalize_report_config(args: argparse.Namespace) -> RunnableConfig:
     """Build the config used when the traced runner invokes finalize_report directly."""
     configurable: dict[str, str] = {"llm_provider": args.provider}
-    if llm_model := os.getenv("LLM_MODEL"):
+    llm_model = str(getattr(args, "model", "") or "").strip() or os.getenv("LLM_MODEL")
+    if llm_model:
         configurable["llm_model"] = llm_model
     return {"recursion_limit": 100, "configurable": configurable}
 
@@ -241,6 +354,7 @@ def build_activation_trace_payload(
     data_dir: Path,
     trace_log_path: Path,
     report_finalized: bool,
+    hypothesis_writer_prompt_mode: str = "default",
     artifact_gate_event: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     activation_trace = summarize_activation_trace(
@@ -252,6 +366,7 @@ def build_activation_trace_payload(
         {
             "skill_set": skill_set,
             "skill_activation_mode": skill_activation_mode,
+            "hypothesis_writer_prompt_mode": hypothesis_writer_prompt_mode,
             "model": model,
             "ollama_base_url": ollama_base_url,
             "data_dir": str(data_dir),
@@ -293,6 +408,7 @@ def write_activation_trace_json(
     data_dir: Path,
     trace_log_path: Path,
     report_finalized: bool,
+    hypothesis_writer_prompt_mode: str = "default",
     artifact_gate_event: dict[str, Any] | None = None,
     project_root: Path = PROJECT_ROOT,
 ) -> Path:
@@ -304,6 +420,7 @@ def write_activation_trace_json(
         all_read_skill_calls=all_read_skill_calls,
         skill_set=skill_set,
         skill_activation_mode=skill_activation_mode,
+        hypothesis_writer_prompt_mode=hypothesis_writer_prompt_mode,
         model=model,
         ollama_base_url=ollama_base_url,
         data_dir=data_dir,
@@ -331,6 +448,7 @@ def write_activation_trace_checkpoint(
     ollama_base_url: str | None,
     data_dir: Path,
     trace_log_path: Path,
+    hypothesis_writer_prompt_mode: str = "default",
     artifact_gate_event: dict[str, Any] | None = None,
 ) -> Path:
     written_path = write_activation_trace_json(
@@ -340,6 +458,7 @@ def write_activation_trace_checkpoint(
         all_read_skill_calls=all_read_skill_calls,
         skill_set=skill_set,
         skill_activation_mode=skill_activation_mode,
+        hypothesis_writer_prompt_mode=hypothesis_writer_prompt_mode,
         model=model,
         ollama_base_url=ollama_base_url,
         data_dir=data_dir,
@@ -570,6 +689,11 @@ def _hypothesis_stream_budget_seconds() -> int:
         return 900
 
 
+def _allow_hypothesis_quality_retry_after_budget_abort() -> bool:
+    raw = os.environ.get("DRUG_TARGET_ALLOW_HYPOTHESIS_RETRY_AFTER_BUDGET_ABORT", "")
+    return raw.strip().casefold() in {"1", "true", "yes", "on"}
+
+
 async def _close_async_stream(stream: object) -> None:
     closer = getattr(stream, "aclose", None)
     if closer is None:
@@ -683,6 +807,8 @@ def _should_skip_hypothesis_quality_after_budget_abort(
     hypothesis_path: Path,
     run_started_at: float,
 ) -> bool:
+    if _allow_hypothesis_quality_retry_after_budget_abort():
+        return False
     return hypothesis_budget_aborted and _artifact_predates_run(
         hypothesis_path,
         run_started_at,
@@ -711,6 +837,22 @@ def _hypothesis_budget_abort_message(
             "[HYPOTHESIS-BUDGET] evidence has been ready for "
             f"{budget_seconds}s but no fresh hypothesis_report.json was saved; "
             "stopping the stream so the graph-level quality gate can handle recovery."
+        )
+    if (
+        _hypothesis_budget_exceeded(
+            evidence_ready_started_at,
+            now,
+            budget_seconds,
+        )
+        and not _artifact_predates_run(hypothesis_path, run_started_at)
+        and (data_dir / "evidence" / "assessment_results.json").exists()
+        and (data_dir / "evidence" / "stage1_filter_results.json").exists()
+    ):
+        return (
+            "[HYPOTHESIS-BUDGET] fresh hypothesis_report.json was saved, but "
+            f"the graph stream did not finish within {budget_seconds}s after "
+            "evidence became ready; stopping the stream so the graph-level "
+            "quality gate can finalize or retry."
         )
     if (
         _hypothesis_budget_exceeded(
@@ -1323,15 +1465,24 @@ async def run_traced(args: argparse.Namespace) -> int:
         hypothesis_writer_skill_names=hypothesis_writer_skill_names,
         enable_skill_activator=enable_skill_activator,
         skill_activation_mode=args.skill_activation_mode,
+        hypothesis_writer_prompt_mode=args.hypothesis_writer_prompt_mode,
     )
     agent, backend = create_drug_target_agent(config)
     print(f"[CONFIG] Agent created (provider={args.provider})")
     print(f"[CONFIG] Disease: {args.disease}")
     print(f"[CONFIG] Hypothesis skill set: {args.hypothesis_skill_set}")
     print(f"[CONFIG] Skill activation mode: {args.skill_activation_mode}")
+    print(f"[CONFIG] Hypothesis writer prompt mode: {args.hypothesis_writer_prompt_mode}")
     print(f"[CONFIG] LLM_PROVIDER env: {os.environ['LLM_PROVIDER']}")
+    active_model = os.getenv("LLM_MODEL") or os.getenv("OLLAMA_MODEL") or ""
+    if active_model:
+        print(f"[CONFIG] LLM model: {active_model}")
     if ollama_base_url:
-        print(f"[CONFIG] Ollama base URL: {ollama_base_url}")
+        print(f"[CONFIG] Model base URL: {ollama_base_url}")
+    if args.max_tokens is not None:
+        print(f"[CONFIG] max_tokens: {args.max_tokens}")
+    if args.enable_thinking is not None:
+        print(f"[CONFIG] enable_thinking: {args.enable_thinking}")
     print(f"[CONFIG] Census API: {'ENABLED' if args.census else 'DISABLED'}")
     print(
         "[CONFIG] Hypothesis quality gate retry: "
@@ -1456,47 +1607,22 @@ async def run_traced(args: argparse.Namespace) -> int:
                     and _artifact_predates_run(hypothesis_path, start)
                 ):
                     evidence_ready_started_at = now
-                if (
-                    _hypothesis_budget_exceeded(
-                        evidence_ready_started_at,
-                        now,
-                        hypothesis_budget_seconds,
-                    )
-                    and _artifact_predates_run(hypothesis_path, start)
-                ):
-                    message = (
-                        "[HYPOTHESIS-BUDGET] evidence has been ready for "
-                        f"{hypothesis_budget_seconds}s but no fresh "
-                        "hypothesis_report.json was saved; stopping the "
-                        "stream so the graph-level quality gate can handle recovery."
-                    )
-                    print(f"\n{message}")
-                    trace_log_fp.write(f"\n{message}\n")
-                    trace_log_fp.flush()
-                    hypothesis_budget_aborted = True
-                    abort_for_hypothesis_budget = True
-                    break
 
                 if (
                     hypothesis_started_at is None
                     and _is_hypothesis_writer_stream_node(node_path, node_name)
                 ):
                     hypothesis_started_at = now
-                if (
-                    _hypothesis_budget_exceeded(
-                        hypothesis_started_at,
-                        now,
-                        hypothesis_budget_seconds,
-                    )
-                    and (data_dir / "evidence" / "assessment_results.json").exists()
-                    and (data_dir / "evidence" / "stage1_filter_results.json").exists()
-                ):
-                    message = (
-                        "[HYPOTHESIS-BUDGET] hypothesis_writer stream exceeded "
-                        f"{hypothesis_budget_seconds}s after deterministic evidence "
-                        "artifacts were written; stopping the stream so the "
-                        "graph-level quality gate can handle recovery."
-                    )
+                message = _hypothesis_budget_abort_message(
+                    data_dir=data_dir,
+                    hypothesis_path=hypothesis_path,
+                    evidence_ready_started_at=evidence_ready_started_at,
+                    hypothesis_started_at=hypothesis_started_at,
+                    now=now,
+                    budget_seconds=hypothesis_budget_seconds,
+                    run_started_at=start,
+                )
+                if message:
                     print(f"\n{message}")
                     trace_log_fp.write(f"\n{message}\n")
                     trace_log_fp.flush()
@@ -1715,6 +1841,7 @@ async def run_traced(args: argparse.Namespace) -> int:
         all_read_skill_calls=all_read_skill_calls,
         skill_set=args.hypothesis_skill_set,
         skill_activation_mode=args.skill_activation_mode,
+        hypothesis_writer_prompt_mode=args.hypothesis_writer_prompt_mode,
         model=os.getenv("LLM_MODEL") or os.getenv("OLLAMA_MODEL") or "",
         ollama_base_url=ollama_base_url,
         data_dir=data_dir,
@@ -1767,6 +1894,14 @@ async def run_traced(args: argparse.Namespace) -> int:
                         "report_finalization_error": None,
                         "evidence_truncated": False,
                         "deep_agent_started_at": start,
+                        "hypothesis_writer_skill_names": tuple(
+                            hypothesis_writer_skill_names
+                        ),
+                        "hypothesis_writer_prompt_mode": (
+                            args.hypothesis_writer_prompt_mode
+                        ),
+                        "skill_activation_mode": args.skill_activation_mode,
+                        "enable_skill_activator": enable_skill_activator,
                     },
                     {
                         "recursion_limit": 10000,
@@ -1988,6 +2123,7 @@ async def run_traced(args: argparse.Namespace) -> int:
         all_read_skill_calls=all_read_skill_calls,
         skill_set=args.hypothesis_skill_set,
         skill_activation_mode=args.skill_activation_mode,
+        hypothesis_writer_prompt_mode=args.hypothesis_writer_prompt_mode,
         model=os.getenv("LLM_MODEL") or os.getenv("OLLAMA_MODEL") or "",
         ollama_base_url=ollama_base_url,
         data_dir=data_dir,

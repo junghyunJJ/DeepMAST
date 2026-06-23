@@ -1,0 +1,17 @@
+{
+  "skill_name": "opentargets-database",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "A hypothesis_report cites ot_ICAM1.json with OpenTargets association and tractability fields. Explain how this evidence should be worded without claiming ICAM1 causes the disease.",
+      "expected_output": "The skill treats OpenTargets as target-disease prioritization and actionability context, separates association from causality, and uses a Not yet established boundary for perturbation effects.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "A report wants to say an OpenTargets known drug proves efficacy in pulmonary fibrosis. Use the OpenTargets skill to repair the wording.",
+      "expected_output": "The skill separates known-drug/clinical precedence from disease-specific efficacy and rewrites the claim as actionability or repurposing-context follow-up.",
+      "files": []
+    }
+  ]
+}

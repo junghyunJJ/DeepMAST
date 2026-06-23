@@ -80,6 +80,69 @@ class DrugTargetState(TypedDict):
     hypothesis_retry_attempts: NotRequired[int]
     hypothesis_retry_status: NotRequired[str]
     hypothesis_retry_error: NotRequired[str | None]
+    hypothesis_writer_skill_names: NotRequired[tuple[str, ...] | list[str]]
+    hypothesis_writer_prompt_mode: NotRequired[str]
+    skill_activation_mode: NotRequired[str]
+    enable_skill_activator: NotRequired[bool]
+
+
+def _drug_target_config_from_state(
+    state: DrugTargetState,
+    provider: str,
+    *,
+    use_checkpointer: bool,
+):
+    """Build an agent config while preserving benchmark hypothesis settings."""
+    from typing import Literal as _Lit, cast as _cast
+
+    from src.agents.drug_target.agent import (
+        DrugTargetConfig,
+        SkillActivationMode as _SkillActivationMode,
+    )
+    from src.agents.drug_target.subagents.prompts import (
+        HypothesisWriterPromptMode as _HypothesisWriterPromptMode,
+    )
+
+    skill_activation_mode = state.get("skill_activation_mode")
+    enable_skill_activator = state.get("enable_skill_activator")
+    if enable_skill_activator is None and skill_activation_mode is not None:
+        enable_skill_activator = skill_activation_mode == "middleware_plus_activator"
+
+    prompt_mode = state.get("hypothesis_writer_prompt_mode")
+    skill_names = state.get("hypothesis_writer_skill_names")
+    default_hypothesis_writer_skill_names = (
+        "drug-target-hypothesis",
+        "opentargets-database",
+        "gwas-database",
+        "chembl-database",
+    )
+
+    return DrugTargetConfig(
+        provider=_cast(
+            _Lit["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"],
+            provider,
+        ),
+        data_dir=state["data_dir"],
+        disease=state["disease"],
+        use_checkpointer=use_checkpointer,
+        hypothesis_writer_skill_names=(
+            tuple(skill_names)
+            if skill_names is not None
+            else default_hypothesis_writer_skill_names
+        ),
+        hypothesis_writer_prompt_mode=_cast(
+            _HypothesisWriterPromptMode,
+            prompt_mode if prompt_mode is not None else "default",
+        ),
+        skill_activation_mode=(
+            _cast(_SkillActivationMode, skill_activation_mode)
+            if skill_activation_mode is not None
+            else None
+        ),
+        enable_skill_activator=(
+            enable_skill_activator if enable_skill_activator is not None else True
+        ),
+    )
 
 
 async def run_deep_agent(state: DrugTargetState, config: RunnableConfig) -> dict:
@@ -96,27 +159,19 @@ async def run_deep_agent(state: DrugTargetState, config: RunnableConfig) -> dict
     # Lazy import to avoid circular dependency at module load time
     import os
     import time
-    from typing import Literal as _Lit, cast as _cast
 
     from langchain_core.runnables import RunnableConfig as _RC
 
-    from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
+    from src.agents.drug_target.agent import create_drug_target_agent
 
-    data_dir: str = state["data_dir"]
-    disease: str = state["disease"]
     started_at = time.time()
 
     # Read provider from env — DrugTargetConfig.provider is a Literal; cast for pyright.
     provider_str = os.getenv("LLM_PROVIDER", "openrouter")
-    provider = _cast(
-        _Lit["openai", "google", "ollama", "ollama-openai", "claude", "openrouter"],
-        provider_str,
-    )
 
-    agent_config = DrugTargetConfig(
-        provider=provider,
-        data_dir=data_dir,
-        disease=disease,
+    agent_config = _drug_target_config_from_state(
+        state,
+        provider_str,
         use_checkpointer=False,
     )
     runnable, backend = create_drug_target_agent(agent_config)
@@ -207,18 +262,17 @@ async def _invoke_hypothesis_retry(
 
     from langchain_core.runnables import RunnableConfig as _RC
 
-    from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
+    from src.agents.drug_target.agent import create_drug_target_agent
     from src.agents.drug_target.hypothesis_retry import build_hypothesis_retry_message
 
     provider_str = os.getenv("LLM_PROVIDER", "openrouter")
     provider = _cast(
-        _Lit["openai", "google", "ollama", "ollama-openai", "claude", "openrouter"],
+        _Lit["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"],
         provider_str,
     )
-    agent_config = DrugTargetConfig(
-        provider=provider,
-        data_dir=state["data_dir"],
-        disease=state["disease"],
+    agent_config = _drug_target_config_from_state(
+        state,
+        provider,
         use_checkpointer=False,
     )
     runnable, backend = create_drug_target_agent(agent_config)
@@ -245,7 +299,20 @@ async def _invoke_hypothesis_retry(
         if timeout is None:
             await call
         else:
-            await asyncio.wait_for(call, timeout=timeout)
+            task = asyncio.ensure_future(call)
+            done, _ = await asyncio.wait({task}, timeout=timeout)
+            if not done:
+                task.cancel()
+
+                def _consume_cancelled_retry(done_task: asyncio.Future) -> None:
+                    try:
+                        done_task.result()
+                    except BaseException:
+                        pass
+
+                task.add_done_callback(_consume_cancelled_retry)
+                raise TimeoutError("hypothesis retry timed out")
+            await task
     finally:
         if backend is not None and hasattr(backend, "cleanup"):
             backend.cleanup()  # type: ignore[union-attr]

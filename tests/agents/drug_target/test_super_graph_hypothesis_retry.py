@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -318,6 +320,49 @@ async def test_retry_failure_hard_blocks_finalize(tmp_path: Path, monkeypatch) -
 
 
 @pytest.mark.asyncio
+async def test_hypothesis_retry_timeout_does_not_wait_for_slow_cancellation(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    cleanup_called = False
+
+    async def slow_to_cancel_ainvoke(inp, config=None):
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            await asyncio.sleep(0.2)
+            raise
+
+    class Backend:
+        def cleanup(self) -> None:
+            nonlocal cleanup_called
+            cleanup_called = True
+
+    def fake_create_agent(cfg):
+        return SimpleNamespace(ainvoke=slow_to_cancel_ainvoke), Backend()
+
+    monkeypatch.setenv("DRUG_TARGET_HYPOTHESIS_RETRY_TIMEOUT_SECONDS", "0.01")
+    monkeypatch.setattr("src.agents.drug_target.agent.create_drug_target_agent", fake_create_agent)
+
+    from src.agents.drug_target.super_graph import _invoke_hypothesis_retry
+
+    started = time.monotonic()
+    with pytest.raises(TimeoutError):
+        await _invoke_hypothesis_retry(
+            _state(data_dir),
+            {"recursion_limit": 10000, "configurable": {}},
+            [{"code": "HYPOTHESIS_REPORT_MISSING", "message": "missing"}],
+            attempt=1,
+            max_attempts=1,
+        )
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 0.1
+    assert cleanup_called is True
+
+
+@pytest.mark.asyncio
 async def test_retry_timeout_accepts_valid_report_saved_before_timeout(
     tmp_path: Path,
     monkeypatch,
@@ -507,6 +552,62 @@ async def test_numeric_quality_failure_succeeds_on_second_retry(
     assert "UNVERIFIED_NUMERIC_PREDICTION" in retry_messages[1]
     assert "unsupported percentages" in retry_messages[1]
     assert (data_dir / "drug.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_hypothesis_retry_preserves_benchmark_writer_config(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    _write_raw_hypothesis_report(data_dir, _invalid_numeric_report())
+    captured_configs = []
+
+    async def retry_valid_ainvoke(inp, config=None):
+        result = json.loads(
+            save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": _valid_report()})
+        )
+        assert result["saved"] is True
+        return {"messages": [AIMessage(content="Hypothesis fixup complete.")]}
+
+    def fake_create_agent(cfg):
+        captured_configs.append(cfg)
+        return SimpleNamespace(ainvoke=retry_valid_ainvoke), None
+
+    monkeypatch.setattr("src.agents.drug_target.agent.create_drug_target_agent", fake_create_agent)
+
+    from src.agents.drug_target.super_graph import validate_and_maybe_retry_hypothesis
+
+    final_state = await validate_and_maybe_retry_hypothesis(
+        {
+            "messages": [],
+            "data_dir": str(data_dir),
+            "disease": "breast cancer",
+            "featured_lr_pairs": None,
+            "report_finalization_error": None,
+            "evidence_truncated": False,
+            "hypothesis_writer_skill_names": (
+                "drug-target-hypothesis",
+                "chembl-database",
+            ),
+            "hypothesis_writer_prompt_mode": "thin_basic_dth_required",
+            "skill_activation_mode": "middleware_only",
+            "enable_skill_activator": False,
+        },
+        {"recursion_limit": 10000, "configurable": {}},
+    )
+
+    assert final_state["hypothesis_quality_valid"] is True
+    assert final_state["hypothesis_retry_status"] == "success"
+    assert len(captured_configs) == 1
+    retry_config = captured_configs[0]
+    assert retry_config.hypothesis_writer_skill_names == (
+        "drug-target-hypothesis",
+        "chembl-database",
+    )
+    assert retry_config.hypothesis_writer_prompt_mode == "thin_basic_dth_required"
+    assert retry_config.skill_activation_mode == "middleware_only"
+    assert retry_config.enable_skill_activator is False
 
 
 @pytest.mark.asyncio

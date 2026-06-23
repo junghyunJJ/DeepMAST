@@ -104,7 +104,8 @@ class DeepInterpreterConfig:
     """Configuration for Deep Interpreter Agent.
 
     Attributes:
-        provider: LLM provider ('openai', 'google', 'ollama', 'claude', 'openrouter').
+        provider: LLM provider ('openai', 'google', 'ollama', 'ollama-openai',
+                  'vllm', 'claude', 'openrouter').
                   Defaults to 'openrouter'. Uses LLM_PROVIDER env var if not specified.
         data_dir: Directory for CCI analysis results and agent workspace
         max_iterations: Maximum quality refinement iterations per part (default: 3)
@@ -123,7 +124,7 @@ class DeepInterpreterConfig:
         - OLLAMA_MODEL (default: gpt-oss:20b)
         - ANTHROPIC_MODEL (default: claude-haiku-4-5-20251001)
     """
-    provider: Literal["openai", "google", "ollama", "ollama-openai", "claude", "openrouter"] = "openrouter"
+    provider: Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"] = "openrouter"
     data_dir: str = field(
         default_factory=lambda: os.getenv(
             "DEEP_INTERPRETER_DATA_DIR", "/tmp/deep_interpreter_workspace"
@@ -329,7 +330,7 @@ def interpret_analysis(
     interest_celltypes: Optional[list[str]] = None,
     sel_factor: Optional[str] = None,
     output_path: Optional[str] = None,
-    provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "ollama",
+    provider: Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"] = "ollama",
     thread_id: Optional[str] = None,
     use_checkpointer: bool = False,
 ) -> dict:
