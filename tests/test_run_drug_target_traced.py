@@ -14,13 +14,41 @@ from scripts import run_drug_target_traced as traced
 def test_parse_args_defaults_timeout_to_120():
     args = traced.parse_args([])
     assert args.timeout == 120
-    assert args.port is None
+    assert args.port == traced.DEFAULT_OLLAMA_PORT
 
 
 def test_parse_args_accepts_port():
     args = traced.parse_args(["--port", "6000"])
     assert args.port == 6000
     assert args.provider == "ollama"
+
+
+def test_parse_args_accepts_vllm_port_and_generation_options():
+    args = traced.parse_args(
+        [
+            "--provider",
+            "vllm",
+            "--port",
+            "7001",
+            "--model",
+            "Qwen/Qwen3.5-122B-A10B-FP8",
+            "--max-tokens",
+            "16384",
+            "--enable-thinking",
+        ]
+    )
+
+    assert args.provider == "vllm"
+    assert args.port == 7001
+    assert args.model == "Qwen/Qwen3.5-122B-A10B-FP8"
+    assert args.max_tokens == 16384
+    assert args.enable_thinking is True
+
+
+def test_parse_args_accepts_ollama_cloud_model():
+    args = traced.parse_args(["--model", "qwen3.5:397b-cloud"])
+
+    assert args.model == "qwen3.5:397b-cloud"
 
 
 @pytest.mark.parametrize("port", ["0", "70000"])
@@ -32,6 +60,13 @@ def test_parse_args_rejects_invalid_port(port: str):
 def test_parse_args_rejects_port_for_non_ollama_provider():
     with pytest.raises(SystemExit):
         traced.parse_args(["--provider", "openai", "--port", "6000"])
+
+
+def test_parse_args_allows_non_ollama_provider_without_explicit_port():
+    args = traced.parse_args(["--provider", "openai"])
+
+    assert args.provider == "openai"
+    assert args.port is None
 
 
 def test_configure_ollama_port_override_sets_env(monkeypatch):
@@ -46,16 +81,40 @@ def test_configure_ollama_port_override_sets_env(monkeypatch):
     assert traced.os.environ["OLLAMA_HOST"] == "http://localhost:6000"
 
 
-def test_configure_ollama_port_override_noops_without_port(monkeypatch):
+def test_configure_ollama_port_override_defaults_to_ollama_default(monkeypatch):
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    args = argparse.Namespace(provider="ollama", port=None)
+
+    base_url = traced._configure_ollama_port_override(args)
+
+    assert base_url == "http://localhost:11434"
+    assert traced.os.environ["OLLAMA_BASE_URL"] == "http://localhost:11434"
+    assert traced.os.environ["OLLAMA_HOST"] == "http://localhost:11434"
+
+
+def test_configure_ollama_port_override_noops_for_non_ollama_provider(monkeypatch):
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:7000")
     monkeypatch.setenv("OLLAMA_HOST", "http://localhost:7000")
+    args = argparse.Namespace(provider="openai", port=None)
 
-    args = argparse.Namespace(provider="ollama", port=None)
     base_url = traced._configure_ollama_port_override(args)
 
     assert base_url is None
     assert traced.os.environ["OLLAMA_BASE_URL"] == "http://localhost:7000"
     assert traced.os.environ["OLLAMA_HOST"] == "http://localhost:7000"
+
+
+def test_configure_ollama_port_override_sets_vllm_base_url_without_ollama_host(monkeypatch):
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    args = argparse.Namespace(provider="vllm", port=7001)
+
+    base_url = traced._configure_ollama_port_override(args)
+
+    assert base_url == "http://localhost:7001"
+    assert traced.os.environ["OLLAMA_BASE_URL"] == "http://localhost:7001"
+    assert "OLLAMA_HOST" not in traced.os.environ
 
 
 def test_configure_provider_env_sets_llm_provider(monkeypatch):
@@ -65,6 +124,48 @@ def test_configure_provider_env_sets_llm_provider(monkeypatch):
     traced._configure_provider_env(args)
 
     assert traced.os.environ["LLM_PROVIDER"] == "ollama"
+
+
+def test_configure_provider_env_sets_cli_model_for_ollama(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+    args = argparse.Namespace(provider="ollama", model="qwen3.5:397b-cloud")
+
+    traced._configure_provider_env(args)
+
+    assert traced.os.environ["LLM_PROVIDER"] == "ollama"
+    assert traced.os.environ["LLM_MODEL"] == "qwen3.5:397b-cloud"
+    assert traced.os.environ["OLLAMA_MODEL"] == "qwen3.5:397b-cloud"
+
+
+def test_configure_provider_env_sets_vllm_generation_env(monkeypatch):
+    for key in (
+        "LLM_PROVIDER",
+        "LLM_MODEL",
+        "OLLAMA_MODEL",
+        "VLLM_MAX_TOKENS",
+        "OLLAMA_OPENAI_MAX_TOKENS",
+        "VLLM_ENABLE_THINKING",
+        "OLLAMA_OPENAI_ENABLE_THINKING",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    args = argparse.Namespace(
+        provider="vllm",
+        model="Qwen/Qwen3.5-122B-A10B-FP8",
+        max_tokens=16384,
+        enable_thinking=False,
+    )
+
+    traced._configure_provider_env(args)
+
+    assert traced.os.environ["LLM_PROVIDER"] == "vllm"
+    assert traced.os.environ["LLM_MODEL"] == "Qwen/Qwen3.5-122B-A10B-FP8"
+    assert traced.os.environ["OLLAMA_MODEL"] == "Qwen/Qwen3.5-122B-A10B-FP8"
+    assert traced.os.environ["VLLM_MAX_TOKENS"] == "16384"
+    assert traced.os.environ["OLLAMA_OPENAI_MAX_TOKENS"] == "16384"
+    assert traced.os.environ["VLLM_ENABLE_THINKING"] == "false"
+    assert traced.os.environ["OLLAMA_OPENAI_ENABLE_THINKING"] == "false"
 
 
 def test_finalize_report_config_forwards_provider(monkeypatch):
@@ -90,6 +191,21 @@ def test_finalize_report_config_forwards_llm_model(monkeypatch):
         "configurable": {
             "llm_provider": "ollama",
             "llm_model": "qwen3.5:122b",
+        },
+    }
+
+
+def test_finalize_report_config_prefers_cli_model(monkeypatch):
+    monkeypatch.setenv("LLM_MODEL", "qwen3.5:122b")
+
+    args = argparse.Namespace(provider="ollama", model="qwen3.5:397b-cloud")
+    config = traced._finalize_report_config(args)
+
+    assert config == {
+        "recursion_limit": 100,
+        "configurable": {
+            "llm_provider": "ollama",
+            "llm_model": "qwen3.5:397b-cloud",
         },
     }
 
@@ -359,6 +475,14 @@ def test_host_hypothesis_fallback_rewrites_failed_suffix_fixture(tmp_path):
     assert saved["host_finalized"] is True
     assert saved["fallback_quality"] == "degraded"
     assert "_FAILED" not in json.dumps(saved)
+    assert len(saved["hypotheses"]) <= 6
+
+    from src.agents.drug_target.tools.hypothesis_schema import (
+        validate_hypothesis_report_quality,
+    )
+
+    quality = validate_hypothesis_report_quality(str(tmp_path))
+    assert quality["valid"] is True, quality
 
     candidates = {
         row["gene"].upper()
@@ -387,6 +511,40 @@ def test_host_hypothesis_fallback_rewrites_failed_suffix_fixture(tmp_path):
             pair = filename.removeprefix("stage1_").removesuffix(".json")
             if detail["usage"] in {"primary", "supporting"}:
                 assert pass_map[pair] is True
+
+
+def test_pre_quality_recovery_rewrites_fresh_invalid_native_report(
+    tmp_path,
+    monkeypatch,
+):
+    fixture_evidence = (
+        Path(__file__).resolve().parent
+        / "agents"
+        / "drug_target"
+        / "fixtures"
+        / "baseline_hallucinated"
+        / "evidence"
+    )
+    shutil.copytree(fixture_evidence, tmp_path / "evidence")
+    report_path = tmp_path / "evidence" / "hypothesis_report.json"
+    run_started_at = report_path.stat().st_mtime - 1
+    trace_log = tmp_path / "trace.log"
+    trace_log.write_text("", encoding="utf-8")
+    monkeypatch.setenv("DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK", "recovery")
+
+    result = traced._maybe_run_host_hypothesis_fallback_before_quality(
+        tmp_path,
+        "idiopathic pulmonary fibrosis",
+        trace_log,
+        run_started_at,
+    )
+
+    assert result["host_hypothesis_fallback_used"] is True, result
+    saved = json.loads(report_path.read_text(encoding="utf-8"))
+    assert saved["host_finalized"] is True
+    assert saved["fallback_quality"] == "degraded"
+    assert "_FAILED" not in json.dumps(saved)
+    assert "pre-quality validation failed" in trace_log.read_text(encoding="utf-8")
 
 
 def test_host_hypothesis_fallback_disabled_by_default(monkeypatch):

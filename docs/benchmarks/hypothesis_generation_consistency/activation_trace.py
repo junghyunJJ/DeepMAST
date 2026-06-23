@@ -127,6 +127,24 @@ def extract_named_tool_calls(
     return calls
 
 
+def dedupe_read_skill_file_calls(
+    calls: Sequence[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    seen: set[tuple[Any, Any]] = set()
+    unique_calls: list[dict[str, Any]] = []
+    duplicate_calls: list[dict[str, Any]] = []
+
+    for call in calls:
+        key = (call.get("skill_name"), call.get("skill_path"))
+        if key in seen:
+            duplicate_calls.append(call)
+            continue
+        seen.add(key)
+        unique_calls.append(call)
+
+    return unique_calls, duplicate_calls
+
+
 def summarize_activation_trace(
     *,
     exposed_skill_names: Sequence[str],
@@ -134,10 +152,14 @@ def summarize_activation_trace(
     all_read_skill_calls: Sequence[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     exposed = tuple(exposed_skill_names)
+    writer_attempts = list(hypothesis_writer_calls)
+    writer_calls, duplicate_writer_attempts = dedupe_read_skill_file_calls(
+        writer_attempts
+    )
     activated_skill_names = sorted(
         {
             call["skill_name"]
-            for call in hypothesis_writer_calls
+            for call in writer_calls
             if call.get("skill_name") in exposed
         }
     )
@@ -150,10 +172,11 @@ def summarize_activation_trace(
     all_calls = list(
         hypothesis_writer_calls if all_read_skill_calls is None else all_read_skill_calls
     )
-    writer_calls = list(hypothesis_writer_calls)
     return {
         "exposed_skill_names": list(exposed),
         "hypothesis_writer_read_skill_file_calls": writer_calls,
+        "hypothesis_writer_read_skill_file_attempts": writer_attempts,
+        "hypothesis_writer_duplicate_read_skill_file_attempts": duplicate_writer_attempts,
         "all_read_skill_file_calls": all_calls,
         "activated_skill_names": activated_skill_names,
         "activated_added_skill_names": activated_added_skill_names,

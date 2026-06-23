@@ -217,6 +217,17 @@ def test_dispatcher_accepts_ollama_openai_via_env(monkeypatch):
     assert isinstance(llm, ChatOpenAI)
 
 
+def test_dispatcher_accepts_vllm_provider_alias():
+    """vLLM OpenAI-compatible endpoints should use the ChatOpenAI path."""
+    with patch("src.agents.model.ChatOpenAI", autospec=True) as mock_chatopenai:
+        mock_chatopenai.return_value = MagicMock(spec=ChatOpenAI)
+        llm = create_llm(provider="vllm")
+        kwargs = mock_chatopenai.call_args.kwargs
+
+    assert isinstance(llm, ChatOpenAI)
+    assert kwargs["base_url"] == "http://localhost:11434/v1"
+
+
 def test_dispatcher_unknown_provider_still_raises():
     """Test #17 (T1.2 #3): regression — unknown provider still raises ValueError."""
     with pytest.raises(ValueError, match="Unknown LLM provider"):
@@ -325,6 +336,42 @@ def test_create_ollama_openai_llm_extra_body_uses_popped_values():
         opts = kwargs.get("model_kwargs", {}).get("extra_body", {}).get("options", {})
     assert opts["num_ctx"] == 4096
     assert opts["num_predict"] == 512
+
+
+def test_create_ollama_openai_llm_merges_chat_template_extra_body():
+    """vLLM Qwen thinking flags must merge with existing OpenAI extra_body."""
+    with patch("src.agents.model.ChatOpenAI", autospec=True) as mock_chatopenai:
+        mock_chatopenai.return_value = MagicMock(spec=ChatOpenAI)
+        _ = create_llm(
+            provider="vllm",
+            base_url="http://localhost:7001",
+            model="Qwen/Qwen3.5-122B-A10B-FP8",
+            max_tokens=16384,
+            enable_thinking=False,
+            extra_body={"chat_template_kwargs": {"foo": "bar"}},
+        )
+        kwargs = mock_chatopenai.call_args.kwargs
+
+    assert kwargs["base_url"] == "http://localhost:7001/v1"
+    assert kwargs["model"] == "Qwen/Qwen3.5-122B-A10B-FP8"
+    assert kwargs["max_tokens"] == 16384
+    assert kwargs["extra_body"]["chat_template_kwargs"] == {
+        "foo": "bar",
+        "enable_thinking": False,
+    }
+    assert kwargs["extra_body"]["options"]["num_ctx"] == 98304
+    assert kwargs["extra_body"]["options"]["num_predict"] == -1
+
+
+def test_create_ollama_openai_llm_reads_vllm_max_tokens_env(monkeypatch):
+    """VLLM_MAX_TOKENS should become top-level ChatOpenAI max_tokens."""
+    monkeypatch.setenv("VLLM_MAX_TOKENS", "8192")
+    with patch("src.agents.model.ChatOpenAI", autospec=True) as mock_chatopenai:
+        mock_chatopenai.return_value = MagicMock(spec=ChatOpenAI)
+        _ = create_llm(provider="vllm")
+        kwargs = mock_chatopenai.call_args.kwargs
+
+    assert kwargs["max_tokens"] == 8192
 
 
 def test_create_ollama_llm_forwards_reasoning_false_kwarg():

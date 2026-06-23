@@ -3471,7 +3471,8 @@ _DRUG_NAME_STOPLIST: frozenset[str] = frozenset({
     "AML", "CML", "EMA", "TBD", "OR", "AND", "NOT", "IF", "THEN",
     "Yes", "No", "None", "WT", "MT", "ENA", "OS", "PFS", "ORR",
     "Trial", "Drug", "Targets", "Indications", "Mechanism", "Action",
-    "Across", "Taken", "Together", "Their", "Its", "Overall", "Because", "Use",
+    "Across", "Taken", "Together", "Their", "They", "Its", "Overall", "Because",
+    "Use", "Treat",
     "Test", "Profile", "Model", "Quantify", "Blocking", "Criteria", "ALL",
     # Common sentence-initial English words (Title-case at line start)
     "This", "The", "These", "Those", "Both", "All", "Any", "Some", "Each",
@@ -3594,20 +3595,25 @@ def _build_drug_allowlist(
     evidence_dir: "Path",
     resolved_drugs: list[dict],
 ) -> frozenset[str]:
-    """Build case-folded set of known drug/gene names from evidence files.
+    """Build case-folded set of known names that are not fabricated drugs.
 
-    Includes gene symbols from stage3 files so they are not flagged as
-    fabricated drug names when they appear in prose.
+    Includes drug names, gene symbols, and cell-type context labels from
+    evidence files so they are not flagged as fabricated drug names when they
+    appear in prose.
 
     Supports both ``name`` and ``resolved_name`` fields so that evidence files
     produced by the ChEMBL resolver (which uses ``resolved_name``) are
     recognised alongside legacy files that use ``name``.
     """
     allowlist: set[str] = set()
+
+    def add_allowlisted_label(value: object) -> None:
+        label = str(value or "").strip()
+        if label:
+            allowlist.add(label.casefold())
+
     for d in resolved_drugs:
-        name = (d.get("name") or d.get("resolved_name") or "").strip().casefold()
-        if name:
-            allowlist.add(name)
+        add_allowlisted_label(d.get("name") or d.get("resolved_name"))
     for stage3_path in evidence_dir.glob("stage3_*.json"):
         try:
             stage3 = json.loads(stage3_path.read_text())
@@ -3662,6 +3668,25 @@ def _build_drug_allowlist(
                     symbol = (entry.get("symbol") or "").strip().casefold()
                     if symbol:
                         allowlist.add(symbol)
+        except Exception:
+            pass
+    celltype_resolution_path = evidence_dir / "celltype_resolution.json"
+    if celltype_resolution_path.exists():
+        try:
+            celltype_resolution = json.loads(
+                celltype_resolution_path.read_text(encoding="utf-8")
+            )
+            if isinstance(celltype_resolution, dict):
+                add_allowlisted_label(celltype_resolution.get("primary_input_celltype"))
+                add_allowlisted_label(
+                    celltype_resolution.get("primary_resolved_celltype")
+                )
+                for label in celltype_resolution.get("interest_celltypes", []) or []:
+                    add_allowlisted_label(label)
+                for match in celltype_resolution.get("matches", []) or []:
+                    if isinstance(match, dict):
+                        add_allowlisted_label(match.get("input_celltype"))
+                        add_allowlisted_label(match.get("matched_celltype"))
         except Exception:
             pass
     return frozenset(allowlist)

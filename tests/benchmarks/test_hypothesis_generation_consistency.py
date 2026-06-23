@@ -26,6 +26,10 @@ from docs.benchmarks.hypothesis_generation_consistency.compare_skill_sets import
 )
 from docs.benchmarks.hypothesis_generation_consistency.run_benchmark import (
     CURRENT4_HYPOTHESIS_WRITER_SKILLS,
+    DOMAIN4_HYPOTHESIS_WRITER_SKILLS,
+    DTH_NONE_HYPOTHESIS_WRITER_SKILLS,
+    DTH_ONLY_HYPOTHESIS_WRITER_SKILLS,
+    DTH_PLUS_DOMAIN4_HYPOTHESIS_WRITER_SKILLS,
     EXPANDED6_HYPOTHESIS_WRITER_SKILLS,
     SELECTIVE8_HYPOTHESIS_WRITER_SKILLS,
     HYPOTHESIS_WRITER_RESUME_MESSAGE,
@@ -79,6 +83,34 @@ def test_selective8_skill_set_exposes_positive_and_negative_controls() -> None:
     )
     assert resolve_hypothesis_writer_skill_names("selective8") == (
         SELECTIVE8_HYPOTHESIS_WRITER_SKILLS
+    )
+
+
+def test_dth_control_skill_sets_are_explicit() -> None:
+    assert DTH_ONLY_HYPOTHESIS_WRITER_SKILLS == ("drug-target-hypothesis",)
+    assert DTH_NONE_HYPOTHESIS_WRITER_SKILLS == ()
+    assert resolve_hypothesis_writer_skill_names("dth_only") == (
+        "drug-target-hypothesis",
+    )
+    assert resolve_hypothesis_writer_skill_names("dth_none") == ()
+
+
+def test_domain4_control_skill_sets_are_explicit() -> None:
+    assert DOMAIN4_HYPOTHESIS_WRITER_SKILLS == (
+        "opentargets-database",
+        "chembl-database",
+        "compare-census-gene-pair-by-cell-type",
+        "string-database",
+    )
+    assert DTH_PLUS_DOMAIN4_HYPOTHESIS_WRITER_SKILLS == (
+        "drug-target-hypothesis",
+        *DOMAIN4_HYPOTHESIS_WRITER_SKILLS,
+    )
+    assert resolve_hypothesis_writer_skill_names("domain4") == (
+        DOMAIN4_HYPOTHESIS_WRITER_SKILLS
+    )
+    assert resolve_hypothesis_writer_skill_names("dth_plus_domain4") == (
+        DTH_PLUS_DOMAIN4_HYPOTHESIS_WRITER_SKILLS
     )
 
 
@@ -228,6 +260,52 @@ def test_extract_hypothesis_writer_read_skill_file_calls_can_infer_registered_un
     ]
 
 
+def test_activation_trace_reports_unique_skill_reads_and_raw_attempts() -> None:
+    from docs.benchmarks.hypothesis_generation_consistency.activation_trace import (
+        summarize_activation_trace,
+    )
+
+    calls = [
+        {
+            "skill_name": "drug-target-hypothesis",
+            "skill_path": "skills/drug-target-hypothesis/SKILL.md",
+            "tool_call_id": "call_1",
+            "node_path": "orchestrator > hypothesis_writer",
+            "node_name": "hypothesis_writer",
+            "registered": True,
+        },
+        {
+            "skill_name": "drug-target-hypothesis",
+            "skill_path": "skills/drug-target-hypothesis/SKILL.md",
+            "tool_call_id": "call_2",
+            "node_path": "orchestrator > hypothesis_writer > retry",
+            "node_name": "hypothesis_writer",
+            "registered": True,
+        },
+    ]
+
+    payload = summarize_activation_trace(
+        exposed_skill_names=("drug-target-hypothesis",),
+        hypothesis_writer_calls=calls,
+        all_read_skill_calls=calls,
+    )
+
+    assert payload["activated_skill_names"] == ["drug-target-hypothesis"]
+    assert len(payload["hypothesis_writer_read_skill_file_calls"]) == 1
+    assert len(payload["hypothesis_writer_read_skill_file_attempts"]) == 2
+    assert len(payload["hypothesis_writer_duplicate_read_skill_file_attempts"]) == 1
+    assert (
+        payload["hypothesis_writer_read_skill_file_calls"][0]["tool_call_id"]
+        == "call_1"
+    )
+    assert (
+        payload["hypothesis_writer_duplicate_read_skill_file_attempts"][0][
+            "tool_call_id"
+        ]
+        == "call_2"
+    )
+
+
 def test_run_drug_target_traced_parse_args_accepts_activation_flags() -> None:
     from scripts.run_drug_target_traced import parse_args as parse_traced_args
 
@@ -240,6 +318,8 @@ def test_run_drug_target_traced_parse_args_accepts_activation_flags() -> None:
             "expanded6",
             "--skill-activation-mode",
             "middleware_only",
+            "--hypothesis-writer-prompt-mode",
+            "progressive_disclosure_with_modality_map",
             "--activation-trace-json",
             "/tmp/example/activation_trace.json",
         ]
@@ -247,6 +327,7 @@ def test_run_drug_target_traced_parse_args_accepts_activation_flags() -> None:
 
     assert args.hypothesis_skill_set == "expanded6"
     assert args.skill_activation_mode == "middleware_only"
+    assert args.hypothesis_writer_prompt_mode == "progressive_disclosure_with_modality_map"
     assert args.activation_trace_json == "/tmp/example/activation_trace.json"
 
 
@@ -539,6 +620,185 @@ def test_governor_production_trial_plan_supports_repeats_and_physical_ports() ->
             assert counts[(model, mode, 7000)] == 6
 
 
+def test_governor_production_trial_plan_supports_duplicate_port_workers() -> None:
+    from collections import Counter
+
+    from docs.benchmarks.hypothesis_generation_consistency.run_governor_production_activation_matrix import (
+        DEFAULT_MODES,
+        build_trial_plan,
+    )
+
+    trials = build_trial_plan(
+        models=("qwen3.5:35b",),
+        ports=(5000, 6000, 6000, 7000, 7000),
+        modes=DEFAULT_MODES,
+        repeats_per_condition=20,
+    )
+
+    assert len(trials) == 60
+    assert len({trial["run_id"] for trial in trials}) == 60
+    assert [trial["port"] for trial in trials[:5]] == [5000, 6000, 6000, 7000, 7000]
+    assert [trial["worker_id"] for trial in trials[:5]] == [
+        "5000",
+        "6000_1",
+        "6000_2",
+        "7000_1",
+        "7000_2",
+    ]
+    assert [trial["wave"] for trial in trials[:5]] == [0, 0, 0, 0, 0]
+    assert trials[0]["run_id"] == "qwen35b_middleware_only_rep001_port5000"
+    assert trials[1]["run_id"] == "qwen35b_middleware_only_rep002_port6000_slot1"
+    assert trials[2]["run_id"] == "qwen35b_middleware_only_rep003_port6000_slot2"
+    assert trials[4]["run_id"] == "qwen35b_middleware_only_rep005_port7000_slot2"
+    assert trials[5]["wave"] == 1
+
+    worker_counts = Counter(
+        (trial["mode"], trial["worker_id"])
+        for trial in trials
+    )
+    port_counts = Counter(
+        (trial["mode"], trial["port"])
+        for trial in trials
+    )
+    for mode in DEFAULT_MODES:
+        assert worker_counts[(mode, "5000")] == 4
+        assert worker_counts[(mode, "6000_1")] == 4
+        assert worker_counts[(mode, "6000_2")] == 4
+        assert worker_counts[(mode, "7000_1")] == 4
+        assert worker_counts[(mode, "7000_2")] == 4
+        assert port_counts[(mode, 5000)] == 4
+        assert port_counts[(mode, 6000)] == 8
+        assert port_counts[(mode, 7000)] == 8
+
+
+def test_governor_production_dry_run_reports_duplicate_port_workers() -> None:
+    from docs.benchmarks.hypothesis_generation_consistency.run_governor_production_activation_matrix import (
+        build_dry_run_payload,
+        build_trial_plan,
+    )
+
+    ports = (5000, 6000, 6000, 7000, 7000)
+    trials = build_trial_plan(
+        models=("qwen3.5:35b",),
+        ports=ports,
+        modes=("middleware_only",),
+        repeats_per_condition=10,
+    )
+
+    payload = build_dry_run_payload(
+        source=Path("/tmp/source"),
+        trials=trials,
+        models=("qwen3.5:35b",),
+        ports=ports,
+        modes=("middleware_only",),
+        repeats_per_condition=10,
+        timeout_minutes=60,
+        wait_for_completion=True,
+        hypothesis_skill_set="selective8",
+        hypothesis_writer_prompt_mode="progressive_disclosure_only",
+        hypothesis_scope_errors=[],
+        host_hypothesis_fallback="off",
+    )
+
+    assert payload["unique_physical_ports"] == [5000, 6000, 7000]
+    assert payload["workers"] == [
+        {"port": 5000, "port_slot": 1, "worker_index": 1, "worker_id": "5000"},
+        {"port": 6000, "port_slot": 1, "worker_index": 2, "worker_id": "6000_1"},
+        {"port": 6000, "port_slot": 2, "worker_index": 3, "worker_id": "6000_2"},
+        {"port": 7000, "port_slot": 1, "worker_index": 4, "worker_id": "7000_1"},
+        {"port": 7000, "port_slot": 2, "worker_index": 5, "worker_id": "7000_2"},
+    ]
+    assert payload["per_worker"] == {
+        "5000": 2,
+        "6000_1": 2,
+        "6000_2": 2,
+        "7000_1": 2,
+        "7000_2": 2,
+    }
+    assert payload["per_port"] == {"5000": 2, "6000": 4, "7000": 4}
+
+
+def test_governor_production_openai_trial_plan_uses_serial_worker_slots() -> None:
+    from docs.benchmarks.hypothesis_generation_consistency.run_governor_production_activation_matrix import (
+        DEFAULT_MODES,
+        batches_by_model_mode_and_wave,
+        build_trial_plan,
+    )
+
+    trials = build_trial_plan(
+        models=("gpt-5.4-mini",),
+        ports=(),
+        modes=DEFAULT_MODES,
+        repeats_per_condition=3,
+        provider="openai",
+        parallel_workers=1,
+    )
+
+    assert len(trials) == 9
+    assert all("port" not in trial for trial in trials)
+    assert trials[0] == {
+        "provider": "openai",
+        "model": "gpt-5.4-mini",
+        "mode": "middleware_only",
+        "repeat": 1,
+        "wave": 0,
+        "worker_index": 1,
+        "worker_id": "openai-1",
+        "run_id": "gpt-54-mini_middleware_only_rep001_openai_slot1",
+    }
+    assert trials[2]["run_id"] == "gpt-54-mini_middleware_only_rep003_openai_slot1"
+    assert trials[-1]["run_id"] == (
+        "gpt-54-mini_middleware_plus_governor_rep003_openai_slot1"
+    )
+    assert [len(batch) for batch in batches_by_model_mode_and_wave(trials)] == [1] * 9
+
+
+def test_governor_production_openai_dry_run_reports_no_physical_ports() -> None:
+    from docs.benchmarks.hypothesis_generation_consistency.run_governor_production_activation_matrix import (
+        DEFAULT_MODES,
+        build_dry_run_payload,
+        build_trial_plan,
+    )
+
+    trials = build_trial_plan(
+        models=("gpt-5.4-mini",),
+        ports=(),
+        modes=DEFAULT_MODES,
+        repeats_per_condition=3,
+        provider="openai",
+        parallel_workers=1,
+    )
+
+    payload = build_dry_run_payload(
+        source=Path("/tmp/source"),
+        trials=trials,
+        models=("gpt-5.4-mini",),
+        ports=(),
+        modes=DEFAULT_MODES,
+        repeats_per_condition=3,
+        timeout_minutes=120,
+        wait_for_completion=True,
+        hypothesis_skill_set="selective8",
+        hypothesis_writer_prompt_mode="progressive_disclosure_with_modality_map",
+        hypothesis_scope_errors=[],
+        host_hypothesis_fallback="off",
+        provider="openai",
+        parallel_workers=1,
+    )
+
+    assert payload["provider"] == "openai"
+    assert payload["trial_count"] == 9
+    assert payload["models"] == ["gpt-5.4-mini"]
+    assert payload["ports"] == []
+    assert payload["unique_physical_ports"] == []
+    assert payload["parallel_workers"] == 1
+    assert payload["workers"] == [
+        {"provider": "openai", "worker_index": 1, "worker_id": "openai-1"}
+    ]
+    assert payload["per_port"] == {}
+    assert payload["per_worker"] == {"openai-1": 9}
+
+
 def test_governor_production_batches_are_model_mode_and_wave_scoped() -> None:
     from docs.benchmarks.hypothesis_generation_consistency.run_governor_production_activation_matrix import (
         batches_by_model_mode_and_wave,
@@ -578,6 +838,7 @@ def test_governor_production_selector_parsers_accept_comma_lists() -> None:
         parse_csv_modes,
         parse_csv_models,
         parse_csv_ports,
+        unique_physical_ports,
     )
 
     assert parse_csv_models("qwen3.5:35b,qwen3.5:122b") == (
@@ -585,6 +846,18 @@ def test_governor_production_selector_parsers_accept_comma_lists() -> None:
         "qwen3.5:122b",
     )
     assert parse_csv_ports("5000,6000,7000") == (5000, 6000, 7000)
+    assert parse_csv_ports("5000,6000,6000,7000,7000") == (
+        5000,
+        6000,
+        6000,
+        7000,
+        7000,
+    )
+    assert unique_physical_ports((5000, 6000, 6000, 7000, 7000)) == (
+        5000,
+        6000,
+        7000,
+    )
     assert parse_csv_modes(
         "middleware_only,middleware_plus_activator,middleware_plus_governor"
     ) == (
@@ -603,13 +876,12 @@ def test_governor_production_selector_rejects_unknown_mode() -> None:
         parse_csv_modes("middleware_only,unknown_mode")
 
 
-def test_governor_production_selector_rejects_duplicate_ports() -> None:
+def test_governor_production_selector_accepts_duplicate_ports() -> None:
     from docs.benchmarks.hypothesis_generation_consistency.run_governor_production_activation_matrix import (
         parse_csv_ports,
     )
 
-    with pytest.raises(ValueError, match="duplicate port 5000"):
-        parse_csv_ports("5000,5000")
+    assert parse_csv_ports("5000,5000") == (5000, 5000)
 
 
 def test_governor_production_parse_args_accepts_rerun_controls() -> None:
@@ -825,6 +1097,111 @@ def test_governor_production_main_uses_selected_matrix(
     assert unload_calls == [("qwen3.5:35b", (5000, 6000))]
 
 
+def test_governor_production_main_openai_runs_serial_without_unload(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from docs.benchmarks.hypothesis_generation_consistency import (
+        run_governor_production_activation_matrix,
+    )
+
+    source = tmp_path / "source"
+    source.mkdir()
+    captured_batches: list[list[dict[str, object]]] = []
+    captured_providers: list[str] = []
+
+    monkeypatch.setattr(
+        run_governor_production_activation_matrix,
+        "PROJECT_ROOT",
+        tmp_path,
+    )
+    monkeypatch.setattr(
+        run_governor_production_activation_matrix.time,
+        "strftime",
+        lambda _: "openai_gpt54mini_fixed",
+    )
+    monkeypatch.setattr(
+        run_governor_production_activation_matrix,
+        "parse_args",
+        lambda argv=None: Namespace(
+            source=str(source),
+            output_root="",
+            workspace_root="",
+            disease="breast cancer",
+            timeout_minutes=120,
+            hypothesis_skill_set="selective8",
+            hypothesis_writer_prompt_mode="progressive_disclosure_with_modality_map",
+            host_hypothesis_fallback="off",
+            activation_trace_grace_seconds=10.0,
+            wait_for_completion=True,
+            dry_run=False,
+            resume=False,
+            rerun_failed=False,
+            repeats_per_condition=3,
+            force=True,
+            provider="openai",
+            parallel_workers=1,
+            models="gpt-5.4-mini",
+            ports="5000,6000,7000",
+            modes="middleware_only,middleware_plus_activator,middleware_plus_governor",
+        ),
+    )
+
+    def fake_run_trial_batch_parallel(**kwargs: object) -> list[dict[str, object]]:
+        batch = cast(list[dict[str, object]], kwargs["batch"])
+        captured_batches.append(batch)
+        captured_providers.append(cast(str, kwargs["provider"]))
+        return [
+            {
+                **trial,
+                "provider": kwargs["provider"],
+                "returncode": 0,
+                "completion_mode": "completed",
+                "activation_trace_valid": True,
+                "activated_skill_names": [],
+                "activated_added_skill_names": [],
+                "validation": {"validation_passed": True},
+            }
+            for trial in batch
+        ]
+
+    monkeypatch.setattr(
+        run_governor_production_activation_matrix,
+        "run_trial_batch_parallel",
+        fake_run_trial_batch_parallel,
+    )
+    monkeypatch.setattr(
+        run_governor_production_activation_matrix,
+        "unload_model_from_ports",
+        lambda model, ports: pytest.fail("OpenAI runs must not unload Ollama ports"),
+    )
+    monkeypatch.setattr(
+        run_governor_production_activation_matrix,
+        "check_hypothesis_scope_untraced",
+        lambda path: {"errors": []},
+    )
+
+    assert run_governor_production_activation_matrix.main([]) == 0
+
+    assert captured_providers == ["openai"] * 9
+    assert [len(batch) for batch in captured_batches] == [1] * 9
+    assert all("port" not in batch[0] for batch in captured_batches)
+
+    payload = json.loads(
+        (
+            tmp_path
+            / "docs/benchmarks/hypothesis_generation_consistency/results/openai_gpt54mini_fixed/benchmark_results.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert payload["provider"] == "openai"
+    assert payload["models"] == ["gpt-5.4-mini"]
+    assert payload["ports"] == []
+    assert payload["unique_physical_ports"] == []
+    assert payload["parallel_workers"] == 1
+    assert payload["runs_requested"] == 9
+    assert payload["unload_events"] == []
+
+
 def test_governor_production_dry_run_validates_hypothesis_scope(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -859,6 +1236,8 @@ def test_governor_production_dry_run_validates_hypothesis_scope(
             "--wait-for-completion",
             "--hypothesis-skill-set",
             "selective8",
+            "--hypothesis-writer-prompt-mode",
+            "progressive_disclosure_with_modality_map",
             "--dry-run",
         ]
     )
@@ -870,6 +1249,7 @@ def test_governor_production_dry_run_validates_hypothesis_scope(
     assert payload["trial_count"] == 120
     assert payload["source"] == str(source.resolve())
     assert payload["hypothesis_scope_errors"] == []
+    assert payload["hypothesis_writer_prompt_mode"] == "progressive_disclosure_with_modality_map"
     assert payload["ports"] == [5000, 6000, 7000]
     assert payload["repeats_per_condition"] == 20
     assert payload["wait_for_completion"] is True
@@ -1933,6 +2313,83 @@ def test_activation_matrix_marks_malformed_trace_invalid(
     assert row["activation_trace_valid"] is False
     assert "JSONDecodeError" in row["activation_trace_error"]
     assert row["activated_skill_names"] == []
+
+
+def test_activation_matrix_run_one_trial_openai_omits_port_and_sets_provider_env(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from docs.benchmarks.hypothesis_generation_consistency import run_activation_matrix
+
+    captured: dict[str, Any] = {}
+
+    def fake_copy_source_workspace(
+        source: Path,
+        destination: Path,
+        *,
+        force: bool,
+    ) -> None:
+        destination.mkdir(parents=True)
+
+    def fake_run(command, *args, **kwargs):
+        captured["command"] = list(command)
+        captured["env"] = dict(kwargs["env"])
+        trace_path = Path(command[command.index("--activation-trace-json") + 1])
+        trace_path.write_text(
+            json.dumps(
+                {
+                    "activated_skill_names": [],
+                    "activated_added_skill_names": [],
+                    "hypothesis_writer_read_skill_file_calls": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        run_activation_matrix,
+        "copy_source_workspace",
+        fake_copy_source_workspace,
+    )
+    monkeypatch.setattr(run_activation_matrix.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        run_activation_matrix,
+        "validate_trial_output",
+        lambda run_id, workspace, *, elapsed_s, error: {
+            "run_id": run_id,
+            "validation_passed": True,
+            "error": error,
+        },
+    )
+
+    row = run_activation_matrix.run_one_trial(
+        trial={
+            "provider": "openai",
+            "model": "gpt-5.4-mini",
+            "mode": "middleware_only",
+            "run_id": "openai_run",
+        },
+        source=tmp_path / "source",
+        workspace_root=tmp_path / "workspaces",
+        output_root=tmp_path,
+        disease="breast cancer",
+        timeout_minutes=1,
+        force=True,
+        provider="openai",
+        hypothesis_skill_set="selective8",
+        hypothesis_writer_prompt_mode="progressive_disclosure_with_modality_map",
+    )
+
+    command = captured["command"]
+    assert command[command.index("--provider") + 1] == "openai"
+    assert "--port" not in command
+    assert captured["env"]["LLM_PROVIDER"] == "openai"
+    assert captured["env"]["LLM_MODEL"] == "gpt-5.4-mini"
+    assert captured["env"].get("OLLAMA_MODEL") != "gpt-5.4-mini"
+    assert row["provider"] == "openai"
+    assert row["model"] == "gpt-5.4-mini"
+    assert row["activation_trace_valid"] is True
 
 
 def test_activation_matrix_aggregate_excludes_invalid_trace_denominator() -> None:

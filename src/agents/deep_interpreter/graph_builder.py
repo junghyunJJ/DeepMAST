@@ -32,7 +32,7 @@ from src.agents.model import create_llm  # noqa: E402
 
 
 def create_deep_interpreter_graph(
-    provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "ollama",
+    provider: Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"] = "ollama",
     data_dir: str = "",
     use_checkpointer: bool = True,
     is_debug: bool = False,
@@ -99,7 +99,7 @@ def _get_deep_interpreter_graph() -> Runnable:
 
 
 def create_deep_interpreter_graph_wrapped(
-    provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "ollama",
+    provider: Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"] = "ollama",
     data_dir: str = "",
     use_checkpointer: bool = False,
     is_debug: bool = False,
@@ -195,7 +195,7 @@ deep_interpreter_wrapped_graph = _get_deep_interpreter_graph_wrapped()
 
 def create_subagent_graph(
     subagent_name: Literal["planner", "searcher", "interpreter", "reporter"],
-    provider: Literal["openai", "google", "ollama", "claude", "openrouter"] = "openai",
+    provider: Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"] = "openai",
 ) -> Runnable:
     """Create standalone subagent graph for testing.
 

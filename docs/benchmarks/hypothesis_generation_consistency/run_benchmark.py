@@ -86,8 +86,25 @@ SELECTIVE8_HYPOTHESIS_WRITER_SKILLS = (
     "html-report-generator",
 )
 
+DTH_ONLY_HYPOTHESIS_WRITER_SKILLS = ("drug-target-hypothesis",)
+DTH_NONE_HYPOTHESIS_WRITER_SKILLS: tuple[str, ...] = ()
+DOMAIN4_HYPOTHESIS_WRITER_SKILLS = (
+    "opentargets-database",
+    "chembl-database",
+    "compare-census-gene-pair-by-cell-type",
+    "string-database",
+)
+DTH_PLUS_DOMAIN4_HYPOTHESIS_WRITER_SKILLS = (
+    "drug-target-hypothesis",
+    *DOMAIN4_HYPOTHESIS_WRITER_SKILLS,
+)
+
 HYPOTHESIS_WRITER_SKILL_SETS = {
     "current4": CURRENT4_HYPOTHESIS_WRITER_SKILLS,
+    "domain4": DOMAIN4_HYPOTHESIS_WRITER_SKILLS,
+    "dth_none": DTH_NONE_HYPOTHESIS_WRITER_SKILLS,
+    "dth_only": DTH_ONLY_HYPOTHESIS_WRITER_SKILLS,
+    "dth_plus_domain4": DTH_PLUS_DOMAIN4_HYPOTHESIS_WRITER_SKILLS,
     "expanded6": EXPANDED6_HYPOTHESIS_WRITER_SKILLS,
     "selective8": SELECTIVE8_HYPOTHESIS_WRITER_SKILLS,
 }
@@ -419,6 +436,7 @@ async def run_hypothesis_writer_once(
     provider: str,
     timeout_s: int,
     hypothesis_writer_skill_names: tuple[str, ...],
+    hypothesis_writer_prompt_mode: str = "default",
 ) -> None:
     from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
 
@@ -434,6 +452,7 @@ async def run_hypothesis_writer_once(
             disease=disease,
             use_checkpointer=False,
             hypothesis_writer_skill_names=hypothesis_writer_skill_names,
+            hypothesis_writer_prompt_mode=hypothesis_writer_prompt_mode,  # type: ignore[arg-type]
             hypothesis_writer_resume_instruction=(
                 build_hypothesis_writer_resume_instruction(workspace)
             ),
@@ -469,6 +488,7 @@ async def run_trial(
     timeout_s: int,
     force: bool,
     hypothesis_writer_skill_names: tuple[str, ...],
+    hypothesis_writer_prompt_mode: str = "default",
 ) -> dict[str, Any]:
     workspace = prepare_trial_workspace(source, workspace_root, run_id, force=force)
     started = time.time()
@@ -480,6 +500,7 @@ async def run_trial(
             provider=provider,
             timeout_s=timeout_s,
             hypothesis_writer_skill_names=hypothesis_writer_skill_names,
+            hypothesis_writer_prompt_mode=hypothesis_writer_prompt_mode,
         )
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
@@ -574,12 +595,39 @@ def parse_args() -> argparse.Namespace:
             "selective8 adds negative controls for selective activation benchmarks."
         ),
     )
+    parser.add_argument(
+        "--hypothesis-writer-prompt-mode",
+        choices=(
+            "default",
+            "dth_contrast_no_skill",
+            "dth_contrast_dth_required",
+            "operational_contract_only",
+            "operational_contract_plus_dth",
+            "operational_contract_minimal",
+            "operational_contract_minimal_plus_dth",
+            "thin_basic",
+            "thin_basic_dth_required",
+            "thin_basic_domain4_required",
+            "thin_basic_dth_plus_domain4_required",
+            "dth_only_required",
+            "progressive_disclosure_only",
+            "progressive_disclosure_with_modality_map",
+        ),
+        default="default",
+        help=(
+            "Prompt variant for hypothesis_writer. Use "
+            "'progressive_disclosure_only' to remove prompt-level forced skill "
+            "reads for pure progressive-disclosure benchmarks, or "
+            "'dth_only_required' for DTH-only controlled activation runs."
+        ),
+    )
     return parser.parse_args()
 
 
 async def async_main() -> int:
     load_benchmark_env()
     args = parse_args()
+    prompt_mode = getattr(args, "hypothesis_writer_prompt_mode", "default")
     try:
         trial_sources = resolve_trial_sources(args.source, args.sources, args.runs)
     except ValueError as exc:
@@ -656,6 +704,7 @@ async def async_main() -> int:
             timeout_s=args.timeout_s,
             force=args.force,
             hypothesis_writer_skill_names=hypothesis_writer_skill_names,
+            hypothesis_writer_prompt_mode=prompt_mode,
         )
         rows.append(row)
         append_jsonl(trials_path, row)
@@ -669,6 +718,7 @@ async def async_main() -> int:
         "disease": args.disease,
         "runs_requested": args.runs,
         "skill_set": args.skill_set,
+        "hypothesis_writer_prompt_mode": prompt_mode,
         "hypothesis_writer_skill_names": list(hypothesis_writer_skill_names),
         "hypothesis_scope": (
             source_scopes[0]["hypothesis_scope"]

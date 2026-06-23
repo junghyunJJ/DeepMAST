@@ -1,0 +1,3347 @@
+diff --git a/docs/benchmarks/hypothesis_generation_consistency/run_activation_matrix.py b/docs/benchmarks/hypothesis_generation_consistency/run_activation_matrix.py
+index 97021f2..38c699c 100644
+--- a/docs/benchmarks/hypothesis_generation_consistency/run_activation_matrix.py
++++ b/docs/benchmarks/hypothesis_generation_consistency/run_activation_matrix.py
+@@ -238,31 +238,42 @@ def run_one_trial(
+     monitor_activation_trace: bool = False,
+     activation_trace_grace_seconds: float = DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
+     hypothesis_skill_set: str = "expanded6",
++    hypothesis_writer_prompt_mode: str = "default",
+     host_hypothesis_fallback: str = "off",
++    provider: str = "ollama",
+ ) -> dict[str, Any]:
+     run_id = str(trial["run_id"])
++    provider_name = provider.strip().lower()
++    if not provider_name:
++        raise ValueError("provider must be non-empty")
+     workspace = workspace_root / run_id
+     copy_source_workspace(source, workspace, force=force)
+
+     activation_trace_path = workspace / "activation_trace.json"
+     stdout_path = output_root / f"{run_id}.stdout.log"
+     stderr_path = output_root / f"{run_id}.stderr.log"
++    stdout_path.parent.mkdir(parents=True, exist_ok=True)
++    stderr_path.parent.mkdir(parents=True, exist_ok=True)
+     started = time.time()
+
+     env = os.environ.copy()
+-    env.update(
+-        {
+-            "LLM_PROVIDER": "ollama",
+-            "LLM_MODEL": str(trial["model"]),
+-            "OLLAMA_MODEL": str(trial["model"]),
+-            "OLLAMA_REASONING": "false",
+-            "OLLAMA_HOST": f"http://127.0.0.1:{trial['port']}",
+-            "OLLAMA_BASE_URL": f"http://127.0.0.1:{trial['port']}",
+-            "DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK": (
+-                "" if host_hypothesis_fallback == "off" else host_hypothesis_fallback
+-            ),
+-        }
+-    )
++    env_updates = {
++        "LLM_PROVIDER": provider_name,
++        "LLM_MODEL": str(trial["model"]),
++        "DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK": (
++            "" if host_hypothesis_fallback == "off" else host_hypothesis_fallback
++        ),
++    }
++    if provider_name == "ollama":
++        env_updates.update(
++            {
++                "OLLAMA_MODEL": str(trial["model"]),
++                "OLLAMA_REASONING": "false",
++                "OLLAMA_HOST": f"http://127.0.0.1:{trial['port']}",
++                "OLLAMA_BASE_URL": f"http://127.0.0.1:{trial['port']}",
++            }
++        )
++    env.update(env_updates)
+
+     command = [
+         sys.executable,
+@@ -272,20 +283,31 @@ def run_one_trial(
+         "--disease",
+         disease,
+         "--provider",
+-        "ollama",
+-        "--port",
+-        str(trial["port"]),
+-        "--timeout",
+-        str(timeout_minutes),
+-        "--no-debug",
+-        "--skip-evidence-assessor",
+-        "--hypothesis-skill-set",
+-        hypothesis_skill_set,
+-        "--skill-activation-mode",
+-        str(trial["mode"]),
+-        "--activation-trace-json",
+-        str(activation_trace_path),
++        provider_name,
+     ]
++    if provider_name == "ollama":
++        command.extend(
++            [
++                "--port",
++                str(trial["port"]),
++            ]
++        )
++    command.extend(
++        [
++            "--timeout",
++            str(timeout_minutes),
++            "--no-debug",
++            "--skip-evidence-assessor",
++            "--hypothesis-skill-set",
++            hypothesis_skill_set,
++            "--hypothesis-writer-prompt-mode",
++            hypothesis_writer_prompt_mode,
++            "--skill-activation-mode",
++            str(trial["mode"]),
++            "--activation-trace-json",
++            str(activation_trace_path),
++        ]
++    )
+
+     returncode: int | None = None
+     error: str | None = None
+@@ -358,7 +380,9 @@ def run_one_trial(
+
+     return {
+         **trial,
++        "provider": provider_name,
+         "hypothesis_skill_set": hypothesis_skill_set,
++        "hypothesis_writer_prompt_mode": hypothesis_writer_prompt_mode,
+         "host_hypothesis_fallback": host_hypothesis_fallback,
+         "host_hypothesis_fallback_used": host_hypothesis_fallback_used,
+         "workspace": str(workspace),
+@@ -477,7 +501,7 @@ def render_summary(rows: Sequence[dict[str, Any]], aggregate: dict[str, Any]) ->
+                 "{trace} | {skills} | {added} |"
+             ).format(
+                 model=row["model"],
+-                port=row["port"],
++                port=row.get("port", "-"),
+                 mode=row["mode"],
+                 returncode=row["returncode"],
+                 validation=validation.get("validation_passed"),
+@@ -527,6 +551,33 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+             "stability acceptance runs."
+         ),
+     )
++    parser.add_argument(
++        "--hypothesis-writer-prompt-mode",
++        choices=(
++            "default",
++            "dth_contrast_no_skill",
++            "dth_contrast_dth_required",
++            "operational_contract_only",
++            "operational_contract_plus_dth",
++            "operational_contract_minimal",
++            "operational_contract_minimal_plus_dth",
++            "thin_basic",
++            "thin_basic_dth_required",
++            "thin_basic_domain4_required",
++            "thin_basic_dth_plus_domain4_required",
++            "dth_only_required",
++            "progressive_disclosure_only",
++            "progressive_disclosure_with_modality_map",
++        ),
++        default="default",
++        help=(
++            "Prompt variant for hypothesis_writer. Use "
++            "'progressive_disclosure_only' to remove prompt-level forced skill "
++            "reads, 'dth_only_required' for DTH-only controlled activation "
++            "runs, or 'progressive_disclosure_with_modality_map' to keep soft "
++            "modality-to-skill routing without forcing drug-target-hypothesis."
++        ),
++    )
+     parser.add_argument(
+         "--activation-trace-grace-seconds",
+         type=float,
+@@ -544,6 +595,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+ def main() -> int:
+     args = parse_args()
+     fallback_mode = getattr(args, "host_hypothesis_fallback", "off")
++    prompt_mode = getattr(args, "hypothesis_writer_prompt_mode", "default")
+     stamp = time.strftime("expanded6_activation_%Y%m%d_%H%M%S")
+     output_root = (
+         Path(args.output_root).expanduser().resolve()
+@@ -583,6 +635,7 @@ def main() -> int:
+             "ports": list(DEFAULT_PORTS),
+             "modes": list(DEFAULT_MODES),
+             "hypothesis_skill_set": args.hypothesis_skill_set,
++            "hypothesis_writer_prompt_mode": prompt_mode,
+             "host_hypothesis_fallback": fallback_mode,
+             "trials": rows,
+             "aggregate": aggregate,
+@@ -623,6 +676,7 @@ def main() -> int:
+                     DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
+                 ),
+                 hypothesis_skill_set=args.hypothesis_skill_set,
++                hypothesis_writer_prompt_mode=prompt_mode,
+                 host_hypothesis_fallback=fallback_mode,
+             )
+             rows.append(row)
+diff --git a/docs/benchmarks/hypothesis_generation_consistency/run_benchmark.py b/docs/benchmarks/hypothesis_generation_consistency/run_benchmark.py
+index 4542503..7c3aefa 100644
+--- a/docs/benchmarks/hypothesis_generation_consistency/run_benchmark.py
++++ b/docs/benchmarks/hypothesis_generation_consistency/run_benchmark.py
+@@ -86,8 +86,25 @@ SELECTIVE8_HYPOTHESIS_WRITER_SKILLS = (
+     "html-report-generator",
+ )
+
++DTH_ONLY_HYPOTHESIS_WRITER_SKILLS = ("drug-target-hypothesis",)
++DTH_NONE_HYPOTHESIS_WRITER_SKILLS: tuple[str, ...] = ()
++DOMAIN4_HYPOTHESIS_WRITER_SKILLS = (
++    "opentargets-database",
++    "chembl-database",
++    "compare-census-gene-pair-by-cell-type",
++    "string-database",
++)
++DTH_PLUS_DOMAIN4_HYPOTHESIS_WRITER_SKILLS = (
++    "drug-target-hypothesis",
++    *DOMAIN4_HYPOTHESIS_WRITER_SKILLS,
++)
++
+ HYPOTHESIS_WRITER_SKILL_SETS = {
+     "current4": CURRENT4_HYPOTHESIS_WRITER_SKILLS,
++    "domain4": DOMAIN4_HYPOTHESIS_WRITER_SKILLS,
++    "dth_none": DTH_NONE_HYPOTHESIS_WRITER_SKILLS,
++    "dth_only": DTH_ONLY_HYPOTHESIS_WRITER_SKILLS,
++    "dth_plus_domain4": DTH_PLUS_DOMAIN4_HYPOTHESIS_WRITER_SKILLS,
+     "expanded6": EXPANDED6_HYPOTHESIS_WRITER_SKILLS,
+     "selective8": SELECTIVE8_HYPOTHESIS_WRITER_SKILLS,
+ }
+@@ -419,6 +436,7 @@ async def run_hypothesis_writer_once(
+     provider: str,
+     timeout_s: int,
+     hypothesis_writer_skill_names: tuple[str, ...],
++    hypothesis_writer_prompt_mode: str = "default",
+ ) -> None:
+     from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
+
+@@ -434,6 +452,7 @@ async def run_hypothesis_writer_once(
+             disease=disease,
+             use_checkpointer=False,
+             hypothesis_writer_skill_names=hypothesis_writer_skill_names,
++            hypothesis_writer_prompt_mode=hypothesis_writer_prompt_mode,  # type: ignore[arg-type]
+             hypothesis_writer_resume_instruction=(
+                 build_hypothesis_writer_resume_instruction(workspace)
+             ),
+@@ -469,6 +488,7 @@ async def run_trial(
+     timeout_s: int,
+     force: bool,
+     hypothesis_writer_skill_names: tuple[str, ...],
++    hypothesis_writer_prompt_mode: str = "default",
+ ) -> dict[str, Any]:
+     workspace = prepare_trial_workspace(source, workspace_root, run_id, force=force)
+     started = time.time()
+@@ -480,6 +500,7 @@ async def run_trial(
+             provider=provider,
+             timeout_s=timeout_s,
+             hypothesis_writer_skill_names=hypothesis_writer_skill_names,
++            hypothesis_writer_prompt_mode=hypothesis_writer_prompt_mode,
+         )
+     except Exception as exc:
+         error = f"{type(exc).__name__}: {exc}"
+@@ -574,12 +595,39 @@ def parse_args() -> argparse.Namespace:
+             "selective8 adds negative controls for selective activation benchmarks."
+         ),
+     )
++    parser.add_argument(
++        "--hypothesis-writer-prompt-mode",
++        choices=(
++            "default",
++            "dth_contrast_no_skill",
++            "dth_contrast_dth_required",
++            "operational_contract_only",
++            "operational_contract_plus_dth",
++            "operational_contract_minimal",
++            "operational_contract_minimal_plus_dth",
++            "thin_basic",
++            "thin_basic_dth_required",
++            "thin_basic_domain4_required",
++            "thin_basic_dth_plus_domain4_required",
++            "dth_only_required",
++            "progressive_disclosure_only",
++            "progressive_disclosure_with_modality_map",
++        ),
++        default="default",
++        help=(
++            "Prompt variant for hypothesis_writer. Use "
++            "'progressive_disclosure_only' to remove prompt-level forced skill "
++            "reads for pure progressive-disclosure benchmarks, or "
++            "'dth_only_required' for DTH-only controlled activation runs."
++        ),
++    )
+     return parser.parse_args()
+
+
+ async def async_main() -> int:
+     load_benchmark_env()
+     args = parse_args()
++    prompt_mode = getattr(args, "hypothesis_writer_prompt_mode", "default")
+     try:
+         trial_sources = resolve_trial_sources(args.source, args.sources, args.runs)
+     except ValueError as exc:
+@@ -656,6 +704,7 @@ async def async_main() -> int:
+             timeout_s=args.timeout_s,
+             force=args.force,
+             hypothesis_writer_skill_names=hypothesis_writer_skill_names,
++            hypothesis_writer_prompt_mode=prompt_mode,
+         )
+         rows.append(row)
+         append_jsonl(trials_path, row)
+@@ -669,6 +718,7 @@ async def async_main() -> int:
+         "disease": args.disease,
+         "runs_requested": args.runs,
+         "skill_set": args.skill_set,
++        "hypothesis_writer_prompt_mode": prompt_mode,
+         "hypothesis_writer_skill_names": list(hypothesis_writer_skill_names),
+         "hypothesis_scope": (
+             source_scopes[0]["hypothesis_scope"]
+diff --git a/docs/benchmarks/hypothesis_generation_consistency/run_governor_production_activation_matrix.py b/docs/benchmarks/hypothesis_generation_consistency/run_governor_production_activation_matrix.py
+index c5819f7..6b284f8 100644
+--- a/docs/benchmarks/hypothesis_generation_consistency/run_governor_production_activation_matrix.py
++++ b/docs/benchmarks/hypothesis_generation_consistency/run_governor_production_activation_matrix.py
+@@ -49,10 +49,16 @@ def parse_csv_models(raw: str) -> tuple[str, ...]:
+     return _split_csv(raw, field_name="--models")
+
+
++def normalize_provider(raw: str) -> str:
++    provider = raw.strip().lower()
++    if not provider:
++        raise ValueError("--provider must be non-empty")
++    return provider
++
++
+ def parse_csv_ports(raw: str) -> tuple[int, ...]:
+     values = _split_csv(raw, field_name="--ports")
+     ports: list[int] = []
+-    seen: set[int] = set()
+     for value in values:
+         try:
+             port = int(value)
+@@ -60,13 +66,62 @@ def parse_csv_ports(raw: str) -> tuple[int, ...]:
+             raise ValueError(f"invalid port {value!r}") from exc
+         if not 1 <= port <= 65535:
+             raise ValueError(f"invalid port {value!r}; expected 1..65535")
+-        if port in seen:
+-            raise ValueError(f"duplicate port {port}; expected unique physical ports")
+-        seen.add(port)
+         ports.append(port)
+     return tuple(ports)
+
+
++def unique_physical_ports(ports: Sequence[int]) -> tuple[int, ...]:
++    seen: set[int] = set()
++    unique: list[int] = []
++    for port in ports:
++        if int(port) in seen:
++            continue
++        seen.add(int(port))
++        unique.append(int(port))
++    return tuple(unique)
++
++
++def build_port_worker_slots(ports: Sequence[int]) -> list[dict[str, Any]]:
++    port_values = tuple(int(port) for port in ports)
++    port_counts = {port: port_values.count(port) for port in port_values}
++    seen_counts: dict[int, int] = {}
++    workers: list[dict[str, Any]] = []
++    for worker_index, physical_port in enumerate(port_values, start=1):
++        slot = seen_counts.get(physical_port, 0) + 1
++        seen_counts[physical_port] = slot
++        duplicate = port_counts[physical_port] > 1
++        workers.append(
++            {
++                "port": physical_port,
++                "port_slot": slot,
++                "worker_index": worker_index,
++                "worker_id": (
++                    f"{physical_port}_{slot}"
++                    if duplicate
++                    else str(physical_port)
++                ),
++                "duplicate_port": duplicate,
++            }
++        )
++    return workers
++
++
++def build_provider_worker_slots(
++    provider: str,
++    parallel_workers: int,
++) -> list[dict[str, Any]]:
++    if parallel_workers < 1:
++        raise ValueError("parallel_workers must be >= 1")
++    return [
++        {
++            "provider": provider,
++            "worker_index": worker_index,
++            "worker_id": f"{provider}-{worker_index}",
++        }
++        for worker_index in range(1, parallel_workers + 1)
++    ]
++
++
+ def parse_csv_modes(raw: str) -> tuple[str, ...]:
+     values = _split_csv(raw, field_name="--modes")
+     known = set(DEFAULT_MODES)
+@@ -85,29 +140,76 @@ def build_trial_plan(
+     ports: Sequence[int],
+     modes: Sequence[str],
+     repeats_per_condition: int | None = None,
++    provider: str = "ollama",
++    parallel_workers: int = 1,
+ ) -> list[dict[str, Any]]:
+-    if not ports:
+-        raise ValueError("ports must contain at least one port")
+-    effective_repeats = len(ports) if repeats_per_condition is None else repeats_per_condition
++    provider_name = normalize_provider(provider)
++    if parallel_workers < 1:
++        raise ValueError("parallel_workers must be >= 1")
++    if provider_name == "ollama":
++        if not ports:
++            raise ValueError("ports must contain at least one port")
++        worker_count = len(ports)
++        port_workers = build_port_worker_slots(ports)
++    else:
++        worker_count = parallel_workers
++        provider_workers = build_provider_worker_slots(provider_name, worker_count)
++
++    effective_repeats = (
++        worker_count if repeats_per_condition is None else repeats_per_condition
++    )
+     if effective_repeats < 1:
+         raise ValueError("repeats_per_condition must be >= 1")
+
+     trials: list[dict[str, Any]] = []
++    if provider_name == "ollama":
++        has_duplicate_ports = any(worker["duplicate_port"] for worker in port_workers)
++        for model in models:
++            for mode in modes:
++                for repeat_index in range(1, effective_repeats + 1):
++                    worker = port_workers[(repeat_index - 1) % len(port_workers)]
++                    port = int(worker["port"])
++                    wave = (repeat_index - 1) // len(ports)
++                    run_id = f"{model_slug(model)}_{mode}_rep{repeat_index:03d}_port{port}"
++                    if has_duplicate_ports and worker["duplicate_port"]:
++                        run_id += f"_slot{worker['port_slot']}"
++                    trial = {
++                        "model": model,
++                        "port": port,
++                        "mode": mode,
++                        "repeat": repeat_index,
++                        "wave": wave,
++                        "run_id": run_id,
++                    }
++                    if has_duplicate_ports:
++                        trial.update(
++                            {
++                                "port_slot": int(worker["port_slot"]),
++                                "worker_index": int(worker["worker_index"]),
++                                "worker_id": str(worker["worker_id"]),
++                            }
++                        )
++                    trials.append(trial)
++        return trials
++
+     for model in models:
+         for mode in modes:
+             for repeat_index in range(1, effective_repeats + 1):
+-                port = int(ports[(repeat_index - 1) % len(ports)])
+-                wave = (repeat_index - 1) // len(ports)
++                worker = provider_workers[(repeat_index - 1) % len(provider_workers)]
++                wave = (repeat_index - 1) // worker_count
++                worker_index = int(worker["worker_index"])
+                 trials.append(
+                     {
++                        "provider": provider_name,
+                         "model": model,
+-                        "port": port,
+                         "mode": mode,
+                         "repeat": repeat_index,
+                         "wave": wave,
++                        "worker_index": worker_index,
++                        "worker_id": str(worker["worker_id"]),
+                         "run_id": (
+-                            f"{model_slug(model)}_{mode}_"
+-                            f"rep{repeat_index:03d}_port{port}"
++                            f"{model_slug(model)}_{mode}_rep{repeat_index:03d}_"
++                            f"{provider_name}_slot{worker_index}"
+                         ),
+                     }
+                 )
+@@ -162,31 +264,65 @@ def build_dry_run_payload(
+     timeout_minutes: int,
+     wait_for_completion: bool,
+     hypothesis_skill_set: str,
++    hypothesis_writer_prompt_mode: str,
+     hypothesis_scope_errors: Sequence[str],
+     host_hypothesis_fallback: str,
++    provider: str = "ollama",
++    parallel_workers: int | None = None,
+ ) -> dict[str, Any]:
++    provider_name = normalize_provider(provider)
++    effective_parallel_workers = (
++        len(ports) if parallel_workers is None and provider_name == "ollama"
++        else 1 if parallel_workers is None
++        else parallel_workers
++    )
+     per_condition: dict[str, int] = {}
+     per_port: dict[str, int] = {}
++    per_worker: dict[str, int] = {}
+     for trial in trials:
+         condition_key = f"{trial['model']}::{trial['mode']}"
+         per_condition[condition_key] = per_condition.get(condition_key, 0) + 1
+-        port_key = str(trial["port"])
+-        per_port[port_key] = per_port.get(port_key, 0) + 1
++        port_key = None
++        if "port" in trial:
++            port_key = str(trial["port"])
++            per_port[port_key] = per_port.get(port_key, 0) + 1
++        worker_key = str(trial.get("worker_id", port_key or provider_name))
++        per_worker[worker_key] = per_worker.get(worker_key, 0) + 1
++    workers = (
++        [
++            {
++                key: value
++                for key, value in worker.items()
++                if key != "duplicate_port"
++            }
++            for worker in build_port_worker_slots(ports)
++        ]
++        if provider_name == "ollama"
++        else build_provider_worker_slots(provider_name, int(effective_parallel_workers))
++    )
+     return {
+         "dry_run": True,
+         "source": str(source),
+         "trial_count": len(trials),
++        "provider": provider_name,
+         "models": list(models),
+-        "ports": [int(port) for port in ports],
++        "ports": [int(port) for port in ports] if provider_name == "ollama" else [],
++        "unique_physical_ports": (
++            list(unique_physical_ports(ports)) if provider_name == "ollama" else []
++        ),
++        "parallel_workers": int(effective_parallel_workers),
++        "workers": workers,
+         "modes": list(modes),
+         "repeats_per_condition": repeats_per_condition,
+         "timeout_minutes": timeout_minutes,
+         "wait_for_completion": wait_for_completion,
+         "hypothesis_skill_set": hypothesis_skill_set,
++        "hypothesis_writer_prompt_mode": hypothesis_writer_prompt_mode,
+         "hypothesis_scope_errors": list(hypothesis_scope_errors),
+         "host_hypothesis_fallback": host_hypothesis_fallback,
+         "per_condition": dict(sorted(per_condition.items())),
+         "per_port": dict(sorted(per_port.items())),
++        "per_worker": dict(sorted(per_worker.items())),
+     }
+
+
+@@ -283,8 +419,11 @@ def run_trial_batch_parallel(
+     wait_for_completion: bool,
+     activation_trace_grace_seconds: float,
+     hypothesis_skill_set: str = "expanded6",
++    hypothesis_writer_prompt_mode: str = "default",
+     host_hypothesis_fallback: str = "off",
++    provider: str = "ollama",
+ ) -> list[dict[str, Any]]:
++    provider_name = normalize_provider(provider)
+     rows: list[dict[str, Any]] = []
+     with ThreadPoolExecutor(max_workers=len(batch)) as executor:
+         futures = [
+@@ -300,13 +439,21 @@ def run_trial_batch_parallel(
+                 monitor_activation_trace=not wait_for_completion,
+                 activation_trace_grace_seconds=activation_trace_grace_seconds,
+                 hypothesis_skill_set=hypothesis_skill_set,
++                hypothesis_writer_prompt_mode=hypothesis_writer_prompt_mode,
+                 host_hypothesis_fallback=host_hypothesis_fallback,
++                provider=provider_name,
+             )
+             for trial in batch
+         ]
+         for future in as_completed(futures):
+             rows.append(future.result())
+-    return sorted(rows, key=lambda row: int(row["port"]))
++    return sorted(
++        rows,
++        key=lambda row: (
++            int(row.get("worker_index", 0) or 0),
++            int(row["port"]) if "port" in row else 0,
++        ),
++    )
+
+
+ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+@@ -334,15 +481,53 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+             "stability acceptance runs."
+         ),
+     )
++    parser.add_argument(
++        "--hypothesis-writer-prompt-mode",
++        choices=(
++            "default",
++            "dth_contrast_no_skill",
++            "dth_contrast_dth_required",
++            "operational_contract_only",
++            "operational_contract_plus_dth",
++            "operational_contract_minimal",
++            "operational_contract_minimal_plus_dth",
++            "thin_basic",
++            "thin_basic_dth_required",
++            "thin_basic_domain4_required",
++            "thin_basic_dth_plus_domain4_required",
++            "dth_only_required",
++            "progressive_disclosure_only",
++            "progressive_disclosure_with_modality_map",
++        ),
++        default="default",
++        help=(
++            "Prompt variant for hypothesis_writer. Use "
++            "'progressive_disclosure_only' to remove prompt-level forced skill "
++            "reads, 'dth_only_required' for DTH-only controlled activation "
++            "runs, or 'progressive_disclosure_with_modality_map' to keep soft "
++            "modality-to-skill routing without forcing drug-target-hypothesis."
++        ),
++    )
+     parser.add_argument(
+         "--models",
+         default=",".join(DEFAULT_MODELS),
+         help="Comma-separated model list for this matrix.",
+     )
++    parser.add_argument(
++        "--provider",
++        default="ollama",
++        help="LLM provider for traced runs. Ollama uses --ports; non-Ollama uses --parallel-workers.",
++    )
+     parser.add_argument(
+         "--ports",
+         default=",".join(str(port) for port in DEFAULT_PORTS),
+-        help="Comma-separated Ollama ports for this matrix.",
++        help="Comma-separated Ollama ports for this matrix; ignored for non-Ollama providers.",
++    )
++    parser.add_argument(
++        "--parallel-workers",
++        type=int,
++        default=1,
++        help="Number of serial/parallel worker slots for non-Ollama providers.",
+     )
+     parser.add_argument(
+         "--modes",
+@@ -382,6 +567,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+ def main(argv: list[str] | None = None) -> int:
+     args = parse_args(argv)
+     fallback_mode = getattr(args, "host_hypothesis_fallback", "off")
++    prompt_mode = getattr(args, "hypothesis_writer_prompt_mode", "default")
++    try:
++        provider = normalize_provider(getattr(args, "provider", "ollama"))
++    except ValueError as exc:
++        raise SystemExit(str(exc)) from exc
+     project_root = PROJECT_ROOT
+     stamp = time.strftime("governor_production_activation_%Y%m%d_%H%M%S")
+     output_root = (
+@@ -404,17 +594,28 @@ def main(argv: list[str] | None = None) -> int:
+
+     try:
+         selected_models = parse_csv_models(args.models)
+-        selected_ports = parse_csv_ports(args.ports)
++        selected_ports = (
++            parse_csv_ports(args.ports)
++            if provider == "ollama"
++            else ()
++        )
+         selected_modes = parse_csv_modes(args.modes)
+     except ValueError as exc:
+         raise SystemExit(str(exc)) from exc
++    parallel_workers = int(getattr(args, "parallel_workers", 1) or 1)
++    if parallel_workers < 1:
++        raise SystemExit("--parallel-workers must be >= 1")
+
+     if args.repeats_per_condition is not None and args.repeats_per_condition < 1:
+         raise SystemExit("--repeats-per-condition must be >= 1")
+-    repeats_per_condition = (
+-        len(selected_ports)
+-        if args.repeats_per_condition is None
+-        else args.repeats_per_condition
++    if args.repeats_per_condition is None:
++        repeats_per_condition = (
++            len(selected_ports) if provider == "ollama" else parallel_workers
++        )
++    else:
++        repeats_per_condition = args.repeats_per_condition
++    selected_unload_ports = (
++        unique_physical_ports(selected_ports) if provider == "ollama" else ()
+     )
+
+     trials = build_trial_plan(
+@@ -422,6 +623,8 @@ def main(argv: list[str] | None = None) -> int:
+         ports=selected_ports,
+         modes=selected_modes,
+         repeats_per_condition=repeats_per_condition,
++        provider=provider,
++        parallel_workers=parallel_workers,
+     )
+
+     scope_errors = _hypothesis_scope_errors(check_hypothesis_scope_untraced(source))
+@@ -438,8 +641,13 @@ def main(argv: list[str] | None = None) -> int:
+                     timeout_minutes=args.timeout_minutes,
+                     wait_for_completion=args.wait_for_completion,
+                     hypothesis_skill_set=args.hypothesis_skill_set,
++                    hypothesis_writer_prompt_mode=prompt_mode,
+                     hypothesis_scope_errors=scope_errors,
+                     host_hypothesis_fallback=fallback_mode,
++                    provider=provider,
++                    parallel_workers=(
++                        len(selected_ports) if provider == "ollama" else parallel_workers
++                    ),
+                 ),
+                 indent=2,
+                 ensure_ascii=False,
+@@ -482,10 +690,16 @@ def main(argv: list[str] | None = None) -> int:
+         aggregate = aggregate_activation(rows)
+         payload = {
+             "source": str(source),
++            "provider": provider,
+             "models": list(selected_models),
+-            "ports": list(selected_ports),
++            "ports": list(selected_ports) if provider == "ollama" else [],
++            "unique_physical_ports": list(selected_unload_ports),
++            "parallel_workers": (
++                len(selected_ports) if provider == "ollama" else parallel_workers
++            ),
+             "modes": list(selected_modes),
+             "hypothesis_skill_set": args.hypothesis_skill_set,
++            "hypothesis_writer_prompt_mode": prompt_mode,
+             "host_hypothesis_fallback": fallback_mode,
+             "repeats_per_condition": repeats_per_condition,
+             "runs_requested": len(trials),
+@@ -513,8 +727,10 @@ def main(argv: list[str] | None = None) -> int:
+         )
+         for batch in batches_by_model_mode_and_wave(pending_trials):
+             model = str(batch[0]["model"])
+-            if active_model is not None and active_model != model:
+-                unload_events.extend(unload_model_from_ports(active_model, selected_ports))
++            if provider == "ollama" and active_model is not None and active_model != model:
++                unload_events.extend(
++                    unload_model_from_ports(active_model, selected_unload_ports)
++                )
+             active_model = model
+
+             batch_rows = run_trial_batch_parallel(
+@@ -528,7 +744,9 @@ def main(argv: list[str] | None = None) -> int:
+                 wait_for_completion=args.wait_for_completion,
+                 activation_trace_grace_seconds=args.activation_trace_grace_seconds,
+                 hypothesis_skill_set=args.hypothesis_skill_set,
++                hypothesis_writer_prompt_mode=prompt_mode,
+                 host_hypothesis_fallback=fallback_mode,
++                provider=provider,
+             )
+             rerun_run_ids = {str(row["run_id"]) for row in batch_rows}
+             rows = [row for row in rows if str(row.get("run_id")) not in rerun_run_ids]
+@@ -553,7 +771,10 @@ def main(argv: list[str] | None = None) -> int:
+             )
+     finally:
+         if active_model is not None:
+-            unload_events.extend(unload_model_from_ports(active_model, selected_ports))
++            if provider == "ollama":
++                unload_events.extend(
++                    unload_model_from_ports(active_model, selected_unload_ports)
++                )
+         write_results()
+         write_runner_state(
+             output_root=output_root,
+diff --git a/scripts/run_drug_target_traced.py b/scripts/run_drug_target_traced.py
+index 9b60014..92a141d 100755
+--- a/scripts/run_drug_target_traced.py
++++ b/scripts/run_drug_target_traced.py
+@@ -181,6 +181,35 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+         default="middleware_plus_activator",
+         help="Skill activation mode for hypothesis writer skills.",
+     )
++    p.add_argument(
++        "--hypothesis-writer-prompt-mode",
++        choices=(
++            "default",
++            "dth_contrast_no_skill",
++            "dth_contrast_dth_required",
++            "operational_contract_only",
++            "operational_contract_plus_dth",
++            "operational_contract_minimal",
++            "operational_contract_minimal_plus_dth",
++            "thin_basic",
++            "thin_basic_dth_required",
++            "thin_basic_domain4_required",
++            "thin_basic_dth_plus_domain4_required",
++            "dth_only_required",
++            "progressive_disclosure_only",
++            "progressive_disclosure_with_modality_map",
++        ),
++        default="default",
++        help=(
++            "Prompt variant for hypothesis_writer. Use "
++            "'progressive_disclosure_only' for benchmarks that remove "
++            "prompt-level forced skill reads and leave skill selection to "
++            "SkillsMiddleware / activator / governor, or "
++            "'dth_only_required' for DTH-only controlled activation runs, or "
++            "'progressive_disclosure_with_modality_map' to keep soft "
++            "modality-to-skill routing without forcing drug-target-hypothesis."
++        ),
++    )
+     p.add_argument(
+         "--activation-trace-json",
+         default=None,
+@@ -241,6 +270,7 @@ def build_activation_trace_payload(
+     data_dir: Path,
+     trace_log_path: Path,
+     report_finalized: bool,
++    hypothesis_writer_prompt_mode: str = "default",
+     artifact_gate_event: dict[str, Any] | None = None,
+ ) -> dict[str, Any]:
+     activation_trace = summarize_activation_trace(
+@@ -252,6 +282,7 @@ def build_activation_trace_payload(
+         {
+             "skill_set": skill_set,
+             "skill_activation_mode": skill_activation_mode,
++            "hypothesis_writer_prompt_mode": hypothesis_writer_prompt_mode,
+             "model": model,
+             "ollama_base_url": ollama_base_url,
+             "data_dir": str(data_dir),
+@@ -293,6 +324,7 @@ def write_activation_trace_json(
+     data_dir: Path,
+     trace_log_path: Path,
+     report_finalized: bool,
++    hypothesis_writer_prompt_mode: str = "default",
+     artifact_gate_event: dict[str, Any] | None = None,
+     project_root: Path = PROJECT_ROOT,
+ ) -> Path:
+@@ -304,6 +336,7 @@ def write_activation_trace_json(
+         all_read_skill_calls=all_read_skill_calls,
+         skill_set=skill_set,
+         skill_activation_mode=skill_activation_mode,
++        hypothesis_writer_prompt_mode=hypothesis_writer_prompt_mode,
+         model=model,
+         ollama_base_url=ollama_base_url,
+         data_dir=data_dir,
+@@ -331,6 +364,7 @@ def write_activation_trace_checkpoint(
+     ollama_base_url: str | None,
+     data_dir: Path,
+     trace_log_path: Path,
++    hypothesis_writer_prompt_mode: str = "default",
+     artifact_gate_event: dict[str, Any] | None = None,
+ ) -> Path:
+     written_path = write_activation_trace_json(
+@@ -340,6 +374,7 @@ def write_activation_trace_checkpoint(
+         all_read_skill_calls=all_read_skill_calls,
+         skill_set=skill_set,
+         skill_activation_mode=skill_activation_mode,
++        hypothesis_writer_prompt_mode=hypothesis_writer_prompt_mode,
+         model=model,
+         ollama_base_url=ollama_base_url,
+         data_dir=data_dir,
+@@ -570,6 +605,11 @@ def _hypothesis_stream_budget_seconds() -> int:
+         return 900
+
+
++def _allow_hypothesis_quality_retry_after_budget_abort() -> bool:
++    raw = os.environ.get("DRUG_TARGET_ALLOW_HYPOTHESIS_RETRY_AFTER_BUDGET_ABORT", "")
++    return raw.strip().casefold() in {"1", "true", "yes", "on"}
++
++
+ async def _close_async_stream(stream: object) -> None:
+     closer = getattr(stream, "aclose", None)
+     if closer is None:
+@@ -683,6 +723,8 @@ def _should_skip_hypothesis_quality_after_budget_abort(
+     hypothesis_path: Path,
+     run_started_at: float,
+ ) -> bool:
++    if _allow_hypothesis_quality_retry_after_budget_abort():
++        return False
+     return hypothesis_budget_aborted and _artifact_predates_run(
+         hypothesis_path,
+         run_started_at,
+@@ -712,6 +754,22 @@ def _hypothesis_budget_abort_message(
+             f"{budget_seconds}s but no fresh hypothesis_report.json was saved; "
+             "stopping the stream so the graph-level quality gate can handle recovery."
+         )
++    if (
++        _hypothesis_budget_exceeded(
++            evidence_ready_started_at,
++            now,
++            budget_seconds,
++        )
++        and not _artifact_predates_run(hypothesis_path, run_started_at)
++        and (data_dir / "evidence" / "assessment_results.json").exists()
++        and (data_dir / "evidence" / "stage1_filter_results.json").exists()
++    ):
++        return (
++            "[HYPOTHESIS-BUDGET] fresh hypothesis_report.json was saved, but "
++            f"the graph stream did not finish within {budget_seconds}s after "
++            "evidence became ready; stopping the stream so the graph-level "
++            "quality gate can finalize or retry."
++        )
+     if (
+         _hypothesis_budget_exceeded(
+             hypothesis_started_at,
+@@ -1323,12 +1381,14 @@ async def run_traced(args: argparse.Namespace) -> int:
+         hypothesis_writer_skill_names=hypothesis_writer_skill_names,
+         enable_skill_activator=enable_skill_activator,
+         skill_activation_mode=args.skill_activation_mode,
++        hypothesis_writer_prompt_mode=args.hypothesis_writer_prompt_mode,
+     )
+     agent, backend = create_drug_target_agent(config)
+     print(f"[CONFIG] Agent created (provider={args.provider})")
+     print(f"[CONFIG] Disease: {args.disease}")
+     print(f"[CONFIG] Hypothesis skill set: {args.hypothesis_skill_set}")
+     print(f"[CONFIG] Skill activation mode: {args.skill_activation_mode}")
++    print(f"[CONFIG] Hypothesis writer prompt mode: {args.hypothesis_writer_prompt_mode}")
+     print(f"[CONFIG] LLM_PROVIDER env: {os.environ['LLM_PROVIDER']}")
+     if ollama_base_url:
+         print(f"[CONFIG] Ollama base URL: {ollama_base_url}")
+@@ -1456,47 +1516,22 @@ async def run_traced(args: argparse.Namespace) -> int:
+                     and _artifact_predates_run(hypothesis_path, start)
+                 ):
+                     evidence_ready_started_at = now
+-                if (
+-                    _hypothesis_budget_exceeded(
+-                        evidence_ready_started_at,
+-                        now,
+-                        hypothesis_budget_seconds,
+-                    )
+-                    and _artifact_predates_run(hypothesis_path, start)
+-                ):
+-                    message = (
+-                        "[HYPOTHESIS-BUDGET] evidence has been ready for "
+-                        f"{hypothesis_budget_seconds}s but no fresh "
+-                        "hypothesis_report.json was saved; stopping the "
+-                        "stream so the graph-level quality gate can handle recovery."
+-                    )
+-                    print(f"\n{message}")
+-                    trace_log_fp.write(f"\n{message}\n")
+-                    trace_log_fp.flush()
+-                    hypothesis_budget_aborted = True
+-                    abort_for_hypothesis_budget = True
+-                    break
+
+                 if (
+                     hypothesis_started_at is None
+                     and _is_hypothesis_writer_stream_node(node_path, node_name)
+                 ):
+                     hypothesis_started_at = now
+-                if (
+-                    _hypothesis_budget_exceeded(
+-                        hypothesis_started_at,
+-                        now,
+-                        hypothesis_budget_seconds,
+-                    )
+-                    and (data_dir / "evidence" / "assessment_results.json").exists()
+-                    and (data_dir / "evidence" / "stage1_filter_results.json").exists()
+-                ):
+-                    message = (
+-                        "[HYPOTHESIS-BUDGET] hypothesis_writer stream exceeded "
+-                        f"{hypothesis_budget_seconds}s after deterministic evidence "
+-                        "artifacts were written; stopping the stream so the "
+-                        "graph-level quality gate can handle recovery."
+-                    )
++                message = _hypothesis_budget_abort_message(
++                    data_dir=data_dir,
++                    hypothesis_path=hypothesis_path,
++                    evidence_ready_started_at=evidence_ready_started_at,
++                    hypothesis_started_at=hypothesis_started_at,
++                    now=now,
++                    budget_seconds=hypothesis_budget_seconds,
++                    run_started_at=start,
++                )
++                if message:
+                     print(f"\n{message}")
+                     trace_log_fp.write(f"\n{message}\n")
+                     trace_log_fp.flush()
+@@ -1715,6 +1750,7 @@ async def run_traced(args: argparse.Namespace) -> int:
+         all_read_skill_calls=all_read_skill_calls,
+         skill_set=args.hypothesis_skill_set,
+         skill_activation_mode=args.skill_activation_mode,
++        hypothesis_writer_prompt_mode=args.hypothesis_writer_prompt_mode,
+         model=os.getenv("LLM_MODEL") or os.getenv("OLLAMA_MODEL") or "",
+         ollama_base_url=ollama_base_url,
+         data_dir=data_dir,
+@@ -1767,6 +1803,14 @@ async def run_traced(args: argparse.Namespace) -> int:
+                         "report_finalization_error": None,
+                         "evidence_truncated": False,
+                         "deep_agent_started_at": start,
++                        "hypothesis_writer_skill_names": tuple(
++                            hypothesis_writer_skill_names
++                        ),
++                        "hypothesis_writer_prompt_mode": (
++                            args.hypothesis_writer_prompt_mode
++                        ),
++                        "skill_activation_mode": args.skill_activation_mode,
++                        "enable_skill_activator": enable_skill_activator,
+                     },
+                     {
+                         "recursion_limit": 10000,
+@@ -1988,6 +2032,7 @@ async def run_traced(args: argparse.Namespace) -> int:
+         all_read_skill_calls=all_read_skill_calls,
+         skill_set=args.hypothesis_skill_set,
+         skill_activation_mode=args.skill_activation_mode,
++        hypothesis_writer_prompt_mode=args.hypothesis_writer_prompt_mode,
+         model=os.getenv("LLM_MODEL") or os.getenv("OLLAMA_MODEL") or "",
+         ollama_base_url=ollama_base_url,
+         data_dir=data_dir,
+diff --git a/skills/drug-target-hypothesis/SKILL.md b/skills/drug-target-hypothesis/SKILL.md
+index a31956d..057f6ab 100644
+--- a/skills/drug-target-hypothesis/SKILL.md
++++ b/skills/drug-target-hypothesis/SKILL.md
+@@ -3,7 +3,7 @@ name: drug-target-hypothesis
+ description: Generate evidence-backed follow-up recommendations from completed drug target assessment evidence. Use when Stage 1-3 evidence is present, `assessment_results.json.stage3_candidates` is non-empty, and the hypothesis writer needs to produce `evidence/hypothesis_report.json` for downstream reporting. Do not use for general literature-driven hypothesis ideation or dataset classification.
+ metadata:
+     skill-author: Junghyun Jung
+-    version: 1.0.0
++    version: 1.2.0
+ ---
+
+ # Drug Target Hypothesis Generation
+@@ -66,6 +66,70 @@ The active runtime contract is:
+
+ Treat `src/agents/drug_target/subagents/prompts.py` and `src/agents/drug_target/tools/evidence_loader.py` as the source of truth when this skill and repo docs disagree.
+
++This skill is also the intended contrastive advantage over the base hypothesis
++writer prompt. Do not assume the base prompt already knows the evidence-class
++rules below. When this skill is loaded, make the output visibly better by
++classifying evidence support, stating claim boundaries, and choosing follow-up
++language that matches the support class.
++
++---
++
++## Small-Model DTH Decision Card
++
++Use this card before reading the longer workflow, especially for 35B and 122B
++models. The base prompt should only make a valid artifact; this skill should
++make the DTH-loaded output visibly better.
++
++### Step 1: Build two inventories first
++
++- `cell_context_anchor`: use
++  `hypothesis_writer_contract.required_cell_context_anchor` when present;
++  otherwise use the original interest cell label plus the resolved Census cell
++  type from `celltype_resolution.json`.
++- `allowed_direct_pair_axes`: use
++  `hypothesis_writer_contract.allowed_direct_pair_axes` when present; otherwise
++  use only usable passed `stage1_*.json` files returned by hypothesis scope or
++  accepted by `validate_evidence_references`.
++
++Do not create pair axes by combining genes from separate files, shared pathway
++mentions, hub context, or skill-guide prose.
++
++### Step 2: Choose exactly one support class for each recommendation
++
++| Support class | Required evidence | Use this wording | Do not write |
++| --- | --- | --- | --- |
++| Interest-cell intrinsic | A cited Stage 1 file in `interest_cell_intrinsic_stage1_pair_files` and the resolved Census cell type named in validation | `interest-cell intrinsic follow-up`, `same-cell validation readout`, `resolved-cell coexpression follow-up` | direct intrinsic wording without the exact Stage 1 file and cell label |
++| Secondary spatial-niche or cross-cell | A cited Stage 1 file that is spatial-only, target-cell-depleted, or coexpression-depleted | `secondary spatial-niche context`, `cross-cell framing`, `non-intrinsic readout` | `same-cell`, `cell-autonomous`, `intrinsic`, or target-cell expression claims |
++| Gene-level/actionability-only | `stage3_<GENE>.json`, `ot_<GENE>.json`, known-drug, or disease-level target files | `gene-level follow-up`, `actionability readout`, `perturbation-development candidate` | spatial, same-cell, direct pair, or cell-context claims |
++
++If a FEATURED gene is linked only to depleted or spatial-only Stage 1 evidence,
++prefer the Gene-level/actionability-only class and cite `stage3_<GENE>.json`
++plus `ot_<GENE>.json`.
++
++### Step 3: Add the DTH quality signature
++
++Every retained recommendation should visibly include this DTH quality signature:
++- evidence class: one of the three support classes above
++- claim boundary: what the cited files support and what remains unproven
++- target rationale: why the named target gene is prioritized
++- follow-up readout: perturbation, actionability, validation, or combination
++  readout
++- limitation: one unresolved boundary when the claim extends beyond direct
++  evidence
++
++### Step 4: Use class-specific repair on save rejection
++
++| Save error | Exact repair |
++| --- | --- |
++| `topn_coverage.missing` | Add one `[FEATURED-GAP]` recommendation per missing FEATURED gene using `stage3_<GENE>.json` and `ot_<GENE>.json`; do not force a depleted Stage 1 pair into intrinsic wording. |
++| Unsupported direct pair axis | Cite the exact matching passed Stage 1 filename named by validation, including reverse ligand-receptor order, or remove all direct pair wording and rewrite as a single-gene follow-up. |
++| Failed Stage 1 pair | Remove the failed file and rebuild from a passed pair or gene-level evidence. |
++| Coexpression-depleted or target-cell-depleted Stage 1 used as intrinsic support | Reclassify as Secondary spatial-niche or cross-cell, or remove the Stage 1 citation and rebuild as Gene-level/actionability-only. |
++| Invalid filename | Replace with an exact filename returned by `load_evidence_files` or accepted by `validate_evidence_references`; never invent a filename. |
++
++After a rejection, change only the rejected hypothesis or field when the error
++names a location. Validate references again, then save the changed payload.
++
+ ---
+
+ ## Workflow
+@@ -140,6 +204,43 @@ Look for:
+
+ Record these entities because they become the building blocks of the final hypotheses.
+
++Before drafting any recommendation, build two local control inventories from the
++loaded hypothesis-scope payload. Prefer `hypothesis_writer_contract` when
++present; it is the canonical save-gate contract, and DTH interpretation must not
++override it.
++- `cell_context_anchor`: copy
++  `hypothesis_writer_contract.required_cell_context_anchor` exactly when present;
++  otherwise use the exact original interest cell label and resolved Census cell
++  type from `celltype_resolution.json`. If the match mode is `semantic_proxy`,
++  describe Census support as proxy validation for the resolved Census cell type
++  and do not claim Census validated lost state modifiers from the original label.
++- `allowed_direct_pair_axes`: exact pair keys and filenames from
++  `hypothesis_writer_contract.allowed_direct_pair_axes` when present, otherwise
++  usable `stage1_*.json` files returned by hypothesis scope or accepted by
++  `validate_evidence_references`. Do not infer new direct pair axes by combining
++  genes from separate Stage 1 files, Stage 2/3 gene evidence, shared pathways,
++  hub context, or co-listed entities.
++
++Before drafting each recommendation, apply this DTH evidence decision tree:
++- **Interest-cell intrinsic pair**: if the pair is in
++  `interest_cell_intrinsic_stage1_pair_files`, direct pair or coexpression
++  wording is allowed only when the same hypothesis cites the exact Stage 1 file
++  and names the resolved Census cell type in validation.
++- **Spatial-niche-only or coexpression-depleted pair**: do not use it as
++  malignant-cell intrinsic, same-cell, cell-autonomous, or direct pair-axis
++  support. Use it only as constrained secondary spatial-niche or cross-cell
++  context when the pair concept is retained.
++- **Gene-level/actionability support**: use `stage3_<GENE>.json` and
++  `ot_<GENE>.json` to cover FEATURED genes without forcing pair-level claims.
++  This is the preferred repair when the only Stage 1 pair for a FEATURED gene is
++  spatial-niche-only or coexpression-depleted.
++
++If a hypothesis cites a file from `interest_cell_intrinsic_stage1_pair_files`,
++the same hypothesis must name the exact resolved Census cell type in
++`biological_entities.cell_types` and in `validation_approach`. If the original
++interest label differs from the resolved Census cell type, you may mention both,
++but the resolved Census cell type is the required anchor for Stage 1 support.
++
+ ### Phase 1.5: Stage 1 Eligibility Gate (DETERMINISTIC)
+
+ Before using any Stage 1 pair as evidence, check its pass/fail status in `stage1_filter_results.json`.
+@@ -152,17 +253,16 @@ The strict Stage 1 pass condition uses all of the following:
+
+ Rules:
+ - Only `passed=true` Stage 1 pairs may be used as hypothesis evidence.
+-- A `passed=true` Stage 1 pair is not automatically AT2/resolved-cell intrinsic
++- A `passed=true` Stage 1 pair is not automatically interest-cell intrinsic
+   support. Read `stage1_pair_usage_guidance`,
+   `interest_cell_intrinsic_stage1_pair_files`, and
+   `spatial_niche_only_stage1_pair_files` from `load_evidence_files` or
+   `validate_evidence_references`.
+-- Only files in `interest_cell_intrinsic_stage1_pair_files` may support AT2,
+-  Transitional AT2, pulmonary/alveolar epithelial, or resolved-Census-cell
+-  intrinsic coexpression claims.
++- Only files in `interest_cell_intrinsic_stage1_pair_files` may support
++  same-cell, intrinsic, target-cell-autonomous, or resolved-Census-cell
++  coexpression claims.
+ - Files in `spatial_niche_only_stage1_pair_files` must not be used as
+-  AT2-intrinsic, Transitional-AT2-intrinsic, pulmonary/alveolar
+-  epithelial-intrinsic, resolved-Census-cell-intrinsic, same-cell, or
++  same-cell, intrinsic, resolved-Census-cell-intrinsic, cell-autonomous, or
+   target-cell-autonomous support. If a recommendation mentions the interest
+   labels or resolved Census cell type, cite these files only as secondary
+   spatial-niche/cross-cell framing evidence with explicit constraints. Cover
+@@ -172,9 +272,9 @@ Rules:
+ - A `passed=false` pair cannot be cited, cannot support a core mechanism claim, and cannot be used as an L-R axis in the title, core claim, or prediction.
+ - If a failed pair appears in citations or as a primary pair claim, `save_hypothesis_report` rejects the payload with `failed_pair_violations`.
+ - Fix failed-pair rejections by removing that evidence or rebuilding the hypothesis around a passed pair or gene-level Stage 3 evidence.
+-- For any passed Stage 1 pair, inspect `census_validation.target_vs_rest` before using it as interest-cell evidence. If coexpression is depleted, or all target-vs-rest diff values are negative, cite that Stage 1 pair only as secondary spatial-niche/cross-cell framing evidence. It must not support AT2, Transitional AT2, pulmonary/alveolar epithelial, resolved-Census-cell intrinsic, same-cell, epithelial-cell-autonomous, or target-cell-autonomous claims. Cover the relevant FEATURED gene with `stage3_<GENE>.json` and `ot_<GENE>.json` for target/actionability support, and use the depleted Stage 1 pair only to constrain the spatial-niche framing.
+-- Passed but target-cell-depleted Stage 1 pair files may still be cited as secondary spatial-niche/cross-cell framing evidence when the recommendation names that pair concept. They are not AT2-intrinsic support and must not be used for same-cell, epithelial-cell-autonomous, or target-cell-autonomous claims.
+-- The report renderer uses those secondary citations to populate a secondary Stage 1 framing evidence table, so cite depleted Stage 1 pair files when the recommendation names that pair concept, but only as framing evidence and not as AT2-intrinsic support.
++- For any passed Stage 1 pair, inspect `census_validation.target_vs_rest` before using it as interest-cell evidence. If coexpression is depleted, or all target-vs-rest diff values are negative, cite that Stage 1 pair only as secondary spatial-niche/cross-cell framing evidence. It must not support resolved-Census-cell intrinsic, same-cell, cell-autonomous, or target-cell-autonomous claims. Cover the relevant FEATURED gene with `stage3_<GENE>.json` and `ot_<GENE>.json` for target/actionability support, and use the depleted Stage 1 pair only to constrain the spatial-niche framing.
++- Passed but target-cell-depleted Stage 1 pair files may still be cited as secondary spatial-niche/cross-cell framing evidence when the recommendation names that pair concept. They are not intrinsic interest-cell support and must not be used for same-cell, cell-autonomous, or target-cell-autonomous claims.
++- The report renderer uses those secondary citations to populate a secondary Stage 1 framing evidence table, so cite depleted Stage 1 pair files when the recommendation names that pair concept, but only as framing evidence and not as interest-cell-intrinsic support.
+
+ ---
+
+@@ -186,7 +286,16 @@ Every recommendation should be written so the report can expose four fixed field
+ - **Biological Grounding**: Stage 1/spatial/Census support and the cell-type interpretation.
+ - **Target-Disease Support**: Stage 2 OpenTargets target-disease support, not causal biology.
+ - **Actionability**: Stage 3 ChEMBL/drug evidence for actionability, perturbability, or repurposing context, not biological causality.
+-- **Interpretation Constraint**: primary AT2/epithelial intrinsic support versus secondary spatial-niche/cross-cell framing.
++- **Interpretation Constraint**: primary interest-cell intrinsic support versus secondary spatial-niche/cross-cell framing.
++
++When this skill is loaded, each retained recommendation should have a visible
++DTH quality signature in its title, core claim, prediction, or validation
++approach:
++1. evidence class: intrinsic pair, spatial-niche/cross-cell, or gene-level/actionability
++2. claim boundary: what the evidence supports and what remains unproven
++3. follow-up readout: a perturbation, actionability, or validation readout
++4. target rationale: why the named target/gene is prioritized
++5. limitation: one unresolved boundary when the claim extends beyond direct evidence
+
+ | Category | Focus | Minimum Count |
+ |----------|-------|:-------------:|
+@@ -212,17 +321,18 @@ Generation guidance:
+ - Lower intervention-success wording:
+   - Avoid `therapeutic intervention candidate` unless clinical/intervention evidence directly supports it; prefer `perturbation/actionability follow-up candidate`.
+   - Avoid `synergistic effects` unless direct combination evidence is cited; prefer `additive or non-additive effects`.
+-  - Avoid statements such as `CD47 blockade alters fibrosis resolution`; prefer `test whether CD47 perturbation changes macrophage-fibroblast readouts`.
++  - Avoid statements such as `target blockade resolves disease`; prefer `test whether target perturbation changes disease-relevant readouts`.
+ - For interest-cell focused reports, mentally split retained recommendations into
+   three support classes even though the JSON schema does not require a separate
+   tier field:
+-  - **Primary epithelial/AT2-intrinsic follow-up recommendations**: cite at
+-    least one `interest_cell_intrinsic_stage1_pair_files` entry and include AT2
+-    or epithelial validation context.
+-  - **Secondary epithelial-associated spatial-niche follow-up recommendations**:
++  - **Primary interest-cell intrinsic follow-up recommendations**: cite at
++    least one `interest_cell_intrinsic_stage1_pair_files` entry and include the
++    original interest cell label or resolved Census cell type in the validation
++    context.
++  - **Secondary interest-cell-associated spatial-niche follow-up recommendations**:
+     cite at least one Stage 1/spatial pair file that is spatial-niche-only or
+-    depleted in the resolved epithelial/AT2 cell context. Use this only as
+-    cross-cell or non-AT2 niche framing, not as epithelial-cell-intrinsic
++    depleted in the resolved cell context. Use this only as cross-cell or
++    non-interest-cell niche framing, not as interest-cell-intrinsic
+     target mechanisms.
+   - **Gene-level/actionability-only follow-up recommendations**: cite only
+     `ot_<GENE>.json`, `stage3_<GENE>.json`, known-drug, or disease-level files.
+@@ -232,16 +342,23 @@ Generation guidance:
+     `perturbation-development candidate`.
+ - Only use `spatial-niche` when a Stage 1/spatial pair file is cited as
+   Biological Grounding or constrained secondary framing evidence.
+-- Primary epithelial/AT2-intrinsic titles should use language such as `prioritizes`, `nominates`, `follow-up axis`, or `program candidate`.
+-- Secondary epithelial-associated spatial-niche titles should use language such as `spatial-niche follow-up candidate`, `cross-cell candidate`, or `non-AT2 niche context`.
++- Primary interest-cell intrinsic titles should use language such as `prioritizes`, `nominates`, `follow-up axis`, or `program candidate`.
++- Secondary interest-cell-associated spatial-niche titles should use language such as `spatial-niche follow-up candidate`, `cross-cell candidate`, or `non-interest-cell niche context`.
+ - Gene-level/actionability-only titles should use language such as `gene-level follow-up candidate`, `actionability follow-up candidate`, or `perturbation-development candidate`.
+ - Avoid unsupported title phrases such as `drives`, `dysregulation via`, `blockade for reducing`, `barrier dysfunction`, `complex assembly`, and `activation and matrix deposition`.
+ - In `falsifiable_prediction`, prefer `test whether ... changes` over `should reduce` or `should alter` unless a cited file directly supports that expected direction.
+ - For asymmetric Stage 2/3 support in a Stage 1 pair, write the recommendation as `<SUPPORTED_GENE>-anchored`. The supported gene is the perturbation or actionability anchor; the unsupported partner is a coexpression-context partner or readout.
+ - Do not treat the unsupported partner as independently druggable, target-disease-supported, or perturbation-prioritized unless its exact gene-level evidence file is cited.
++- Do not write `A-B axis`, `A/B interaction`, `A-B signaling`,
++  `A-B coexpression`, or equivalent direct pair wording unless `A--B` or `B--A`
++  is present in `allowed_direct_pair_axes` and the exact matching passed Stage 1
++  filename is cited in that same hypothesis. If the desired pair is absent from
++  `allowed_direct_pair_axes`, rewrite as `<SUPPORTED_GENE>-anchored`
++  gene-level/actionability follow-up and mention the uncited partner only as
++  context, not as a direct mechanism.
+ - Do not list a partner gene in `biological_entities.genes` unless the same hypothesis cites `ot_<GENE>.json`, `stage3_<GENE>.json`, or a Stage 1 pair file containing that gene. If an uncited partner is biologically useful, mention it only as context in prose and label it `context only, not independently supported by cited evidence`.
+ - OpenTargets known-drug evidence and Stage 3 ChEMBL matched-drug evidence are distinct. If `ot_<GENE>.json` contains known-drug programs, attribute those drugs to OpenTargets. If `stage3_<GENE>.json` has empty `matched_drugs`, do not describe that file as ChEMBL drug, ChEMBL compound, or matched-drug support; say Stage 3 provides no matched ChEMBL drug evidence for that gene.
+-- Avoid `fibrosis resolution` in hypothesis titles and avoid treating exploratory perturbation readouts as disease-resolution outcomes. Prefer `fibrosis-relevant readouts`, `matrix deposition readouts`, or `macrophage-fibroblast interaction readouts`.
++- Avoid disease-resolution claims in hypothesis titles and avoid treating exploratory perturbation readouts as therapeutic outcomes. Prefer disease-relevant cellular or molecular readouts named in the local evidence.
+ - Include `Not yet established:` when the recommendation extends beyond direct Stage 1, Stage 3, OpenTargets, ChEMBL, or spatial evidence.
+
+ ---
+@@ -321,6 +438,11 @@ Rules:
+ - Use 6 retained recommendations only when needed for FEATURED coverage or mandatory category balance
+ - If FEATURED coverage cannot be satisfied within 6 retained recommendations, stop and report the deterministic blocker instead of saving an incomplete payload
+ - `save_hypothesis_report` computes `topn_coverage` deterministically and rejects the payload if `topn_coverage.missing` is non-empty
++- FEATURED gene coverage is independent from pair-level Stage 1 support. A
++  FEATURED gene can be covered by `stage3_<GENE>.json` plus `ot_<GENE>.json`
++  even when no valid interest-cell intrinsic pair supports that gene.
++- Do not reintroduce spatial-niche-only or coexpression-depleted Stage 1 files
++  as intrinsic support just to satisfy FEATURED coverage.
+
+ This gate is independent from the general orphan-evidence `[GAP]` logic.
+
+@@ -350,13 +472,27 @@ Required top-level payload fields include:
+
+ If `save_hypothesis_report` returns `saved: false`:
+ - For `invalid_references`, remove or replace invalid filenames and validate again
+-- For `topn_coverage.missing`, add one `[FEATURED-GAP]` hypothesis per missing FEATURED gene
++- For `topn_coverage.missing`, add one `[FEATURED-GAP]` hypothesis per missing
++  FEATURED gene. Prefer gene-level/actionability evidence
++  (`stage3_<GENE>.json` and `ot_<GENE>.json`) when the missing gene's Stage 1
++  pair support is spatial-niche-only, coexpression-depleted, absent, or would
++  require an unsupported direct pair claim.
+ - For `failed_pair_violations`, remove the failed pair citation/claim or rebuild the hypothesis from passed pair or Stage 3 gene evidence
+ - For `hypothesis_grounding_violations`, apply the exact deterministic repair before retrying:
+   - Direct pair-axis violation: remove the unsupported `A-B axis` wording, or cite a matching passed `stage1_A--B.json`/`stage1_B--A.json`. Stage 1 pair filenames may be ligand-receptor ordered and reverse of the prose order; cite the actual available filename returned by validation/load evidence, not a normalized filename you invent. If the rejection names an available reverse-order file, cite that exact file or remove the direct pair-axis wording. Do not infer combinatorial axes from separate hub-partner files.
+-  - Target-cell-depleted Stage 1 used as interest-cell support: if the hypothesis mentions AT2, Transitional AT2, pulmonary/alveolar epithelial, or the resolved Census cell type anywhere, remove that Stage 1 citation and support the FEATURED gene with `stage3_<GENE>.json`/`ot_<GENE>.json`; otherwise rewrite as non-interest-cell spatial niche evidence.
+-  - Coexpression-depleted Stage 1 used as intrinsic same-cell support: remove same-cell/intrinsic/AT2-intrinsic wording and AT2 validation, or remove that Stage 1 citation.
+-  - Target-cell-depleted gene expression claim: remove any statement that the depleted gene is expressed on/in AT2, Transitional AT2, pulmonary alveolar type 2, alveolar epithelial, or pulmonary epithelial cells.
++  - If a direct pair-axis rejection reports `canonical_existing=none` or
++    `available: no matching Stage 1 pair file exists`, do not try to repair by
++    inventing a filename. Remove the direct pair wording and rebuild the
++    recommendation as gene-level/actionability-only or as a supported-pair
++    recommendation using an allowed direct pair from `allowed_direct_pair_axes`.
++  - Target-cell-depleted Stage 1 used as interest-cell support: if the hypothesis mentions the original interest label or resolved Census cell type anywhere, remove that Stage 1 citation and support the FEATURED gene with `stage3_<GENE>.json`/`ot_<GENE>.json`; otherwise rewrite as non-interest-cell spatial niche evidence.
++  - Coexpression-depleted Stage 1 used as intrinsic same-cell support: remove
++    same-cell/intrinsic/target-cell-autonomous wording and interest-cell
++    validation, or remove that Stage 1 citation. If removing the citation makes
++    a FEATURED gene uncovered, immediately add or revise a gene-level/actionability
++    hypothesis for that gene using exact `stage3_<GENE>.json` and `ot_<GENE>.json`
++    evidence instead of restoring the depleted Stage 1 citation.
++  - Target-cell-depleted gene expression claim: remove any statement that the depleted gene is expressed in or on the original interest cell label or resolved Census cell type.
+
+ Do not retry the same payload after a deterministic rejection. Change the payload first, then retry.
+
+@@ -379,7 +515,7 @@ Repair the exact saved=false errors before saving again:
+   and biological_entities.cell_types as secondary spatial-niche/cross-cell or
+   non-interest-cell context; or remove that Stage 1 citation and rewrite the
+   hypothesis as gene-level/actionability-only. Do not leave depleted Stage 1 in
+-  a primary AT2/epithelial, interest-cell, same-cell, or intrinsic recommendation.
++  a primary interest-cell, same-cell, cell-autonomous, or intrinsic recommendation.
+
+ Do not repeat a rejected payload. Validate references again, then save only the
+ repaired report.
+@@ -458,7 +594,11 @@ Remove or replace the bad filenames. Do not invent new ones. Stage 1 pair filena
+
+ ### `save_hypothesis_report` returns `topn_coverage.missing`
+
+-One or more FEATURED genes are uncovered. Add a `[FEATURED-GAP]` hypothesis for each missing gene before retrying.
++One or more FEATURED genes are uncovered. Add a `[FEATURED-GAP]` hypothesis for
++each missing gene before retrying. If the missing gene is linked only through a
++spatial-niche-only or coexpression-depleted Stage 1 pair, cover it with
++gene-level `stage3_<GENE>.json` and `ot_<GENE>.json` evidence instead of forcing
++that Stage 1 pair into an intrinsic claim.
+
+ ### `save_hypothesis_report` returns `failed_pair_violations`
+
+diff --git a/skills/drug-target-hypothesis/evals/evals.json b/skills/drug-target-hypothesis/evals/evals.json
+index 8ab6634..706c5f6 100644
+--- a/skills/drug-target-hypothesis/evals/evals.json
++++ b/skills/drug-target-hypothesis/evals/evals.json
+@@ -4,7 +4,7 @@
+     {
+       "id": 1,
+       "prompt": "Using data_dir=<SCRATCH_COPY_OF_res_ipf_qwen2>, generate evidence/hypothesis_report.json from the existing Stage 1-3 evidence. Validate every cited filename before saving and do not produce markdown output.",
+-      "expected_output": "Skill triggers and follows the runtime-aligned JSON hypothesis flow using load_evidence_files(..., scope=\"hypothesis\"), validate_evidence_references(...), and save_evidence(..., \"hypothesis_report.json\", ...).",
++      "expected_output": "Skill triggers and follows the runtime-aligned JSON hypothesis flow using load_evidence_files(..., scope=\"hypothesis\"), validate_evidence_references(...), and save_hypothesis_report(...).",
+       "files": []
+     },
+     {
+@@ -24,6 +24,12 @@
+       "prompt": "A saved Stage 1 filter marks FN1--PLAUR as passed=false, but stage3_FN1.json exists. Retry the hypothesis report without inventing filenames or using failed pair evidence.",
+       "expected_output": "Skill uses load_evidence_files(..., scope=\"hypothesis\"), excludes the failed FN1--PLAUR pair from hypothesis evidence, rejects any failed-pair citation or primary FN1-PLAUR axis claim, and rebuilds from passed Stage 1 pairs or Stage 3 gene evidence before save_hypothesis_report.",
+       "files": []
++    },
++    {
++      "id": 5,
++      "prompt": "A DTH-loaded hypothesis retry is rejected because stage1_EFNB2--EPHB4.json is coexpression-depleted when used as malignant-cell intrinsic support, and removing it leaves EFNB2 in topn_missing. Repair the report without weakening the base prompt.",
++      "expected_output": "Skill keeps the repair DTH-specific: it removes intrinsic/same-cell EFNB2--EPHB4 wording, covers EFNB2 with stage3_EFNB2.json and ot_EFNB2.json as gene-level/actionability evidence, avoids unsupported direct pair-axis claims, and leaves non-DTH/base prompt behavior unchanged.",
++      "files": []
+     }
+   ]
+ }
+diff --git a/src/agents/drug_target/hypothesis_retry.py b/src/agents/drug_target/hypothesis_retry.py
+index d956bb3..ad5ba7b 100644
+--- a/src/agents/drug_target/hypothesis_retry.py
++++ b/src/agents/drug_target/hypothesis_retry.py
+@@ -223,11 +223,13 @@ def _interest_cell_validation_guidance(errors: list[dict] | None) -> str:
+     return (
+         " Interest-cell validation repair: when a hypothesis cites target-cell-intrinsic "
+         "Stage 1 evidence or lists an interest/resolved cell type, rewrite that named "
+-        "hypothesis so `biological_entities.cell_types` includes the original interest "
+-        "label or resolved Census cell type, and `validation_approach` explicitly names "
+-        "that cell context. For this breast-cancer semantic proxy context, use exact "
+-        "phrases such as `Prolif Invasive Tumor` or `malignant cell`; do not rely on "
+-        "generic disease, tumor, epithelial, or breast-cancer wording alone."
++        "hypothesis after reading `hypothesis_writer_contract` from "
++        "`load_evidence_files(data_dir, scope='hypothesis')` or "
++        "`validate_evidence_references`. Copy "
++        "`hypothesis_writer_contract.required_cell_context_anchor` exactly into "
++        "`biological_entities.cell_types` and explicitly name that same cell context "
++        "in `validation_approach`. Do not rely on generic disease, tumor, epithelial, "
++        "or cancer wording alone."
+         f"{refs_text}"
+     )
+
+@@ -242,8 +244,7 @@ def _depleted_stage1_guidance(errors: list[dict] | None) -> str:
+         return ""
+     return (
+         " Depleted Stage 1 repair: remove original interest label, resolved "
+-        "Census cell type such as malignant cell, legacy AT2, Transitional AT2, "
+-        "pulmonary/alveolar epithelial, "
++        "Census cell type, legacy AT2, Transitional AT2, pulmonary/alveolar epithelial, "
+         "epithelial-intrinsic, same-cell, and target-cell-autonomous wording "
+         "from recommendations citing depleted Stage 1 files. A depleted Stage 1 "
+         "file cannot support primary interest-cell intrinsic, legacy AT2/epithelial, "
+@@ -266,7 +267,6 @@ def _legacy_at2_repair_guidance(errors: list[dict] | None) -> str:
+     legacy_markers = (
+         "transitional at2",
+         "pulmonary alveolar type 2",
+-        "pulmonary/alveolar epithelial",
+         "alveolar epithelial",
+         "pulmonary epithelial",
+     )
+diff --git a/src/agents/drug_target/middleware.py b/src/agents/drug_target/middleware.py
+index a831215..e2c45ac 100644
+--- a/src/agents/drug_target/middleware.py
++++ b/src/agents/drug_target/middleware.py
+@@ -13,6 +13,7 @@ from collections.abc import Awaitable, Callable
+ from typing import Any
+
+ from langchain.agents.middleware import AgentMiddleware
++from langchain.agents.middleware.types import hook_config
+ from langchain.tools.tool_node import ToolCallRequest
+ from langchain_core.messages import ToolMessage
+ from langgraph.types import Command
+@@ -27,9 +28,38 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
+     2026-05-13 summarizer simplification.
+     """
+
+-    def __init__(self) -> None:
++    def __init__(
++        self,
++        *,
++        stop_after_first_save: bool = False,
++        max_hypothesis_save_attempts: int | None = None,
++    ) -> None:
+         super().__init__()
++        self._stop_after_first_save = stop_after_first_save
++        self._max_hypothesis_save_attempts = max_hypothesis_save_attempts
+         self._rejected_payload_hashes: set[str] = set()
++        self._hypothesis_save_seen = False
++        self._hypothesis_save_attempts = 0
++        self._hypothesis_stop_requested = False
++
++    def _is_hypothesis_report_save_request(self, request: ToolCallRequest) -> bool:
++        tool_name = request.tool_call.get("name")
++        if tool_name == "save_hypothesis_report":
++            return True
++        args = request.tool_call.get("args") or {}
++        return (
++            tool_name == "save_evidence"
++            and isinstance(args, dict)
++            and args.get("filename") == "hypothesis_report.json"
++        )
++
++    def _record_hypothesis_save_result(self, request: ToolCallRequest) -> None:
++        if not self._stop_after_first_save:
++            return
++        if not self._is_hypothesis_report_save_request(request):
++            return
++        self._hypothesis_save_seen = True
++        self._hypothesis_stop_requested = True
+
+     def _payload_for_request(self, request: ToolCallRequest) -> Any | None:
+         tool_name = request.tool_call.get("name")
+@@ -42,6 +72,38 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
+             return args.get("data")
+         return None
+
++    def _blocked_after_save_response(self, request: ToolCallRequest) -> ToolMessage:
++        payload = {
++            "saved": False,
++            "error": (
++                "hypothesis_report save already completed in this subagent turn. "
++                "Stop now so the graph-native hypothesis quality retry can apply "
++                "the bounded retry policy."
++            ),
++        }
++        return ToolMessage(
++            content=json.dumps(payload),
++            tool_call_id=request.tool_call.get("id", ""),
++        )
++
++    def _blocked_after_attempt_limit_response(
++        self, request: ToolCallRequest
++    ) -> ToolMessage:
++        payload = {
++            "saved": False,
++            "error": (
++                "hypothesis_report save attempt limit reached in this subagent "
++                "turn. Stop now so the graph-native hypothesis quality retry "
++                "can apply the bounded retry policy."
++            ),
++            "attempts": self._hypothesis_save_attempts,
++            "max_attempts": self._max_hypothesis_save_attempts,
++        }
++        return ToolMessage(
++            content=json.dumps(payload),
++            tool_call_id=request.tool_call.get("id", ""),
++        )
++
+     def _blocked_response(self, request: ToolCallRequest, payload_hash: str) -> ToolMessage:
+         payload = {
+             "saved": False,
+@@ -57,6 +119,25 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
+             tool_call_id=request.tool_call.get("id", ""),
+         )
+
++    def _save_attempt_limit_reached(self) -> bool:
++        return (
++            self._max_hypothesis_save_attempts is not None
++            and self._hypothesis_save_attempts >= self._max_hypothesis_save_attempts
++        )
++
++    def _record_save_attempt(self, request: ToolCallRequest) -> None:
++        if self._is_hypothesis_report_save_request(request):
++            self._hypothesis_save_attempts += 1
++
++    def _result_saved_false(self, result: ToolMessage | Command) -> bool:
++        if not isinstance(result, ToolMessage):
++            return False
++        try:
++            parsed = json.loads(str(result.content))
++        except Exception:
++            return False
++        return isinstance(parsed, dict) and parsed.get("saved") is False
++
+     def _record_if_rejected(self, payload_hash: str, result: ToolMessage | Command) -> None:
+         if not isinstance(result, ToolMessage):
+             return
+@@ -67,6 +148,20 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
+         if isinstance(parsed, dict) and parsed.get("saved") is False:
+             self._rejected_payload_hashes.add(payload_hash)
+
++    def _jump_to_end_if_requested(self) -> dict[str, str] | None:
++        if self._hypothesis_stop_requested:
++            self._hypothesis_stop_requested = False
++            return {"jump_to": "end"}
++        return None
++
++    @hook_config(can_jump_to=["end"])
++    def after_model(self, state: Any, runtime: Any) -> dict[str, str] | None:
++        return self._jump_to_end_if_requested()
++
++    @hook_config(can_jump_to=["end"])
++    async def aafter_model(self, state: Any, runtime: Any) -> dict[str, str] | None:
++        return self._jump_to_end_if_requested()
++
+     def wrap_tool_call(
+         self,
+         request: ToolCallRequest,
+@@ -74,12 +169,35 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
+     ) -> ToolMessage | Command:
+         payload = self._payload_for_request(request)
+         if payload is None:
+-            return handler(request)
++            if (
++                self._is_hypothesis_report_save_request(request)
++                and self._save_attempt_limit_reached()
++            ):
++                self._hypothesis_stop_requested = True
++                return self._blocked_after_attempt_limit_response(request)
++            result = handler(request)
++            self._record_save_attempt(request)
++            self._record_hypothesis_save_result(request)
++            if (
++                self._is_hypothesis_report_save_request(request)
++                and self._save_attempt_limit_reached()
++            ):
++                self._hypothesis_stop_requested = True
++            return result
++        if self._stop_after_first_save and self._hypothesis_save_seen:
++            return self._blocked_after_save_response(request)
++        if self._save_attempt_limit_reached():
++            self._hypothesis_stop_requested = True
++            return self._blocked_after_attempt_limit_response(request)
+         payload_hash = canonical_json_hash(payload)
+         if payload_hash in self._rejected_payload_hashes:
+             return self._blocked_response(request, payload_hash)
+         result = handler(request)
++        self._record_save_attempt(request)
++        self._record_hypothesis_save_result(request)
+         self._record_if_rejected(payload_hash, result)
++        if self._save_attempt_limit_reached():
++            self._hypothesis_stop_requested = True
+         return result
+
+     async def awrap_tool_call(
+@@ -89,10 +207,33 @@ class HypothesisRetryLoopMiddleware(AgentMiddleware):
+     ) -> ToolMessage | Command:
+         payload = self._payload_for_request(request)
+         if payload is None:
+-            return await handler(request)
++            if (
++                self._is_hypothesis_report_save_request(request)
++                and self._save_attempt_limit_reached()
++            ):
++                self._hypothesis_stop_requested = True
++                return self._blocked_after_attempt_limit_response(request)
++            result = await handler(request)
++            self._record_save_attempt(request)
++            self._record_hypothesis_save_result(request)
++            if (
++                self._is_hypothesis_report_save_request(request)
++                and self._save_attempt_limit_reached()
++            ):
++                self._hypothesis_stop_requested = True
++            return result
++        if self._stop_after_first_save and self._hypothesis_save_seen:
++            return self._blocked_after_save_response(request)
++        if self._save_attempt_limit_reached():
++            self._hypothesis_stop_requested = True
++            return self._blocked_after_attempt_limit_response(request)
+         payload_hash = canonical_json_hash(payload)
+         if payload_hash in self._rejected_payload_hashes:
+             return self._blocked_response(request, payload_hash)
+         result = await handler(request)
++        self._record_save_attempt(request)
++        self._record_hypothesis_save_result(request)
+         self._record_if_rejected(payload_hash, result)
++        if self._save_attempt_limit_reached():
++            self._hypothesis_stop_requested = True
+         return result
+diff --git a/src/agents/drug_target/subagents/configs.py b/src/agents/drug_target/subagents/configs.py
+index d553c3c..f42218e 100644
+--- a/src/agents/drug_target/subagents/configs.py
++++ b/src/agents/drug_target/subagents/configs.py
+@@ -27,7 +27,11 @@ from src.agents.deep_interpreter.middleware.write_file_guard import (
+     ReadFileBlockMiddleware,
+     WriteFileArgGuardMiddleware,
+ )
+-from src.agents.drug_target.subagents.prompts import SUBAGENT_PROMPTS
++from src.agents.drug_target.subagents.prompts import (
++    HypothesisWriterPromptMode,
++    SUBAGENT_PROMPTS,
++    render_hypothesis_writer_prompt,
++)
+ from src.agents.drug_target.middleware import HypothesisRetryLoopMiddleware
+ from src.agents.drug_target.tools import (
+     apply_semantic_celltype_proxy,
+@@ -368,6 +372,7 @@ def get_subagents(
+     subagent_skill_registries: dict[str, dict[str, str]] | None = None,
+     enable_skill_activator: bool = True,
+     skill_activation_mode: SkillActivationMode | None = None,
++    hypothesis_writer_prompt_mode: HypothesisWriterPromptMode = "default",
+ ) -> list[dict]:
+     """Build the two drug-target subagents in workflow order.
+
+@@ -399,6 +404,10 @@ def get_subagents(
+             benchmarks.
+         skill_activation_mode: Optional explicit activation strategy. When
+             omitted, derives from enable_skill_activator for compatibility.
++        hypothesis_writer_prompt_mode: Prompt variant for hypothesis_writer.
++            ``default`` preserves production prompt-level skill reads;
++            ``progressive_disclosure_only`` removes those benchmark-confounding
++            direct reads so SkillsMiddleware/activator/governor owns selection.
+
+     Returns:
+         List of three subagent configuration dictionaries.
+@@ -410,9 +419,23 @@ def get_subagents(
+
+     for subagent in subagents:
+         if subagent["name"] == "hypothesis_writer":
++            subagent["system_prompt"] = render_hypothesis_writer_prompt(
++                hypothesis_writer_prompt_mode
++            )
+             subagent["middleware"] = [
+                 *list(subagent.get("middleware", [])),
+-                HypothesisRetryLoopMiddleware(),
++                HypothesisRetryLoopMiddleware(
++                    stop_after_first_save=(
++                        hypothesis_writer_prompt_mode.startswith("thin_basic")
++                    ),
++                    max_hypothesis_save_attempts=(
++                        3
++                        if hypothesis_writer_prompt_mode.startswith(
++                            ("dth_contrast", "operational_contract")
++                        )
++                        else None
++                    ),
++                ),
+             ]
+
+     # Remove Census tools when disabled (too slow for some providers)
+@@ -531,6 +554,7 @@ def get_subagents(
+                     ("drug-target-hypothesis",)
+                     if (
+                         subagent["name"] == "hypothesis_writer"
++                        and hypothesis_writer_prompt_mode == "default"
+                         and "drug-target-hypothesis" in allowed_names
+                     )
+                     else ()
+diff --git a/src/agents/drug_target/subagents/prompts.py b/src/agents/drug_target/subagents/prompts.py
+index 4ac8061..89e8d6f 100644
+--- a/src/agents/drug_target/subagents/prompts.py
++++ b/src/agents/drug_target/subagents/prompts.py
+@@ -8,6 +8,8 @@ Three subagents with staged funnel architecture (happy path):
+ 3. REPORT_WRITER: Generate drug.md aligned with report_template.md.
+ """
+
++from typing import Literal
++
+ # =============================================================================
+ # Evidence Assessor (merged evidence_collector + clinical_assessor)
+ # =============================================================================
+@@ -1510,6 +1512,714 @@ audit but should be populated whenever Sections 1, 3, or 4 are present.
+ GUIDANCE: If `ls` or `glob` returns an empty list for a path you expect to contain evidence files (for example `/evidence/`), do NOT conclude the directory is empty. The data is guaranteed present per the user prompt. Instead, call `load_evidence_files(data_dir)` — the project's canonical evidence loader — to retrieve evidence files. Do NOT call `read_file` directly under `/evidence/` (this is forbidden by the existing HARD rules in this prompt module). Always use virtual paths starting with `/evidence/...`. NEVER prepend the disk path of `data_dir` (such as `/private/tmp/...`) to filesystem operations.
+ """
+
++_THIN_BASIC_HYPOTHESIS_WRITER_PROMPT_TEMPLATE = """You are the hypothesis_writer subagent for the Drug Target Assessment Agent.
++
++Goal: create a valid `evidence/hypothesis_report.json` from the evidence already
++on disk. Keep the prompt interpretation basic; use any loaded skill guides as
++the treatment-specific source of extra interpretation guidance.
++
++## Required File/Tool Rules
++- Use `load_evidence_files(data_dir=data_dir, scope="hypothesis")` to read evidence.
++- Do not use `read_file`, `write_file`, `ls`, or external database query tools.
++- Save the final artifact with `save_hypothesis_report(data_dir=data_dir, report=report)`.
++- Cite only exact evidence filenames returned by `load_evidence_files`.
++
++## Forced Skill Reads
++{forced_skill_read_block}
++
++## Skill Use Boundary
++- Treat skill guides only as interpretation guidance for already-loaded evidence.
++- Do not use skill text to add facts, genes, drugs, pathways, cell types, or
++  interactions that are absent from the loaded evidence.
++
++## Minimal Workflow
++1. Load evidence with `load_evidence_files(data_dir=data_dir, scope="hypothesis")`.
++2. Complete the forced skill-read step exactly as specified above.
++3. Draft 4-6 evidence-grounded follow-up recommendations.
++4. Include at least one recommendation in each canonical category:
++   `Mechanism of Action`, `Therapeutic Strategy`, `Cross-Target Interaction`,
++   and `Novel Pathway`.
++5. Each recommendation must include `title`, `category`, `gap_type`,
++   `core_claim`, `evidence_references`, `biological_entities`,
++   `falsifiable_prediction`, `validation_approach`, and `scores`.
++6. Call `validate_evidence_references` with every cited filename before saving.
++7. Call `save_hypothesis_report` exactly once. If the save is rejected, do not
++   call `save_hypothesis_report` again in this subagent turn; stop so the
++   graph-native hypothesis quality retry can handle the bounded retry policy.
++
++## Output Shape
++Build a JSON-compatible object:
++{
++  "disease": DISEASE,
++  "evidence_coverage_pct": <float>,
++  "hypotheses_generated": <int>,
++  "hypotheses_retained": <int>,
++  "hypotheses": [
++    {
++      "rank": 1,
++      "title": "...",
++      "category": "Mechanism of Action|Therapeutic Strategy|Cross-Target Interaction|Novel Pathway",
++      "gap_type": "none|orphan_evidence|featured_coverage",
++      "core_claim": "...",
++      "evidence_references": ["...json"],
++      "biological_entities": {"genes": [], "pathways": [], "cell_types": [], "drugs": []},
++      "falsifiable_prediction": "...",
++      "validation_approach": "...",
++      "scores": {
++        "evidence_coverage": <float>,
++        "specificity": <float>,
++        "novelty": <float>,
++        "actionability": <float>,
++        "composite": <float>
++      }
++    }
++  ],
++  "gap_analysis": {
++    "total_evidence_files": <int>,
++    "referenced_files": <int>,
++    "orphan_files": []
++  }
++}
++
++Keep claims conservative and evidence-bound. If a claim is not supported by a
++cited evidence file, remove it or phrase it as an unproven follow-up question.
++"""
++
++_THIN_BASIC_DTH_SKILL_PATHS = (
++    "skills/drug-target-hypothesis/SKILL.md",
++)
++_THIN_BASIC_DOMAIN4_SKILL_PATHS = (
++    "skills/opentargets-database/SKILL.md",
++    "skills/chembl-database/SKILL.md",
++    "skills/compare-census-gene-pair-by-cell-type/SKILL.md",
++    "skills/string-database/SKILL.md",
++)
++
++
++_OPERATIONAL_CONTRACT_HYPOTHESIS_WRITER_PROMPT_TEMPLATE = """You are the hypothesis_writer subagent for the Drug Target Assessment Agent.
++
++Goal: create a valid `evidence/hypothesis_report.json` from evidence that
++already exists on disk. This prompt is an operational contract for benchmark
++skill-isolation runs: it defines tool use, citation validity, schema shape, and
++deterministic save-gate requirements. It does not provide a drug-target
++interpretation rubric; loaded skill guides may provide interpretation guidance
++when this condition explicitly requires them.
++
++## Required File/Tool Rules
++- Use `load_evidence_files(data_dir=data_dir, scope="hypothesis")` to read evidence.
++- Do not use `read_file`, `write_file`, `ls`, grep, or external database query tools.
++- Cite only exact evidence filenames returned with usable content by
++  `load_evidence_files` or accepted by `validate_evidence_references`.
++- Before saving, call `validate_evidence_references(data_dir, all_cited_filenames)`.
++- Save only with `save_hypothesis_report(data_dir=data_dir, report=report)`.
++
++## Forced Skill Reads
++{forced_skill_read_block}
++
++## Evidence Inventory
++After loading evidence, identify:
++- `assessment_results.json.stage3_candidates` as the FEATURED gene list.
++- usable Stage 1 pair files from the loaded hypothesis-scope `files` payload.
++- `interest_cell_intrinsic_stage1_pair_files` and
++  `spatial_niche_only_stage1_pair_files` from `load_evidence_files` or
++  `validate_evidence_references`.
++- the original interest cell label and resolved Census cell type from
++  `celltype_resolution.json` when present.
++
++Before drafting recommendations, build two local inventories from the loaded
++evidence and obey them throughout the report:
++- Prefer the returned `hypothesis_writer_contract` when present; it is the
++  canonical save-gate contract. Do not replace it with your own inferred axes or
++  cell labels.
++- `cell_context_anchor`: copy
++  `hypothesis_writer_contract.required_cell_context_anchor` exactly when present;
++  otherwise use the exact original interest label and resolved Census cell type
++  from `celltype_resolution.json`. If the match mode is
++  `semantic_proxy`, describe Stage 1 Census support as proxy validation for the
++  resolved Census cell type, not state-specific validation for lost modifiers.
++  When any hypothesis cites an `interest_cell_intrinsic_stage1_pair_files` item,
++  include the exact resolved Census cell type in both
++  `biological_entities.cell_types` and `validation_approach`.
++- `allowed_direct_pair_axes`: the exact pair keys and filenames from
++  `hypothesis_writer_contract.allowed_direct_pair_axes` when present, otherwise
++  usable `stage1_*.json` files returned by hypothesis scope or accepted by
++  `validate_evidence_references`. Never infer a new direct pair axis by
++  combining genes from separate evidence files, shared pathways, hub context, or
++  co-listed entities.
++
++## Valid Output Contract
++Generate 4-6 retained recommendations. The final retained set must:
++- include every FEATURED gene at least once in `biological_entities.genes`;
++- include at least one recommendation in each category:
++  `Mechanism of Action`, `Therapeutic Strategy`, `Cross-Target Interaction`,
++  and `Novel Pathway`;
++- use only qualitative `falsifiable_prediction` wording. Do not write numeric
++  effect sizes, percentages, thresholds, or bare comparison operators in
++  predictions.
++
++## Grounding Rules
++Apply these rules before every save attempt:
++1. Every gene in `biological_entities.genes` must be supported by a cited file
++   in the same hypothesis: `ot_<GENE>.json`, `stage3_<GENE>.json`, or a cited
++   matching `stage1_<GENE1>--<GENE2>.json`.
++2. A direct pair-axis claim in title, `core_claim`, `falsifiable_prediction`, or
++   `validation_approach` requires a cited matching passed Stage 1 file in either
++   filename direction. If no matching Stage 1 file is cited, rewrite as separate
++   gene-level follow-up or remove the pair-axis wording. If the desired pair is
++   absent from `allowed_direct_pair_axes`, do not write `A-B axis`,
++   `A/B interaction`, `A-B signaling`, `A-B coexpression`, or equivalent direct
++   pair wording; write a `<SUPPORTED_GENE>-anchored` gene-level/actionability
++   follow-up and use the uncited partner only as context.
++3. Never cite failed Stage 1 files as positive evidence. Failed pairs may not
++   appear in `evidence_references`.
++4. Stage 1 files in `interest_cell_intrinsic_stage1_pair_files` may support
++   same-cell or intrinsic cell-context wording only when the hypothesis names the
++   original interest cell label or resolved Census cell type in both
++   `biological_entities.cell_types` and `validation_approach`.
++5. Stage 1 files in `spatial_niche_only_stage1_pair_files`, or any passed pair
++   with target-vs-rest depletion, may be used only as secondary spatial-niche or
++   cross-cell framing. Do not use them as same-cell, intrinsic,
++   cell-autonomous, or target-cell-autonomous support.
++6. OpenTargets and Stage 3 evidence provide gene-level target support,
++   tractability, perturbability, or drug evidence. They do not by themselves
++   support spatial, same-cell, or pair-interaction claims.
++7. Put drug or compound names in `biological_entities.drugs` only when a cited
++   evidence file for that same hypothesis contains the exact drug or compound.
++8. Use cautious follow-up wording such as `test whether`, `prioritize for
++   validation`, `perturbation readout`, `combination readout`, or
++   `target-prioritization follow-up`. Do not state causal mechanism or clinical
++   benefit unless a cited file directly supports that statement.
++
++## Save-Rejection Repair
++If `save_hypothesis_report` returns `saved: false`:
++- change the payload before retrying; never resend an identical rejected payload;
++- for missing FEATURED genes, add or revise a `[FEATURED-GAP]` hypothesis using
++  available gene-level evidence for that gene;
++- for unsupported pair-axis errors, cite the exact available matching Stage 1
++  filename named by validation, or remove the pair-axis wording;
++- for depleted or non-intrinsic Stage 1 errors, remove intrinsic wording or
++  convert the claim to secondary spatial-niche/cross-cell framing;
++- stop after 3 save attempts in this subagent turn so graph-native retry can
++  apply the bounded retry policy.
++
++## Output Shape
++Build a JSON-compatible object:
++{
++  "disease": DISEASE,
++  "evidence_coverage_pct": <float>,
++  "hypotheses_generated": <int>,
++  "hypotheses_retained": <int>,
++  "hypotheses": [
++    {
++      "rank": 1,
++      "title": "...",
++      "category": "Mechanism of Action|Therapeutic Strategy|Cross-Target Interaction|Novel Pathway",
++      "gap_type": "none|orphan_evidence|featured_coverage",
++      "core_claim": "...",
++      "evidence_references": ["...json"],
++      "biological_entities": {"genes": [], "pathways": [], "cell_types": [], "drugs": []},
++      "falsifiable_prediction": "...",
++      "validation_approach": "...",
++      "scores": {
++        "evidence_coverage": <float>,
++        "specificity": <float>,
++        "novelty": <float>,
++        "actionability": <float>,
++        "composite": <float>
++      }
++    }
++  ],
++  "gap_analysis": {
++    "total_evidence_files": <int>,
++    "referenced_files": <int>,
++    "orphan_files": []
++  }
++}
++
++Use simple numeric scores between 0 and 1. The scores only need to rank the
++retained recommendations consistently; do not invent extra evidence to justify
++them.
++"""
++
++
++_MINIMAL_OPERATIONAL_CONTRACT_HYPOTHESIS_WRITER_PROMPT_TEMPLATE = """You are the hypothesis_writer subagent for the Drug Target Assessment Agent.
++
++Goal: create a valid `evidence/hypothesis_report.json` from evidence that
++already exists on disk. This is a minimal operational contract for small-model DTH contrast
++runs: it defines tool use, citation validity, schema shape, and
++save-gate survival rules only. No drug-target interpretation rubric is provided by this base prompt;
++loaded skill guides may provide extra interpretation guidance when this
++condition explicitly requires them.
++
++## Required File/Tool Rules
++- Use `load_evidence_files(data_dir=data_dir, scope="hypothesis")` to read evidence.
++- Do not use `read_file`, `write_file`, `ls`, grep, or external database query tools.
++- Cite only exact filenames returned with usable content by `load_evidence_files`
++  or accepted by `validate_evidence_references`.
++- Before saving, call `validate_evidence_references(data_dir, all_cited_filenames)`.
++- Save only with `save_hypothesis_report(data_dir=data_dir, report=report)`.
++
++## Forced Skill Reads
++{forced_skill_read_block}
++
++## Minimal Evidence Inventory
++After loading evidence, identify:
++- the FEATURED gene list from `assessment_results.json.stage3_candidates`;
++- usable Stage 1 pair filenames from the loaded hypothesis-scope `files` payload;
++- usable gene-level filenames such as `stage3_<GENE>.json` and `ot_<GENE>.json`;
++- `hypothesis_writer_contract.allowed_direct_pair_axes` when present.
++
++Use these only as save-gate boundaries. Do not infer new pair axes, cell labels,
++genes, drugs, pathways, or mechanisms from skill text or from filename patterns.
++
++## Valid Output Contract
++Generate 4-6 retained recommendations. The final retained set must:
++- include every FEATURED gene at least once in `biological_entities.genes`;
++- include at least one recommendation in each category:
++  `Mechanism of Action`, `Therapeutic Strategy`, `Cross-Target Interaction`,
++  and `Novel Pathway`;
++- use cautious qualitative `falsifiable_prediction` wording rather than numeric
++  effects or clinical-benefit claims.
++
++## Minimal Save-Gate Checks
++Apply these checks before every save attempt:
++1. Every cited filename must be exact and must pass `validate_evidence_references`.
++2. Every gene in `biological_entities.genes` must be supported by a cited file
++   in the same hypothesis: `ot_<GENE>.json`, `stage3_<GENE>.json`, or a cited
++   matching Stage 1 pair file.
++3. Any direct pair wording in title, `core_claim`, `falsifiable_prediction`, or
++   `validation_approach` requires a cited matching passed Stage 1 pair file in
++   either filename direction. If no matching file is cited, rewrite as a
++   single-gene follow-up or remove the direct pair wording.
++4. Do not cite failed Stage 1 files as positive evidence. Failed pairs may not
++   appear in `evidence_references`.
++5. If validation or loaded evidence says a Stage 1 pair is not permitted for
++   target-cell intrinsic wording, do not use same-cell, intrinsic,
++   cell-autonomous, or target-cell-autonomous wording for that pair.
++6. OpenTargets and Stage 3 files provide target support, tractability,
++   perturbability, or drug evidence for the cited gene. They do not by
++   themselves support spatial, same-cell, or pair-interaction claims.
++7. Put drug or compound names in `biological_entities.drugs` only when a cited
++   evidence file for that same hypothesis contains the exact drug or compound.
++8. Prefer cautious wording such as `test whether`, `prioritize for validation`,
++   `perturbation readout`, `combination readout`, or
++   `target-prioritization follow-up`.
++
++## Save-Rejection Repair
++If `save_hypothesis_report` returns `saved: false`:
++- change the payload before retrying; never resend an identical rejected payload;
++- for missing FEATURED genes, add or revise one `[FEATURED-GAP]` hypothesis using
++  available gene-level evidence for that gene;
++- for unsupported pair-axis errors, cite the exact available matching Stage 1
++  filename named by validation, or remove the direct pair wording;
++- for invalid references, remove or replace the invalid filename and validate
++  again;
++- Stop after 3 save attempts in this subagent turn so graph-native retry can
++  apply the bounded retry policy.
++
++## Output Shape
++Build a JSON-compatible object:
++{
++  "disease": DISEASE,
++  "evidence_coverage_pct": <float>,
++  "hypotheses_generated": <int>,
++  "hypotheses_retained": <int>,
++  "hypotheses": [
++    {
++      "rank": 1,
++      "title": "...",
++      "category": "Mechanism of Action|Therapeutic Strategy|Cross-Target Interaction|Novel Pathway",
++      "gap_type": "none|orphan_evidence|featured_coverage",
++      "core_claim": "...",
++      "evidence_references": ["...json"],
++      "biological_entities": {"genes": [], "pathways": [], "cell_types": [], "drugs": []},
++      "falsifiable_prediction": "...",
++      "validation_approach": "...",
++      "scores": {
++        "evidence_coverage": <float>,
++        "specificity": <float>,
++        "novelty": <float>,
++        "actionability": <float>,
++        "composite": <float>
++      }
++    }
++  ],
++  "gap_analysis": {
++    "total_evidence_files": <int>,
++    "referenced_files": <int>,
++    "orphan_files": []
++  }
++}
++
++Use simple numeric scores between 0 and 1. The scores only need to rank the
++retained recommendations consistently; do not invent extra evidence to justify
++them.
++"""
++
++
++_DTH_CONTRAST_HYPOTHESIS_WRITER_PROMPT_TEMPLATE = """You are the hypothesis_writer subagent for the Drug Target Assessment Agent.
++
++Goal: create a valid `evidence/hypothesis_report.json` that prioritizes
++drug-target follow-up hypotheses from the evidence already on disk. This is a
++DTH contrast benchmark: both conditions use this same task contract; only the
++forced skill-read block differs.
++
++## Required File/Tool Rules
++- Use `load_evidence_files(data_dir=data_dir, scope="hypothesis")` to read evidence.
++- Do not use `read_file`, `write_file`, `ls`, or external database query tools.
++- Save the final artifact with `save_hypothesis_report(data_dir=data_dir, report=report)`.
++- Cite only exact evidence filenames returned by `load_evidence_files`.
++
++## Forced Skill Reads
++{forced_skill_read_block}
++
++## Skill Use Boundary
++- Treat any loaded skill guide as a decision rubric for interpreting already
++  loaded evidence, not as a source of new biomedical facts.
++- Do not add genes, drugs, pathways, cell types, or interactions that are absent
++  from the loaded evidence.
++- If no skill guide is loaded, still complete the same drug-target follow-up
++  task using only the evidence and validation contract below.
++
++## Drug-Target Contrast Task
++Draft 4-6 ranked follow-up hypotheses. Each hypothesis must make a conservative
++drug-target interpretation using only cited local evidence:
++- Identify one explicit target gene or target-gene pair in `title`,
++  `core_claim`, and `biological_entities.genes`.
++- Explain actionability as a testable perturbation or readout, not as a clinical
++  treatment recommendation, unless a cited evidence file explicitly supports the
++  drug/MoA claim.
++- Put drug names in `biological_entities.drugs` only when the same hypothesis
++  cites an evidence file containing that drug or matched compound.
++- Keep at least one hypothesis in each canonical category:
++  `Mechanism of Action`, `Therapeutic Strategy`, `Cross-Target Interaction`,
++  and `Novel Pathway`.
++
++Before drafting, build these local inventories from `load_evidence_files` and
++use them as hard boundaries:
++- Prefer the returned `hypothesis_writer_contract` when present; it is the
++  canonical save-gate contract. Do not replace it with your own inferred axes or
++  cell labels.
++- `cell_context_anchor`: copy
++  `hypothesis_writer_contract.required_cell_context_anchor` exactly when present;
++  otherwise use the exact original interest label and resolved Census cell type
++  from `celltype_resolution.json`. If the match mode is `semantic_proxy`,
++  treat the resolved Census cell type as proxy validation and do not claim that
++  Census validated lost state modifiers.
++- `allowed_direct_pair_axes`: exact pair keys and filenames from
++  `hypothesis_writer_contract.allowed_direct_pair_axes` when present, otherwise
++  usable `stage1_*.json` files returned by hypothesis scope or accepted by
++  `validate_evidence_references`. Do not create new direct axes by combining
++  genes from separate Stage 1, Stage 2, Stage 3, pathway, or skill-guide context.
++
++## Evidence-Grounding Contract
++Before saving, self-check every hypothesis against these hard constraints:
++1. Every gene in `biological_entities.genes` must be supported by at least one
++   cited file for that same hypothesis: `ot_<GENE>.json`, `stage3_<GENE>.json`,
++   or a matching cited `stage1_<GENE1>--<GENE2>.json`.
++2. State a direct pair axis only when `evidence_references` includes the exact
++   matching Stage 1 pair file, in either direction. If no matching Stage 1 file
++   is cited, rephrase as separate gene-level actionability or remove the pair.
++   If the desired pair is absent from `allowed_direct_pair_axes`, do not write
++   `A-B axis`, `A/B interaction`, `A-B signaling`, `A-B coexpression`, or
++   equivalent direct pair wording; write a `<SUPPORTED_GENE>-anchored`
++   gene-level/actionability follow-up and use the uncited partner only as
++   context.
++3. Do not use failed or coexpression-depleted Stage 1 evidence as positive
++   same-cell, intrinsic, spatial, or interaction support.
++4. If a hypothesis cites target-cell-intrinsic Stage 1 evidence, include the
++   original/resolved cell type in `biological_entities.cell_types` and name that
++   same cell type in `validation_approach`.
++   For this breast cancer benchmark, Stage 1 Census pair files use exact
++   interest/resolved cell labels such as `malignant cell` and sometimes
++   `Prolif Invasive Tumor`; if you cite a target-cell-intrinsic Stage 1 file,
++   include the exact phrase `malignant cell` in `biological_entities.cell_types`
++   and explicitly name `malignant cell` in `validation_approach`.
++5. Treat OpenTargets/Stage 3 evidence as gene-level or drug-target actionability
++   evidence only. Do not label it as spatial, same-cell, or pair-interaction
++   evidence unless a cited Stage 1/spatial file supports that claim.
++6. Avoid unsupported therapeutic certainty. Prefer "perturbation test",
++   "actionability readout", "combination readout", "resistance readout", or
++   "target-prioritization follow-up" wording.
++7. If `save_hypothesis_report` reports `topn_missing`, add one `[FEATURED-GAP]`
++   hypothesis for each missing FEATURED gene and cite available
++   `stage3_<GENE>.json` plus `ot_<GENE>.json` for that gene.
++8. Do not cite Stage 1 files with `stage1_filter.passed` false as positive pair
++   support. For depleted or non-passing Stage 1 evidence, remove same-cell,
++   intrinsic, or target-cell-autonomous wording.
++
++## Minimal Workflow
++1. Load evidence with `load_evidence_files(data_dir=data_dir, scope="hypothesis")`.
++2. Complete the forced skill-read step exactly as specified above.
++3. Draft 4-6 recommendations under the Drug-Target Contrast Task.
++4. Run the Evidence-Grounding Contract as a self-check and remove or rewrite
++   unsupported claims before saving.
++5. Call `validate_evidence_references` with every cited filename before saving.
++6. Call `save_hypothesis_report`. If it returns `saved: false`, read the
++   returned errors, change the report to satisfy those errors, and call
++   `save_hypothesis_report` again with the changed payload. Never repeat an
++   identical rejected payload. Stop after 3 save attempts in this subagent turn
++   so graph-native hypothesis quality retry can apply the bounded retry policy.
++
++## Output Shape
++Build a JSON-compatible object:
++{
++  "disease": DISEASE,
++  "evidence_coverage_pct": <float>,
++  "hypotheses_generated": <int>,
++  "hypotheses_retained": <int>,
++  "hypotheses": [
++    {
++      "rank": 1,
++      "title": "...",
++      "category": "Mechanism of Action|Therapeutic Strategy|Cross-Target Interaction|Novel Pathway",
++      "gap_type": "none|orphan_evidence|featured_coverage",
++      "core_claim": "...",
++      "evidence_references": ["...json"],
++      "biological_entities": {"genes": [], "pathways": [], "cell_types": [], "drugs": []},
++      "falsifiable_prediction": "...",
++      "validation_approach": "...",
++      "scores": {
++        "evidence_coverage": <float>,
++        "specificity": <float>,
++        "novelty": <float>,
++        "actionability": <float>,
++        "composite": <float>
++      }
++    }
++  ],
++  "gap_analysis": {
++    "total_evidence_files": <int>,
++    "referenced_files": <int>,
++    "orphan_files": []
++  }
++}
++
++Keep claims conservative and evidence-bound. If a claim is not supported by a
++cited evidence file, remove it or phrase it as an unproven follow-up question.
++"""
++
++
++def _render_thin_basic_hypothesis_writer_prompt(
++    forced_skill_paths: tuple[str, ...] = (),
++) -> str:
++    if forced_skill_paths:
++        lines = [
++            "Before drafting recommendations, call these exact skill reads in order:"
++        ]
++        lines.extend(
++            f'- `read_skill_file("{skill_path}")`'
++            for skill_path in forced_skill_paths
++        )
++        lines.append("Do not read any other skill guide in this condition.")
++        block = "\n".join(lines)
++    else:
++        block = (
++            "No skill guide is required in this control condition. Do not call "
++            "`read_skill_file` unless a later tool rejection explicitly requires "
++            "a repair that cannot be performed from loaded evidence alone."
++        )
++    return _THIN_BASIC_HYPOTHESIS_WRITER_PROMPT_TEMPLATE.replace(
++        "{forced_skill_read_block}",
++        block,
++    )
++
++
++def _render_dth_contrast_hypothesis_writer_prompt(
++    forced_skill_paths: tuple[str, ...] = (),
++) -> str:
++    if forced_skill_paths:
++        lines = [
++            "Before drafting recommendations, call these exact skill reads in order:"
++        ]
++        lines.extend(
++            f'- `read_skill_file("{skill_path}")`'
++            for skill_path in forced_skill_paths
++        )
++        lines.append("Do not read any other skill guide in this condition.")
++        block = "\n".join(lines)
++    else:
++        block = (
++            "No skill guide is available in this control condition. Do not call "
++            "`read_skill_file`; complete the same drug-target follow-up task "
++            "using only loaded evidence and the contract below."
++        )
++    return _DTH_CONTRAST_HYPOTHESIS_WRITER_PROMPT_TEMPLATE.replace(
++        "{forced_skill_read_block}",
++        block,
++    )
++
++
++def _render_operational_contract_hypothesis_writer_prompt(
++    forced_skill_paths: tuple[str, ...] = (),
++) -> str:
++    if forced_skill_paths:
++        lines = [
++            "Before drafting recommendations, call these exact skill reads in order:"
++        ]
++        lines.extend(
++            f'- `read_skill_file("{skill_path}")`'
++            for skill_path in forced_skill_paths
++        )
++        lines.append("Do not read any other skill guide in this condition.")
++        block = "\n".join(lines)
++    else:
++        block = (
++            "No skill guide is available in this control condition. Do not call "
++            "`read_skill_file`; complete the same valid artifact task using only "
++            "loaded evidence and the operational contract below."
++        )
++    return _OPERATIONAL_CONTRACT_HYPOTHESIS_WRITER_PROMPT_TEMPLATE.replace(
++        "{forced_skill_read_block}",
++        block,
++    )
++
++
++def _render_minimal_operational_contract_hypothesis_writer_prompt(
++    forced_skill_paths: tuple[str, ...] = (),
++) -> str:
++    if forced_skill_paths:
++        lines = [
++            "Before drafting recommendations, call these exact skill reads in order:"
++        ]
++        lines.extend(
++            f'- `read_skill_file("{skill_path}")`'
++            for skill_path in forced_skill_paths
++        )
++        lines.append("Do not read any other skill guide in this condition.")
++        block = "\n".join(lines)
++    else:
++        block = (
++            "No skill guide is available in this control condition. Do not call "
++            "`read_skill_file`; complete the same valid artifact task using only "
++            "loaded evidence and the minimal operational contract below."
++        )
++    return _MINIMAL_OPERATIONAL_CONTRACT_HYPOTHESIS_WRITER_PROMPT_TEMPLATE.replace(
++        "{forced_skill_read_block}",
++        block,
++    )
++
++
++THIN_BASIC_HYPOTHESIS_WRITER_PROMPT = _render_thin_basic_hypothesis_writer_prompt()
++
++HypothesisWriterPromptMode = Literal[
++    "default",
++    "dth_contrast_no_skill",
++    "dth_contrast_dth_required",
++    "operational_contract_only",
++    "operational_contract_plus_dth",
++    "operational_contract_minimal",
++    "operational_contract_minimal_plus_dth",
++    "thin_basic",
++    "thin_basic_dth_required",
++    "thin_basic_domain4_required",
++    "thin_basic_dth_plus_domain4_required",
++    "dth_only_required",
++    "progressive_disclosure_only",
++    "progressive_disclosure_with_modality_map",
++]
++
++_HYPOTHESIS_WRITER_SKILL_BLOCK_START = (
++    "Read the full core hypothesis-writing skill guide first (do not skip):"
++)
++_HYPOTHESIS_WRITER_SKILL_BLOCK_END = (
++    "If a modality is absent from the loaded evidence, do not force that skill; "
++    "continue with the available evidence and preserve the missing-evidence "
++    "boundary in the recommendation wording."
++)
++_HYPOTHESIS_WRITER_PROGRESSIVE_DISCLOSURE_ONLY_NOTE = """Use progressive disclosure for skill guidance:
++- The base hypothesis_writer prompt must not force any specific skill guide read.
++- Available skills are provided by SkillsMiddleware and any selected activation middleware.
++- If a skill guide is needed, follow the active skill middleware instructions and use `read_skill_file` for that skill.
++- Treat skill guides as interpretation guidance for already-loaded evidence only."""
++_HYPOTHESIS_WRITER_DTH_ONLY_REQUIRED_NOTE = """Use DTH-only controlled skill activation:
++- This benchmark condition exposes only the `drug-target-hypothesis` skill guide.
++- Before generating or saving `hypothesis_report.json`, call `read_skill_file("skills/drug-target-hypothesis/SKILL.md")`.
++- Do not read any other skill guide. Treat all non-DTH database evidence directly from `load_evidence_files(data_dir, scope="hypothesis")`.
++- The DTH skill guide is interpretation guidance for already-loaded evidence only."""
++_HYPOTHESIS_WRITER_PROGRESSIVE_DISCLOSURE_WITH_MODALITY_MAP_NOTE = """Use progressive disclosure with modality-based skill routing:
++- The base hypothesis_writer prompt must not force `drug-target-hypothesis` or any other specific skill guide read.
++- Available skills are provided by SkillsMiddleware and any selected activation middleware.
++- Treat `drug-target-hypothesis` as an available candidate skill, not a prompt-required read.
++- After evidence loading, use the modality-to-skill map below to decide which skill guides are needed.
++
++### Skill Interpretation Checkpoint
++"""
++
++
++def render_hypothesis_writer_prompt(
++    mode: HypothesisWriterPromptMode = "default",
++) -> str:
++    """Return the hypothesis_writer prompt variant for production or benchmarks."""
++    if mode == "default":
++        return HYPOTHESIS_WRITER_PROMPT
++    if mode == "dth_contrast_no_skill":
++        return _render_dth_contrast_hypothesis_writer_prompt()
++    if mode == "dth_contrast_dth_required":
++        return _render_dth_contrast_hypothesis_writer_prompt(
++            _THIN_BASIC_DTH_SKILL_PATHS
++        )
++    if mode == "operational_contract_only":
++        return _render_operational_contract_hypothesis_writer_prompt()
++    if mode == "operational_contract_plus_dth":
++        return _render_operational_contract_hypothesis_writer_prompt(
++            _THIN_BASIC_DTH_SKILL_PATHS
++        )
++    if mode == "operational_contract_minimal":
++        return _render_minimal_operational_contract_hypothesis_writer_prompt()
++    if mode == "operational_contract_minimal_plus_dth":
++        return _render_minimal_operational_contract_hypothesis_writer_prompt(
++            _THIN_BASIC_DTH_SKILL_PATHS
++        )
++    if mode == "thin_basic":
++        return THIN_BASIC_HYPOTHESIS_WRITER_PROMPT
++    if mode == "thin_basic_dth_required":
++        return _render_thin_basic_hypothesis_writer_prompt(
++            _THIN_BASIC_DTH_SKILL_PATHS
++        )
++    if mode == "thin_basic_domain4_required":
++        return _render_thin_basic_hypothesis_writer_prompt(
++            _THIN_BASIC_DOMAIN4_SKILL_PATHS
++        )
++    if mode == "thin_basic_dth_plus_domain4_required":
++        return _render_thin_basic_hypothesis_writer_prompt(
++            _THIN_BASIC_DTH_SKILL_PATHS + _THIN_BASIC_DOMAIN4_SKILL_PATHS
++        )
++    if mode == "dth_only_required":
++        start = HYPOTHESIS_WRITER_PROMPT.index(_HYPOTHESIS_WRITER_SKILL_BLOCK_START)
++        end = HYPOTHESIS_WRITER_PROMPT.index(
++            _HYPOTHESIS_WRITER_SKILL_BLOCK_END,
++            start,
++        ) + len(_HYPOTHESIS_WRITER_SKILL_BLOCK_END)
++        return (
++            HYPOTHESIS_WRITER_PROMPT[:start]
++            + _HYPOTHESIS_WRITER_DTH_ONLY_REQUIRED_NOTE
++            + HYPOTHESIS_WRITER_PROMPT[end:]
++        )
++    if mode == "progressive_disclosure_only":
++        start = HYPOTHESIS_WRITER_PROMPT.index(_HYPOTHESIS_WRITER_SKILL_BLOCK_START)
++        end = HYPOTHESIS_WRITER_PROMPT.index(
++            _HYPOTHESIS_WRITER_SKILL_BLOCK_END,
++            start,
++        ) + len(_HYPOTHESIS_WRITER_SKILL_BLOCK_END)
++        return (
++            HYPOTHESIS_WRITER_PROMPT[:start]
++            + _HYPOTHESIS_WRITER_PROGRESSIVE_DISCLOSURE_ONLY_NOTE
++            + HYPOTHESIS_WRITER_PROMPT[end:]
++        )
++    if mode == "progressive_disclosure_with_modality_map":
++        start = HYPOTHESIS_WRITER_PROMPT.index(_HYPOTHESIS_WRITER_SKILL_BLOCK_START)
++        modality_map_start = HYPOTHESIS_WRITER_PROMPT.index(
++            'After `load_evidence_files(data_dir, scope="hypothesis")` returns',
++            start,
++        )
++        return (
++            HYPOTHESIS_WRITER_PROMPT[:start]
++            + _HYPOTHESIS_WRITER_PROGRESSIVE_DISCLOSURE_WITH_MODALITY_MAP_NOTE
++            + HYPOTHESIS_WRITER_PROMPT[modality_map_start:]
++        )
++    raise ValueError(f"unknown hypothesis_writer_prompt_mode: {mode!r}")
++
+
+ # =============================================================================
+ # Prompt Registry
+@@ -1523,7 +2233,9 @@ SUBAGENT_PROMPTS = {
+ __all__ = [
+     "EVIDENCE_ASSESSOR_PROMPT",
+     "HYPOTHESIS_WRITER_PROMPT",
++    "HypothesisWriterPromptMode",
+     "REPORT_WRITER_PROMPT",  # Retained pending reader migration — see canonical comment above the constant.
+     "LEGACY_CRITIC_PROMPT_PERSISTED_REPORT",
+     "SUBAGENT_PROMPTS",
++    "render_hypothesis_writer_prompt",
+ ]
+diff --git a/src/agents/drug_target/super_graph.py b/src/agents/drug_target/super_graph.py
+index 8b88635..9a82a01 100644
+--- a/src/agents/drug_target/super_graph.py
++++ b/src/agents/drug_target/super_graph.py
+@@ -80,6 +80,69 @@ class DrugTargetState(TypedDict):
+     hypothesis_retry_attempts: NotRequired[int]
+     hypothesis_retry_status: NotRequired[str]
+     hypothesis_retry_error: NotRequired[str | None]
++    hypothesis_writer_skill_names: NotRequired[tuple[str, ...] | list[str]]
++    hypothesis_writer_prompt_mode: NotRequired[str]
++    skill_activation_mode: NotRequired[str]
++    enable_skill_activator: NotRequired[bool]
++
++
++def _drug_target_config_from_state(
++    state: DrugTargetState,
++    provider: str,
++    *,
++    use_checkpointer: bool,
++):
++    """Build an agent config while preserving benchmark hypothesis settings."""
++    from typing import Literal as _Lit, cast as _cast
++
++    from src.agents.drug_target.agent import (
++        DrugTargetConfig,
++        SkillActivationMode as _SkillActivationMode,
++    )
++    from src.agents.drug_target.subagents.prompts import (
++        HypothesisWriterPromptMode as _HypothesisWriterPromptMode,
++    )
++
++    skill_activation_mode = state.get("skill_activation_mode")
++    enable_skill_activator = state.get("enable_skill_activator")
++    if enable_skill_activator is None and skill_activation_mode is not None:
++        enable_skill_activator = skill_activation_mode == "middleware_plus_activator"
++
++    prompt_mode = state.get("hypothesis_writer_prompt_mode")
++    skill_names = state.get("hypothesis_writer_skill_names")
++    default_hypothesis_writer_skill_names = (
++        "drug-target-hypothesis",
++        "opentargets-database",
++        "gwas-database",
++        "chembl-database",
++    )
++
++    return DrugTargetConfig(
++        provider=_cast(
++            _Lit["openai", "google", "ollama", "ollama-openai", "claude", "openrouter"],
++            provider,
++        ),
++        data_dir=state["data_dir"],
++        disease=state["disease"],
++        use_checkpointer=use_checkpointer,
++        hypothesis_writer_skill_names=(
++            tuple(skill_names)
++            if skill_names is not None
++            else default_hypothesis_writer_skill_names
++        ),
++        hypothesis_writer_prompt_mode=_cast(
++            _HypothesisWriterPromptMode,
++            prompt_mode if prompt_mode is not None else "default",
++        ),
++        skill_activation_mode=(
++            _cast(_SkillActivationMode, skill_activation_mode)
++            if skill_activation_mode is not None
++            else None
++        ),
++        enable_skill_activator=(
++            enable_skill_activator if enable_skill_activator is not None else True
++        ),
++    )
+
+
+ async def run_deep_agent(state: DrugTargetState, config: RunnableConfig) -> dict:
+@@ -96,27 +159,19 @@ async def run_deep_agent(state: DrugTargetState, config: RunnableConfig) -> dict
+     # Lazy import to avoid circular dependency at module load time
+     import os
+     import time
+-    from typing import Literal as _Lit, cast as _cast
+
+     from langchain_core.runnables import RunnableConfig as _RC
+
+-    from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
++    from src.agents.drug_target.agent import create_drug_target_agent
+
+-    data_dir: str = state["data_dir"]
+-    disease: str = state["disease"]
+     started_at = time.time()
+
+     # Read provider from env — DrugTargetConfig.provider is a Literal; cast for pyright.
+     provider_str = os.getenv("LLM_PROVIDER", "openrouter")
+-    provider = _cast(
+-        _Lit["openai", "google", "ollama", "ollama-openai", "claude", "openrouter"],
+-        provider_str,
+-    )
+
+-    agent_config = DrugTargetConfig(
+-        provider=provider,
+-        data_dir=data_dir,
+-        disease=disease,
++    agent_config = _drug_target_config_from_state(
++        state,
++        provider_str,
+         use_checkpointer=False,
+     )
+     runnable, backend = create_drug_target_agent(agent_config)
+@@ -207,7 +262,7 @@ async def _invoke_hypothesis_retry(
+
+     from langchain_core.runnables import RunnableConfig as _RC
+
+-    from src.agents.drug_target.agent import DrugTargetConfig, create_drug_target_agent
++    from src.agents.drug_target.agent import create_drug_target_agent
+     from src.agents.drug_target.hypothesis_retry import build_hypothesis_retry_message
+
+     provider_str = os.getenv("LLM_PROVIDER", "openrouter")
+@@ -215,10 +270,9 @@ async def _invoke_hypothesis_retry(
+         _Lit["openai", "google", "ollama", "ollama-openai", "claude", "openrouter"],
+         provider_str,
+     )
+-    agent_config = DrugTargetConfig(
+-        provider=provider,
+-        data_dir=state["data_dir"],
+-        disease=state["disease"],
++    agent_config = _drug_target_config_from_state(
++        state,
++        provider,
+         use_checkpointer=False,
+     )
+     runnable, backend = create_drug_target_agent(agent_config)
+@@ -245,7 +299,20 @@ async def _invoke_hypothesis_retry(
+         if timeout is None:
+             await call
+         else:
+-            await asyncio.wait_for(call, timeout=timeout)
++            task = asyncio.ensure_future(call)
++            done, _ = await asyncio.wait({task}, timeout=timeout)
++            if not done:
++                task.cancel()
++
++                def _consume_cancelled_retry(done_task: asyncio.Future) -> None:
++                    try:
++                        done_task.result()
++                    except BaseException:
++                        pass
++
++                task.add_done_callback(_consume_cancelled_retry)
++                raise TimeoutError("hypothesis retry timed out")
++            await task
+     finally:
+         if backend is not None and hasattr(backend, "cleanup"):
+             backend.cleanup()  # type: ignore[union-attr]
+diff --git a/src/agents/drug_target/tools/evidence_loader.py b/src/agents/drug_target/tools/evidence_loader.py
+index 68176c7..32ef69f 100644
+--- a/src/agents/drug_target/tools/evidence_loader.py
++++ b/src/agents/drug_target/tools/evidence_loader.py
+@@ -12,7 +12,7 @@ import logging
+ import os
+ import re
+ from pathlib import Path
+-from typing import Union
++from typing import Any, Union
+
+ from langchain_core.tools import tool
+ from src.agents.drug_target.tools.disease_context import initialize_disease_context
+@@ -728,7 +728,12 @@ def load_evidence_files(data_dir: str, scope: str = "all") -> str:
+             if _STAGE1_PAIR_NAME_RE.match(name)
+             and filter_map.get(name[len("stage1_"):-len(".json")].upper()) is True
+         )
+-        result.update(_stage1_pair_usage_guidance(evidence_dir, stage1_pair_files))
++        usage_guidance = _stage1_pair_usage_guidance(evidence_dir, stage1_pair_files)
++        result.update(usage_guidance)
++        result["hypothesis_writer_contract"] = _hypothesis_writer_contract(
++            evidence_dir,
++            usage_guidance,
++        )
+
+     if hypothesis_scope:
+         return json.dumps(result, separators=(",", ":"))
+@@ -794,8 +799,8 @@ def _stage1_usage_record(filename: str, payload: object) -> dict:
+     else:
+         citation_policy = (
+             "Passed Stage 1 pair, but not interest-cell intrinsic by "
+-            "target-vs-rest direction. Do not cite as AT2, Transitional AT2, "
+-            "pulmonary/alveolar epithelial, or resolved-Census-cell support; "
++            "target-vs-rest direction. Do not cite as original interest-cell, "
++            "resolved-Census-cell, same-cell, or cell-autonomous support; "
+             "use only as secondary non-interest-cell spatial-niche/cross-cell "
+             "framing, or cover the gene with stage3/ot evidence instead."
+         )
+@@ -838,6 +843,117 @@ def _stage1_pair_usage_guidance(
+     }
+
+
++def _first_nonempty_text(value: object) -> str:
++    if isinstance(value, str):
++        return value.strip()
++    if isinstance(value, (list, tuple)):
++        for item in value:
++            text = _first_nonempty_text(item)
++            if text:
++                return text
++    return ""
++
++
++def _load_celltype_resolution(evidence_dir: Path) -> dict[str, Any]:
++    path = evidence_dir / "celltype_resolution.json"
++    try:
++        payload = json.loads(path.read_text(encoding="utf-8"))
++    except Exception:
++        return {}
++    return payload if isinstance(payload, dict) else {}
++
++
++def _celltype_contract_labels(evidence_dir: Path) -> dict[str, str]:
++    payload = _load_celltype_resolution(evidence_dir)
++    original = _first_nonempty_text(payload.get("primary_input_celltype"))
++    resolved = _first_nonempty_text(payload.get("primary_resolved_celltype"))
++    match_mode = _first_nonempty_text(payload.get("primary_match_mode"))
++
++    if not original:
++        original = _first_nonempty_text(payload.get("interest_celltypes"))
++
++    matches = payload.get("matches")
++    if isinstance(matches, list):
++        for match in matches:
++            if not isinstance(match, dict):
++                continue
++            if not original:
++                original = _first_nonempty_text(match.get("input_celltype"))
++            if not resolved:
++                resolved = (
++                    _first_nonempty_text(match.get("resolved_celltype"))
++                    or _first_nonempty_text(match.get("matched_celltype"))
++                )
++            if not match_mode:
++                match_mode = _first_nonempty_text(match.get("match_mode"))
++            if original and resolved and match_mode:
++                break
++
++    return {
++        "original_interest_label": original,
++        "resolved_census_cell_type": resolved,
++        "match_mode": match_mode,
++        "required_cell_context_anchor": resolved or original,
++    }
++
++
++def _stage1_contract_axis(record: dict[str, Any]) -> dict[str, Any]:
++    return {
++        "pair_key": record.get("pair_key"),
++        "filename": record.get("filename"),
++        "usage": record.get("usage"),
++        "target_cell_intrinsic": record.get("target_cell_intrinsic"),
++        "target_vs_rest_directions": record.get("target_vs_rest_directions"),
++        "target_cell_depleted_metrics": record.get("target_cell_depleted_metrics"),
++        "citation_policy": record.get("citation_policy"),
++    }
++
++
++def _hypothesis_writer_contract(
++    evidence_dir: Path,
++    usage_guidance: dict[str, Any],
++) -> dict[str, Any]:
++    labels = _celltype_contract_labels(evidence_dir)
++    records = [
++        record
++        for record in usage_guidance.get("stage1_pair_usage_guidance", [])
++        if isinstance(record, dict)
++    ]
++    axes = [_stage1_contract_axis(record) for record in records]
++    intrinsic_axes = [axis for axis in axes if axis.get("usage") == "interest_cell_intrinsic"]
++    secondary_axes = [axis for axis in axes if axis.get("usage") == "spatial_niche_only"]
++    anchor = labels["required_cell_context_anchor"]
++    return {
++        **labels,
++        "semantic_proxy": labels["match_mode"] == "semantic_proxy",
++        "cell_context_instruction": (
++            "When citing any interest-cell-intrinsic Stage 1 pair, copy "
++            f"`{anchor}` into biological_entities.cell_types and name it in "
++            "validation_approach."
++            if anchor
++            else (
++                "When citing any interest-cell-intrinsic Stage 1 pair, name the "
++                "resolved interest cell context from celltype_resolution.json in "
++                "biological_entities.cell_types and validation_approach."
++            )
++        ),
++        "allowed_direct_pair_axes": axes,
++        "interest_cell_intrinsic_pair_axes": intrinsic_axes,
++        "secondary_only_pair_axes": secondary_axes,
++        "forbidden_direct_pair_policy": (
++            "Only claim an A--B direct pair axis when that pair_key is listed in "
++            "allowed_direct_pair_axes and the exact matching passed Stage 1 "
++            "filename is cited by the same hypothesis. Do not infer direct axes "
++            "from separate gene files, hub context, pathway overlap, or skill text."
++        ),
++        "secondary_only_policy": (
++            "Pairs in secondary_only_pair_axes may be cited only as secondary "
++            "spatial-niche/cross-cell framing, not as same-cell, intrinsic, "
++            "resolved-cell, cell-autonomous, or target-cell-autonomous support."
++        ),
++    }
++
++
+ def _validate_hypothesis_report_references(
+     parsed: dict,
+     evidence_dir: Path,
+@@ -1512,7 +1628,11 @@ def _is_safe_filename(filename: str) -> bool:
+
+
+ @tool
+-def save_evidence(data_dir: str, filename: str, data: Union[str, dict, list]) -> str:
++def save_evidence(
++    data_dir: str,
++    filename: str,
++    data: Union[str, dict[str, Any], list[dict[str, Any]]],
++) -> str:
+     """Save evidence data as a JSON file in the evidence/ subdirectory.
+
+     Creates the evidence/ directory if it doesn't exist.
+@@ -1747,6 +1867,7 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
+         and filter_results.get(f[len("stage1_"):-len(".json")].upper()) is True
+     )
+     usage_guidance = _stage1_pair_usage_guidance(evidence_dir, stage1_pair_files)
++    writer_contract = _hypothesis_writer_contract(evidence_dir, usage_guidance)
+
+     return json.dumps({
+         "valid": len(invalid) == 0,
+@@ -1757,6 +1878,7 @@ def validate_evidence_references(data_dir: str, references: list[str]) -> str:
+         "stage1_pair_files": stage1_pair_files,
+         "eligible_stage1_pair_files": stage1_pair_files,
+         **usage_guidance,
++        "hypothesis_writer_contract": writer_contract,
+         "naming_convention": (
+             "Stage 1 L-R pair evidence files use the convention "
+             "`stage1_<LIGAND>--<RECEPTOR>.json` with TWO HYPHENS "
+diff --git a/src/agents/drug_target/tools/hypothesis_grounding.py b/src/agents/drug_target/tools/hypothesis_grounding.py
+index 26765aa..b102a3c 100644
+--- a/src/agents/drug_target/tools/hypothesis_grounding.py
++++ b/src/agents/drug_target/tools/hypothesis_grounding.py
+@@ -754,8 +754,8 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
+                     errors.append(
+                         f"hypotheses[{idx}] cites target-cell-intrinsic Stage 1 "
+                         f"evidence ({ref}) but biological_entities.cell_types does "
+-                        "not include the original interest label, resolved Census "
+-                        "cell type, or pulmonary/alveolar epithelial equivalent."
++                        "not include the original interest label or resolved "
++                        "Census cell type."
+                     )
+                 if not _mentions_interest_celltype(
+                     hypothesis.get("validation_approach"),
+@@ -764,8 +764,7 @@ def validate_hypothesis_grounding(parsed: dict[str, Any], evidence_dir: Path) ->
+                     errors.append(
+                         f"hypotheses[{idx}] cites target-cell-intrinsic Stage 1 "
+                         f"evidence ({ref}) but validation_approach does not test "
+-                        "the original interest label, resolved Census cell type, "
+-                        "or pulmonary/alveolar epithelial equivalent."
++                        "the original interest label or resolved Census cell type."
+                     )
+
+             coexpression = target_vs_rest.get("coexpression", {})
+diff --git a/src/agents/drug_target/tools/hypothesis_schema.py b/src/agents/drug_target/tools/hypothesis_schema.py
+index f1a8169..898d58f 100644
+--- a/src/agents/drug_target/tools/hypothesis_schema.py
++++ b/src/agents/drug_target/tools/hypothesis_schema.py
+@@ -4,6 +4,7 @@ from __future__ import annotations
+
+ import copy
+ import json
++import os
+ import re
+ from datetime import datetime, timezone
+ from pathlib import Path
+@@ -58,7 +59,39 @@ _CHEMBL_DRUG_WORDING_RE = re.compile(
+     re.IGNORECASE,
+ )
+ _FIBROSIS_RESOLUTION_RE = re.compile(r"\bfibrosis resolution\b", re.IGNORECASE)
++_EXPLICIT_NON_ANCHOR_CELL_CONTEXT_RE = re.compile(
++    r"\b("
++    r"fibroblast|fibroblasts|intestinal\s+epithelial|macrophage|macrophages|"
++    r"endothelial|endothelium|stromal|myeloid|monocyte|monocytes|lymphocyte|"
++    r"lymphocytes|t\s*cell|t\s*cells|b\s*cell|b\s*cells"
++    r")\b",
++    re.IGNORECASE,
++)
+ _HYPOTHESIS_REJECTION_FILENAME = "hypothesis_report_last_rejection.json"
++_VIRTUAL_HYPOTHESIS_DATA_DIRS = {"", "/", "/evidence", "evidence", "./evidence"}
++
++
++def _env_hypothesis_workspace() -> Path | None:
++    for env_key in ("DRUG_TARGET_DATA_DIR", "DEEP_INTERPRETER_DATA_DIR"):
++        raw = os.getenv(env_key)
++        if not raw:
++            continue
++        path = Path(raw).expanduser().resolve()
++        if path.exists():
++            return path
++    return None
++
++
++def _resolve_hypothesis_report_data_dir(data_dir: str | Path) -> Path:
++    raw = str(data_dir or "").strip()
++    env_workspace = _env_hypothesis_workspace()
++    if env_workspace is not None:
++        if raw in _VIRTUAL_HYPOTHESIS_DATA_DIRS:
++            return env_workspace
++        resolved = Path(raw).expanduser().resolve()
++        if resolved == Path("/") or resolved == Path("/evidence"):
++            return env_workspace
++    return Path(raw).expanduser().resolve()
+
+
+ def _hypothesis_rejection_path(evidence_dir: Path) -> Path:
+@@ -766,6 +799,126 @@ def _stage1_pair_files_for_intrinsic_coverage(
+     return sorted(stage1_pair_files)
+
+
++def _celltype_contract_anchor(evidence_dir: Path) -> str:
++    path = evidence_dir / "celltype_resolution.json"
++    try:
++        payload = json.loads(path.read_text(encoding="utf-8"))
++    except Exception:
++        return ""
++    if not isinstance(payload, dict):
++        return ""
++
++    for key in ("primary_resolved_celltype", "primary_input_celltype"):
++        value = payload.get(key)
++        if isinstance(value, str) and value.strip():
++            return value.strip()
++
++    interest = payload.get("interest_celltypes")
++    if isinstance(interest, list):
++        for value in interest:
++            if isinstance(value, str) and value.strip():
++                return value.strip()
++    if isinstance(interest, str) and interest.strip():
++        return interest.strip()
++
++    matches = payload.get("matches")
++    if isinstance(matches, list):
++        for match in matches:
++            if not isinstance(match, dict):
++                continue
++            for key in ("resolved_celltype", "matched_celltype", "input_celltype"):
++                value = match.get(key)
++                if isinstance(value, str) and value.strip():
++                    return value.strip()
++    return ""
++
++
++def _contains_celltype_anchor(value: Any, evidence_dir: Path) -> bool:
++    text = _normal_celltype(value)
++    if not text:
++        return False
++    tokens = _celltype_anchor_variants(_celltype_resolution_anchor_tokens(evidence_dir))
++    return any(f" {token} " in f" {text} " for token in tokens)
++
++
++def _has_explicit_non_anchor_cell_context(value: Any) -> bool:
++    return bool(_EXPLICIT_NON_ANCHOR_CELL_CONTEXT_RE.search(str(value or "")))
++
++
++def _autofix_intrinsic_stage1_cell_anchor(
++    canonical: dict[str, Any],
++    evidence_dir: Path,
++) -> list[dict[str, Any]]:
++    from src.agents.drug_target.tools.evidence_loader import (
++        _stage1_pair_usage_guidance,
++    )
++
++    anchor = _celltype_contract_anchor(evidence_dir)
++    if not anchor:
++        return []
++
++    guidance = _stage1_pair_usage_guidance(
++        evidence_dir,
++        _stage1_pair_files_for_intrinsic_coverage(canonical, evidence_dir),
++    )
++    intrinsic_files = set(
++        guidance.get("interest_cell_intrinsic_stage1_pair_files") or []
++    )
++    if not intrinsic_files:
++        return []
++
++    diagnostics: list[dict[str, Any]] = []
++    for idx, hypothesis in enumerate(canonical.get("hypotheses") or []):
++        if not isinstance(hypothesis, dict):
++            continue
++        refs = {
++            str(ref)
++            for ref in hypothesis.get("evidence_references", [])
++            if isinstance(ref, str)
++        }
++        if not intrinsic_files.intersection(refs):
++            continue
++
++        fields_changed: list[str] = []
++        entities = hypothesis.get("biological_entities")
++        if not isinstance(entities, dict):
++            entities = {}
++            hypothesis["biological_entities"] = entities
++        cell_types = entities.get("cell_types")
++        if not isinstance(cell_types, list):
++            cell_types = []
++            entities["cell_types"] = cell_types
++        cell_type_text = " ".join(str(v) for v in cell_types if v)
++        if (
++            not cell_type_text
++            and not _contains_celltype_anchor(cell_type_text, evidence_dir)
++        ):
++            cell_types.append(anchor)
++            fields_changed.append("biological_entities.cell_types")
++
++        validation = hypothesis.get("validation_approach")
++        if (
++            not _contains_celltype_anchor(validation, evidence_dir)
++            and not _has_explicit_non_anchor_cell_context(validation)
++        ):
++            current = str(validation or "").strip()
++            suffix = f" Test in {anchor} context."
++            hypothesis["validation_approach"] = (
++                f"{current.rstrip('.')}." if current else "Validate the hypothesis."
++            ) + suffix
++            fields_changed.append("validation_approach")
++
++        if fields_changed:
++            diagnostics.append({
++                "code": "INTEREST_CELL_ANCHOR_AUTOFIX",
++                "hypothesis_index": idx,
++                "anchor": anchor,
++                "fields": fields_changed,
++            })
++
++    return diagnostics
++
++
+ def _validate_primary_epithelial_intrinsic_coverage(
+     canonical: dict[str, Any],
+     evidence_dir: str | Path,
+@@ -801,7 +954,7 @@ def _validate_primary_epithelial_intrinsic_coverage(
+
+ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
+     """Validate, canonicalize, and write evidence/hypothesis_report.json."""
+-    base = Path(data_dir).expanduser().resolve()
++    base = _resolve_hypothesis_report_data_dir(data_dir)
+     evidence_dir = base / "evidence"
+     evidence_dir.mkdir(parents=True, exist_ok=True)
+
+@@ -835,6 +988,7 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
+     canonical["evidence_coverage_pct"] = diag["evidence_coverage_pct"]
+     canonical["topn_coverage"] = diag["topn_coverage"]
+     canonical["gap_analysis"] = diag["gap_analysis"]
++    diagnostics.extend(_autofix_intrinsic_stage1_cell_anchor(canonical, evidence_dir))
+
+     deterministic_errors: list[str] = []
+     ref_errors = _validate_hypothesis_report_references(canonical, evidence_dir)
+diff --git a/tests/agents/drug_target/test_hypothesis_writer_skill_activation_prompt.py b/tests/agents/drug_target/test_hypothesis_writer_skill_activation_prompt.py
+index d882440..e88e117 100644
+--- a/tests/agents/drug_target/test_hypothesis_writer_skill_activation_prompt.py
++++ b/tests/agents/drug_target/test_hypothesis_writer_skill_activation_prompt.py
+@@ -2,6 +2,7 @@
+
+ from __future__ import annotations
+
++from pathlib import Path
+ import re
+
+ from src.agents.drug_target.subagents import prompts
+@@ -95,6 +96,402 @@ def test_hypothesis_writer_prompt_bounds_skill_use_to_loaded_evidence() -> None:
+         assert guardrail in checkpoint
+
+
++def test_progressive_disclosure_prompt_mode_removes_forced_skill_reads() -> None:
++    prompt = prompts.render_hypothesis_writer_prompt("progressive_disclosure_only")
++
++    forced_skill_paths = (
++        'read_skill_file("skills/drug-target-hypothesis/SKILL.md")',
++        'read_skill_file("skills/opentargets-database/SKILL.md")',
++        'read_skill_file("skills/gwas-database/SKILL.md")',
++        'read_skill_file("skills/chembl-database/SKILL.md")',
++        'read_skill_file("skills/compare-census-gene-pair-by-cell-type/SKILL.md")',
++        'read_skill_file("skills/string-database/SKILL.md")',
++    )
++
++    assert "Use progressive disclosure for skill guidance" in prompt
++    assert "Available skills are provided by SkillsMiddleware" in prompt
++    assert "Use this modality-to-skill map" not in prompt
++    assert "### Phase 1: Evidence Ingestion & Target Categorization" in prompt
++    for skill_path in forced_skill_paths:
++        assert skill_path not in prompt
++
++
++def test_dth_only_required_prompt_mode_requires_only_drug_target_skill() -> None:
++    prompt = prompts.render_hypothesis_writer_prompt("dth_only_required")
++
++    assert "Use DTH-only controlled skill activation" in prompt
++    assert 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")' in prompt
++    assert 'read_skill_file("skills/opentargets-database/SKILL.md")' not in prompt
++    assert 'read_skill_file("skills/gwas-database/SKILL.md")' not in prompt
++    assert 'read_skill_file("skills/chembl-database/SKILL.md")' not in prompt
++    assert (
++        'read_skill_file("skills/compare-census-gene-pair-by-cell-type/SKILL.md")'
++        not in prompt
++    )
++    assert 'read_skill_file("skills/string-database/SKILL.md")' not in prompt
++
++
++def test_thin_basic_prompt_mode_has_no_forced_skill_reads() -> None:
++    prompt = prompts.render_hypothesis_writer_prompt("thin_basic")
++
++    assert "Goal: create a valid `evidence/hypothesis_report.json`" in prompt
++    assert "No skill guide is required in this control condition" in prompt
++    assert 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")' not in prompt
++    assert 'read_skill_file("skills/opentargets-database/SKILL.md")' not in prompt
++    assert "Use this modality-to-skill map" not in prompt
++    assert "Call `save_hypothesis_report` exactly once" in prompt
++    assert "graph-native hypothesis quality retry" in prompt
++    assert "up to 3 total save attempts" not in prompt
++    assert "UCB" not in prompt
++
++
++def test_thin_basic_forced_read_prompt_modes_name_exact_skill_paths() -> None:
++    dth_prompt = prompts.render_hypothesis_writer_prompt("thin_basic_dth_required")
++    domain_prompt = prompts.render_hypothesis_writer_prompt(
++        "thin_basic_domain4_required"
++    )
++    combined_prompt = prompts.render_hypothesis_writer_prompt(
++        "thin_basic_dth_plus_domain4_required"
++    )
++
++    dth_path = 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")'
++    domain_paths = (
++        'read_skill_file("skills/opentargets-database/SKILL.md")',
++        'read_skill_file("skills/chembl-database/SKILL.md")',
++        'read_skill_file("skills/compare-census-gene-pair-by-cell-type/SKILL.md")',
++        'read_skill_file("skills/string-database/SKILL.md")',
++    )
++
++    assert dth_path in dth_prompt
++    for path in domain_paths:
++        assert path not in dth_prompt
++
++    assert dth_path not in domain_prompt
++    for path in domain_paths:
++        assert path in domain_prompt
++
++    assert dth_path in combined_prompt
++    for path in domain_paths:
++        assert path in combined_prompt
++
++
++def test_dth_contrast_prompt_modes_differ_only_by_dth_forced_read() -> None:
++    no_skill_prompt = prompts.render_hypothesis_writer_prompt(
++        "dth_contrast_no_skill"
++    )
++    dth_prompt = prompts.render_hypothesis_writer_prompt(
++        "dth_contrast_dth_required"
++    )
++
++    dth_path = 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")'
++
++    assert "DTH contrast benchmark" in no_skill_prompt
++    assert "DTH contrast benchmark" in dth_prompt
++    assert "## Evidence-Grounding Contract" in no_skill_prompt
++    assert "## Evidence-Grounding Contract" in dth_prompt
++    assert "No skill guide is available in this control condition" in no_skill_prompt
++    assert dth_path not in no_skill_prompt
++    assert dth_path in dth_prompt
++    assert 'read_skill_file("skills/opentargets-database/SKILL.md")' not in dth_prompt
++    assert "identical rejected payload" in no_skill_prompt
++    assert "identical rejected payload" in dth_prompt
++    assert "Stop after 3 save attempts" in no_skill_prompt
++    assert "Stop after 3 save attempts" in dth_prompt
++    assert "cell_context_anchor" in no_skill_prompt
++    assert "cell_context_anchor" in dth_prompt
++    assert "allowed_direct_pair_axes" in no_skill_prompt
++    assert "allowed_direct_pair_axes" in dth_prompt
++    assert "hypothesis_writer_contract.required_cell_context_anchor" in no_skill_prompt
++    assert "hypothesis_writer_contract.allowed_direct_pair_axes" in dth_prompt
++    assert "Do not create new direct axes" in no_skill_prompt
++    assert "Do not create new direct axes" in dth_prompt
++    assert "malignant cell" in no_skill_prompt
++    assert "malignant cell" in dth_prompt
++
++
++def test_operational_contract_prompt_modes_isolate_dth_skill_read() -> None:
++    base_prompt = prompts.render_hypothesis_writer_prompt("operational_contract_only")
++    dth_prompt = prompts.render_hypothesis_writer_prompt("operational_contract_plus_dth")
++
++    dth_path = 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")'
++
++    assert "operational contract for benchmark" in base_prompt
++    assert "operational contract for benchmark" in dth_prompt
++    assert "No skill guide is available in this control condition" in base_prompt
++    assert dth_path not in base_prompt
++    assert dth_path in dth_prompt
++
++    for prompt in (base_prompt, dth_prompt):
++        assert "Use this modality-to-skill map" not in prompt
++        assert 'read_skill_file("skills/opentargets-database/SKILL.md")' not in prompt
++        assert "Primary AT2/Epithelial" not in prompt
++        assert "AT2-intrinsic" not in prompt
++        assert "pulmonary alveolar" not in prompt
++        assert "fibrosis resolution" not in prompt
++        assert "cell_context_anchor" in prompt
++        assert "allowed_direct_pair_axes" in prompt
++        assert "hypothesis_writer_contract.required_cell_context_anchor" in prompt
++        assert "hypothesis_writer_contract.allowed_direct_pair_axes" in prompt
++        assert "Never infer a new direct pair axis" in prompt
++        assert "original interest cell label or resolved Census cell type" in prompt
++        assert "Use simple numeric scores between 0 and 1" in prompt
++
++
++def test_operational_contract_minimal_prompt_modes_keep_dth_interpretation_in_skill() -> None:
++    base_prompt = prompts.render_hypothesis_writer_prompt("operational_contract_minimal")
++    dth_prompt = prompts.render_hypothesis_writer_prompt(
++        "operational_contract_minimal_plus_dth"
++    )
++
++    dth_path = 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")'
++
++    assert "minimal operational contract for small-model DTH contrast" in base_prompt
++    assert "minimal operational contract for small-model DTH contrast" in dth_prompt
++    assert "No skill guide is available in this control condition" in base_prompt
++    assert dth_path not in base_prompt
++    assert dth_path in dth_prompt
++    assert 'read_skill_file("skills/opentargets-database/SKILL.md")' not in dth_prompt
++
++    for prompt in (base_prompt, dth_prompt):
++        assert "No drug-target interpretation rubric is provided by this base prompt" in prompt
++        assert "Use this modality-to-skill map" not in prompt
++        assert "FEATURED gene list" in prompt
++        assert "matching Stage 1 pair file" in prompt
++        assert "Stop after 3 save attempts" in prompt
++        assert "DTH quality signature" not in prompt
++        assert "target rationale" not in prompt
++        assert "claim boundary" not in prompt
++        assert "Interest-cell intrinsic pair" not in prompt
++        assert "spatial-niche/cross-cell" not in prompt
++        assert "gene-level/actionability-only" not in prompt
++
++
++def test_drug_target_hypothesis_skill_is_disease_agnostic_for_operational_rules() -> None:
++    repo_root = Path(__file__).resolve().parents[3]
++    skill_text = (repo_root / "skills/drug-target-hypothesis/SKILL.md").read_text(
++        encoding="utf-8"
++    )
++
++    forbidden_operational_phrases = (
++        "Primary epithelial/AT2-intrinsic",
++        "Primary AT2/Epithelial",
++        "AT2-intrinsic",
++        "non-AT2",
++        "Transitional AT2",
++        "pulmonary/alveolar epithelial",
++        "fibrosis resolution",
++        "macrophage-fibroblast",
++    )
++    for phrase in forbidden_operational_phrases:
++        assert phrase not in skill_text
++
++    assert "primary interest-cell intrinsic support" in skill_text
++    assert "original interest cell label or resolved Census cell type" in skill_text
++    assert "cell_context_anchor" in skill_text
++    assert "allowed_direct_pair_axes" in skill_text
++    assert "hypothesis_writer_contract.required_cell_context_anchor" in skill_text
++    assert "hypothesis_writer_contract.allowed_direct_pair_axes" in skill_text
++    assert "do not claim Census validated lost state" in skill_text
++    assert "canonical_existing=none" in skill_text
++
++
++def test_drug_target_hypothesis_skill_has_small_model_decision_card() -> None:
++    repo_root = Path(__file__).resolve().parents[3]
++    skill_text = (repo_root / "skills/drug-target-hypothesis/SKILL.md").read_text(
++        encoding="utf-8"
++    )
++
++    required_phrases = (
++        "## Small-Model DTH Decision Card",
++        "Use this card before reading the longer workflow",
++        "Choose exactly one support class for each recommendation",
++        "Interest-cell intrinsic",
++        "Secondary spatial-niche or cross-cell",
++        "Gene-level/actionability-only",
++        "DTH quality signature",
++        "Unsupported direct pair axis",
++        "topn_coverage.missing",
++    )
++    for phrase in required_phrases:
++        assert phrase in skill_text
++
++
++def test_get_subagents_can_render_progressive_disclosure_prompt_mode() -> None:
++    from src.agents.drug_target.subagents.configs import get_subagents
++
++    subagents = get_subagents(
++        hypothesis_writer_prompt_mode="progressive_disclosure_only"
++    )
++    hypothesis_writer = next(
++        subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
++    )
++    prompt = hypothesis_writer["system_prompt"]
++
++    assert "Use progressive disclosure for skill guidance" in prompt
++    assert "Use this modality-to-skill map" not in prompt
++    assert 'read_skill_file("skills/opentargets-database/SKILL.md")' not in prompt
++
++
++def test_get_subagents_enforces_native_retry_only_for_thin_prompt_modes() -> None:
++    from src.agents.drug_target.middleware import HypothesisRetryLoopMiddleware
++    from src.agents.drug_target.subagents.configs import get_subagents
++
++    subagents = get_subagents(hypothesis_writer_prompt_mode="thin_basic")
++    hypothesis_writer = next(
++        subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
++    )
++
++    retry_middleware = next(
++        middleware
++        for middleware in hypothesis_writer["middleware"]
++        if isinstance(middleware, HypothesisRetryLoopMiddleware)
++    )
++    assert retry_middleware._stop_after_first_save is True
++
++    subagents = get_subagents(hypothesis_writer_prompt_mode="dth_contrast_no_skill")
++    hypothesis_writer = next(
++        subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
++    )
++    retry_middleware = next(
++        middleware
++        for middleware in hypothesis_writer["middleware"]
++        if isinstance(middleware, HypothesisRetryLoopMiddleware)
++    )
++    assert retry_middleware._stop_after_first_save is False
++    assert retry_middleware._max_hypothesis_save_attempts == 3
++
++    subagents = get_subagents(hypothesis_writer_prompt_mode="operational_contract_only")
++    hypothesis_writer = next(
++        subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
++    )
++    retry_middleware = next(
++        middleware
++        for middleware in hypothesis_writer["middleware"]
++        if isinstance(middleware, HypothesisRetryLoopMiddleware)
++    )
++    assert retry_middleware._stop_after_first_save is False
++    assert retry_middleware._max_hypothesis_save_attempts == 3
++
++    subagents = get_subagents(
++        hypothesis_writer_prompt_mode="operational_contract_minimal"
++    )
++    hypothesis_writer = next(
++        subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
++    )
++    retry_middleware = next(
++        middleware
++        for middleware in hypothesis_writer["middleware"]
++        if isinstance(middleware, HypothesisRetryLoopMiddleware)
++    )
++    assert retry_middleware._stop_after_first_save is False
++    assert retry_middleware._max_hypothesis_save_attempts == 3
++
++
++def test_progressive_disclosure_with_modality_map_keeps_soft_routing() -> None:
++    prompt = prompts.render_hypothesis_writer_prompt(
++        "progressive_disclosure_with_modality_map"
++    )
++    checkpoint = _extract_skill_interpretation_checkpoint(prompt)
++
++    assert "Use progressive disclosure with modality-based skill routing" in prompt
++    assert "Read the full core hypothesis-writing skill guide first" not in prompt
++    assert "The core hypothesis-writing guide remains required" not in prompt
++    assert 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")' not in checkpoint
++    assert "Use this modality-to-skill map" in checkpoint
++    assert 'read_skill_file("skills/opentargets-database/SKILL.md")' in checkpoint
++    assert 'read_skill_file("skills/chembl-database/SKILL.md")' in checkpoint
++    assert (
++        'read_skill_file("skills/compare-census-gene-pair-by-cell-type/SKILL.md")'
++        in checkpoint
++    )
++    assert 'read_skill_file("skills/string-database/SKILL.md")' in checkpoint
++
++
++def test_get_subagents_can_render_progressive_disclosure_with_modality_map() -> None:
++    from src.agents.drug_target.subagents.configs import get_subagents
++
++    subagents = get_subagents(
++        hypothesis_writer_prompt_mode="progressive_disclosure_with_modality_map"
++    )
++    hypothesis_writer = next(
++        subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
++    )
++    prompt = hypothesis_writer["system_prompt"]
++
++    assert "Use progressive disclosure with modality-based skill routing" in prompt
++    assert "Use this modality-to-skill map" in prompt
++    assert 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")' not in prompt
++    assert 'read_skill_file("skills/opentargets-database/SKILL.md")' in prompt
++
++
++def test_progressive_disclosure_governor_does_not_hard_require_drug_target_skill() -> None:
++    from src.agents.drug_target.subagents.configs import get_subagents
++    from src.agents.shared.skill_activation_governor import SkillActivationGovernor
++
++    allowed_names = (
++        "drug-target-hypothesis",
++        "opentargets-database",
++        "chembl-database",
++    )
++    registry = {
++        name: f"skills/{name}"
++        for name in allowed_names
++    }
++    subagents = get_subagents(
++        skills_dir="skills",
++        subagent_skill_names={"hypothesis_writer": allowed_names},
++        subagent_skill_registries={"hypothesis_writer": registry},
++        skill_activation_mode="middleware_plus_governor",
++        hypothesis_writer_prompt_mode="progressive_disclosure_only",
++    )
++    hypothesis_writer = next(
++        subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
++    )
++    governor = next(
++        middleware
++        for middleware in hypothesis_writer["middleware"]
++        if isinstance(middleware, SkillActivationGovernor)
++    )
++
++    assert governor.hard_required_skill_names == ()
++    assert governor.required_skill_names == ()
++    assert governor.candidate_skill_names == allowed_names
++
++
++def test_progressive_disclosure_with_modality_map_governor_keeps_drug_target_candidate() -> None:
++    from src.agents.drug_target.subagents.configs import get_subagents
++    from src.agents.shared.skill_activation_governor import SkillActivationGovernor
++
++    allowed_names = (
++        "drug-target-hypothesis",
++        "opentargets-database",
++        "chembl-database",
++    )
++    registry = {
++        name: f"skills/{name}"
++        for name in allowed_names
++    }
++    subagents = get_subagents(
++        skills_dir="skills",
++        subagent_skill_names={"hypothesis_writer": allowed_names},
++        subagent_skill_registries={"hypothesis_writer": registry},
++        skill_activation_mode="middleware_plus_governor",
++        hypothesis_writer_prompt_mode="progressive_disclosure_with_modality_map",
++    )
++    hypothesis_writer = next(
++        subagent for subagent in subagents if subagent["name"] == "hypothesis_writer"
++    )
++    governor = next(
++        middleware
++        for middleware in hypothesis_writer["middleware"]
++        if isinstance(middleware, SkillActivationGovernor)
++    )
++
++    assert governor.hard_required_skill_names == ()
++    assert governor.required_skill_names == ()
++    assert governor.candidate_skill_names == allowed_names
++
++
+ def test_hypothesis_writer_still_has_no_database_query_tools() -> None:
+     tools = SUBAGENT_CONFIGS["hypothesis_writer"]["tools"]
+     names = {tool.name for tool in tools}

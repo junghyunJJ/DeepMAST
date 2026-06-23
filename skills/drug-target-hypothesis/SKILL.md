@@ -3,7 +3,7 @@ name: drug-target-hypothesis
 description: Generate evidence-backed follow-up recommendations from completed drug target assessment evidence. Use when Stage 1-3 evidence is present, `assessment_results.json.stage3_candidates` is non-empty, and the hypothesis writer needs to produce `evidence/hypothesis_report.json` for downstream reporting. Do not use for general literature-driven hypothesis ideation or dataset classification.
 metadata:
     skill-author: Junghyun Jung
-    version: 1.0.0
+    version: 1.2.0
 ---
 
 # Drug Target Hypothesis Generation
@@ -65,6 +65,91 @@ The active runtime contract is:
 - Persist through `save_hypothesis_report(data_dir=data_dir, report=report)`; do not use `save_evidence` as the primary persistence path.
 
 Treat `src/agents/drug_target/subagents/prompts.py` and `src/agents/drug_target/tools/evidence_loader.py` as the source of truth when this skill and repo docs disagree.
+
+This skill is also the intended contrastive advantage over the base hypothesis
+writer prompt. Do not assume the base prompt already knows the evidence-class
+rules below. When this skill is loaded, make the output visibly better by
+classifying evidence support, stating claim boundaries, and choosing follow-up
+language that matches the support class.
+
+---
+
+## Small-Model DTH Decision Card
+
+Use this card before reading the longer workflow, especially for 35B and 122B
+models. The base prompt should only make a valid artifact; this skill should
+make the DTH-loaded output visibly better.
+
+### Step 1: Read the mechanical save-gate packet first
+
+Prefer `hypothesis_writer_contract.mechanical_save_gate_contract` from
+`load_evidence_files(data_dir, scope="hypothesis")` when present:
+- `featured_genes`: exact FEATURED genes and available gene-level files
+- `direct_pair_axes`: exact allowed pair keys, filenames, and support-class labels
+- `pair_axes_not_listed_policy`: absent pairs are forbidden as direct claims when
+  the value is `forbidden_as_direct_pair_claim`
+- `cell_context_anchor`: exact cell context required for interest-cell intrinsic
+  Stage 1 support
+
+Also keep these fallback inventories:
+- `cell_context_anchor`: use
+  `hypothesis_writer_contract.required_cell_context_anchor` when present;
+  otherwise use the original interest cell label plus the resolved Census cell
+  type from `celltype_resolution.json`.
+- `allowed_direct_pair_axes`: use
+  `hypothesis_writer_contract.allowed_direct_pair_axes` when present; otherwise
+  use only usable passed `stage1_*.json` files returned by hypothesis scope or
+  accepted by `validate_evidence_references`.
+
+Use the packet to avoid invalid claims, then use this skill to make the retained recommendations better.
+The base prompt handles mechanical survival; this skill handles interpretation quality.
+
+Do not create pair axes by combining genes from separate files, shared pathway
+mentions, hub context, or skill-guide prose.
+
+### Step 2: Choose exactly one support class for each recommendation
+
+| Support class | Required evidence | Use this wording | Do not write |
+| --- | --- | --- | --- |
+| Interest-cell intrinsic | A cited Stage 1 file in `interest_cell_intrinsic_stage1_pair_files` and the resolved Census cell type named in validation | `interest-cell intrinsic follow-up`, `same-cell validation readout`, `resolved-cell coexpression follow-up` | direct intrinsic wording without the exact Stage 1 file and cell label |
+| Secondary spatial-niche or cross-cell | A cited Stage 1 file that is spatial-only, target-cell-depleted, or coexpression-depleted | `secondary spatial-niche context`, `cross-cell framing`, `non-intrinsic readout` | `same-cell`, `cell-autonomous`, `intrinsic`, or target-cell expression claims |
+| Gene-level/actionability-only | Exact available gene-level files from loaded evidence or `mechanical_save_gate_contract.featured_genes`; use `stage3_<GENE>.json`, `ot_<GENE>.json`, known-drug, or disease-level target files only when those exact filenames are returned by `load_evidence_files` or accepted by `validate_evidence_references` | `gene-level follow-up`, `actionability readout`, `perturbation-development candidate` | spatial, same-cell, direct pair, or cell-context claims |
+
+If a FEATURED gene is linked only to depleted or spatial-only Stage 1 evidence,
+prefer the Gene-level/actionability-only class and cite exact available
+gene-level files from loaded evidence or
+`mechanical_save_gate_contract.featured_genes`. Use `stage3_<GENE>.json` plus
+`ot_<GENE>.json` only when those exact files are returned by
+`load_evidence_files` or accepted by `validate_evidence_references`.
+
+### Step 3: Add the DTH quality signature
+
+Every retained recommendation should visibly include this DTH quality signature:
+- evidence class: one of the three support classes above
+- claim boundary: what the cited files support and what remains unproven
+- target rationale: why the named target gene is prioritized
+- follow-up readout: perturbation, actionability, validation, or combination
+  readout
+- limitation: one unresolved boundary when the claim extends beyond direct
+  evidence
+
+### Step 4: Use class-specific repair on save rejection
+
+When repairing, first rewrite the affected recommendation's private support
+declaration: `support_class`, `direct_pair_axis_file`, cited `featured_genes`
+files, and blocked pair terms. Then rewrite visible fields so the recommendation
+matches that declaration.
+
+| Save error | Exact repair |
+| --- | --- |
+| `topn_coverage.missing` | Add one `[FEATURED-GAP]` recommendation per missing FEATURED gene using exact available gene-level files from loaded evidence or `mechanical_save_gate_contract.featured_genes`; use `stage3_<GENE>.json` plus `ot_<GENE>.json` only when those exact files are returned by `load_evidence_files` or accepted by `validate_evidence_references`; do not force a depleted Stage 1 pair into intrinsic wording. |
+| Unsupported direct pair axis | Cite the exact matching passed Stage 1 filename named by validation, including reverse ligand-receptor order, or remove all direct pair wording and rewrite as a single-gene follow-up. |
+| Failed Stage 1 pair | Remove the failed file and rebuild from a passed pair or gene-level evidence. |
+| Coexpression-depleted or target-cell-depleted Stage 1 used as intrinsic support | Reclassify as Secondary spatial-niche or cross-cell, or remove the Stage 1 citation and rebuild as Gene-level/actionability-only. |
+| Invalid filename | Replace with an exact filename returned by `load_evidence_files` or accepted by `validate_evidence_references`; never invent a filename. |
+
+After a rejection, change only the rejected hypothesis or field when the error
+names a location. Validate references again, then save the changed payload.
 
 ---
 
@@ -140,6 +225,47 @@ Look for:
 
 Record these entities because they become the building blocks of the final hypotheses.
 
+Before drafting any recommendation, build two local control inventories from the
+loaded hypothesis-scope payload. Prefer `hypothesis_writer_contract` when
+present; it is the canonical save-gate contract, and DTH interpretation must not
+override it.
+- `cell_context_anchor`: copy
+  `hypothesis_writer_contract.required_cell_context_anchor` exactly when present;
+  otherwise use the exact original interest cell label and resolved Census cell
+  type from `celltype_resolution.json`. If the match mode is `semantic_proxy`,
+  describe Census support as proxy validation for the resolved Census cell type
+  and do not claim Census validated lost state modifiers from the original label.
+- `allowed_direct_pair_axes`: exact pair keys and filenames from
+  `hypothesis_writer_contract.allowed_direct_pair_axes` when present, otherwise
+  usable `stage1_*.json` files returned by hypothesis scope or accepted by
+  `validate_evidence_references`. Do not infer new direct pair axes by combining
+  genes from separate Stage 1 files, Stage 2/3 gene evidence, shared pathways,
+  hub context, or co-listed entities.
+
+Before drafting each recommendation, apply this DTH evidence decision tree:
+- **Interest-cell intrinsic pair**: if the pair is in
+  `interest_cell_intrinsic_stage1_pair_files`, direct pair or coexpression
+  wording is allowed only when the same hypothesis cites the exact Stage 1 file
+  and names the resolved Census cell type in validation.
+- **Spatial-niche-only or coexpression-depleted pair**: do not use it as
+  malignant-cell intrinsic, same-cell, cell-autonomous, or direct pair-axis
+  support. Use it only as constrained secondary spatial-niche or cross-cell
+  context when the pair concept is retained.
+- **Gene-level/actionability support**: use exact available gene-level files
+  from loaded evidence or `mechanical_save_gate_contract.featured_genes` to
+  cover FEATURED genes without forcing pair-level claims. Use
+  `stage3_<GENE>.json` plus `ot_<GENE>.json` only when those exact files are
+  returned by `load_evidence_files` or accepted by
+  `validate_evidence_references`. This is the preferred repair when the only
+  Stage 1 pair for a FEATURED gene is spatial-niche-only or
+  coexpression-depleted.
+
+If a hypothesis cites a file from `interest_cell_intrinsic_stage1_pair_files`,
+the same hypothesis must name the exact resolved Census cell type in
+`biological_entities.cell_types` and in `validation_approach`. If the original
+interest label differs from the resolved Census cell type, you may mention both,
+but the resolved Census cell type is the required anchor for Stage 1 support.
+
 ### Phase 1.5: Stage 1 Eligibility Gate (DETERMINISTIC)
 
 Before using any Stage 1 pair as evidence, check its pass/fail status in `stage1_filter_results.json`.
@@ -152,29 +278,29 @@ The strict Stage 1 pass condition uses all of the following:
 
 Rules:
 - Only `passed=true` Stage 1 pairs may be used as hypothesis evidence.
-- A `passed=true` Stage 1 pair is not automatically AT2/resolved-cell intrinsic
+- A `passed=true` Stage 1 pair is not automatically interest-cell intrinsic
   support. Read `stage1_pair_usage_guidance`,
   `interest_cell_intrinsic_stage1_pair_files`, and
   `spatial_niche_only_stage1_pair_files` from `load_evidence_files` or
   `validate_evidence_references`.
-- Only files in `interest_cell_intrinsic_stage1_pair_files` may support AT2,
-  Transitional AT2, pulmonary/alveolar epithelial, or resolved-Census-cell
-  intrinsic coexpression claims.
+- Only files in `interest_cell_intrinsic_stage1_pair_files` may support
+  same-cell, intrinsic, target-cell-autonomous, or resolved-Census-cell
+  coexpression claims.
 - Files in `spatial_niche_only_stage1_pair_files` must not be used as
-  AT2-intrinsic, Transitional-AT2-intrinsic, pulmonary/alveolar
-  epithelial-intrinsic, resolved-Census-cell-intrinsic, same-cell, or
+  same-cell, intrinsic, resolved-Census-cell-intrinsic, cell-autonomous, or
   target-cell-autonomous support. If a recommendation mentions the interest
   labels or resolved Census cell type, cite these files only as secondary
   spatial-niche/cross-cell framing evidence with explicit constraints. Cover
-  those FEATURED genes with `stage3_<GENE>.json` and `ot_<GENE>.json`; use the
-  Stage 1 pair only as constrained secondary framing when the recommendation
-  names that pair concept.
+  those FEATURED genes with exact available gene-level files from loaded
+  evidence or `mechanical_save_gate_contract.featured_genes`; use the Stage 1
+  pair only as constrained secondary framing when the recommendation names that
+  pair concept.
 - A `passed=false` pair cannot be cited, cannot support a core mechanism claim, and cannot be used as an L-R axis in the title, core claim, or prediction.
 - If a failed pair appears in citations or as a primary pair claim, `save_hypothesis_report` rejects the payload with `failed_pair_violations`.
 - Fix failed-pair rejections by removing that evidence or rebuilding the hypothesis around a passed pair or gene-level Stage 3 evidence.
-- For any passed Stage 1 pair, inspect `census_validation.target_vs_rest` before using it as interest-cell evidence. If coexpression is depleted, or all target-vs-rest diff values are negative, cite that Stage 1 pair only as secondary spatial-niche/cross-cell framing evidence. It must not support AT2, Transitional AT2, pulmonary/alveolar epithelial, resolved-Census-cell intrinsic, same-cell, epithelial-cell-autonomous, or target-cell-autonomous claims. Cover the relevant FEATURED gene with `stage3_<GENE>.json` and `ot_<GENE>.json` for target/actionability support, and use the depleted Stage 1 pair only to constrain the spatial-niche framing.
-- Passed but target-cell-depleted Stage 1 pair files may still be cited as secondary spatial-niche/cross-cell framing evidence when the recommendation names that pair concept. They are not AT2-intrinsic support and must not be used for same-cell, epithelial-cell-autonomous, or target-cell-autonomous claims.
-- The report renderer uses those secondary citations to populate a secondary Stage 1 framing evidence table, so cite depleted Stage 1 pair files when the recommendation names that pair concept, but only as framing evidence and not as AT2-intrinsic support.
+- For any passed Stage 1 pair, inspect `census_validation.target_vs_rest` before using it as interest-cell evidence. If coexpression is depleted, or all target-vs-rest diff values are negative, cite that Stage 1 pair only as secondary spatial-niche/cross-cell framing evidence. It must not support resolved-Census-cell intrinsic, same-cell, cell-autonomous, or target-cell-autonomous claims. Cover the relevant FEATURED gene with exact available gene-level files from loaded evidence or `mechanical_save_gate_contract.featured_genes` for target/actionability support, and use the depleted Stage 1 pair only to constrain the spatial-niche framing.
+- Passed but target-cell-depleted Stage 1 pair files may still be cited as secondary spatial-niche/cross-cell framing evidence when the recommendation names that pair concept. They are not intrinsic interest-cell support and must not be used for same-cell, cell-autonomous, or target-cell-autonomous claims.
+- The report renderer uses those secondary citations to populate a secondary Stage 1 framing evidence table, so cite depleted Stage 1 pair files when the recommendation names that pair concept, but only as framing evidence and not as interest-cell-intrinsic support.
 
 ---
 
@@ -186,7 +312,16 @@ Every recommendation should be written so the report can expose four fixed field
 - **Biological Grounding**: Stage 1/spatial/Census support and the cell-type interpretation.
 - **Target-Disease Support**: Stage 2 OpenTargets target-disease support, not causal biology.
 - **Actionability**: Stage 3 ChEMBL/drug evidence for actionability, perturbability, or repurposing context, not biological causality.
-- **Interpretation Constraint**: primary AT2/epithelial intrinsic support versus secondary spatial-niche/cross-cell framing.
+- **Interpretation Constraint**: primary interest-cell intrinsic support versus secondary spatial-niche/cross-cell framing.
+
+When this skill is loaded, each retained recommendation should have a visible
+DTH quality signature in its title, core claim, prediction, or validation
+approach:
+1. evidence class: intrinsic pair, spatial-niche/cross-cell, or gene-level/actionability
+2. claim boundary: what the evidence supports and what remains unproven
+3. follow-up readout: a perturbation, actionability, or validation readout
+4. target rationale: why the named target/gene is prioritized
+5. limitation: one unresolved boundary when the claim extends beyond direct evidence
 
 | Category | Focus | Minimum Count |
 |----------|-------|:-------------:|
@@ -212,36 +347,48 @@ Generation guidance:
 - Lower intervention-success wording:
   - Avoid `therapeutic intervention candidate` unless clinical/intervention evidence directly supports it; prefer `perturbation/actionability follow-up candidate`.
   - Avoid `synergistic effects` unless direct combination evidence is cited; prefer `additive or non-additive effects`.
-  - Avoid statements such as `CD47 blockade alters fibrosis resolution`; prefer `test whether CD47 perturbation changes macrophage-fibroblast readouts`.
+  - Avoid statements such as `target blockade resolves disease`; prefer `test whether target perturbation changes disease-relevant readouts`.
 - For interest-cell focused reports, mentally split retained recommendations into
   three support classes even though the JSON schema does not require a separate
   tier field:
-  - **Primary epithelial/AT2-intrinsic follow-up recommendations**: cite at
-    least one `interest_cell_intrinsic_stage1_pair_files` entry and include AT2
-    or epithelial validation context.
-  - **Secondary epithelial-associated spatial-niche follow-up recommendations**:
+  - **Primary interest-cell intrinsic follow-up recommendations**: cite at
+    least one `interest_cell_intrinsic_stage1_pair_files` entry and include the
+    original interest cell label or resolved Census cell type in the validation
+    context.
+  - **Secondary interest-cell-associated spatial-niche follow-up recommendations**:
     cite at least one Stage 1/spatial pair file that is spatial-niche-only or
-    depleted in the resolved epithelial/AT2 cell context. Use this only as
-    cross-cell or non-AT2 niche framing, not as epithelial-cell-intrinsic
+    depleted in the resolved cell context. Use this only as cross-cell or
+    non-interest-cell niche framing, not as interest-cell-intrinsic
     target mechanisms.
   - **Gene-level/actionability-only follow-up recommendations**: cite only
-    `ot_<GENE>.json`, `stage3_<GENE>.json`, known-drug, or disease-level files.
+    exact available gene-level files from loaded evidence or
+    `mechanical_save_gate_contract.featured_genes`; use `ot_<GENE>.json`,
+    `stage3_<GENE>.json`, known-drug, or disease-level files only when those
+    exact files are returned by `load_evidence_files` or accepted by
+    `validate_evidence_references`.
     If Biological Grounding is `No Stage 1/spatial grounding reference cited`,
     do not label it as spatial-niche. Use title phrases such as `gene-level
     follow-up candidate`, `actionability follow-up candidate`, or
     `perturbation-development candidate`.
 - Only use `spatial-niche` when a Stage 1/spatial pair file is cited as
   Biological Grounding or constrained secondary framing evidence.
-- Primary epithelial/AT2-intrinsic titles should use language such as `prioritizes`, `nominates`, `follow-up axis`, or `program candidate`.
-- Secondary epithelial-associated spatial-niche titles should use language such as `spatial-niche follow-up candidate`, `cross-cell candidate`, or `non-AT2 niche context`.
+- Primary interest-cell intrinsic titles should use language such as `prioritizes`, `nominates`, `follow-up axis`, or `program candidate`.
+- Secondary interest-cell-associated spatial-niche titles should use language such as `spatial-niche follow-up candidate`, `cross-cell candidate`, or `non-interest-cell niche context`.
 - Gene-level/actionability-only titles should use language such as `gene-level follow-up candidate`, `actionability follow-up candidate`, or `perturbation-development candidate`.
 - Avoid unsupported title phrases such as `drives`, `dysregulation via`, `blockade for reducing`, `barrier dysfunction`, `complex assembly`, and `activation and matrix deposition`.
 - In `falsifiable_prediction`, prefer `test whether ... changes` over `should reduce` or `should alter` unless a cited file directly supports that expected direction.
 - For asymmetric Stage 2/3 support in a Stage 1 pair, write the recommendation as `<SUPPORTED_GENE>-anchored`. The supported gene is the perturbation or actionability anchor; the unsupported partner is a coexpression-context partner or readout.
 - Do not treat the unsupported partner as independently druggable, target-disease-supported, or perturbation-prioritized unless its exact gene-level evidence file is cited.
-- Do not list a partner gene in `biological_entities.genes` unless the same hypothesis cites `ot_<GENE>.json`, `stage3_<GENE>.json`, or a Stage 1 pair file containing that gene. If an uncited partner is biologically useful, mention it only as context in prose and label it `context only, not independently supported by cited evidence`.
-- OpenTargets known-drug evidence and Stage 3 ChEMBL matched-drug evidence are distinct. If `ot_<GENE>.json` contains known-drug programs, attribute those drugs to OpenTargets. If `stage3_<GENE>.json` has empty `matched_drugs`, do not describe that file as ChEMBL drug, ChEMBL compound, or matched-drug support; say Stage 3 provides no matched ChEMBL drug evidence for that gene.
-- Avoid `fibrosis resolution` in hypothesis titles and avoid treating exploratory perturbation readouts as disease-resolution outcomes. Prefer `fibrosis-relevant readouts`, `matrix deposition readouts`, or `macrophage-fibroblast interaction readouts`.
+- Do not write `A-B axis`, `A/B interaction`, `A-B signaling`,
+  `A-B coexpression`, or equivalent direct pair wording unless `A--B` or `B--A`
+  is present in `allowed_direct_pair_axes` and the exact matching passed Stage 1
+  filename is cited in that same hypothesis. If the desired pair is absent from
+  `allowed_direct_pair_axes`, rewrite as `<SUPPORTED_GENE>-anchored`
+  gene-level/actionability follow-up and mention the uncited partner only as
+  context, not as a direct mechanism.
+- Do not list a partner gene in `biological_entities.genes` unless the same hypothesis cites an exact available gene-level file for that gene or a Stage 1 pair file containing that gene. If an uncited partner is biologically useful, mention it only as context in prose and label it `context only, not independently supported by cited evidence`.
+- OpenTargets known-drug evidence and Stage 3 ChEMBL matched-drug evidence are distinct. If an exact available `ot_<GENE>.json` contains known-drug programs, attribute those drugs to OpenTargets. If an exact available `stage3_<GENE>.json` has empty `matched_drugs`, do not describe that file as ChEMBL drug, ChEMBL compound, or matched-drug support; say Stage 3 provides no matched ChEMBL drug evidence for that gene.
+- Avoid disease-resolution claims in hypothesis titles and avoid treating exploratory perturbation readouts as therapeutic outcomes. Prefer disease-relevant cellular or molecular readouts named in the local evidence.
 - Include `Not yet established:` when the recommendation extends beyond direct Stage 1, Stage 3, OpenTargets, ChEMBL, or spatial evidence.
 
 ---
@@ -321,6 +468,14 @@ Rules:
 - Use 6 retained recommendations only when needed for FEATURED coverage or mandatory category balance
 - If FEATURED coverage cannot be satisfied within 6 retained recommendations, stop and report the deterministic blocker instead of saving an incomplete payload
 - `save_hypothesis_report` computes `topn_coverage` deterministically and rejects the payload if `topn_coverage.missing` is non-empty
+- FEATURED gene coverage is independent from pair-level Stage 1 support. A
+  FEATURED gene can be covered by exact available gene-level files from loaded
+  evidence or `mechanical_save_gate_contract.featured_genes` even when no valid
+  interest-cell intrinsic pair supports that gene. Use `stage3_<GENE>.json`
+  plus `ot_<GENE>.json` only when those exact files are returned by
+  `load_evidence_files` or accepted by `validate_evidence_references`.
+- Do not reintroduce spatial-niche-only or coexpression-depleted Stage 1 files
+  as intrinsic support just to satisfy FEATURED coverage.
 
 This gate is independent from the general orphan-evidence `[GAP]` logic.
 
@@ -350,13 +505,33 @@ Required top-level payload fields include:
 
 If `save_hypothesis_report` returns `saved: false`:
 - For `invalid_references`, remove or replace invalid filenames and validate again
-- For `topn_coverage.missing`, add one `[FEATURED-GAP]` hypothesis per missing FEATURED gene
+- For `topn_coverage.missing`, add one `[FEATURED-GAP]` hypothesis per missing
+  FEATURED gene. Prefer exact available gene-level/actionability evidence from
+  loaded evidence or `mechanical_save_gate_contract.featured_genes` when the
+  missing gene's Stage 1 pair support is spatial-niche-only,
+  coexpression-depleted, absent, or would require an unsupported direct pair
+  claim. Use `stage3_<GENE>.json` plus `ot_<GENE>.json` only when those exact
+  files are returned by `load_evidence_files` or accepted by
+  `validate_evidence_references`.
 - For `failed_pair_violations`, remove the failed pair citation/claim or rebuild the hypothesis from passed pair or Stage 3 gene evidence
 - For `hypothesis_grounding_violations`, apply the exact deterministic repair before retrying:
   - Direct pair-axis violation: remove the unsupported `A-B axis` wording, or cite a matching passed `stage1_A--B.json`/`stage1_B--A.json`. Stage 1 pair filenames may be ligand-receptor ordered and reverse of the prose order; cite the actual available filename returned by validation/load evidence, not a normalized filename you invent. If the rejection names an available reverse-order file, cite that exact file or remove the direct pair-axis wording. Do not infer combinatorial axes from separate hub-partner files.
-  - Target-cell-depleted Stage 1 used as interest-cell support: if the hypothesis mentions AT2, Transitional AT2, pulmonary/alveolar epithelial, or the resolved Census cell type anywhere, remove that Stage 1 citation and support the FEATURED gene with `stage3_<GENE>.json`/`ot_<GENE>.json`; otherwise rewrite as non-interest-cell spatial niche evidence.
-  - Coexpression-depleted Stage 1 used as intrinsic same-cell support: remove same-cell/intrinsic/AT2-intrinsic wording and AT2 validation, or remove that Stage 1 citation.
-  - Target-cell-depleted gene expression claim: remove any statement that the depleted gene is expressed on/in AT2, Transitional AT2, pulmonary alveolar type 2, alveolar epithelial, or pulmonary epithelial cells.
+  - If a direct pair-axis rejection reports `canonical_existing=none` or
+    `available: no matching Stage 1 pair file exists`, do not try to repair by
+    inventing a filename. Remove the direct pair wording and rebuild the
+    recommendation as gene-level/actionability-only or as a supported-pair
+    recommendation using an allowed direct pair from `allowed_direct_pair_axes`.
+  - Target-cell-depleted Stage 1 used as interest-cell support: if the hypothesis mentions the original interest label or resolved Census cell type anywhere, remove that Stage 1 citation and support the FEATURED gene with exact available gene-level files from loaded evidence or `mechanical_save_gate_contract.featured_genes`; otherwise rewrite as non-interest-cell spatial niche evidence.
+  - Coexpression-depleted Stage 1 used as intrinsic same-cell support: remove
+    same-cell/intrinsic/target-cell-autonomous wording and interest-cell
+    validation, or remove that Stage 1 citation. If removing the citation makes
+    a FEATURED gene uncovered, immediately add or revise a gene-level/actionability
+    hypothesis for that gene using exact available gene-level files from loaded
+    evidence or `mechanical_save_gate_contract.featured_genes` instead of
+    restoring the depleted Stage 1 citation. Use `stage3_<GENE>.json` plus
+    `ot_<GENE>.json` only when those exact files are returned by
+    `load_evidence_files` or accepted by `validate_evidence_references`.
+  - Target-cell-depleted gene expression claim: remove any statement that the depleted gene is expressed in or on the original interest cell label or resolved Census cell type.
 
 Do not retry the same payload after a deterministic rejection. Change the payload first, then retry.
 
@@ -379,7 +554,7 @@ Repair the exact saved=false errors before saving again:
   and biological_entities.cell_types as secondary spatial-niche/cross-cell or
   non-interest-cell context; or remove that Stage 1 citation and rewrite the
   hypothesis as gene-level/actionability-only. Do not leave depleted Stage 1 in
-  a primary AT2/epithelial, interest-cell, same-cell, or intrinsic recommendation.
+  a primary interest-cell, same-cell, cell-autonomous, or intrinsic recommendation.
 
 Do not repeat a rejected payload. Validate references again, then save only the
 repaired report.
@@ -458,7 +633,14 @@ Remove or replace the bad filenames. Do not invent new ones. Stage 1 pair filena
 
 ### `save_hypothesis_report` returns `topn_coverage.missing`
 
-One or more FEATURED genes are uncovered. Add a `[FEATURED-GAP]` hypothesis for each missing gene before retrying.
+One or more FEATURED genes are uncovered. Add a `[FEATURED-GAP]` hypothesis for
+each missing gene before retrying. If the missing gene is linked only through a
+spatial-niche-only or coexpression-depleted Stage 1 pair, cover it with
+exact available gene-level files from loaded evidence or
+`mechanical_save_gate_contract.featured_genes` instead of forcing that Stage 1
+pair into an intrinsic claim. Use `stage3_<GENE>.json` plus `ot_<GENE>.json`
+only when those exact files are returned by `load_evidence_files` or accepted by
+`validate_evidence_references`.
 
 ### `save_hypothesis_report` returns `failed_pair_violations`
 

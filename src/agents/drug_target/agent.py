@@ -45,6 +45,7 @@ from src.agents.deep_interpreter.middleware.think_tool_quality_gate import (
 )
 from deepagents.backends import FilesystemBackend
 from src.agents.drug_target.subagents.configs import get_subagents
+from src.agents.drug_target.subagents.prompts import HypothesisWriterPromptMode
 from src.agents.drug_target.tools import (
     check_stage1_completion,
     check_hypothesis_completion,
@@ -148,10 +149,14 @@ class DrugTargetConfig:
         agent_skill_names: Legacy fallback skill tuple retained for registry helpers.
         evidence_assessor_skill_names: Skills exposed to evidence_assessor.
         hypothesis_writer_skill_names: Skills exposed to hypothesis_writer.
+        hypothesis_writer_prompt_mode: Prompt mode for hypothesis_writer.
+            ``default`` preserves production direct skill-read instructions;
+            ``progressive_disclosure_only`` removes those prompt-level reads
+            for pure progressive-disclosure benchmarks.
         skills_dir: Optional override for the project skills directory.
     """
 
-    provider: Literal["openai", "google", "ollama", "ollama-openai", "claude", "openrouter"] = "ollama"
+    provider: Literal["openai", "google", "ollama", "ollama-openai", "vllm", "claude", "openrouter"] = "ollama"
     data_dir: str = field(
         default_factory=lambda: os.getenv(
             "DRUG_TARGET_DATA_DIR",
@@ -180,6 +185,7 @@ class DrugTargetConfig:
         "gwas-database",
         "chembl-database",
     )
+    hypothesis_writer_prompt_mode: HypothesisWriterPromptMode = "default"
     hypothesis_writer_resume_instruction: str | None = None
     skills_dir: str | None = None
     subagent_models: dict[str, BaseChatModel | str] | None = None
@@ -379,6 +385,7 @@ def create_drug_target_agent(
         subagent_skill_registries=subagent_skill_registries,
         enable_skill_activator=config.enable_skill_activator,
         skill_activation_mode=skill_activation_mode,
+        hypothesis_writer_prompt_mode=config.hypothesis_writer_prompt_mode,
     )
 
     # 5. Create agent — orchestrator has NO skills (just delegates)

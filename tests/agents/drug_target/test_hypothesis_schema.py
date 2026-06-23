@@ -35,6 +35,22 @@ def _write_hypothesis_evidence(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def test_save_hypothesis_report_redirects_virtual_root_to_env_workspace(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.setenv("DRUG_TARGET_DATA_DIR", str(workspace))
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": "/", "report": {"hypotheses": []}})
+    )
+
+    assert result["path"] == str(workspace / "evidence" / "hypothesis_report.json")
+    assert (workspace / "evidence").exists()
+
+
 def _add_intrinsic_stage1_evidence(data_dir: Path) -> None:
     evidence_dir = data_dir / "evidence"
     filter_path = evidence_dir / "stage1_filter_results.json"
@@ -59,6 +75,69 @@ def _add_intrinsic_stage1_evidence(data_dir: Path) -> None:
         }),
         encoding="utf-8",
     )
+
+
+def _write_malignant_intrinsic_evidence(tmp_path: Path) -> Path:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "assessment_results.json").write_text(
+        json.dumps({"stage3_candidates": [{"gene": "EGF"}, {"gene": "ERBB2"}]}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage1_filter_results.json").write_text(
+        json.dumps([{"ligand": "EGF", "receptor": "ERBB2", "passed": True}]),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage1_EGF--ERBB2.json").write_text(
+        json.dumps({
+            "pair_id": "EGF--ERBB2",
+            "status": "PASS",
+            "census_validation": {
+                "risk_ratio": 6.25,
+                "p_value": 0.0,
+                "requested_cell_type": "Prolif Invasive Tumor",
+                "resolved_cell_type": "malignant cell",
+                "target_vs_rest": {
+                    "gene_a": {"direction": "enriched", "risk_ratio": 2.0},
+                    "gene_b": {"direction": "enriched", "risk_ratio": 2.0},
+                    "coexpression": {"direction": "enriched", "risk_ratio": 6.25},
+                },
+            },
+            "stage1_filter": {
+                "passed": True,
+                "string_combined": 0.99,
+                "census_coexpr_pvalue": 0.0,
+                "census_gene_a_pvalue": 0.0,
+                "census_gene_b_pvalue": 0.0,
+            },
+        }),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage3_EGF.json").write_text(
+        json.dumps({"gene_symbol": "EGF"}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "stage3_ERBB2.json").write_text(
+        json.dumps({"gene_symbol": "ERBB2"}),
+        encoding="utf-8",
+    )
+    (evidence_dir / "celltype_resolution.json").write_text(
+        json.dumps({
+            "interest_celltypes": ["Prolif Invasive Tumor"],
+            "primary_input_celltype": "Prolif Invasive Tumor",
+            "primary_resolved_celltype": "malignant cell",
+            "primary_match_mode": "semantic_proxy",
+            "matches": [
+                {
+                    "input_celltype": "Prolif Invasive Tumor",
+                    "matched_celltype": "malignant cell",
+                    "match_mode": "semantic_proxy",
+                }
+            ],
+        }),
+        encoding="utf-8",
+    )
+    return tmp_path
 
 
 def _strict_report() -> dict:
@@ -785,6 +864,79 @@ def test_save_hypothesis_report_rejects_missing_intrinsic_coverage_with_stale_st
     assert not (data_dir / "evidence" / "hypothesis_report.json").exists()
 
 
+def test_save_hypothesis_report_accepts_primary_interest_cell_intrinsic_coverage(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_malignant_intrinsic_evidence(tmp_path)
+    report = _clone_report()
+    report["disease"] = "breast cancer"
+    report["stage1_pair_files"] = ["stage1_EGF--ERBB2.json"]
+    hyp = report["hypotheses"][0]
+    hyp["title"] = "Primary EGF-ERBB2 intrinsic hypothesis"
+    hyp["core_claim"] = (
+        "EGF-ERBB2 supports a primary interest-cell intrinsic follow-up mechanism "
+        "in resolved malignant cells."
+    )
+    hyp["evidence_references"] = [
+        "stage1_EGF--ERBB2.json",
+        "stage3_EGF.json",
+        "stage3_ERBB2.json",
+    ]
+    hyp["biological_entities"]["genes"] = ["EGF", "ERBB2"]
+    hyp["biological_entities"]["cell_types"] = ["malignant cells"]
+    hyp["validation_approach"] = (
+        "Test EGF-ERBB2 perturbation in malignant cells breast-cancer models."
+    )
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is True, result
+
+
+def test_save_hypothesis_report_autofixes_intrinsic_coverage_interest_cell_anchor(
+    tmp_path: Path,
+) -> None:
+    data_dir = _write_malignant_intrinsic_evidence(tmp_path)
+    report = _clone_report()
+    report["disease"] = "breast cancer"
+    report["stage1_pair_files"] = ["stage1_EGF--ERBB2.json"]
+    hyp = report["hypotheses"][0]
+    hyp["title"] = "Primary EGF-ERBB2 intrinsic hypothesis"
+    hyp["core_claim"] = (
+        "EGF-ERBB2 supports a primary intrinsic follow-up mechanism in the "
+        "disease context."
+    )
+    hyp["evidence_references"] = [
+        "stage1_EGF--ERBB2.json",
+        "stage3_EGF.json",
+        "stage3_ERBB2.json",
+    ]
+    hyp["biological_entities"]["genes"] = ["EGF", "ERBB2"]
+    hyp["biological_entities"]["cell_types"] = []
+    hyp["validation_approach"] = "Test EGF-ERBB2 perturbation in disease models."
+
+    result = json.loads(
+        save_hypothesis_report.invoke({"data_dir": str(data_dir), "report": report})
+    )
+
+    assert result["saved"] is True, result
+    assert any(
+        diagnostic.get("code") == "INTEREST_CELL_ANCHOR_AUTOFIX"
+        and diagnostic.get("anchor") == "malignant cell"
+        for diagnostic in result["diagnostics"]
+    )
+    saved = json.loads(
+        (data_dir / "evidence" / "hypothesis_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    saved_hyp = saved["hypotheses"][0]
+    assert "malignant cell" in saved_hyp["biological_entities"]["cell_types"]
+    assert "malignant cell" in saved_hyp["validation_approach"]
+
+
 def test_save_hypothesis_report_accepts_primary_epithelial_intrinsic_coverage(
     tmp_path: Path,
 ) -> None:
@@ -1155,3 +1307,95 @@ def test_save_hypothesis_report_keeps_contrast_details_out_of_primary_refs(
         "display_reference": "stage1_FN1--PLAUR.json",
     }
     assert "_FAILED" not in json.dumps(saved_hyp)
+
+
+def test_celltype_context_detects_legacy_at2_branch(tmp_path: Path) -> None:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "celltype_resolution.json").write_text(
+        json.dumps(
+            {
+                "interest_celltypes": ["AT2", "Transitional AT2"],
+                "primary_resolved_celltype": "pulmonary alveolar type 2 cell",
+                "matches": [
+                    {
+                        "input_celltype": "AT2",
+                        "matched_celltype": "pulmonary alveolar type 2 cell",
+                        "match_mode": "alias",
+                    },
+                    {
+                        "input_celltype": "Transitional AT2",
+                        "matched_celltype": "pulmonary alveolar type 2 cell",
+                        "match_mode": "state_stripped_alias",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    from src.agents.drug_target.tools.hypothesis_schema import (
+        _celltype_resolution_context,
+    )
+
+    context = _celltype_resolution_context(evidence_dir)
+
+    assert context["branch"] == "legacy_at2"
+    assert context["legacy_at2"] is True
+    assert context["semantic_proxy"] is False
+    assert "pulmonary alveolar type 2 cell" in context["anchor_tokens"]
+
+
+def test_celltype_context_detects_generic_epithelial_legacy_branch(
+    tmp_path: Path,
+) -> None:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "celltype_resolution.json").write_text(
+        json.dumps({"interest_celltypes": ["Epithelial"]}),
+        encoding="utf-8",
+    )
+
+    from src.agents.drug_target.tools.hypothesis_schema import (
+        _celltype_resolution_context,
+    )
+
+    context = _celltype_resolution_context(evidence_dir)
+
+    assert context["branch"] == "legacy_at2"
+    assert context["legacy_at2"] is True
+    assert "epithelial" in context["anchor_tokens"]
+
+
+def test_celltype_context_detects_semantic_proxy_branch(tmp_path: Path) -> None:
+    evidence_dir = tmp_path / "evidence"
+    evidence_dir.mkdir()
+    (evidence_dir / "celltype_resolution.json").write_text(
+        json.dumps(
+            {
+                "interest_celltypes": ["Prolif Invasive Tumor"],
+                "primary_input_celltype": "Prolif Invasive Tumor",
+                "primary_resolved_celltype": "malignant cell",
+                "matches": [
+                    {
+                        "input_celltype": "Prolif Invasive Tumor",
+                        "matched_celltype": "malignant cell",
+                        "match_mode": "semantic_proxy",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    from src.agents.drug_target.tools.hypothesis_schema import (
+        _celltype_resolution_context,
+    )
+
+    context = _celltype_resolution_context(evidence_dir)
+
+    assert context["branch"] == "semantic_proxy"
+    assert context["legacy_at2"] is False
+    assert context["semantic_proxy"] is True
+    assert "malignant cell" in context["anchor_tokens"]
+    assert "prolif invasive tumor" in context["anchor_tokens"]

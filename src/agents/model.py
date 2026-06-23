@@ -20,7 +20,7 @@ class _ChatOllamaWithThink(ChatOllama):
 
     def _chat_params(self, messages, stop=None, **kwargs) -> dict[str, Any]:
         params = super()._chat_params(messages, stop=stop, **kwargs)
-        if self.think is not None and "think" not in params:
+        if self.think is not None and params.get("think") is None:
             params["think"] = self.think
         return params
 
@@ -44,7 +44,8 @@ def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
     Create LLM based on provider (default: openrouter with moonshotai/kimi-k2.5)
 
     Args:
-        provider: LLM provider ('openai', 'google', 'ollama', 'ollama-openai', 'claude', 'openrouter').
+        provider: LLM provider ('openai', 'google', 'ollama', 'ollama-openai', 'vllm',
+                 'claude', 'openrouter').
                  If None, uses LLM_PROVIDER env var or defaults to 'openrouter'
         **kwargs: Provider-specific arguments
 
@@ -64,8 +65,8 @@ def create_llm(provider: Optional[str] = None, **kwargs) -> BaseChatModel:
     
     if provider == "ollama":
         return create_ollama_llm(**kwargs)
-    elif provider == "ollama-openai":
-        return create_ollama_openai_llm(**kwargs)
+    elif provider in {"ollama-openai", "vllm"}:
+        return create_ollama_openai_llm(provider_label=provider, **kwargs)
     elif provider == "google":
         return create_google_llm(**kwargs)
     elif provider == "openai":
@@ -129,10 +130,17 @@ def create_google_llm(**kwargs) -> ChatGoogleGenerativeAI:
     """
     model = kwargs.get("model", os.getenv("GOOGLE_MODEL", "gemini-3.1-flash-lite-preview"))
     temperature = kwargs.get("temperature", 0)
+    request_timeout = float(
+        kwargs.get(
+            "request_timeout",
+            os.getenv("GOOGLE_REQUEST_TIMEOUT_SECONDS", "600"),
+        )
+    )
     
     return ChatGoogleGenerativeAI(
         model=model,
         temperature=temperature,
+        request_timeout=request_timeout,
     )
 
 
@@ -151,7 +159,11 @@ def create_ollama_llm(**kwargs) -> ChatOllama:
     temperature = kwargs.get("temperature", 0)
     
     num_ctx = kwargs.get("num_ctx", 98304) # default to 98K
-    num_predict = kwargs.get("num_predict", -1)  # unlimited; prevents truncated tool call JSON (#14570)
+    raw_num_predict = kwargs.get("num_predict", os.getenv("OLLAMA_NUM_PREDICT"))
+    num_predict = int(raw_num_predict) if raw_num_predict not in (None, "") else -1
+    if num_predict <= 0 and str(model).endswith("-cloud"):
+        # Ollama cloud rejects unlimited generation as max_tokens=-1.
+        num_predict = int(os.getenv("OLLAMA_CLOUD_NUM_PREDICT", "16384"))
     reasoning = _parse_optional_bool(kwargs.get("reasoning", os.getenv("OLLAMA_REASONING")))
 
     llm = _ChatOllamaWithThink(
@@ -187,7 +199,9 @@ def create_ollama_openai_llm(**kwargs: Any) -> ChatOpenAI:
 
     Reuses the same NUM_CTX / NUM_PREDICT / BASE_URL env keys as
     create_ollama_llm so load_subagent_models_from_env() works
-    without modification. Ollama-specific kwargs (and the canonical
+    without modification. The provider also supports vLLM/OpenAI-compatible
+    local servers that expose /v1/chat/completions. Ollama-specific kwargs
+    (and the canonical
     ChatOpenAI kwargs we explicitly forward) are POPPED from kwargs
     before the **kwargs spread. Per CP-P2-007: each popped key is
     removed from `kwargs` by `kwargs.pop(...)`, so the subsequent
@@ -222,6 +236,7 @@ def create_ollama_openai_llm(**kwargs: Any) -> ChatOpenAI:
     # Pop Ollama-specific kwargs BEFORE forwarding to ChatOpenAI.
     # ChatOpenAI raises TypeError on unknown kwargs (num_ctx, num_predict).
     # All popped kwargs are removed from **kwargs spread; no double-pass risk.
+    provider_label = kwargs.pop("provider_label", "ollama-openai")
     base_host = kwargs.pop("base_url", None) or os.getenv(
         "OLLAMA_BASE_URL", "http://localhost:11434"
     )
@@ -241,14 +256,38 @@ def create_ollama_openai_llm(**kwargs: Any) -> ChatOpenAI:
     num_ctx = int(kwargs.pop("num_ctx", 98304))
     num_predict = int(kwargs.pop("num_predict", -1))
     temperature = kwargs.pop("temperature", 0)
+    if "max_tokens" not in kwargs:
+        raw_max_tokens_env = os.getenv("VLLM_MAX_TOKENS") or os.getenv(
+            "OLLAMA_OPENAI_MAX_TOKENS"
+        )
+        if raw_max_tokens_env:
+            kwargs["max_tokens"] = int(raw_max_tokens_env)
+    raw_extra_body = kwargs.pop("extra_body", None)
+    extra_body = dict(raw_extra_body or {})
+    options = dict(extra_body.get("options") or {})
+    options.update({"num_ctx": num_ctx, "num_predict": num_predict})
+    extra_body["options"] = options
+    enable_thinking = _parse_optional_bool(
+        kwargs.pop(
+            "enable_thinking",
+            os.getenv("VLLM_ENABLE_THINKING")
+            or os.getenv("OLLAMA_OPENAI_ENABLE_THINKING"),
+        )
+    )
+    if enable_thinking is not None:
+        chat_template_kwargs = dict(extra_body.get("chat_template_kwargs") or {})
+        chat_template_kwargs["enable_thinking"] = enable_thinking
+        extra_body["chat_template_kwargs"] = chat_template_kwargs
 
     # CP-P2-005 (iteration 4): emit ops audit log before constructing the LLM.
     logger.info(
-        "LLM provider=ollama-openai model=%s base_url=%s num_ctx=%s num_predict=%s",
+        "LLM provider=%s model=%s base_url=%s num_ctx=%s num_predict=%s enable_thinking=%s",
+        provider_label,
         model,
         base_url,
         num_ctx,
         num_predict,
+        enable_thinking,
     )
 
     llm = ChatOpenAI(
@@ -263,14 +302,21 @@ def create_ollama_openai_llm(**kwargs: Any) -> ChatOpenAI:
         # in Ollama 0.20.6 (verified 2026-05-03 — see docstring KNOWN LIMITATION
         # block). Kept for future-proofing; the syntax is per Ollama's OpenAI-
         # compat docs and is harmless when ignored.
-        extra_body={"options": {"num_ctx": num_ctx, "num_predict": num_predict}},
+        extra_body=extra_body,
         **kwargs,  # forward any remaining caller-supplied kwargs (e.g., max_tokens for OpenRouter parity)
     )
     # D2: Mirror create_ollama_llm profile setup VERBATIM.
     # `profile` is a typed Pydantic field on BaseChatModel:
     #   profile: ModelProfile | None  (where ModelProfile is TypedDict, total=False)
     # Formula: copied verbatim from src/agents/model.py:137
-    effective_output = num_predict if num_predict > 0 else num_ctx // 4
+    raw_max_tokens = kwargs.get("max_tokens")
+    effective_output = (
+        num_predict
+        if num_predict > 0
+        else int(raw_max_tokens)
+        if raw_max_tokens not in (None, "")
+        else num_ctx // 4
+    )
     llm.profile = {
         "max_input_tokens": num_ctx - effective_output,
         "max_output_tokens": effective_output,
@@ -315,7 +361,8 @@ def load_subagent_models_from_env(
         {PREFIX}_{NAME}_NUM_CTX       (Ollama only)
         {PREFIX}_{NAME}_NUM_PREDICT   (Ollama only)
         {PREFIX}_{NAME}_BASE_URL      (Ollama only)
-        {PREFIX}_{NAME}_MAX_TOKENS    (OpenRouter only)
+        {PREFIX}_{NAME}_MAX_TOKENS    (OpenRouter / OpenAI-compatible providers)
+        {PREFIX}_{NAME}_ENABLE_THINKING (vLLM / OpenAI-compatible Qwen providers)
 
     Example .env:
         SUBAGENT_PLANNER_PROVIDER=openai
@@ -349,7 +396,7 @@ def load_subagent_models_from_env(
         if temperature:
             kwargs["temperature"] = float(temperature)
 
-        # Shared by ollama and ollama-openai (both providers reuse these env keys per D3)
+        # Shared by ollama, ollama-openai, and vllm (all reuse these env keys here).
         num_ctx = os.getenv(f"{env_prefix}_NUM_CTX")
         if num_ctx:
             kwargs["num_ctx"] = int(num_ctx)
@@ -362,10 +409,14 @@ def load_subagent_models_from_env(
         if base_url:
             kwargs["base_url"] = base_url
 
-        # OpenRouter-specific
+        # OpenAI-compatible providers
         max_tokens = os.getenv(f"{env_prefix}_MAX_TOKENS")
         if max_tokens:
             kwargs["max_tokens"] = int(max_tokens)
+
+        enable_thinking = os.getenv(f"{env_prefix}_ENABLE_THINKING")
+        if enable_thinking:
+            kwargs["enable_thinking"] = _parse_optional_bool(enable_thinking)
 
         models[name] = create_llm(provider=provider, **kwargs)
 

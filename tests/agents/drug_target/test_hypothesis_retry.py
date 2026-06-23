@@ -163,6 +163,160 @@ def test_retry_message_names_available_reverse_stage1_pair_repair() -> None:
     assert "present in evidence_references" in message
 
 
+def test_retry_message_includes_indexed_direct_pair_patch_recipe() -> None:
+    message = build_hypothesis_retry_message(
+        "res_bc_drugtarget",
+        "breast cancer",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        (
+                            "hypotheses[2] claims direct pair axis 'EGF--LRIG1' "
+                            "without citing a matching passed Stage 1 pair file. "
+                            "Expected stage1_EGF--LRIG1.json or stage1_LRIG1--EGF.json; "
+                            "available: no matching Stage 1 pair file exists; "
+                            "canonical_existing=none."
+                        )
+                    ],
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "Patch recipe for deterministic save rejection" in message
+    assert "Edit only hypotheses[2] when possible" in message
+    assert "Remove `EGF--LRIG1` direct pair wording" in message
+    assert "title, core_claim, falsifiable_prediction, validation_approach" in message
+    assert "biological_entities.genes" in message
+    assert "Do not invent stage1_EGF--LRIG1.json" in message
+
+
+def test_retry_message_includes_topn_missing_repair_guidance() -> None:
+    message = build_hypothesis_retry_message(
+        "res_bc_drugtarget",
+        "breast cancer",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "TOPN_COVERAGE_MISSING: topn_missing=['NECTIN4'] after save_hypothesis_report validation."
+                    ],
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "[FEATURED-GAP]" in message
+    assert "NECTIN4" in message
+    assert "stage3_<GENE>.json" in message
+    assert "ot_<GENE>.json" in message
+    assert "Do NOT retry the same payload" in message
+
+
+def test_retry_message_includes_indexed_topn_patch_recipe() -> None:
+    message = build_hypothesis_retry_message(
+        "res_bc_drugtarget",
+        "breast cancer",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "TOPN_COVERAGE_MISSING: topn_missing=['EFNB2', 'EPHB4'] after save_hypothesis_report validation."
+                    ],
+                },
+            }
+        ],
+        attempt=3,
+        max_attempts=3,
+    )
+
+    assert "Patch recipe for deterministic save rejection" in message
+    assert "Add or revise one [FEATURED-GAP] recommendation for `EFNB2`" in message
+    assert "Add or revise one [FEATURED-GAP] recommendation for `EPHB4`" in message
+    assert "cite exact available `stage3_<GENE>.json` and `ot_<GENE>.json` files" in message
+
+
+def test_retry_message_includes_interest_cell_validation_repair_guidance() -> None:
+    message = build_hypothesis_retry_message(
+        "res_bc_drugtarget",
+        "breast cancer",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        (
+                            "hypotheses[0] cites target-cell-intrinsic Stage 1 "
+                            "evidence (stage1_CDH1--ERBB3.json) but "
+                            "validation_approach does not test the original "
+                            "interest label or resolved Census cell type."
+                        ),
+                        (
+                            "hypotheses[2] cites target-cell-intrinsic Stage 1 "
+                            "evidence (stage1_EGF--ERBB2.json) but "
+                            "biological_entities.cell_types does not include "
+                            "the original interest label or resolved Census "
+                            "cell type."
+                        ),
+                    ],
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "Interest-cell validation repair" in message
+    assert "hypothesis_writer_contract" in message
+    assert "required_cell_context_anchor" in message
+    assert "validation_approach" in message
+    assert "biological_entities.cell_types" in message
+    assert "stage1_CDH1--ERBB3.json" in message
+    assert "stage1_EGF--ERBB2.json" in message
+    assert "Legacy AT2/Epithelial repair" not in message
+
+
+def test_retry_message_includes_invalid_reference_repair_guidance() -> None:
+    message = build_hypothesis_retry_message(
+        "res_bc_drugtarget",
+        "breast cancer",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "hypotheses[1].evidence_references cites 'stage3_CD47.json' which is not in evidence/ directory.",
+                        "hypotheses[2].evidence_references cites Stage 1 pair 'CD47--ERBB3' without proven passed=true status (no passing Stage 1 filter entry found for 'CD47--ERBB3'). Stage 1 pair citations must be eligible hypothesis evidence.",
+                    ],
+                },
+            }
+        ],
+        attempt=1,
+        max_attempts=3,
+    )
+
+    assert "Invalid citation repair" in message
+    assert "validate_evidence_references" in message
+    assert "available_files" in message
+    assert "eligible_stage1_pair_files" in message
+    assert "NEVER invent filenames" in message
+    assert "stage3_CD47.json" in message
+    assert "CD47--ERBB3" in message
+
+
 def test_retry_message_includes_depleted_stage1_repair_guidance() -> None:
     message = build_hypothesis_retry_message(
         "res_ipf_drugtarget3",
@@ -184,11 +338,13 @@ def test_retry_message_includes_depleted_stage1_repair_guidance() -> None:
     )
 
     assert "Depleted Stage 1 repair" in message
-    assert "remove AT2, Transitional AT2, pulmonary/alveolar epithelial" in message
-    assert "resolved Census cell-type, epithelial-intrinsic, same-cell" in message
+    assert "original interest label" in message
+    assert "resolved Census cell type" in message
+    assert "legacy AT2, Transitional AT2, pulmonary/alveolar epithelial" in message
+    assert "epithelial-intrinsic, same-cell" in message
     assert "target-cell-autonomous wording" in message
     assert "from recommendations citing depleted Stage 1 files" in message
-    assert "cannot support primary AT2/epithelial intrinsic" in message
+    assert "cannot support primary interest-cell intrinsic" in message
     assert "same-cell, or target-cell-autonomous wording" in message
     assert (
         "`target-cell-depleted Stage 1 Census evidence as interest-cell support` "
@@ -202,10 +358,106 @@ def test_retry_message_includes_depleted_stage1_repair_guidance() -> None:
     assert "remove that Stage 1 pair citation entirely" in message
     assert "gene-level/actionability-only" in message
     assert (
-        "Do not leave the depleted Stage 1 file in a primary AT2/epithelial, "
-        "interest-cell, same-cell, or intrinsic recommendation"
+        "Do not leave the depleted Stage 1 file in a primary interest-cell, "
+        "legacy AT2/epithelial, same-cell, or intrinsic recommendation"
         in message
     )
+
+
+def test_retry_message_uses_legacy_at2_branch_for_at2_rejections() -> None:
+    message = build_hypothesis_retry_message(
+        "res_ipf_drugtarget",
+        "pulmonary fibrosis",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "hypotheses[1] uses target-cell-depleted Stage 1 Census evidence as interest-cell support: stage1_FN1--SDC2.json has negative target-vs-rest diff values.",
+                        "hypotheses[1] makes a target-cell-depleted gene expression claim for FN1 in AT2 pulmonary alveolar type 2 cell context.",
+                    ]
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "Legacy AT2/Epithelial repair" in message
+    assert "Primary AT2/Epithelial" in message
+    assert "remove AT2-intrinsic wording" in message
+    assert "stage3_<GENE>.json" in message
+
+
+def test_retry_message_uses_legacy_at2_branch_for_parenthetical_at2_rejections() -> None:
+    message = build_hypothesis_retry_message(
+        "res_ipf_drugtarget",
+        "pulmonary fibrosis",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "hypotheses[0] lists interest/resolved cell type (AT2) but validation_approach does not mention the original interest label or resolved Census cell type.",
+                    ]
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "Legacy AT2/Epithelial repair" in message
+
+
+def test_retry_message_uses_semantic_proxy_branch_for_malignant_cell_rejections() -> None:
+    message = build_hypothesis_retry_message(
+        "res_bc_drugtarget",
+        "breast cancer",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "hypotheses[0] lists interest/resolved cell type (malignant cell) but validation_approach does not mention the original interest label or resolved Census cell type.",
+                    ]
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "Semantic-proxy repair" in message
+    assert "Prolif Invasive Tumor" in message or "original interest label" in message
+    assert "malignant cell" in message
+    assert "generic tumor, breast-cancer, epithelial, or disease wording is not enough" in message
+
+
+def test_retry_message_does_not_use_semantic_proxy_branch_for_unrelated_malignant_cell_context() -> None:
+    message = build_hypothesis_retry_message(
+        "res_bc_drugtarget",
+        "breast cancer",
+        quality_errors=[
+            {
+                "code": "HYPOTHESIS_LAST_SAVE_REJECTION",
+                "message": "The last save_hypothesis_report attempt was rejected.",
+                "details": {
+                    "errors": [
+                        "hypotheses[1].evidence_references cites 'stage3_CD47.json' which is not in evidence/ directory for malignant cell context.",
+                    ]
+                },
+            }
+        ],
+        attempt=2,
+        max_attempts=3,
+    )
+
+    assert "Semantic-proxy repair" not in message
+    assert "Invalid citation repair" in message
 
 
 def test_retry_message_names_res3_final_depleted_stage1_blocker() -> None:

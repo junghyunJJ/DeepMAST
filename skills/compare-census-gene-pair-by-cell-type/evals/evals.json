@@ -1,0 +1,17 @@
+{
+  "skill_name": "compare-census-gene-pair-by-cell-type",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "A Census pair has high RR in resolved AT2 cells. Explain what a hypothesis_report may claim and what remains unproven.",
+      "expected_output": "The skill supports enrichment/coexpression wording and rejects causal regulation or ligand-receptor directionality unless separately evidenced.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "A Stage 1 pair is target-cell-depleted but spatially adjacent. Repair a same-cell intrinsic hypothesis claim.",
+      "expected_output": "The skill rewrites the claim as secondary spatial-niche or cross-cell context and removes same-cell/intrinsic wording.",
+      "files": []
+    }
+  ]
+}

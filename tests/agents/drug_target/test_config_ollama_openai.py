@@ -54,6 +54,15 @@ def test_drug_target_config_provider_literal_includes_ollama_openai():
     )
 
 
+def test_drug_target_config_provider_literal_includes_vllm():
+    """DrugTargetConfig.provider Literal must include the vLLM alias."""
+    provider_args = _get_provider_literal_values(_AGENT_SRC)
+    assert provider_args, "Could not parse DrugTargetConfig.provider Literal from source"
+    assert "vllm" in provider_args, (
+        f"DrugTargetConfig.provider Literal missing 'vllm'; got {provider_args}"
+    )
+
+
 def test_drug_target_config_provider_literal_still_includes_existing_providers():
     """T2.3 #2: regression — pre-existing provider values must remain in the Literal."""
     provider_args = _get_provider_literal_values(_AGENT_SRC)

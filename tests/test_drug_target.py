@@ -288,11 +288,12 @@ class TestSubagentConfigs:
     def test_hypothesis_writer_prompt_contains_ucb(self):
         from src.agents.drug_target.subagents.configs import SUBAGENT_CONFIGS
         prompt = SUBAGENT_CONFIGS["hypothesis_writer"]["system_prompt"]
-        assert "UCB" in prompt
+        assert "minimal operational contract" in prompt
+        assert 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")' in prompt
         assert "hypothesis" in prompt.lower()
         assert "hypothesis_report.json" in prompt
-        assert "Evidence_Coverage" in prompt
-        assert "Specificity" in prompt
+        assert "evidence_coverage" in prompt
+        assert "specificity" in prompt
 
     def test_subagent_prompts_registry_has_2_entries(self):
         """SUBAGENT_PROMPTS contains only evidence_assessor and hypothesis_writer
@@ -5926,21 +5927,19 @@ class TestCensusDiseaseTool:
         assert 'read_skill_file("skills/drug-target-hypothesis/SKILL.md")' in HYPOTHESIS_WRITER_PROMPT
 
     def test_hypothesis_writer_skill_read_is_first_workflow_step(self):
-        """Phase H7a (structural proxy): the skill read must appear at the top of the Workflow
-        (5 Phases) section, before Phase 1 begins. Anchors the first tool call deterministically."""
+        """The production prompt must require DTH before drafting recommendations."""
         from src.agents.drug_target.subagents.prompts import HYPOTHESIS_WRITER_PROMPT
 
-        workflow_marker = "## Workflow (5 Phases)"
-        phase1_marker = "### Phase 1: Evidence Ingestion & Target Categorization"
-        assert workflow_marker in HYPOTHESIS_WRITER_PROMPT
-        assert phase1_marker in HYPOTHESIS_WRITER_PROMPT
-        workflow_idx = HYPOTHESIS_WRITER_PROMPT.index(workflow_marker)
-        phase1_idx = HYPOTHESIS_WRITER_PROMPT.index(phase1_marker)
+        skill_marker = "## Forced Skill Reads"
+        draft_marker = "## Structured Mechanical Contract Packet"
+        assert skill_marker in HYPOTHESIS_WRITER_PROMPT
+        assert draft_marker in HYPOTHESIS_WRITER_PROMPT
+        skill_section_idx = HYPOTHESIS_WRITER_PROMPT.index(skill_marker)
         skill_read_idx = HYPOTHESIS_WRITER_PROMPT.index(
             'read_skill_file("skills/drug-target-hypothesis/SKILL.md")'
         )
-        # skill_read must come between the Workflow header and Phase 1's start
-        assert workflow_idx < skill_read_idx < phase1_idx
+        draft_idx = HYPOTHESIS_WRITER_PROMPT.index(draft_marker)
+        assert skill_section_idx < skill_read_idx < draft_idx
 
     def test_read_skill_file_reads_project_relative_skill_doc(self, tmp_path):
         # read_skill_file now lives in src.agents.shared.skill_reader and uses

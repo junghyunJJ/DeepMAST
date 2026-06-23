@@ -16,6 +16,12 @@ def test_schema_accepts_ollama_openai():
     assert config.llm_provider == "ollama-openai"
 
 
+def test_schema_accepts_vllm():
+    """LLMConfigSchema(llm_provider='vllm') must not raise."""
+    config = LLMConfigSchema(llm_provider="vllm")
+    assert config.llm_provider == "vllm"
+
+
 def test_schema_still_accepts_existing_providers():
     """T2.1 #2: regression — all pre-existing providers still accepted."""
     for provider in ("openrouter", "openai", "google", "ollama", "claude"):

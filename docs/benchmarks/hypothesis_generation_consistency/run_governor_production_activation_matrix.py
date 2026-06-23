@@ -49,10 +49,16 @@ def parse_csv_models(raw: str) -> tuple[str, ...]:
     return _split_csv(raw, field_name="--models")
 
 
+def normalize_provider(raw: str) -> str:
+    provider = raw.strip().lower()
+    if not provider:
+        raise ValueError("--provider must be non-empty")
+    return provider
+
+
 def parse_csv_ports(raw: str) -> tuple[int, ...]:
     values = _split_csv(raw, field_name="--ports")
     ports: list[int] = []
-    seen: set[int] = set()
     for value in values:
         try:
             port = int(value)
@@ -60,11 +66,60 @@ def parse_csv_ports(raw: str) -> tuple[int, ...]:
             raise ValueError(f"invalid port {value!r}") from exc
         if not 1 <= port <= 65535:
             raise ValueError(f"invalid port {value!r}; expected 1..65535")
-        if port in seen:
-            raise ValueError(f"duplicate port {port}; expected unique physical ports")
-        seen.add(port)
         ports.append(port)
     return tuple(ports)
+
+
+def unique_physical_ports(ports: Sequence[int]) -> tuple[int, ...]:
+    seen: set[int] = set()
+    unique: list[int] = []
+    for port in ports:
+        if int(port) in seen:
+            continue
+        seen.add(int(port))
+        unique.append(int(port))
+    return tuple(unique)
+
+
+def build_port_worker_slots(ports: Sequence[int]) -> list[dict[str, Any]]:
+    port_values = tuple(int(port) for port in ports)
+    port_counts = {port: port_values.count(port) for port in port_values}
+    seen_counts: dict[int, int] = {}
+    workers: list[dict[str, Any]] = []
+    for worker_index, physical_port in enumerate(port_values, start=1):
+        slot = seen_counts.get(physical_port, 0) + 1
+        seen_counts[physical_port] = slot
+        duplicate = port_counts[physical_port] > 1
+        workers.append(
+            {
+                "port": physical_port,
+                "port_slot": slot,
+                "worker_index": worker_index,
+                "worker_id": (
+                    f"{physical_port}_{slot}"
+                    if duplicate
+                    else str(physical_port)
+                ),
+                "duplicate_port": duplicate,
+            }
+        )
+    return workers
+
+
+def build_provider_worker_slots(
+    provider: str,
+    parallel_workers: int,
+) -> list[dict[str, Any]]:
+    if parallel_workers < 1:
+        raise ValueError("parallel_workers must be >= 1")
+    return [
+        {
+            "provider": provider,
+            "worker_index": worker_index,
+            "worker_id": f"{provider}-{worker_index}",
+        }
+        for worker_index in range(1, parallel_workers + 1)
+    ]
 
 
 def parse_csv_modes(raw: str) -> tuple[str, ...]:
@@ -85,29 +140,76 @@ def build_trial_plan(
     ports: Sequence[int],
     modes: Sequence[str],
     repeats_per_condition: int | None = None,
+    provider: str = "ollama",
+    parallel_workers: int = 1,
 ) -> list[dict[str, Any]]:
-    if not ports:
-        raise ValueError("ports must contain at least one port")
-    effective_repeats = len(ports) if repeats_per_condition is None else repeats_per_condition
+    provider_name = normalize_provider(provider)
+    if parallel_workers < 1:
+        raise ValueError("parallel_workers must be >= 1")
+    if provider_name == "ollama":
+        if not ports:
+            raise ValueError("ports must contain at least one port")
+        worker_count = len(ports)
+        port_workers = build_port_worker_slots(ports)
+    else:
+        worker_count = parallel_workers
+        provider_workers = build_provider_worker_slots(provider_name, worker_count)
+
+    effective_repeats = (
+        worker_count if repeats_per_condition is None else repeats_per_condition
+    )
     if effective_repeats < 1:
         raise ValueError("repeats_per_condition must be >= 1")
 
     trials: list[dict[str, Any]] = []
-    for model in models:
-        for mode in modes:
-            for repeat_index in range(1, effective_repeats + 1):
-                port = int(ports[(repeat_index - 1) % len(ports)])
-                wave = (repeat_index - 1) // len(ports)
-                trials.append(
-                    {
+    if provider_name == "ollama":
+        has_duplicate_ports = any(worker["duplicate_port"] for worker in port_workers)
+        for model in models:
+            for mode in modes:
+                for repeat_index in range(1, effective_repeats + 1):
+                    worker = port_workers[(repeat_index - 1) % len(port_workers)]
+                    port = int(worker["port"])
+                    wave = (repeat_index - 1) // len(ports)
+                    run_id = f"{model_slug(model)}_{mode}_rep{repeat_index:03d}_port{port}"
+                    if has_duplicate_ports and worker["duplicate_port"]:
+                        run_id += f"_slot{worker['port_slot']}"
+                    trial = {
                         "model": model,
                         "port": port,
                         "mode": mode,
                         "repeat": repeat_index,
                         "wave": wave,
+                        "run_id": run_id,
+                    }
+                    if has_duplicate_ports:
+                        trial.update(
+                            {
+                                "port_slot": int(worker["port_slot"]),
+                                "worker_index": int(worker["worker_index"]),
+                                "worker_id": str(worker["worker_id"]),
+                            }
+                        )
+                    trials.append(trial)
+        return trials
+
+    for model in models:
+        for mode in modes:
+            for repeat_index in range(1, effective_repeats + 1):
+                worker = provider_workers[(repeat_index - 1) % len(provider_workers)]
+                wave = (repeat_index - 1) // worker_count
+                worker_index = int(worker["worker_index"])
+                trials.append(
+                    {
+                        "provider": provider_name,
+                        "model": model,
+                        "mode": mode,
+                        "repeat": repeat_index,
+                        "wave": wave,
+                        "worker_index": worker_index,
+                        "worker_id": str(worker["worker_id"]),
                         "run_id": (
-                            f"{model_slug(model)}_{mode}_"
-                            f"rep{repeat_index:03d}_port{port}"
+                            f"{model_slug(model)}_{mode}_rep{repeat_index:03d}_"
+                            f"{provider_name}_slot{worker_index}"
                         ),
                     }
                 )
@@ -162,29 +264,65 @@ def build_dry_run_payload(
     timeout_minutes: int,
     wait_for_completion: bool,
     hypothesis_skill_set: str,
+    hypothesis_writer_prompt_mode: str,
     hypothesis_scope_errors: Sequence[str],
+    host_hypothesis_fallback: str,
+    provider: str = "ollama",
+    parallel_workers: int | None = None,
 ) -> dict[str, Any]:
+    provider_name = normalize_provider(provider)
+    effective_parallel_workers = (
+        len(ports) if parallel_workers is None and provider_name == "ollama"
+        else 1 if parallel_workers is None
+        else parallel_workers
+    )
     per_condition: dict[str, int] = {}
     per_port: dict[str, int] = {}
+    per_worker: dict[str, int] = {}
     for trial in trials:
         condition_key = f"{trial['model']}::{trial['mode']}"
         per_condition[condition_key] = per_condition.get(condition_key, 0) + 1
-        port_key = str(trial["port"])
-        per_port[port_key] = per_port.get(port_key, 0) + 1
+        port_key = None
+        if "port" in trial:
+            port_key = str(trial["port"])
+            per_port[port_key] = per_port.get(port_key, 0) + 1
+        worker_key = str(trial.get("worker_id", port_key or provider_name))
+        per_worker[worker_key] = per_worker.get(worker_key, 0) + 1
+    workers = (
+        [
+            {
+                key: value
+                for key, value in worker.items()
+                if key != "duplicate_port"
+            }
+            for worker in build_port_worker_slots(ports)
+        ]
+        if provider_name == "ollama"
+        else build_provider_worker_slots(provider_name, int(effective_parallel_workers))
+    )
     return {
         "dry_run": True,
         "source": str(source),
         "trial_count": len(trials),
+        "provider": provider_name,
         "models": list(models),
-        "ports": [int(port) for port in ports],
+        "ports": [int(port) for port in ports] if provider_name == "ollama" else [],
+        "unique_physical_ports": (
+            list(unique_physical_ports(ports)) if provider_name == "ollama" else []
+        ),
+        "parallel_workers": int(effective_parallel_workers),
+        "workers": workers,
         "modes": list(modes),
         "repeats_per_condition": repeats_per_condition,
         "timeout_minutes": timeout_minutes,
         "wait_for_completion": wait_for_completion,
         "hypothesis_skill_set": hypothesis_skill_set,
+        "hypothesis_writer_prompt_mode": hypothesis_writer_prompt_mode,
         "hypothesis_scope_errors": list(hypothesis_scope_errors),
+        "host_hypothesis_fallback": host_hypothesis_fallback,
         "per_condition": dict(sorted(per_condition.items())),
         "per_port": dict(sorted(per_port.items())),
+        "per_worker": dict(sorted(per_worker.items())),
     }
 
 
@@ -281,7 +419,11 @@ def run_trial_batch_parallel(
     wait_for_completion: bool,
     activation_trace_grace_seconds: float,
     hypothesis_skill_set: str = "expanded6",
+    hypothesis_writer_prompt_mode: str = "default",
+    host_hypothesis_fallback: str = "off",
+    provider: str = "ollama",
 ) -> list[dict[str, Any]]:
+    provider_name = normalize_provider(provider)
     rows: list[dict[str, Any]] = []
     with ThreadPoolExecutor(max_workers=len(batch)) as executor:
         futures = [
@@ -297,12 +439,21 @@ def run_trial_batch_parallel(
                 monitor_activation_trace=not wait_for_completion,
                 activation_trace_grace_seconds=activation_trace_grace_seconds,
                 hypothesis_skill_set=hypothesis_skill_set,
+                hypothesis_writer_prompt_mode=hypothesis_writer_prompt_mode,
+                host_hypothesis_fallback=host_hypothesis_fallback,
+                provider=provider_name,
             )
             for trial in batch
         ]
         for future in as_completed(futures):
             rows.append(future.result())
-    return sorted(rows, key=lambda row: int(row["port"]))
+    return sorted(
+        rows,
+        key=lambda row: (
+            int(row.get("worker_index", 0) or 0),
+            int(row["port"]) if "port" in row else 0,
+        ),
+    )
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -321,14 +472,62 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Hypothesis-writer skill registry for traced benchmark runs.",
     )
     parser.add_argument(
+        "--host-hypothesis-fallback",
+        choices=("off", "recovery"),
+        default="off",
+        help=(
+            "Enable deterministic host hypothesis fallback for recovery smokes. "
+            "Use 'off' for pure writer benchmarking and 'recovery' for pipeline "
+            "stability acceptance runs."
+        ),
+    )
+    parser.add_argument(
+        "--hypothesis-writer-prompt-mode",
+        choices=(
+            "default",
+            "dth_contrast_no_skill",
+            "dth_contrast_dth_required",
+            "operational_contract_only",
+            "operational_contract_plus_dth",
+            "operational_contract_minimal",
+            "operational_contract_minimal_plus_dth",
+            "thin_basic",
+            "thin_basic_dth_required",
+            "thin_basic_domain4_required",
+            "thin_basic_dth_plus_domain4_required",
+            "dth_only_required",
+            "progressive_disclosure_only",
+            "progressive_disclosure_with_modality_map",
+        ),
+        default="default",
+        help=(
+            "Prompt variant for hypothesis_writer. Use "
+            "'progressive_disclosure_only' to remove prompt-level forced skill "
+            "reads, 'dth_only_required' for DTH-only controlled activation "
+            "runs, or 'progressive_disclosure_with_modality_map' to keep soft "
+            "modality-to-skill routing without forcing drug-target-hypothesis."
+        ),
+    )
+    parser.add_argument(
         "--models",
         default=",".join(DEFAULT_MODELS),
         help="Comma-separated model list for this matrix.",
     )
     parser.add_argument(
+        "--provider",
+        default="ollama",
+        help="LLM provider for traced runs. Ollama uses --ports; non-Ollama uses --parallel-workers.",
+    )
+    parser.add_argument(
         "--ports",
         default=",".join(str(port) for port in DEFAULT_PORTS),
-        help="Comma-separated Ollama ports for this matrix.",
+        help="Comma-separated Ollama ports for this matrix; ignored for non-Ollama providers.",
+    )
+    parser.add_argument(
+        "--parallel-workers",
+        type=int,
+        default=1,
+        help="Number of serial/parallel worker slots for non-Ollama providers.",
     )
     parser.add_argument(
         "--modes",
@@ -367,6 +566,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    fallback_mode = getattr(args, "host_hypothesis_fallback", "off")
+    prompt_mode = getattr(args, "hypothesis_writer_prompt_mode", "default")
+    try:
+        provider = normalize_provider(getattr(args, "provider", "ollama"))
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     project_root = PROJECT_ROOT
     stamp = time.strftime("governor_production_activation_%Y%m%d_%H%M%S")
     output_root = (
@@ -389,17 +594,28 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         selected_models = parse_csv_models(args.models)
-        selected_ports = parse_csv_ports(args.ports)
+        selected_ports = (
+            parse_csv_ports(args.ports)
+            if provider == "ollama"
+            else ()
+        )
         selected_modes = parse_csv_modes(args.modes)
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
+    parallel_workers = int(getattr(args, "parallel_workers", 1) or 1)
+    if parallel_workers < 1:
+        raise SystemExit("--parallel-workers must be >= 1")
 
     if args.repeats_per_condition is not None and args.repeats_per_condition < 1:
         raise SystemExit("--repeats-per-condition must be >= 1")
-    repeats_per_condition = (
-        len(selected_ports)
-        if args.repeats_per_condition is None
-        else args.repeats_per_condition
+    if args.repeats_per_condition is None:
+        repeats_per_condition = (
+            len(selected_ports) if provider == "ollama" else parallel_workers
+        )
+    else:
+        repeats_per_condition = args.repeats_per_condition
+    selected_unload_ports = (
+        unique_physical_ports(selected_ports) if provider == "ollama" else ()
     )
 
     trials = build_trial_plan(
@@ -407,6 +623,8 @@ def main(argv: list[str] | None = None) -> int:
         ports=selected_ports,
         modes=selected_modes,
         repeats_per_condition=repeats_per_condition,
+        provider=provider,
+        parallel_workers=parallel_workers,
     )
 
     scope_errors = _hypothesis_scope_errors(check_hypothesis_scope_untraced(source))
@@ -423,7 +641,13 @@ def main(argv: list[str] | None = None) -> int:
                     timeout_minutes=args.timeout_minutes,
                     wait_for_completion=args.wait_for_completion,
                     hypothesis_skill_set=args.hypothesis_skill_set,
+                    hypothesis_writer_prompt_mode=prompt_mode,
                     hypothesis_scope_errors=scope_errors,
+                    host_hypothesis_fallback=fallback_mode,
+                    provider=provider,
+                    parallel_workers=(
+                        len(selected_ports) if provider == "ollama" else parallel_workers
+                    ),
                 ),
                 indent=2,
                 ensure_ascii=False,
@@ -466,10 +690,17 @@ def main(argv: list[str] | None = None) -> int:
         aggregate = aggregate_activation(rows)
         payload = {
             "source": str(source),
+            "provider": provider,
             "models": list(selected_models),
-            "ports": list(selected_ports),
+            "ports": list(selected_ports) if provider == "ollama" else [],
+            "unique_physical_ports": list(selected_unload_ports),
+            "parallel_workers": (
+                len(selected_ports) if provider == "ollama" else parallel_workers
+            ),
             "modes": list(selected_modes),
             "hypothesis_skill_set": args.hypothesis_skill_set,
+            "hypothesis_writer_prompt_mode": prompt_mode,
+            "host_hypothesis_fallback": fallback_mode,
             "repeats_per_condition": repeats_per_condition,
             "runs_requested": len(trials),
             "resume": args.resume,
@@ -496,8 +727,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         for batch in batches_by_model_mode_and_wave(pending_trials):
             model = str(batch[0]["model"])
-            if active_model is not None and active_model != model:
-                unload_events.extend(unload_model_from_ports(active_model, selected_ports))
+            if provider == "ollama" and active_model is not None and active_model != model:
+                unload_events.extend(
+                    unload_model_from_ports(active_model, selected_unload_ports)
+                )
             active_model = model
 
             batch_rows = run_trial_batch_parallel(
@@ -511,6 +744,9 @@ def main(argv: list[str] | None = None) -> int:
                 wait_for_completion=args.wait_for_completion,
                 activation_trace_grace_seconds=args.activation_trace_grace_seconds,
                 hypothesis_skill_set=args.hypothesis_skill_set,
+                hypothesis_writer_prompt_mode=prompt_mode,
+                host_hypothesis_fallback=fallback_mode,
+                provider=provider,
             )
             rerun_run_ids = {str(row["run_id"]) for row in batch_rows}
             rows = [row for row in rows if str(row.get("run_id")) not in rerun_run_ids]
@@ -535,7 +771,10 @@ def main(argv: list[str] | None = None) -> int:
             )
     finally:
         if active_model is not None:
-            unload_events.extend(unload_model_from_ports(active_model, selected_ports))
+            if provider == "ollama":
+                unload_events.extend(
+                    unload_model_from_ports(active_model, selected_unload_ports)
+                )
         write_results()
         write_runner_state(
             output_root=output_root,

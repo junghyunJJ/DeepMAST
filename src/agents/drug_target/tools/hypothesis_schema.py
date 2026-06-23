@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,7 +59,39 @@ _CHEMBL_DRUG_WORDING_RE = re.compile(
     re.IGNORECASE,
 )
 _FIBROSIS_RESOLUTION_RE = re.compile(r"\bfibrosis resolution\b", re.IGNORECASE)
+_EXPLICIT_NON_ANCHOR_CELL_CONTEXT_RE = re.compile(
+    r"\b("
+    r"fibroblast|fibroblasts|intestinal\s+epithelial|macrophage|macrophages|"
+    r"endothelial|endothelium|stromal|myeloid|monocyte|monocytes|lymphocyte|"
+    r"lymphocytes|t\s*cell|t\s*cells|b\s*cell|b\s*cells"
+    r")\b",
+    re.IGNORECASE,
+)
 _HYPOTHESIS_REJECTION_FILENAME = "hypothesis_report_last_rejection.json"
+_VIRTUAL_HYPOTHESIS_DATA_DIRS = {"", "/", "/evidence", "evidence", "./evidence"}
+
+
+def _env_hypothesis_workspace() -> Path | None:
+    for env_key in ("DRUG_TARGET_DATA_DIR", "DEEP_INTERPRETER_DATA_DIR"):
+        raw = os.getenv(env_key)
+        if not raw:
+            continue
+        path = Path(raw).expanduser().resolve()
+        if path.exists():
+            return path
+    return None
+
+
+def _resolve_hypothesis_report_data_dir(data_dir: str | Path) -> Path:
+    raw = str(data_dir or "").strip()
+    env_workspace = _env_hypothesis_workspace()
+    if env_workspace is not None:
+        if raw in _VIRTUAL_HYPOTHESIS_DATA_DIRS:
+            return env_workspace
+        resolved = Path(raw).expanduser().resolve()
+        if resolved == Path("/") or resolved == Path("/evidence"):
+            return env_workspace
+    return Path(raw).expanduser().resolve()
 
 
 def _hypothesis_rejection_path(evidence_dir: Path) -> Path:
@@ -596,6 +629,144 @@ def _hypothesis_has_epithelial_anchor(hypothesis: dict[str, Any]) -> bool:
     return bool(_EPITHELIAL_ANCHOR_RE.search(text))
 
 
+def _normal_celltype(value: Any) -> str:
+    text = re.sub(r"[^a-z0-9]+", " ", str(value or "").lower())
+    return " ".join(text.split())
+
+
+_LEGACY_AT2_TOKENS = {
+    "at2",
+    "transitional at2",
+    "pulmonary alveolar type 2 cell",
+    "alveolar type 2 cell",
+    "alveolar epithelial",
+    "pulmonary epithelial",
+    "epithelial",
+}
+
+
+def _celltype_resolution_context(evidence_dir: Path) -> dict[str, Any]:
+    try:
+        celltype_resolution = json.loads(
+            (evidence_dir / "celltype_resolution.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError):
+        return {
+            "branch": "unknown",
+            "legacy_at2": False,
+            "semantic_proxy": False,
+            "anchor_tokens": set(),
+            "match_modes": set(),
+        }
+    if not isinstance(celltype_resolution, dict):
+        return {
+            "branch": "unknown",
+            "legacy_at2": False,
+            "semantic_proxy": False,
+            "anchor_tokens": set(),
+            "match_modes": set(),
+        }
+
+    raw_tokens: list[str] = []
+    match_modes: set[str] = set()
+    for key in ("primary_input_celltype", "primary_resolved_celltype"):
+        value = celltype_resolution.get(key)
+        if isinstance(value, str):
+            raw_tokens.append(value)
+
+    interest_celltypes = celltype_resolution.get("interest_celltypes")
+    if isinstance(interest_celltypes, list):
+        raw_tokens.extend(
+            value for value in interest_celltypes if isinstance(value, str)
+        )
+
+    matches = celltype_resolution.get("matches")
+    if isinstance(matches, list):
+        for match in matches:
+            if not isinstance(match, dict):
+                continue
+            match_mode = str(match.get("match_mode") or "").strip()
+            if match_mode:
+                match_modes.add(match_mode)
+            for key in ("input_celltype", "matched_celltype", "resolved_celltype"):
+                value = match.get(key)
+                if isinstance(value, str):
+                    raw_tokens.append(value)
+
+    anchor_tokens = {
+        token
+        for token in (_normal_celltype(value) for value in raw_tokens)
+        if token
+    }
+    legacy_at2 = bool(anchor_tokens.intersection(_LEGACY_AT2_TOKENS))
+    semantic_proxy = "semantic_proxy" in match_modes
+    branch = (
+        "legacy_at2"
+        if legacy_at2
+        else "semantic_proxy" if semantic_proxy else "dynamic"
+    )
+    return {
+        "branch": branch,
+        "legacy_at2": legacy_at2,
+        "semantic_proxy": semantic_proxy,
+        "anchor_tokens": anchor_tokens,
+        "match_modes": match_modes,
+    }
+
+
+def _celltype_resolution_anchor_tokens(evidence_dir: Path) -> set[str]:
+    context = _celltype_resolution_context(evidence_dir)
+    tokens = context["anchor_tokens"]
+    return set(tokens) if isinstance(tokens, set) else set()
+
+
+def _celltype_anchor_variants(tokens: set[str]) -> set[str]:
+    variants = set(tokens)
+    for token in tokens:
+        if token.endswith(" cell"):
+            variants.add(f"{token}s")
+    return variants
+
+
+def _hypothesis_has_interest_cell_anchor(
+    hypothesis: dict[str, Any],
+    evidence_dir: Path,
+) -> bool:
+    if _hypothesis_has_epithelial_anchor(hypothesis):
+        return True
+
+    fields: list[Any] = [
+        hypothesis.get("title"),
+        hypothesis.get("core_claim"),
+        hypothesis.get("mechanism"),
+        hypothesis.get("patient_context"),
+        hypothesis.get("experimental_test"),
+        hypothesis.get("falsifiable_prediction"),
+        hypothesis.get("validation_approach"),
+    ]
+
+    raw_cell_types = hypothesis.get("cell_types")
+    if isinstance(raw_cell_types, list):
+        fields.extend(raw_cell_types)
+
+    entities = hypothesis.get("biological_entities")
+    if isinstance(entities, dict):
+        raw_entity_cell_types = entities.get("cell_types")
+        if isinstance(raw_entity_cell_types, list):
+            fields.extend(raw_entity_cell_types)
+
+    text = _normal_celltype(" ".join(str(value) for value in fields if value))
+    if not text:
+        return False
+
+    return any(
+        f" {token} " in f" {text} "
+        for token in _celltype_anchor_variants(
+            _celltype_resolution_anchor_tokens(evidence_dir)
+        )
+    )
+
+
 def _stage1_pair_files_for_intrinsic_coverage(
     canonical: dict[str, Any],
     evidence_dir: Path,
@@ -628,6 +799,126 @@ def _stage1_pair_files_for_intrinsic_coverage(
     return sorted(stage1_pair_files)
 
 
+def _celltype_contract_anchor(evidence_dir: Path) -> str:
+    path = evidence_dir / "celltype_resolution.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+
+    for key in ("primary_resolved_celltype", "primary_input_celltype"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    interest = payload.get("interest_celltypes")
+    if isinstance(interest, list):
+        for value in interest:
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    if isinstance(interest, str) and interest.strip():
+        return interest.strip()
+
+    matches = payload.get("matches")
+    if isinstance(matches, list):
+        for match in matches:
+            if not isinstance(match, dict):
+                continue
+            for key in ("resolved_celltype", "matched_celltype", "input_celltype"):
+                value = match.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+    return ""
+
+
+def _contains_celltype_anchor(value: Any, evidence_dir: Path) -> bool:
+    text = _normal_celltype(value)
+    if not text:
+        return False
+    tokens = _celltype_anchor_variants(_celltype_resolution_anchor_tokens(evidence_dir))
+    return any(f" {token} " in f" {text} " for token in tokens)
+
+
+def _has_explicit_non_anchor_cell_context(value: Any) -> bool:
+    return bool(_EXPLICIT_NON_ANCHOR_CELL_CONTEXT_RE.search(str(value or "")))
+
+
+def _autofix_intrinsic_stage1_cell_anchor(
+    canonical: dict[str, Any],
+    evidence_dir: Path,
+) -> list[dict[str, Any]]:
+    from src.agents.drug_target.tools.evidence_loader import (
+        _stage1_pair_usage_guidance,
+    )
+
+    anchor = _celltype_contract_anchor(evidence_dir)
+    if not anchor:
+        return []
+
+    guidance = _stage1_pair_usage_guidance(
+        evidence_dir,
+        _stage1_pair_files_for_intrinsic_coverage(canonical, evidence_dir),
+    )
+    intrinsic_files = set(
+        guidance.get("interest_cell_intrinsic_stage1_pair_files") or []
+    )
+    if not intrinsic_files:
+        return []
+
+    diagnostics: list[dict[str, Any]] = []
+    for idx, hypothesis in enumerate(canonical.get("hypotheses") or []):
+        if not isinstance(hypothesis, dict):
+            continue
+        refs = {
+            str(ref)
+            for ref in hypothesis.get("evidence_references", [])
+            if isinstance(ref, str)
+        }
+        if not intrinsic_files.intersection(refs):
+            continue
+
+        fields_changed: list[str] = []
+        entities = hypothesis.get("biological_entities")
+        if not isinstance(entities, dict):
+            entities = {}
+            hypothesis["biological_entities"] = entities
+        cell_types = entities.get("cell_types")
+        if not isinstance(cell_types, list):
+            cell_types = []
+            entities["cell_types"] = cell_types
+        cell_type_text = " ".join(str(v) for v in cell_types if v)
+        if (
+            not cell_type_text
+            and not _contains_celltype_anchor(cell_type_text, evidence_dir)
+        ):
+            cell_types.append(anchor)
+            fields_changed.append("biological_entities.cell_types")
+
+        validation = hypothesis.get("validation_approach")
+        if (
+            not _contains_celltype_anchor(validation, evidence_dir)
+            and not _has_explicit_non_anchor_cell_context(validation)
+        ):
+            current = str(validation or "").strip()
+            suffix = f" Test in {anchor} context."
+            hypothesis["validation_approach"] = (
+                f"{current.rstrip('.')}." if current else "Validate the hypothesis."
+            ) + suffix
+            fields_changed.append("validation_approach")
+
+        if fields_changed:
+            diagnostics.append({
+                "code": "INTEREST_CELL_ANCHOR_AUTOFIX",
+                "hypothesis_index": idx,
+                "anchor": anchor,
+                "fields": fields_changed,
+            })
+
+    return diagnostics
+
+
 def _validate_primary_epithelial_intrinsic_coverage(
     canonical: dict[str, Any],
     evidence_dir: str | Path,
@@ -654,7 +945,7 @@ def _validate_primary_epithelial_intrinsic_coverage(
         if not isinstance(refs, list):
             continue
         if intrinsic_files.intersection(str(ref) for ref in refs) and (
-            _hypothesis_has_epithelial_anchor(hypothesis)
+            _hypothesis_has_interest_cell_anchor(hypothesis, evidence_path)
         ):
             return []
 
@@ -663,7 +954,7 @@ def _validate_primary_epithelial_intrinsic_coverage(
 
 def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
     """Validate, canonicalize, and write evidence/hypothesis_report.json."""
-    base = Path(data_dir).expanduser().resolve()
+    base = _resolve_hypothesis_report_data_dir(data_dir)
     evidence_dir = base / "evidence"
     evidence_dir.mkdir(parents=True, exist_ok=True)
 
@@ -697,6 +988,7 @@ def persist_hypothesis_report(data_dir: str | Path, report: Any) -> dict:
     canonical["evidence_coverage_pct"] = diag["evidence_coverage_pct"]
     canonical["topn_coverage"] = diag["topn_coverage"]
     canonical["gap_analysis"] = diag["gap_analysis"]
+    diagnostics.extend(_autofix_intrinsic_stage1_cell_anchor(canonical, evidence_dir))
 
     deterministic_errors: list[str] = []
     ref_errors = _validate_hypothesis_report_references(canonical, evidence_dir)
@@ -979,8 +1271,8 @@ def validate_hypothesis_report_quality(
             _quality_error(
                 error_code,
                 "At least one hypothesis must cite an intrinsic Stage 1 pair file "
-                "and name an AT2, alveolar epithelial, pulmonary epithelial, or "
-                "epithelial context.",
+                "and name the original interest cell label, resolved Census cell "
+                "type, or legacy AT2/epithelial context.",
             )
         )
     if diag["failed_pair_violations"]:

@@ -129,6 +129,13 @@ def load_activation_trace(path: Path) -> tuple[dict[str, Any], bool, str | None]
     return payload, True, None
 
 
+def trace_records_host_hypothesis_fallback(trace_text: str) -> bool:
+    return (
+        "host_hypothesis_fallback_used: YES" in trace_text
+        or "[HOST-HYPOTHESIS-FIXUP] save_hypothesis_report completed" in trace_text
+    )
+
+
 def terminate_process_gracefully(
     process: subprocess.Popen,
     *,
@@ -231,28 +238,42 @@ def run_one_trial(
     monitor_activation_trace: bool = False,
     activation_trace_grace_seconds: float = DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
     hypothesis_skill_set: str = "expanded6",
+    hypothesis_writer_prompt_mode: str = "default",
+    host_hypothesis_fallback: str = "off",
+    provider: str = "ollama",
 ) -> dict[str, Any]:
     run_id = str(trial["run_id"])
+    provider_name = provider.strip().lower()
+    if not provider_name:
+        raise ValueError("provider must be non-empty")
     workspace = workspace_root / run_id
     copy_source_workspace(source, workspace, force=force)
 
     activation_trace_path = workspace / "activation_trace.json"
     stdout_path = output_root / f"{run_id}.stdout.log"
     stderr_path = output_root / f"{run_id}.stderr.log"
+    stdout_path.parent.mkdir(parents=True, exist_ok=True)
+    stderr_path.parent.mkdir(parents=True, exist_ok=True)
     started = time.time()
 
     env = os.environ.copy()
-    env.update(
-        {
-            "LLM_PROVIDER": "ollama",
-            "LLM_MODEL": str(trial["model"]),
-            "OLLAMA_MODEL": str(trial["model"]),
-            "OLLAMA_REASONING": "false",
-            "OLLAMA_HOST": f"http://127.0.0.1:{trial['port']}",
-            "OLLAMA_BASE_URL": f"http://127.0.0.1:{trial['port']}",
-            "DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK": "",
-        }
-    )
+    env_updates = {
+        "LLM_PROVIDER": provider_name,
+        "LLM_MODEL": str(trial["model"]),
+        "DRUG_TARGET_ENABLE_HOST_HYPOTHESIS_FALLBACK": (
+            "" if host_hypothesis_fallback == "off" else host_hypothesis_fallback
+        ),
+    }
+    if provider_name == "ollama":
+        env_updates.update(
+            {
+                "OLLAMA_MODEL": str(trial["model"]),
+                "OLLAMA_REASONING": "false",
+                "OLLAMA_HOST": f"http://127.0.0.1:{trial['port']}",
+                "OLLAMA_BASE_URL": f"http://127.0.0.1:{trial['port']}",
+            }
+        )
+    env.update(env_updates)
 
     command = [
         sys.executable,
@@ -262,20 +283,31 @@ def run_one_trial(
         "--disease",
         disease,
         "--provider",
-        "ollama",
-        "--port",
-        str(trial["port"]),
-        "--timeout",
-        str(timeout_minutes),
-        "--no-debug",
-        "--skip-evidence-assessor",
-        "--hypothesis-skill-set",
-        hypothesis_skill_set,
-        "--skill-activation-mode",
-        str(trial["mode"]),
-        "--activation-trace-json",
-        str(activation_trace_path),
+        provider_name,
     ]
+    if provider_name == "ollama":
+        command.extend(
+            [
+                "--port",
+                str(trial["port"]),
+            ]
+        )
+    command.extend(
+        [
+            "--timeout",
+            str(timeout_minutes),
+            "--no-debug",
+            "--skip-evidence-assessor",
+            "--hypothesis-skill-set",
+            hypothesis_skill_set,
+            "--hypothesis-writer-prompt-mode",
+            hypothesis_writer_prompt_mode,
+            "--skill-activation-mode",
+            str(trial["mode"]),
+            "--activation-trace-json",
+            str(activation_trace_path),
+        ]
+    )
 
     returncode: int | None = None
     error: str | None = None
@@ -337,10 +369,22 @@ def run_one_trial(
     activation_trace, activation_trace_valid, activation_trace_error = (
         load_activation_trace(activation_trace_path)
     )
+    trace_logs = sorted(workspace.glob("trace_*.log"))
+    trace_log_path = trace_logs[-1] if trace_logs else workspace / "trace.log"
+    trace_text = (
+        trace_log_path.read_text(encoding="utf-8", errors="ignore")
+        if trace_log_path.exists()
+        else ""
+    )
+    host_hypothesis_fallback_used = trace_records_host_hypothesis_fallback(trace_text)
 
     return {
         **trial,
+        "provider": provider_name,
         "hypothesis_skill_set": hypothesis_skill_set,
+        "hypothesis_writer_prompt_mode": hypothesis_writer_prompt_mode,
+        "host_hypothesis_fallback": host_hypothesis_fallback,
+        "host_hypothesis_fallback_used": host_hypothesis_fallback_used,
         "workspace": str(workspace),
         "activation_trace": str(activation_trace_path),
         "stdout_log": str(stdout_path),
@@ -397,6 +441,18 @@ def aggregate_activation(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
                 for row in group_rows
                 if row.get("validation", {}).get("validation_passed")
             ),
+            "fallback_assisted_successes": sum(
+                1
+                for row in group_rows
+                if row.get("host_hypothesis_fallback_used")
+                and row.get("validation", {}).get("validation_passed")
+            ),
+            "writer_native_successes": sum(
+                1
+                for row in group_rows
+                if not row.get("host_hypothesis_fallback_used")
+                and row.get("validation", {}).get("validation_passed")
+            ),
             "activation_trace_checkpoint_runs": sum(
                 1
                 for row in group_rows
@@ -431,23 +487,25 @@ def render_summary(rows: Sequence[dict[str, Any]], aggregate: dict[str, Any]) ->
         "# Expanded6 Activation Comparison",
         "",
         (
-            "| model | port | mode | returncode | validation | activation trace | "
+            "| model | port | mode | returncode | validation | fallback | activation trace | "
             "activated skills | added skills |"
         ),
-        "| --- | ---: | --- | ---: | --- | --- | --- | --- |",
+        "| --- | ---: | --- | ---: | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
         validation = row.get("validation", {})
         lines.append(
             (
                 "| {model} | {port} | {mode} | {returncode} | {validation} | "
+                "{fallback} | "
                 "{trace} | {skills} | {added} |"
             ).format(
                 model=row["model"],
-                port=row["port"],
+                port=row.get("port", "-"),
                 mode=row["mode"],
                 returncode=row["returncode"],
                 validation=validation.get("validation_passed"),
+                fallback="yes" if row.get("host_hypothesis_fallback_used") else "-",
                 trace=(
                     "valid"
                     if row.get("activation_trace_valid")
@@ -484,6 +542,43 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Hypothesis-writer skill registry for traced benchmark runs.",
     )
     parser.add_argument(
+        "--host-hypothesis-fallback",
+        choices=("off", "recovery"),
+        default="off",
+        help=(
+            "Enable deterministic host hypothesis fallback for recovery smokes. "
+            "Use 'off' for pure writer benchmarking and 'recovery' for pipeline "
+            "stability acceptance runs."
+        ),
+    )
+    parser.add_argument(
+        "--hypothesis-writer-prompt-mode",
+        choices=(
+            "default",
+            "dth_contrast_no_skill",
+            "dth_contrast_dth_required",
+            "operational_contract_only",
+            "operational_contract_plus_dth",
+            "operational_contract_minimal",
+            "operational_contract_minimal_plus_dth",
+            "thin_basic",
+            "thin_basic_dth_required",
+            "thin_basic_domain4_required",
+            "thin_basic_dth_plus_domain4_required",
+            "dth_only_required",
+            "progressive_disclosure_only",
+            "progressive_disclosure_with_modality_map",
+        ),
+        default="default",
+        help=(
+            "Prompt variant for hypothesis_writer. Use "
+            "'progressive_disclosure_only' to remove prompt-level forced skill "
+            "reads, 'dth_only_required' for DTH-only controlled activation "
+            "runs, or 'progressive_disclosure_with_modality_map' to keep soft "
+            "modality-to-skill routing without forcing drug-target-hypothesis."
+        ),
+    )
+    parser.add_argument(
         "--activation-trace-grace-seconds",
         type=float,
         default=DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
@@ -499,6 +594,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    fallback_mode = getattr(args, "host_hypothesis_fallback", "off")
+    prompt_mode = getattr(args, "hypothesis_writer_prompt_mode", "default")
     stamp = time.strftime("expanded6_activation_%Y%m%d_%H%M%S")
     output_root = (
         Path(args.output_root).expanduser().resolve()
@@ -538,6 +635,8 @@ def main() -> int:
             "ports": list(DEFAULT_PORTS),
             "modes": list(DEFAULT_MODES),
             "hypothesis_skill_set": args.hypothesis_skill_set,
+            "hypothesis_writer_prompt_mode": prompt_mode,
+            "host_hypothesis_fallback": fallback_mode,
             "trials": rows,
             "aggregate": aggregate,
             "unload_events": unload_events,
@@ -577,6 +676,8 @@ def main() -> int:
                     DEFAULT_ACTIVATION_TRACE_GRACE_SECONDS,
                 ),
                 hypothesis_skill_set=args.hypothesis_skill_set,
+                hypothesis_writer_prompt_mode=prompt_mode,
+                host_hypothesis_fallback=fallback_mode,
             )
             rows.append(row)
             with (output_root / "trials.jsonl").open("a", encoding="utf-8") as handle:

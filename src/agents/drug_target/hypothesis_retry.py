@@ -5,6 +5,15 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
+
+
+_TOPN_MISSING_RE = re.compile(r"topn_missing\s*=\s*\[([^\]]*)\]", re.IGNORECASE)
+_HYPOTHESIS_INDEX_RE = re.compile(r"hypotheses\[(\d+)\]")
+_DIRECT_PAIR_AXIS_RE = re.compile(
+    r"(?:direct pair axis|pair axis)\s+['`]([A-Za-z0-9_.-]+--[A-Za-z0-9_.-]+)['`]",
+    re.IGNORECASE,
+)
 
 
 def _numeric_prediction_guidance(errors: list[dict] | None) -> str:
@@ -77,6 +86,50 @@ def _last_rejection_guidance(errors: list[dict] | None) -> str:
     )
 
 
+def _indexed_patch_recipe(errors: list[dict] | None) -> str:
+    text = _flatten_error_text(errors)
+    if not text:
+        return ""
+
+    recipe_lines: list[str] = []
+    direct_pairs = sorted(dict.fromkeys(_DIRECT_PAIR_AXIS_RE.findall(text)))
+    indices = sorted(dict.fromkeys(_HYPOTHESIS_INDEX_RE.findall(text)))
+    topn_genes = sorted(dict.fromkeys(_extract_topn_missing_genes(text)))
+
+    if direct_pairs:
+        location = (
+            f" Edit only hypotheses[{indices[0]}] when possible."
+            if len(indices) == 1
+            else " Edit only the rejected hypotheses named by the validation errors when possible."
+        )
+        recipe_lines.append(location)
+        for pair in direct_pairs:
+            first, second = pair.split("--", 1)
+            recipe_lines.append(
+                f" Remove `{pair}` direct pair wording from title, core_claim, "
+                "falsifiable_prediction, validation_approach, and "
+                "biological_entities.genes unless the same hypothesis cites an exact "
+                f"matching passed Stage 1 file. Do not invent stage1_{first}--{second}.json "
+                f"or stage1_{second}--{first}.json."
+            )
+
+    if topn_genes:
+        for gene in topn_genes:
+            recipe_lines.append(
+                f" Add or revise one [FEATURED-GAP] recommendation for `{gene}`; "
+                "include the gene in biological_entities.genes and cite exact "
+                "available `stage3_<GENE>.json` and `ot_<GENE>.json` files."
+            )
+
+    if not recipe_lines:
+        return ""
+
+    return (
+        " Patch recipe for deterministic save rejection:"
+        + "".join(f" {line}" for line in recipe_lines)
+    )
+
+
 def _direct_pair_axis_guidance(errors: list[dict] | None) -> str:
     text = _flatten_error_text(errors)
     if "claims direct pair axis" not in text:
@@ -100,8 +153,7 @@ def _direct_pair_axis_guidance(errors: list[dict] | None) -> str:
         "Stage 1 file present in evidence_references."
         f"{available_guidance} Do not use synergy or "
         "synergistic effects unless direct combination evidence is cited; prefer "
-        "`additive or non-additive effects`."
-        f"{available_guidance} Otherwise rewrite as co-observed "
+        "`additive or non-additive effects`. Otherwise rewrite as co-observed "
         "genes, convergent programs, or separate follow-up recommendations."
     )
 
@@ -119,6 +171,117 @@ def _featured_gene_reference_guidance(errors: list[dict] | None) -> str:
     )
 
 
+def _invalid_citation_guidance(errors: list[dict] | None) -> str:
+    text = _flatten_error_text(errors)
+    if (
+        "which is not in evidence/ directory" not in text
+        and "without proven passed=true status" not in text
+    ):
+        return ""
+    missing_files = sorted(
+        set(
+            re.findall(
+                r"'([^']+\.json)' which is not in evidence/ directory",
+                text,
+            )
+        )
+    )
+    unpassed_pairs = sorted(
+        set(
+            re.findall(
+                r"Stage 1 pair '([A-Za-z0-9-]+--[A-Za-z0-9-]+)' "
+                r"without proven passed=true status",
+                text,
+            )
+        )
+    )
+    details: list[str] = []
+    if missing_files:
+        details.append(f"fabricated or unavailable file(s): {', '.join(missing_files)}")
+    if unpassed_pairs:
+        details.append(f"unpassed Stage 1 pair(s): {', '.join(unpassed_pairs)}")
+    detail_text = f" Specific rejected citations: {'; '.join(details)}." if details else ""
+    return (
+        " Invalid citation repair: before retrying, call `validate_evidence_references` "
+        "with the combined flat list of all proposed evidence_references and repair every "
+        "invalid reference. Use only exact filenames in `available_files`; use Stage 1 "
+        "pair files only when they appear in `eligible_stage1_pair_files` or are otherwise "
+        "confirmed passed=true. NEVER invent filenames, normalized pair directions, "
+        "`stage3_<GENE>.json`, or `ot_<GENE>.json` files that are absent from evidence/."
+        f"{detail_text}"
+    )
+
+
+def _extract_topn_missing_genes(text: str) -> list[str]:
+    genes: list[str] = []
+    for block in _TOPN_MISSING_RE.findall(text):
+        genes.extend(re.findall(r"[A-Za-z][A-Za-z0-9_.-]*", block))
+    return genes
+
+
+def _collect_missing_gene_strings(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str)]
+    return []
+
+
+def _topn_missing_guidance(errors: list[dict] | None) -> str:
+    genes = set(_extract_topn_missing_genes(_flatten_error_text(errors)))
+    for err in errors or []:
+        if not isinstance(err, dict):
+            continue
+        details = err.get("details")
+        if not isinstance(details, dict):
+            continue
+        genes.update(_collect_missing_gene_strings(details.get("missing")))
+        topn_coverage = details.get("topn_coverage")
+        if isinstance(topn_coverage, dict):
+            genes.update(_collect_missing_gene_strings(topn_coverage.get("missing")))
+
+    if not genes:
+        return ""
+
+    joined = ", ".join(sorted(genes))
+    return (
+        " [FEATURED-GAP] Top-N coverage repair: the previous payload omitted "
+        f"required top-ranked gene(s): {joined}. Do NOT retry the same payload. "
+        "For each missing gene, add or repair a `[FEATURED-GAP]` hypothesis whose "
+        "`biological_entities.genes` includes that gene and cite exact "
+        "`stage3_<GENE>.json` and `ot_<GENE>.json` evidence when present. "
+        "Do not remove other valid hypotheses just to satisfy top-N coverage."
+    )
+
+
+def _interest_cell_validation_guidance(errors: list[dict] | None) -> str:
+    text = _flatten_error_text(errors)
+    triggers = (
+        "validation_approach does not mention the original interest label",
+        "validation_approach does not test the original interest label",
+        "biological_entities.cell_types does not include the original interest label",
+        "lists interest/resolved cell type",
+    )
+    if not any(trigger in text for trigger in triggers):
+        return ""
+    stage1_refs = sorted(
+        set(re.findall(r"stage1_[A-Za-z0-9-]+--[A-Za-z0-9-]+\.json", text))
+    )
+    refs_text = f" Affected Stage 1 file(s): {', '.join(stage1_refs)}." if stage1_refs else ""
+    return (
+        " Interest-cell validation repair: when a hypothesis cites target-cell-intrinsic "
+        "Stage 1 evidence or lists an interest/resolved cell type, rewrite that named "
+        "hypothesis after reading `hypothesis_writer_contract` from "
+        "`load_evidence_files(data_dir, scope='hypothesis')` or "
+        "`validate_evidence_references`. Copy "
+        "`hypothesis_writer_contract.required_cell_context_anchor` exactly into "
+        "`biological_entities.cell_types` and explicitly name that same cell context "
+        "in `validation_approach`. Do not rely on generic disease, tumor, epithelial, "
+        "or cancer wording alone."
+        f"{refs_text}"
+    )
+
+
 def _depleted_stage1_guidance(errors: list[dict] | None) -> str:
     text = _flatten_error_text(errors)
     if (
@@ -128,11 +291,11 @@ def _depleted_stage1_guidance(errors: list[dict] | None) -> str:
     ):
         return ""
     return (
-        " Depleted Stage 1 repair: remove AT2, Transitional AT2, "
-        "pulmonary/alveolar epithelial, resolved Census cell-type, "
+        " Depleted Stage 1 repair: remove original interest label, resolved "
+        "Census cell type, legacy AT2, Transitional AT2, pulmonary/alveolar epithelial, "
         "epithelial-intrinsic, same-cell, and target-cell-autonomous wording "
         "from recommendations citing depleted Stage 1 files. A depleted Stage 1 "
-        "file cannot support primary AT2/epithelial intrinsic, interest-cell, "
+        "file cannot support primary interest-cell intrinsic, legacy AT2/epithelial, "
         "same-cell, or target-cell-autonomous wording. For a "
         "`target-cell-depleted Stage 1 Census evidence as interest-cell support` "
         "error, choose exactly one repair path for the named hypothesis: "
@@ -143,7 +306,60 @@ def _depleted_stage1_guidance(errors: list[dict] | None) -> str:
         "or (B) remove that Stage 1 pair citation entirely and rewrite the hypothesis "
         "as gene-level/actionability-only using available ot_<GENE>.json and "
         "stage3_<GENE>.json evidence. Do not leave the depleted Stage 1 file in a "
-        "primary AT2/epithelial, interest-cell, same-cell, or intrinsic recommendation."
+        "primary interest-cell, legacy AT2/epithelial, same-cell, or intrinsic recommendation."
+    )
+
+
+def _legacy_at2_repair_guidance(errors: list[dict] | None) -> str:
+    text = _flatten_error_text(errors).casefold()
+    legacy_markers = (
+        "transitional at2",
+        "pulmonary alveolar type 2",
+        "alveolar epithelial",
+        "pulmonary epithelial",
+    )
+    if not re.search(r"\bat2\b", text) and not any(
+        marker in text for marker in legacy_markers
+    ):
+        return ""
+    if (
+        "target-cell-depleted" not in text
+        and "coexpression-depleted" not in text
+        and "validation_approach does not" not in text
+    ):
+        return ""
+    return (
+        " Legacy AT2/Epithelial repair: preserve the Primary AT2/Epithelial branch "
+        "only for hypotheses that cite non-depleted files from "
+        "`interest_cell_intrinsic_stage1_pair_files`. For rejected hypotheses citing "
+        "target-cell-depleted or coexpression-depleted Stage 1 files, remove "
+        "AT2-intrinsic wording, remove AT2 validation language, or remove that Stage 1 "
+        "citation and rebuild the hypothesis as gene-level/actionability-only with "
+        "`stage3_<GENE>.json` and `ot_<GENE>.json`. Do not leave depleted Stage 1 "
+        "files in a Primary AT2/Epithelial recommendation."
+    )
+
+
+def _semantic_proxy_repair_guidance(errors: list[dict] | None) -> str:
+    text = _flatten_error_text(errors).casefold()
+    deterministic_validation_phrases = (
+        "lists interest/resolved cell type",
+        "validation_approach does not mention",
+        "validation_approach does not test",
+        "biological_entities.cell_types does not include",
+    )
+    if "semantic_proxy" not in text and not (
+        "malignant cell" in text
+        and any(phrase in text for phrase in deterministic_validation_phrases)
+    ):
+        return ""
+    return (
+        " Semantic-proxy repair: for Prolif Invasive Tumor -> malignant cell or "
+        "similar proxy contexts, validation_approach and biological_entities.cell_types "
+        "must name the original interest label or the resolved Census proxy; generic "
+        "tumor, breast-cancer, epithelial, or disease wording is not enough. If the "
+        "rejected hypothesis cannot be repaired with exact cell-type wording, rewrite "
+        "it as gene-level/actionability-only and remove interest-cell intrinsic claims."
     )
 
 
@@ -187,9 +403,15 @@ def _format_quality_errors_for_instruction(quality_errors: list[dict] | None) ->
         + "; ".join(parts)
         + _numeric_prediction_guidance(quality_errors)
         + _last_rejection_guidance(quality_errors)
+        + _indexed_patch_recipe(quality_errors)
+        + _invalid_citation_guidance(quality_errors)
+        + _interest_cell_validation_guidance(quality_errors)
+        + _topn_missing_guidance(quality_errors)
         + _direct_pair_axis_guidance(quality_errors)
         + _featured_gene_reference_guidance(quality_errors)
         + _depleted_stage1_guidance(quality_errors)
+        + _legacy_at2_repair_guidance(quality_errors)
+        + _semantic_proxy_repair_guidance(quality_errors)
         + _evidence_scope_guardrails()
     )
 
