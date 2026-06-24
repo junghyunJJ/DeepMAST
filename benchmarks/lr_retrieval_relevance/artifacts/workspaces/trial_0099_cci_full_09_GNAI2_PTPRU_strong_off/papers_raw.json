@@ -1,0 +1,794 @@
+{
+  "papers": [
+    {
+      "pmid": "41581316",
+      "title": "Utilization of machine learning algorithms for the identification of the RLN associated prognostic model and feature biomarkers of RLN-related subtypes in breast cancer",
+      "abstract": "Highlights\n\nThe relaxin-associated prognostic model for breast cancer was firstly established.\n\nSignificant differences between risk groups in survival, gene expression, genomic mutations, and immune character.\n\nRC3 subtype was identified with unique immune, metabolic feature and biomarkers.\n\nThe differential expression patterns of RC3 were validated by experiment.\n\nBackground\n\nBreast cancer (BC) is the most common malignancy afflicting women worldwide, yet the role of relaxin-related genes (RLN) in BC progression remains unclear. This study aims to elucidate the relationship between RLN and BC outcomes through immune microenvironment and metabolic pathway analysis.\n\nMethods\n\nGene expression and clinical data were collected from The Cancer Genome Atlas (TCGA) and Gene Expression Omnibus (GEO). Relaxin-related genes were identified using KEGG and Genecard databases. A prognostic model, the RLN Associated Prognostic Model (TRAPM), was established using 101 combinations of 10 machine learning algorithms and validated at the single-cell level. Multi-omics analysis, including the IMvigor210 cohort, was performed to assess TRAPM's applicability in immunotherapy and drug selection.\n\nResults\n\nTRAPM, comprising nine prognostic genes (MMP1, RXFP1, PRKCZ, JUN, NFKBIA, GNAI2, NOS2, MMP9, and MMP13), showed significant associations with immune and metabolic profiles. Using TRAPM, a novel BC subtype RC3 and its key marker genes (MTHFD1L, CAVIN4, MMP1, ADGRG6, B3GNT5, SMYD2, and TFRC) were ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GNAI2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36711612",
+      "title": "Active Galphai/o mutants accelerate breast tumor metastasis via the c-Src pathway",
+      "abstract": "Constitutively active mutations in the Galphai2 and GalphaoA subunits of heterotrimeric G proteins have been identified in several human cancers including breast cancer, but their functional significance in tumorigenesis and metastasis has not been well characterized. In this study, we show that expression of the constitutively active GalphaoAR243H and Galphai2R179C mutants alone was insufficient to induce mammary tumor formation in mice. However, in transgenic mouse models of breast cancer induced by Neu expression or PTEN loss, we found that the Galphai2R179C mutant enhanced spontaneous lung metastasis while having no effect on primary tumor initiation and growth. Additionally, we observed that ectopic expression of the GalphaoAR243H and Galphai2R179C mutants in tumor cells promote cell migration in vitro as well as dissemination into multiple organs in vivo by activating c-Src signaling. Thus, our study uncovers a critical function of Galphai/o signaling in accelerating breast cancer metastasis via the c-Src pathway. This work is clinically significant, as it can potentially pave the way to personalized therapies for patients who present with active Galphai/o mutations or elevated Galphai/o signaling by targeting c-Src to inhibit breast cancer metastasis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GNAI2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32667883",
+      "title": "Three-dimensional growth of breast cancer cells potentiates the anti-tumor effects of unacylated ghrelin and AZP-531",
+      "abstract": "Breast cancer is the most common type of cancer in women and notwithstanding important therapeutic advances, remains the second leading cause of cancer-related death. Despite extensive research relating to the hormone ghrelin, responsible for the stimulation of growth hormone release and appetite, little is known of the effects of its unacylated form, especially in cancer. The present study aimed to characterize effects of unacylated ghrelin on breast cancer cells, define its mechanism of action, and explore the therapeutic potential of unacylated ghrelin or analog AZP-531. We report potent anti-tumor effects of unacylated ghrelin, dependent on cells being cultured in 3D in a biologically-relevant extracellular matrix. The mechanism of unacylated ghrelin-mediated growth inhibition involves activation of Galphai and suppression of MAPK signaling. AZP-531 also suppresses the growth of breast cancer cells in vitro and in xenografts, and may be a novel approach for the safe and effective treatment of breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GNAI2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "24521094",
+      "title": "Gialpha proteins exhibit functional differences in the activation of ERK1/2, Akt and mTORC1 by growth factors in normal and breast cancer cells",
+      "abstract": "Background\n\nIn a classic model, Gialpha proteins including Gi1alpha, Gi2alpha and Gi3alpha are important for transducing signals from Gialpha protein-coupled receptors (GialphaPCRs) to their downstream cascades in response to hormones and neurotransmitters. Our previous study has suggested that Gi1alpha, Gi2alpha and Gi3alpha are also important for the activation of the PI3K/Akt/mTORC1 pathway by epidermal growth factor (EGF) and its family members. However, a genetic role of these Gialpha proteins in the activation of extracellular signal-regulated protein kinase 1 and 2 (ERK1/2) by EGF is largely unknown. Further, it is not clear whether these Gialpha proteins are also engaged in the activation of both the Akt/mTORC1 and ERK1/2 pathways by other growth factor family members. Additionally, a role of these Gialpha proteins in breast cancer remains to be elucidated.\n\nResults\n\nWe found that Gi1/3 deficient MEFs with the low expression level of Gi2alpha showed defective ERK1/2 activation by EGFs, IGF-1 and insulin, and Akt and mTORC1 activation by EGFs and FGFs. Gi1/2/3 knockdown breast cancer cells exhibited a similar defect in the activations and a defect in in vitro growth and invasion. The Gialpha proteins associated with RTKs, Gab1, FRS2 and Shp2 in breast cancer cells and their ablation impaired Gab1's interactions with Shp2 in response to EGF and IGF-1, or with FRS2 and Grb2 in response to bFGF.\n\nConclusions\n\nGialpha proteins differentially regulate the activation of Akt,",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GNAI2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "18925433",
+      "title": "Expression profiling identifies genes that predict recurrence of breast cancer after adjuvant CMF-based chemotherapy.",
+      "abstract": "Cyclophosphamide, methotrexate and 5-fluorouracile (CMF)-based chemotherapy for adjuvant treatment of breast cancer reduces the risk of relapse. In this exploratory study, we tested the feasibility of identifying molecular markers of recurrence in CMF-treated patients. Using Affymetrix U133A GeneChips, RNA samples from 19 patients with primary breast cancer who had been uniformly treated with adjuvant CMF chemotherapy were analyzed. Two supervised class prediction approaches were used to identify gene markers that can best discriminate between patients who would experience relapse and patients who would remain disease-free. An additional independent validation set of 51 patients and 21 genes were analyzed by quantitative RT-PCR. Applying different algorithms to evaluate our microarray data, we identified two gene expression signatures of 21 and 12 genes containing eight overlapping genes, that predict recurrence in 19 cases with high accuracy (94%). Quantitative RT-PCR demonstrated that six genes from the combined signatures (CXCL9, ITSN2, GNAI2, H2AFX, INDO, and MGC10986) were significantly differentially expressed in the recurrence versus the non-recurrence group of the 19 cases and the independent breast cancer patient cohort (n = 51) treated with CMF. High expression levels of CXCL9, ITSN2, and GNAI2 were associated with prolonged disease-free survival (DFS) (P = 0.029, 0.018 and 0.032, respectively). When patients were stratified by combined CXCL9/ITSN2 or CXCL9/FLJ22028",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GNAI2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40819057",
+      "title": "A comprehensive in silico and invitro analysis revealed the diagnostic, prognostic and therapeutic potential of GNAI family genes in colon adenocarcinoma (COAD)",
+      "abstract": "Introduction\n\nGuanine nucleotide-binding protein alpha inhibiting activity polypeptides (GNAI1, GNAI2, and GNAI3) play critical roles in cell cycle regulation, intracellular signaling, and immune modulation. However, their contribution to colorectal adenocarcinoma (COAD) pathogenesis remains poorly defined. This study aimed to comprehensively evaluate the diagnostic, prognostic, and therapeutic relevance of GNAI genes in COAD through integrated in silico and in vitro analyses.\n\nMethods\n\nmRNA and protein expression profiles of GNAI1, GNAI2, and GNAI3 were analyzed using TCGA, OncoDB, HPA databases, and RT-qPCR analysis across COAD cell lines. Genetic and epigenetic alterations were assessed using UALCAN, cBioPortal, and GSCA databases. Prognostic significance was evaluated through Kaplan-Meier survival and GENT2 databases. Potential miRNA regulators were identified via TargetScan and quantified using TaqMan assays. Immune interactions, immune infiltration, and drug sensitivity were examined using TISIDB and GSCA platforms. Functional effects of GNAI1 and GNAI2 overexpression were tested in SW480 and HCT116 cell lines using proliferation, colony formation, and wound healing assays.\n\nResults\n\nGNAI1, GNAI2, and GNAI3 were significantly downregulated in both COAD tissues and cell lines. This downregulation correlated with promoter hypermethylation, CNV deletions, and reduced patient survival. ROC analysis indicated better diagnostic potential, particularly for GNAI2 (AUC = 0.83). ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GNAI2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36092739",
+      "title": "Galphai protein subunit: A step toward understanding its non-canonical mechanisms",
+      "abstract": "The heterotrimeric G protein family plays essential roles during a varied array of cellular events; thus, its deregulation can seriously alter signaling events and the overall state of the cell. Heterotrimeric G-proteins have three subunits (alpha, beta, gamma) and are subdivided into four families, Galphai, Galpha12/13, Galphaq, and Galphas. These proteins cycle between an inactive Galpha-GDP state and active Galpha-GTP state, triggered canonically by the G-protein coupled receptor (GPCR) and by other accessory proteins receptors independent also known as AGS (Activators of G-protein Signaling). In this review, we summarize research data specific for the Galphai family. This family has the largest number of individual members, including Galphai1, Galphai2, Galphai3, Galphao, Galphat, Galphag, and Galphaz, and constitutes the majority of G proteins alpha subunits expressed in a tissue or cell. Galphai was initially described by its inhibitory function on adenylyl cyclase activity, decreasing cAMP levels. Interestingly, today Gi family G-protein have been reported to be importantly involved in the immune system function. Here, we discuss the impact of Galphai on non-canonical effector proteins, such as c-Src, ERK1/2, phospholipase-C (PLC), and proteins from the Rho GTPase family members, all of them essential signaling pathways regulating a wide range of physiological processes.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GNAI2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30866419",
+      "title": "In Systemic Sclerosis, a Unique Long Non Coding RNA Regulates Genes and Pathways Involved in the Three Main Features of the Disease (Vasculopathy, Fibrosis and Autoimmunity) and in Carcinogenesis",
+      "abstract": "Systemic sclerosis (SSc) is an autoimmune disease characterized by three main features: vasculopathy, immune system dysregulation and fibrosis. Long non-coding RNAs (lncRNAs) may play a role in the pathogenesis of autoimmune diseases and a comprehensive analysis of lncRNAs expression in SSc is still lacking. We profiled 542,500 transcripts in peripheral blood mononuclear cells (PBMCs) from 20 SSc patients and 20 healthy donors using Clariom D arrays, confirming the results by Reverse Transcription Polymerase-chain reaction (RT-PCR). A total of 837 coding-genes were modulated in SSc patients, whereas only one lncRNA, heterogeneous nuclear ribonucleoprotein U processed transcript (ncRNA00201), was significantly downregulated. This transcript regulates tumor proliferation and its gene target hnRNPC (Heterogeneous nuclear ribonucleoproteins C) encodes for a SSc-associated auto-antigen. NcRNA00201 targeted micro RNAs (miRNAs) regulating the most highly connected genes in the Protein-Protein interaction (PPI) network of the SSc transcriptome. A total of 26 of these miRNAs targeted genes involved in pathways connected to the three main features of SSc and to cancer development including Epidermal growth factor (EGF) receptor, ErbB1 downstream, Sphingosine 1 phosphate receptor 1 (S1P1), Activin receptor-like kinase 1 (ALK1), Endothelins, Ras homolog family member A (RhoA), Class I Phosphoinositide 3-kinase (PI3K), mammalian target of rapamycin (mTOR), p38 mitogen-activated protein ki",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GNAI2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25739453",
+      "title": "Homer3 regulates the establishment of neutrophil polarity",
+      "abstract": "Most chemoattractants rely on activation of the heterotrimeric G-protein Galphai to regulate directional cell migration, but few links from Galphai to chemotactic effectors are known. Homer3 is a novel Galphai2-interacting protein that spatially organizes actin assembly to support efficient polarity and motility in neutrophils.\n\nMost chemoattractants rely on activation of the heterotrimeric G-protein Galphai to regulate directional cell migration, but few links from Galphai to chemotactic effectors are known. Through affinity chromatography using primary neutrophil lysate, we identify Homer3 as a novel Galphai2-binding protein. RNA interference-mediated knockdown of Homer3 in neutrophil-like HL-60 cells impairs chemotaxis and the establishment of polarity of phosphatidylinositol 3,4,5-triphosphate (PIP3) and the actin cytoskeleton, as well as the persistence of the WAVE2 complex. Most previously characterized proteins that are required for cell polarity are needed for actin assembly or activation of core chemotactic effectors such as the Rac GTPase. In contrast, Homer3-knockdown cells show normal magnitude and kinetics of chemoattractant-induced activation of phosphoinositide 3-kinase and Rac effectors. Chemoattractant-stimulated Homer3-knockdown cells also exhibit a normal initial magnitude of actin polymerization but fail to polarize actin assembly and intracellular PIP3 and are defective in the initiation of cell polarity and motility. Our data suggest that Homer3 acts as ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GNAI2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "8099726",
+      "title": "Deletion mapping of chromosome 3p in human uterine cervical cancer.",
+      "abstract": "Deletion mapping of chromosome 3p was performed on 47 cases of human uterine cervical cancer using 24 polymorphic DNA markers including five inter-Alu DNA markers and two NotI-boundary cosmid markers obtained in our laboratory. The most likely order of these 24 polymorphic DNA markers was determined as being cen-[D3S4, H8]-D3S693-D3S659-D3S30-D3S687-[D3S2, UR9, UR47]-J36-J17-GNAI2B-D3F15S2-D3S643- D3S32-D3S23-D3S686-H35-UR189-D3S685-D3S 11 - D3S12-THRB-D3S22-pter, based on the data from radiation hybrid mapping genetic linkage analysis and in situ hybridization. Loss of heterozygosity (LOH) at one or more loci on chromosome 3p was detected in 21 of 47 cases (45%). Four tumors showed partial or interstitial deletions, and the common region of LOH in these tumors was 3p13-p21.1 between the D3S30 marker and the D3S2 marker. Candidates for tumor-suppressor genes, APEH, D8, GNA12B, ZNF35, RARB, THRB and RAFI, were all mapped outside of the common region in uterine cervical cancer. However, this region is commonly deleted in carcinoma of the lung, breast and kidney, and encompasses the breakpoint of the (3;8) translocation in hereditary renal cell carcinoma. This result indicates the presence of a novel tumor-suppressor gene in the region of 3p13-p21.1, which is involved in the development of several human cancers.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GNAI2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39684488",
+      "title": "Identification of Diagnostic and Prognostic Subnetwork Biomarkers for Women with Breast Cancer Using Integrative Genomic and Network-Based Analysis.",
+      "abstract": "Breast cancer remains a major global health concern and a leading cause of cancer-related deaths among women. Early detection and effective treatment are essential in improving patient survival. Advances in omics technologies have provided deeper insights into the molecular mechanisms underlying breast cancer. This study aimed to identify subnetwork markers with diagnostic and prognostic potential by integrating genome-wide gene expression data with protein-protein interaction networks. We identified four significant subnetworks revealing potentially important hub genes, including VEGFA, KIF4A, ZWINT, PTPRU, IKBKE, STYK1, CENPO, and UBE2C. The diagnostic and prognostic potentials of these subnetworks were validated using independent datasets. Unsupervised principal component analysis demonstrated a clear separation of breast cancer patients from healthy controls across multiple datasets. A KNN classification model, based on these subnetworks, achieved an accuracy of 97%, sensitivity of 98%, specificity of 94%, and area under the curve (AUC) of 96%. Moreover, the prognostic significance of these subnetwork markers was validated using independent transcriptomic datasets comprising over 4000 patients. These findings suggest that subnetwork markers derived from integrated genomic network analyses can enhance our understanding of the molecular landscape of breast cancer, potentially leading to improved diagnostic, prognostic, and therapeutic strategies.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "PTPRU"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "31799666",
+      "title": "PPARgamma inhibits breast cancer progression by upregulating PTPRF expression.",
+      "abstract": "OBJECTIVE: Peroxisome proliferator-activated receptor gamma (PPARgamma) regulates fatty acid storage and glucose metabolism. Recently, PPARgamma has been reported to be involved in cancer. The present study reported a PPARgamma consensus binding site (AGGTCA) in the ptprf promoter and identified a strong association between PPARgamma and PTPRF expression, as well as their tumor suppressor roles in a v-Ha-Ras-induced model of breast cancer. MATERIALS AND METHODS: The prognostic potential of PPARgamma was assessed with a KM analysis of raw data from 3,951 breast cancer patients. The expression of PPARgamma and PTPRF in the rat breast cancer cell lines was detected by Western blot and qPCR. The impact of PPARgamma on cancer cell migration, invasion, and growth was confirmed using cell migration assay, transwell cell invasion assay, tri-dimensional soft agar culture, respectively. The binding of PPARgamma with the ptprf promoter was then examined using electrophoretic mobility shift assay. The inhibitory effect of PPARgamma on tumor growth was then examined in mouse tumor model in vivo. RESULTS: It was identified that PPARgamma expression is lost in the aggressive v-Ha-Ras-induced breast cancer cell line FE1.2 but highly expressed in less malignant FE1.3 cells. Exogenous expression of PPARgamma in FE1.2 cells (FE1.2-PPARgammahi) resulted in a marked inhibition of proliferation compared with that in FE1.2-Vector control group. FE1.2-PPARgammahi cells also exhibited reduced migrati",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "PTPRU"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "27514798",
+      "title": "Global RT-PCR and RT-qPCR Analysis of the mRNA Expression of the Human PTPome.",
+      "abstract": "Comprehensive comparative gene expression analysis of the tyrosine phosphatase superfamily members (PTPome) under cell- or tissue-specific growth conditions may help to define their individual and specific role in physiology and disease. Semi-quantitative and quantitative PCR are commonly used methods to analyze and measure gene expression. Here, we describe technical aspects of PTPome mRNA expression analysis by semi-quantitative RT-PCR and quantitative RT-PCR (RT-qPCR). We provide a protocol for each method consisting in reverse transcription followed by PCR using a global platform of specific PTP primers. The chapter includes aspects from primer validation to the setup of the PTPome RT-qPCR platform. Examples are given of PTP-profiling gene expression analysis using a human breast cancer cell line upon long-term or short-term treatment with cell signaling-activation agents.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "PTPRU"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "24152909",
+      "title": "Protein tyrosine phosphatase controls breast cancer invasion through the expression of matrix metalloproteinase-9",
+      "abstract": "The expression of matrix metalloproteinases (MMPs) produced by cancer cells has been associated with the high potential of metastasis in several human carcinomas, including breast cancer. Several pieces of evidence demonstrate that protein tyrosine phosphatases (PTP) have functions that promote cell migration and metastasis in breast cancer. We analyzed whether PTP inhibitor might control breast cancer invasion through MMP expression. Herein, we investigate the effect of 4-hydroxy-3,3-dimethyl-2H benzo[g]indole-2,5(3H)-dione (BVT948), a novel PTP inhibitor, on 12-O-tetradecanoyl phorbol-13-acetate (TPA)-induced MMP-9 expression and cell invasion in MCF-7 cells. The expression of MMP-9 and cell invasion increased after TPA treatment, whereas TPA-induced MMP-9 expression and cell invasion were decreased by BVT948 pretreatment. Also, BVT948 suppressed NF-kappaB activation in TPA-treated MCF-7 cells. However, BVT948 didn't block TPA-induced AP-1 activation in MCF-7 cells. Our results suggest that the PTP inhibitor blocks breast cancer invasion via suppression of the expression of MMP-9. [BMB Reports 2013; 46(11): 533-538]",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "PTPRU"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "12475979",
+      "title": "Hepatocyte growth factor receptor tyrosine kinase met is a substrate of the receptor protein-tyrosine phosphatase DEP-1.",
+      "abstract": "The receptor protein-tyrosine phosphatase (PTP) DEP-1 (CD148/PTP-eta) has been implicated in the regulation of cell growth, differentiation, and transformation, and most recently has been identified as a potential tumor suppressor gene mutated in colon, lung, and breast cancers. We have generated constructs comprising the cytoplasmic segment of DEP-1 fused to the maltose-binding protein to identify potential substrates and thereby suggest a physiological function for DEP-1. We have shown that the substrate-trapping mutant form of DEP-1 interacted with a small subset of tyrosine-phosphorylated proteins from lysates of the human breast tumor cell lines MDA-MB-231, T-47D, and T-47D/Met and have identified the hepatocyte growth factor/scatter factor receptor Met, the adapter protein Gab1, and the junctional component p120 catenin as potential substrates. Following ligand stimulation, phosphorylation of specific tyrosyl residues in Met induces mitogenic, motogenic, and morphogenic responses. When co-expressed in 293 cells, the full-length substrate-trapping mutant form of DEP-1 formed a stable complex with the chimeric receptor colony stimulating factor 1 (CSF)-Met and wild type DEP-1 dephosphorylated CSF-Met. Furthermore, we observed that DEP-1 preferentially dephosphorylated a Gab1 binding site (Tyr(1349)) and a COOH-terminal tyrosine implicated in morphogenesis (Tyr(1365)), whereas tyrosine residues in the activation loop of Met (Tyr(1230), Tyr(1234), and Tyr(1235)) were not pr",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "PTPRU"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "7749152",
+      "title": "Protein tyrosine phosphatase activity as a diagnostic parameter in breast cancer.",
+      "abstract": "Cellular phosphotyrosine levels are regulated by the balance between protein tyrosine kinases (PTKs) and protein tyrosine phosphatases (PTPs). It is supposed that this balance is disturbed in tumour cells, making the increased or altered activity of PTKs and PTPs likely hallmarks of tumour tissues. Indeed it could be shown that the PTK activity was increased in breast cancer in correlation with prognosis (Hennipman et al., Cancer Res. 49, 516-522, 1989). In the present report we measured the PTP activities in breast cancer and normal breast tissues. An increase of approximately three- to four-fold was measured in the cytosolic tumour fractions compared to normal, whereas the solubilized membrane fraction PTP activity showed an increase in tumours of approximately 1.5-fold. Remarkably, the membrane PTP activity correlated with the presence of tumour positive axillary lymph nodes (p = 0.004), whereas the cytosolic PTP activity correlated with the mitotic index, a higher PTP activity occurring when the mitotic index was higher than 10 (p = 0.0004). These results indicate the membrane PTP activity may be considered as an index of metastatic potential, whereas cytosolic PTP activity may be a measure of the growth capacity of the tumour. The increase of PTP activity in breast cancers was confirmed by enzyme-histochemical studies. In frozen sections of tumours a strong to moderate activity was found in both tumour cells and interstitial cells. In the interstitium membrane activity w",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "PTPRU"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "11720250",
+      "title": "Comparative tissue distribution of the processing enzymes \"prohormone thiol protease,\" and prohormone convertases 1 and 2, in human PTHrP-producing cell lines and mammalian neuroendocrine tissues.",
+      "abstract": "Peptide hormones are generated by proteolytic processing of their respective protein precursors by several prohormone processing proteases. The peptide hormone PTHrP is widely expressed in normal and malignant tissues, where proPTHrP undergoes proteolytic processing to generate PTHrP peptides with distinct biological actions. In this study, the tissue distribution of the prohormone processing enzymes PTP, PC1, and PC2 were compared by immunohistochemistry in human PTHrP-producing cancer cell lines, and in mammalian neuroendocrine and other tissues from rat and bovine that contain peptide hormones. PTP, PC1, and PC2 were prominently expressed in PTHrP-expressing human cancer cell lines originating from tumors of the breast, lung, prostate, as well as lymphoma. These processing enzymes also showed significant expression in normal mammalian neuroendocrine tissues from bovine and rat, including pituitary, hypothalamus, adrenal medulla, pancreas, and other tissues. Most neuroendocrine tissues contained prominent levels of at least two of the three processing enzymes examined, and all tissues contained at least one of these three enzymes. Differential expression of processing enzyme proteins was also demonstrated by Western blots. The differential expression of PTP, PC1, and PC2 observed in certain cancer and normal neuroendocrine cell types postulates selective roles for these processing enzymes in different tissues for generating biologically active peptide hormones. These result",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "PTPRU"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "9115287",
+      "title": "Article 9115287",
+      "abstract": "",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "PTPRU"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "8754775",
+      "title": "Octapeptide somatostatin analog SMS 201-995 induces translocation of intracellular PTP1C to membranes in MCF-7 human breast adenocarcinoma cells.",
+      "abstract": "Somatostatin (SST) analogs exert direct antiproliferative actions in pancreatic, pituitary, and mammary tumor cells in vitro. SST receptor (SSTR)-mediated induction of membrane-associated protein tyrosine phosphatase (PTP) activity has been implicated in its anti-proliferative signaling by virtue of its ability to dephosphorylate and inactivate growth factor receptor kinases. Recently, a PTP-containing Src homology 2 domain, identified as PTP1C/SHPTP1/SHP/HCP, was found to be associated with SSTR in rat pancreatic acinar cell membranes. In the present study we investigated the antiproliferative action of the octapeptide SST analog SMS 201-995 (OCT) and its effect on PTP activity in MCF-7 human breast adenocarcinoma cells. We report here that OCT does not directly stimulate membrane-associated PTP activity, but induces translocation of intracellular PTP to the membrane in MCF-7 cells preincubated with the peptide in a time- and concentration-dependent manner. We demonstrate that this is due at least in part to OCT-induced recruitment of cytosolic PTP1C. OCT-induced recruitment of PTP1C to the cell surface as well as its ability to inhibit the growth of MCF-7 cells was G protein dependent and inhibited by orthovanadate. These findings suggest that translocation of cytosolic PTP1C by SST analogs to the cell surface is an early event in its antiproliferative signaling in tumor cells.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "PTPRU"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "8663237",
+      "title": "Association of human protein-tyrosine phosphatase kappa with members of the armadillo family.",
+      "abstract": "We have identified a human receptor-like protein-tyrosine phosphatase (PTP) in the mammary carcinoma cell line SK-BR-3, which represents the human homolog of murine PTPkappa (Jiang, Y.-P., Wang, H., D'Eustachio, P., Musacchio, J. M., Schlessinger, J., and Sap, J. (1993) Mol. Cell. Biol. 13, 2942-2951) and was therefore termed hPTPkappa. We show here that hPTPkappa expression is dependent on cell density and find it colocalized with two members of the arm family of proteins, beta-catenin and gamma-catenin/plakoglobin, at adherens junctions. Using both in vitro and in vivo binding assays, we demonstrate specific complex formation between endogenous hPTPkappa and beta- and gamma-catenin/plakoglobin. In addition, we present evidence that suggests that beta-catenin may represent a substrate for the catalytic activity of hPTPkappa. The identification of specific binding partners for this receptor-like PTP provides insight into the mechanisms of its biological action and suggests a role for hPTPkappa in the regulation of processes involving cell contact and adhesion such as growth control, tumor invasion, and metastasis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "PTPRU"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39499736",
+      "title": "Transcriptomic analysis of the 12 major human breast cell types reveals mechanisms of cell and tissue function",
+      "abstract": "A fundamental question in biology, central to our understanding of cancer and other pathologies, is determining how different cell types coordinate to form and maintain tissues. Recognizing the distinct features and capabilities of the cells that compose these tissues is critical. Unfortunately, the complexity of tissues often hinders our ability to distinguish between neighboring cell types and, in turn, scrutinize their transcriptomes and generate reliable and tractable cell models for studying their inherently different biologies. We have recently introduced a novel method that permits the identification and purification of the 12 cell types that compose the human breast:nearly all of which could be reliably propagated in the laboratory. Here, we explore the nature of these cell types. We sequence mRNAs from each purified population and investigate transcriptional patterns that reveal their distinguishing features. We describe the differentially expressed genes and enriched biological pathways that capture the essence of each cell type, and we highlight transcripts that display intriguing expression patterns. These data, analytic tools, and transcriptional analyses form a rich resource whose exploration provides remarkable insights into the inner workings of the cell types composing the breast, thus furthering our understanding of the rules governing normal cell and tissue function.\n\nDetermining how different cell types coordinate to form and maintain tissues is crucial to",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "G protein signaling",
+          "GNAI2 pathway",
+          "heterotrimeric G protein",
+          "signal transduction"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "31337866",
+      "title": "Rare, functional, somatic variants in gene families linked to cancer genes: GPCR signaling as a paradigm",
+      "abstract": "Oncodriver genes are usually identified when mutations recur in multiple tumours. Different drivers often converge in the activation or repression of key cancer-relevant pathways. However, as many pathways contain multiple members of the same gene family, individual mutations might be overlooked, as each family member would necessarily have a lower mutation frequency and thus not identified as significant in any one-gene-at-a-time analysis. Here, we looked for mutated, functional sequence positions in gene families that were mutually exclusive (in patients) with another gene in the same pathway, which identified both known and new candidate oncodrivers. For instance, many inactivating mutations in multiple G-protein (particularly Gi/o) coupled receptors, are mutually exclusive with Galphas oncogenic activating mutations, both of which ultimately enhance cAMP signalling. By integrating transcriptomics and interaction data, we show that the Gs pathway is upregulated in multiple cancer types, even those lacking known GNAS activating mutations. This suggests that cancer cells may develop alternative strategies to activate adenylate cyclase signalling in multiple cancer types. Our study provides a mechanistic interpretation for several rare somatic mutations in multi-gene oncodrivers, and offers possible explanations for known and potential off-label cancer treatments, suggesting new therapeutic opportunities.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "G protein signaling",
+          "GNAI2 pathway",
+          "heterotrimeric G protein",
+          "signal transduction"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "28789624",
+      "title": "Hedgehog inhibitor sonidegib potentiates 177Lu-octreotate therapy of GOT1 human small intestine neuroendocrine tumors in nude mice",
+      "abstract": "Background\n\n 177Lu-octreotate can be used to treat somatostatin receptor expressing neuroendocrine tumors. It is highly effective in animal models, but clinical studies have so far only demonstrated low cure rates. Hedgehog inhibitors have shown therapeutic effect as monotherapy in neuroendocrine tumor model systems and might be one option to enhance the efficacy of 177Lu-octreotate therapy. The aim of this study was to determine the therapeutic effect of combination therapy using 177Lu-octreotate and the Hedgehog signaling pathway inhibitor sonidegib.\n\nMethods\n\nGOT1-bearing BALB/c nude mice were treated with either sonidegib (80 mg/kg twice a week via oral gavage), a single injection of 30 MBq 177Lu-octreotate i.v., or a combination of both. Untreated animals served as controls. Tumor size was measured twice-weekly using calipers. The animals were killed 41 d after injection followed by excision of the tumors. Total RNA was extracted from each tumor sample and then subjected to gene expression analysis. Gene expression patterns were compared with those of untreated controls using Nexus Expression 3.0, IPA and Gene Ontology terms. Western blot was carried out on total protein extracted from the tumor samples to analyze activation-states of the Hh and PI3K/AKT/mTOR pathways.\n\nResults\n\nSonidegib monotherapy resulted in inhibition of tumor growth, while a significant reduction in mean tumor volume was observed after 177Lu-octreotate monotherapy and combination therapy. Time to p",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "G protein signaling",
+          "GNAI2 pathway",
+          "heterotrimeric G protein",
+          "signal transduction"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "28246447",
+      "title": "Transcriptomic comparison of primary bovine horn core carcinoma culture and parental tissue at early stage",
+      "abstract": "Aim:\n\nSquamous cell carcinoma or SCC of horn in bovines (bovine horn core carcinoma) frequently observed in Bos indicus affecting almost 1% of cattle population. Freshly isolated primary epithelial cells may be closely related to the malignant epithelial cells of the tumor. Comparison of gene expression in between horn's SCC tissue and its early passage primary culture using next generation sequencing was the aim of this study.\n\nMaterials and Methods:\n\nWhole transcriptome sequencing of horn's SCC tissue and its early passage cells using Ion Torrent PGM were done. Comparative expression and analysis of different genes and pathways related to cancer and biological processes associated with malignancy, proliferating capacity, differentiation, apoptosis, senescence, adhesion, cohesion, migration, invasion, angiogenesis, and metabolic pathways were identified.\n\nResults:\n\nUp-regulated genes in SCC of horn's early passage cells were involved in transporter activity, catalytic activity, nucleic acid binding transcription factor activity, biogenesis, cellular processes, biological regulation and localization and the down-regulated genes mainly were involved in focal adhesion, extracellular matrix receptor interaction and spliceosome activity.\n\nConclusion:\n\nThe experiment revealed similar transcriptomic nature of horn's SCC tissue and its early passage cells.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "G protein signaling",
+          "GNAI2 pathway",
+          "heterotrimeric G protein",
+          "signal transduction"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "26894955",
+      "title": "Registered report: Diverse somatic mutation patterns and pathway alterations in human cancers",
+      "abstract": "The Reproducibility Project: Cancer Biology seeks to address growing concerns about reproducibility in scientific research by conducting replications of selected experiments from a number of high-profile papers in the field of cancer biology. The papers, which were published between 2010 and 2012, were selected on the basis of citations and Altmetric scores. This Registered Report describes the proposed replication plan of key experiments from \"Diverse somatic mutation patterns and pathway alterations in human cancers\" by Kan and colleagues published in Nature in 2010. The experiments to be replicated are those reported in Figures 3D-F and 4C-F. Kan and colleagues utilized mismatch repair detection (MRD) technology to identify somatic mutations in primary human tumor samples and identified a previously uncharacterized arginine 243 to histidine (R243H) mutation in the G-protein alpha subunit GNAO1 in breast carcinoma tissue. In Figures 3D-F, Kan and colleagues demonstrated that stable expression of mutant GNAO1R243D conferred a significant growth advantage in human mammary epithelial cells, confirming the oncogenic potential of this mutation. Similarly, expression of variants with somatic mutations in MAP2K4, a JNK pathway kinase (shown in Figures 4C-E) resulted in a significant increase in anchorage-independent growth. Interestingly, these mutants exhibited reduced kinase activity compared to wild type MAP2K4, indicating these mutations impose a dominant-negative influence to",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "G protein signaling",
+          "GNAI2 pathway",
+          "heterotrimeric G protein",
+          "signal transduction"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "21753190",
+      "title": "Differential Impact of Caveolae and Caveolin-1 Scaffolds on The Membrane Raft Proteome*",
+      "abstract": "Caveolae, a class of cholesterol-rich lipid rafts, are smooth invaginations of the plasma membrane whose formation in nonmuscle cells requires caveolin-1 (Cav1). The recent demonstration that Cav1-associated cavin proteins, in particular PTRF/cavin-1, are also required for caveolae formation supports a functional role for Cav1 independently of caveolae. In tumor cells deficient for Golgi beta-1,6N-acetylglucosaminyltransferase V (Mgat5), reduced Cav1 expression is associated not with caveolae but with oligomerized Cav1 domains, or scaffolds, that functionally regulate receptor signaling and raft-dependent endocytosis. Using subdiffraction-limit microscopy, we show that Cav1 scaffolds are homogenous subdiffraction-limit sized structures whose size distribution differs from that of Cav1 in caveolae expressing cells. These cell lines displaying differing Cav1/caveolae phenotypes are effective tools for probing the structure and composition of caveolae. Using stable isotope labeling by amino acids in cell culture, we are able to quantitatively distinguish the composition of caveolae from the background of detergent-resistant membrane proteins and show that the presence of caveolae enriches the protein composition of detergent-resistant membrane, including the recruitment of multiple heterotrimeric G-protein subunits. These data were further supported by analysis of immuno-isolated Cav1 domains and of methyl-beta-cyclodextrin-disrupted detergent-resistant membrane. Our data show t",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "G protein signaling",
+          "GNAI2 pathway",
+          "heterotrimeric G protein",
+          "signal transduction"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "21317923",
+      "title": "Molecular basis of a novel oncogenic mutation in GNAO1.",
+      "abstract": "Heterotrimeric G proteins are molecular switches that control signal transduction, and their dysregulation can promote oncogenesis. Somatic mutations in GNAS, GNAI2 and GNAQ genes induce oncogenesis by rendering Galpha subunits constitutively activated. Recently the first somatic mutation, arginine(243)   histidine (R243H) in the GNAO1 (Galphao) gene was identified in breast carcinomas and shown to promote oncogenic transformation when introduced into cells. Here, we provide the molecular basis for the oncogenic properties of the Galphao R243H mutant. Using limited proteolysis assays, nucleotide-binding assays, and single-turnover and steady-state GTPase assays, we demonstrate that the oncogenic R234H mutation renders Galphao constitutively active by accelerating the rate of nucleotide exchange; however, this mutation does not affect Galphao's ability to become deactivated by GTPase-activating proteins (GAPs) or by its intrinsic GTPase activity. This mechanism differs from that of previously reported oncogenic mutations that impair GTPase activity and GAP sensitivity without affecting nucleotide exchange. The constitutively active Galphao R243H mutant also enhances Src-STAT3 signaling in NIH-3T3 cells, a pathway previously shown to be directly triggered by active Galphao proteins to promote cellular transformation. Based on structural analyses, we propose that the enhanced rate of nucleotide exchange in Galphao R243H results from loss of the highly conserved electrostatic int",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "G protein signaling",
+          "GNAI2 pathway",
+          "heterotrimeric G protein",
+          "signal transduction"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "39584795",
+      "title": "Loss of the Endothelial Glycocalyx Component EMCN Leads to Glomerular Impairment",
+      "abstract": "BACKGROUND:\n\nEMCN (endomucin), an endothelial-specific glycocalyx component, was found to be highly expressed by the endothelium of the renal glomerulus. We reported an anti-inflammatory role of EMCN and its involvement in the regulation of VEGF (vascular endothelial growth factor) activity through modulating VEGFR2 (VEGF receptor 2) endocytosis. The goal of this study is to investigate the phenotypic and functional effects of EMCN deficiency using the first global EMCN knockout mouse model.\n\nMETHODS:\n\nGlobal EMCN knockout mice were generated by crossing EMCN-floxed mice with ROSA26-Cre mice. Flow cytometry was used to analyze infiltrating myeloid cells in the kidneys. The ultrastructure of the glomerular filtration barrier was examined by transmission electron microscopy, whereas urinary albumin, creatinine, and total protein levels were analyzed from freshly collected urine samples. Expression and localization of EMCN, EGFP (enhanced green fluorescent protein), CD45 (cluster of differentiation 45), CD31, CD34, podocin, and albumin were examined by immunohistochemistry. Mice were weighed regularly, and their systemic blood pressure was measured using a noninvasive tail-cuff system. Glomerular endothelial cells and podocytes were isolated by fluorescence-activated cell sorting for RNA sequencing. Transcriptional profiles were analyzed to identify differentially expressed genes in both endothelium and podocytes, followed by gene ontology analysis. Protein levels of EMCN, album",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "protein tyrosine phosphatase",
+          "PTPRU pathway",
+          "cell adhesion signaling",
+          "receptor phosphatase"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "37332329",
+      "title": "Curcumin inhibits proliferation of hepatocellular carcinoma cells by blocking PTPN1 and PTPN11 expression",
+      "abstract": "The antitumor mechanism of curcumin is unclear, especially in hepatocellular carcinoma (HCC) cells. To clarify the mechanism of action of curcumin in the effective treatment of HCC, the targets of curcumin were screened and validated. Candidate genes of curcumin for HCC were screened using the traditional Chinese medicine systems pharmacology (TCMSP) database and validated using The Cancer Genome Atlas (TCGA) database. The correlation of mRNA expression levels between key candidate genes was identified in the TCGA liver hepatocellular carcinoma (LIHC) dataset. The effects on prognosis were analyzed to identify the target gene of curcumin, which inhibits HCC cell proliferation. Based on the subcutaneous xenograft model of human HCC in nude mice, the expression levels of target proteins were observed using immunohistochemistry. The analysis results of the present study identified the target genes of curcumin, which were obtained by screening the TCSMP database. The protein tyrosine phosphatase non-receptor type 1 (PTPN1) was obtained from TCGA database analysis of the targeted genes. The expression levels of PTPN1 and its homologous sequence genes in TCGA LIHC project was analyzed to identify the potential target gene of curcumin, for use in HCC treatment. Next, xenograft experiments were performed to investigate the therapeutic effects of curcumin in an animal model. Curcumin was demonstrated to inhibit the growth of HCC xenograft tumors in mice. Immunohistochemistry results d",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "protein tyrosine phosphatase",
+          "PTPRU pathway",
+          "cell adhesion signaling",
+          "receptor phosphatase"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "36927814",
+      "title": "MicroRNAs in cancer metastasis: biological and therapeutic implications",
+      "abstract": "Cancer metastasis is the primary cause of cancer-related deaths. The seeding of primary tumours at a secondary site is a highly inefficient process requiring substantial alterations in the genetic architecture of cancer cells. These alterations include significant changes in global gene expression patterns. MicroRNAs are small, non-protein coding RNAs which play a central role in regulating gene expression. Here, we focus on microRNA determinants of cancer metastasis and examine microRNA dysregulation in metastatic cancer cells. We dissect the metastatic process in a step-wise manner and summarise the involvement of microRNAs at each step. We also discuss the advantages and limitations of different microRNA-based strategies that have been used to target metastasis in pre-clinical models. Finally, we highlight current clinical trials that use microRNA-based therapies to target advanced or metastatic tumours.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "protein tyrosine phosphatase",
+          "PTPRU pathway",
+          "cell adhesion signaling",
+          "receptor phosphatase"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "GNAI2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "PTPRU"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "GNAI2",
+        "PTPRU"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "G protein alpha i2",
+        "protein tyrosine phosphatase receptor type U",
+        "signal transduction",
+        "cell adhesion"
+      ]
+    },
+    {
+      "genes": [
+        "GNAI2",
+        "PTPRU"
+      ],
+      "diseases": [
+        "breast cancer",
+        "ductal carcinoma in situ"
+      ],
+      "keywords": [
+        "receptor tyrosine phosphatase",
+        "G-protein coupled receptor signaling",
+        "tumor microenvironment",
+        "invasion"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "G protein signaling",
+        "GNAI2 pathway",
+        "heterotrimeric G protein",
+        "signal transduction"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "protein tyrosine phosphatase",
+        "PTPRU pathway",
+        "cell adhesion signaling",
+        "receptor phosphatase"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "macrophage",
+        "T cell",
+        "endothelial",
+        "myoepithelial",
+        "tumor microenvironment"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer",
+        "ductal carcinoma in situ"
+      ],
+      "keywords": [
+        "DCIS",
+        "perivascular-like cells",
+        "stromal cells",
+        "spatial distribution",
+        "cell composition"
+      ]
+    },
+    {
+      "genes": [
+        "GNAI2",
+        "PTPRU"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "spatial transcriptomics",
+        "cell-cell interaction",
+        "tumor microenvironment",
+        "ligand-receptor",
+        "signaling axis"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "T cell and tumor hybrid",
+        "myoepithelial ACTA2",
+        "myoepithelial KRT15",
+        "cell-cell communication"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "GNAI2",
+      "PTPRU"
+    ],
+    "genes_matched_by": {
+      "GNAI2": "gnai",
+      "PTPRU": "ptpru"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Endothelial"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 12.5,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "DCIS 2",
+      "Macrophages 2",
+      "Myoepi ACTA2+",
+      "Myoepi KRT15+",
+      "Perivascular-Like",
+      "Stromal",
+      "T Cell & Tumor Hybrid"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 35,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": "final",
+      "papers": 30,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    }
+  ],
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with controlled pathway labels/aliases + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

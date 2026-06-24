@@ -1,0 +1,911 @@
+{
+  "schema_version": "deep_interpreter_literature_handoff_v1",
+  "policy": {
+    "included_buckets": [
+      "direct_lr_evidence",
+      "receptor_pathway_context_evidence"
+    ],
+    "excluded_buckets": [
+      "disease_only_background",
+      "rejected_weak_evidence"
+    ],
+    "cap": 40
+  },
+  "source": {
+    "total_papers": 30,
+    "unique_papers": 30,
+    "duplicates_dropped": 0,
+    "raw_papers_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0058_cci_full_28_CALR_ITGA3_weak_off/papers_raw.json",
+    "citation_candidates_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0058_cci_full_28_CALR_ITGA3_weak_off/citation_candidates.json"
+  },
+  "counts": {
+    "direct_lr_evidence": 0,
+    "receptor_pathway_context_evidence": 14,
+    "disease_only_background": 10,
+    "rejected_weak_evidence": 6
+  },
+  "papers": [
+    {
+      "pmid": "39477308",
+      "title": "CD47 and Calreticulin Expression in Breast Cancer Subtypes and Anti-CD47 Inhibitory Effects in Macrophage-mediated Phagocytosis.",
+      "abstract": "BACKGROUND/AIM: Macrophage-mediated cancer immune evasion is modulated by the balance between \"the cluster of differentiation 47 (CD47), an anti-phagocytic signal\" and \"calreticulin (CALR), a pro-phagocytic signal\". CD47 is highly expressed in various types of cancer. However, the expression profiles of CD47 and CALR in breast cancer, especially in different hormone receptor subtypes, and the effects of CD47 blockade in macrophage-mediated therapy are not well understood. MATERIALS AND METHODS: The expression levels of CD47 and CALR were investigated in breast cancer and adjacent normal tissues using immunohistochemistry. To study the effects of CD47 blockade therapy, CD47 and CALR expression in breast cancer cell lines were determined. In vitro macrophage-mediated phagocytosis of breast cancer upon treatment with a monoclonal CD47 antibody (B6H12) were performed. RESULTS: CD47 and CALR were overexpressed in breast cancer tissues and their up-regulation was associated with hormone receptor subtypes. Patients with Luminal A breast cancer had higher levels of CD47, while patients with triple-negative breast cancer (TNBC) had higher levels of CALR. The levels of CD47 and CALR were also elevated in breast cancer cell lines of Luminal A (MCF-7) and TNBC (MDA-MB-231) subtypes. Interestingly, the expression ratio of surface CD47/CALR was significantly higher in MCF-7. Moreover, in vitro phagocytosis assays revealed that blockage of CD47 enhanced macrophage-mediated activity in both ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CALR"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CALR-ITGA3": {
+          "ligand": "CALR",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "38247288",
+      "title": "Calreticulin, a potential coregulator of immune checkpoints and biomarker associated with tumor microenvironment and clinical prognostic significance in breast invasive carcinoma.",
+      "abstract": "As a promising immune checkpoint of immunogenic cell death (ICD) and multifunctional calcium-binding molecular chaperone, calreticulin (CALR) has been attracting increasing attention. CALR mainly locates in cellular endoplasmic reticulum and significantly affects cell proliferation, invasion, induction of apoptosis, and angiogenesis in breast invasive carcinoma (BRCA). CALR overexpression might be correlated with a worse outcome. Nonetheless, it remains obscure how CALR correlates with immune infiltration and survival prognosis of BRCA. In this study, we investigated CALR expression utilizing RNAseq data from the cancer genome atlas (TCGA) and genotype-tissue expression (GTEx) database. The prognostic value of CALR was analyzed using clinical survival data. Enrichment analysis was conducted using the R package \"clusterProfiler.\" We downloaded the immune cell infiltration score of TCGA samples from published articles and online databases and performed a correlation analysis between immune cell infiltration levels and CALR expression. We further assessed the association between CALR and immunomodulators. Moreover, we also evaluated the expression of CALR in 100 formalin-fixed and paraffin-embedded breast cancer and adjacent normal breast tissue specimens. Our results found that CALR was highly expressed in BRCA, and CALR expression levels differed in pathological stages, T stages, and N stages. Besides, these results suggested that CALR overexpression may have adverse effects o",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CALR"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CALR-ITGA3": {
+          "ligand": "CALR",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "36136972",
+      "title": "MicroRNA-206 suppresses growth and metastasis of breast cancer stem cells via blocking EVI-1-mediated CALR expression",
+      "abstract": "Aim to investigate the effect of miR-206 on the growth and metastasis of breast cancer stem cells and clarify the precise mechanism of miR-206 on EVI-1-mediated CALR expression in driving malignant phenotype. Our results showed that miR-206 mimics suppressed CALR expression, inhibited the proliferation and metastasis ability of breast cancer stem cells and finally induced cellular apoptosis. Over-expression of CALR could effectively attenuate the cytotoxic effect of miR-206. Further studies demonstrated that EVI-1 could be served as a key regulator of miR206-mediated CALR expression. Elevation of EVI-1 can reverse the function of miR-206 on induction of CALR.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CALR"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CALR-ITGA3": {
+          "ligand": "CALR",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "34706936",
+      "title": "HIF-1-regulated expression of calreticulin promotes breast tumorigenesis and progression through Wnt/beta-catenin pathway activation.",
+      "abstract": "Calreticulin (CALR) is a multifunctional protein that participates in various cellular processes, which include calcium homeostasis, cell adhesion, protein folding, and cancer progression. However, the role of CALR in breast cancer (BC) is unclear. Here, we report that CALR is overexpressed in BC compared with normal tissue, and its expression is correlated with patient mortality and stemness indices. CALR expression was increased in mammosphere cultures, CD24-CD44+ cells, and aldehyde dehydrogenase-expressing cells, which are enriched for breast cancer stem cells (BCSCs). Additionally, CALR knockdown led to BCSC depletion, which impaired tumor initiation and metastasis and enhanced chemosensitivity in vivo. Chromatin immunoprecipitation and reporter assays revealed that hypoxia-inducible factor 1 (HIF-1) directly activated CALR transcription in hypoxic BC cells. CALR expression was correlated with Wnt/beta-catenin pathway activation, and an activator of Wnt/beta-catenin signaling abrogated the inhibitory effect of CALR knockdown on mammosphere formation. Taken together, our results demonstrate that CALR facilitates BC progression by promoting the BCSC phenotype through Wnt/beta-catenin signaling in an HIF-1-dependent manner and suggest that CALR may represent a target for BC therapy.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CALR"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CALR-ITGA3": {
+          "ligand": "CALR",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "29981820",
+      "title": "Differential expression and molecular interactions of chromosome region maintenance 1 and calreticulin exportins in breast cancer cells.",
+      "abstract": "Chromosome region maintenance 1 (CRM-1) and calreticulin (CALR) are two proteins that act as exportins for some nuclear receptors, in addition to other critical functions for cellular homeostasis. In several cancer types, CRM-1 and CALR are upregulated suggesting an imbalance in their functions. However, the regulation of CRM-1 and CALR, and their biological implications, are not completely known. Here, we evaluated the interplay between the levels of CRM-1 and CALR, and estrogen receptor alpha (ERalpha) status, in breast cancer cells. CRM-1 and CALR were upregulated in mammary tumors relative to normal mammary tissue. Furthermore, the mRNA and protein levels of CRM-1 and CALR were higher in breast cancer cells lacking ERalpha, in comparison with those that express ERalpha. Additionally, both proteins were distributed in the nucleus and cytoplasm in the two cell types. Importantly, we identified novel interactions for these exportins. First, we showed an interaction between CRM-1 and CALR, and then we identified that SUN1 and SUN2, two proteins localized in the nuclear envelop, were able to interact specifically with CRM-1, but not CALR. Interestingly, SUN1 and SUN2 expression seemed to be decreased in breast cancer, thereby affecting the interactions of these proteins with CRM-1, and possibly its actions as an exportin. Thus, our data suggest that expression levels for CRM-1 and CALR, the interaction between these exportins, and specific interactions of SUN1 and SUN2 with CR",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CALR"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CALR-ITGA3": {
+          "ligand": "CALR",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "36843258",
+      "title": "Integrin alpha3 mediates stemness and invasion of glioblastoma by regulating POU3F2.",
+      "abstract": "BACKGROUND: Glioblastoma (GBM) is an aggressive brain tumor. Integrins have been implicated in the malignancy of GBM. A recent study demonstrated that integrin alpha3 (ITGA3) promoted the invasion of breast cancer cells by regulating transcriptional factor POU3F2. However, whether this also happened in GBM remained unknown. METHODS: Therefore, we explored the relationship between ITGA3 and POU3F2 in GBM. We measured the expression of ITGA3 and POU3F2 in GBM tissues. We generated ITGA3 knockdown and POU3F2 knockdown GBM U87MG cells and the proliferation, migration and invasion, the expression of stemness markers and epithelial to mesenchymal transition (EMT) markers were measured. We transplanted ITGA3 knockdown and POU3F2 knockdown GBM U87MG cells into mice. The mice were treated with anti-ITGA3 antibody. The tumor sizes, the expression of stemness markers and epithelial-to-mesenchymal transition (EMT) markers were measured. RESULTS: Both ITGA3 and POU3F2 were upregulated in GBM tissues. Knocking down ITGA3 resulted in reduced expression of POU3F2. Knocking down ITGA3 and POU3F2 suppressed U87MG cells proliferation, migration and invasion, inhibited the expression of stemness markers and prevented epithelial-to-mesenchymal transition. The transplantation of ITGA3 knockdown and POU3F2 knockdown U87MG cells decreased tumor size. CONCLUSION: Anti-ITGA3 antibody treatment reduced the tumor size. ITGA3 regulates stemness and invasion of glioblastoma through POU3F2.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CALR-ITGA3": {
+          "ligand": "",
+          "receptor": "ITGA3",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "34094951",
+      "title": " ITGA3 Is Associated With Immune Cell Infiltration and Serves as a Favorable Prognostic Biomarker for Breast Cancer",
+      "abstract": "Background\n\n ITGA3 is a member of the integrin family, a cell surface adhesion molecule that can interact with extracellular matrix (ECM) proteins. The purpose of this study was to explore the significance of ITGA3 expression in the prognosis and clinical diagnosis of breast cancer patients.\n\nMethods\n\nOncomine, the Human Protein Atlas (HPA) and UALCAN were used to analyze the expression of ITGA3 in various cancers. PrognoScan, GEPIA, Kaplan-Meier plotter and Easysurv were utilized to analyze the prognosis of ITGA3 in certain cancers. Based on TCGA data, a receiver operating characteristic (ROC) curve was used to evaluate the diagnostic performance of ITGA3 expression. cBio-Portal and MethSurv were used to evaluate the genomic mechanism. LinkedOmics, NetworkAnalyst and Metascape were used to build the signaling network. TIMER is a web server for comprehensive analysis of tumor infiltrating immune cells and tumor infiltrating lymphocytes (TILs).\n\nResults\n\nThe expression of ITGA3 in normal breast tissues was greater than that in breast cancer tissues at both the mRNA and protein levels. High expression of ITGA3 was associated with better prognosis of breast cancer patients. ROC analysis indicated that ITGA3 had significant diagnostic value. Genomic analysis revealed that promoter methylation of ITGA3 leads to transcriptional silencing, which may be one of the mechanisms underlying ITGA3 downregulation in BRCA. Immune infiltration analysis showed that ITGA3 may be involved in the",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CALR-ITGA3": {
+          "ligand": "",
+          "receptor": "ITGA3",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "33500458",
+      "title": "Abnormal promoter DNA hypermethylation of the integrin, nidogen, and dystroglycan genes in breast cancer",
+      "abstract": "Cell transmembrane receptors and extracellular matrix components play a pivotal role in regulating cell activity and providing for the concerted integration of cells in the tissue structures. We have assessed DNA methylation in the promoter regions of eight integrin genes, two nidogen genes, and the dystroglycan gene in normal breast tissues and breast carcinomas (BC). The protein products of these genes interact with the basement membrane proteins LAMA1, LAMA2, and LAMB1; abnormal hypermethylation of the LAMA1, LAMA2, and LAMB1 promoters in BC has been described in our previous publications. In the present study, the frequencies of abnormal promoter hypermethylation in BC were 13% for ITGA1, 31% for ITGA4, 4% for ITGA7, 39% for ITGA9, 38% for NID1, and 41% for NID2. ITGA2, ITGA3, ITGA6, ITGB1, and DAG1 promoters were nonmethylated in normal and BC samples. ITGA4, ITGA9, and NID1 promoter hypermethylation was associated with the HER2 positive tumors, and promoter hypermethylation of ITGA1, ITGA9, NID1 and NID2 was associated with a genome-wide CpG island hypermethylated BC subtype. Given that ITGA4 is not expressed in normal breast, one might suggest that its abnormal promoter hypermethylation in cancer is non-functional and is thus merely a passenger epimutation. Yet, this assumption is not supported by our finding that it is not associated with a hypermethylated BC subtype. ITGA4 acquires expression in a subset of breast carcinomas, and methylation of its promoter may be pr",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CALR-ITGA3": {
+          "ligand": "",
+          "receptor": "ITGA3",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "31987909",
+      "title": "ITGA3 interacts with VASP to regulate stemness and epithelial-mesenchymal transition of breast cancer cells.",
+      "abstract": "BACKGROUND: The interaction of integrin and extracellular matrix (ECM) has a profound implication on pathological conditions such as tumor growth and infiltration. Related reports have confirmed that integrin alpha3 (ITGA3) influences the development of bladder cancer, head and neck cancer, colorectal cancer and other cancers. However, the mechanism of ITGA3 in breast cancer is unknown. METHODS: The impact of ITGA3 on the biological features of breast cancer cells was explored using the Transwell and wound healing assays. In addition, its influence on stemness of breast cancer cells was examined with the sphere formation assay. The possible mechanism by which ITGA3 regulates breast cancer was explored using Western blot. The interaction between ITGA3 and VASP was determined by co-immunoprecipitation and immunofluorescence staining assays. RESULTS: Results show that downregulation of ITGA3 promotes breast cancer cell proliferation, apoptosis, invasion and migration. Indeed, suppression of ITGA3 negatively regulates the stemness of breast cancer cells and EMT process. Our findings indicate that ITGA3 interacts with VASP and regulates its expression, and knockdown of ITGA3 inhibits the activity of the PI3K-AKT axis. CONCLUSION: Our results show that ITGA3-VASP modulates breast cancer cell stemness, EMT and PI3K-AKT pathways. Therefore, ITGA3 might be a druggable target for clinical breast cancer management.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CALR-ITGA3": {
+          "ligand": "",
+          "receptor": "ITGA3",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "23786209",
+      "title": "Identification of integrin alpha3 as a molecular marker of cells undergoing epithelial-mesenchymal transition and of cancer cells with aggressive phenotypes.",
+      "abstract": "Epithelial-mesenchymal transition (EMT) is a crucial event in wound healing, tissue repair, and cancer progression in adult tissues. Transforming growth factor (TGF)-beta induces EMT in mouse epithelial cells. During prolonged treatment, TGF-beta successively induces myofibroblastic differentiation with increased expression of myofibroblast marker proteins, including smooth muscle alpha actin and calponin. We recently showed that fibroblast growth factor-2 prevented myofibroblastic differentiation induced by TGF-beta, and transdifferentiated the cells to those with much more aggressive characteristics (enhanced EMT). To identify the molecular markers specifically expressed in cells undergoing enhanced EMT induced by the combination of TGF-beta and fibroblast growth factor-2, we carried out a microarray-based analysis and found that integrin alpha3 (ITGA3) and Ret were upregulated. Intriguingly, ITGA3 was also overexpressed in breast cancer cells with aggressive phenotypes and its expression was correlated with that of deltaEF-1, a key regulator of EMT. Moreover, the expression of both genes was downregulated by U0126, a MEK 1/2 inhibitor. Therefore, ITGA3 is a potential marker protein for cells undergoing enhanced EMT and for cancer cells with aggressive phenotypes, which is positively regulated by deltaEF-1 and the MEK-ERK pathway.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CALR-ITGA3": {
+          "ligand": "",
+          "receptor": "ITGA3",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "40123257",
+      "title": "High Expression of Calreticulin Affected the Tumor Microenvironment and Correlated With Worse Prognosis in Patients With Triple-Negative Breast Cancer",
+      "abstract": "Calreticulin (CALR) preserves reticular homeostasis by maintaining correct protein folding within the endoplasmic reticulum. Immunogenic cell death (ICD) is a regulated form of cell death and could activate adaptive immune response. As one of the damage-associated molecular patterns during ICD process, surface-exposed CALR resulted in the activation of adaptive immune response. Here, we evaluated the expression patterns of CALR in a cohort of 231 untreated triple-negative breast cancer (TNBC) and determined correlations between CALR expression and clinicopathologic parameters, programmed cell death ligand 1 (PD-L1) expression in immune cells (ICs), and survival. In addition, we analyzed a TNBC data set from The Cancer Genome Atlas to explore the relationship between mRNA expression of CALR and clinicopathologic features, IC infiltration, and survival. Tissue microarray results showed that high CLAR was strongly correlated with advanced stage (P = 0.022), shorter disease-free survival (P = 0.008) and overall survival (P = 0.002), and independently predicted prognosis in TNBC. Spearman analyses demonstrated that CALR negatively correlated with PD-L1 in ICs (r = -0.198, P = 0.003). Patients with low CALR and high PD-L1 in ICs had the best disease-free survival (P = 0.013) and overall survival (P = 0.004) compared with other patients, especially the patients with high CALR and low PD-L1 in ICs. In the \"The Cancer Genome Atlas\" cohort, CALR mRNA expression in tumors was significan",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CALR"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "calreticulin",
+          "chaperone",
+          "immunogenic cell death",
+          "endoplasmic reticulum stress"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CALR-ITGA3": {
+          "ligand": "CALR",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "37762557",
+      "title": "Thymoquinone, a Novel Multi-Strike Inhibitor of Pro-Tumorigenic Breast Cancer (BC) Markers: CALR, NLRP3 Pathway and sPD-L1 in PBMCs of HR+ and TNBC Patients",
+      "abstract": "Breast cancer (BC) is not only a mass of malignant cells but also a systemic inflammatory disease. BC pro-tumorigenic inflammation has been shown to promote immune evasion and provoke BC progression. The NOD-like receptor (NLR) family pyrin domain-containing protein 3 (NLRP3) inflammasome is activated when pattern recognition receptors (PRRs) sense danger signals such as calreticulin (CALR) from damaged/dying cells, leading to the secretion of interleukin-1beta (IL-1beta). CALR is a novel BC biological marker, and its high levels are associated with advanced tumors. NLRP3 expression is strongly correlated with an elevated proliferative index Ki67, BC progression, metastasis, and recurrence in patients with hormone receptor-positive (HR+) and triple-negative BC (TNBC). Tumor-associated macrophages (TAMs) secrete high levels of IL-1beta promoting endocrine resistance in HR+ BC. Recently, an immunosuppressive soluble form of programmed death ligand 1 (sPD-L1) has been identified as a novel prognostic biomarker in triple-negative breast cancer (TNBC) patients. Interestingly, IL-1beta induces sPD-L1 release. BC Patients with elevated IL-1beta and sPD-L1 levels show significantly short progression-free survival. For the first time, this study aims to investigate the inhibitory impact of thymoquinone (TQ) on CALR, the NLRP3 pathway and sPD-L1 in HR+ and TNBC. Blood samples were collected from 45 patients with BC. The effect of differing TQ concentrations for different durations on t",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CALR"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "calreticulin",
+          "chaperone",
+          "immunogenic cell death",
+          "endoplasmic reticulum stress"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CALR-ITGA3": {
+          "ligand": "CALR",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "34910788",
+      "title": "Bioinformatics analysis for the role of CALR in human cancers",
+      "abstract": "Cancer is one of the most important public health problems in the world. The curative effect of traditional surgery, radiotherapy and chemotherapy is limited and has inevitable side effects. As a potential target for tumor therapy, few studies have comprehensively analyzed the role of CALR in cancers. Therefore, by using GeneCards, UALCAN, GEPIA, Kaplan-Meier Plotter, COSMIC, Regulome Explorer, String, GeneMANIA and TIMER databases, we collected and analyzed relevant data to conduct in-depth bioinformatics research on the CALR expression in Pan-cancer to assess the possibility of CALR as a potential therapeutic target and survival biomarker. We studied the CALR expression in normal human tissues and various tumors of different stages, and found that CALR expression was associated with relapse free survival (RFS). We verified the expression of CALR in breast cancer cell lines by vitro experiments. Mutations of CALR were widely present in tumors. CALR interacted with different genes and various proteins. In tumors, a variety of immune cells are closely related to CALR. In conclusion, CALR can be used as a biomarker for predicting prognosis and a potential target for tumor molecular and immunotherapy.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CALR"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "calreticulin",
+          "chaperone",
+          "immunogenic cell death",
+          "endoplasmic reticulum stress"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CALR",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CALR-ITGA3": {
+          "ligand": "CALR",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "27418879",
+      "title": "Calreticulin mediates an invasive breast cancer phenotype through the transcriptional dysregulation of p53 and MAPK pathways",
+      "abstract": "Background\n\nThe introduction of effective novel biomarkers of invasion and metastasis is integral for the advancement of breast cancer management. The present study focused on the identification and evaluation of calreticulin (CRT) as a potential biomarker for breast cancer invasion.\n\nMethods\n\nTwo-dimensional gel protein electrophoresis and MALDI-TOF were utilized in the analysis of fresh-frozen invasive intra-ductal carcinoma specimens. Calreticulin-associated expression was analyzed using immunohistochemistry of FFPE non-malignant/malignant breast specimens. A CRT-knockdown model of MCF7 cell line was developed using siRNA and the CRT genotype/phenotype correlations based on migration and trans-well invasion assays were determined. Finally, microarray-based global gene expression profiling was conducted to elucidate the possible calreticulin pro-invasive regulatory pathways.\n\nResults\n\nTwo-dimensional gel protein electrophoresis and MALDI-TOF analysis showed upregulation of calreticulin expression in tumor tissues as compared to the normal adjacent tissues. Meta-analysis of the immunohistochemical results confirmed significantly higher expression of calreticulin (p < 0.05) in the stromal compartments of malignant tissues as compared to non-malignant tissues. Migration and transwell invasion assays showed significant loss in the migratory and invasive potential of CRT-knockdown cells (p < 0.05). Global gene expression profiling successfully identified various putative gene ne",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CALR"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CALR-ITGA3": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    }
+  ],
+  "search_method": "search_literature_dynamic",
+  "coverage": {
+    "genes_covered": [
+      "CALR",
+      "ITGA3"
+    ],
+    "genes_matched_by": {
+      "CALR": "calr",
+      "ITGA3": "itga3"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Stromal",
+      "Macrophages 1",
+      "Macrophages 2"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 37.5,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Endothelial",
+      "Myoepi ACTA2+",
+      "Myoepi KRT15+",
+      "Perivascular-Like",
+      "Stromal & T Cell Hybrid"
+    ]
+  }
+}

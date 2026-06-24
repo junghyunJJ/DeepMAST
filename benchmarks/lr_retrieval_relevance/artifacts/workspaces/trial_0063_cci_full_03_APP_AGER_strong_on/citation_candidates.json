@@ -1,0 +1,1505 @@
+{
+  "schema_version": "deep_interpreter_literature_candidates_v1",
+  "inputs": {
+    "disease": "breast cancer",
+    "lr_pairs": [
+      {
+        "pair": "APP-AGER",
+        "ligand": "APP",
+        "receptor": "AGER"
+      }
+    ],
+    "pathways": [
+      "Estrogen"
+    ],
+    "celltypes": [
+      "Macrophages 2",
+      "Myoepi KRT15+",
+      "Stromal"
+    ]
+  },
+  "source": {
+    "total_papers": 30,
+    "unique_papers": 30,
+    "duplicates_dropped": 0
+  },
+  "bucket_order": [
+    "direct_lr_evidence",
+    "receptor_pathway_context_evidence",
+    "disease_only_background",
+    "rejected_weak_evidence"
+  ],
+  "counts": {
+    "direct_lr_evidence": 0,
+    "receptor_pathway_context_evidence": 11,
+    "disease_only_background": 10,
+    "rejected_weak_evidence": 9
+  },
+  "pair_results": [
+    {
+      "lr_pair": "APP-AGER",
+      "ligand": "APP",
+      "receptor": "AGER",
+      "direct_lr_evidence": 0,
+      "receptor_pathway_context_evidence": 9
+    }
+  ],
+  "papers": [
+    {
+      "pmid": "38892209",
+      "title": "Royal Jelly: Biological Action and Health Benefits.",
+      "abstract": "Royal jelly (RJ) is a highly nutritious natural product with great potential for use in medicine, cosmetics, and as a health-promoting food. This bee product is a mixture of important compounds, such as proteins, vitamins, lipids, minerals, hormones, neurotransmitters, flavonoids, and polyphenols, that underlie the remarkable biological and therapeutic activities of RJ. Various bioactive molecules like 10-hydroxy-2-decenoic acid (10-HDA), antibacterial protein, apisin, the major royal jelly proteins, and specific peptides such as apisimin, royalisin, royalactin, apidaecin, defensin-1, and jelleins are characteristic ingredients of RJ. RJ shows numerous physiological and pharmacological properties, including vasodilatory, hypotensive, antihypercholesterolaemic, antidiabetic, immunomodulatory, anti-inflammatory, antioxidant, anti-aging, neuroprotective, antimicrobial, estrogenic, anti-allergic, anti-osteoporotic, and anti-tumor effects. Moreover, RJ may reduce menopause symptoms and improve the health of the reproductive system, liver, and kidneys, and promote wound healing. This article provides an overview of the molecular mechanisms underlying the beneficial effects of RJ in various diseases, aging, and aging-related complications, with special emphasis on the bioactive components of RJ and their health-promoting properties. The data presented should be an incentive for future clinical studies that hopefully will advance our knowledge about the therapeutic potential of RJ an",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP",
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "amyloid precursor protein",
+          "advanced glycosylation end product"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [
+          "Estrogen"
+        ],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "36531051",
+      "title": "PDLIM2 is highly expressed in Breast Cancer tumour-associated macrophages and is required for M2 macrophage polarization",
+      "abstract": "The PDZ-LIM domain-containing protein 2 (PDLIM2) regulates cell polarity and the protein stability of key transcription factors in epithelial and hemopoietic cells. We previously reported that PDLIM2 is more highly expressed in Triple Negative Breast Cancer (TNBC) than in other breast cancer types or normal breast tissue. In the course of the TNBC study, it was noted that PDLIM2 was highly expressed in the stroma of PDLIM2-expressing tumours. Here, we investigated the phenotype of these stromal cells and whether any infiltrating immune population was linked to PDLIM2 expression. We found that high PDLIM2 expression in breast tumours was associated with higher levels of infiltrating M2 macrophages, but was not associated with infiltrating T cell sub-populations. We then tested whether PDLIM2 contributes to macrophage differentiation or function by using cultures of bone marrow-derived macrophages from wildtype and Pdlim2 knockout mice. This demonstrated that PDLIM2 is required for naive macrophage migration and for the full adoption of IL-4-induced M2 polarization, including expression of M2 phenotypic markers, cell adhesion and cell migration. TLR4-, TLR3- or IFNgamma-induced M1 macrophage activity was less dependent on PDLIM2. Finally, analysis of publicly available breast cancer datasets showed that high PDLIM2 expression is associated with increased M2 macrophage infiltration. We conclude that PDLIM2 expression influences the tumour associated stroma and, in particular, M2",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "M2 macrophage",
+          "tumor-associated macrophage",
+          "immune infiltration",
+          "polarization"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "41614805",
+      "title": "Androgen Effects on Amyloid Precursor Protein Processing Pathways in Cancer: A Systematic Review.",
+      "abstract": "Androgens have been shown to be linked to cancer progression, particularly in hormone-dependent cancers such as prostate and breast cancer, but also other cancers. Amyloid precursor protein (APP), which has primarily been studied in Alzheimer's disease, is gaining recognition for its role in tumor growth and survival. While APP overexpression and androgen receptor (AR) signaling are each associated with cancer progression, the connection between androgens and APP processing in cancer has not been thoroughly investigated. This systematic review was conducted through a comprehensive search of PubMed, Scopus, Web of Science, and EMBASE between 2000 to 2024 for studies examining the effects of androgens on APP and its cleavage enzymes in cancer. Five experimental studies met the inclusion criteria, covering prostate and breast cancer models. Data were extracted and synthesized narratively due to heterogeneity in methods and outcomes. Three studies reported that dihydrotestosterone (DHT) or AR agonists increased the expression and nuclear translocation of ADAM10, a key alpha-secretase enzyme in the non-amyloidogenic APP processing pathway. Two studies identified APP as an androgen-responsive gene, showing that androgens upregulated APP expression in prostate and breast cancer cells and promoted the proliferation of cancer cells. Inhibition or knockdown of APP and ADAM10 reduced proliferation, supporting their roles in tumor progression. Androgen signaling modulates APP processing ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "APP-AGER": {
+          "ligand": "APP",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "34592066",
+      "title": "Accumulation of amyloid beta (Abeta) and amyloid precursor protein (APP) in tumors formed by a mouse xenograft model of inflammatory breast cancer",
+      "abstract": "Accumulation of amyloid in breast cancer is a well-known phenomenon, but only immunoglobulin light-chain amyloidosis (AL) or transthyretin (TTR) amyloid had been detected in human breast tumor samples previously. We recently reported that another amyloidogenic peptide, amyloid beta (Abeta), is present in an aggregated form in animal and human high-grade gliomas and suggested that it originates systemically from the blood, possibly generated by platelets. To study whether breast cancers are also associated with these Abeta peptides and in what form, we used a nude mouse model inoculated with triple-negative inflammatory breast cancer cell (SUM-149) xenografts, which develop noticeable tumors. Immunostaining with two types of specific antibodies for Abeta identified the clear presence of Abeta peptides associated with (a) carcinoma cells and (b) extracellular aggregated amyloid (also revealed by Congo red and thioflavin S staining). Abeta peptides, in both cells and in aggregated amyloid, were distributed in clear gradients, with maximum levels near blood vessels. We detected significant presence of amyloid precursor protein (APP) in the walls of blood vessels of tumor samples, as well as in carcinoma cells. Finally, we used ELISA to confirm the presence of elevated levels of mouse-generated Abeta40 in tumors. We conclude that Abeta in inflammatory breast cancer tumors, at least in a mouse model, is always present and is concentrated near blood vessels. We also discuss here the",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "APP-AGER": {
+          "ligand": "APP",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "34619469",
+      "title": "Panaxadiol as a major metabolite of AD-1 can significantly inhibit the proliferation and migration of breast cancer cells: In vitro and in vivo study.",
+      "abstract": "Previous studies have shown that 20 (R)-25-methoxyl-dammarane-3beta, 12beta, 20 triol (AD-1) can inhibit various cancer cell lines. This study aimed to explore the effect and mechanism of AD-1 metabolite M2 (Panaxadiol; PD) on breast cancer cells of nude mice. Five AD-1 metabolites were isolated and identified using various chromatographic techniques. PD was the main component. In vitro results showed that PD could inhibit the proliferation and migration of MDA-MB-231 cells by inducing G1-phase arrest. In addition, PD down-regulated the expression of Cyclin D1, cdk2, cdk4, cdk6, P-p38, and MMP9, and up-regulated p21 and p27. In vivo results showed that PD could effectively reduce the volume, weight, and migration of breast cancer Transcriptomics analyzed 491 differentially expressed genes by GO and KEGG enrichment. RT-PCR verification confirmed that the significant down-regulation of MMP9 was consistent with transcriptomics results. In further research showed that PD regulated the protein expression of P-p38 and MMP9 in MAPK pathway. In summary, in vivo and in vitro studies showed that PD significantly inhibit the occurrence and development of breast cancer, possibly through the MAPK pathway.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "31746365",
+      "title": "Amyloid precursor protein promotes the migration and invasion of breast cancer cells by regulating the MAPK signaling pathway",
+      "abstract": "To verify whether amyloid precursor protein (APP) affects the migration and invasion of breast cancer cell lines, and to understand its underlying mechanisms, epithelial-mesenchymal transition (EMT), the mitogen-activated protein kinase (MAPK) signaling pathway and the matrix metalloproteinase (MMP) family were investigated in MDA-MB-231, MCF-7 and BT474 human breast cancer cells. Breast cancer cell lines were transfected with plasmids containing APP coding sequences (pEGFP-n1-APP) and APP short hairpin RNA (pENTR APP shRNA). APP overexpres-sion efficiency, knockout efficiency and the expression levels of related genes were tested using reverse transcription-quantitative PCR (RT-qPCR) and western blot analyses. The effects of APP and mitogen-activated protein kinase kinase (MEK) inhibitor on cell migration and invasion were examined using Transwell assays. The results demonstrated that APP was significantly upregulated in the pEGFP-n1-APP group (P<0.05), and significantly downregulated in the pENTR APP shRNA group (P<0.05), compared with the control group. APP overexpression increased the migratory and invasive ability of human breast cancer cells (P<0.05), whereas APP silencing significantly inhibited cell migration and invasion (P<0.05). RT-qPCR and western blot analysis results suggested that APP overexpression significantly increased the expression of MMP-9, MMP-2, MMP-3, N-cadherin and vimentin (P<0.05). In addition, the enhanced expression of APP markedly affected the p",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "APP-AGER": {
+          "ligand": "APP",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "30470613",
+      "title": "Proteolytic cleavage of amyloid precursor protein by ADAM10 mediates proliferation and migration in breast cancer",
+      "abstract": "Background\n\nAmyloid precursor protein (APP), best known for its association with Alzheimer disease, has recently been implicated in breast cancer progression. However, the precise mechanism involved remains unclear. Here, we investigated the role of APP proteolytic cleavage in breast cancer functions.\n\nMethods\n\nThe presence of APP proteolytic cleavage products was examined in breast cancer cell lines. The functional roles of APP in breast cancer were studied in vitro and tumor xenograft model using siRNA. The effects of full length APP and the alpha-secretase cleaved ectodomain fragment, soluble APPalpha (sAPPalpha) were further investigated for their overexpression in breast cancers. The alpha-secretase involved was identified. The alpha-secretase expression together with APP was examined in clinical breast cancers.\n\nResults\n\nWe showed that APP underwent proteolytic cleavage in breast cancer cells to generate sAPPalpha. The sAPPalpha and full length protein mediated breast cancer migration and proliferation, but in different functional extent. This proteolytic cleavage was mediated by ADAM10. Downregulation of APP and ADAM10 brought about similar functional effects. Overexpression of sAPPalpha reversed the effects of ADAM10 downregulation. Interestingly, in patients with non-luminal breast cancers, APP and ADAM10 expression correlated with each other and their co-expression was associated with the worst outcome.\n\nConclusions\n\nThese results demonstrated the contributory role ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "APP-AGER": {
+          "ligand": "APP",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "28847292",
+      "title": "Therapeutic Targeting of Amyloid Precursor Protein and its Processing Enzymes for Breast Cancer Treatment.",
+      "abstract": "Breast cancer cases in women are increasing at an alarming rate globally and extensive research is being conducted to identify a breakthrough medicine against this dreadful disease. In fact, researchers are looking for fresh targets to develop novel treatment strategies for cancer of the breasts. In this article, 'amyloid precursor protein' or (APP) and its processing enzymes are deeply studied so as to explore the same as prospective targets for breast cancer treatment. Even though most of the studies on APP and its processing enzymes have been performed on neuronal cells owing to their linkage with Alzheimer's disease, they are omnipresent on various non-neuronal cells also. Interestingly, APP and its processing enzymes have a role in the proliferation of cancer cells as well as in their growth, adherence and movement. Over-synthesis of APP and its processing enzymes are emerging as important hallmark features in breast cancer. It has been found that APP and its processing enzymes, i.e., gamma-secretase and alpha- secretase are strongly linked with breast cancer via Akt phosporylation and Notch signaling pathways. Thus, targeting APP or gamma-secretase or alpha-secretase could be considered as an effective strategy to treat breast cancer and even metastasis. There are various clinical trials which are in progress to explore the potential of gamma-secretase inhibitor against breast cancer. Hence, the present review is composed of two sections, one section deals with all the ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "APP-AGER": {
+          "ligand": "APP",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "27980417",
+      "title": "Clinicopathological Significance of TARBP2, APP, and ZNF395 in Breast Cancer",
+      "abstract": "The double-stranded RNA-binding protein TARBP2 has been suggested to act as an upstream regulator of breast cancer metastasis by destabilizing transcripts of the possible metastasis suppressors amyloid precursor protein (APP) and ZNF395. We examined this hypothesis by immunostaining of TARBP2, APP, and ZNF395 in 200 breast cancer specimens using tissue microarrays and analyzed the relationships between expression levels and clinicopathological parameters and prognosis. Increased TARBP2 overexpression was associated with shorter overall survival and disease-free survival, and increased but not reduced APP expression correlated with lower overall survival and disease-free survival. ZNF395 expression levels had no prognostic value, but reduced expression correlated with reduced lymph node metastasis. There was no significant relationship between TARBP2 overexpression and reduced APP and/or ZNF395 expression. Patients with tumors with higher TARBP2 or APP expression had unfavorable prognoses. Although reduced ZNF395 expression was significantly related to reduced lymph node metastasis, further studies are needed to clarify the role of TARBP2/APP/ZNF395 in breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "APP-AGER": {
+          "ligand": "APP",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "25491510",
+      "title": "Amyloid-beta precursor protein promotes cell proliferation and motility of advanced breast cancer",
+      "abstract": "Background\n\nAmyloid-beta precursor protein (APP) is a highly conserved single transmembrane protein that has been linked to Alzheimer disease. Recently, the increased expression of APP in multiple types of cancers has been reported where it has significant correlation with the cancer cell proliferation. However, the function of APP in the pathogenesis of breast cancer has not previously been determined. In this study, we studied the pathological role of APP in breast cancer and revealed its potential mechanism.\n\nMethods\n\nThe expression level of APP in multiple breast cancer cell lines was measured by Western blot analysis and the breast cancer tissue microarray was utilized to analyze the expression pattern of APP in human patient specimens. To interrogate the functional role of APP in cell growth and apoptosis, the effect of APP knockdown in MDA-MB-231 cells were analyzed. Specifically, multiple signal transduction pathways and functional alterations linked to cell survival and motility were examined in in vivo animal model as well as in vitro cell culture with the manipulation of APP expression.\n\nResults\n\nWe found that the expression of APP is increased in mouse and human breast cancer cell lines, especially in the cell line possessing higher metastatic potential. Moreover, the analysis of human breast cancer tissues revealed a significant correlation between the level of APP and tumor development. Knockdown of APP (APP-kd) in breast cancer cells caused the retardation of c",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "APP-AGER": {
+          "ligand": "APP",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "21367477",
+      "title": "Is alpha/beta for breast cancer really low?",
+      "abstract": "PURPOSE: Low alpha/beta ratio for breast cancer has drawn a growing interest for exploring hypofractionation for breast irradiation. This work is to confirm the low alpha/beta ratio based on large randomized clinical trials of breast irradiation. METHODS AND MATERIALS: A model based on the generalized linear-quadratic (LQ) model and Poisson statistical model was developed to calculate disease-free survival with consideration of clonogen proliferation during the course of radiation treatment and exponential behavior of survival rate with follow-up time. Outcome data from a series of randomized clinical trials of early-stage breast radiotherapy were fitted to estimate the model parameters. Other clinical outcomes, including treatments with surgery alone or radiotherapy alone were used to validate the model and the estimated parameters. Hypofractionation regimens were proposed based on the newly estimated LQ parameters. RESULTS: Plausible population averaged radiobiologic parameters for breast cancer (95% confidence level) are alpha/beta=2.88 (0.75-5.01) Gy; alpha=0.08+-0.02Gy(-1); potential doubling time T(d)=14.4+-7.8day. The analysis of the radiation-alone data suggested an alpha/beta ratio of 3.89+-6.25Gy, verifying the low alpha/beta ratio based on the post-lumpectomy irradiation data. The hypofractionation regimens that are equivalent to the conventional regimen of 2.0Gyx25 in 5weeks include 2.26Gyx20, 3.34Gyx10, 4.93Gyx5 or 3.39Gyx10 (BID). CONCLUSIONS: The analysis of th",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "17567567",
+      "title": "Gamma-synuclein and the progression of cancer.",
+      "abstract": "The synucleins are a small, soluble, highly conserved group of neuronal proteins that have been implicated in both neurodegenerative diseases and cancer. The synuclein family consists of alpha-, beta-, and gamma-synucleins (gamma-syn). They are a natively unfolded group of proteins that share sequence homologies and structural properties. So far, the biological functions of the synucleins are still unclear, but their involvement in neurodegenerative diseases and cancer may provide insights into the pathological processes that result from these two groups of debilitating diseases, and present the possibility to use them as potential targets for early diagnosis and treatment. Recently, elevated levels of gamma-syn proteins have been detected in various types of cancer, especially in advanced stages of the disease. Furthermore, studies to date indicate that overexpression of gamma-syn compromises normal mitotic checkpoint controls, resulting in multinucleation as well as faster cell growth. Gamma-syn has also been shown to promote invasion and metastasis in in vitro assays as well as in animal models. Overexpression of gamma-syn also interferes with drug-induced apoptotic responses. These observations raise questions about the involvement of gamma-syn in the process of tumorigenesis and metastasis, and efforts have already been made to use gamma-syn as a marker for assessing breast cancer progression. This review will discuss the involvement of gamma-syn in cancer progression, m",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "42141167",
+      "title": "Aging promotes a RAGE-dependent increase in breast cancer metastasis.",
+      "abstract": "Breast cancer incidence and mortality increase with age, but the mechanisms linking aging to metastasis remain unclear. Most preclinical studies use young animal models, limiting insight into how the aged microenvironment influences cancer. Here, we show that aging markedly increases breast cancer metastasis in multiple mouse models, and this effect is dependent on host expression of the Receptor for Advanced Glycation End-products (RAGE). Aging increased tumor RAGE ligand levels, including S100A8/9 and AGEs, and induced RAGE-dependent changes in inflammatory, EMT, angiogenic, and extracellular matrix gene programs in tumors. Circulating cytokines and S100A8/9 from aged hosts promoted tumor cell invasion, which was suppressed by RAGE or S100A8/9 inhibition. In human breast cancers, elevated AGER expression and enrichment of aging- and RAGE-associated transcriptional signatures correlated with poorer survival, especially in older patients. These findings identify RAGE as a mechanistic link between aging and metastasis and a potential therapeutic target in older patients.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "APP-AGER": {
+          "ligand": "",
+          "receptor": "AGER",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "39830522",
+      "title": "RAGE and its ligands in breast cancer progression and metastasis.",
+      "abstract": "Introduction: Breast cancer is the most common form of cancer diagnosed worldwide and the leading cause of death in women globally, according to Globocan 2020. Hence, investigating novel pathways implicated in cancer progression and metastasis could lead to the development of targeted therapies and new treatment strategies in breast cancer. Recent studies reported an interplay between the receptor for advanced glycation end products (RAGE) and its ligands, S100 protein group, advanced glycation end products (AGEs) and high-mobility group box 1 protein (HMGB1) and breast cancer growth and metastasis. Materials and methods: We used articles available in the NCBI website database PubMed to write this scoping review. The search words used were 'RAGE receptor' AND/OR 'breast cancer, RAGE ligands, glycation end products'. A total of 90 articles were included. We conducted a meta-analysis to assess the relationship between the RAGE rs1800624 polymorphism and breast cancer risk using fixed-effect or random-effect models to calculate odds ratios (ORs) and their corresponding 95% confidence intervals (95% CIs). Results: RAGE upon activation by its ligands enhances downstream signaling pathways, contributing to breast cancer cells migration, growth, angiogenesis, metastasis, and drug resistance. In addition, studies have shown that RAGE and its ligands influence the way breast cancer cells interact with immune cells present in the tumor microenvironment (macrophages, fibroblasts), thus ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "37434266",
+      "title": "The Ephrin tyrosine kinase a3 (EphA3) is a novel mediator of RAGE-prompted motility of breast cancer cells",
+      "abstract": "Background\n\nThe receptor for advanced glycation-end products (RAGE) and its ligands have been implicated in obesity and associated inflammatory processes as well as in metabolic alterations like diabetes. In addition, RAGE-mediated signaling has been reported to contribute to the metastatic progression of breast cancer (BC), although mechanistic insights are still required. Here, we provide novel findings regarding the transcriptomic landscape and the molecular events through which RAGE may prompt aggressive features in estrogen receptor (ER)-positive BC.\n\nMethods\n\nMCF7 and T47D BC cells stably overexpressing human RAGE were used as a model system to evaluate important changes like cell protrusions, migration, invasion and colony formation both in vitro through scanning electron microscopy, clonogenic, migration and invasion assays and in vivo through zebrafish xenografts experiments. The whole transcriptome of RAGE-overexpressing BC cells was screened by high-throughput RNA sequencing. Thereafter, Gene Ontology (GO) and Kyoto Encyclopedia of Genes and Genomes (KEGG) pathway enrichment analyses allowed the prediction of potential functions of differentially expressed genes (DEGs). Flow cytometry, real time-PCR, chromatin immunoprecipitation, immunofluorescence and western blot assays were performed to investigate the molecular network involved in the regulation of a novel RAGE target gene namely EphA3. The clinical significance of EphA3 was explored in the TCGA cohort of pati",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [
+          "Estrogen"
+        ],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "36551607",
+      "title": "Genetically Modified Circulating Levels of Advanced Glycation End-Products and Their Soluble Receptor (AGEs-RAGE Axis) with Risk and Mortality of Breast Cancer",
+      "abstract": "Simple Summary\n\nThe large-scale population-based evidence exploring genetically modified circulating levels of advanced glycation end-products (AGEs) and their receptor (RAGE) with risk and mortality of breast cancer is scarce. We aimed to evaluate the role of plasma AGEs, soluble RAGE (sRAGE), and AGEs/sRAGE-ratio level, as well as their interactions with a genetic predisposition in their metabolism-related genes on breast cancer. Higher levels of AGEs and AGEs/sRAGE-ratio were associated with an increased risk of breast cancer, but sRAGE levels were negatively associated with breast cancer risk. We also observed a positive association between AGEs and the bad prognosis of breast cancer. Although we did not observe a significant contribution of genetic variants to breast cancer risk, rs2070600 and rs1800624 in the AGER gene were dose-dependently correlated with sRAGE levels. Further, compared to the haplotype CT at the lowest quartile of AGEs, haplotypes TT and TA were prominently associated with breast cancer risk in the highest quartile of AGEs. This study emphasized the potential of the AGE-RAGE axis as a new biomarker of breast cancer in the future and aided in screening a high-risk population with breast cancer.\n\nAbstract\n\nThe interaction of advanced glycation end-products (AGEs) with their receptor (RAGE) elicits oxidative stress and inflammation, which is involved in the development of breast cancer. However, large-scale population-based evidence exploring genetically",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "APP",
+          "receptor": "AGER"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "APP-AGER": {
+          "ligand": "",
+          "receptor": "AGER",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "27669433",
+      "title": "Targeting of RAGE-ligand signaling impairs breast cancer cell invasion and metastasis.",
+      "abstract": "The receptor for advanced glycation end products (RAGE) is highly expressed in various cancers and is correlated with poorer outcome in breast and other cancers. Here we tested the role of targeting RAGE by multiple approaches in the tumor and tumor microenvironment, to inhibit the metastatic process. We first tested how RAGE impacts tumor cell-intrinsic mechanisms using either RAGE overexpression or knockdown with short hairpin RNAs (shRNAs). RAGE ectopic overexpression in breast cancer cells increased MEK-EMT (MEK-epithelial-to-mesenchymal transition) signaling, transwell invasion and soft agar colony formation, and in vivo promoted lung metastasis independent of tumor growth. RAGE knockdown with multiple independent shRNAs in breast cancer cells led to decreased transwell invasion and soft agar colony formation, without affecting proliferation. In vivo, targeting RAGE shRNA knockdown in human and mouse breast cancer cells, decreased orthotopic tumor growth, reduced tumor angiogenesis and recruitment of inflammatory cells, and markedly decreased metastasis to the lung and liver in multiple xenograft and syngeneic mouse models. To test the non-tumor cell microenvironment role of RAGE, we performed syngeneic studies with orthotopically injected breast cancer cells in wild-type and RAGE-knockout C57BL6 mice. RAGE-knockout mice displayed striking impairment of tumor cell growth compared with wild-type mice, along with decreased mitogen-activated protein kinase signaling, tumor ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "27014721",
+      "title": "RAGE: A novel target for breast cancer growth and metastasis",
+      "abstract": "Article: 27014721",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "27710974",
+      "title": "Increased Expression of the Receptor for Advanced Glycation End-Products (RAGE) Is Associated with Advanced Breast Cancer Stage.",
+      "abstract": "BACKGROUND: The receptor for advanced glycation end-products (RAGE) is a multiligand transmembrane receptor that is overexpressed in various pathological conditions including cancers. However, the expression pattern of RAGE in breast cancer tumors is still not completely clear. METHODS: In this study, we investigated the expression levels of RAGE in 25 fresh-frozen breast cancer samples and corresponding noncancerous tissue samples collected from breast cancer patients, by real-time polymerase chain reaction (PCR). Additionally, we performed immunohistochemistry on breast cancer specimens. RESULTS: The results indicate a high expression of the RAGE-encoding gene in the cancerous tissues. RAGE expression at the mRNA and protein levels was statistically significantly up-regulated in advanced-stage and triple-negative breast tumors and node-positive tissues compared with other tissues (p < 0.001). A significant association between RAGE expression and tumor size was observed (p = 0.029). CONCLUSIONS: Overexpression of RAGE in advanced-stage tumors may be a useful biomarker for diagnosis and the prediction of breast cancer progression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "25572331",
+      "title": "RAGE mediates S100A7-induced breast cancer growth and metastasis by modulating the tumor microenvironment.",
+      "abstract": "RAGE is a multifunctional receptor implicated in diverse processes including inflammation and cancer. In this study, we report that RAGE expression is upregulated widely in aggressive triple-negative breast cancer (TNBC) cells, both in primary tumors and in lymph node metastases. In evaluating the functional contributions of RAGE in breast cancer, we found that RAGE-deficient mice displayed a reduced propensity for breast tumor growth. In an established model of lung metastasis, systemic blockade by injection of a RAGE neutralizing antibody inhibited metastasis development. Mechanistic investigations revealed that RAGE bound to the proinflammatory ligand S100A7 and mediated its ability to activate ERK, NF-kappaB, and cell migration. In an S100A7 transgenic mouse model of breast cancer (mS100a7a15 mice), administration of either RAGE neutralizing antibody or soluble RAGE was sufficient to inhibit tumor progression and metastasis. In this model, we found that RAGE/S100A7 conditioned the tumor microenvironment by driving the recruitment of MMP9-positive tumor-associated macrophages. Overall, our results highlight RAGE as a candidate biomarker for TNBCs, and they reveal a functional role for RAGE/S100A7 signaling in linking inflammation to aggressive breast cancer development.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "24177755",
+      "title": "RAGE-binding S100A8/A9 promotes the migration and invasion of human breast cancer cells through actin polymerization and epithelial-mesenchymal transition.",
+      "abstract": "S100A8/A9 proteins are members of EF-hand calcium-binding proteins secreted by neutrophils and activated monocytes. S100A8/A9 has cell growth-promoting activity at low concentrations by binding to the receptor for advanced glycation end products (RAGE). In this study, we report for the first time that S100A8/A9 promoted the invasion of breast cancer cells depending on RAGE. In addition, RAGE binding to S100A8/A9 promoted the phosphorylation of LIN-11, Isl1, and MEC-3 protein domain kinase, as well as cofilin. This phosphorylation is a critical step in cofilin recycling and actin polymerization. Interestingly, RAGE binding to S100A8/A9 enhanced cell mesenchymal properties and induced epithelial-mesenchymal transition. Mechanistically, RAGE binding to S100A8/A9 stabilized Snail through the NF-kappaB signaling pathway. Based on these observations, RAGE expression in breast cancer cells was associated with lymph node and distant metastases in patients with invasive ductal carcinoma. Moreover, RAGE binding to S100A8/A9 promoted lung metastasis in vivo. In summary, our in vitro and in vivo results indicated that RAGE binding to S100A8/A9 played an important role in breast cancer invasion/metastasis. This study identified both RAGE and S100A8/A9 as potential anti-invasion targets for therapeutic intervention in breast cancer. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "22497255",
+      "title": "Genotyping of -374A/T, -429A/G, and 63 bp Ins/del polymorphisms of RAGE by rapid one-step hexaprimer amplification refractory mutation system polymerase chain reaction in breast cancer patients.",
+      "abstract": "Several studies have focused on the RAGE genetic background and have demonstrated that its polymorphisms affect the receptor's activity, expression, and downstream signaling. However, there is only little information regarding RAGE polymorphism in breast cancer. In the present study, the authors studied RAGE polymorphisms in 71 patients with breast cancer and 93 healthy women. RAGE -374T/A, -429T/C, and 63 bp Ins/del polymorphisms were analyzed using a hexaprimer amplification refractory mutation system PCR (H-ARMS-PCR). The results showed that RAGE polymorphisms are not associated with breast cancer in the current study population. Larger studies are required to confirm these data in other populations.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "37386015",
+      "title": "Amyloid beta-based therapy for Alzheimer's disease: challenges, successes and future",
+      "abstract": "Amyloid beta protein (Abeta) is the main component of neuritic plaques in Alzheimer's disease (AD), and its accumulation has been considered as the molecular driver of Alzheimer's pathogenesis and progression. Abeta has been the prime target for the development of AD therapy. However, the repeated failures of Abeta-targeted clinical trials have cast considerable doubt on the amyloid cascade hypothesis and whether the development of Alzheimer's drug has followed the correct course. However, the recent successes of Abeta targeted trials have assuaged those doubts. In this review, we discussed the evolution of the amyloid cascade hypothesis over the last 30 years and summarized its application in Alzheimer's diagnosis and modification. In particular, we extensively discussed the pitfalls, promises and important unanswered questions regarding the current anti-Abeta therapy, as well as strategies for further study and development of more feasible Abeta-targeted approaches in the optimization of AD prevention and treatment.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP",
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "amyloid precursor protein",
+          "advanced glycosylation end product"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "36840033",
+      "title": "Current Advances of Plant-Based Vaccines for Neurodegenerative Diseases",
+      "abstract": "Neurodegenerative diseases (NDDs) are characterized by the progressive degeneration and/or loss of neurons belonging to the central nervous system, and represent one of the major global health issues. Therefore, a number of immunotherapeutic approaches targeting the non-functional or toxic proteins that induce neurodegeneration in NDDs have been designed in the last decades. In this context, due to unprecedented advances in genetic engineering techniques and molecular farming technology, pioneering plant-based immunogenic antigen expression systems have been developed aiming to offer reliable alternatives to deal with important NDDs, including Alzheimer's disease, Parkinson's disease, and multiple sclerosis. Diverse reports have evidenced that plant-made vaccines trigger significant immune responses in model animals, supported by the production of antibodies against the aberrant proteins expressed in the aforementioned NDDs. Moreover, these immunogenic tools have various advantages that make them a viable alternative for preventing and treating NDDs, such as high scalability, no risk of contamination with human pathogens, cold chain free production, and lower production costs. Hence, this article presents an overview of the current progress on plant-manufactured vaccines for NDDs and discusses its future prospects.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP",
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "amyloid precursor protein",
+          "advanced glycosylation end product"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "36851285",
+      "title": "Innate and Adaptive Immunity during SARS-CoV-2 Infection: Biomolecular Cellular Markers and Mechanisms",
+      "abstract": "The coronavirus 2019 (COVID-19) pandemic was caused by a positive sense single-stranded RNA (ssRNA) severe acute respiratory syndrome coronavirus 2 (SARS-CoV-2). However, other human coronaviruses (hCoVs) exist. Historical pandemics include smallpox and influenza, with efficacious therapeutics utilized to reduce overall disease burden through effectively targeting a competent host immune system response. The immune system is composed of primary/secondary lymphoid structures with initially eight types of immune cell types, and many other subtypes, traversing cell membranes utilizing cell signaling cascades that contribute towards clearance of pathogenic proteins. Other proteins discussed include cluster of differentiation (CD) markers, major histocompatibility complexes (MHC), pleiotropic interleukins (IL), and chemokines (CXC). The historical concepts of host immunity are the innate and adaptive immune systems. The adaptive immune system is represented by T cells, B cells, and antibodies. The innate immune system is represented by macrophages, neutrophils, dendritic cells, and the complement system. Other viruses can affect and regulate cell cycle progression for example, in cancers that include human papillomavirus (HPV: cervical carcinoma), Epstein-Barr virus (EBV: lymphoma), Hepatitis B and C (HB/HC: hepatocellular carcinoma) and human T cell Leukemia Virus-1 (T cell leukemia). Bacterial infections also increase the risk of developing cancer (e.g., Helicobacter pylori). Vi",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP",
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "amyloid precursor protein",
+          "advanced glycosylation end product"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "36817589",
+      "title": "Acute-serum amyloid A and A-SAA-derived peptides as formyl peptide receptor (FPR) 2 ligands",
+      "abstract": "Originally, it was thought that a single serum amyloid A (SAA) protein was involved in amyloid A amyloidosis, but in fact, SAA represents a four-membered family wherein SAA1 and SAA2 are acute phase proteins (A-SAA). SAA is highly conserved throughout evolution within a wide range of animal species suggestive of an important biological function. In fact, A-SAA has been linked to a number of divergent biological activities wherein a number of these functions are mediated via the G protein-coupled receptor (GPCR), formyl peptide receptor (FPR) 2. For instance, through the activation of FPR2, A-SAA has been described to regulate leukocyte activation, atherosclerosis, pathogen recognition, bone formation and cell survival. Moreover, A-SAA is subject to post-translational modification, primarily through proteolytic processing, generating a range of A-SAA-derived peptides. Although very little is known regarding the biological effect of A-SAA-derived peptides, they have been shown to promote neutrophil and monocyte migration through FPR2 activation via synergy with other GPCR ligands namely, the chemokines CXCL8 and CCL3, respectively. Within this review, we provide a detailed analysis of the FPR2-mediated functions of A-SAA. Moreover, we discuss the potential role of A-SAA-derived peptides as allosteric modulators of FPR2.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP",
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "amyloid precursor protein",
+          "advanced glycosylation end product"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "36408389",
+      "title": "MS-based glycomics: An analytical tool to assess nervous system diseases",
+      "abstract": "Neurological diseases affect millions of peopleochemistryorldwide and are continuously increasing due to the globe's aging population. Such diseases affect the nervous system and are characterized by a progressive decline in brain function and progressive cognitive impairment, decreasing the quality of life for those with the disease as well as for their families and loved ones. The increased burden of nervous system diseases demands a deeper insight into the biomolecular mechanisms at work during disease development in order to improve clinical diagnosis and drug design. Recently, evidence has related glycosylation to nervous system diseases. Glycosylation is a vital post-translational modification that mediates many biological functions, and aberrant glycosylation has been associated with a variety of diseases. Thus, the investigation of glycosylation in neurological diseases could provide novel biomarkers and information for disease pathology. During the last decades, many techniques have been developed for facilitation of reliable and efficient glycomic analysis. Among these, mass spectrometry (MS) is considered the most powerful tool for glycan analysis due to its high resolution, high sensitivity, and the ability to acquire adequate structural information for glycan identification. Along with MS, a variety of approaches and strategies are employed to enhance the MS-based identification and quantitation of glycans in neurological samples. Here, we review the advanced gly",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP",
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "amyloid precursor protein",
+          "advanced glycosylation end product"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "35967420",
+      "title": "Pathophysiology of RAGE in inflammatory diseases",
+      "abstract": "The receptor for advanced glycation end products (RAGE) is a non-specific multi-ligand pattern recognition receptor capable of binding to a range of structurally diverse ligands, expressed on a variety of cell types, and performing different functions. The ligand-RAGE axis can trigger a range of signaling events that are associated with diabetes and its complications, neurological disorders, cancer, inflammation and other diseases. Since RAGE is involved in the pathophysiological processes of many diseases, targeting RAGE may be an effective strategy to block RAGE signaling.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP",
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "amyloid precursor protein",
+          "advanced glycosylation end product"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "35806376",
+      "title": "GANAB and N-Glycans Substrates Are Relevant in Human Physiology, Polycystic Pathology and Multiple Sclerosis: A Review",
+      "abstract": "Glycans are one of the four fundamental macromolecular components of living matter, and they are highly regulated in the cell. Their functions are metabolic, structural and modulatory. In particular, ER resident N-glycans participate with the Glc3Man9GlcNAc2 highly conserved sequence, in protein folding process, where the physiological balance between glycosylation/deglycosylation on the innermost glucose residue takes place, according GANAB/UGGT concentration ratio. However, under abnormal conditions, the cell adapts to the glucose availability by adopting an aerobic or anaerobic regimen of glycolysis, or to external stimuli through internal or external recognition patterns, so it responds to pathogenic noxa with unfolded protein response (UPR). UPR can affect Multiple Sclerosis (MS) and several neurological and metabolic diseases via the BiP stress sensor, resulting in ATF6, PERK and IRE1 activation. Furthermore, the abnormal GANAB expression has been observed in MS, systemic lupus erythematous, male germinal epithelium and predisposed highly replicating cells of the kidney tubules and bile ducts. The latter is the case of Polycystic Liver Disease (PCLD) and Polycystic Kidney Disease (PCKD), where genetically induced GANAB loss affects polycystin-1 (PC1) and polycystin-2 (PC2), resulting in altered protein quality control and cyst formation phenomenon. Our topics resume the role of glycans in cell physiology, highlighting the N-glycans one, as a substrate of GANAB, which is",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP",
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "amyloid precursor protein",
+          "advanced glycosylation end product"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "35455991",
+      "title": "Advanced Glycation End-Products (AGEs): Formation, Chemistry, Classification, Receptors, and Diseases Related to AGEs",
+      "abstract": "Advanced glycation end-products (AGEs) constitute a non-homogenous, chemically diverse group of compounds formed either exogeneously or endogeneously on the course of various pathways in the human body. In general, they are formed non-enzymatically by condensation between carbonyl groups of reducing sugars and free amine groups of nucleic acids, proteins, or lipids, followed by further rearrangements yielding stable, irreversible end-products. In the last decades, AGEs have aroused the interest of the scientific community due to the increasing evidence of their involvement in many pathophysiological processes and diseases, such as diabetes, cancer, cardiovascular, neurodegenerative diseases, and even infection with the SARS-CoV-2 virus. They are recognized by several cellular receptors and trigger many signaling pathways related to inflammation and oxidative stress. Despite many experimental research outcomes published recently, the complexity of their engagement in human physiology and pathophysiological states requires further elucidation. This review focuses on the receptors of AGEs, especially on the structural aspects of receptor-ligand interaction, and the diseases in which AGEs are involved. It also aims to present AGE classification in subgroups and to describe the basic processes leading to both exogeneous and endogeneous AGE formation.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "APP",
+          "AGER"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor",
+          "ligand",
+          "amyloid precursor protein",
+          "advanced glycosylation end product"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "APP-AGER": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    }
+  ]
+}

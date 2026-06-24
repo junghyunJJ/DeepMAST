@@ -1,0 +1,20 @@
+# Local live reruns and transient artifacts.
+/live_runs/
+/logs/
+/tmp/
+*.log
+*.pid
+*.run_id
+*.container_dir
+*.badrows-backup*
+*.stale-badrows-backup*
+.DS_Store
+.Rhistory
+__pycache__/
+*.py[cod]
+
+# The repository root ignores res*; keep this bundle's committed results visible.
+!/results/
+!/results/**
+!/figures/
+!/figures/**

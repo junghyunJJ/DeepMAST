@@ -1,0 +1,20 @@
+{
+  "A_passive": {
+    "f1": 0.6054,
+    "precision": 0.7807,
+    "recall": 0.4944,
+    "specificity": 0.9621,
+    "false_positive_rate": 0.05,
+    "activation_rate": 0.55,
+    "avg_latency": 15.36
+  },
+  "B_NO_hints": {
+    "f1": 0.6027,
+    "precision": 0.7857,
+    "recall": 0.4889,
+    "specificity": 0.9636,
+    "false_positive_rate": 0.0,
+    "activation_rate": 0.575,
+    "avg_latency": 19.22
+  }
+}

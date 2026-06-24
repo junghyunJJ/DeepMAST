@@ -1,0 +1,160 @@
+You are evaluating two anonymized generated biomedical therapeutic-target hypothesis reports for breast cancer.
+The generation settings and method labels are hidden. Judge only the visible scientific report content, not report length or inferred method.
+
+Score each output independently using integer scores from 0 to 5:
+- evidence_grounding: uses stated evidence references to support claims
+- biological_plausibility: mechanisms fit breast cancer biology and the named entities
+- therapeutic_relevance: target/intervention logic is useful without clinical overreach
+- claim_boundary_restraint: separates supported evidence from unknowns and avoids overclaiming
+- specificity_testability: predictions and validation plans are concrete and falsifiable
+- unsupported_claim_penalty: 0, -1, or -2 for unsupported mechanisms, invented evidence, disease mismatch, or overstated therapeutic conclusions
+- major_error: true only for a material factual or evidence-interpretation error
+
+Comparison ID: pair002
+
+Output A report:
+Disease: breast cancer
+Hypotheses generated/retained: 6 / 6
+Evidence coverage pct: 70.59
+Covered top genes: EFNB2, EPHB4, ERBB2, ERBB3, INSR, LAMA5, NECTIN4
+Missing top genes: -
+Prediction grounding summary: {"grounded": 0, "grounded_indices": [], "grounded_verified": 0, "qualitative": 6, "unverified": 0, "unverified_indices": []}
+Gap analysis: {"orphan_files": ["stage1_AFDN--NECTIN4.json", "stage1_EFNB2--EPHB4.json", "stage1_LAMA5--BCAM.json", "stage1_LAMA5--DAG1.json", "stage1_LRIG1--ERBB2.json"], "referenced_files": 12, "total_evidence_files": 17}
+
+Hypotheses:
+H1: CDH1-ERBB3 coexpression axis as malignant cell follow-up candidate
+Category: Mechanism of Action
+Genes: CDH1, ERBB3; cell types: malignant cell; pathways: -; drugs: -
+Evidence refs: stage1_CDH1--ERBB3.json, stage3_ERBB3.json, ot_ERBB3.json
+Claim: CDH1 and ERBB3 show enriched coexpression in malignant cells per Stage 1 evidence, nominating this pair as a follow-up axis for testing adhesion-linked signaling readouts. ERBB3 has Stage 3 and OpenTargets support as a breast cancer target. Not yet established: whether CDH1-ERBB3 coexpression drives specific downstream signaling cascades in breast cancer malignant cells.
+Prediction: Test whether ERBB3 perturbation in malignant cells changes coexpression-linked readouts with CDH1, such as adhesion marker expression or proliferation signals.
+Validation: Perturbation readout in malignant cell context using CRISPR or small molecule inhibition of ERBB3, measuring CDH1-associated cellular phenotypes.
+Prediction grounding: qualitative
+
+H2: EGF-ERBB2 signaling as gene-level actionability follow-up candidate
+Category: Therapeutic Strategy
+Genes: EGF, ERBB2; cell types: malignant cell; pathways: -; drugs: -
+Evidence refs: stage1_EGF--ERBB2.json, stage3_ERBB2.json, ot_ERBB2.json
+Claim: EGF-ERBB2 pair shows interest-cell intrinsic support in malignant cells. ERBB2 has strong Stage 3 drug evidence and OpenTargets tractability support for breast cancer. This recommendation prioritizes ERBB2-anchored perturbation follow-up rather than claiming therapeutic intervention success.
+Prediction: Test whether ERBB2 perturbation changes EGF-linked cellular readouts in malignant cells, such as proliferation or survival markers.
+Validation: Target-prioritization follow-up using ERBB2 inhibitors or genetic perturbation in malignant cell models, measuring EGF-responsive phenotypes.
+Prediction grounding: qualitative
+
+H3: PTPRF-INSR cross-target interaction as malignant cell follow-up candidate
+Category: Cross-Target Interaction
+Genes: PTPRF, INSR; cell types: malignant cell; pathways: -; drugs: -
+Evidence refs: stage1_PTPRF--INSR.json, stage3_INSR.json, ot_INSR.json
+Claim: PTPRF and INSR show enriched coexpression in malignant cells per Stage 1 evidence. INSR has Stage 3 and OpenTargets support in breast cancer context. This recommendation frames INSR as the perturbation anchor with PTPRF as coexpression context. Not yet established: whether PTPRF-INSR interaction produces additive or non-additive effects.
+Prediction: Test whether INSR perturbation in malignant cells alters PTPRF-associated readouts, such as metabolic or growth signaling markers.
+Validation: Combination readout or target-prioritization follow-up using INSR perturbation in malignant cell context, measuring PTPRF-correlated phenotypes.
+Prediction grounding: qualitative
+
+H4: LAMA5-ITGB4 adhesion program as malignant cell follow-up candidate
+Category: Novel Pathway
+Genes: LAMA5, ITGB4; cell types: malignant cell; pathways: -; drugs: -
+Evidence refs: stage1_LAMA5--ITGB4.json, stage3_LAMA5.json, ot_LAMA5.json
+Claim: LAMA5 and ITGB4 show enriched coexpression in malignant cells per Stage 1 evidence. LAMA5 has Stage 3 and OpenTargets support for breast cancer. This recommendation prioritizes LAMA5-anchored adhesion pathway follow-up. Not yet established: whether LAMA5-ITGB4 coexpression regulates specific matrix interaction programs in breast cancer malignant cells.
+Prediction: Test whether LAMA5 perturbation changes ITGB4-linked adhesion or migration readouts in malignant cells.
+Validation: Perturbation readout using LAMA5 knockdown or blockade in malignant cell models, measuring ITGB4-associated cellular phenotypes such as adhesion or invasion.
+Prediction grounding: qualitative
+
+H5: NECTIN2-NECTIN4 interaction as malignant cell follow-up candidate
+Category: Cross-Target Interaction
+Genes: NECTIN2, NECTIN4; cell types: malignant cell; pathways: -; drugs: -
+Evidence refs: stage1_NECTIN2--NECTIN4.json, stage3_NECTIN4.json, ot_NECTIN4.json
+Claim: NECTIN2 and NECTIN4 show enriched coexpression in malignant cells per Stage 1 evidence. NECTIN4 has Stage 3 and OpenTargets support in breast cancer. This recommendation frames NECTIN4 as the perturbation anchor with NECTIN2 as coexpression context. Not yet established: whether NECTIN2-NECTIN4 interaction produces additive or non-additive cellular effects.
+Prediction: Test whether NECTIN4 perturbation in malignant cells alters NECTIN2-linked cellular readouts, such as cell-cell adhesion or immune evasion markers.
+Validation: Target-prioritization follow-up using NECTIN4 perturbation in malignant cell context, measuring NECTIN2-correlated phenotypes.
+Prediction grounding: qualitative
+
+H6: EFNB2 and EPHB4 gene-level actionability follow-up candidate
+Category: Mechanism of Action
+Genes: EFNB2, EPHB4; cell types: -; pathways: -; drugs: -
+Evidence refs: stage3_EFNB2.json, ot_EFNB2.json, stage3_EPHB4.json, ot_EPHB4.json
+Claim: EFNB2 and EPHB4 are FEATURED genes with Stage 3 and OpenTargets support in breast cancer. This is a gene-level actionability follow-up recommendation without Stage 1 intrinsic pair support. Not yet established: whether EFNB2 or EPHB4 operates in malignant cell-intrinsic programs versus secondary context.
+Prediction: Test whether EFNB2 or EPHB4 perturbation changes breast cancer-relevant cellular readouts such as proliferation or migration markers.
+Validation: Gene-level follow-up using EFNB2 or EPHB4 perturbation in breast cancer models, measuring disease-relevant cellular phenotypes.
+Prediction grounding: qualitative
+
+Output B report:
+Disease: breast cancer
+Hypotheses generated/retained: 5 / 5
+Evidence coverage pct: 52.94
+Covered top genes: EFNB2, EPHB4, ERBB2, ERBB3, INSR, LAMA5, NECTIN4
+Missing top genes: -
+Prediction grounding summary: {"grounded": 0, "grounded_indices": [], "grounded_verified": 0, "qualitative": 5, "unverified": 0, "unverified_indices": []}
+Gap analysis: {"orphan_files": ["stage1_AFDN--NECTIN4.json", "stage1_CDH1--ERBB3.json", "stage1_EGF--ERBB2.json", "stage1_LAMA5--BCAM.json", "stage1_LAMA5--DAG1.json", "stage1_LAMA5--ITGB4.json", "stage1_LRIG1--ERBB2.json", "stage1_NECTIN2--NECTIN4.json"], "referenced_files": 9, "total_evidence_files": 17}
+
+Hypotheses:
+H1: ERBB2 and ERBB3 as Signaling Drivers in Breast Cancer
+Category: Mechanism of Action
+Genes: ERBB2, ERBB3; cell types: -; pathways: ERBB signaling; drugs: -
+Evidence refs: stage3_ERBB2.json, stage3_ERBB3.json, ot_ERBB2.json, ot_ERBB3.json
+Claim: ERBB2 and ERBB3 show target-disease association and tractability evidence supporting their roles in breast cancer signaling pathways.
+Prediction: Test whether ERBB2 or ERBB3 perturbation reduces proliferative readouts in breast cancer models.
+Validation: Prioritize ERBB2 and ERBB3 for perturbation follow-up using available tractability evidence from OpenTargets and Stage 3 assessments.
+Prediction grounding: qualitative
+
+H2: PTPRF-INSR Coexpression in Malignant Cells as Therapeutic Target in Breast Cancer
+Category: Therapeutic Strategy
+Genes: INSR, PTPRF; cell types: malignant cell; pathways: Insulin signaling; drugs: -
+Evidence refs: stage1_PTPRF--INSR.json, stage3_INSR.json, ot_INSR.json, ot_PTPRF.json
+Claim: PTPRF and INSR show enriched coexpression in malignant cells, supporting their prioritization for therapeutic follow-up in breast cancer.
+Prediction: Test whether INSR perturbation changes cited cellular readouts in malignant cell context.
+Validation: Prioritize INSR for target-prioritization follow-up in malignant cell context using Stage 1 pair evidence and Stage 3/OpenTargets tractability assessment.
+Prediction grounding: qualitative
+
+H3: EFNB2-EPHB4 Cross-Cell Interaction in Breast Cancer Spatial Context
+Category: Cross-Target Interaction
+Genes: EFNB2, EPHB4; cell types: -; pathways: Ephrin signaling; drugs: -
+Evidence refs: stage1_EFNB2--EPHB4.json, ot_EFNB2.json, ot_EPHB4.json, stage3_EFNB2.json, stage3_EPHB4.json
+Claim: EFNB2 and EPHB4 represent a ligand-receptor pair with enriched expression patterns that may mediate cross-cell communication in breast cancer tissue context.
+Prediction: Test whether EFNB2-EPHB4 perturbation alters cross-cell communication readouts in breast cancer tissue models.
+Validation: Prioritize EFNB2 and EPHB4 for combination readout follow-up; validate cross-cell interaction using spatial or co-culture models without same-cell intrinsic claims.
+Prediction grounding: qualitative
+
+H4: LAMA5 Extracellular Matrix Role in Breast Cancer Progression
+Category: Novel Pathway
+Genes: LAMA5; cell types: -; pathways: Extracellular matrix organization; drugs: -
+Evidence refs: stage3_LAMA5.json, ot_LAMA5.json
+Claim: LAMA5 shows target-disease association and tractability evidence supporting its role in extracellular matrix-mediated breast cancer progression.
+Prediction: Test whether LAMA5 perturbation changes extracellular matrix-related cellular readouts in breast cancer models.
+Validation: Prioritize LAMA5 for perturbation readout follow-up using Stage 3 and OpenTargets evidence for actionability assessment.
+Prediction grounding: qualitative
+
+H5: NECTIN4 Cell Adhesion Pathway in Breast Cancer
+Category: Novel Pathway
+Genes: NECTIN4; cell types: -; pathways: Cell adhesion; drugs: -
+Evidence refs: stage3_NECTIN4.json, ot_NECTIN4.json
+Claim: NECTIN4 shows target-disease association and perturbability evidence supporting its role in cell adhesion pathways in breast cancer.
+Prediction: Test whether NECTIN4 perturbation changes cell adhesion-related readouts in breast cancer models.
+Validation: Prioritize NECTIN4 for target-prioritization follow-up using Stage 3 and OpenTargets evidence for tractability assessment.
+Prediction grounding: qualitative
+
+Return exactly one valid JSON object. Do not include markdown or prose outside JSON. Use this schema:
+{
+  "output_a": {
+    "evidence_grounding": 0,
+    "biological_plausibility": 0,
+    "therapeutic_relevance": 0,
+    "claim_boundary_restraint": 0,
+    "specificity_testability": 0,
+    "unsupported_claim_penalty": 0,
+    "major_error": false,
+    "notes": "..."
+  },
+  "output_b": {
+    "evidence_grounding": 0,
+    "biological_plausibility": 0,
+    "therapeutic_relevance": 0,
+    "claim_boundary_restraint": 0,
+    "specificity_testability": 0,
+    "unsupported_claim_penalty": 0,
+    "major_error": false,
+    "notes": "..."
+  },
+  "judge_preference": "tie",
+  "confidence": "low",
+  "rationale": "...",
+  "key_differences": ["..."]
+}

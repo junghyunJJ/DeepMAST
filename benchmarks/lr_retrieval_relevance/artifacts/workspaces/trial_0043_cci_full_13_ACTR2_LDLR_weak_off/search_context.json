@@ -1,0 +1,22 @@
+{
+  "genes": [
+    "ACTR2",
+    "LDLR"
+  ],
+  "pathways": [
+    "EGFR",
+    "PI3K"
+  ],
+  "celltypes": [
+    "DCIS 2",
+    "Endothelial",
+    "Macrophages 2",
+    "Myoepi ACTA2+",
+    "Perivascular-Like",
+    "Stromal",
+    "Stromal & T Cell Hybrid"
+  ],
+  "disease": "breast cancer",
+  "lr_pair": "ACTR2-LDLR",
+  "category": "medium_morans_known"
+}

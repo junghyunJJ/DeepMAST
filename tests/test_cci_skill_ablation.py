@@ -13,8 +13,10 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-BENCHMARK_DIR = PROJECT_ROOT / "docs" / "benchmarks" / "cci_skill_ablation"
-sys.path.insert(0, str(BENCHMARK_DIR))
+BENCHMARK_DIR = PROJECT_ROOT / "benchmarks" / "cci_skill_ablation"
+BENCHMARK_SCRIPTS_DIR = BENCHMARK_DIR / "scripts"
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(BENCHMARK_SCRIPTS_DIR))
 
 from benchmark_cci_core import (
     ALL_VARIANTS,
@@ -42,7 +44,7 @@ from benchmark_cci_core import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
-CASES_PATH = BENCHMARK_DIR / "cases" / "pilot_cci_cases.json"
+CASES_PATH = BENCHMARK_DIR / "inputs" / "pilot_cci_cases.json"
 
 
 @pytest.fixture

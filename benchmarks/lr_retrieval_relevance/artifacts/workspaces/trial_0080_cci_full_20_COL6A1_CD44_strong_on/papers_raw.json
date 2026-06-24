@@ -1,0 +1,2287 @@
+{
+  "papers": [
+    {
+      "pmid": "40056038",
+      "title": "Tumor Microenvironment On-A-Chip and Single-Cell Analysis Reveal Synergistic Stromal-Immune Crosstalk on Breast Cancer Progression",
+      "abstract": "Abstract\n\nSolid tumors develop within a complex environment called the tumor microenvironment (TME), which is sculpted by the presence of other cells, such as cancer-associated fibroblasts (CAFs) and immune cells like macrophages (Mphis). Despite the presence of immune cells, tumor cells orchestrate a tumor-supportive environment through intricate interaction with the components of the TME. However, the specific mechanism by which this intercellular dialogue is regulated is not fully understood. To that end, the development of an organotypic 3D breast TME-on-a-chip (TMEC) model, integrated with single-cell RNA sequencing analysis, is reported to mechanistically evaluate the progression of triple-negative breast cancer (TNBC) cells in the presence of patient-derived CAFs and Mphis. Extensive functional assays, including invasion and morphometric characterization, reveal the synergistic influence of CAFs and Mphis on tumor cells. Furthermore, gene expression and pathway enrichment analyses identify the involvement of the KYNU gene, suggesting a potential immune evasion mechanism through the kynurenine pathway. Lastly, the pharmacological targeting of the identified pathway is investigated.\n\nUsing a 3D tumor microenvironment (TME)-on-a-chip model, tumor-stromal-immune crosstalk in triple-negative breast cancer is studied, revealing the TME's combinatorial effect on cancer progression. Integrating single-cell transcriptomic analysis demonstrates metabolic reprogramming via the ky",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40470875",
+      "title": "Fibronectin Fibers Progressively Lose Their Tension in Invasive Human Breast Carcinoma while Being Tensed in DCIS and Healthy Breast Tissue",
+      "abstract": "Abstract\n\nExtracellular matrix (ECM) remodeling plays critical roles in cancer progression and involves alterations in its composition and biophysical properties. Aggressiveness and malignancy of solid tumors are strongly correlated with tissue stiffening, mainly due to upregulated ECM production and cross-linking. However, nothing is known about the tensional alterations that occur at the single-fiber level during tumorigenesis in humans. The well-validated peptide tension probe (FnBPA5) now reveals that Fibronectin fibers lose their tension as invasive tumors progress while they are stretched in healthy human breast tissue stroma and in ductal carcinoma in situ (DCIS), the non-invasive precursor of breast cancer. In invasive carcinomas, cancer cells, cancer-associated fibroblasts (CAFs) and infiltrating immune cells (cytotoxic T cells and regulatory T cells), are predominantly located in proximity to untensed Fibronectin fibers. This is significant, as Fibronectin fiber stretching can mechano-regulate the reciprocal cell-ECM crosstalk and the bioavailability of ECM-bound molecules. Not only tissue stiffening, but also the accumulation of untensed Fibronectin fibers may serve as a mechanical biomarker that correlates with tumor grade. Loss of Fibronectin fiber tension may play a central role in regulating tumor invasiveness. This suggests that physically altered ECM fibers can be exploited for stroma-targeted drug delivery and immunotherapy.\n\nExtracellular matrix remodeling ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "tumor progression",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35095281",
+      "title": "Single Nuclear RNA Sequencing Highlights Intra-Tumoral Heterogeneity and Tumor Microenvironment Complexity in Testicular Embryonic Rhabdomyosarcoma",
+      "abstract": "Background\n\nTesticular embryonic rhabdomyosarcoma (ERMS) is a rare soft tissue tumor in children featured with high intra-tumoral heterogeneity. In this study, we aimed to comprehensively delineate the testicular ERMS intra-tumoral heterogeneity and tumor microenvironment.\n\nMethods\n\nCell types and the corresponding marker genes were identified by single-nuclear RNA sequencing (snRNA-seq). Functional states of different clusters were evaluated by uniform manifold approximation and projection and differentially expressed genes. Kaplan-Meier curve analysis was constructed according to the gene expression profile to determine the correlation between candidate marker genes and the overall survival and disease-free survival of patients with osteosarcoma from TCGA.\n\nResults\n\nA total of 8868 tumor cells and 10,147 normal cells were obtained from testicular ERMS tissues. The heterogeneous malignant subtype was composed of six subgroups (C1-C6) with differential proliferative and migratory potentials. Cell trajectory analysis revealed the C1 subgroup might be the starting cells of the tumor and transform into two different types of malignant cells, C2 and C5/6, during the development of RMS. The differentially expressed genes were closely related to cell adhesion and extracellular matrix signaling pathways. Furthermore, the interaction analysis between cell subgroups (macrophages and tumor cells, endothelial cells and tumor cells) demonstrated that collagen-related gene COL6A1 plays a ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40927672",
+      "title": "Collagen proteins, thrombospondin 1 and lumican are differentially expressed across breast cancer subtypes by functional proteomics from core needle biopsy samples of Taiwanese breast cancer.",
+      "abstract": "Purpose: This study aimed to conduct functional proteomics across breast cancer subtypes with bioinformatics analyses. Methods: Candidate proteins were identified using nanoscale liquid chromatography with tandem mass spectrometry (NanoLC-MS/MS) from core needle biopsy samples of early stage (0-III) breast cancers, followed by external validation with public domain gene-expression datasets (TCGA TARGET GTEx and TCGA BRCA). Results: Seventeen proteins demonstrated significantly differential expression and protein-protein interaction (PPI) found the strong networks including COL2A1, COL11A1, COL6A1, COL6A2, THBS1 and LUM. Public domain databases also showed that COL2A1, COL11A1, COL6A1, COL6A2 and LUM were higher in primary/metastatic tumor than in normal tissue (one-way ANOVA, all P-values less than 0.001), and all six genes were differentially expressed across four molecular subtypes based on hormone receptor (HR) status and human epidermal growth factor receptor II (HER2) status (one-way ANOVA, all P-values less than 0.001). Disease-specific survival discrepancy was observed comparing breast cancer patients of the upper and lower quartile of the collagen family (COL2A1, COL11A1, COL6A1, COL6A2), THBS1 and LUM gene expression signature (log-rank test, P = 0.06). Conclusion: Functional proteomics suggested that collagen proteins, thrombospondin 1 and lumican are differentially expressed across breast cancer subtypes.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35990840",
+      "title": "Comprehensive Analysis Identifies COL1A1, COL3A1, and POSTN as Key Genes Associated with Brain Metastasis in Patients with Breast Cancer",
+      "abstract": "Objective\n\n Brain metastasis (BM) is associated with a high mortality in patients with breast cancer (BC). Nevertheless, the molecular mechanisms of BM in BM remain uncertain. The study aims to identify the key genes in BC in relation to BM and to assess their prognostic value. \n\nMethods\n\n Two microarray datasets GSE125989 and GSE100534 were downloaded from the Gene Expression Omnibus (GEO) database to identify differentially expressed genes (DEGs) between primary BC and BM samples. The function enrichment analysis and protein-protein interaction (PPI) network were performed. We mapped hub genes into the Kaplan-Meier database for their correlations with BC survival. \n\nResults\n\n Venn diagram analysis showed an overlapped upregulated DEG and 18 overlapped downregulated ones between primary BC and BM samples. We constructed the PPI network, and top 5 hub genes were sorted out according to the node degree, including type I collagen alpha1 chain (COL1A1), lumican (LUM), type III collagen alpha1 chain (COL3A1), type V collagen alpha2 chain (COL5A2), and periosteal protein (POSTN). The Kaplan-Meier database analysis found that COL1A1, COL3A1, and POSTN were significantly correlated with overall survival of BC patients. \n\nConclusion\n\n The study suggests that COL1A1, COL3A1, and POSTN may be key genes associated with BM in patients with BC.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34541602",
+      "title": "Identification of potential genes related to breast cancer brain metastasis in breast cancer patients",
+      "abstract": "Abstract\n\nBrain metastases (BMs) usually develop in breast cancer (BC) patients. Thus, the molecular mechanisms of breast cancer brain metastasis (BCBM) are of great importance in designing therapeutic strategies to treat or prevent BCBM. The present study attempted to identify novel diagnostic and prognostic biomarkers of BCBM. Two datasets (GSE125989 and GSE100534) were obtained from the Gene Expression Omnibus (GEO) database to find differentially expressed genes (DEGs) in cases of BC with and without brain metastasis (BM). A total of 146 overlapping DEGs, including 103 up-regulated and 43 down-regulated genes, were identified. Functional enrichment analysis showed that these DEGs were mainly enriched for functions including extracellular matrix (ECM) organization and collagen catabolic fibril organization. Using protein-protein interaction (PPI) and principal component analysis (PCA) analysis, we identified ten key genes, including LAMA4, COL1A1, COL5A2, COL3A1, COL4A1, COL5A1, COL5A3, COL6A3, COL6A2, and COL6A1. Additionally, COL5A1, COL4A1, COL1A1, COL6A1, COL6A2, and COL6A3 were significantly associated with the overall survival of BC patients. Furthermore, COL6A3, COL5A1, and COL4A1 were potentially correlated with BCBM in human epidermal growth factor 2 (HER2) expression. Additionally, the miR-29 family might participate in the process of metastasis by modulating the cancer microenvironment. Based on datasets in the GEO database, several DEGs have been identified as ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32894152",
+      "title": "Non-canonical Fzd7 signaling contributes to breast cancer mesenchymal-like stemness involving Col6a1",
+      "abstract": "Mesenchymal-like stemness is characterized by epithelial-mesenchymal transition (EMT). Breast cancer (BC) cell mesenchymal-like stemness is responsible for distal lung metastasis. Interrogation of databases showed that Fzd7 was closely associated with a panel of mesenchymal-related genes and a panel of stemness-related genes. Fzd7 knockdown in mesenchymal-like MDA-MB-231 and Hs578T cells reduced expression of Vimentin, Slug and Zeb1, induced an epithelial-like morphology, inhibited cell motility, impaired mammosphere formation and decreased Lgr5+ subpopulation. In contrast, Fzd7 overexpression in MCF7 cells resulted in opposite changes. Fzd7 knockdown delayed xenograft tumor formation, suppressed tumor growth, and impaired lung metastasis. Mechanistically, Fzd7 combined with Wnt5a/b and modulated expression of phosphorylated Stat3 (p-STAT3), Smad3 and Yes-associated protein 1 (Yap1). Moreover, Fzd7-Wnt5b modulated expression of collagen, type VI, alpha 1 (Col6a1). Both Wnt5b knockdown and Col6a1 knockdown disrupted BC cell mesenchymal phenotype and stemness. Taken together, Fzd7 contributes to BC cell EMT and stemness, inducing tumorigenesis and metastasis, mainly through a non-canonical Wnt5b pathway. Col6a1 is implicated in Fzd7-Wnt5b signaling, and mediates Fzd7-Wnt5b -induced mesenchymal-like stemness.\n\nVideo Abstract",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30353998",
+      "title": "ECM Remodeling in Breast Cancer with Different Grade: Contribution of 2D-DIGE Proteomics.",
+      "abstract": "Tumor extracellular matrix (ECM) plays a pivotal role in outcome of breast cancer (BC) patients. Overexpression of 58 genes, encoding 43 structural ECM proteins, has been identified to determine a specific cluster of BC with accelerated metastatic potential only in the undifferentiated (grade III) phenotype. The scope of this study is to characterize protein repertoire able to predict patient outcome in BC according to ECM gene expression pattern and histological grade. The differential proteomic analysis is based on 2D-differential gel electrophoresis, MALDI-MS, bioinformatics, and immunoblotting. Results suggest a relationship among ECM remodeling, signal mechanotransduction, and metabolic rewiring in BCs characterized by a specific mRNA ECM signature and identified a set of dysregulated proteins characteristic of hormone receptors expression as fibrinogen-beta chain, collagen alpha-1(VI) chain, and alpha-1B-glycoprotein. Furthermore, in triple negative tumors with ECM signature, the FGG and alpha5beta1/alphavbeta3 integrins increase whereas detyrosinated alpha-tubulin and mimecan decrease leading to unorganized integrin presentation involving focal adhesion kinase, activation of Rho GTPases associated to epithelial mesenchymal transition. In hormone receptors negative BCs characterized by a specific ECM gene cluster, the differentially regulated proteins, identified in the present study, can be potentially relevant to predict patient's outcome.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "10220145",
+      "title": "Reliable and sensitive detection of premature termination mutations using a protein truncation test designed to overcome problems of nonsense-mediated mRNA instability.",
+      "abstract": "The protein truncation test (PTT) is a mutation-detection method used to scan for premature termination (nonsense) mutations. PCR amplification of the DNA or mRNA source material is performed using forward primers containing a T7-promoter sequence and translation initiation signals such that the resultant products can be transcribed and translated in vitro to identify the smaller truncated protein products. mRNA is commonly used as the source material, but success of the PTT and other RNA-based mutation detection methods can be severely compromised by nonsense mutation-induced mRNA decay, a well-documented process that is often overlooked in mutation detection strategies. In this study, we develop an RNA-based PTT that overcomes the problem of mRNA decay by preincubating cells with cycloheximide to stabilise the mutant mRNA. The effectiveness of this method for mutation detection in abundant mRNAs was demonstrated in osteogenesis imperfecta fibroblasts by the protection of type I collagen (COL1A1) mRNA containing nonsense mutations that normally resulted in mutant mRNA degradation. Stabilisation of mutant mismatch repair gene (MLH1) mRNA was also observed in transformed lymphocytes from patients with hereditary nonpolyposis colorectal cancer (HNPCC). Importantly, our strategy also stabilised very low-level (or illegitimate) nonsense-containing transcripts in lymphoblasts from patients with Bethlem myopathy (COL6A1), familial adenomatous polyposis (APC), and breast cancer (BRC",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "41256660",
+      "title": "scGPD: single-cell informed gene panel design for targeted spatial transcriptomics",
+      "abstract": "In targeted spatial transcriptomics technologies, a key challenge is to select an informative gene panel that captures the complexity of cellular and spatial heterogeneity within tissues. Many existing methods use prior knowledge or heuristic selection rules, such as selecting highly variable genes, which overlook gene-gene correlations and may consequently result in suboptimal coverage. To address the limitations of the existing methods, we introduce scGPD, a deep learning-based framework for gene panel design that leverages single-cell RNA-seq data to identify compact, nonredundant sets of genes for spatial profiling. scGPD uses a gene-gene correlation-aware gating mechanism to extract informative features from data, encouraging diversity among selected genes and eliminating redundancy. Across diverse single-cell datasets, scGPD outperforms existing gene panel design methods in recovering transcriptome-wide expression using a limited number of genes. When applied to spatial transcriptomics data, it achieves superior cell type classification accuracy, demonstrating strong generalization across modalities. The gene panels selected by scGPD further exhibit well-defined spatial expression patterns, highlighting their robustness and relevance for spatial analysis. The scGPD framework is flexible and can be adapted to multiple use cases, enabling the prioritization of genes relevant to specific diseases or phenotypes. Together, these results demonstrate that scGPD provides a robu",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36980785",
+      "title": "Cancer-Associated Fibroblasts: Master Tumor Microenvironment Modifiers",
+      "abstract": "Simple Summary\n\nCancer cells rely on the surrounding environment to grow and spread. This environment contains structural components, secreted factors, immune cells, and other types of cells. Among these, cancer-associated fibroblasts (CAFs) play an important role in tumor cell growth, invasion, and metastasis. CAFs are heterogenous within tumor tissue and across cancer types. Given the plasticity, CAFs are the master tumor microenvironment modifier: an architect and a coordinator. Specifically, they produce and remodel the tumor microenvironment. They also communicate with immune cells, aiding the cancer in evading immune detection. This review highlights the factors and signaling pathways by which CAFs act.\n\nAbstract\n\nCancer cells rely on the tumor microenvironment (TME), a composite of non-malignant cells, and extracellular matrix (ECM), for survival, growth, and metastasis. The ECM contributes to the biomechanical properties of the surrounding tissue, in addition to providing signals for tissue development. Cancer-associated fibroblasts (CAFs) are stromal cells in the TME that are integral to cancer progression. Subtypes of CAFs across a variety of cancers have been revealed, and each play a different role in cancer progression or suppression. CAFs secrete signaling molecules and remodel the surrounding ECM by depositing its constituents as well as degrading enzymes. In cancer, a remodeled ECM can lead to tumor-promoting effects. Not only does the remodeled ECM promote gr",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34956327",
+      "title": "Tissue-Specific Expression Pattern in Ancherythroculter nigrocauda, a Sexually Size Dimorphic Fish",
+      "abstract": "Certain members of the Actinopterygii class are known to exhibit sexual dimorphism (SD) that results in major phenotypic differences between male and female fishes of a species. One of the most common differences between the two sexes is in body weight, a factor with a high economic value in aquaculture. In this study, we used RNA sequencing (RNA-seq) to study the liver and brain transcriptomes of Ancherythroculter nigrocauda, a fish exhibiting SD. Females attain about fourfold body weight of males at sexual maturity. Sample clustering showed that both sexes were grouped well with their sex phenotypes. In addition, 2,395 and 457 differentially expressed genes (DEGs) were identified in the liver and brain tissues, respectively. The gene ontology (GO) and Kyoto Encyclopedia of Genes and Genomes (KEGG) pathway enrichment analyses predicted the association of PPAR signaling, cytochrome P450, and steroid hormone biosynthesis to the differences in sexual size. In addition, weighted gene co-expression network analyses (WGCNA) were conducted, and the green module was identified to be significantly correlated with sexual size dimorphism (SSD). Altogether, these results improve our understanding of the molecular mechanism underlying SSD in A. nigrocauda.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "42184620",
+      "title": "A cross-sectional study on the expression of CD44 as a stem cell marker in breast cancer patients: Association with clinicopathological prognostic markers across molecular subtypes.",
+      "abstract": "The clinical application of cancer stem cell marker CD44 in breast cancer prognosis has been widely explored. However, data on the association between CD44 expression and prognostication across molecular subtypes of breast cancer remain limited. In this study we evaluated CD44 expression in various breast carcinoma subtypes and its association with clinicopathological prognostic parameters. Further, molecular docking studies were performed to investigate molecular interactions involving CD44. A cross-sectional study was conducted on breast tissue specimens collected from 60 patients over a period of two years. Immunohistochemistry analyses were performed to assess CD44 expression in paraffin-embedded breast tissue samples. Clinicopathological prognostic parameters were analysed in relation to CD44 expression. Of the 60 cases, CD44 staining was positive in 34 cases (57%) and negative in 26 (43%). Increased CD44 expression was correlated with histological grade (p=0.022), lymphovascular invasion (p=0.039), and lymph node status (p=0.033) in invasive breast carcinoma. Notably, high CD44 expression was also observed in patients with triple-negative breast cancer. Further, protein docking analysis revealed significant interactions between CD44 and molecular markers such as ER, PR, HER2/neu, and Ki-67, with HER2/neu showing the strongest correlation. Several new targeted treatments for breast cancer were also identified through docking studies. These findings highlight that induced",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "27121210",
+      "title": "MicroRNA-143 targets CD44 to inhibit breast cancer progression and stem cell-like properties.",
+      "abstract": "CD44 is closely linked to breast cancer progression; however, the regulatory functions of microRNAs (miRs) in breast cancer have yet to be fully elucidated. In order to investigate the regulation of CD44 by miRs in breast cancer, the present study isolated CD44+ and CD44- breast cancer cells by flow cytometry, revealing that CD44+ cells were enriched in transplanted compared with those in primary breast cancers, and that their proliferation and stem-cell sphere formation ability were enhanced. A miRNA array assay indicated that miR-143 expression in CD44+ breast cancer cells was lower than that in CD44- cells. Furthermore, miR-143 was decreased in breast cancer tissues and cell lines compared with that in normal tissues and cells. Restoration of miR-143 expression in CD44+ breast cancer cells inhibited their proliferation and sphere formation. A luciferase reporter assay demonstrated that miR-143 directly tartgeted the 3'-untranslated region of CD44. In addition, miR-143 inhibited metastasis-associated features in breast cancer and reduced tumor growth in a mouse model of breast cancer. In conclusion, the results of the present study demonstrated that miR-143 inhibited the progression and stem-cell properties of breast cancer cells by targeting CD44. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25683728",
+      "title": "FOXP3 suppresses breast cancer metastasis through downregulation of CD44.",
+      "abstract": "Forkhead box protein 3 (FOXP3) plays an important role in breast cancer as an X-linked tumor suppressor gene. However, the biological functions and significance of FOXP3 in breast cancer metastasis remain unclear. Here, we find that, clinically, nuclear FOXP3 expression is inversely correlated with breast cancer metastasis. Moreover, we demonstrate that FOXP3 significantly inhibits adhesion, invasion and metastasis of breast cancer cells in vivo and in vitro. In addition, the adhesion molecule CD44 is found to be suppressed by FOXP3 through transcriptome sequence analysis (RNA-seq). A luciferase reporter assay, chromatin immunoprecipitation and electrophoretic mobility shift assay identify CD44 as a direct target of FOXP3. The expression of CD44 is downregulated by FOXP3 in breast cancer cells. Importantly, anti-CD44 antibody reverses the FOXP3 siRNA-induced effects on the breast cancer cells in vitro and FOXP3 expression level in the nucleus of breast cancer cells is inversely correlated with CD44 expression level in clinic breast cancer tissues. Taken together, the results from the present study suggest that FOXP3 is a suppressor of breast cancer metastasis. FOXP3 directly binds to the promoter of CD44 and inhibits its protein expression, thereby suppressing adhesion and invasion of human breast cancer cells. This finding highlights the therapeutic potential of FOXP3-CD44 signaling to inhibit breast cancer metastasis. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25815697",
+      "title": "Blocking the adhesion cascade at the premetastatic niche for prevention of breast cancer metastasis.",
+      "abstract": "Shear-resistant adhesion and extravasation of disseminated cancer cells at the target organ is a crucial step in hematogenous metastasis. We found that the vascular adhesion molecule E-selectin preferentially promoted the shear-resistant adhesion and transendothelial migration of the estrogen receptor (ER)(-)/CD44(+) hormone-independent breast cancer cells, but not of the ER(+)/CD44(-/low) hormone-dependent breast cancer cells. Coincidentally, CD44(+) breast cancer cells were abundant in metastatic lung and brain lesions in ER(-) breast cancer, suggesting that E-selectin supports hematogenous metastasis of ER(-)/CD44(+) breast cancer. In an attempt to prevent hematogenous metastasis through the inhibition of a shear-resistant adhesion of CD44(+) cancer cells to E-selectin-expressing blood vessels on the premetastatic niche, an E-selectin targeted aptamer (ESTA) was developed. We demonstrated that a single intravenous injection of ESTA reduced metastases to a baseline level in both syngeneic and xenogeneic forced breast cancer metastasis models without relocating the site of metastasis. The effect of ESTA was absent in E-selectin knockout mice, suggesting that E-selectin is a molecular target of ESTA. Our data highlight the potential application of an E-selectin antagonist for the prevention of hematogenous metastasis of ER(-)/CD44(+) breast cancer. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "22152097",
+      "title": "Differentiation of breast cancer stem cells by knockdown of CD44: promising differentiation therapy",
+      "abstract": "Background\n\nBreast cancer stem cells (BCSCs) are the source of breast tumors. Compared with other cancer cells, cancer stem cells show high resistance to both chemotherapy and radiotherapy. Targeting of BCSCs is thus a potentially promising and effective strategy for breast cancer treatment. Differentiation therapy represents one type of cancer stem-cell-targeting therapy, aimed at attacking the stemness of cancer stem cells, thus reducing their chemo- and radioresistance. In a previous study, we showed that down-regulation of CD44 sensitized BCSCs to the anti-tumor agent doxorubicin. This study aimed to determine if CD44 knockdown caused BCSCs to differentiate into breast cancer non-stem cells (non-BCSCs).\n\nMethods\n\nWe isolated a breast cancer cell population (CD44+CD24- cells) from primary cultures of malignant breast tumors. These cells were sorted into four sub-populations based on their expression of CD44 and CD24 surface markers. CD44 knockdown in the BCSC population was achieved using small hairpin RNA lentivirus particles. The differentiated status of CD44 knock-down BCSCs was evaluated on the basis of changes in CD44+CD24- phenotype, tumorigenesis in NOD/SCID mice, and gene expression in relation to renewal status, metastasis, and cell cycle in comparison with BCSCs and non-BCSCs.\n\nResults\n\nKnockdown of CD44 caused BCSCs to differentiate into non-BCSCs with lower tumorigenic potential, and altered the cell cycle and expression profiles of some stem cell-related genes",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21970856",
+      "title": "Understanding the dual nature of CD44 in breast cancer progression.",
+      "abstract": "CD44 has been the subject of extensive research for more than 3 decades because of its role in breast cancer, in addition to many physiological processes, but interestingly, conflicting data implicate CD44 in both tumor suppression and tumor promotion. CD44 has been shown to promote protumorigenic signaling and advance the metastatic cascade. On the other hand, CD44 has been shown to suppress growth and metastasis. Histopathological studies of human breast cancer have correlated CD44 expression with both favorable and unfavorable clinical outcomes. In recent years, CD44 has garnered significant attention because of its utility as a stem cell marker and has surfaced as a potential therapeutic target, necessitating a greater understanding of CD44 in breast cancer. In this review, we attempt to unify the literature implicating CD44 in both tumor promotion and suppression, and explain its dualistic nature.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21804359",
+      "title": "Implications of single nucleotide polymorphisms in CD44 exon 2 for risk of breast cancer.",
+      "abstract": "CD44 is a cell-surface glycoprotein involved in many cellular functions including lymphocyte activation, recirculation and homing, hematopoiesis and tumor metastasis, suggesting that CD44 may play an important role in breast cancer development. In this study, we examined whether CD44 exon 2 polymorphisms are associated with increased susceptibility to breast cancer. Direct nucleotide sequencing analysis showed that multiple single nucleotide polymorphisms were present in the CD44 exon 2 coding region in female patients with breast cancer. There was no significant difference in the frequency of any one single nucleotide polymorphism in the CD44 exon 2 coding region between patients with breast cancer and normal donors. However, CD44 polymorphisms in the CD44 exon 2 coding region were identified in approximately 40% of patients with breast cancer, which was significantly higher than in normal donors (odds ratio, 9.34; 95% confidence interval = 2.58-33.82; P < 0.0001). The Wilcoxon-Mann-Whitney test analysis showed that the patients with the CD44 polymorphisms in CD44 exon 2 coding sequence had breast cancer at earlier ages, 49 +- 3 versus 62 +- 2 years (P < 0.0005), and larger tumor burdens (4.9 +- 1.22 vs. 1.6 +- 0.15 mm, P < 0.01) at the time of diagnosis. Interestingly, African-American female patients having the CD44 polymorphisms in CD44 exon 2 coding sequence were diagnosed with breast cancer at very young age (41 +- 2 years). Our results show that CD44 exon 2 polymorphis",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "20530438",
+      "title": "Unique SNP in CD44 intron 1 and its role in breast cancer development.",
+      "abstract": "In the current study, we investigated if CD44 polymorphisms are associated with increased susceptibility to breast cancer. Direct nucleotide sequencing analysis identified a novel and unique single nucleotide polymorphism (SNP, designated as CD44 Ex2+14 A>G) in the CD44 intron 1 region in 84% of breast cancer patients, which was significantly higher than that seen in normal donors. Moreover, the breast cancer patients with homozygous unique SNP in CD44 intron 1 had breast cancer at earlier ages, larger tumor burden, more regional lymph node metastases at the time of diagnosis, and higher cancer recurrence rate. There was a strong association between the unique SNP in CD44 intron 1 and CD44 expression on peripheral blood mononuclear cells. Our results suggest that CD44 polymorphism is associated with breast cancer development, and CD44 polymorphism analysis may be effectively used in the risk assessment, prediction, prevention, diagnosis and genetic epidemiological analysis of breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "8669866",
+      "title": "Expression of the CD44 glycoprotein (lymphocyte-homing receptor) in untreated human breast cancer and its relationship to prognostic markers.",
+      "abstract": "CD44 is a cell surface glycoprotein which has been suggested to be associated with aggressive histological features in breast cancer (BC). It has also been implicated in conferring metastatic potential to rat carcinoma cells. The aim of this study was to determine the potential value of CD44 as a prognostic/metastatic marker in BC by means of immunohistochemistry. The expression of the CD44 glycoprotein was investigated in tumours from 52 untreated female patients with BC, using the monoclonal antibody A3D8. 10 samples of normal breast tissue were randomly obtained and also investigated with respect to CD44 expression. DNA ploidy, the S-phase fraction (SPF) and oestrogen-(OR) and progesterone-receptor (PgR) contents in the tumours were determined and together with the prognostic markers of age, tumour size, tumour grade and lymph node status, correlated with CD44 expression in BC. Also, the distribution of CD44 tumour cell expression was compared with expression of the permeability drug resistance glycoprotein (P-gp) in this material. Expression of CD44 on carcinoma cells was observed in 21/52 cases (40%). Capillary endothelial reactivity of the tumours occurred in 42 cases (80%). Non-neoplastic epithelial breast tissue was positive in 2/10 (20%) samples and capillary vessels in 7/10 (70%). Carcinoma CD44 cell expression was not associated with age, tumour size, tumour grade, DNA ploidy, SPF, hormone-receptor contents or lymph node metastases. There was a statistical correlat",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34311079",
+      "title": "Article 34311079",
+      "abstract": "",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "41315075",
+      "title": "Collagen dynamics in the breast cancer tumor microenvironment and therapeutic perspectives",
+      "abstract": "Breast Cancer (BC) remains one of the most prevalent malignancies among women globally, with its pathogenesis and clinical progression being profoundly regulated by the tumor microenvironment (TME). Collagen, the most abundant extracellular matrix (ECM) component, plays multifaceted roles in shaping the TME of BC. Aberrant cllagen deposition, crosslinking, and remodeling alter tissue stiffness and architecture, driving tumor initiation, growth, invasion, and metastasis through integrin and discoidin domain receptor-mediated mechanosignaling, growth factor regulation, and metabolic reprogramming. Collagen rich stroma also acts as a physical and biochemical barrier that restricts T cell infiltration, promotes macrophage polarization, and impairs natural killer cell (NK) cytotoxicity, thereby facilitating immune evasion and therapeutic resistance. Specific collagen isoforms, including types I, III, V, VI, X, and XI, exhibit context-dependent tumor promoting or tumor restraining effects, underscoring the complexity of roles. Recent advances in targeting collagen biology, such as enzymatic degradation, inhibition of crosslinking enzymes, blockade of collagen receptors, and immune modulation strategies demonstrates promising preclinical results, with several approaches progressing to clinical trials. Future perspectives emphasize the integration of collagen targeting therapies with immunotherapy and chemotherapy, alongside the development of predictive biomarkers to stratify patien",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36940196",
+      "title": "Identification of molecularly unique tumor-associated mesenchymal stromal cells in breast cancer patients",
+      "abstract": "The tumor microenvironment is a complex mixture of cell types that bi-directionally interact and influence tumor initiation, progression, recurrence, and patient survival. Mesenchymal stromal cells (MSCs) of the tumor microenvironment engage in crosstalk with cancer cells to mediate epigenetic control of gene expression. We identified CD90+ MSCs residing in the tumor microenvironment of patients with invasive breast cancer that exhibit a unique gene expression signature. Single-cell transcriptional analysis of these MSCs in tumor-associated stroma identified a distinct subpopulation characterized by increased expression of genes functionally related to extracellular matrix signaling. Blocking the TGFbeta pathway reveals that these cells directly contribute to cancer cell proliferation. Our findings provide novel insight into communication between breast cancer cells and MSCs that are consistent with an epithelial to mesenchymal transition and acquisition of competency for compromised control of proliferation, mobility, motility, and phenotype.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34370182",
+      "title": "In-depth characterization of a new patient-derived xenograft model for metaplastic breast carcinoma to identify viable biologic targets and patterns of matrix evolution within rare tumor types",
+      "abstract": "Metaplastic breast carcinoma (MBC) is a rare breast cancer subtype with rapid growth, high rates of metastasis, recurrence and drug resistance, and diverse molecular and histological heterogeneity. Patient-derived xenografts (PDXs) provide a translational tool and physiologically relevant system to evaluate tumor biology of rare subtypes. Here, we provide an in-depth comprehensive characterization of a new PDX model for MBC, TU-BcX-4IC. TU-BcX-4IC is a clinically aggressive tumor exhibiting rapid growth in vivo, spontaneous metastases, and elevated levels of cell-free DNA and circulating tumor cell DNA. Relative chemosensitivity of primary cells derived from TU-BcX-4IC was performed using the National Cancer Institute (NCI) oncology drug set, crystal violet staining, and cytotoxic live/dead immunofluorescence stains in adherent and organoid culture conditions. We employed novel spheroid/organoid incubation methods (Pu MA system) to demonstrate that TU-BcX-4IC is resistant to paclitaxel. An innovative physiologically relevant system using human adipose tissue was used to evaluate presence of cancer stem cell-like populations ex vivo. Tissue decellularization, cryogenic-scanning electron microscopy imaging and rheometry revealed consistent matrix architecture and stiffness were consistent despite serial transplantation. Matrix-associated gene pathways were essentially unchanged with serial passages, as determined by qPCR and RNA sequencing, suggesting utility of decellularized ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34685653",
+      "title": "In Silico Evaluation of Natural Compounds for an Acidic Extracellular Environment in Human Breast Cancer",
+      "abstract": "The survival rates for breast cancer (BC) have improved in recent years, but resistance, metastasis, and recurrence still remain major therapeutic challenges for BC. The acidic tumor microenvironment (TME) has attracted attention because of its association with tumorigenesis, metastasis, drug resistance, and immune surveillance. In this study, we evaluated natural compounds from traditional herbal medicine used to treat cancer that selectively target genes regulated by extracellular acidosis. We integrated four transcriptomic data including BC prognostic data from The Cancer Genome Atlas database, gene expression profiles of MCF-7 cells treated with 102 natural compounds, patterns of gene profiles by acidic condition, and single-cell RNA-sequencing from BC patient samples. Bruceine D (BD) was predicted as having the highest therapeutic potential, having an information gain (IG) score of 0.24, to regulate reprogrammed genes driven by acidosis affecting the survival of BC patients. BD showed the highest IG on EMT (IG score: 0.11) and invasion (IG score: 0.1) compared to the other phenotypes with the CancerSEA database. BD also demonstrated therapeutic potential by interfering with the tumor cell-TME interactions by reducing the amyloid beta precursor protein and CD44 expression. Therefore, BD is a potential candidate to target the acidic TME induced metastatic process in BC.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "41279931",
+      "title": "Scaffold-free 3D-Cell Co-Culture Model System for the Study of Metastatic Cancer Cell Behavior in the Brain TME",
+      "abstract": "Cancer is a complex disease involving dynamic interactions between cancer, stromal, and infiltrating immune cells, as well as between these cells and the extracellular matrix components of the tumor microenvironment. Brain metastases arise primarily from solid tumors and often result in fatal outcomes. An in-depth understanding of the complex intercellular interactions that evolve in the brain microenvironment is essential to enabling early cancer diagnostics and improving patient outcomes. The protected tumor microenvironment of the brain hinders, however, direct access, impeding the execution of mechanistic studies and limiting the ability to derive meaningful insights. Several in vitro 2D and 3D model systems have been developed to circumvent this problem, none, however, without limitations. The 2D models fail to recapitulate the 3D architecture of the in-vivo environment lacking therefore physiological relevance, while the 3D models present challenges related to the lack of control over cell positioning, lack of vascularization, contamination from non-human scaffolds, batch-to-batch reproducibility, and high production costs. To overcome some of these limitations, we developed an in vitro scaffold-free 3D tumor model system to simulate the in vivo brain metastatic niche. The model was constructed from human brain endothelial cells (HBEC-5i) and two different cancer cell lines derived from breast (MDA-MB-231/triple negative and SK-BR-3/HER2+) and aggressive ovarian (SK-OV-",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40195290",
+      "title": "The role of cancer-associated fibroblasts in the tumour microenvironment of urinary system",
+      "abstract": "Abstract\n\nUrological tumours are a type of neoplasms that significantly jeopardise human life and wellbeing. Cancer-associated fibroblasts (CAFs), serving as the primary component of the stromal cellular milieu, form a diverse cellular cohort that exerts substantial influence on tumourigenesis and tumour progression. In this review, we summarised the literatures regarding the functions of CAFs in the urinary tumour microenvironment (TME). We primarily examined the multifaceted activities of CAFs in the TME of urological system tumours, including inhibiting tumour immunity, remodelling the extracellular matrix, promoting tumour growth, metastasis, drug resistance and their clinical applications. We also discussed potential future directions for leveraging artificial intelligence in CAFs research.\n\nKey points\n\nThe interaction of CAFs with various cell secretory factors in the TME of urological tumors.\n\nThe application of CAFs in diagnosis, treatment and prognosis of urological tumors.\n\nWe summarised the role of cancer-associated fibroblasts (CAFs) in urological tumours, including their origin, exosomes and extracellular matrix (ECM). CAFs are derived from various precursor cells and can communicate with other cells to form a hypoxic and immunosuppressive microenvironment. Additionally, CAFs can interact with tumour cells through various exosomes and exert a tumour-promoting effect .",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38887185",
+      "title": "Identification and validation of COL6A1 as a novel target for tumor electric field therapy in glioblastoma",
+      "abstract": "Abstract\n\nBackground\n\nGlioblastoma multiforme (GBM) is the most aggressive primary brain malignancy. Novel therapeutic modalities like tumor electric field therapy (TEFT) have shown promise, but underlying mechanisms remain unclear. The extracellular matrix (ECM) is implicated in GBM progression, warranting investigation into TEFT-ECM interplay.\n\nMethods\n\nT98G cells were treated with TEFT (200 kHz, 2.2 V/m) for 72 h. Collagen type VI alpha 1 (COL6A1) was identified as hub gene via comprehensive bioinformatic analysis based on RNA sequencing (RNA-seq) and public glioma datasets. TEFT intervention models were established using T98G and Ln229 cell lines. Pre-TEFT and post-TEFT GBM tissues were collected for further validation. Focal adhesion pathway activity was assessed by western blot. Functional partners of COL6A1 were identified and validated by co-localization and survival analysis.\n\nResults\n\nTEFT altered ECM-related gene expression in T98G cells, including the hub gene COL6A1. COL6A1 was upregulated in GBM and associated with poor prognosis. Muti-database GBM single-cell analysis revealed high-COL6A1 expression predominantly in malignant cell subpopulations. Differential expression and functional enrichment analyses suggested COL6A1 might be involved in ECM organization and focal adhesion. Western blot (WB), immunofluorescence (IF), and co-immunoprecipitation (Co-IP) experiments revealed that TEFT significantly inhibited expression of COL6A1, hindering its interaction with",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38590654",
+      "title": "Pan-cancer and single-cell analyses identify CD44 as an immunotherapy response predictor and regulating macrophage polarization and tumor progression in colorectal cancer",
+      "abstract": "Introduction\n\nCluster of differentiation (CD) 44 is a non-kinase cell surface transmembrane glycoprotein critical for tumor maintenance and progression.\n\nMethods\n\nWe conducted a systematic analysis of the expression profile and genomic alteration profile of CD44 in 33 types of cancer. The immune characteristics of CD44 were comprehensively explored by TIMER2.0 and CIBERSORT. In addition, the CD44 transcriptional landscape was examined at the single-cell level. Then, Pseudotime trajectory analysis of CD44 gene expression was performed using Monocle 2, and CellChat was utilized to compare the crosstalk differences between CD44+monocytes and CD44- monocytes. Tumor immune dysfunction and exclusion (TIDE) was used to evaluate the predictive ability of CD44 for immune checkpoint blockade (ICB) responses. The effects of CD44 on colorectal cancer (CRC) and macrophage polarization were investigated by knocking down the expression of CD44 in HCT-116 cell and macrophages in vitro.\n\nResults\n\nThe expression of CD44 elevated in most cancers, predicting unfavorable prognosis. In addditon, CD44 was correlation with immune cell infiltration and key immune regulators. CD44+ monocytes had a higher information flow intensity than CD44- monocytes. CD44 had good predictive ability for immune checkpoint blockade responses. Knockdown of CD44 inhibited the proliferation, migration, and invasion of HCT-116 cell in vitro. Knockdown of CD44 inhibited M2 macrophage polarization.\n\nDiscussion\n\nThese findin",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34901028",
+      "title": "Targeting Tumor-Stromal Interactions in Pancreatic Cancer: Impact of Collagens and Mechanical Traits",
+      "abstract": "Pancreatic ductal adenocarcinoma (PDAC) has one of the worst outcomes among cancers with a 5-years survival rate of below 10%. This is a result of late diagnosis and the lack of effective treatments. The tumor is characterized by a highly fibrotic stroma containing distinct cellular components, embedded within an extracellular matrix (ECM). This ECM-abundant tumor microenvironment (TME) in PDAC plays a pivotal role in tumor progression and resistance to treatment. Cancer-associated fibroblasts (CAFs), being a dominant cell type of the stroma, are in fact functionally heterogeneous populations of cells within the TME. Certain subtypes of CAFs are the main producer of the ECM components of the stroma, with the most abundant one being the collagen family of proteins. Collagens are large macromolecules that upon deposition into the ECM form supramolecular fibrillar structures which provide a mechanical framework to the TME. They not only bring structure to the tissue by being the main structural proteins but also contain binding domains that interact with surface receptors on the cancer cells. These interactions can induce various responses in the cancer cells and activate signaling pathways leading to epithelial-to-mesenchymal transition (EMT) and ultimately metastasis. In addition, collagens are one of the main contributors to building up mechanical forces in the tumor. These forces influence the signaling pathways that are involved in cell motility and tumor progression and af",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40847127",
+      "title": "Oncogenic effects of ECM remodeling in obesity and breast cancer",
+      "abstract": "Extracellular matrix (ECM) components are key regulators in breast cancer progression, as ECM remodeling is essential for breast cancer cells to invade into surrounding tissue. This process is characterized by the alignment of fibrillar collagens, breakdown of basement membrane components, and increased interstitial collagen stiffness. In patients with obesity, pre-existing ECM changes, including excessive collagen deposition and heightened matrix stiffness, mimic alterations detected in breast cancer. Given that obesity is a predictor of poor prognosis and resistance to treatment in breast cancer, it is crucial to understand how ECM conditioned by obesity affects disease outcomes. In this review, we highlight known ECM changes that occur with breast cancer and obesity and describe how these changes impact cancer cell metastasis, disease progression, and the breast cancer tumor microenvironment. We examine how obesity driven ECM remodeling affects treatment response and resistance. Further, we discuss how the compounding factor of age contributes to remodeling and current preclinical models of ECM in breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen VI",
+          "fibrosis",
+          "myofibroblast activation",
+          "matrix remodeling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37296891",
+      "title": "Obesity and Fibrosis: Setting the Stage for Breast Cancer",
+      "abstract": "Simple Summary\n\nObesity is a significant risk factor for breast cancer in postmenopausal women. Regardless of menopausal status, women with obesity have an elevated incidence of metastasis and a decreased response to treatment. Understanding how obesity promotes the development and progression of breast cancer could improve interventions for women with obesity. Breast tissue contains fat. In response to obesity, breast tissue fat contains more collagen that surrounds the fat cells and epithelial cells. Supportive cells within the fat increase collagen production, which elevates the stiffness of the tissue. Inflammatory cells called macrophages interact with other supportive cells within the fat to increase collagen in the surrounding breast tissue. While weight loss is recommended to reduce obesity, the long-term effects on improving inflammation and the amount of collagen are less clear. Increased collagen and inflammation within breast tissue may enhance the risk for tumor development and promote characteristics associated with a worsened prognosis.\n\nAbstract\n\nObesity is a rising health concern and is linked to a worsened breast cancer prognosis. Tumor desmoplasia, which is characterized by elevated numbers of cancer-associated fibroblasts and the deposition of fibrillar collagens within the stroma, may contribute to the aggressive clinical behavior of breast cancer in obesity. A major component of the breast is adipose tissue, and fibrotic changes in adipose tissue due to ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen VI",
+          "fibrosis",
+          "myofibroblast activation",
+          "matrix remodeling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33087348",
+      "title": "Decellularized extracellular matrix scaffolds identify full-length collagen VI as a driver of breast cancer cell invasion in obesity and metastasis",
+      "abstract": "Collagen VI, an ECM protein up-regulated in triple-negative breast cancer and obese individuals, drives breast cancer metastasis.\n\nThe extracellular matrix (ECM), a major component of the tumor microenvironment, promotes local invasion to drive metastasis. Here, we describe a method to study whole-tissue ECM effects from disease states associated with metastasis on tumor cell phenotypes and identify the individual ECM proteins and signaling pathways that are driving these effects. We show that decellularized ECM from tumor-bearing and obese mammary glands drives TNBC cell invasion. Proteomics of the ECM from the obese mammary gland led us to identify full-length collagen VI as a novel driver of TNBC cell invasion whose abundance in tumor stroma increases with body mass index in human TNBC patients. Last, we describe the mechanism by which collagen VI contributes to TNBC cell invasion via NG2-EGFR cross-talk and MAPK signaling. Overall, these studies demonstrate the value of decellularized ECM scaffolds obtained from tissues to identify novel functions of the ECM.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen VI",
+          "fibrosis",
+          "myofibroblast activation",
+          "matrix remodeling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "27725631",
+      "title": "Cancer-associated fibroblast-secreted CXCL16 attracts monocytes to promote stroma activation in triple-negative breast cancers",
+      "abstract": "Triple-negative (TN) breast cancers (ER-PR-HER2-) are highly metastatic and associated with poor prognosis. Within this subtype, invasive, stroma-rich tumours with infiltration of inflammatory cells are even more aggressive. The effect of myeloid cells on reactive stroma formation in TN breast cancer is largely unknown. Here, we show that primary human monocytes have a survival advantage, proliferate in vivo and develop into immunosuppressive myeloid cells expressing the myeloid-derived suppressor cell marker S100A9 only in a TN breast cancer environment. This results in activation of cancer-associated fibroblasts and expression of CXCL16, which we show to be a monocyte chemoattractant. We propose that this migratory feedback loop amplifies the formation of a reactive stroma, contributing to the aggressive phenotype of TN breast tumours. These insights could help select more suitable therapies targeting the stromal component of these tumours, and could aid prediction of drug resistance.\n\n A reactive tumour stroma is associated with poor prognosis. Here, the authors show that in patients with triple negative breast cancer resident monocytes activate cancer-associated fibroblasts and induce production of CXCL16, which acts as a monocyte chemoattractant, resulting in an amplificatory feedback loop.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen VI",
+          "fibrosis",
+          "myofibroblast activation",
+          "matrix remodeling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36546396",
+      "title": "Collagen VI expression is negatively mechanosensitive in pancreatic cancer cells and supports the metastatic niche",
+      "abstract": "ABSTRACT\n\nPancreatic cancer is a deadly and highly metastatic disease, although how metastatic lesions establish is not fully understood. A key feature of pancreatic tumours is extensive fibrosis and deposition of extracellular matrix (ECM). While pancreatic cancer cells are programmed by stimuli derived from a stiff ECM, metastasis requires loss of attachment and adaptation to a softer microenvironment at distant sites. Growing evidence suggests that stiff ECM influences pancreatic cancer cell behaviour. Here, we argue that this influence is reversible and that pancreatic cancer cells can be reprogrammed upon sensing soft substrates. Using engineered polyacrylamide hydrogels with tuneable mechanical properties, we show that collagen VI is specifically upregulated in pancreatic cancer cells on soft substrates, due to a lack of integrin engagement. Furthermore, the expression of collagen VI is inversely correlated with mechanosensing and activity of YAP (also known as YAP1), which might be due to a direct or indirect effect on transcription of genes encoding collagen VI. Collagen VI supports migration in vitro and metastasis formation in vivo. Metastatic nodules formed by pancreatic cancer cells lacking Col6a1 display stromal cell-derived collagen VI deposition, suggesting that collagen VI derived from either cancer cells or the stroma is an essential component of the metastatic niche.\n\nSummary: Collagen VI is expressed by pancreatic tumours and metastases in a mechanosensitiv",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen VI",
+          "fibrosis",
+          "myofibroblast activation",
+          "matrix remodeling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36428776",
+      "title": "Obesity-Associated ECM Remodeling in Cancer Progression",
+      "abstract": "Simple Summary\n\nAccumulated evidence has demonstrated that adipocytes can transform or de-differentiate into myofibroblast/fibroblast-like cells, which play vital roles in obesity-related extracellular matrix (ECM) remodeling and cancer progression. This review summarizes recent progress in adipocyte plasticity during obesity-related cancer progression and the function and regulation of obesity-associated ECM remodeling in cancer progression.\n\nAbstract\n\nAdipose tissue, an energy storage and endocrine organ, is emerging as an essential player for ECM remodeling. Fibrosis is one of the hallmarks of obese adipose tissue, featuring excessive ECM deposition and enhanced collagen alignment. A variety of ECM components and ECM-related enzymes are produced by adipocytes and myofibroblasts in obese adipose tissue. Data from lineage-tracing models and a single-cell analysis indicate that adipocytes can transform or de-differentiate into myofibroblast/fibroblast-like cells. This de-differentiation process has been observed under normal tissue development and pathological conditions such as cutaneous fibrosis, wound healing, and cancer development. Accumulated evidence has demonstrated that adipocyte de-differentiation and myofibroblasts/fibroblasts play crucial roles in obesity-associated ECM remodeling and cancer progression. In this review, we summarize the recent progress in obesity-related ECM remodeling, the mechanism underlying adipocyte de-differentiation, and the function of obe",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen VI",
+          "fibrosis",
+          "myofibroblast activation",
+          "matrix remodeling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35874275",
+      "title": "Longevity-Promoting Pathways and Transcription Factors Respond to and Control Extracellular Matrix Dynamics During Aging and Disease",
+      "abstract": "Aging is one of the largest risk factors for cancer, type 2 diabetes, osteoarthritis, cardiovascular diseases, and other age-related pathologies. Here, we give a detailed description of the interplay of chronic age-related pathologies with the remodeling of the extracellular matrix during disease development and progression. Longevity-promoting signaling pathways slow or prevent age-related diseases. In particular, we focus on the mTOR signaling pathway, sirtuins, and canonical longevity-promoting transcription factors, such as FOXO, NF-kappaB, and Nrf2. We extend our analysis using chromatin immunoprecipitation (ChIP) sequencing and transcriptomic data and report that many established and emerging longevity-promoting transcription factors, such as CREB1, FOXO1,3, GATA1,2,3,4, HIF1A, JUN, KLF4, MYC, NFE2L2/Nrf2, RELA/NF-kappaB, REST, STAT3,5A, and TP53/p53, directly regulate many extracellular matrix genes and remodelers. We propose that modulation of these pathways increases lifespan and protects from age-related diseases in part due to their effects on extracellular matrix remodeling. Therefore, to successfully treat age-related diseases, it is necessary to better understand the connection between extracellular matrix components and longevity pathways.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen VI",
+          "fibrosis",
+          "myofibroblast activation",
+          "matrix remodeling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34513697",
+      "title": "Regulation of Extracellular Matrix Production in Activated Fibroblasts: Roles of Amino Acid Metabolism in Collagen Synthesis",
+      "abstract": "Cancer associated fibroblasts (CAFs) are a major component of the tumour microenvironment in most tumours, and are key mediators of the response to tissue damage caused by tumour growth and invasion, contributing to the observation that tumours behave as 'wounds that do not heal'. CAFs have been shown to play a supporting role in all stages of tumour progression, and this is dependent on the highly secretory phenotype CAFs develop upon activation, of which extracellular matrix (ECM) production is a key element. A collagen rich, stromal ECM has been shown to influence tumour growth and metastasis, exclude immune cells and impede drug delivery, and is associated with poor prognosis in many cancers. CAFs also extensively remodel their metabolism to support cancer cells, however, it is becoming clear that metabolic rewiring also supports intrinsic functions of activated fibroblasts, such as increased ECM production. In this review, we summarise how fibroblasts metabolically regulate ECM production, focussing on collagen production, at the transcriptional, translational and post-translational level, and discuss how this can provide possible strategies for effectively targeting CAF activation and formation of a tumour-promoting stroma.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen VI",
+          "fibrosis",
+          "myofibroblast activation",
+          "matrix remodeling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37040171",
+      "title": "Truncation of GalNAc-type O-glycans Suppresses CD44-mediated Osteoclastogenesis and Bone Metastasis in Breast Cancer",
+      "abstract": "Abstract\n\nThe glycoprotein CD44 is a key regulator of malignant behaviors in breast cancer cells. To date, hyaluronic acid (HA)-CD44 signaling pathway has been widely documented in the context of metastatic bone diseases. Core 1 beta1,3-galactosyltransferase (C1GALT1) is a critical enzyme responsible for the elongation of O-glycosylation. Aberrant O-glycans is recognized as a hallmark in cancers. However, the effects of C1GALT1 on CD44 signaling and bone metastasis remain unclear. In this study, IHC analysis indicated that C1GALT1 expression positively correlates with CD44 in breast cancer. Silencing C1GALT1 accumulates the Tn antigen on CD44, which decreases CD44 levels and osteoclastogenic signaling. Mutations in the O-glycosites on the stem region of CD44 impair its surface localization as well as suppress cell-HA adhesion and osteoclastogenic effects of breast cancer cells. Furthermore, in vivo experiments demonstrated the inhibitory effect of silencing C1GALT1 on breast cancer bone metastasis and bone loss. In conclusion, our study highlights the importance of O-glycans in promoting CD44-mediated tumorigenic signals and indicates a novel function of C1GALT1 in driving breast cancer bone metastasis.\n\nImplications:\n\nTruncation of GalNAc-type O-glycans by silencing C1GALT1 suppresses CD44-mediated osteoclastogenesis and bone metastasis in breast cancer. Targeting the O-glycans on CD44 may serve as a potential therapeutic target for blocking cancer bone metastasis.\n\nVisual O",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33292278",
+      "title": "CD44 cross-linking increases malignancy of breast cancer via upregulation of p-Moesin",
+      "abstract": "Background\n\nCD44 is highly expressed in most cancer cells and its cross-linking pattern is closely related to tumor migration and invasion. However, the underlying molecular mechanism regarding CD44 cross-linking during cancer cell metastasis is poorly understood. Therefore, the purpose of this study was to explore whether disruption of CD44 cross-linking in breast cancer cells could prevent the cells migration and invasion and determine the effects of CD44 cross-linking on the malignancy of the cancer cells.\n\nMethods\n\nThe expression of CD44, CD44 cross-linking and Moesin phosphorylation in breast cancer cells was assessed by Western Blot assays. Effects of CD44 cross-linking on tumor metastasis were evaluated by Transwell assay. The effects of CD44 cross-linking disruption on cell viability were assessed using CCK-8 assays. The expression of p-Moesin between normal and breast cancer tissues was examined by immunohistochemical staining.\n\nResults\n\nHigh expression of CD44 cross-linking was found in invasive breast cancer cells (BT-549 and MDA-MB-231), which is associated with the malignancy of breast cancer. The expressions of ERM complex in a panel of breast cancer cell lines indicate that Moesin and its phosphorylation may play a significant role in cell metastasis. Moesin phosphorylation was inhibited by CD44 de-crosslinking in breast cancer cells and Moesin shRNA knockdown attenuated the promotion of CD44 cross-linking on cell migration and invasion. Finally, immunohistoche",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30443182",
+      "title": "Novel CD44-downstream signaling pathways mediating breast tumor invasion",
+      "abstract": "CD44, also known as homing cell adhesion molecule is a multi-structural cell molecule involved in cell-cell and cell-extracellular matrix communications. CD44 regulates a number of central signaling pathways, including PI3K/AKT, Rho GTPases and the Ras-MAPK pathways, but also acts as a growth/arrest sensor, and inhibitor of angiogenesis and invasion, in response to signals from the microenvironment. The function of CD44 has been very controversial since it acts as both, a suppressor and a promoter of tumor growth and progression. To address this discrepancy, we have previously established CD44-inducible system both in vitro and in vivo. Next, using microarray analysis, we have identified and validated Survivin, Cortactin and TGF-beta2 as novel CD44-downstream target genes, and characterized their signaling pathways underpinning CD44-promoted breast cancer (BC) cell invasion. This report aims to update the literature by adding and discussing the impact of these novel three signaling pathways to better understand the CD44-signaling pathways involved in BC tumor cell invasion.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "29339728",
+      "title": "How BMP-2 induces EMT and breast cancer stemness through Rb and CD44?",
+      "abstract": "Article: 29339728",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26447611",
+      "title": "CD44-mediated activation of alpha5beta1-integrin, cortactin and paxillin signaling underpins adhesion of basal-like breast cancer cells to endothelium and Fibronectin-enriched matrices",
+      "abstract": "CD44 expression is elevated in basal-like breast cancer (BLBC) tissue, and correlates with increased efficiency of distant metastasis in patients and experimental models. We sought to characterize mechanisms underpinning CD44-promoted adhesion of BLBC cells to vascular endothelial monolayers and extracellular matrix (ECM) substrates. Stimulation with hyaluronan (HA), the native ligand for CD44, increased expression and activation of beta1-integrin receptors, and increased alpha5-integrin subunit expression. Adhesion assays confirmed that CD44-signalling potentiated BLBC cell adhesion to endothelium and Fibronectin in an alpha5B1-integrin-dependent mechanism. Co-immunoprecipitation experiments confirmed HA-promoted association of CD44 with talin and the beta1-integrin chain in BLBC cells. Knockdown of talin inhibited CD44 complexing with beta1-integrin and repressed HA-induced, CD44-mediated activation of beta1-integrin receptors. Immunoblotting confirmed that HA induced rapid phosphorylation of cortactin and paxillin, through a CD44-dependent and beta1-integrin-dependent mechanism. Knockdown of CD44, cortactin or paxillin independently attenuated the adhesion of BL-BCa cells to endothelial monolayers and Fibronectin. Accordingly, we conclude that CD44 induced, integrin-mediated signaling not only underpins efficient adhesion of BLBC cells to BMECs to facilitate extravasation but initiates their adhesion to Fibronectin, enabling penetrant cancer cells to adhere more efficientl",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23983821",
+      "title": "TGF-beta2: A Novel Target of CD44-Promoted Breast Cancer Invasion",
+      "abstract": "We have developed a tetracycline (tet)-off regulated expression of CD44s gene in the breast cancer (BC) cell line MCF-7 (B5 clone) and identified TGF-beta2 (Transforming Growth Factor beta-2; 3 fold induction) as a potential CD44-downstream transcriptional target by microarray analysis. To further validate this finding, the same RNA samples, used for microarray analysis and their corresponding protein lysates, collected from the BC cell line MCF-7-B5, were examined for CD44 expression in the presence of HA. Our results showed that TGF-beta2 mRNA levels were significantly elevated following the removal of tetracycline at 18, 24, and 48 h post-HA stimulation compared to the parental cells. Furthermore, the TGF-beta2 precursor protein increased in a time-dependent pattern upon HA-stimulation and in the absence of tetracycline. More interestingly, inhibition of CD44 gene by RNAi method decreased TGF-beta2 expression upon HA-stimulation, and subsequently inhibited BC cell invasion in vitro. In addition to identifying TGF-beta2 as a target for HA/CD44 signaling, this data suggests that ATF/CREB might be a potential transcription factor linking HA/CD44 activation to TGF-beta2 transcription and additional experiments are required for a better understanding of the molecular mechanisms underpinning the novel function of the CD44/ TGF-beta2 signaling pathway in breast cancer metastasis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23039365",
+      "title": "Overexpression of CD44 accompanies acquired tamoxifen resistance in MCF7 cells and augments their sensitivity to the stromal factors, heregulin and hyaluronan",
+      "abstract": "Background\n\nAcquired resistance to endocrine therapy in breast cancer is a significant problem with relapse being associated with local and/or regional recurrence and frequent distant metastases. Breast cancer cell models reveal that endocrine resistance is accompanied by a gain in aggressive behaviour driven in part through altered growth factor receptor signalling, particularly involving erbB family receptors. Recently we identified that CD44, a transmembrane cell adhesion receptor known to interact with growth factor receptors, is upregulated in tamoxifen-resistant (TamR) MCF7 breast cancer cells. The purpose of this study was to explore the consequences of CD44 upregulation in an MCF7 cell model of acquired tamoxifen resistance, specifically with respect to the hypothesis that CD44 may influence erbB activity to promote an adverse phenotype.\n\nMethods\n\nCD44 expression in MCF7 and TamR cells was assessed by RT-PCR, Western blotting and immunocytochemistry. Immunofluorescence and immunoprecipitation studies revealed CD44-erbB associations. TamR cells (A+- siRNA-mediated CD44 suppression) or MCF7 cells (A+- transfection with the CD44 gene) were treated with the CD44 ligand, hyaluronon (HA), or heregulin and their in vitro growth (MTT), migration (Boyden chamber and wound healing) and invasion (Matrigel transwell migration) determined. erbB signalling was assessed using Western blotting. The effect of HA on erbB family dimerisation in TamR cells was determined by immunoprecipi",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "22788972",
+      "title": "CD44 rs13347 C>T polymorphism predicts breast cancer risk and prognosis in Chinese populations",
+      "abstract": "Introduction\n\nIt has been demonstrated that the interplay of adhesion molecule CD44 and its ligands can regulate cancer cell proliferation, migration and invasion, as well as tumor-associated angiogenesis and is related to breast cancer patient survival. In this two-stage, case control study, we determined whether common functional tagSNPs (single nucleotide polymorphisms) are associated with breast cancer risk and prognosis.\n\nMethods\n\nFive tagSNPs of CD44 (rs10836347C>T, rs13347C>T, rs1425802A>G, rs11821102G>A, rs713330T>C) were selected and genotyped in 1,853 breast cancer patients and 1,992 healthy control subjects in Eastern and Southern populations. Potential function of rs13347C>T and association between this variation and breast cancer were further studied.\n\nResults\n\nCompared with the most common rs13347CC genotype, variant genotypes (CT and TT) increased an individual's susceptibility to breast cancer, especially in estrogen receptor (ER) negative patients (odds ratio (OR) = 1.37, 95%CI = 1.17 to 1.59 for ER positive patients; OR = 2.37, 95% CI = 2.00 to 2.80 for ER negative patients). We also found that rs13347CT+ TT genotypes predicts lower five-year survival rate (hazard ratio (HR) = 1.85, 95% CI = 1.09 to 3.15, P = 0.023), with the lowest survival probability in ER negative T allele carriers. Furthermore, our reporter assay findings, although preliminary and rather modest, showed that miR-509-3p may suppress CD44 expression more strongly in C allele carriers than ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "22621373",
+      "title": "CD44 enhances invasion of basal-like breast cancer cells by upregulating serine protease and collagen-degrading enzymatic expression and activity",
+      "abstract": "Introduction\n\nBasal-like breast cancers (BL-BCa) have the worst prognosis of all subgroups of this disease. Hyaluronan (HA) and the HA receptor CD44 have a long-standing association with cell invasion and metastasis of breast cancer. The purpose of this study was to establish the relation of CD44 to BL-BCa and to characterize how HA/CD44 signaling promotes a protease-dependent invasion of breast cancer (BrCa) cells.\n\nMethods\n\nCD44 expression was determined with immunohistochemistry (IHC) analysis of a breast cancer tissue microarray (TMA). In vitro experiments were performed on a panel of invasive BL-BCa cell lines, by using quantitative polymerase chain reaction (PCR), immunoblotting, protease activity assays, and invasion assays to characterize the basis of HA-induced, CD44-mediated invasion.\n\nResults\n\nExpression of the hyaluronan (HA) receptor CD44 associated with the basal-like subgroup in a cohort of 141 breast tumor specimens (P = 0.018). Highly invasive cells of the representative BL-BCa cell line, MDA-MB-231 (MDA-MB-231Hi) exhibited increased invasion through a basement membrane matrix (Matrigel) and collagen. In further experiments, HA-induced promotion of CD44 signaling potentiated expression of urokinase plasminogen activator (uPA) and its receptor uPAR, and underpinned an increased cell-associated activity of this serine protease in MDA-MB-231Hi and a further BL-BCa cell line, Hs578T cells. Knockdown of CD44 attenuated both basal and HA-stimulated uPA and uPAR gen",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25888636",
+      "title": "Article 25888636",
+      "abstract": "",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38525245",
+      "title": "Fibroblast heterogeneity and functions: insights from single-cell sequencing in wound healing, breast cancer, ovarian cancer and melanoma",
+      "abstract": "Cancer has been described as the wound that does not heal, in large part due to fibroblast involvement. Activation of cancer-associated fibroblasts (CAFs) contributes to critical features of the tumor microenvironment, including upregulation of key marker proteins, recruitment of immune cells, and deposition of extracellular matrix (ECM):similar to fibroblast activation in injury-induced wound healing. Prior to the widespread availability of single-cell RNA sequencing (scRNA seq), studies of CAFs or fibroblasts in wound healing largely relied on models guided by individual fibroblast markers, or methods with less resolution to unravel the heterogeneous nature of CAFs and wound healing fibroblasts (especially regarding scarring outcome). Here, insights from the enhanced resolution provided by scRNA sequencing of fibroblasts in normal wound healing, breast cancer, ovarian cancer, and melanoma are discussed. These data have revealed differences in expression of established canonical activation marker genes, epigenetic modifications, fibroblast lineages, new gene and proteins of clinical interest for further experimentation, and novel signaling interactions with other cell types that include spatial information.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell communication",
+          "ligand-receptor interaction",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 9,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "41310748",
+      "title": "Single-cell and spatial transcriptomics reveal TNC-positive cancer-associated fibroblasts that mediate immunosuppression and promote tumor progression in basal cell carcinoma",
+      "abstract": "Background\n\nThe global incidence of basal cell carcinoma (BCC) is steadily increasing. Although immunotherapy has emerged as a treatment option, its efficacy remains limited. This underscores the need for further investigation of immune remodeling mechanisms in BCC. Here, we aimed to characterize fibroblast subsets and their interactions with other components of the tumor microenvironment in BCC.\n\nMethods\n\nWe performed single-cell RNA sequencing on nine surgical specimens from six patients, including BCC tumors and adjacent normal tissues. Key findings were further validated using spatial transcriptomics and multiplex immunohistochemistry.\n\nResults\n\nWe identified the C01_TNC fibroblast cluster as a population of cancer-associated fibroblasts (CAFs). These cells exhibited prominent peritumoral infiltration and were characterized by matrix-associated and inflammatory gene expression profiles. We propose that C01_TNC CAFs contribute to tumor progression, possibly by upregulating collagens that engage integrins on tumor cells, thereby facilitating extracellular matrix remodeling and invasion. Furthermore, C01_TNC CAFs were spatially associated with Tregs and expressed ligands that interact with Treg receptors, suggesting a role in enhancing immunosuppression. Notably, this subset was significantly enriched in peritumoral regions and could establish an immune barrier favoring tumor progression.\n\nConclusions\n\nOur findings shed light on the role of fibroblasts in orchestrating inter",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell communication",
+          "ligand-receptor interaction",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 9,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40906645",
+      "title": "Spatial colocalization and molecular crosstalk of myofibroblastic CAFs and tumor cells shape lymph node metastasis in oral squamous cell carcinoma",
+      "abstract": "Lymph node metastasis (LNM) is a critical prognostic factor for patients with oral squamous cell carcinoma (OSCC). Previous research has implicated the partial epithelial-to-mesenchymal transition of tumor cells and myofibroblastic cancer-associated fibroblasts (myCAFs) in the LNM process. However, the underlying molecular mechanisms remain poorly understood. Here, we conducted a comprehensive molecular analysis integrating original and publicly available OSCC data from bulk genome and transcriptome, single-cell transcriptome, and spatial transcriptome analyses. We found that myCAFs were quantitatively and functionally activated in LNM-positive samples and spatially colocalized with OSCC cells within the invasive tumor front (ITF), providing a niche that may facilitate LNM. Immunohistochemical validation in 90 ITF samples confirmed significantly higher myCAF density in LNM-positive samples than in LNM-negative samples, and this density remained an independent predictor of LNM when adjusted for pathological grade and the pattern of invasion. In LNM-positive samples, myCAFs provided increased extracellular matrix (ECM) signals, upregulating stemness-related genes such as CD44 in OSCC cells. The functional importance of this myCAF-driven ECM-CD44 axis was further supported by our validation analysis of expanded, publicly available spatial transcriptome and experimental in vitro coculture data. We also extracted a spatially resolved, 23-gene signature from the metastatic ITF wher",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell communication",
+          "ligand-receptor interaction",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 9,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40390063",
+      "title": "Spatial transcriptomics reveal PI3K-AKT and metabolic alterations in aggressive, treatment-resistant lactotroph pituitary neuroendocrine tumors",
+      "abstract": "Clinically aggressive lactotroph pituitary neuroendocrine tumors (PitNET) are invasive tumors with an unusually rapid growth rate despite maximally tolerated doses of dopamine agonist (DA). We aimed to unravel the molecular heterogeneity of lactotroph PitNET and to identify biomarkers of aggressiveness and resistance to pharmacological treatment. A total of 13 patients harboring DA-resistant lactotroph PitNET were included in this study. Visium Spatial Transcriptomics (ST), whole transcriptome sequencing (WTS), and whole exome sequencing (WES) were performed in tumors from 4 of these patients; WTS and WES was carried out in 5; tumors from two patients underwent ST and WES and tumors from two other patients underwent only ST. Tumors were classified as null or partial responders according to their response to DA treatment. The eight PitNET analyzed by ST exhibited significant intratumoral heterogeneity, with clones showing alterations in PI3K/AKT and lipid metabolism pathways, particularly inositol phosphate, glycerophospholipid, and sphingolipid metabolism. The cell-cell communication analysis showed FGF-FGFR ligand receptor interaction whilst the transcription factors RXRA and CREM showed participation in both groups. A trajectory exploration was performed by including all PitNET together in a single analysis to determine whether there was a tendency or molecular pathway showing a differentiation pattern that would guide the transition from a partially responsive PitNET to a ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell communication",
+          "ligand-receptor interaction",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 9,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40538442",
+      "title": "Integrated spatial omics of metabolic reprogramming and the tumor microenvironment in pancreatic cancer",
+      "abstract": "Summary\n\nMetabolic reprogramming is a defining feature of pancreatic cancer, influencing tumor progression and the tumor microenvironment. By integrating single-cell transcriptomics, spatial transcriptomics, and spatial metabolomics, this study visualized the spatial co-localization of metabolites and gene expression within tumor samples, uncovering metabolic heterogeneity and intercellular interactions. Spatial transcriptomics identified distinct pathological regions, which were further characterized using single-cell transcriptomic data and pathologist annotations. Pseudotime trajectory analysis revealed metabolic shifts along the malignant progression, while single-cell Metabolism (scMetabolism) delineated metabolic differences between pathological regions, classifying them as hypermetabolic or hypometabolic. Notably, aberrant cell communication between cancer cells, macrophages, and fibroblasts was observed, with key receptor-ligand pairs significantly co-expressed in malignant regions and correlated with poor prognosis. Spatial metabolomics imaging identified signature metabolites, highlighting metabolic alterations in amino acid metabolism, polyamine metabolism, fatty acid synthesis, and phospholipid metabolism. This integrated analysis provides critical insights into pancreatic cancer metabolism, offering potential avenues for targeted therapeutic interventions.\n\nGraphical abstract\n\nHighlights\n\nIntegrated spatial transcriptomic and metabolomic analysis of pancreatic ca",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell communication",
+          "ligand-receptor interaction",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 9,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38002057",
+      "title": "Intercellular Molecular Crosstalk Networks within Invasive and Immunosuppressive Tumor Microenvironment Subtypes Associated with Clinical Outcomes in Four Cancer Types",
+      "abstract": "Heterogeneity is a critical basis for understanding how the tumor microenvironment (TME) contributes to tumor progression. However, an understanding of the specific characteristics and functions of TME subtypes (subTMEs) in the progression of cancer is required for further investigations into single-cell resolutions. Here, we analyzed single-cell RNA sequencing data of 250 clinical samples with more than 200,000 cells analyzed in each cancer datum. Based on the construction of an intercellular infiltration model and unsupervised clustering analysis, four, three, three, and four subTMEs were revealed in breast, colorectal, esophageal, and pancreatic cancer, respectively. Among the subTMEs, the immune-suppressive subTME (subTME-IS) and matrix remodeling with malignant cells subTME (subTME-MRM) were highly enriched in tumors, whereas the immune cell infiltration subTME (subTME-ICI) and precancerous state of epithelial cells subTME (subTME-PSE) were less in tumors, compared with paracancerous tissues. We detected and compared genes encoding cytokines, chemokines, cytotoxic mediators, PD1, and PD-L1. The results showed that these genes were specifically overexpressed in different cell types, and, compared with normal tissues, they were upregulated in tumor-derived cells. In addition, compared with other subTMEs, the expression levels of PDCD1 and TGFB1 were higher in subTME-IS. The Cox proportional risk regression model was further constructed to identify possible prognostic marke",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell communication",
+          "ligand-receptor interaction",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 9,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35986392",
+      "title": "Single-Nucleus RNA Sequencing and Spatial Transcriptomics Reveal the Immunological Microenvironment of Cervical Squamous Cell Carcinoma",
+      "abstract": "Abstract\n\nThe effective treatment of advanced cervical cancer remains challenging. Herein, single-nucleus RNA sequencing (snRNA-seq) and SpaTial enhanced resolution omics-sequencing (Stereo-seq) are used to investigate the immunological microenvironment of cervical squamous cell carcinoma (CSCC). The expression levels of most immune suppressive genes in the tumor and inflammation areas of CSCC are not significantly higher than those in the non-cancer samples, except for LGALS9 and IDO1. Stronger signals of CD56+ NK cells and immature dendritic cells are found in the hypermetabolic tumor areas, whereas more eosinophils, immature B cells, and Treg cells are found in the hypometabolic tumor areas. Moreover, a cluster of pro-tumorigenic cancer-associated myofibroblasts (myCAFs) are identified. The myCAFs may support the growth and metastasis of tumors by inhibiting lymphocyte infiltration and remodeling of the tumor extracellular matrix. Furthermore, these myCAFs are associated with poorer survival probability in patients with CSCC, predict resistance to immunotherapy, and might be present in a small fraction (< 30%) of patients with advanced cancer. Immunohistochemistry and multiplex immunofluorescence staining are conducted to validate the spatial distribution and potential function of myCAFs. Collectively, these findings enhance the understanding of the immunological microenvironment of CSCC and shed light on the treatment of advanced CSCC.\n\nThe high heterogeneity in viral gen",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell communication",
+          "ligand-receptor interaction",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 9,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35365629",
+      "title": "Single-cell and spatial analysis reveal interaction of FAP+ fibroblasts and SPP1+ macrophages in colorectal cancer",
+      "abstract": "Colorectal cancer (CRC) is among the most common malignancies with limited treatments other than surgery. The tumor microenvironment (TME) profiling enables the discovery of potential therapeutic targets. Here, we profile 54,103 cells from tumor and adjacent tissues to characterize cellular composition and elucidate the potential origin and regulation of tumor-enriched cell types in CRC. We demonstrate that the tumor-specific FAP+ fibroblasts and SPP1+ macrophages were positively correlated in 14 independent CRC cohorts containing 2550 samples and validate their close localization by immuno-fluorescent staining and spatial transcriptomics. This interaction might be regulated by chemerin, TGF-beta, and interleukin-1, which would stimulate the formation of immune-excluded desmoplasic structure and limit the T cell infiltration. Furthermore, we find patients with high FAP or SPP1 expression achieved less therapeutic benefit from an anti-PD-L1 therapy cohort. Our results provide a potential therapeutic strategy by disrupting FAP+ fibroblasts and SPP1+ macrophages interaction to improve immunotherapy.\n\nTumour microenvironment profiling during colorectal cancer progression may enable the discovery of therapeutic targets. Here, single cell and spatial RNA sequencing of tumour and adjacent normal tissues reveals an interaction between FAP+ fibroblasts and SPP1+ macrophages that could be disrupted as an immunotherapy strategy.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell communication",
+          "ligand-receptor interaction",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 9,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40216762",
+      "title": "The transcriptional regulators GATA6 and TET1 regulate the TGF-beta pathway in cancer-associated fibroblasts to promote breast cancer progression",
+      "abstract": "Cancer-associated fibroblasts (CAFs) are pivotal drivers of tumor progression, yet the molecular mechanisms underlying their activation remain incompletely understood. Here, we identified the TET1/SMAD4/GATA6 regulatory axis as a central mechanism governing CAF transformation and function in breast cancer. Through integrative in vitro and in vivo models, we demonstrated that TET1, an epigenetic modulator, demethylates the SMAD4 promoter, enhancing SMAD4 expression. SMAD4 transcriptionally upregulates GATA6, which amplifies TGF-beta signaling by directly activating the TGF-beta promoter, establishing a self-reinforcing feedforward loop critical for CAF identity and stromal-tumor crosstalk. GATA6 and TET1 were significantly upregulated in breast CAFs compared to normal fibroblasts (NFs) and TGF-beta-induced CAFs. Loss- or gain-of-function experiments revealed that these regulators control CAF survival, marker expression, and secretion of pro-tumorigenic factors. Knockdown of GATA6 or TET1 reduced CAF-mediated migration and invasion of breast cancer cells in vitro, while their overexpression enhanced cancer cell aggressiveness. Mechanistically, TET1-mediated epigenetic remodeling and GATA6-driven transcriptional activation converge on the TGF-beta/SMAD pathway, sustaining CAF activation. In vivo, tumors derived from GATA6- or TET1-depleted CAFs exhibited reduced growth, proliferation, and CAF engraftment, underscoring their role in tumor progression. These findings position GATA",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "TGF-beta signaling",
+          "EMT pathway",
+          "fibroblast activation",
+          "stromal crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "36835413",
+      "title": "Crosstalk of Inflammatory Cytokines within the Breast Tumor Microenvironment",
+      "abstract": "Several immune and immunocompetent cells, including dendritic cells, macrophages, adipocytes, natural killer cells, T cells, and B cells, are significantly correlated with the complex discipline of oncology. Cytotoxic innate and adaptive immune cells can block tumor proliferation, and others can prevent the immune system from rejecting malignant cells and provide a favorable environment for tumor progression. These cells communicate with the microenvironment through cytokines, a chemical messenger, in an endocrine, paracrine, or autocrine manner. These cytokines play an important role in health and disease, particularly in host immune responses to infection and inflammation. They include chemokines, interleukins (ILs), adipokines, interferons, colony-stimulating factors (CSFs), and tumor necrosis factor (TNF), which are produced by a wide range of cells, including immune cells, such as macrophages, B-cells, T-cells, and mast cells, as well as endothelial cells, fibroblasts, a variety of stromal cells, and some cancer cells. Cytokines play a crucial role in cancer and cancer-related inflammation, with direct and indirect effects on tumor antagonistic or tumor promoting functions. They have been extensively researched as immunostimulatory mediators to promote the generation, migration and recruitment of immune cells that contribute to an effective antitumor immune response or pro-tumor microenvironment. Thus, in many cancers such as breast cancer, cytokines including leptin, IL",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "TGF-beta signaling",
+          "EMT pathway",
+          "fibroblast activation",
+          "stromal crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "41387974",
+      "title": "Impact of pancreatic proenzymes on pancreatic ductal adenocarcinoma associated fibroblasts",
+      "abstract": "The tumor microenvironment (TME) plays a pivotal role in tumor initiation, progression, and the formation of pre-metastatic niches. Pancreatic ductal adenocarcinoma (PDAC) is characterized by a dense fibrotic stroma containing a significant enriched population of cancer-associated fibroblasts (CAFs). The interplay between CAFs and tumor cells is crucial in driving tumor advancement and metastasis, underscoring the potential benefits of novel therapeutic strategies targeting stromal cells to improve patient survival. Pancreatic (pro)enzymes have shown efficacy in cancer treatment. In this study, we evaluated a formulation of Trypsinogen and Chymotrypsinogen A (PRP) on a model of PDAC-CAFs dynamics. Our findings demonstrated PRP multifaceted effects, including: (i) inhibition of the acquisition of a pro-tumoral phenotype by normal fibroblasts; (ii) enhanced expression of E-cadherin and decreased expression of epithelial-mesenchymal transition (EMT)-associated genes; (iii) blockade of the crosstalk between CAFs and cancer cells, leading to a decrease in the proliferation and migration rate of the pancreatic cancer cells; (iv) modulation of CAFs-induced alteration on endothelial cells; (v) induction of Meflin expression, associated with a less pro-tumoral phenotype; (vi) inhibition of the TGF-beta pathway, reducing the activation of Smad2/3 proteins involved in fibroblast phenotypic alteration; (vii) selective induction of apoptosis in CAFs by PRP, as evidenced by increased expre",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "TGF-beta signaling",
+          "EMT pathway",
+          "fibroblast activation",
+          "stromal crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "40551209",
+      "title": "Paracrine signaling in cancer-associated fibroblasts: central regulators of the tumor immune microenvironment",
+      "abstract": "Despite groundbreaking advances in cancer immunotherapy, clinical efficacy remains constrained by the immunosuppressive tumor microenvironment (TME). As key stromal components within this TME, cancer-associated fibroblasts (CAFs) emerge as pivotal regulators of drug resistance and immune evasion. Beyond establishing physical barriers that exclude cytotoxic T cells from tumor nests, that is creating an immune \"desert\", CAFs dynamically reprogram the TME through multifaceted paracrine signaling, orchestrating crosstalk among tumor cells, stromal components, and immune cells. The complex paracrine signaling network jointly promotes the recruitment of immunosuppressive cells, alters the dynamics of immune cells, remodels the extracellular matrix, and ultimately establishes the immunosuppressive TME. Emerging strategies aimed at undermining the paracrine signaling Network of CAF-TME have shown potential in clinical studies to enhance the response to immunotherapy. Natural compounds such as curcumin and Baicalein and their derivatives have further expanded therapeutic approaches by regulating the paracrine phenotype of CAF due to their inherent multi-target intervention advantages. This review describes CAF and its paracrine effect as the central regulators of TME immunosuppression, emphasizing its key role in the immunotherapy response and providing new possibilities for clinical treatment strategies to restore CAFs paracrine-mediated immunosuppression and improve the efficacy of ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "TGF-beta signaling",
+          "EMT pathway",
+          "fibroblast activation",
+          "stromal crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "38234683",
+      "title": "Role of autophagy in cancer-associated fibroblast activation, signaling and metabolic reprograming",
+      "abstract": "Tumors not only consist of cancerous cells, but they also harbor several normal-like cell types and non-cellular components. cancer-associated fibroblasts (CAFs) are one of these cellular components that are found predominantly in the tumor stroma. Autophagy is an intracellular degradation and quality control mechanism, and recent studies provided evidence that autophagy played a critical role in CAF formation, metabolic reprograming and tumor-stroma crosstalk. Therefore, shedding light on the autophagy and its role in CAF biology might help us better understand the roles of CAFs and the TME in cancer progression and may facilitate the exploitation of more efficient cancer diagnosis and treatment. Here, we provide an overview about the involvement of autophagy in CAF-related pathways, including transdifferentiation and activation of CAFs, and further discuss the implications of targeting tumor stroma as a treatment option.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "TGF-beta signaling",
+          "EMT pathway",
+          "fibroblast activation",
+          "stromal crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "37460910",
+      "title": "Helicobacter pylori-activated fibroblasts as a silent partner in gastric cancer development",
+      "abstract": "The discovery of Helicobacter pylori (Hp) infection of gastric mucosa leading to active chronic gastritis, gastroduodenal ulcers, and MALT lymphoma laid the groundwork for understanding of the general relationship between chronic infection, inflammation, and cancer. Nevertheless, this sequence of events is still far from full understanding with new players and mediators being constantly identified. Originally, the Hp virulence factors affecting mainly gastric epithelium were proposed to contribute considerably to gastric inflammation, ulceration, and cancer. Furthermore, it has been shown that Hp possesses the ability to penetrate the mucus layer and directly interact with stroma components including fibroblasts and myofibroblasts. These cells, which are the source of biophysical and biochemical signals providing the proper balance between cell proliferation and differentiation within gastric epithelial stem cell compartment, when exposed to Hp, can convert into cancer-associated fibroblast (CAF) phenotype. The crosstalk between fibroblasts and myofibroblasts with gastric epithelial cells including stem/progenitor cell niche involves several pathways mediated by non-coding RNAs, Wnt, BMP, TGF-beta, and Notch signaling ligands. The current review concentrates on the consequences of Hp-induced increase in gastric fibroblast and myofibroblast number, and their activation towards CAFs with the emphasis to the altered communication between mesenchymal and epithelial cell compartme",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "TGF-beta signaling",
+          "EMT pathway",
+          "fibroblast activation",
+          "stromal crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35884382",
+      "title": "Cancer-Associated Fibroblasts in the Hypoxic Tumor Microenvironment",
+      "abstract": "Simple Summary\n\nCancers have regions of low oxygen concentration where hypoxia-related signaling pathways are activated. The hypoxic tumor microenvironment has been widely accepted as a hallmark of cancer and shown to be a critical factor in the crosstalk between cancer and stromal cells. Fibroblasts are one of the most abundant cellular components in the tumor stroma and are also significantly affected by oxygen deprivation. In this case, we discuss the molecular and cellular mechanisms that regulate fibroblasts under hypoxic conditions and their effect on cancer development and progression. Unraveling these regulatory mechanisms could be exploited in developing potential fibroblast-specific therapeutics for cancer.\n\nAbstract\n\nSolid cancers are composed of malignant cells and their surrounding matrix components. Hypoxia plays a critical role in shaping the tumor microenvironment that contributes to cancer progression and treatment failure. Cancer-associated fibroblasts (CAFs) are one of the most prominent components of the tumor microenvironment. CAFs are highly sensitive to hypoxia and participates in the crosstalk with cancer cells. Hypoxic CAFs modulate several mechanisms that induce cancer malignancy, such as extracellular matrix (ECM) remodeling, immune evasion, metabolic reprogramming, angiogenesis, metastasis, and drug resistance. Key signaling molecules regulating CAFs in hypoxia include transforming growth factor (TGF-beta) and hypoxia-inducible factors (HIFs). In t",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "TGF-beta signaling",
+          "EMT pathway",
+          "fibroblast activation",
+          "stromal crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "34439114",
+      "title": "The Multifaceted Role of TGF-beta in Gastrointestinal Tumors",
+      "abstract": "Simple Summary\n\nThe transforming growth factor beta signaling pathway elicits a broad range of physiological re-sponses, and its misregulation has been related to cancer. The secreted cytokine TGFbeta exerts a tumor-suppressive effect that counteracts malignant transformation. However, once tumor has developed, TGFbeta can support tumor progression regulating epithelial to mesenchymal transition, invasion and metastasis, stimulating fibrosis, angiogenesis and immune suppression. Here we review the dichotomous role of TGF-beta in the progression of gastrointestinal tumors, as well as its intricate crosstalk with other signaling pathways. We also discuss about the therapeutic strate-gies that are currently explored in clinical trials to counteract TGF-beta functions.\n\nAbstract\n\nTransforming growth factor-beta (TGF-beta) is a secreted cytokine that signals via serine/threonine kinase receptors and SMAD effectors. Although TGF-beta acts as a tumor suppressor during the early stages of tumorigenesis, it supports tumor progression in advanced stages. Indeed, TGF-beta can modulate the tumor microenvironment by modifying the extracellular matrix and by sustaining a paracrine interaction between neighboring cells. Due to its critical role in cancer development and progression, a wide range of molecules targeting the TGF-beta signaling pathway are currently under active clinical development in different diseases. Here, we focused on the role of TGF-beta in modulating different patholog",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "TGF-beta signaling",
+          "EMT pathway",
+          "fibroblast activation",
+          "stromal crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "33499083",
+      "title": "TGF-beta in Cancer: Metabolic Driver of the Tolerogenic Crosstalk in the Tumor Microenvironment",
+      "abstract": "Simple Summary\n\nMetabolic reprogramming is an emerging hallmark in cancer. Beside the malignant compartment, the tumor microenvironment also undergoes to a metabolic skewing, contributing to the neoplastic progression and metastasizing process. Growing evidence pointed out a central role for Transforming Growth Factor Beta (TGF-beta) as a driver of these metabolic changes in multiple cellular targets in cancer. This review deals with very recent discoveries on TGF-beta-mediated metabolic reprogramming of stromal and immune cell population within the tumor microenvironment. In particular, we scrutinized current literature to highlight relevant metabolic checkpoints in the TGF-beta cascade that sustain tolerogenic programs in tumors.\n\nAbstract\n\nOvercoming tumor immunosuppression still represents one ambitious achievement for cancer immunotherapy. Of note, the cytokine TGF-beta contributes to immune evasion in multiple cancer types, by feeding the establishment of a tolerogenic environment in the host. Indeed, it fosters the expansion and accumulation of immunosuppressive regulatory cell populations within the tumor microenvironment (TME), where it also activates resident stromal cells and enhances angiogenesis programs. More recently, TGF-beta has also turned out as a key metabolic adjuster in tumors orchestrating metabolic pathways in the TME. In this review, we will scrutinize TGF-beta-mediated immune and stromal cell crosstalk within the TME, with a primary focus on metaboli",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "TGF-beta signaling",
+          "EMT pathway",
+          "fibroblast activation",
+          "stromal crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "41294885",
+      "title": "Integrin alphavbeta3 as a Non-Genomic Estrogen Receptor in Breast Cancer for Signaling Pathways and Crosstalk",
+      "abstract": "Highlights\n\nIntegrin alphavbeta3 functions as a crucial non-genomic receptor for estrogen, initiating rapid activation of FAK, ERK1/2, and PI3K signaling pathways.\n\nThis non-genomic estrogen signaling is shown to critically modulate integrin alphavbeta3 activity, subsequently driving cancer proliferation, migration, and metastasis\n\n What are the main findings?  \n\nCrosstalk among estrogen, integrin alphavbeta3, and GPER generates diverse cellular effects relevant to breast cancer biology.\n\nTargeting the Integrin alphavbeta3 non-genomic axis is proposed as a therapeutic strategy to overcome resistance observed in cancers.\n\n What is the implication of the main finding?  \n\nAbstract\n\nIntegrin alphavbeta3, a key member of the integrin family, plays a crucial role in cell localization, mobilization, and signal transduction through collaborating with extracellular proteins. Its unique expression and activation in tumor cells and rapidly dividing endothelial cells suggest its potential role in cancer cell growth and metastasis, making it a promising therapeutic target. In genomic pathways, estrogen binds to its receptors to form transcription complexes that bind to the promoters of steroid hormone-receptive genes. Conversely, G protein-coupled estrogen receptor 1 (GPER) and integrin alphavbeta3 have been shown to play oles in non-genomic actions that contribute to estrogen-induced cancer growth. The molecular mechanisms of these non-genomic functions involve signal transduction via fo",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "integrin signaling",
+          "FAK pathway",
+          "cell migration",
+          "adhesion signaling"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "38068928",
+      "title": "The Effect of Adipocyte-Secreted Factors in Activating Focal Adhesion Kinase-Mediated Cell Signaling Pathway towards Metastasis in Breast Cancer Cells",
+      "abstract": "Obesity-associated perturbations in the normal secretion of adipocytokines from white adipocytes can drive the metastatic progression of cancer. However, the association between obesity-induced changes in secretory factors of white adipocytes and subsequent transactivation of the downstream effector proteins impacting metastasis in breast cancer cells remains unclear. Focal adhesion kinase, a cytoplasmic signal transducer, regulates the biological phenomenon of metastasis by activating downstream targets such as beta-catenin and MMP9. Thus, the possible role of phosphorylated FAK in potentiating cancer cell migration was investigated. To elucidate this potential relationship, MCF7 (ER+), MDA-MB-231 (Triple Negative) breast cancer cells, and MCF-10A non-tumorigenic breast cells were exposed to in vitro murine adipocyte-conditioned medium derived from 3T3-L1 MBX cells differentiated to obesity with fatty acid supplementation. Our results show that the conditioned medium derived from these obese adipocytes enhanced motility and invasiveness of breast cancer cells. Importantly, no such changes were observed in the non-tumorigenic breast cells. Our results also show that increased FAK autophosphorylation was followed by increased expression of beta-catenin and MMP9 in the breast cancer cells when exposed to obese adipocyte-conditioned medium, but not in the MCF10A cells. These results indicate that adipocyte-derived secretory factors induced FAK activation through phosphorylation.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "integrin signaling",
+          "FAK pathway",
+          "cell migration",
+          "adhesion signaling"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "33671551",
+      "title": "Picturing Breast Cancer Brain Metastasis Development to Unravel Molecular Players and Cellular Crosstalk",
+      "abstract": "Simple Summary\n\nBreast cancer is a devastating disorder affecting millions of women worldwide. With improved therapeutics for the primary tumor, the appearance of metastasis has been increasing. Breast cancer frequently metastasizes to the brain, constituting a major hurdle without cure and with a poor survival. It is imperative to better understand the mechanisms involved in malignant cell transposition of the brain microvasculature and parenchymal colonization by deciphering the alterations occurring in the tumor and microvascular cells, as well as the occurrence of intercellular communication during the process. We aimed to profile the process of the formation of breast cancer brain metastasis and the timeline of events governing it. We used a specific mouse model of the disease to perform extensive microscopic analyses. We identified phenotypic changes and the activation of relevant molecular players in tumorigenesis, together with vascular alterations, and the occurrence of crosstalk. Our findings unravel putative therapeutic targets to tackle breast cancer brain metastasis.\n\nAbstract\n\nWith breast cancer (BC) therapy improvements, the appearance of brain metastases has been increasing, representing a life-threatening condition. Brain metastasis formation involves BC cell (BCC) extravasation across the blood-brain barrier (BBB) and brain colonization by unclear mechanisms. We aimed to disclose the actors involved in BC brain metastasis formation, focusing on BCCs' phenoty",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "integrin signaling",
+          "FAK pathway",
+          "cell migration",
+          "adhesion signaling"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "41732392",
+      "title": "Modulating cell surface chemistry through mild reduction reinforces extracellular-to-intracellular transmission forces and mechano-signaling.",
+      "abstract": "Cell surface engineering offers a powerful strategy to modulate cellular behaviors, including adhesion, migration, and differentiation. While cell fate is typically governed by extracellular cues such as matrix ligands, engineered cell surfaces can reshape how these signals are sensed and transduced. Here, we present a facile and robust approach to cell surface engineering via mild chemical reduction. Using tris(2-carboxyethyl)phosphine (TCEP), a gentle reducing agent, we modulated surface-exposed disulfide bonds to induce adhesion-dependent signaling without genetic manipulation. This strategy was applied to preadipocytes to investigate its effects on cell adhesion, mechanotransduction, and adipogenic differentiation. Mild surface reduction induced pronounced morphological changes, including increased spreading, elongation, and cytoskeletal reorganization. Notably, TCEP treatment enhanced focal adhesion kinase (FAK)-associated adhesion and mechanotransductive signaling, accompanied by elevated cell-matrix traction forces, increased intracellular tension, and enhanced cytoskeletal-nuclear force transmission. These multiscale mechanical responses were quantified using traction force microscopy, intracellular force microscopy, and nuclear envelope wrinkling analysis. Functionally, these coordinated mechanobiological changes suppressed adipogenic differentiation, even under adipogenic induction conditions. Taken together, our findings demonstrate that mild chemical reduction of ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "integrin signaling",
+          "FAK pathway",
+          "cell migration",
+          "adhesion signaling"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "39169946",
+      "title": "Article 39169946",
+      "abstract": "",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "integrin signaling",
+          "FAK pathway",
+          "cell migration",
+          "adhesion signaling"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "38475740",
+      "title": "Knockdown of ribosome RNA processing protein 15 suppresses migration of hepatocellular carcinoma through inhibiting PATZ1-associated LAMC2/FAK pathway",
+      "abstract": "Background\n\nRibosomal RNA processing protein 15 (RRP15) has been found to regulate the progression of hepatocellular carcinoma (HCC). Nevertheless, the extent to which it contributes to the spread of HCC cells remains uncertain. Thus, the objective of this research was to assess the biological function of RRP15 in the migration of HCC.\n\nMethods\n\nThe expression of RRP15 in HCC tissue microarray (TMA), tumor tissues and cell lines were determined. In vitro, the effects of RRP15 knockdown on the migration, invasion and adhesion ability of HCC cells were assessed by wound healing assay, transwell and adhesion assay, respectively. The effect of RRP15 knockdown on HCC migration was also evaluated in vivo in a mouse model.\n\nResults\n\nBioinformatics analysis showed that high expression of RRP15 was significantly associated with low survival rate of HCC. The expression level of RRP15 was strikingly upregulated in HCC tissues and cell lines compared with the corresponding controls, and TMA data also indicated that RRP15 was a pivotal prognostic factor for HCC. RRP15 knockdown in HCC cells reduced epithelial-to-mesenchymal transition (EMT) and inhibited migration in vitro and in vivo, independent of P53 expression. Mechanistically, blockade of RRP15 reduced the protein level of the transcription factor POZ/BTB and AT hook containing zinc finger 1 (PATZ1), resulting in decreased expression of the downstream genes encoding laminin 5 subunits, LAMC2 and LAMB3, eventually suppressing the int",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "integrin signaling",
+          "FAK pathway",
+          "cell migration",
+          "adhesion signaling"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "38099295",
+      "title": "Thy-1 (CD90)-regulated cell adhesion and migration of mesenchymal cells: insights into adhesomes, mechanical forces, and signaling pathways",
+      "abstract": "Cell adhesion and migration depend on the assembly and disassembly of adhesive structures known as focal adhesions. Cells adhere to the extracellular matrix (ECM) and form these structures via receptors, such as integrins and syndecans, which initiate signal transduction pathways that bridge the ECM to the cytoskeleton, thus governing adhesion and migration processes. Integrins bind to the ECM and soluble or cell surface ligands to form integrin adhesion complexes (IAC), whose composition depends on the cellular context and cell type. Proteomic analyses of these IACs led to the curation of the term adhesome, which is a complex molecular network containing hundreds of proteins involved in signaling, adhesion, and cell movement. One of the hallmarks of these IACs is to sense mechanical cues that arise due to ECM rigidity, as well as the tension exerted by cell-cell interactions, and transduce this force by modifying the actin cytoskeleton to regulate cell migration. Among the integrin/syndecan cell surface ligands, we have described Thy-1 (CD90), a GPI-anchored protein that possesses binding domains for each of these receptors and, upon engaging them, stimulates cell adhesion and migration. In this review, we examine what is currently known about adhesomes, revise how mechanical forces have changed our view on the regulation of cell migration, and, in this context, discuss how we have contributed to the understanding of signaling mechanisms that control cell adhesion and migrat",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "integrin signaling",
+          "FAK pathway",
+          "cell migration",
+          "adhesion signaling"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "37519303",
+      "title": "CSK-mediated signalling by integrins in cancer",
+      "abstract": "Cancer progression and metastasis are processes heavily controlled by the integrin receptor family. Integrins are cell adhesion molecules that constitute the central components of mechanosensing complexes called focal adhesions, which connect the extracellular environment with the cell interior. Focal adhesions act as key players in cancer progression by regulating biological processes, such as cell migration, invasion, proliferation, and survival. Src family kinases (SFKs) can interplay with integrins and their downstream effectors. SFKs also integrate extracellular cues sensed by integrins and growth factor receptors (GFR), transducing them to coordinate metastasis and cell survival in cancer. The non-receptor tyrosine kinase CSK is a well-known SFK member that suppresses SFK activity by phosphorylating its specific negative regulatory loop (C-terminal Y527 residue). Consequently, CSK may play a pivotal role in tumour progression and suppression by inhibiting SFK oncogenic effects in several cancer types. Remarkably, CSK can localise near focal adhesions when SFKs are activated and even interact with focal adhesion components, such as phosphorylated FAK and Paxillin, among others, suggesting that CSK may regulate focal adhesion dynamics and structure. Even though SFK oncogenic signalling has been extensively described before, the specific role of CSK and its crosstalk with integrins in cancer progression, for example, in mechanosensing, remain veiled. Here, we review how CS",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "integrin signaling",
+          "FAK pathway",
+          "cell migration",
+          "adhesion signaling"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35223494",
+      "title": "Integrin-Mediated Tumorigenesis and Its Therapeutic Applications",
+      "abstract": "Integrins, a family of adhesion molecules generally exist on the cell surface, are essential for regulating cell growth and its function. As a bi-directional signaling molecule, they mediate cell-cell and cell-extracellular matrix interaction. The recognitions of their key roles in many human pathologies, including autoimmunity, thrombosis and neoplasia, have revealed their great potential as a therapeutic target. This paper focuses on the activation of integrins, the role of integrins in tumorigenesis and progression, and advances of integrin-dependent tumor therapeutics in recent years. It is expected that understanding function and signaling transmission will fully exploit potentialities of integrin as a novel target for tumors.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "integrin signaling",
+          "FAK pathway",
+          "cell migration",
+          "adhesion signaling"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "33578954",
+      "title": "Role of Site-Specific Glycosylation in the I-Like Domain of Integrin beta1 in Small Extracellular Vesicle-Mediated Malignant Behavior and FAK Activation",
+      "abstract": "Integrin beta1 plays an essential role in the crosstalk between tumor cells and their microenvironment. Aberrant N-glycosylation of integrin beta1 was documented to alter integrin beta1 expression, dimerization, and biological function. However, the biological function of site-specific N-glycosylation of integrin beta1 on extracellular vesicles is not fully understood. In this study, we mutated putative N-glycosylation sites in different domains of integrin beta1. Removal of the N-glycosylation sites on the I-like domain of integrin beta1 (termed the Delta4-6 beta1 mutant) suppressed focal adhesion kinase (FAK) signaling, cell migration, and adhesion compared with other beta1 mutants. Cell adhesion, migration, and activation of FAK were suppressed in recipient MCF7 cells co-cultured with Delta4-6 mutant cells and treated with small extracellular vesicles (sEVs) from Delta4-6 mutant cells. Notably, the wild-type and beta1 mutant were both present in sEVs, and could be transferred to recipient cells via sEVs, resulting in changes of cell behavior. Our findings demonstrate the important roles of N-glycosylation of the I-like domain of integrin beta1. Moreover, the vesicular Delta4-6 beta1 mutant can regulate integrin-mediated functions in recipient cells via sEVs. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "integrin signaling",
+          "FAK pathway",
+          "cell migration",
+          "adhesion signaling"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "40101158",
+      "title": "Single-Cell Expression Analysis of Ductal Carcinoma In Situ Identifies Complex Genotypic-Phenotypic Relationships Altering Epithelial Composition",
+      "abstract": "Single-cell analyses reveal ductal carcinoma in situ comprises multiple genetic clones with significant phenotypic diversity and link alterations in epithelial cell states and basement membrane integrity with invasive breast cancer progression.\n\nAbstract\n\nDuctal carcinoma in situ (DCIS) is a risk factor for subsequent invasive breast cancer (IBC). To identify events in DCIS that lead to invasive cancer, we performed single-cell RNA sequencing on DCIS lesions and matched normal breast tissue. Inferred copy-number variation was used to identify neoplastic epithelial cells from clinical specimens, which contained a mixture of DCIS and normal ducts. Phylogenetic analysis demonstrated intratumoral clonal heterogeneity that was associated with significant gene expression differences. Classification of epithelial cells into mammary cell states revealed that subclones contained a mixture of cell states, suggesting an ongoing pattern of differentiation after neoplastic transformation. Cell state proportions were significantly different based on estrogen receptor expression, with estrogen receptor-negative DCIS more closely resembling the distribution in the normal breast, particularly with respect to cells with basal characteristics. Specific alterations in cell state proportions were associated with progression to invasive cancer in a cohort of DCIS with longitudinal outcome. Ongoing transcription of key basement membrane (BM) genes occurred in specific subsets of epithelial cell sta",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "tumor progression",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "39937011",
+      "title": "Three-Dimensional Models: Biomimetic Tools That Recapitulate Breast Tissue Architecture and Microenvironment to Study Ductal Carcinoma In Situ Transition to Invasive Ductal Breast Cancer",
+      "abstract": "Diagnosis of ductal carcinoma in situ (DCIS) presents a challenge as we cannot yet distinguish between those lesions that remain dormant from cases that may progress to invasive ductal breast cancer (IDC) and require therapeutic intervention. Our overall interest is to develop biomimetic three-dimensional (3D) models that more accurately recapitulate the structure and characteristics of pre-invasive breast cancer in order to study the underlying mechanisms driving malignant progression. These models allow us to mimic the microenvironment to investigate many aspects of mammary cell biology, including the role of the extracellular matrix (ECM), the interaction between carcinoma-associated fibroblasts (CAFs) and epithelial cells, and the dynamics of cytoskeletal reorganization. In this review article, we outline the significance of 3D culture models as reliable pre-clinical tools that mimic the in vivo tumor microenvironment and facilitate the study of DCIS lesions as they progress to invasive breast cancer. We also discuss the role of CAFs and other stromal cells in DCIS transition as well as the clinical significance of emerging technologies like tumor-on-chip and co-culture models.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "tumor progression",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "38570490",
+      "title": "Progression from ductal carcinoma in situ to invasive breast cancer: molecular features and clinical significance",
+      "abstract": "Ductal carcinoma in situ (DCIS) represents pre-invasive breast carcinoma. In untreated cases, 25-60% DCIS progress to invasive ductal carcinoma (IDC). The challenge lies in distinguishing between non-progressive and progressive DCIS, often resulting in over- or under-treatment in many cases. With increasing screen-detected DCIS in these years, the nature of DCIS has aroused worldwide attention. A deeper understanding of the biological nature of DCIS and the molecular journey of the DCIS-IDC transition is crucial for more effective clinical management. Here, we reviewed the key signaling pathways in breast cancer that may contribute to DCIS initiation and progression. We also explored the molecular features of DCIS and IDC, shedding light on the progression of DCIS through both inherent changes within tumor cells and alterations in the tumor microenvironment. In addition, valuable research tools utilized in studying DCIS including preclinical models and newer advanced technologies such as single-cell sequencing, spatial transcriptomics and artificial intelligence, have been systematically summarized. Further, we thoroughly discussed the clinical advancements in DCIS and IDC, including prognostic biomarkers and clinical managements, with the aim of facilitating more personalized treatment strategies in the future. Research on DCIS has already yielded significant insights into breast carcinogenesis and will continue to pave the way for practical clinical applications.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "tumor progression",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "38561380",
+      "title": "Deciphering the spatial landscape and plasticity of immunosuppressive fibroblasts in breast cancer",
+      "abstract": "Although heterogeneity of FAP+ Cancer-Associated Fibroblasts (CAF) has been described in breast cancer, their plasticity and spatial distribution remain poorly understood. Here, we analyze trajectory inference, deconvolute spatial transcriptomics at single-cell level and perform functional assays to generate a high-resolution integrated map of breast cancer (BC), with a focus on inflammatory and myofibroblastic (iCAF/myCAF) FAP+ CAF clusters. We identify 10 spatially-organized FAP+ CAF-related cellular niches, called EcoCellTypes, which are differentially localized within tumors. Consistent with their spatial organization, cancer cells drive the transition of detoxification-associated iCAF (Detox-iCAF) towards immunosuppressive extracellular matrix (ECM)-producing myCAF (ECM-myCAF) via a DPP4- and YAP-dependent mechanism. In turn, ECM-myCAF polarize TREM2+ macrophages, regulatory NK and T cells to induce immunosuppressive EcoCellTypes, while Detox-iCAF are associated with FOLR2+ macrophages in an immuno-protective EcoCellType. FAP+ CAF subpopulations accumulate differently according to the invasive BC status and predict invasive recurrence of ductal carcinoma in situ (DCIS), which could help in identifying low-risk DCIS patients eligible for therapeutic de-escalation.\n\nThe heterogeneity of cancer associated fibroblasts (CAFs) in breast cancer has been previously described. Here the authors provide further insights into the spatial landscape and plasticity of immunosuppressive",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "tumor progression",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "38114474",
+      "title": "High resolution mapping of the tumor microenvironment using integrated single-cell, spatial and in situ analysis",
+      "abstract": "Single-cell and spatial technologies that profile gene expression across a whole tissue are revolutionizing the resolution of molecular states in clinical samples. Current commercially available technologies provide whole transcriptome single-cell, whole transcriptome spatial, or targeted in situ gene expression analysis. Here, we combine these technologies to explore tissue heterogeneity in large, FFPE human breast cancer sections. This integrative approach allowed us to explore molecular differences that exist between distinct tumor regions and to identify biomarkers involved in the progression towards invasive carcinoma. Further, we study cell neighborhoods and identify rare boundary cells that sit at the critical myoepithelial border confining the spread of malignant cells. Here, we demonstrate that each technology alone provides information about molecular signatures relevant to understanding cancer heterogeneity; however, it is the integration of these technologies that leads to deeper insights, ushering in discoveries that will progress oncology research and the development of diagnostics and therapeutics.\n\nThe integration of single-cell and spatial data can provide a more comprehensive picture of the network of cells within the tumour microenvironment. Here the authors use a combination of single-cell and spatial technologies including 10x Xenium to characterise serial formalin-fixed, paraffin-embedded human breast cancer sections.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "tumor progression",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35526305",
+      "title": "Prognostic value of integrin alphaV expression and localization pattern in invasive breast carcinomas",
+      "abstract": "Highlights\n\nLow expression of integrin alphaV correlates with poor cancer-specific survival human breast cancer patients.\n\nLoss of integrin alphaV continuity in the periphery of tumor cell clusters correlates with decreased cancer-specific survival.\n\nStromal localization of integrin alphaV can be an indicative of poor survival and metastasis risk.\n\n3D culture models of non-malignant and malignant breast cells recapitulate the expression pattern and spatial distribution of integrin in the epithelia observed in patient samples.\n\nInvasion of surrounding stroma is an early event in breast cancer metastatic progression, and involves loss of cell polarity, loss of myoepithelial layer, epithelial-mesenchymal transition (EMT) and remodeling of the extracellular matrix (ECM). Integrins are transmembrane receptors responsible for cell-ECM binding, which triggers signals that regulate many aspects of cell behavior and fate. Changes in the expression, localization and pairing of integrins contribute for abnormal responses found in transformed epithelia. We analyzed 345 human breast cancer samples in tissue microarrays (TMA) from cases diagnosed with invasive breast carcinoma to assess the expression and localization pattern of integrin alphaV and correlation with clinical parameters. Patients with lower levels of integrin alphaV staining showed reduced cancer specific survival. A subset of cases presented a peripheral staining of integrin alphaV surrounding tumor cell clusters, possibly ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "tumor progression",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35063072",
+      "title": "Transition to invasive breast cancer is associated with progressive changes in the structure and composition of tumor stroma",
+      "abstract": "SUMMARY\n\nDuctal carcinoma in situ (DCIS) is a pre-invasive lesion that is thought to be a precursor to invasive breast cancer (IBC). To understand the changes in the tumor microenvironment (TME) accompanying transition to IBC, we used multiplexed ion beam imaging by time of flight (MIBI-TOF) and a 37-plex antibody staining panel to interrogate 79 clinically annotated surgical resections using machine learning tools for cell segmentation, pixel-based clustering, and object morphometrics. Comparison of normal breast with patient-matched DCIS and IBC revealed coordinated transitions between four TME states that were delineated based on the location and function of myoepithelium, fibroblasts, and immune cells. Surprisingly, myoepithelial disruption was more advanced in DCIS patients that did not develop IBC, suggesting this process could be protective against recurrence. Taken together, this HTAN Breast PreCancer Atlas study offers insight into drivers of IBC relapse and emphasizes the importance of the TME in regulating these processes.\n\nIn brief\n\nA spatial imaging atlas of patient-matched ductal carcinoma in situ and invasive breast cancer depicts coordinated changes in the tumor microenviroment associated with invasive relapse, suggesting a potential protective role of myoepithelial disruption against invasive progression.\n\nGraphical Abstract",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "tumor progression",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "33649333",
+      "title": "Unmasking the immune microecology of ductal carcinoma in situ with deep learning",
+      "abstract": "Despite increasing evidence supporting the clinical relevance of tumour infiltrating lymphocytes (TILs) in invasive breast cancer, TIL spatial variability within ductal carcinoma in situ (DCIS) samples and its association with progression are not well understood. To characterise tissue spatial architecture and the microenvironment of DCIS, we designed and validated a new deep learning pipeline, UNMaSk. Following automated detection of individual DCIS ducts using a new method IM-Net, we applied spatial tessellation to create virtual boundaries for each duct. To study local TIL infiltration for each duct, DRDIN was developed for mapping the distribution of TILs. In a dataset comprising grade 2-3 pure DCIS and DCIS adjacent to invasive cancer (adjacent DCIS), we found that pure DCIS cases had more TILs compared to adjacent DCIS. However, the colocalisation of TILs with DCIS ducts was significantly lower in pure DCIS compared to adjacent DCIS, which may suggest a more inflamed tissue ecology local to DCIS ducts in adjacent DCIS cases. Our study demonstrates that technological developments in deep convolutional neural networks and digital pathology can enable an automated morphological and microenvironmental analysis of DCIS, providing a new way to study differential immune ecology for individual ducts and identify new markers of progression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "tumor progression",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35567670",
+      "title": "Ductal Carcinoma in Situ: Molecular Changes Accompanying Disease Progression",
+      "abstract": "Ductal carcinoma in situ (DCIS) is a non-obligate precursor of invasive ductal carcinoma (IDC), whereby if left untreated, approximately 12% of patients develop invasive disease. The current standard of care is surgical removal of the lesion, to prevent potential progression, and radiotherapy to reduce risk of recurrence. There is substantial overtreatment of DCIS patients, considering not all DCIS lesions progress to invasive disease. Hence, there is a critical imperative to better predict which DCIS lesions are destined for poor outcome and which are not, allowing for tailored treatment. Active surveillance is currently being trialed as an alternative management practice, but this approach relies on accurately identifying cases that are at low risk of progression to invasive disease. Two DCIS-specific genomic profiling assays that attempt to distinguish low and high-risk patients have emerged, but imperfections in risk stratification coupled with a high price tag warrant the continued search for more robust and accessible prognostic biomarkers. This search has largely turned researchers toward the tumor microenvironment. Recent evidence suggests that a spectrum of cell types within the DCIS microenvironment are genetically and phenotypically altered compared to normal tissue and play critical roles in disease progression. Uncovering the molecular mechanisms contributing to DCIS progression has provided optimism for the search for well-validated prognostic biomarkers that ca",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "tumor progression",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35602610",
+      "title": "Identification of Angiogenesis-Related Prognostic Biomarkers Associated With Immune Cell Infiltration in Breast Cancer",
+      "abstract": " Background: This study aimed to explore the prognostic value of angiogenesis-related genes (ARGs) and their association with immune cell infiltration (ICI) in breast cancer (BC).\n\n Methods: Transcriptome data of BC were obtained from the TCGA and GEO databases. Differentially expressed ARGs were identified by the limma package. The identification of key genes and construction of the risk score model were performed by univariate and multivariate Cox regression algorithms. The prognostic value of the risk score was assessed by ROC curves and nomogram. GO, KEGG pathway, and GSEA were used to investigate the biological functions of differentially expressed genes (DEGs), and CIBERSORT, ssGSEA, and xCell algorithms were performed to estimate the ICI in high-risk and low-risk groups. The correlations between prognostic biomarkers and differentially distributed immune cells were assessed. Moreover, a ceRNA regulatory network based on prognostic biomarkers was constructed and visualized by Cytoscape software.\n\n Results: A total of 18 differentially expressed ARGs were identified between tumor and adjacent normal tissue samples. TNFSF12, SCG2, COL4A3, and TNNI3 were identified as key prognostic genes by univariate and multivariate Cox regression analyses. The risk score model was further constructed based on the four-gene signature and validated in GSE7390 and GSE88770 datasets. ROC curves and nomogram indicated that the risk score had good accuracy for determining BC patient survival",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "endothelial cell",
+          "tumor-associated macrophage",
+          "immune infiltration",
+          "angiogenesis"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35202089",
+      "title": "Non-Coding RNAs in the Crosstalk between Breast Cancer Cells and Tumor-Associated Macrophages",
+      "abstract": "Non-coding RNAs (ncRNAs) play a pivotal role in regulating the tumor microenvironment (TME) by controlling gene expression at multiple levels. In tumors, ncRNAs can mediate the crosstalk between cancer cells and other cells in the TME, such as immune cells, stromal cells, and endothelial cells, influencing tumor development and progression. Tumor-associated macrophages (TAMs) are among the most abundant inflammatory cells infiltrating solid cancers that promote tumorigenesis, and their infiltration correlates with a poor prognosis in many tumors. Cancer cells produce different ncRNAs that orchestrate TAM recruitment and polarization toward a tumor-promoting phenotype. Tumor-reprogrammed macrophages shape the TME by promoting angiogenesis and tissue remodeling, and suppressing the anti-tumor activity of adaptive immune cells. TAMs can also produce ncRNA molecules that boost cancer cell proliferation and direct their phenotype and metabolic changes facilitating cancer progression and metastasis. This review will focus on the crosstalk between cancer cells and TAMs mediated by microRNAs and long non-coding RNAs during breast cancer (BC) initiation and progression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "endothelial cell",
+          "tumor-associated macrophage",
+          "immune infiltration",
+          "angiogenesis"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "34914196",
+      "title": "Tumor-associated macrophages: An important player in breast cancer progression",
+      "abstract": "Abstract\n\nBreast cancer is the most common form of malignant tumor in females, accounting for the second highest mortality among cancer patients. In the breast tumor microenvironment, tumor-associated macrophages (TAMs) are the most abundant immune cells, which regulate the progression of breast cancer. During breast cancer tumorigenesis and progression, TAMs support breast tumor growth by promoting angiogenesis and cancer cell metastasis, inducing cancer stemness, regulating energy metabolism, and supporting immune system suppression. TAMs exhibit a high degree of cellular plasticity. Repolarizing tumor-related macrophages into M1 macrophages can promote tumor regression. This study reviews the role and mechanism of action of TAMs in the development of breast cancer and establishes TAMs as effective targets for breast cancer treatment.\n\nTAMs support the progression of breast cancer by promoting tumor cell invasion and metastasis, angiogenesis, cancer stemness, regulating energy metabolism, and modulating T cell activity. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "endothelial cell",
+          "tumor-associated macrophage",
+          "immune infiltration",
+          "angiogenesis"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "34354867",
+      "title": "Increased apoptosis is associated with robust immune cell infiltration and cytolytic activity in breast cancer.",
+      "abstract": "Tumor infiltrating immune cells plays a critical role in cancer progression. Apoptosis is an autonomous cell death that counteracts tumor growth. To this end, we hypothesized that increased apoptosis in breast cancer is associated with immune cell killing. Apoptosis score of MSigDB Hallmark collection was used to analyze METABRIC cohort (n=1904) and TCGA (n=1069) as validation cohort. High apoptosis tumors enriched cancer promoting signaling pathways; hypoxia, KRAS, TGF-beta, PI3K signaling, and was associated with low MKI67 expression and less cell proliferation gene sets, less homologous recombination defects, and less altered fraction. High apoptosis tumors also enriched angiogenesis and high infiltration of vascular endothelial cells, pericytes and stromal cells and significantly enriched inflammation and immune response-related gene sets and high infiltration of CD8, CD4 memory, dendritic cells, M1 and M2 macrophages and significant elevation of cytolytic activity and immune checkpoint molecules, consistently in both cohorts. In conclusion, breast cancer patients with high apoptosis are associated with angiogenesis, immune response, high immune cell infiltration and cytolytic activity. To the best of our knowledge, this is the first study to utilize in silico translational approach to demonstrate the clinical relevance of apoptosis in breast cancer patients in large cohorts.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "endothelial cell",
+          "tumor-associated macrophage",
+          "immune infiltration",
+          "angiogenesis"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "33968034",
+      "title": "Macrophage Biology and Mechanisms of Immune Suppression in Breast Cancer",
+      "abstract": "Macrophages are crucial innate immune cells that maintain tissue homeostasis and defend against pathogens; however, their infiltration into tumors has been associated with adverse outcomes. Tumor-associated macrophages (TAMs) represent a significant component of the inflammatory infiltrate in breast tumors, and extensive infiltration of TAMs has been linked to poor prognosis in breast cancer. Here, we detail how TAMs impede a productive tumor immunity cycle by limiting antigen presentation and reducing activation of cytotoxic T lymphocytes (CTLs) while simultaneously supporting tumor cell survival, angiogenesis, and metastasis. There is an urgent need to overcome TAM-mediated immune suppression for durable anti-tumor immunity in breast cancer. To date, failure to fully characterize TAM biology and classify multiple subsets has hindered advancement in therapeutic targeting. In this regard, the complexity of TAMs has recently taken center stage owing to their subset diversity and tightly regulated molecular and metabolic phenotypes. In this review, we reveal major gaps in our knowledge of the functional and phenotypic characterization of TAM subsets associated with breast cancer, before and after treatment. Future work to characterize TAM subsets, location, and crosstalk with neighboring cells will be critical to counteract TAM pro-tumor functions and to identify novel TAM-modulating strategies and combinations that are likely to enhance current therapies and overcome chemo- an",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "endothelial cell",
+          "tumor-associated macrophage",
+          "immune infiltration",
+          "angiogenesis"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "36604669",
+      "title": "Coordinated reprogramming of renal cancer transcriptome, metabolome and secretome associates with immune tumor infiltration",
+      "abstract": "Background\n\nClear cell renal cell carcinoma (ccRCC) is the most common subtype of renal cancer. The molecules (proteins, metabolites) secreted by tumors affect their extracellular milieu to support cancer progression. If secreted in amounts detectable in plasma, these molecules can also serve as useful, minimal invasive biomarkers. The knowledge of ccRCC tumor microenvironment is fragmentary. In particular, the links between ccRCC transcriptome and the composition of extracellular milieu are weakly understood. In this study, we hypothesized that ccRCC transcriptome is reprogrammed to support alterations in tumor microenvironment. Therefore, we comprehensively analyzed ccRCC extracellular proteomes and metabolomes as well as transcriptomes of ccRCC cells to find molecules contributing to renal tumor microenvironment.\n\nMethods\n\nProteomic and metabolomics analysis of conditioned media isolated from normal kidney cells as well as five ccRCC cell lines was performed using mass spectrometry, with the following ELISA validation. Transcriptomic analysis was done using microarray analysis and validated using real-time PCR. Independent transcriptomic and proteomic datasets of ccRCC tumors were used for the analysis of gene and protein expression as well as the level of the immune infiltration.\n\nResults\n\nRenal cancer secretome contained 85 proteins detectable in human plasma, consistently altered in all five tested ccRCC cell lines. The top upregulated extracellular proteins included SP",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "endothelial cell",
+          "tumor-associated macrophage",
+          "immune infiltration",
+          "angiogenesis"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35565348",
+      "title": "Tumor-Associated Macrophages and Ovarian Cancer: Implications for Therapy",
+      "abstract": "Simple Summary\n\nOvarian cancer is a highly lethal female malignancy with high rates of advanced stage and recurrent disease. Ovarian cancer is characterized as poorly responsive to immunotherapy. This is hypothesized to be secondary to its highly immunosuppressive and phenotypically \"cold\" tumor microenvironment (TME). Tumor-associated macrophages (TAMs) are an integral component of the ovarian cancer TME, and predominantly display an M2 protumor phenotype. Ovarian cancer cells and TAMs interact via a complex network of signaling cytokines. Ovarian cancer TAMs are linked to tumor metastasis, angiogenesis, chemoresistance, and poor prognosis. Due to their profound role, TAMs represent a therapeutic target for ovarian cancer immunotherapy. Strategies for targeting TAMs include increasing phagocytosis, decreasing recruitment, decreasing macrophage survival, and repolarizing TAMs to an antitumor phenotype.\n\nAbstract\n\nThe tumor microenvironment (TME) has been implicated to play an important role in the progression of ovarian cancer. One of the most important components of the TME is tumor associated macrophages (TAMs). Phenotypically, macrophages are broadly categorized as M1 pro-inflammatory or M2 anti-inflammatory, based on the cytokines and chemokines that they secrete. The tumor microenvironment is associated with macrophages of an M2 phenotype which suppress the surrounding immune environment, assist tumor cells in evading immune targeting, and support tumor growth and metast",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "endothelial cell",
+          "tumor-associated macrophage",
+          "immune infiltration",
+          "angiogenesis"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35326602",
+      "title": "Mitochondrial DNA on Tumor-Associated Macrophages Polarization and Immunity",
+      "abstract": "Simple Summary\n\nAs the most abundant cell in the tumor microenvironment (TME), tumor-associated macrophages (TAMs) drive tumor progress by inducing angiogenesis, fibrosis, invasion, metastasis, and immunosuppression, which makes these cells an important target for tumor treatment. Recently, the role of free mitochondrial DNA (mtDNA) has attracted increased attention in the regulation of immune cells in the TME. In this review, we first summarize the functional characteristics of macrophages in tumor progression. The release and regulation mechanisms of tumor cell-derived mtDNA in TME are also introduced. Then, the biological effects of endogenous and exogenous mtDNA on macrophages are discussed. Finally, we propose that the effect of mtDNA on macrophages is worthy of attention in the process of tumor treatment, especially in immunotherapy. Our review provides a systematic summary of the effects of mtDNA on the survival, function, and phenotypes of TAMs in the TME.\n\nAbstract\n\nAs the richest immune cells in most tumor microenvironments (TMEs), tumor-associated macrophages (TAMs) play an important role in tumor development and treatment sensitivity. The phenotypes and functions of TAMs vary according to their sources and tumor progression. Different TAM phenotypes display distinct behaviors in terms of tumor immunity and are regulated by intracellular and exogenous molecules. Additionally, dysfunctional and oxidatively stressed mitochondrial-derived mitochondrial DNA (mtDNA) pla",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "endothelial cell",
+          "tumor-associated macrophage",
+          "immune infiltration",
+          "angiogenesis"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "keyword"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "COL6A1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CD44"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "COL6A1",
+        "CD44"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "extracellular matrix",
+        "cell adhesion",
+        "tumor microenvironment",
+        "stromal interaction"
+      ]
+    },
+    {
+      "genes": [
+        "COL6A1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "collagen VI",
+        "fibrosis",
+        "myofibroblast activation",
+        "matrix remodeling"
+      ]
+    },
+    {
+      "genes": [
+        "CD44"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "hyaluronan receptor",
+        "cancer stem cell",
+        "invasion",
+        "metastasis"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "TGF-beta signaling",
+        "EMT pathway",
+        "fibroblast activation",
+        "stromal crosstalk"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "integrin signaling",
+        "FAK pathway",
+        "cell migration",
+        "adhesion signaling"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "DCIS",
+        "invasive carcinoma",
+        "myoepithelial layer",
+        "tumor progression",
+        "spatial distribution"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "macrophage",
+        "endothelial cell",
+        "tumor-associated macrophage",
+        "immune infiltration",
+        "angiogenesis"
+      ]
+    },
+    {
+      "genes": [
+        "COL6A1",
+        "CD44"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "spatial transcriptomics",
+        "cell-cell communication",
+        "ligand-receptor interaction",
+        "tumor microenvironment"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "COL6A1",
+      "CD44"
+    ],
+    "genes_matched_by": {
+      "COL6A1": "biomcp_tag_only",
+      "CD44": "biomcp_tag_only"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Macrophages 2",
+      "Stromal",
+      "DCIS 2",
+      "Invasive Tumor",
+      "Endothelial"
+    ],
+    "total_papers": 93,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 55.55555555555556,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Myoepi ACTA2+",
+      "Myoepi KRT15+",
+      "Prolif Invasive Tumor",
+      "Stromal & T Cell Hybrid"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 93,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": "final",
+      "papers": 93,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    }
+  ],
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with controlled pathway labels/aliases + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

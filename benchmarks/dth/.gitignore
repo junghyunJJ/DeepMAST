@@ -1,0 +1,6 @@
+live_runs/
+__pycache__/
+.DS_Store
+Rplots.pdf
+!/results/
+!/results/**

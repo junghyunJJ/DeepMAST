@@ -1,0 +1,43 @@
+{
+  "dry_run": true,
+  "source": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/res_bc_drugtarget",
+  "trial_count": 9,
+  "provider": "ollama",
+  "models": [
+    "qwen3.5:397b-cloud"
+  ],
+  "ports": [
+    11434
+  ],
+  "unique_physical_ports": [
+    11434
+  ],
+  "parallel_workers": 1,
+  "workers": [
+    {
+      "port": 11434,
+      "port_slot": 1,
+      "worker_index": 1,
+      "worker_id": "11434"
+    }
+  ],
+  "modes": [
+    "middleware_only"
+  ],
+  "repeats_per_condition": 9,
+  "timeout_minutes": 120,
+  "wait_for_completion": true,
+  "hypothesis_skill_set": "dth_none",
+  "hypothesis_writer_prompt_mode": "operational_contract_minimal",
+  "hypothesis_scope_errors": [],
+  "host_hypothesis_fallback": "off",
+  "per_condition": {
+    "qwen3.5:397b-cloud::middleware_only": 9
+  },
+  "per_port": {
+    "11434": 9
+  },
+  "per_worker": {
+    "11434": 9
+  }
+}

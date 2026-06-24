@@ -1,0 +1,291 @@
+{
+  "schema_version": "deep_interpreter_literature_handoff_v1",
+  "policy": {
+    "included_buckets": [
+      "direct_lr_evidence",
+      "receptor_pathway_context_evidence"
+    ],
+    "excluded_buckets": [
+      "disease_only_background",
+      "rejected_weak_evidence"
+    ],
+    "cap": 40
+  },
+  "source": {
+    "total_papers": 30,
+    "unique_papers": 30,
+    "duplicates_dropped": 0,
+    "raw_papers_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0069_cci_full_09_GNAI2_PTPRU_strong_on/papers_raw.json",
+    "citation_candidates_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0069_cci_full_09_GNAI2_PTPRU_strong_on/citation_candidates.json"
+  },
+  "counts": {
+    "direct_lr_evidence": 0,
+    "receptor_pathway_context_evidence": 4,
+    "disease_only_background": 8,
+    "rejected_weak_evidence": 18
+  },
+  "papers": [
+    {
+      "pmid": "41581316",
+      "title": "Utilization of machine learning algorithms for the identification of the RLN associated prognostic model and feature biomarkers of RLN-related subtypes in breast cancer",
+      "abstract": "Highlights\n\nThe relaxin-associated prognostic model for breast cancer was firstly established.\n\nSignificant differences between risk groups in survival, gene expression, genomic mutations, and immune character.\n\nRC3 subtype was identified with unique immune, metabolic feature and biomarkers.\n\nThe differential expression patterns of RC3 were validated by experiment.\n\nBackground\n\nBreast cancer (BC) is the most common malignancy afflicting women worldwide, yet the role of relaxin-related genes (RLN) in BC progression remains unclear. This study aims to elucidate the relationship between RLN and BC outcomes through immune microenvironment and metabolic pathway analysis.\n\nMethods\n\nGene expression and clinical data were collected from The Cancer Genome Atlas (TCGA) and Gene Expression Omnibus (GEO). Relaxin-related genes were identified using KEGG and Genecard databases. A prognostic model, the RLN Associated Prognostic Model (TRAPM), was established using 101 combinations of 10 machine learning algorithms and validated at the single-cell level. Multi-omics analysis, including the IMvigor210 cohort, was performed to assess TRAPM's applicability in immunotherapy and drug selection.\n\nResults\n\nTRAPM, comprising nine prognostic genes (MMP1, RXFP1, PRKCZ, JUN, NFKBIA, GNAI2, NOS2, MMP9, and MMP13), showed significant associations with immune and metabolic profiles. Using TRAPM, a novel BC subtype RC3 and its key marker genes (MTHFD1L, CAVIN4, MMP1, ADGRG6, B3GNT5, SMYD2, and TFRC) were ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GNAI2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GNAI2",
+          "receptor": "PTPRU"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GNAI2",
+          "receptor": "PTPRU"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GNAI2-PTPRU": {
+          "ligand": "GNAI2",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GNAI2-PTPRU": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "39684488",
+      "title": "Identification of Diagnostic and Prognostic Subnetwork Biomarkers for Women with Breast Cancer Using Integrative Genomic and Network-Based Analysis.",
+      "abstract": "Breast cancer remains a major global health concern and a leading cause of cancer-related deaths among women. Early detection and effective treatment are essential in improving patient survival. Advances in omics technologies have provided deeper insights into the molecular mechanisms underlying breast cancer. This study aimed to identify subnetwork markers with diagnostic and prognostic potential by integrating genome-wide gene expression data with protein-protein interaction networks. We identified four significant subnetworks revealing potentially important hub genes, including VEGFA, KIF4A, ZWINT, PTPRU, IKBKE, STYK1, CENPO, and UBE2C. The diagnostic and prognostic potentials of these subnetworks were validated using independent datasets. Unsupervised principal component analysis demonstrated a clear separation of breast cancer patients from healthy controls across multiple datasets. A KNN classification model, based on these subnetworks, achieved an accuracy of 97%, sensitivity of 98%, specificity of 94%, and area under the curve (AUC) of 96%. Moreover, the prognostic significance of these subnetwork markers was validated using independent transcriptomic datasets comprising over 4000 patients. These findings suggest that subnetwork markers derived from integrated genomic network analyses can enhance our understanding of the molecular landscape of breast cancer, potentially leading to improved diagnostic, prognostic, and therapeutic strategies.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "PTPRU"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GNAI2",
+          "receptor": "PTPRU"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GNAI2",
+          "receptor": "PTPRU"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GNAI2-PTPRU": {
+          "ligand": "",
+          "receptor": "PTPRU",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GNAI2-PTPRU": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "18925433",
+      "title": "Expression profiling identifies genes that predict recurrence of breast cancer after adjuvant CMF-based chemotherapy.",
+      "abstract": "Cyclophosphamide, methotrexate and 5-fluorouracile (CMF)-based chemotherapy for adjuvant treatment of breast cancer reduces the risk of relapse. In this exploratory study, we tested the feasibility of identifying molecular markers of recurrence in CMF-treated patients. Using Affymetrix U133A GeneChips, RNA samples from 19 patients with primary breast cancer who had been uniformly treated with adjuvant CMF chemotherapy were analyzed. Two supervised class prediction approaches were used to identify gene markers that can best discriminate between patients who would experience relapse and patients who would remain disease-free. An additional independent validation set of 51 patients and 21 genes were analyzed by quantitative RT-PCR. Applying different algorithms to evaluate our microarray data, we identified two gene expression signatures of 21 and 12 genes containing eight overlapping genes, that predict recurrence in 19 cases with high accuracy (94%). Quantitative RT-PCR demonstrated that six genes from the combined signatures (CXCL9, ITSN2, GNAI2, H2AFX, INDO, and MGC10986) were significantly differentially expressed in the recurrence versus the non-recurrence group of the 19 cases and the independent breast cancer patient cohort (n = 51) treated with CMF. High expression levels of CXCL9, ITSN2, and GNAI2 were associated with prolonged disease-free survival (DFS) (P = 0.029, 0.018 and 0.032, respectively). When patients were stratified by combined CXCL9/ITSN2 or CXCL9/FLJ22028",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GNAI2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GNAI2",
+          "receptor": "PTPRU"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GNAI2",
+          "receptor": "PTPRU"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GNAI2-PTPRU": {
+          "ligand": "GNAI2",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GNAI2-PTPRU": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "36721232",
+      "title": "c-MYC mediates the crosstalk between breast cancer cells and tumor microenvironment",
+      "abstract": "The MYC oncogenic family is dysregulated in diverse tumors which is generally linked to the poor prognosis of tumors. The members in MYC family are transcription factors which are responsible for the regulation of various genes expression. Among them, c-MYC is closely related to the progression of tumors. Furthermore, c-MYC aberrations is tightly associated with the prevalence of breast cancer. Tumor microenvironment (TME) is composed of many different types of cellular and non-cellular factors, mainly including cancer-associated fibroblasts, tumor-associated macrophages, vascular endothelial cells, myeloid-derived suppressor cells and immune cells, all of which can affect the diagnosis, prognosis, and therapeutic efficacy of breast cancer. Importantly, the biological processes occurred in TME, such as angiogenesis, immune evasion, invasion, migration, and the recruition of stromal and tumor-infiltrating cells are under the modulation of c-MYC. These findings indicated that c-MYC serves as a critical regulator of TME. Here, we aimed to summarize and review the relevant research, thus to clarify c-MYC is a key mediator between breast cancer cells and TME.\n\nVideo Abstract\n\nSupplementary Information\n\nThe online version contains supplementary material available at 10.1186/s12964-023-01043-1.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "T cell",
+          "endothelial",
+          "myoepithelial",
+          "tumor microenvironment"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GNAI2-PTPRU": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial",
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    }
+  ],
+  "search_method": "search_literature_dynamic",
+  "coverage": {
+    "genes_covered": [
+      "GNAI2",
+      "PTPRU"
+    ],
+    "genes_matched_by": {
+      "GNAI2": "biomcp_tag+text_confirmed",
+      "PTPRU": "biomcp_tag+text_confirmed"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Endothelial",
+      "Macrophages 2",
+      "Stromal",
+      "DCIS 2"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 50.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Myoepi ACTA2+",
+      "Myoepi KRT15+",
+      "Perivascular-Like",
+      "T Cell & Tumor Hybrid"
+    ]
+  }
+}

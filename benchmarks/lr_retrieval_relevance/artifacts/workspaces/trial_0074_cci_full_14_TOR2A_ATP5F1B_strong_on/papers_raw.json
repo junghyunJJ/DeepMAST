@@ -1,0 +1,831 @@
+{
+  "papers": [
+    {
+      "pmid": "36835413",
+      "title": "Crosstalk of Inflammatory Cytokines within the Breast Tumor Microenvironment",
+      "abstract": "Several immune and immunocompetent cells, including dendritic cells, macrophages, adipocytes, natural killer cells, T cells, and B cells, are significantly correlated with the complex discipline of oncology. Cytotoxic innate and adaptive immune cells can block tumor proliferation, and others can prevent the immune system from rejecting malignant cells and provide a favorable environment for tumor progression. These cells communicate with the microenvironment through cytokines, a chemical messenger, in an endocrine, paracrine, or autocrine manner. These cytokines play an important role in health and disease, particularly in host immune responses to infection and inflammation. They include chemokines, interleukins (ILs), adipokines, interferons, colony-stimulating factors (CSFs), and tumor necrosis factor (TNF), which are produced by a wide range of cells, including immune cells, such as macrophages, B-cells, T-cells, and mast cells, as well as endothelial cells, fibroblasts, a variety of stromal cells, and some cancer cells. Cytokines play a crucial role in cancer and cancer-related inflammation, with direct and indirect effects on tumor antagonistic or tumor promoting functions. They have been extensively researched as immunostimulatory mediators to promote the generation, migration and recruitment of immune cells that contribute to an effective antitumor immune response or pro-tumor microenvironment. Thus, in many cancers such as breast cancer, cytokines including leptin, IL",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "endothelial cells",
+          "macrophages",
+          "stromal cells",
+          "tumor microenvironment",
+          "immune infiltration"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "34451892",
+      "title": "Ampelopsin Suppresses Stem Cell Properties Accompanied by Attenuation of Oxidative Phosphorylation in Chemo- and Radio-Resistant MDA-MB-231 Breast Cancer Cells",
+      "abstract": "Ampelopsin, also known as dihydromyricetin, is a commonly found flavonoid in medicinal plants. The cancer stem cell (CSC) population is a promising target for triple-negative breast cancer (TNBC). In this study, flavonoid screening was performed in the established MDA-MB-231/IR cell line, which is enriched in CSCs. Ampelopsin suppressed the proliferation and colony formation of stem cell-rich MDA-MB-231/IR, while inducing their apoptosis. Importantly, ampelopsin displayed an inhibitory impact on the stemness features of MDA-MB-231/IR cells, demonstrated by decreases in mammosphere formation, the CD44+/CD24-/low population, aldehyde dehydrogenase activity, and the levels of stem cell markers (e.g., CD44, MRP1, beta-catenin, and KLF4). Ampelopsin also suppressed the epithelial-mesenchymal transition, as evidenced by decreases in migration, invasion capacity, and mesenchymal markers, as well as an increase in the epithelial marker E-cadherin. Moreover, ampelopsin significantly impaired oxidative phosphorylation by reducing the oxygen consumption rate and adenosine triphosphate production in MDA-MB-231/IR cells. Notably, ampelopsin treatment significantly reduced the levels of the phosphorylated forms of IkappaBalpha and NF-kappaB p65, as well as the levels of tumor necrosis factor (TNF)-alpha-stimulated phosphorylation of IkappaBalpha and NF-kappaB p65. These results demonstrated that ampelopsin prevents the TNF-alpha/NF-kappaB signaling axis in breast CSCs.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ATP synthase",
+          "oxidative phosphorylation",
+          "metabolic reprogramming",
+          "mitochondrial complex V"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36707670",
+      "title": "TOR1B: a predictor of bone metastasis in breast cancer patients",
+      "abstract": "Recent therapeutic advances in breast cancer (BC) have improved survival outcomes; however, the prognosis for patients with bone metastasis (BM) remains poor. Hence, novel clinical biomarkers are needed to accurately predict BC BM as well as to promote personalized medicine. Here, we discovered a novel biomarker, TOR1B, for BM in BC patients via analysis of BC gene expression data and clinical information downloaded from open public databases. In cancer cells, we found high expression levels of TOR1B in the nucleus and endoplasmic reticulum. Regarding gene expression, the level of TOR1B was significantly upregulated in BC patients with BM (p < 0.05), and the result was externally validated. In addition, gene expression clearly demonstrated two distinct types of prognoses in ER- and PR-positive patients. In multivariate regression, the gene could be an independent predictor of BM in BC patients, i.e., a low expression level of TOR1B was associated with delayed metastasis to bone in BC patients (HR, 0.28; 95% CI 0.094-0.84). Conclusively, TOR1B might be a useful biomarker for predicting BM; specifically, patients with ER- and PR-positive subtypes would benefit from the clinical use of this promising prognostic biomarker.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "TOR2A"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36225631",
+      "title": "Investigation of the effects of downregulation of jumping translocation breakpoint (JTB) protein expression in MCF7 cells for potential use as a biomarker in breast cancer.",
+      "abstract": "MCF7 is a commonly used luminal type A non-invasive/poor-invasive human breast cancer cell line that does not usually migrate or invade compared with MDA-MB-231 highly metastatic cells, which emphasize an invasive and migratory behavior. Under special conditions, MCF7 cells might acquire invasive features. The aberration in expression and biological functions of the jumping translocation breackpoint (JTB) protein is associated with malignant transformation of cells, based on mitochondrial dysfunction, inhibition of tumor suppressive function of TGF-beta, and involvement in cancer cell cycle. To investigate new putative functions of JTB by cellular proteomics, we analyzed the biological processes and pathways that are associated with the JTB protein downregulation. The results demonstrated that MCF7 cell line developed a more \"aggressive\" phenotype and behavior. Most of the proteins that were overexpressed in this experiment promoted the actin cytoskeleton reorganization that is involved in growth and metastatic dissemination of cancer cells. Some of these proteins are involved in the epithelial-mesenchymal transition (EMT) process (ACTBL2, TUBA4A, MYH14, CSPG5, PKM, UGDH, HSP90AA2, and MIF), in correlation with the energy metabolism reprogramming (PKM, UGDH), stress-response (HSP10, HSP70A1A, HSP90AA2), and immune and inflammatory response (MIF and ERp57-TAPBP). Almost all upregulated proteins in JTB downregulated condition promote viability, motility, proliferation, invasion",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "TOR2A"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35614988",
+      "title": "Immunogenomic landscape analyses of immune molecule signature-based risk panel for patients with triple-negative breast cancer",
+      "abstract": "Triple-negative breast cancer (TNBC) presented as high heterogeneous immunogenicity that lacks useful clinical signatures to risk-stratify immune-benefit subtypes. We hypothesized that molecular-based phenotypic characterization of TNBC tumors and their immunity may overcome these challenges. We enrolled 1,145 patients with TNBC for analysis. Through combining algorithm integration analysis and TNBC datasets, a tumor immune risk score (TIRS) panel consisting of 8 potential biomarkers was identified. The TIRS panel represented excellent effectiveness as an independent predictor. High- and low risk stratification of patients was further achieved by TIRS, and significant survival and immune-infiltration pattern differences were found in each cohort, both at the transcriptome and protein levels. Non-negative matrix factorization clustering further identified four different tumor immune microenvironment types (TIMTs), among which TIMT-II was associated with the best prognosis and immune status, whereas TIMT-IV had the opposite effect, TIMT-III was associated with highly unstable genomes, and TIMT-I displayed stem-cell-related characteristics along with high stromal scores and may have extensive enrichment of tumor-associated fibroblasts and vascular cells. In conclusion, our TIRS panel could serve as a robust prognostic signature and provide therapeutic benefits for immunotherapy. Additionally, coordinating four TIMTs may be helpful for clinical decision-making in TNBC patients.\n\n",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "TOR2A"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34064798",
+      "title": "Amplifications of Stemness Gene Loci:New Markers for the Determination of the Need for Neoadjuvant Chemotherapy for Patients with Breast Cancer. A Prospective Study",
+      "abstract": "In this prospective study, a new strategy for the prescription of neoadjuvant chemotherapy (NAC) was prospectively tested and depended on the presence of stemness gene amplifications in the tumor before treatment, which in our early studies showed a connection with metastasis. The study included 92 patients with grade IIA-IIIB luminal B breast cancer. Patients underwent a biopsy before treatment, and with the use of a CytoScan HD Array microarray (Affymetrix, Santa Clara, CA, USA), the presence of stemness gene amplifications (3q, 5p, 6p, 7q, 8q, 13q, 9p, 9q, 10p, 10q21.1, 16p, 18chr, 19p) in the tumor was determined. In group 1 (n = 41), in the presence of two or more amplifications, patients were prescribed a personalized NAC regimen. In group 2 (n = 21), if there was no amplification of stemness genes in the tumor, then patients were not prescribed NAC, and treatment began with surgery. Group 3 (n = 30) served as a historical control. The frequency of an objective response to NAC in groups 1 and 3 was 79%. Nonmetastatic survival was found in 100% of patients in group 2, who did not undergo NAC. In patients in group 1, the frequency of metastasis was 10% (4/41). At the same time, in patients in group 3, who received NAC, the rate of metastasis was 47% (14/30). The differences between group 1 and group 3 and between group 2 and group 3 were statistically significant, both by Fisher's criterion and a log-rank test. The appointment of NAC was most feasible in patients with clo",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "TOR2A"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33785008",
+      "title": "Identification and development of an independent immune-related genes prognostic model for breast cancer",
+      "abstract": "Background\n\nBreast cancer is one of the main malignant tumors that threaten the lives of women, which has received more and more clinical attention worldwide. There are increasing evidences showing that the immune micro-environment of breast cancer (BC) seriously affects the clinical outcome. This study aims to explore the role of tumor immune genes in the prognosis of BC patients and construct an immune-related genes prognostic index.\n\nMethods\n\nThe list of 2498 immune genes was obtained from ImmPort database. In addition, gene expression data and clinical characteristics data of BC patients were also obtained from the TCGA database. The prognostic correlation of the differential genes was analyzed through Survival package. Cox regression analysis was performed to analyze the prognostic effect of immune genes. According to the regression coefficients of prognostic immune genes in regression analysis, an immune risk scores model was established. Gene set enrichment analysis (GSEA) was performed to probe the biological correlation of immune gene scores. P < 0.05 was considered to be statistically significant.\n\nResults\n\nIn total, 556 immune genes were differentially expressed between normal tissues and BC tissues (p < 0. 05). According to the univariate cox regression analysis, a total of 66 immune genes were statistically significant for survival risk, of which 30 were associated with overall survival (P < 0.05). Finally, a 15 immune genes risk scores model was established. All",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "TOR2A"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39720923",
+      "title": "A Systematic Review of the Molecular Mechanisms Involved in the Association Between PCOS and Endometrial and Ovarian Cancers",
+      "abstract": "ABSTRACT\n\nPolycystic ovary syndrome (PCOS), a major cause of female infertility, affects 4%-20% of reproductive-age women. Metabolic and hormonal alterations are key features of PCOS, potentially raising the risk of endometrial (EC) and ovarian (OVCA) cancers. This systematic review aims to summarise the proposed molecular mechanisms involved in the association between PCOS and EC or OVCA. This is achieved by conducting a thorough literature review and utilising specific search terms to identify all relevant studies published in English from 2010 to December 2022. PRISMA was followed, and the protocol was registered on PROSPERO (CRD42022375461). The QUADAS-2 tool and Review Manager Software were employed to evaluate study quality and risk of bias respectively. Forty-five eligible studies were selected with molecular signatures based on genomic, transcriptomic, metabolomic, proteomic and epigenetic analyses. Genes and their products deregulated in EC and/or OVCA were identified, including BRCA1, MLH1, NQO1 and ESR1, which were also deregulated in PCOS. Serum levels of IGF1, IGFBP1, SREBP1 and visfatin in women with PCOS were also identified as potential biomarkers of enhanced EC risk. Salusin-beta serum levels in individuals with PCOS were identified as a potential biomarker for increased risk of OVCA. Gene signature-based drug repositioning identified several drug candidates: metformin, fenofibrate, fatostatin, melatonin, resveratrol and quercetin, some already established an",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "TOR2A"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37631307",
+      "title": "Recent Advances of Cell-Penetrating Peptides and Their Application as Vectors for Delivery of Peptide and Protein-Based Cargo Molecules",
+      "abstract": "Peptides and proteins, two important classes of biomacromolecules, play important roles in the biopharmaceuticals field. As compared with traditional drugs based on small molecules, peptide- and protein-based drugs offer several advantages, although most cannot traverse the cell membrane, a natural barrier that prevents biomacromolecules from directly entering cells. However, drug delivery via cell-penetrating peptides (CPPs) is increasingly replacing traditional approaches that mediate biomacromolecular cellular uptake, due to CPPs' superior safety and efficiency as drug delivery vehicles. In this review, we describe the discovery of CPPs, recent developments in CPP design, and recent advances in CPP applications for enhanced cellular delivery of peptide- and protein-based drugs. First, we discuss the discovery of natural CPPs in snake, bee, and spider venom. Second, we describe several synthetic types of CPPs, such as cyclic CPPs, glycosylated CPPs, and D-form CPPs. Finally, we summarize and discuss cell membrane permeability characteristics and therapeutic applications of different CPPs when used as vehicles to deliver peptides and proteins to cells, as assessed using various preclinical disease models. Ultimately, this review provides an overview of recent advances in CPP development with relevance to applications related to the therapeutic delivery of biomacromolecular drugs to alleviate diverse diseases.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "TOR2A"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37488424",
+      "title": "A performance evaluation of drug response prediction models for individual drugs",
+      "abstract": "Drug response prediction is important to establish personalized medicine for cancer therapy. Model construction for predicting drug response (i.e., cell viability half-maximal inhibitory concentration [IC50]) of an individual drug by inputting pharmacogenomics in disease models remains critical. Machine learning (ML) has been predominantly applied for prediction, despite the advent of deep learning (DL). Moreover, whether DL or traditional ML models are superior for predicting cell viability IC50s has to be established. Herein, we constructed ML and DL drug response prediction models for 24 individual drugs and compared the performance of the models by employing gene expression and mutation profiles of cancer cell lines as input. We observed no significant difference in drug response prediction performance between DL and ML models for 24 drugs [root mean squared error (RMSE) ranging from 0.284 to 3.563 for DL and from 0.274 to 2.697 for ML; R2 ranging from -7.405 to 0.331 for DL and from -8.113 to 0.470 for ML]. Among the 24 individual drugs, the ridge model of panobinostat exhibited the best performance (R2 0.470 and RMSE 0.623). Thus, we selected the ridge model of panobinostat for further application of explainable artificial intelligence (XAI). Using XAI, we further identified important genomic features for panobinostat response prediction in the ridge model, suggesting the genomic features of 22 genes. Based on our findings, results for an individual drug employing both ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "TOR2A"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35421138",
+      "title": "Bayesian hierarchical lasso Cox model: A 9-gene prognostic signature for overall survival in gastric cancer in an Asian population",
+      "abstract": "Objective\n\nGastric cancer (GC) is one of the most common tumour diseases worldwide and has poor survival, especially in the Asian population. Exploration based on biomarkers would be efficient for better diagnosis, prediction, and targeted therapy.\n\nMethods\n\nExpression profiles were downloaded from the Gene Expression Omnibus (GEO) database. Survival-related genes were identified by gene set enrichment analysis (GSEA) and univariate Cox. Then, we applied a Bayesian hierarchical lasso Cox model for prognostic signature screening. Protein-protein interaction and Spearman analysis were performed. Kaplan-Meier and receiver operating characteristic (ROC) curve analysis were applied to evaluate the prediction performance. Multivariate Cox regression was used to identify prognostic factors, and a prognostic nomogram was constructed for clinical application.\n\nResults\n\nWith the Bayesian lasso Cox model, a 9-gene signature included TNFRSF11A, NMNAT1, EIF5A, NOTCH3, TOR2A, E2F8, PSMA5, TPMT, and KIF11 was established to predict overall survival in GC. Protein-protein interaction analysis indicated that E2F8 was likely related to KIF11. Kaplan-Meier analysis showed a significant difference between the high-risk and low-risk groups (P<0.001). Multivariate analysis demonstrated that the 9-gene signature was an independent predictor (HR = 2.609, 95% CI 2.017-3.370), and the C-index of the integrative model reached 0.75. Function enrichment analysis for different risk groups revealed the mos",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "TOR2A"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35210821",
+      "title": "Identification and Verification of Immune-Related Genes Prognostic Signature Based on ssGSEA for Adrenocortical Carcinoma (ACC)",
+      "abstract": "Purpose\n\nAdrenocortical carcinoma (ACC) is an endocrine malignant tumor with poor prognosis. The study aimed to construct ACC immune-related gene prognostic signature and verify the efficacy of prognostic signature.\n\nMethods\n\nACC RNA-seq data and clinical information are downloaded from TCGA databases and GEO databases. We used single sample gene set enrichment analysis (ssGSEA) to assess immune cell infiltration in ACC patients and ACC patients were divided into high- and low-immune cell infiltration clusters. The validity of ssGSEA grouping was verified using the ESTIMATE algorithm. A total of 275 differentially expressed immune-related genes (IRGs) were obtained from the intersection of IRGs and differentially expressed genes (DEGs) in high and low immune cell infiltration clusters. LASSO analysis was used to identify 13 IRGs that regulate the prognosis of ACC patients through immune infiltration. Kaplan-Meier analysis, ROC curve, univariate and multivariate Cox regression further confirmed that these 13 immune-related gene signatures were innovative and significant prognostic factors, which were independent of clinical features. Finally, ACC prognostic nomogram was constructed, ROC curve and calibration curve were drawn to evaluate the accuracy of the prognostic nomogram.\n\nResults\n\nLASSO regression analysis was used to screen out ACC survival-related genes. Univariate and multivariate Cox proportional risk regression models were used to analyze and construct the ACC progn",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "TOR2A"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39920398",
+      "title": "Retraction Note: The function of Cav-1 in MDA-MB-231 breast cancer cell migration and invasion induced by ectopic ATP5B",
+      "abstract": "Article: 39920398",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36553919",
+      "title": "Breast Cancer Dataset, Classification and Detection Using Deep Learning",
+      "abstract": "Incorporating scientific research into clinical practice via clinical informatics, which includes genomics, proteomics, bioinformatics, and biostatistics, improves patients' treatment. Computational pathology is a growing subspecialty with the potential to integrate whole slide images, multi-omics data, and health informatics. Pathology and laboratory medicine are critical to diagnosing cancer. This work will review existing computational and digital pathology methods for breast cancer diagnosis with a special focus on deep learning. The paper starts by reviewing public datasets related to breast cancer diagnosis. Additionally, existing deep learning methods for breast cancer diagnosis are reviewed. The publicly available code repositories are introduced as well. The paper is closed by highlighting challenges and future works for deep learning-based diagnosis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34703878",
+      "title": "Defueling the cancer: ATP synthase as an emerging target in cancer therapy",
+      "abstract": "Reprogramming of cellular metabolism is a hallmark of cancer. Mitochondrial ATP synthase (MAS) produces most of the ATP that drives the cell. High expression of the MAS-composing proteins is found during cancer and is linked to a poor prognosis in glioblastoma, ovarian cancer, prostate cancer, breast cancer, and clear cell renal cell carcinoma. Cell surface-expressed ATP synthase, translocated from mitochondrion to cell membrane, involves the angiogenesis, tumorigenesis, and metastasis of cancer. ATP synthase has therefore been considered a therapeutic target. We review recent various ATP synthase inhibitors that suppress tumor growth and are being tested for the clinic.\n\nGraphical abstract\n\nThe review highlights the ongoing development of ATP synthase inhibitors that have shown effectiveness in the treatment of cancer. High expression of the ATP synthase composing proteins is found during cancer and links to a poor prognosis in various tumors. Many ATP synthase inhibitors suppress tumor growth and are being tested for the clinic.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34122507",
+      "title": "Integrated Analyses Reveal the Multi-Omics and Prognostic Characteristics of ATP5B in Breast Cancer",
+      "abstract": "The beta subunit of F1Fo-ATP synthase (ATP5B) has been demonstrated to play an essential role in tumor progression and metastasis. However, there has been no comprehensive pan-cancer multi-omics analysis of ATP5B, while the clinical relevance of ATP5B and its potential mechanism in regulating breast cancer are still poorly understood. In this study, we demonstrated that ATP5B has a higher frequency of amplification than deletion in most cancer types, and the copy number variation (CNV) of ATP5B was significantly positively correlated with its mRNA expression level. DNA methylation analysis across pan-cancer also revealed a strong correlation between ATP5B expression and epigenetic changes. We identified 6 significant methylation sites involved in the regulation of ATP5B expression. Tissue microarrays (TMA) from 129 breast cancer samples, integrated with multiple additional breast cancer dataset, were used to evaluate the ATP5B expression and its correlation with prognosis. Higher levels of ATP5B expression were consistently associated with a worse OS in all datasets, and Cox regression analysis suggested that ATP5B expression was an independent prognostic factor. Gene enrichment analysis indicated that the gene signatures of DNA damage recognition, the E-cadherin nascent pathway and the PLK1 pathway were enriched in ATP5B-high patients. Moreover, somatic mutation analysis showed that a significant different mutation frequency of CDH1 and ADAMTSL3 could be observed between the",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34009483",
+      "title": "The function of Cav-1 in MDA-MB-231 breast cancer cell migration and invasion induced by ectopic ATP5B",
+      "abstract": "Ectopic ATP5B, which is located in a unique type of lipid raft caveolar structure, can be upregulated by cholesterol loading. As the structural component of caveolae, Cav-1 is a molecular hub that is involved in transmembrane signaling. In a previous study, the ATP5B-specific binding peptide B04 was shown to inhibit the migration and invasion of prostate cancer cells, and the expression of ATP5B on the plasma membrane of MDA-MB-231 cells was confirmed. The present study investigated the effect of ectopic ATP5B on the migration and invasion of MDA-MB-231 cells and examined the involvement of Cav-1. Cholesterol loading increased the level of ectopic ATP5B and promoted cell migration and invasion. These effects were blocked by B04. Ectopic ATP5B was physically colocalized with Cav-1, as demonstrated by double immunofluorescence staining and coimmunoprecipitation. After Cav-1 knockdown, the migration and invasion abilities of MDA-MB-231 cells were significantly decreased, suggesting that Cav-1 influences the function of ectopic ATP5B. Furthermore, these effects were not reversed after treatment with cholesterol. We concluded that Cav-1 may participate in MDA-MB-231 cell migration and invasion induced by binding to ectopic ATP5B.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "31006104",
+      "title": "A novel RNA aptamer identifies plasma membrane ATP synthase beta subunit as an early marker and therapeutic target in aggressive cancer",
+      "abstract": "Purpose\n\nPrimary breast and prostate cancers can be cured, but metastatic disease cannot. Identifying cell factors that predict metastatic potential could guide both prognosis and treatment.\n\nMethods\n\nWe used Cell-SELEX to screen an RNA aptamer library for differential binding to prostate cancer cell lines with high vs. low metastatic potential. Mass spectroscopy, immunoblot, and immunohistochemistry were used to identify and validate aptamer targets. Aptamer properties were tested in vitro, in xenograft models, and in clinical biopsies. Gene expression datasets were queried for target associations in cancer.\n\nResults\n\nWe identified a novel aptamer (Apt63) that binds to the beta subunit of F1Fo ATP synthase (ATP5B), present on the plasma membrane of certain normal and cancer cells. Apt63 bound to plasma membranes of multiple aggressive breast and prostate cell lines, but not to normal breast and prostate epithelial cells, and weakly or not at all to non-metastasizing cancer cells; binding led to rapid cell death. A single intravenous injection of Apt63 induced rapid, tumor cell-selective binding and cytotoxicity in MDA-MB-231 xenograft tumors, associated with endonuclease G nuclear translocation and DNA fragmentation. Apt63 was not toxic to non-transformed epithelial cells in vitro or adjacent normal tissue in vivo. In breast cancer tissue arrays, plasma membrane staining with Apt63 correlated with tumor stage (p < 0.0001, n = 416) and was independent of other cancer markers.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "27344270",
+      "title": "Bedaquiline, an FDA-approved antibiotic, inhibits mitochondrial function and potently blocks the proliferative expansion of stem-like cancer cells (CSCs)",
+      "abstract": "Bedaquiline (a.k.a., Sirturo) is an anti-microbial agent, which is approved by the FDA for the treatment of multi-drug resistant pulmonary tuberculosis (TB). Bedaquiline is a first-in-class diaryl-quinoline compound, that mechanistically inhibits the bacterial ATP-synthase, and shows potent activity against both drug-sensitive and drug-resistant TB. Interestingly, eukaryotic mitochondria originally evolved from engulfed aerobic bacteria. Thus, we hypothesized that, in mammalian cells, bedaquiline might also target the mitochondrial ATP-synthase, leading to mitochondrial dysfunction and ATP depletion. Here, we show that bedaquiline has anti-cancer activity, directed against Cancer Stem-like Cells (CSCs). More specifically, we demonstrate that bedaquiline treatment of MCF7 breast cancer cells inhibits mitochondrial oxygen-consumption, as well as glycolysis, but induces oxidative stress. Importantly, bedaquiline significantly blocks the propagation and expansion of MCF7-derived CSCs, with an IC-50 of approx. 1-muM, as determined using the mammosphere assay. Similarly, bedaquiline also reduces both the CD44+/CD24low/- CSC and ALDH+ CSC populations, under anchorage-independent growth conditions. In striking contrast, bedaquiline significantly increases oxygen consumption in normal human fibroblasts, consistent with the fact that it is well-tolerated in patients treated for TB infections. As such, future pre-clinical studies and human clinical trials in cancer patients may be warra",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "22883974",
+      "title": "The mitochondrial transporter SLC25A43 is frequently deleted and may influence cell proliferation in HER2-positive breast tumors",
+      "abstract": "Background\n\nOverexpression of the human epidermal growth factor receptor (HER) 2 is associated with poor prognosis and shortened survival in breast cancer patients. HER2 is a potent activator of several signaling pathways that support cell survival, proliferation and metabolism. In HER2-positive breast cancer there are most likely unexplored proteins that act directly or indirectly downstream of well established pathways and take part in tumor development and treatment response.\n\nMethods\n\nIn order to identify novel copy number variations (CNVs) in HER2-positive breast cancer whole-genome single nucleotide polymorphism (SNP) arrays were used. A PCR-based loss of heterozygosis (LOH) assay was conducted to verify presence of deletion in HER2-positive breast cancer cases but also in HER2 negative breast cancers, cervical cancers and lung cancers. Screening for mutations was performed using single-strand conformation polymorphism (SSCP) followed by PCR sequencing. Protein expression was evaluated with immunohistochemistry (IHC).\n\nResults\n\nA common deletion at chromosome Xq24 was found in 80% of the cases. This locus harbors the gene solute carrier (SLC) family 25A member 43 (SLC25A43) encoding for a mitochondrial transport protein. The LOH assay revealed presence of SLC25A43 deletion in HER2-positive (48%), HER2-negative (9%), cervical (42%) and lung (67%) cancers. HER2-positive tumors with negative or low SLC25A43 protein expression had significantly lower S-phase fraction compar",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36698840",
+      "title": "1,4-dihydroxy quininib modulates the secretome of uveal melanoma tumour explants and a marker of oxidative phosphorylation in a metastatic xenograft model",
+      "abstract": "Uveal melanoma (UM) is an intraocular cancer with propensity for liver metastases. The median overall survival (OS) for metastatic UM (MUM) is 1.07 years, with a reported range of 0.84-1.34. In primary UM, high cysteinyl leukotriene receptor 1 (CysLT1) expression associates with poor outcomes. CysLT1 antagonists, quininib and 1,4-dihydroxy quininib, alter cancer hallmarks of primary and metastatic UM cell lines in vitro. Here, the clinical relevance of CysLT receptors and therapeutic potential of quininib analogs is elaborated in UM using preclinical in vivo orthotopic xenograft models and ex vivo patient samples. Immunohistochemical staining of an independent cohort (n = 64) of primary UM patients confirmed high CysLT1 expression significantly associates with death from metastatic disease (p = 0.02; HR 2.28; 95% CI 1.08-4.78), solidifying the disease relevance of CysLT1 in UM. In primary UM samples (n = 11) cultured as ex vivo explants, 1,4-dihydroxy quininib significantly alters the secretion of IL-13, IL-2, and TNF-alpha. In an orthotopic, cell line-derived xenograft model of MUM, 1,4-dihydroxy quininib administered intraperitoneally at 25 mg/kg significantly decreases ATP5B expression (p = 0.03), a marker of oxidative phosphorylation. In UM, high ATP5F1B is a poor prognostic indicator, whereas low ATP5F1B, in combination with disomy 3, correlates with an absence of metastatic disease in the TCGA-UM dataset. These preclinical data highlight the diagnostic potential of CysL",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "24252137",
+      "title": "Metabolic markers GAPDH, PKM2, ATP5B and BEC-index in advanced serous ovarian cancer",
+      "abstract": "Background\n\nA deregulated energy metabolism is a hallmark of malignant disease that offers possible future targets for treatment. We investigated the prognostic value of the glycolytic enzymes glyceraldehyde 3-phosphate dehydrogenase (GAPDH) and pyruvate kinase type M2 (PKM2), mitochondrial beta-F1-ATPase (ATP5B) and the bioenergetic cellular (BEC) index in advanced ovarian cancer.\n\nMethods\n\nFresh tumor samples were prospectively collected from 123 patients undergoing primary surgery for suspected advanced ovarian cancer. Of these, 57 met the eligibility criteria; stage IIC-IV, serous or endometrioid subtype, specimens containing >= 50% tumor cells and patients receiving platinum-based chemotherapy. An adequate amount of mRNA could be extracted in all but one case, with a resultant study population of 56 patients. Eighty-six percent of cases had serous tumors, and 93% were grade 2-3. GAPDH, PKM2 and ATP5B mRNA- and protein expression was assessed by real-time PCR and immunohistochemistry. We estimated the association with platinum-free interval (PFI) and overall survival (OS) by Cox proportional hazards models. Median follow-up was 60 months.\n\nResults\n\nHigh GAPDH mRNA levels (HR 2.1, 95% CI 1.0-4.5) and low BEC-index (HR 0.47, 95% CI 0.23-0.95) were both independently associated with shorter PFI. Median PFI for patients with high GAPDH mRNA was 5.0 months compared to 10.1 months for low expression cases (p = 0.031). Similarly, median PFI for patients with low BEC-index based ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "31963885",
+      "title": "Potential Role of Tocotrienols on Non-Communicable Diseases: A Review of Current Evidence",
+      "abstract": "Tocotrienol (T3) is a subfamily of vitamin E known for its wide array of medicinal properties. This review aimed to summarize the health benefits of T3, particularly in prevention or treatment of non-communicable diseases (NCDs), including cardiovascular, musculoskeletal, metabolic, gastric, and skin disorders, as well as cancers. Studies showed that T3 could prevent various NCDs, by suppressing 3-hydroxy-3-methylglutaryl-coenzyme A reductase (HMGCR) in the mevalonate pathway, inflammatory response, oxidative stress, and alternating hormones. The efficacy of T3 in preventing/treating these NCDs is similar or greater compared to tocopherol (TF). TF may lower the efficacy of T3 because the efficacy of the combination of TF and T3 was lower than T3 alone in some studies. Data investigating the effects of T3 on osteoporosis, arthritis, and peptic ulcers in human are limited. The positive outcomes of T3 treatment obtained from the preclinical studies warrant further validation from clinical trials.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "TOR2A"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "mitochondrial function",
+          "ATP synthesis",
+          "cell migration",
+          "tumor progression"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36869333",
+      "title": "Short term starvation potentiates the efficacy of chemotherapy in triple negative breast cancer via metabolic reprogramming",
+      "abstract": "Background\n\nChemotherapy (CT) is central to the treatment of triple negative breast cancer (TNBC), but drug toxicity and resistance place strong restrictions on treatment regimes. Fasting sensitizes cancer cells to a range of chemotherapeutic agents and also ameliorates CT-associated adverse effects. However, the molecular mechanism(s) by which fasting, or short-term starvation (STS), improves the efficacy of CT is poorly characterized.\n\nMethods\n\nThe differential responses of breast cancer or near normal cell lines to combined STS and CT were assessed by cellular viability and integrity assays (Hoechst and PI staining, MTT or H2DCFDA staining, immunofluorescence), metabolic profiling (Seahorse analysis, metabolomics), gene expression (quantitative real-time PCR) and iRNA-mediated silencing. The clinical significance of the in vitro data was evaluated by bioinformatical integration of transcriptomic data from patient data bases: The Cancer Genome Atlas (TCGA), European Genome-phenome Archive (EGA), Gene Expression Omnibus (GEO) and a TNBC cohort. We further examined the translatability of our findings in vivo by establishing a murine syngeneic orthotopic mammary tumor-bearing model.\n\nResults\n\nWe provide mechanistic insights into how preconditioning with STS enhances the susceptibility of breast cancer cells to CT. We showed that combined STS and CT enhanced cell death and increased reactive oxygen species (ROS) levels, in association with higher levels of DNA damage and decrea",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ATP synthase",
+          "oxidative phosphorylation",
+          "metabolic reprogramming",
+          "mitochondrial complex V"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33568351",
+      "title": "TGFbeta drives NK cell metabolic dysfunction in human metastatic breast cancer",
+      "abstract": "Background\n\nNatural killer (NK) cells provide important immune protection from cancer and are a key requirement for particular immunotherapies. There is accumulating evidence that NK cells become dysfunctional during cancer. Overcoming NK cell exhaustion would be an important step to allow them to function optimally in a range of NK cell therapies, including those that depend on autologos circulating NK cells. We have previously demonstrated that NK cells undergo a normal metabolic reprogramming in response to cytokine activation and that this is required for optimal function. The objective of this work was to investigate if cellular metabolism of circulating NK cells is dysregulated in patients with metastatic breast cancer and if so, to gain insights into potential mechanisms underpinning this. Such discoveries would provide important insights into how to unleash the full activity of NK cells for maximum immunotherapy output.\n\nMethods\n\nSingle-cell analysis, metabolic flux and confocal analysis of NK cells from patients with metastatic breast cancer and healthy controls\n\nResults\n\nIn addition to reduced interferon-gamma production and cytotoxicity, peripheral blood NK cells from patients had clear metabolic deficits including reduced glycolysis and oxidative phosphorylation. There were also distinct morphologically alterations in the mitochondria with increased mitochondrial fragmentation observed. Transforminggrowth factor-beta (TGFbeta) was identified as a key driver of thi",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ATP synthase",
+          "oxidative phosphorylation",
+          "metabolic reprogramming",
+          "mitochondrial complex V"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39584783",
+      "title": "Aberrant Energy Metabolism in Tumors and Potential Therapeutic Targets",
+      "abstract": "ABSTRACT\n\nEnergy metabolic reprogramming is frequently observed during tumor progression as tumor cells necessitate adequate energy production for rapid proliferation. Although current medical research shows promising prospects in studying the characteristics of tumor energy metabolism and developing anti-tumor drugs targeting energy metabolism, there is a lack of systematic compendiums and comprehensive reviews in this field. The objective of this study is to conduct a systematic review on the characteristics of tumor cells' energy metabolism, with a specific focus on comparing abnormalities between tumor and normal cells, as well as summarizing potential targets for tumor therapy. Additionally, this review also elucidates the aberrant mechanisms underlying four major energy metabolic pathways (glucose, lipid, glutamine, and mitochondria-dependent) during carcinogenesis and tumor progression. Through the utilization of graphical representations, we have identified anomalies in crucial energy metabolism pathways, encompassing transporter proteins (glucose transporter, CD36, and ASCT2), signaling molecules (Ras, AMPK, and PTEN), as well as transcription factors (Myc, HIF-1alpha, CREB-1, and p53). The key molecules responsible for aberrant energy metabolism in tumors may serve as potential targets for cancer therapy. Therefore, this review provides an overview of the distinct energy-generating pathways within tumor cells, laying the groundwork for developing innovative strategi",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ATP synthase",
+          "oxidative phosphorylation",
+          "metabolic reprogramming",
+          "mitochondrial complex V"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37482618",
+      "title": "A systems biology approach to pathogenesis of gastric cancer: gene network modeling and pathway analysis",
+      "abstract": "Background\n\nGastric cancer (GC) ranks among the most common malignancies worldwide. This study aimed to find critical genes/pathways in GC pathogenesis.\n\nMethods\n\nGene interactions were analyzed, and the protein-protein interaction network was drawn. Then enrichment analysis of the hub genes was performed and network cluster analysis and promoter analysis of the hub genes were done. Age/sex analysis was done on the identified genes.\n\nResults\n\nEleven hub genes in GC were identified in the current study (ATP5A1, ATP5B, ATP5D, MT-ATP8, COX7A2, COX6C, ND4, ND6, NDUFS3, RPL8, and RPS16), mostly involved in mitochondrial functions. There was no report on the ATP5D, ND6, NDUFS3, RPL8, and RPS16 in GC. Our results showed that the most affected processes in GC are the metabolic processes, and the oxidative phosphorylation pathway was considerably enriched which showed the significance of mitochondria in GC pathogenesis. Most of the affected pathways in GC were also involved in neurodegenerative diseases. Promoter analysis showed that negative regulation of signal transduction might play an important role in GC pathogenesis. In the analysis of the basal expression pattern of the selected genes whose basal expression presented a change during the age, we found that a change in age may be an indicator of changes in disease insurgence and/or progression at different ages.\n\nConclusions\n\nThese results might open up new insights into GC pathogenesis. The identified genes might be novel diagn",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ATP synthase",
+          "oxidative phosphorylation",
+          "metabolic reprogramming",
+          "mitochondrial complex V"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37298366",
+      "title": "Roles of Noncoding RNAs in Regulation of Mitochondrial Electron Transport Chain and Oxidative Phosphorylation",
+      "abstract": "The mitochondrial electron transport chain (ETC) plays an essential role in energy production by inducing oxidative phosphorylation (OXPHOS) to drive numerous biochemical processes in eukaryotic cells. Disorders of ETC and OXPHOS systems are associated with mitochondria- and metabolism-related diseases, including cancers; thus, a comprehensive understanding of the regulatory mechanisms of ETC and OXPHOS systems is required. Recent studies have indicated that noncoding RNAs (ncRNAs) play key roles in mitochondrial functions; in particular, some ncRNAs have been shown to modulate ETC and OXPHOS systems. In this review, we introduce the emerging roles of ncRNAs, including microRNAs (miRNAs), transfer-RNA-derived fragments (tRFs), long ncRNAs (lncRNAs), and circular RNAs (circRNAs), in the mitochondrial ETC and OXPHOS regulation.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ATP synthase",
+          "oxidative phosphorylation",
+          "metabolic reprogramming",
+          "mitochondrial complex V"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34140262",
+      "title": "Molecular processes mediating hyperhomocysteinemia-induced metabolic reprogramming, redox regulation and growth inhibition in endothelial cells",
+      "abstract": "Hyperhomocysteinemia (HHcy) is an established and potent independent risk factor for degenerative diseases, including cardiovascular disease (CVD), Alzheimer disease, type II diabetes mellitus, and chronic kidney disease. HHcy has been shown to inhibit proliferation and promote inflammatory responses in endothelial cells (EC), and impair endothelial function, a hallmark for vascular injury. However, metabolic processes and molecular mechanisms mediating HHcy-induced endothelial injury remains to be elucidated. This study examined the effects of HHcy on the expression of microRNA (miRNA) and mRNA in human aortic EC treated with a pathophysiologically relevant concentration of homocysteine (Hcy 500 muM). We performed a set of extensive bioinformatics analyses to identify HHcy-altered metabolic and molecular processes. The global functional implications and molecular network were determined by Gene Set Enrichment Analysis (GSEA) followed by Cytoscape analysis. We identified 244 significantly differentially expressed (SDE) mRNA, their relevant functional pathways, and 45 SDE miRNA. HHcy-altered SDE inversely correlated miRNA-mRNA pairs (45 induced/14 reduced mRNA) were discovered and applied to network construction using an experimentally verified database. We established a hypothetical model to describe the biochemical and molecular network with these specified miRNA/mRNA axes, finding: 1) HHcy causes metabolic reprogramming by increasing glucose uptake and oxidation, by glycoge",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ATP5F1B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ATP synthase",
+          "oxidative phosphorylation",
+          "metabolic reprogramming",
+          "mitochondrial complex V"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "41981793",
+      "title": "Damnacanthal Suppresses Breast Cancer Cells by Inducing Apoptosis and Cell Cycle Arrest via NF-kB Signaling.",
+      "abstract": "Breast cancer is the most common cancer diagnosed and the leading cause of death for women worldwide. Noni (Morinda citrifolia L.) contains an anthraquinone called damnacanthal (3-hydroxy-1-methoxy-anthraquinone-2-aldehyde), which is known to inhibit the growth of many types of cancer cells. The purpose of this study is to examine the anticancer effects of damnacanthal on cell proliferation, apoptosis, and cell cycle in breast cancer cells and its underlying signaling pathway, including nuclear factor kappa B (NF-kB), epidermal growth factor receptors (EGFR), and PI3K/AKT/PTEN. Damnacanthal reduced cell viability in both normal and triple-negative breast cancer cell lines, MCF-7 and MDA-MB-231, respectively. In MCF-7 cells, damnacanthal induced late apoptosis and increased cell cycle arrest in the G0/G1 and S phase, decreased RELA gene expression, and enhanced TNF-alpha gene expression. However, it had no effect on the protein expression of PI3K/AKT. Damnacanthal exerted anticancer activity on MCF-7 cell lines via blocking NF-kB (subunit p65) expression at mRNA levels in the PI3K/AKT-independent manner. These findings highlight the potential benefits of damnacanthal as a promising NF-kB inhibitor for cancer prevention or treatment against breast carcinoma.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "NF-kappa B signaling pathway",
+          "NF-kB",
+          "nuclear factor kappa B"
+        ],
+        "query_intent": "deterministic_pathway"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "pathway"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "NF-kappa B signaling pathway",
+        "NF-kB",
+        "nuclear factor kappa B"
+      ],
+      "query_intent": "deterministic_pathway"
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "TNF signaling pathway",
+        "TNF-alpha signaling",
+        "TNFA signaling via NFKB"
+      ],
+      "query_intent": "deterministic_pathway"
+    },
+    {
+      "genes": [
+        "TOR2A"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ATP5F1B"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "TOR2A"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "mitochondrial function",
+        "ATP synthesis",
+        "cell migration",
+        "tumor progression"
+      ]
+    },
+    {
+      "genes": [
+        "ATP5F1B"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "ATP synthase",
+        "oxidative phosphorylation",
+        "metabolic reprogramming",
+        "mitochondrial complex V"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "NF-kB signaling",
+        "NFkB pathway",
+        "nuclear factor kappa B",
+        "inflammatory response",
+        "tumor microenvironment"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "TNFa signaling",
+        "TNF-alpha pathway",
+        "tumor necrosis factor",
+        "inflammation",
+        "immune activation"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "endothelial cells",
+        "macrophages",
+        "stromal cells",
+        "tumor microenvironment",
+        "immune infiltration"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "stromal and T cell hybrid",
+        "cell-cell interaction",
+        "spatial transcriptomics",
+        "tumor microenvironment composition"
+      ]
+    },
+    {
+      "genes": [
+        "TOR2A",
+        "ATP5F1B"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "NF-kB",
+        "TNFa",
+        "mitochondrial signaling",
+        "inflammatory crosstalk",
+        "spatial transcriptomics"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "spatial transcriptomics",
+        "cell-cell communication",
+        "tumor microenvironment",
+        "NF-kB",
+        "TNFa"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "ATP5F1B",
+      "TOR2A"
+    ],
+    "genes_matched_by": {
+      "ATP5F1B": "biomcp_tag_only",
+      "TOR2A": "biomcp_tag_only"
+    },
+    "pathways_covered": [
+      "TNFa",
+      "NFkB"
+    ],
+    "pathways_matched_by": {
+      "TNFa": "tumor necrosis factor",
+      "NFkB": "nf-kappab"
+    },
+    "celltypes_covered": [
+      "Endothelial",
+      "Macrophages 2",
+      "Stromal"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 100.0,
+    "celltypes_coverage_pct": 75.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Stromal & T Cell Hybrid"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 79,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 1.0
+    },
+    {
+      "iteration": "final",
+      "papers": 30,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 1.0
+    }
+  ],
+  "coverage_sufficient": true,
+  "recommended_actions": [],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

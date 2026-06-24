@@ -1,0 +1,5 @@
+variant,condition,mean,sd,n,se
+D_guide_compliant_skill,Structured SKILLs (Guide-Compliant),1.780000,1.004139,300,0.057974
+C_structured_skill,Structured SKILLs (Basic),2.033333,0.991041,300,0.057218
+B_unstructured_prose,Unstructured Prose,2.173333,0.916199,300,0.052897
+A_no_skill,No Skills,3.893333,1.208369,300,0.069765

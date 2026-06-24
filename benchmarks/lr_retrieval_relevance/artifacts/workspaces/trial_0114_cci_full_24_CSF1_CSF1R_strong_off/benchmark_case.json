@@ -1,0 +1,73 @@
+{
+  "case_id": "cci_full_24_CSF1_CSF1R",
+  "category": "high_morans_known",
+  "lr_pair": "CSF1-CSF1R",
+  "genes": [
+    "CSF1",
+    "CSF1R"
+  ],
+  "pathways": [],
+  "celltypes": [
+    "Endothelial",
+    "Macrophages 1",
+    "Macrophages 2",
+    "Stromal"
+  ],
+  "disease": "breast cancer",
+  "search_context": {
+    "genes": [
+      "CSF1",
+      "CSF1R"
+    ],
+    "pathways": [],
+    "celltypes": [
+      "Endothelial",
+      "Macrophages 1",
+      "Macrophages 2",
+      "Stromal"
+    ],
+    "disease": "breast cancer",
+    "lr_pair": "CSF1-CSF1R",
+    "category": "high_morans_known"
+  },
+  "raw_case": {
+    "case_id": "cci_full_24_CSF1_CSF1R",
+    "benchmark_type": "cci_interpretation_v2",
+    "lr_pair": "CSF1-CSF1R",
+    "category": "high_morans_known",
+    "input_bundle": {
+      "ligand": "CSF1",
+      "receptor": "CSF1R",
+      "interaction": "CSF1^CSF1R",
+      "morans_r": 0.157917,
+      "morans_pval": 0.0,
+      "ligand_means": 0.4691,
+      "ligand_props": 0.5776,
+      "receptor_means": 0.8839,
+      "receptor_props": 0.7857,
+      "factor1": 1.2037,
+      "factor2": 1.0866,
+      "factor3": 0.2241,
+      "pathway_associations": [],
+      "disease_associations": [
+        "Mammary Neoplasms, Human",
+        "Breast Carcinoma",
+        "Malignant neoplasm of breast",
+        "Mammary Neoplasms"
+      ],
+      "ligand_cell_types": [
+        "Macrophages 1",
+        "Stromal"
+      ],
+      "receptor_cell_types": [
+        "Endothelial",
+        "Macrophages 2",
+        "Stromal"
+      ],
+      "mean_interest": -0.04205,
+      "pval_interest": 2.1742860512041773e-08,
+      "pval_interest_adj": 8.043813059623147e-08,
+      "tissue_context": "Breast cancer Visium spatial transcriptomics"
+    }
+  }
+}

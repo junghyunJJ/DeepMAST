@@ -1,0 +1,16 @@
+variant,condition,dimension,mean,sd,n,se
+D_guide_compliant_skill,Structured SKILLs,Composite,3.893667,0.459740,150,0.037538
+D_guide_compliant_skill,Structured SKILLs,Faithfulness,3.496667,0.724619,300,0.041836
+D_guide_compliant_skill,Structured SKILLs,Uncertainty Handling,4.506667,0.513974,300,0.029674
+D_guide_compliant_skill,Structured SKILLs,Spatial Calibration,4.936667,0.243968,300,0.014086
+D_guide_compliant_skill,Structured SKILLs,Overclaiming,3.523333,0.724250,300,0.041815
+B_unstructured_prose,Unstructured Prose,Composite,3.585167,0.347849,150,0.028402
+B_unstructured_prose,Unstructured Prose,Faithfulness,3.090000,0.602586,300,0.034790
+B_unstructured_prose,Unstructured Prose,Uncertainty Handling,4.263333,0.484532,300,0.027974
+B_unstructured_prose,Unstructured Prose,Spatial Calibration,4.963333,0.205254,300,0.011850
+B_unstructured_prose,Unstructured Prose,Overclaiming,3.113333,0.612432,300,0.035359
+A_no_skill,No Skills,Composite,3.140000,0.277634,150,0.022669
+A_no_skill,No Skills,Faithfulness,2.793333,0.514624,300,0.029712
+A_no_skill,No Skills,Uncertainty Handling,3.910000,0.434968,300,0.025113
+A_no_skill,No Skills,Spatial Calibration,4.736667,0.463362,300,0.026752
+A_no_skill,No Skills,Overclaiming,2.743333,0.459885,300,0.026551

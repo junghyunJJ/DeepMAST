@@ -1,0 +1,1043 @@
+{
+  "schema_version": "deep_interpreter_literature_handoff_v1",
+  "policy": {
+    "included_buckets": [
+      "direct_lr_evidence",
+      "receptor_pathway_context_evidence"
+    ],
+    "excluded_buckets": [
+      "disease_only_background",
+      "rejected_weak_evidence"
+    ],
+    "cap": 40
+  },
+  "source": {
+    "total_papers": 72,
+    "unique_papers": 72,
+    "duplicates_dropped": 0,
+    "raw_papers_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0068_cci_full_08_JAG1_VASN_strong_on/papers_raw.json",
+    "citation_candidates_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0068_cci_full_08_JAG1_VASN_strong_on/citation_candidates.json"
+  },
+  "counts": {
+    "direct_lr_evidence": 0,
+    "receptor_pathway_context_evidence": 18,
+    "disease_only_background": 17,
+    "rejected_weak_evidence": 37
+  },
+  "papers": [
+    {
+      "pmid": "36539520",
+      "title": "JAG1 is associated with the prognosis and metastasis in breast cancer",
+      "abstract": "Jagged canonical Notch ligand 1 (JAG1) regulates the progression of many cancers by the Notch signaling pathway, but its role in breast cancer (BC) remains unclear. In this research, JAG1 protein expression in BC tissues was detected by immunohistochemistry. The association between JAG1 and clinical significance was analyzed. The effect of JAG1 on malignant behaviors of BC cells was demonstrated by in vitro experiments. JAG1 expression in BC tissues was higher than that in para-carcinoma tissues. High JAG1 expression was significantly linked to advanced lymph node metastasis, distant metastasis, and the TNM stage. JAG1 was an independent prognostic factor for BC patients. JAG1 knockdown inhibited the proliferation, motility, migration, and invasion of BC cells, and weakened adhesion and penetration abilities to the blood-brain barrier, whereas JAG1 overexpression had the opposite effects. JAG1 has the potential to be a prognostic marker and therapeutic target for BC patients.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "JAG1-VASN": {
+          "ligand": "JAG1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "32111499",
+      "title": "Highly Expressed DLL4 and JAG1: Their Role in Incidence of Breast Cancer Metastasis.",
+      "abstract": "BACKGROUND: The role of Notch signaling dysregulation in causing metastatic breast cancer is not yet elucidated, therefore, this study aimed to investigate the expression of DLL4 and JAG1 in metastatic breast cancer. Moreover, we examined the possible association between clinicopathological features and studied parameters. DESIGN AND METHODS: A total of 90 patients with invasive ductal breast carcinomas (52 non-metastatic and 38 metastatic) were enrolled in the current study. Furthermore, there were 42 patients with benign breast diseases. The mRNA and protein expression of DLL4 and JAG1 were analyzed by RT-PCR and ELISA, respectively in breast cell lysates. RESULTS: The mRNA and protein expression of DLL4 and JAG1 were obviously higher in patients with breast cancer compared to patients with benign breast diseases and in metastatic versus non-metastatic breast cancer. A significant positive correlation was declared between DLL4 and JAG1 at both mRNA and protein levels in metastatic and localized breast cancer patients. Highly expressed mRNA and protein of DLL4 and JAG1 were associated with late tumor stages; moreover, upregulation of mRNA and protein of JAG1 was correlated with poorly differentiated tumors. CONCLUSION: Our data emphasize that overexpression of DLL4 and JAG1 could predict the development of distant metastasis in breast cancer patients.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "JAG1-VASN": {
+          "ligand": "JAG1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "22618231",
+      "title": "Regulatory interplay between miR-21, JAG1 and 17beta-estradiol (E2) in breast cancer cells.",
+      "abstract": "Overexpression of the oncomir miR-21 is associated with many cancers, including breast cancer. Elevated levels of Jagged-1 (JAG1), a predicted miR-21 target, are implicated in estrogen receptor negative (ER-) breast cancer. We demonstrate (by ablation of the miR-21 binding site in the JAG1 3'UTR) that miR-21 directly targets and represses JAG1 levels in MCF-7 (ER+) breast cancer cells. MiR-21 targeting of JAG1 in MDA-MB-231 (ER-) breast cancer cells is dependent on miR-21 dosage (levels). In both cell lines, miR-21 and JAG1 expression levels were negatively correlated due to their regulatory relationship. In addition, 17beta-estradiol (E2) increases JAG1 levels by limiting (via downregulating miR-21 levels) the repressive effects of miR-21 on the JAG1 3'UTR. Our results reveal a regulatory interplay between miR-21, JAG1 and E2 that is important for advancing understanding of how the oncogenic potential of miR-21 and JAG1 manifests in different sub-types of breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "JAG1-VASN": {
+          "ligand": "JAG1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "21199807",
+      "title": "Plasminogen activator uPA is a direct transcriptional target of the JAG1-Notch receptor signaling pathway in breast cancer.",
+      "abstract": "Aberrant activation of the Notch receptor signaling pathway and overexpression of the Notch ligand JAG1 are associated with poor outcome in breast cancer. The plasminogen activator system, which includes urokinase-type plasminogen activator (uPA), has been validated as a marker of recurrence, high metastasis risk and death in breast malignancy. By using microarray profiling of breast cancer cell lines that had undergone siRNA-mediated abrogation of Notch signaling we uncovered a link between activated Notch signaling and uPA expression. An association between elevated expression of the Notch ligand JAG1, uPA, and the basal-like breast cancer subtype was confirmed in breast cancer cell lines. The association between JAG1 and uPA expression persisted in a survey of primary carcinomas of the breast. We found that Notch knockdown reduced transcription of uPA and phenocopied uPA knockdown in breast cancer cells. Through mutational analysis we identified a CBF-1 binding site in the uPA promoter that is required for direct transcriptional regulation by Notch. These data suggest that JAG1-induced Notch activation results in breast cancer progression through upregulation of the plasminogen activator system, directly linking these 2 important pathways of poor prognosis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "JAG1-VASN": {
+          "ligand": "JAG1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "19915977",
+      "title": "Cyclin D1 is a direct target of JAG1-mediated Notch signaling in breast cancer.",
+      "abstract": "The Notch ligand, JAG1 is associated with breast cancer recurrence. Herein, we report on a genomics approach to elucidate mechanisms downstream of JAG1 that promote breast cancer growth. In a survey of 46 breast cancer cell lines, we found that triple negative (TN; basal and mesenchymal ER-, PR-, and Her2-negative) lines express JAG1 at significantly higher levels than do HER2(+) or luminal (ER(+)) Her2(-) cell lines. In contrast to the luminal lines tested (T47D and MCF7), TN breast cancer cell lines (HCC1143 and MDA MB231) display high-level JAG1 expression and growth inhibition with RNA interference-induced JAG1 down-regulation. We used microarray profiling of TN tumor cells transfected with JAG1 siRNA to identify JAG1-regulated genes (P <or= 0.005; fold change >or=1.5). Among JAG1-regulated genes identified, cyclin D1 was found to be a direct target of NOTCH1 and NOTCH3. We show that JAG1 down-regulation reduces direct binding of Notch to the cyclin D1 promoter, reduced cyclin D1 expression and inhibition of cell cycle progression through the cyclin D1-dependant G1/S checkpoint. Furthermore, we show that cyclin D1 and JAG1 expression correlate in TN breast cancer expression datasets. These data suggest a model whereby JAG1 promotes cyclin D1-mediated proliferation of TN breast cancers.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "JAG1-VASN": {
+          "ligand": "JAG1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "17990101",
+      "title": "JAG1 expression is associated with a basal phenotype and recurrence in lymph node-negative breast cancer.",
+      "abstract": "Expression of the JAG1 Notch ligand has previously been shown to correlate with poor overall survival in women with advanced breast cancer. We undertook to test whether expression of JAG1 is associated with reduced disease free survival (DFS) in 887 samples from a prospectively accrued LNN cohort with a median follow-up greater than 8 years. Moderate to high JAG1 mRNA expression was associated with reduced DFS in univariate analysis (hazard ratio of 1.58; 95% confidence interval, 1.03-2.40; P = 0.034) and correlated with large tumor size, ER and PgR negativity, high tumor grade, and p53 antibody reactivity. Although elevated risk of reduced DFS in patients with high JAG1 mRNA did not persist with adjustment for other prognostic factors, it did in combination with HER2. JAG1 mRNA was positively associated with expression of basal breast cancer markers, however, in contrast to the finding that basal gene expression is most strongly associated with reduced DFS in the first 36 months of follow-up, JAG1 mRNA expression was associated with reduced DFS through the full follow-up period. Also, tumors expressing high levels of both mRNA and protein showed reduced DFS as compared to all other groups in univariate analysis (hazard ratio of 1.73; 95% confidence interval, 1.09-2.74; P = 0.020). Thus, JAG1 expression is associated with poor DFS in LNN breast cancer. As JAG1 is a target of several oncogenic signaling pathways, and is a ligand for Notch, these data provide novel insights int",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "JAG1-VASN": {
+          "ligand": "JAG1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "17974275",
+      "title": "[Notch signaling in human breast cancer].",
+      "abstract": "OBJECTIVE: To explore the role of Notch signaling in human breast cancers, the expression of Notch1 and its ligand JAG1 in human breast cancers and their relationships with clinical stages of breast cancers were analyzed. METHODS: RT-PCR was used to detect the expression of Notch1 and JAG1 in 62 breast cancer specimens and 22 normal breast tissues at the margin of tumor sections, and the statistical difference of expression rates and standardized coefficient between the two groups were analyzed. To compare the expression intensity of Notch1 and JAG1 at different development stages of the illness and at different stages with or without axillary node metastasis. RESULTS: The expression rate and standardized coefficient of Notch1 in human breast cancers were significantly higher than those of normal breast tissues at the margin of tumor sections. The expression rate of JAG1 in human breast cancers was 15%, while JAG1 was not detected in normal breast tissues at the margin of tumor sections. The standardized coefficient of Notch1 in cases with axillary node metastasis was significantly higher than that in cases without axillary node metastasis. The standardized coefficient of Notch1 at stage I was significantly lower than that at stage II, and stage II was significantly higher than stage III. There was no statistically significant difference between stage I and stage III. CONCLUSION: Notch1 and JAG1 are highly expressed in human breast cancers, indicating that the aberrant expres",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "JAG1-VASN": {
+          "ligand": "JAG1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "30252131",
+      "title": "Sialylation of vasorin by ST3Gal1 facilitates TGF-beta1-mediated tumor angiogenesis and progression",
+      "abstract": "ST3Gal1 is a key sialyltransferase which adds alpha2,3-linked sialic acid to substrates and generates core 1 O-glycan structure. Upregulation of ST3Gal1 has been associated with worse prognosis of breast cancer patients. However, the protein substrates of ST3Gal1 implicated in tumor progression remain elusive. In our study, we demonstrated that ST3GAL1-silencing significantly reduced tumor growth along with a notable decrease in vascularity of MCF7 xenograft tumors. We identified vasorin (VASN) which was shown to bind TGF-beta1, as a potential candidate that links ST3Gal1 to angiogenesis. LC-MS/MS analysis of VASN secreted from MCF7, revealed that more than 80% of its O-glycans are sialyl-3T and disialyl-T. ST3GAL1-silencing or desialylation of VASN by neuraminidase enhanced its binding to TGF-beta1 by 2- to 3-fold and thereby dampening TGF-beta1 signaling and angiogenesis, as indicated by impaired tube formation of HUVECs, suppressed angiogenesis gene expression and reduced activation of Smad2 and Smad3 in HUVEC cells. Examination of 114 fresh primary breast cancer and their adjacent normal tissues showed that the expression levels of ST3Gal1 and TGFB1 were high in tumor part and the expression of two genes was positively correlated. Kaplan Meier survival analysis showed a significantly shorter relapse-free survival for those with lower expression VASN, notably, the combination of low VASN with high ST3GAL1 yielded even higher risk of recurrence (p = 0.025, HR = 2.967, 95% C",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "VASN"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "JAG1-VASN": {
+          "ligand": "",
+          "receptor": "VASN",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "30888555",
+      "title": "Identification of key genes relevant to the prognosis of ER-positive and ER-negative breast cancer based on a prognostic prediction system.",
+      "abstract": "Few prognostic indicators with differential expression have been reported among the differing ER statuses. We aimed to screen important breast cancer prognostic genes related to ER status and to construct an efficient prognostic prediction system. mRNA expression profiles were downloaded from TCGA and GSE70947 dataset. Two hundred seventy-one overlapping differentially expressed genes (DEGs) between the ER- and ER+ breast cancer samples were identified. Among the 271 DEGs, 109 prognostically relevant mRNAs were screened. mRNAs such as RASEF, ITM2C, CPEB2, ESR1, ANXA9, and VASN correlated strongly with breast cancer prognosis. Three modules, which contained 28, 9 and 8 enriched DEGs, were obtained from the network, and the DEGs in these modules were enriched in response to hormone stimulus, epithelial cell development, and host cell entry. Using bayes discriminant analysis, 48 signature genes were screened. We constructed a prognostic prediction system using the 48 signature genes and validated this system as relatively accurate and reliable. The DEGs might be closely associated with the prognosis in patients with breast cancer. We validated the effectiveness of our prognostic prediction system by GEO database. Therefore, this system might be a useful tool for preliminary screening and validation of potential prognosis indicators for ER+ breast cancer derived from mechanistic research.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "VASN"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "JAG1-VASN": {
+          "ligand": "",
+          "receptor": "VASN",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "26282201",
+      "title": "A network-based approach to identify disease-associated gene modules through integrating DNA methylation and gene expression.",
+      "abstract": "Formation and progression of complex diseases are generally the joint effect of genetic and epigenetic disorders, thus an integrative analysis of epigenetic and genetic data is essential for understanding mechanism of the diseases. In this study, we integrate Illuminate 450k DNA methylation and gene expression data to calculate the weights of gene network using Principal Component Analysis (PCA) and Canonical Correlation Analysis (CCA). The approach considers all methylation values of CpG sites in a gene, rather than averaging them which was used in other studies ignoring the variability of the methylation sites. Through comparing topological features of control network with those of case network, including global and local features, candidate disease-associated genes and gene modules are identified. We apply the approach to real data, breast invasive carcinoma (BRCA). It successfully identifies susceptibility breast cancer-related genes, such as TP53, BRCA1, EP300, CDK2, MCM7 and so forth, within which most are previously known to breast cancer. Also, GO and pathway enrichment analysis indicate that these genes enrich in cell apoptosis and regulation of cell death which are cancer-related biological processes. Importantly, through analyzing the functions and comparing expression and methylation values of these genes between cases and controls, we find some genes, such as VASN, SNRPD3, and gene modules, targeted by POLR2C, CHMP1B and TAF9, which might be novel breast cancer-r",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "VASN"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "JAG1",
+          "receptor": "VASN"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "JAG1-VASN": {
+          "ligand": "",
+          "receptor": "VASN",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "35268340",
+      "title": "The Role of Extracellular Matrix Proteins in Breast Cancer",
+      "abstract": "The extracellular matrix is a structure composed of many molecules, including fibrillar (types I, II, III, V, XI, XXIV, XXVII) and non-fibrillar collagens (mainly basement membrane collagens: types IV, VIII, X), non-collagenous glycoproteins (elastin, laminin, fibronectin, thrombospondin, tenascin, osteopontin, osteonectin, entactin, periostin) embedded in a gel of negatively charged water-retaining glycosaminoglycans (GAGs) such as non-sulfated hyaluronic acid (HA) and sulfated GAGs which are linked to a core protein to form proteoglycans (PGs). This highly dynamic molecular network provides critical biochemical and biomechanical cues that mediate the cell-cell and cell-matrix interactions, influence cell growth, migration and differentiation and serve as a reservoir of cytokines and growth factors' action. The breakdown of normal ECM and its replacement with tumor ECM modulate the tumor microenvironment (TME) composition and is an essential part of tumorigenesis and metastasis, acting as key driver for malignant progression. Abnormal ECM also deregulate behavior of stromal cells as well as facilitating tumor-associated angiogenesis and inflammation. Thus, the tumor matrix modulates each of the classically defined hallmarks of cancer promoting the growth, survival and invasion of the cancer. Moreover, various ECM-derived components modulate the immune response affecting T cells, tumor-associated macrophages (TAM), dendritic cells and cancer-associated fibroblasts (CAF). This",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vascular remodeling",
+          "angiogenesis",
+          "extracellular matrix organization",
+          "stromal interaction"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "38102637",
+      "title": "Exploring the interaction between extracellular matrix components in a 3D organoid disease model to replicate the pathophysiology of breast cancer",
+      "abstract": "In vitro models are necessary to study the pathophysiology of the disease and the development of effective, tailored treatment methods owing to the complexity and heterogeneity of breast cancer and the large population affected by it. The cellular connections and tumor microenvironments observed in vivo are often not recapitulated in conventional two-dimensional (2D) cell cultures. Therefore, developing 3D in vitro models that mimic the complex architecture and physiological circumstances of breast tumors is crucial for advancing our understanding of the illness. A 3D scaffold-free in vitro disease model mimics breast cancer pathophysiology by allowing cells to self-assemble/pattern into 3D structures, in contrast with other 3D models that rely on artificial scaffolds. It is possible that this model, whether applied to breast tumors using patient-derived primary cells (fibroblasts, endothelial cells, and cancer cells), can accurately replicate the observed heterogeneity. The complicated interactions between different cell types are modelled by integrating critical components of the tumor microenvironment, such as the extracellular matrix, vascular endothelial cells, and tumor growth factors. Tissue interactions, immune cell infiltration, and the effects of the milieu on drug resistance can be studied using this scaffold-free 3D model. The scaffold-free 3D in vitro disease model for mimicking tumor pathophysiology in breast cancer is a useful tool for studying the molecular ba",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vascular remodeling",
+          "angiogenesis",
+          "extracellular matrix organization",
+          "stromal interaction"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "36118583",
+      "title": "Fibroblast-derived CXCL12 increases vascular permeability in a 3-D microfluidic model independent of extracellular matrix contractility",
+      "abstract": "Cancer-associated fibroblasts (CAFs) play an active role in remodeling the local tumor stroma to support tumor initiation, growth, invasion, metastasis, and therapeutic resistance. The CAF-secreted chemokine, CXCL12, has been directly implicated in the tumorigenic progression of carcinomas, including breast cancer. Using a 3-D in vitro microfluidic-based microtissue model, we demonstrate that stromal CXCL12 secreted by CAFs has a potent effect on increasing the vascular permeability of local blood microvessel analogues through paracrine signaling. Moreover, genetic deletion of fibroblast-specific CXCL12 significantly reduced vessel permeability compared to CXCL12 secreting CAFs within the recapitulated tumor microenvironment (TME). We suspected that fibroblast-mediated extracellular matrix (ECM) remodeling and contraction indirectly accounted for this change in vessel permeability. To this end, we investigated the autocrine effects of CXCL12 on fibroblast contractility and determined that antagonistic blocking of CXCL12 did not have a substantial effect on ECM contraction. Our findings indicate that fibroblast-secreted CXCL12 has a significant role in promoting a leakier endothelium hospitable to angiogenesis and tumor cell intravasation; however, autocrine CXCL12 is not the primary upstream trigger of CAF contractility.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vascular remodeling",
+          "angiogenesis",
+          "extracellular matrix organization",
+          "stromal interaction"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "33791288",
+      "title": "Engineering a Vascularized 3D Hybrid System to Model Tumor-Stroma Interactions in Breast Cancer",
+      "abstract": "The stromal microenvironment of breast tumors, namely the vasculature, has a key role in tumor development and metastatic spread. Tumor angiogenesis is a coordinated process, requiring the cooperation of cancer cells, stromal cells, such as fibroblasts and endothelial cells, secreted factors and the extracellular matrix (ECM). In vitro models capable of capturing such complex environment are still scarce, but are pivotal to improve success rates in drug development and screening. To address this challenge, we developed a hybrid alginate-based 3D system, combining hydrogel-embedded mammary epithelial cells (parenchymal compartment) with a porous scaffold co-seeded with fibroblasts and endothelial cells (vascularized stromal compartment). For the stromal compartment, we used porous alginate scaffolds produced by freeze-drying with particle leaching, a simple, low-cost and non-toxic approach that provided storable ready-to-use scaffolds fitting the wells of standard 96-well plates. Co-seeded endothelial cells and fibroblasts were able to adhere to the surface, spread and organize into tubular-like structures. For the parenchymal compartment, a designed alginate gel precursor solution load with mammary epithelial cells was added to the pores of pre-vascularized scaffolds, forming a hydrogel in situ by ionic crosslinking. The 3D hybrid system supports epithelial morphogenesis in organoids/tumoroids and endothelial tubulogenesis, allowing heterotypic cell-cell and cell-ECM interact",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "vascular remodeling",
+          "angiogenesis",
+          "extracellular matrix organization",
+          "stromal interaction"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial",
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "37108371",
+      "title": "Extracellular Vesicles in Breast Cancer: From Biology and Function to Clinical Diagnosis and Therapeutic Management",
+      "abstract": "Breast cancer (BC) is the first worldwide most frequent cancer in both sexes and the most commonly diagnosed in females. Although BC mortality has been thoroughly declining over the past decades, there are still considerable differences between women diagnosed with early BC and when metastatic BC is diagnosed. BC treatment choice is widely dependent on precise histological and molecular characterization. However, recurrence or distant metastasis still occurs even with the most recent efficient therapies. Thus, a better understanding of the different factors underlying tumor escape is mainly mandatory. Among the leading candidates is the continuous interplay between tumor cells and their microenvironment, where extracellular vesicles play a significant role. Among extracellular vesicles, smaller ones, also called exosomes, can carry biomolecules, such as lipids, proteins, and nucleic acids, and generate signal transmission through an intercellular transfer of their content. This mechanism allows tumor cells to recruit and modify the adjacent and systemic microenvironment to support further invasion and dissemination. By reciprocity, stromal cells can also use exosomes to profoundly modify tumor cell behavior. This review intends to cover the most recent literature on the role of extracellular vesicle production in normal and cancerous breast tissues. Specific attention is paid to the use of extracellular vesicles for early BC diagnosis, follow-up, and prognosis because exosome",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "ductal carcinoma in situ",
+          "preinvasive",
+          "myoepithelial layer",
+          "perivascular niche"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "35202089",
+      "title": "Non-Coding RNAs in the Crosstalk between Breast Cancer Cells and Tumor-Associated Macrophages",
+      "abstract": "Non-coding RNAs (ncRNAs) play a pivotal role in regulating the tumor microenvironment (TME) by controlling gene expression at multiple levels. In tumors, ncRNAs can mediate the crosstalk between cancer cells and other cells in the TME, such as immune cells, stromal cells, and endothelial cells, influencing tumor development and progression. Tumor-associated macrophages (TAMs) are among the most abundant inflammatory cells infiltrating solid cancers that promote tumorigenesis, and their infiltration correlates with a poor prognosis in many tumors. Cancer cells produce different ncRNAs that orchestrate TAM recruitment and polarization toward a tumor-promoting phenotype. Tumor-reprogrammed macrophages shape the TME by promoting angiogenesis and tissue remodeling, and suppressing the anti-tumor activity of adaptive immune cells. TAMs can also produce ncRNA molecules that boost cancer cell proliferation and direct their phenotype and metabolic changes facilitating cancer progression and metastasis. This review will focus on the crosstalk between cancer cells and TAMs mediated by microRNAs and long non-coding RNAs during breast cancer (BC) initiation and progression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "endothelial cell",
+          "fibroblast",
+          "tumor-associated macrophage",
+          "immune infiltration"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial",
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "35619312",
+      "title": "Role of Biological Mediators of Tumor-Associated Macrophages in Breast Cancer Progression.",
+      "abstract": "BACKGROUND: Breast cancer (BRCA) has become the most common cancer worldwide. The tumor microenvironment (TME) in the breast exerts a crucial role in promoting BRCA initiation, progression, and metastasis. Tumor-associated macrophages (TAMs) are the primary component of tumor-infiltrating immune cells through biological mediators that convert TME into malignant tumors. Combinations of these biological mediators can promote tumor growth, metastasis, angiogenesis, and immune suppression and limit the anti-tumor activity of conventional chemotherapy and radiotherapy. OBJECTIVES: The present study aimed to highlight the functions of several biological mediators in the breast thatgenerate TME into malignant tumors. Furthermore, this review offers a rationale for TAM-targeted therapy as a novel treatment strategy for BRCA. RESULTS: This review emphasizes TAM-associated biological mediators of TME, viz., cancer- associated fibroblasts, endothelial cells, adipocytes, tumor-derived exosomes, extracellular matrix, and other immune cells, which facilitate TME in malignant tumors. Evidence suggests that the increased infiltration of TAMs and elevated expression of TAMrelated genes are associated with a poor prognosis of BRCA. Based on these findings, TAM-targeted therapeutic strategies, including inhibitors of CSF-1/CSF-1R, CCL2/CCR2, CCL5-CCR5, bisphosphonate, nanoparticle, and exosomal-targeted delivery have been developed, and are currently being employed in intervention trials. CONCL",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "endothelial cell",
+          "fibroblast",
+          "tumor-associated macrophage",
+          "immune infiltration"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "37391533",
+      "title": "Deciphering Stromal Changes between Metastatic and Non-metastatic Canine Mammary Carcinomas",
+      "abstract": "Cancer-associated stroma (CAS) is widely recognized to influence development and progression of epithelial tumours including breast cancer. Canine mammary tumours (CMTs) such as simple canine mammary carcinomas represent valuable models for human breast cancer also with respect to stromal reprogramming. However, it remains unclear whether and how CAS changes in metastatic tumours compared to non-metastatic ones. To characterize stromal changes between metastatic and non-metastatic CMTs and identify potential drivers of tumour progression, we analysed CAS and matched normal stroma from 16 non-metastatic and 15 metastatic CMTs by RNA-sequencing of microdissected FFPE tissue. We identified 1438 differentially regulated genes between CAS and normal stroma, supporting previous results demonstrating stromal reprogramming in CMTs to be comparable with CAS in human breast cancer and validating deregulation of pathways and genes associated with CAS. Using primary human fibroblasts activated by treatment with TGFbeta, we demonstrate some of the strongest expression changes to be conserved in fibroblasts across species. Furthermore, we identify 132 differentially expressed genes between CAS from metastatic and non-metastatic tumours, with strong changes in pathways including chemotaxis, regulation of apoptosis, immune response and TGFbeta signalling and validate deregulation of several targets using RT-qPCR. Finally, we identify specific upregulation of COL6A5, F5, GALNT3, CIT and MMP11",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ACTA2",
+          "myofibroblast",
+          "pericyte",
+          "vascular support",
+          "tumor stroma"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 9,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "JAG1-VASN": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    }
+  ],
+  "search_method": "search_literature_dynamic",
+  "coverage": {
+    "genes_covered": [
+      "JAG1",
+      "VASN"
+    ],
+    "genes_matched_by": {
+      "JAG1": "biomcp_tag_only",
+      "VASN": "biomcp_tag_only"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Endothelial",
+      "Macrophages 2",
+      "Stromal"
+    ],
+    "total_papers": 72,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 42.857142857142854,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "DCIS 2",
+      "Myoepi ACTA2+",
+      "Perivascular-Like",
+      "Stromal & T Cell Hybrid"
+    ]
+  }
+}

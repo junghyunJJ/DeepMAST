@@ -1,0 +1,676 @@
+{
+  "schema_version": "deep_interpreter_literature_handoff_v1",
+  "policy": {
+    "included_buckets": [
+      "direct_lr_evidence",
+      "receptor_pathway_context_evidence"
+    ],
+    "excluded_buckets": [
+      "disease_only_background",
+      "rejected_weak_evidence"
+    ],
+    "cap": 40
+  },
+  "source": {
+    "total_papers": 30,
+    "unique_papers": 30,
+    "duplicates_dropped": 0,
+    "raw_papers_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0022_cci_full_22_BAMBI_ACVR2B_weak_on/papers_raw.json",
+    "citation_candidates_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0022_cci_full_22_BAMBI_ACVR2B_weak_on/citation_candidates.json"
+  },
+  "counts": {
+    "direct_lr_evidence": 0,
+    "receptor_pathway_context_evidence": 11,
+    "disease_only_background": 8,
+    "rejected_weak_evidence": 11
+  },
+  "papers": [
+    {
+      "pmid": "35536451",
+      "title": "Identification of a 5-gene-risk score model for predicting luminal A-invasive lobular breast cancer survival.",
+      "abstract": "Breast cancer is a devastating malignancy, among which the luminal A (LumA) breast cancer is the most common subtype. In the present study, we used a comprehensive bioinformatics approach in the hope of identifying novel prognostic biomarkers for LumA breast cancer patients. Transcriptomic profiling of 611 LumA breast cancer patients was downloaded from TCGA database. Differentially expressed genes (DEGs) between tumor samples and controls were first identified by differential expression analysis, before being used for the weighted gene co-expression network analysis. The subsequent univariate Cox regression and LASSO algorithm were used to uncover key prognostic genes for constructing multivariate Cox regression model. Patients were stratified into high-risk and low-risk groups according to the risk score, and subjected to multiple downstream analyses including survival analysis, gene set enrichment analysis (GSEA), inference on immune cell infiltration and analysis of mutation burden. Receiving operator curve analysis was also performed. A total of 7071 DEGs were first identified by edgeR package, pink module was found significantly associated with invasive lobular carcinoma (ILC). 105 prognostic genes and 9 predictors were identified, allowing the identification of a 5-key prognostic genes (LRRC77P, CA3, BAMBI, CABP1, ATP8A2) after intersection. These 5 genes, and the resulting Cox model, displayed good prognostic performance. Furthermore, distinct differences existed betw",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "BAMBI"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "BAMBI-ACVR2B": {
+          "ligand": "BAMBI",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "BAMBI-ACVR2B": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "32584896",
+      "title": "Super-enhancer acquisition drives oncogene expression in triple negative breast cancer",
+      "abstract": "Triple Negative Breast Cancer (TNBC) is a heterogeneous disease lacking known molecular drivers and effective targeted therapies. Cytotoxic chemotherapy remains the mainstay of treatment for TNBCs, which have significantly poorer survival rates compared to other breast cancer subtypes. In addition to changes within the coding genome, aberrant enhancer activity is a well-established contributor to tumorigenesis. Here we use H3K27Ac chromatin immunoprecipitation followed by sequencing (ChIP-Seq) to map the active cis-regulatory landscape in TNBC. We identify distinct disease subtypes associated with specific enhancer activity, and over 2,500 unique superenhancers acquired by tumor cells but absent from normal breast tissue. To identify potential actionable disease drivers, we probed the dependency on genes that associate with tumor-specific enhancers by CRISPR screening. In this way we identify a number of tumor-specific dependencies, including a previously uncharacterized dependency on the TGFbeta pseudo-receptor BAMBI.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "BAMBI"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "BAMBI-ACVR2B": {
+          "ligand": "BAMBI",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "BAMBI-ACVR2B": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "23034983",
+      "title": "Inhibition of TGF-beta/Smad signaling by BAMBI blocks differentiation of human mesenchymal stem cells to carcinoma-associated fibroblasts and abolishes their protumor effects.",
+      "abstract": "Bone marrow mesenchymal stem cells (BM-MSCs) have multiple therapeutic potentials for regenerative, anti-inflammatory, and immunomodulatory purposes and also show promise as vehicles for gene therapy of various metastatic cancers based on their tumor-tropic capacity. However, BM-MSCs are also a source of carcinoma-associated fibroblasts (CAFs) and may promote growth and metastasis of cancer. Transforming growth factor beta (TGF-beta) signaling is required to induce CAF differentiation of mouse BM-MSCs in vivo and can induce expression of some CAF markers in human BM-MSCs in vitro. To determine whether inhibiting TGF-beta signaling in human BM-MSCs can block their differentiation to CAFs induced by tumor microenvironments and the consequent protumor effects, we transduced human BM-MSCs with a lentiviral vector encoding bone morphogenetic protein and activin membrane-bound inhibitor (BAMBI), a decoy TGF-beta receptor. BAMBI transduction significantly inhibited TGF-beta/Smad signaling and expression of CAF markers in human BM-MSCs treated with TGF-beta1 or tumor-conditioned medium or cocultured with cancer cells, but did not alter the stem cell properties and the tumor-tropic property of MSCs. In addition, BAMBI transduction disrupted the cytokine network mediating the interaction between MSCs and breast cancer cells. Consequently, BAMBI transduction abolished protumor effects of BM-MSCs in vitro and in an orthotopic breast cancer xenograft model, and instead significantly inhib",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "BAMBI"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "BAMBI-ACVR2B": {
+          "ligand": "BAMBI",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "BAMBI-ACVR2B": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "37486509",
+      "title": "Bioinformatics Analysis of the Genetic and Epigenetic Alterations of Bone Morphogenetic Protein Receptors in Metastatic Breast Cancer.",
+      "abstract": "The leading cause of mortality in patients with breast cancer is metastasis, and bone morphogenetic protein (BMP) signaling activation regulates metastasis in breast cancer. This study explored the genetic and epigenetic modification of BMP receptor genes associated with metastatic breast cancer cells using bioinformatics. The genetic and epigenetic alterations of BMP receptors (BMPR1A, BMPR1B, BMPR2, ACVR2A, ACVR1, ACVR2B, ACVR1B, HJV, and ENG) were examined using cBioportal and methSurv, respectively. mRNA expression was analyzed using TNM plot and bcgenex, and protein expression was studied using Human Protein Atlas. Prognostic value and ROC were investigated using Kaplan-Meier (KM) and ROC plot, respectively. Finally, mutant function was predicted using several databases, including PolyPhen-2, FATHMM, Mutation Assessor, and PredictSNP. Oncoprint analysis showed genetic alterations in BMPR1A (39%), BMPR1B (13%), BMPR2 (34%), ACVR2A (14%), ACVR1 (7%), ACVR2B (13), ACVR1B (35%), HJV (40%), and ENG (33%) across the patients with breast cancer in The Metastatic Breast Cancer Project. The mRNA and protein levels of BMPR2 were increased in metastatic breast tumor tissues compared with those in normal and breast tumor tissues. BMPR1A and BMPR2 showed the highest and lowest levels of epigenetic alterations among the BMP receptors, respectively. The patients with breast cancer who had low levels of BMPR2 had a better overall survival (OS) than those with high levels of BMPR2. Funct",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ACVR2B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "BAMBI-ACVR2B": {
+          "ligand": "",
+          "receptor": "ACVR2B",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "BAMBI-ACVR2B": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "37333824",
+      "title": "Aberrant expression of bone morphogenetic proteins in the disease progression and metastasis of breast cancer",
+      "abstract": "Background\n\nBone morphogenetic proteins (BMPs) play crucial roles in the tumorigenesis and metastasis of cancers. Controversy remains about the exact implications of BMPs and their antagonists in breast cancer (BC), due to their diverse and complex biological functions and signalling. A comprehensive study of the whole family and their signalling in breast cancer is provoked.\n\nMethods\n\nAberrant expression of BMP, BMP receptors and antagonists in primary tumours in breast cancer were analysed by using TCGA-BRCA and E-MTAB-6703 cohorts. Related biomarkers including ER, HER, proliferation, invasion, angiogenesis, lymphangiogenesis and bone metastasis were involved to identify the relationship with BMPs in breast cancer.\n\nResults\n\nThe present study showed BMP8B was significantly increased in breast tumours, while BMP6 and ACVRL1 were decreased in breast cancer tissues. The expressions of BMP2, BMP6, TGFBR1 and GREM1 were significantly correlated with BC patients' poor overall survival. Aberrant expression of BMPs, together with BMP receptors, were explored in different subtypes of breast cancer according to ER, PR and HER2 status. Furthermore, higher levels of BMP2, BMP6 and GDF5 were revealed in triple negative breast cancer (TNBC) whilst BMP4, GDF15, ACVR1B, ACVR2B and BMPR1B were relatively higher in Luminal type BC. ACVR1B and BMPR1B were positively correlated with ERalpha but were inversely correlated with ERbeta. High expression of GDF15, BMP4 and ACVR1B were associated wit",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ACVR2B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "BAMBI-ACVR2B": {
+          "ligand": "",
+          "receptor": "ACVR2B",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "BAMBI-ACVR2B": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "23180569",
+      "title": "Genetic variation in bone morphogenetic proteins and breast cancer risk in hispanic and non-hispanic white women: The breast cancer health disparities study.",
+      "abstract": "Bone morphogenetic proteins (BMP) are thought to be important in breast cancer promotion and progression. We evaluated genetic variation in BMP-related genes and breast cancer risk among Hispanic (2,111 cases, 2,597 controls) and non-Hispanic White (NHW) (1,481 cases, 1,586 controls) women who participated in the 4-Corner's Breast Cancer Study, the Mexico Breast Cancer Study and the San Francisco Bay Area Breast Cancer Study. BMP genes and their receptors evaluated include ACVR1, AVCR2A, ACVR2B, ACVRL1, BMP1, BMP2, BMP4, BMP6, BMP7, BMPR1A, BMPR1B, BMPR2, MSTN and GDF10. Additionally, 104 ancestral informative markers were assessed to discriminate between European and native American ancestry. The importance of estrogen on BMP-related associations was suggested through unique associations by menopausal status and estrogen (ER) and progesterone (PR) receptor status of tumors. After adjustment for multiple comparisons ACVR1 (8 SNPs) was modestly associated with ER+PR+ tumors [odds ratios (ORs) between 1.18 and 1.39 padj < 0.05]. ACVR1 (3 SNPs) and BMP4 (3 SNPs) were associated with ER+PR- tumors (ORs 0.59-2.07; padj < 0.05). BMPR2 was associated with ER-PR+ tumors (OR 4.20; 95% CI 1.62, 10.91; padj < 0.05) as was GDF10 (2 SNPs; ORs 3.62 and 3.85; padj < 0.05). After adjustment for multiple comparisons several SNPs remained associated with ER-PR- tumors (padj < 0.05) including ACVR1 BMP4 and GDF10 (ORs between 0.53 and 2.12). Differences in association also were observed by perc",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ACVR2B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "BAMBI-ACVR2B": {
+          "ligand": "",
+          "receptor": "ACVR2B",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "BAMBI-ACVR2B": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "17004110",
+      "title": "A comprehensive expression survey of bone morphogenetic proteins in breast cancer highlights the importance of BMP4 and BMP7.",
+      "abstract": "Bone morphogenetic proteins (BMPs) regulate diverse cellular processes, such as proliferation, differentiation, and apoptosis. The BMPs have been studied in several cancers, but thus far contradictory results have been obtained and, especially in breast cancer, information on BMPs is still limited. We performed a systematic expression survey of BMPs and their receptors in breast cancer. mRNA expression was studied of seven BMP ligands (BMP2-BMP8) and six receptors (ACVR1, BMPR1A, BMPR1B, BMPR2, ACVR2A, and ACVR2B) that specifically mediate BMP signals. Expression levels were determined in 22 breast cancer cell lines, 39 primary breast tumors, normal human mammary epithelial cell line, and normal mammary gland using semiquantitative RT-PCR. The expression frequencies and expression levels of different BMPs varied considerably in breast cancer with BMP4 and BMP7 being most frequently expressed and showing highest expression levels. The BMP specific receptors were more uniformly expressed and indicated that breast cancer is fully capable of transmitting BMP signals. Expression frequencies and levels for both the ligands and the receptors were in good concordance between the breast cancer cell lines and primary tumors. We can conclude that breast cancers possess functional BMP signaling machinery on the cell surface with distinct differences in the expression of various BMP ligands. Our survey focuses the attention particularly toward BMP4 and BMP7 and suggests their importance i",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ACVR2B"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "BAMBI",
+          "receptor": "ACVR2B"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "BAMBI-ACVR2B": {
+          "ligand": "",
+          "receptor": "ACVR2B",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "BAMBI-ACVR2B": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "40056038",
+      "title": "Tumor Microenvironment On-A-Chip and Single-Cell Analysis Reveal Synergistic Stromal-Immune Crosstalk on Breast Cancer Progression",
+      "abstract": "Abstract\n\nSolid tumors develop within a complex environment called the tumor microenvironment (TME), which is sculpted by the presence of other cells, such as cancer-associated fibroblasts (CAFs) and immune cells like macrophages (Mphis). Despite the presence of immune cells, tumor cells orchestrate a tumor-supportive environment through intricate interaction with the components of the TME. However, the specific mechanism by which this intercellular dialogue is regulated is not fully understood. To that end, the development of an organotypic 3D breast TME-on-a-chip (TMEC) model, integrated with single-cell RNA sequencing analysis, is reported to mechanistically evaluate the progression of triple-negative breast cancer (TNBC) cells in the presence of patient-derived CAFs and Mphis. Extensive functional assays, including invasion and morphometric characterization, reveal the synergistic influence of CAFs and Mphis on tumor cells. Furthermore, gene expression and pathway enrichment analyses identify the involvement of the KYNU gene, suggesting a potential immune evasion mechanism through the kynurenine pathway. Lastly, the pharmacological targeting of the identified pathway is investigated.\n\nUsing a 3D tumor microenvironment (TME)-on-a-chip model, tumor-stromal-immune crosstalk in triple-negative breast cancer is studied, revealing the TME's combinatorial effect on cancer progression. Integrating single-cell transcriptomic analysis demonstrates metabolic reprogramming via the ky",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "EGFR",
+          "tumor microenvironment",
+          "stromal-epithelial crosstalk",
+          "invasive carcinoma"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "BAMBI-ACVR2B": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "39808846",
+      "title": "Cross-Talk between NOK and EGFR: Juxtamembrane and Kinase domain interactions enhancing STAT3/5 signaling in breast cancer tumorigenesis",
+      "abstract": "Highlights\n\nEGFR heterodimerizes with NOK/STYK1, a novel tyrosine kinase with a transmembrane domain, in a manner of cross interaction via their juxtamembrane (JM) domains and kinase domains.\n\nNOK enhances EGF signaling activation, in particular, the phosphorylation of STAT3 and STAT5 via its JM domain.\n\nNOK and EGFR synergistically promote proliferation and migration of breast cancer cells and induce tumorigenesis of normal cells.\n\nCo-expression of NOK and EGFR correlates with tumor malignant stages in breast cancer patients.\n\nEpidermal growth factor receptor (EGFR) plays an important role in the regulation of cell proliferation and migration. It forms a homodimer or heterodimer with other ErbB receptor family members to activate downstream signaling. Emerging evidence indicates that the EGFR activity and downstream signaling are regulated by other proteins except its family members during tumorigenesis. Hence, investigating the diverse partnership profiles of EGFR is crucial for elucidating the mechanisms underlying EGFR-mediated actions in tumors, which in turn can guide the development of targeted therapeutic strategies. Here we report that NOK (also known as STYK1), a novel tyrosine kinase cross-talks with EGFR to promote tumorigenesis and metastasis of breast cancer cells. We found that NOK directly interacted with EGFR and formed a heterodimer complex in a manner of cross interaction via their juxtamembrane (JM) domains and kinase domains. Depletion of NOK impaired, bu",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Signaling by EGFR",
+          "EGFR signaling",
+          "ERBB signaling"
+        ],
+        "query_intent": "deterministic_pathway"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "pathway",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "BAMBI-ACVR2B": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [
+          "EGFR"
+        ],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "39937011",
+      "title": "Three-Dimensional Models: Biomimetic Tools That Recapitulate Breast Tissue Architecture and Microenvironment to Study Ductal Carcinoma In Situ Transition to Invasive Ductal Breast Cancer",
+      "abstract": "Diagnosis of ductal carcinoma in situ (DCIS) presents a challenge as we cannot yet distinguish between those lesions that remain dormant from cases that may progress to invasive ductal breast cancer (IDC) and require therapeutic intervention. Our overall interest is to develop biomimetic three-dimensional (3D) models that more accurately recapitulate the structure and characteristics of pre-invasive breast cancer in order to study the underlying mechanisms driving malignant progression. These models allow us to mimic the microenvironment to investigate many aspects of mammary cell biology, including the role of the extracellular matrix (ECM), the interaction between carcinoma-associated fibroblasts (CAFs) and epithelial cells, and the dynamics of cytoskeletal reorganization. In this review article, we outline the significance of 3D culture models as reliable pre-clinical tools that mimic the in vivo tumor microenvironment and facilitate the study of DCIS lesions as they progress to invasive breast cancer. We also discuss the role of CAFs and other stromal cells in DCIS transition as well as the clinical significance of emerging technologies like tumor-on-chip and co-culture models.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "EGFR",
+          "tumor microenvironment",
+          "stromal-epithelial crosstalk",
+          "invasive carcinoma"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "BAMBI-ACVR2B": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "33791288",
+      "title": "Engineering a Vascularized 3D Hybrid System to Model Tumor-Stroma Interactions in Breast Cancer",
+      "abstract": "The stromal microenvironment of breast tumors, namely the vasculature, has a key role in tumor development and metastatic spread. Tumor angiogenesis is a coordinated process, requiring the cooperation of cancer cells, stromal cells, such as fibroblasts and endothelial cells, secreted factors and the extracellular matrix (ECM). In vitro models capable of capturing such complex environment are still scarce, but are pivotal to improve success rates in drug development and screening. To address this challenge, we developed a hybrid alginate-based 3D system, combining hydrogel-embedded mammary epithelial cells (parenchymal compartment) with a porous scaffold co-seeded with fibroblasts and endothelial cells (vascularized stromal compartment). For the stromal compartment, we used porous alginate scaffolds produced by freeze-drying with particle leaching, a simple, low-cost and non-toxic approach that provided storable ready-to-use scaffolds fitting the wells of standard 96-well plates. Co-seeded endothelial cells and fibroblasts were able to adhere to the surface, spread and organize into tubular-like structures. For the parenchymal compartment, a designed alginate gel precursor solution load with mammary epithelial cells was added to the pores of pre-vascularized scaffolds, forming a hydrogel in situ by ionic crosslinking. The 3D hybrid system supports epithelial morphogenesis in organoids/tumoroids and endothelial tubulogenesis, allowing heterotypic cell-cell and cell-ECM interact",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "endothelial cells",
+          "tumor vasculature",
+          "stromal cells",
+          "spatial distribution",
+          "tumor microenvironment"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "BAMBI-ACVR2B": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial",
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    }
+  ],
+  "search_method": "search_literature_dynamic",
+  "coverage": {
+    "genes_covered": [
+      "BAMBI",
+      "ACVR2B"
+    ],
+    "genes_matched_by": {
+      "BAMBI": "biomcp_tag_only",
+      "ACVR2B": "biomcp_tag_only"
+    },
+    "pathways_covered": [
+      "EGFR"
+    ],
+    "pathways_matched_by": {
+      "EGFR": "biomcp_tag+text_confirmed"
+    },
+    "celltypes_covered": [
+      "Macrophages 2",
+      "Stromal",
+      "DCIS 2",
+      "Endothelial"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 100.0,
+    "celltypes_coverage_pct": 50.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Invasive Tumor",
+      "Prolif Invasive Tumor",
+      "Stromal & T Cell Hybrid",
+      "T Cell & Tumor Hybrid"
+    ]
+  }
+}

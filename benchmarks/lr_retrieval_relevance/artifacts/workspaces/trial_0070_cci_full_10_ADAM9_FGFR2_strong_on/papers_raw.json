@@ -1,0 +1,812 @@
+{
+  "papers": [
+    {
+      "pmid": "41890767",
+      "title": "M2-type tumor-associated macrophages promote invasion of canine breast cancer through ADAM9 upregulation.",
+      "abstract": "Introduction: Tumor-associated macrophages (TAMs) represent the most abundant immune cell population within the tumor microenvironment and play a critical role in cancer progression. However, the molecular mediators underlying TAM-driven tumor invasion remain incompletely defined. This study investigated whether ADAM9 functions as a key effector of pro-invasive TAM polarization using a canine mammary tumor model integrated with human transcriptomic datasets. Methods: Transcriptomic analyses were performed using canine and publicly available human datasets. Single-cell RNA sequencing was used to determine cellular localization of ADAM9. IL-4-induced M2 macrophages were evaluated for ADAM9 expression, tumor migration and invasion capacity, extracellular matrix (ECM) degradation, cytoskeletal remodeling, and spheroid destabilization. ADAM9 knockdown and cancer stem cell (CSC)-conditioned medium experiments were conducted to assess mechanistic involvement. Results: ADAM9 was consistently enriched in M2-polarized TAMs across species and was confirmed to be expressed in TAM populations by single-cell RNA sequencing. IL-4-induced M2 macrophages upregulated ADAM9 and significantly enhanced tumor migration and invasion. ADAM9 knockdown attenuated ECM degradation, reduced MMP9 expression, and disrupted F-actin remodeling. CSC-conditioned medium further induced ADAM9 expression, suggesting its role as a convergent mediator of CSC-macrophage crosstalk. In spheroid models, ADAM9 depletion",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "41521297",
+      "title": "Spatial and temporal dynamics of cancer-associated fibroblast niches in breast cancer",
+      "abstract": "Background\n\nCancer-associated fibroblasts (CAFs) are the main constituents of the tumor microenvironment. Several studies have delineated CAF heterogeneity in different types of tumors, however, it is still unknown how the distinct CAF transcriptional profiles are established during tumor progression.\n\nMethods\n\nWe reanalyzed a previously published single-cell RNA-sequencing dataset of MMTV-PyMT tumors at higher resolution using Seurat , and CytoTRACE to characterize CAF subtypes and their differentiation states. Wilcoxon rank sum test was applied for differential gene expression. Multiplex immunostaining (Akoya PhenoImager HT) was performed on 38 murine mammary tumors from MMTV-PyMT mice to identify the distinct CAF subtypes. Whole-slide imaging and spatial analysis were conducted using QuPath and Cellpose , followed by neighborhood clustering and interaction mapping with CytoMAP . Cellular distances from CAFs to immune, tumor, and endothelial cells were quantified using SPIAT and Wilcoxon tests for comparisons. In parallel, human spatial transcriptomics data from the 10X Genomics Xenium platform were integrated for cross-species validation.\n\nResults\n\nHere, by single cell RNA-sequencing and multiplex immunostaining, we identify six CAF substates. Spatial analysis on immunostained murine mammary tumors and human spatial transcriptomics data outlined temporal changes in stromal composition and the existence of distinct functional niches enriched with different CAF substates. Im",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "tumor-associated macrophage",
+          "endothelial cell",
+          "perivascular",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "16230393",
+      "title": "Critical function for ADAM9 in mouse prostate cancer.",
+      "abstract": "ADAM9 is a membrane-anchored metalloprotease that is markedly up-regulated in several human carcinomas. Here, we show that ADAM9 is similarly up-regulated in mouse models for prostate, breast, and intestinal carcinoma. To assess whether ADAM9 is critical for the pathogenesis of prostate carcinoma, one of the most common cancers in men, we evaluated how loss of ADAM9 affects tumorigenesis in W(10) mice, a mouse model for this disease. In the absence of ADAM9, most tumors in 50-week-old W(10) mice were well differentiated, whereas littermate controls expressing wild-type ADAM9 had predominantly poorly differentiated, and in some cases significantly larger, tumors. Moreover, gain-of-function experiments in which ADAM9 was overexpressed in mouse prostate epithelium resulted in significant abnormalities, including epithelial hyperplasia at 4 to 6 months of age, and prostatic intraepithelial neoplasia after 1 year. A potential underlying mechanism for the role of ADAM9 in prostate cancer emerged from cell-based assays: ADAM9 can cleave and release epidermal growth factor and FGFR2iiib from cells, both of which have pivotal functions in the pathogenesis of this disease. Taken together, these results suggest that ADAM9 contributes to the pathogenesis of prostate cancer and potentially also other carcinomas, raising the possibility that ADAM9 might be a good target for antitumor drugs.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40721545",
+      "title": "Decoding tumor-infiltrating lymphocytes heterogeneity in ductal carcinoma in situ: immune microenvironment dynamics and prognostic insights",
+      "abstract": "With the widespread use of mammography, the incidence of ductal carcinoma in situ (DCIS) has significantly increased and currently accounts for approximately 20-25% of newly diagnosed breast cancer cases. While a significant proportion of DCIS lesions exhibit long-term indolence without progression to invasive carcinoma, the current paucity of validated biomarkers for invasive potential prediction creates a therapeutic dilemma in clinical practice, potentially leading to either overtreatment of biologically inert lesions or undertreatment of high-risk precursors. Reflecting the body's adaptive immune response, tumor-infiltrating lymphocytes (TILs) have been demonstrated to be associated with adverse clinicopathologic factors in DCIS. The relationship between total TILs and the risk of DCIS recurrence remains controversial, but subpopulations of TILs such as FOXP3 + T lymphocytes, B cells, CD68, and CD163 macrophages are found to be associated with DCIS recurrence. Increased levels of total TILs are associated with increased malignancy of breast lesions, and the number and composition of TILs subpopulations change during DCIS progression. Moreover, dense TILs are correlated with high PD-L1 expression and the \"healing\" phenomenon in DCIS. Further exploration of the immune microenvironment, TILs subpopulations, and adaptive immune responses in DCIS remains a critical unmet need, contributing to more refined risk stratification of DCIS patients and facilitating the implementation",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "stromal interaction",
+          "tumor heterogeneity"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "33146718",
+      "title": "microRNA-1298 inhibits the malignant behaviors of breast cancer cells via targeting ADAM9",
+      "abstract": "Abstract\n\nMicroRNAs (miRNAs) regulate the progression of human malignancy by targeting oncogenes or tumor suppressors, which are 12 promising targets for cancer treatment. Increasing evidence has suggested the aberrant expression and tumor-suppressive function of miR-1298 in cancers, however, the regulatory mechanism of miR-1298 in breast cancer (BC) remains unclear. Here, our findings showed that miR-1298 was down-regulated in BC tissues and cell lines. Lower level of miR-1298 was significantly correlated with the advanced progression of BC patients. Experimental study showed that overexpression of miR-1298 inhibited the proliferation, induced apoptosis and cell cycle arrest in BC cells. The in vivo xenograft mice model showed that highly expressed miR-1298 significantly reduced the tumor growth and metastasis. Further mechanism analysis revealed that miR-1298 bound the 3'-untranslated region (UTR) of a disintegrin and metalloproteinase 9 domain (ADAM9) and suppressed the expression of ADAM9 in BC cells. ADAM9 was overexpressed in BC tissues and inversely correlated with miR-1298. Down-regulation of ADAM9 induced apoptosis and cell cycle arrest of BC cells. Moreover, ectopic expression of ADAM9 by transiently transfecting with vector encoding the full coding sequence of ADAM9 attenuated the inhibitory effects of miR-1298 on the proliferation and cell cycle progression of BC cells. Collectively, our results illustrated that miR-1298 played a suppressive role in regulating the",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "29163713",
+      "title": "MicroRNA-154/ADAM9 axis inhibits the proliferation, migration and invasion of breast cancer cells.",
+      "abstract": "Breast cancer is the leading cause for cancer-associated mortality in women. Although great progress has been made in the earlier diagnosis and systemic therapy of patients with breast cancer in recent years, recurrence or distant metastasis continue to present major barriers to the successful treatment of breast cancer. Therefore, fully understanding the molecular mechanisms underlying the progression of breast cancer may be critical for the development of effective therapeutic strategies against breast cancer. The aim of the present study was to explore the expression, function and molecular mechanisms of microRNA-154 (miR-154) in human breast cancer. It was demonstrated that miR-154 was significantly downregulated in breast cancer tissue and cell lines. The restoration of miR-154 expression suppressed the proliferation, migration and invasion of breast cancer cells. ADAM metallopeptidase domain 9 (ADAM9) was identified as a novel direct target for miR-154 in breast cancer. It was demonstrated that miR-154 acted as a tumor suppressor in breast cancer by targeting ADAM9. The results of the present study suggest that the restoration of miR-154 expression may be an effective therapeutic strategy for the treatment of breast cancer in the future.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26261534",
+      "title": "MiR-126 regulated breast cancer cell invasion by targeting ADAM9.",
+      "abstract": "Accumulating evidence has shown that microRNAs (miRNAs) deregulation is commonly observed in human malignancies and crucial to cancer metastasis. Herein, we demonstrated that miR-126 play a suppressor role in human breast cancer cells invasion through the direct repression of a disintegrin and metalloprotease 9 (ADAM9). MiR-126 expression was investigated in forty cases of breast cancer specimens by real-time PCR. Transwell assay was conducted to explore the effects of miR-126 on the invasion of human breast cancer cell lines. The impact of miR-126 overexpression on putative target ADAM9 was subsequently confirmed by Western blot analysis. Our results indicated that miR-126 expression was frequently down-regulated in breast cancer specimens compared with adjacent normal tissues (P<0.05). Overexpression of miR-126 significantly reduced (P<0.05) the protein levels of ADAM9, further suppressed (P<0.05) breast cancer cell invasion in vitro. Meanwhile, knockdown of ADAM9 by small interfering RNA (siRNA) also inhibited (P<0.05) breast cancer cell invasion. Thus, our study revealed that miR-126 may act as a tumor suppressor via inhibition of cell invasion by downregulating ADAM9 in breast cancer development. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23810013",
+      "title": "ADAM22 as a prognostic and therapeutic drug target in the treatment of endocrine-resistant breast cancer.",
+      "abstract": "The development of breast cancer resistance to endocrine therapies may result from an increase in cellular plasticity, permitting the emergence of a hormone-independent tumor. ADAM proteins are multidomain transmembrane proteins that have a diverse array of functions in both natural physiology and disease. A number of ADAM proteins have been implicated in the occurrence of breast cancer, including ADAM 9, ADAM12, ADAM15, ADAM17, ADAM22, and ADAM28. ADAM22 expression is driven by the coactivator protein SRC-1 in response to tamoxifen treatment in the resistant setting. ADAM22 is an ER-independent predictor of disease-free survival. LGI1 is a neuropeptide that binds ADAM22 in the nervous system. In addition to being a ligand for ADAM11, ADAM22, and ADAM23, LGI1 may play a role as a tumor suppressor. Furthermore, LGI1 may act to reduce cell migration and may impair proliferation. Therapies based on LGI1 may provide a building block for future therapies in ADAM22-positive breast cancer. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "20736367",
+      "title": "Secreted and membrane-bound isoforms of protease ADAM9 have opposing effects on breast cancer cell migration.",
+      "abstract": "Tumor cell migration is mediated by cell-autonomous signaling mechanisms as well as paracrine and autocrine factors secreted by activated stromal cells in the tumor microenvironment. Like other members of the ADAM (a disintegrin and metalloproteinase) family, the integrin-binding metalloproteinase ADAM9 modulates cell-cell and cell-matrix interactions as well as ectodomain shedding of cell surface receptors and ligands, thereby modifying intracellular and extracellular signaling. ADAM9 transcripts are alternatively spliced to express a transmembrane protein (ADAM9-L) and a secreted variant (ADAM9-S). In this study, we show that ADAM9-S promotes breast cancer cell migration in a manner requiring its metalloproteinase activity, whereas ADAM9-L suppresses cell migration independent of its metalloproteinase activity. Suppression of migration by ADAM9-L requires a functional disintegrin domain and integrin binding. Expression analysis revealed that both ADAM9 isoforms are expressed in breast cancer cell lines and tissues. Therefore, relative levels of membrane-tethered and secreted variants of ADAM9 are a key determinant in manifestation of aggressive migratory phenotypes associated with breast cancer progression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "12767059",
+      "title": "Expression of ADAM-9 mRNA and protein in human breast cancer.",
+      "abstract": "The ADAMs (a disintegrin and metalloprotease) are membrane proteins containing both protease and adhesion domains and thus may be potentially important in cancer invasion and metastasis. The aim of our study was to investigate the distribution and potential clinical significance of ADAM-9 in breast cancer. ADAM-9 expression was measured using both reverse transcriptase-polymerase chain reaction (RT-PCR) and Western blotting. ADAM-9 mRNA was expressed more frequently in both breast carcinomas (72/110, 66%) and fibroadenomas (21/38, 55%) compared to normal breast tissue (6/25, 24%) (p = 0.0004, p = 0.028, respectively). Multiple forms of ADAM-9 protein were detected by Western blotting, i.e., at 124, 84 and 48 kDa under reducing conditions and at 115, 76, 55, 52 and 46 kDa under nonreducing conditions. The 84 and 55 kDa forms were detected more frequently in the primary cancers compared to normal breast tissue (p < 0.0001, p = 0.0002, respectively). In addition, relative levels of the 84 kDa mature form were significantly higher in the primary cancers than in the fibroadenomas (p = 0.003), while the reverse was found for the 124 kDa precursor form (p = 0.026). In the carcinomas, the 84 kDa form of ADAM-9 protein was expressed at higher levels in node-positive than node-negative cancers (p = 0.05) and correlated positively with HER-2/neu protein levels (r = 0.313, p = 0.016). This is the first report to describe expression of any ADAM in a large number of human carcinomas.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "27554339",
+      "title": "ADAM9 silencing inhibits breast tumor cells transmigration through blood and lymphatic endothelial cells.",
+      "abstract": "ADAMs are transmembrane multifunctional proteins that contain disintegrin and metalloprotease domains. ADAMs act in a diverse set of biological processes, including fertilization, inflammatory responses, myogenesis, cell migration, cell proliferation and ectodomain cleavage of membrane proteins. These proteins also have additional functions in pathological processes as cancer and metastasis development. ADAM9 is a member of ADAM protein family that is overexpressed in several types of human carcinomas. The aim of this study was to investigate the role of ADAM9 in hematogenous and lymphatic tumor cell dissemination assisting the development of new therapeutic tools. The role of ADAM9 in the interaction of breast tumor cells (MDA-MB-231) and endothelial cells was studied through RNA silencing. ADAM9 silencing in MDA-MB-231 cells had no influence in expression of several genes related to the metastatic process such as ADAM10, ADAM12, ADAM17, cMYC, MMP9, VEGF-A, VEGF-C, osteopontin and collagen XVII. However, there was a minor decrease in ADAM15 expression but an increase in that of MMP2. Moreover, ADAM9 silencing had no effect in the adhesion of MDA-MB-231 cells to vascular (HMEC-1 and HUVEC) and lymphatic cells (HMVEC-dLyNeo) under flow condition. Nevertheless, siADAM9 in MDA-MB-231 decreased transendothelial cell migration in vitro through HUVEC, HMEC-1 and HMVEC-dLyNeo (50%, 40% and 32% respectively). These results suggest a role for ADAM9 on the extravasation step of the met",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23499592",
+      "title": "ADAM9 silencing inhibits breast tumor cell invasion in vitro.",
+      "abstract": "ADAM9 (A Disintegrin And Metalloproteinase 9) is a member of the ADAM protein family which contains a disintegrin domain. This protein family plays key roles in many physiological processes, including fertilization, migration, and cell survival. The ADAM proteins have also been implicated in various diseases, including cancer. Specifically, ADAM9 has been suggested to be involved in metastasis. To address this question, we generated ADAM9 knockdown clones of MDA-MB-231 breast tumor cells using silencing RNAs that were tested for cell adhesion, proliferation, migration and invasion assays. In RNAi-mediated ADAM9 silenced MDA-MB-231 cells, the expression of ADAM9 was lower from the third to the sixth day after silencing and inhibited tumor cell invasion in matrigel by approximately 72% when compared to control cells, without affecting cell adhesion, proliferation or migration. In conclusion, the generation of MDA-MB-231 knockdown clones lacking ADAM9 expression inhibited tumor cell invasion in vitro, suggesting that ADAM9 is an important molecule in the processes of invasion and metastasis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39596875",
+      "title": "Lower FGFR2 mRNA Expression and Higher Levels of FGFR2 IIIc in HER2-Positive Breast Cancer.",
+      "abstract": "Fibroblast growth factor receptor 2 (FGFR2) has been associated with breast cancer. We performed in silico analyses to investigate the FGFR2 mRNA expression and splice variants associated with breast cancer subtypes. Online databases, including cBioPortal and TCGA SpliceSeq, were used to examine the association between the FGFR2 expression and splice variants with breast cancer subtypes. A higher FGFR2 mRNA was significantly associated with luminal, oestrogen receptor (ER)-positive breast cancers, and invasive lobular carcinomas, whereas a lower FGFR2 was associated with human epidermal growth factor receptor 2 (HER2)-positive breast cancer and invasive ductal carcinomas. The epithelial alternatively spliced FGFR2 IIIb isoform was significantly enriched in ER+ breast cancer, while the mesenchymal FGFR2 IIIc isoform was significantly prevalent in HER2+ cancer. Increased levels of FGFR2 and IIIb splice isoforms are associated with less aggressive breast cancer phenotypes, while decreased levels of FGFR2 and increased IIIc splice isoform are associated with more aggressive phenotypes.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32381997",
+      "title": "Comprehensive Analysis of Fibroblast Growth Factor Receptor (FGFR) Family Genes in Breast Cancer by Integrating Online Databases and Bioinformatics",
+      "abstract": "Background\n\nFibroblast growth factor receptors (FGFRs) play vital roles in the development and progression of human cancers. This study aimed to comprehensively understand the prognostic performances of FGFR1-4 expression in breast cancer (BC) by mining databases.\n\nMaterial/Methods\n\nThe levels of FGFR1-4 expression in BC were analyzed by online databases, GEPIA (Gene Expression Profiling Interactive Analysis) and UALCAN. Survival analysis of FGFR1-4 was carried out by Kaplan-Meier plotter. GSE74146 was downloaded from Gene Expression Omnibus (GEO) and analyzed by GEO2R to screen the differentially expressed genes (DEGs) between FGFR2-silenced BC cells and control. Over-presentation for DEGs were done by Enrichr tool. Networks of DEGs were obtained by using Search Tool for the Retrieval of Interacting Genes (STRING) and Cytoscape software. Hub genes were identified by cytoHubba Cytoscape plugin.\n\nResults\n\nThe online databases showed that FGFR1 was significantly downregulated whereas FGFR3 was upregulated in BC. Kaplan-Meier plotter demonstrated the upregulation of both FGFR1 and FGFR3 indicated favorable relapse free survival (RFS) whereas FGFR4 overexpression predicted unfavorable overall survival (OS) in BC patients. Importantly, our results showed FGFR2 overexpression robustly predicted favorable OS and RFS in BC. Further bioinformatics analysis of GSE74146 suggested FGFR2 mainly participated in regulating degradation and organization of the extracellular matrix and signali",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26728143",
+      "title": "Variants of FGFR2 and their associations with breast cancer risk: a HUGE systematic review and meta-analysis.",
+      "abstract": "Extensive epidemiological studies have demonstrated that there are associations between variants in intron 2 of FGFR2 and the breast cancer risk in various populations; however, the relationships are not yet conclusively established. To comprehensively review the epidemiological studies showing associations between the variants of FGFR2 and the breast cancer risk, and to establish correlations via a meta-analysis. The PubMed and MEDLINE databases were searched for eligible studies. The associations between the variants and breast cancer risk were evaluated using a random-effects model. The heterogeneity among the studies and the potential publication bias were also evaluated. Fifty-three studies with a total of 121,740 cases and 198,549 controls have examined the associations between 23 variants in intron 2 of FGFR2 and the breast cancer risk. The relationships for the 10 most frequently evaluated variants-rs1078806, rs11200014, rs1219648, rs2420946, rs2981578, rs2981579, rs2981582, rs3135718, rs10736303, and rs3750817-were synthesized based on a meta-analysis. Interestingly, we found that all 10 variants were significantly associated with the risk of breast cancer. In studies stratified by ethnicity, we found that the associations were more notable in Caucasians and Asians compared to Africans. Similar pooled results were found in population-based and hospital-based case-control studies and in studies with small and large sample sizes. FGFR2 is a breast cancer susceptibility",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26025410",
+      "title": "Evaluation of FGFR2 gene polymorphism in women with breast cancer.",
+      "abstract": "Breast cancer (BC) is one of the most frequent cancers among women worldwide. It is a complex polygenic disorder that genetic factors play an important role in disease etiology. The highly significant association of the Fibroblast growth factor receptor 2 (FGFR2) locus with breast cancer risk has been replicated in multiple genome association study; however, it's mechanism of action remains unclear. The aim of this study was to investigate whether the single nucleotide polymorphism (SNP) C:906T within intron 2 of FGFR2 is responsible for susceptibility to breast cancer. This case-control study included 108 breast cancer cases and 108 cancer-free controls. The prevalence of genotype frequencies of the FGFR2 CC/CT/TT was 5.5%, 90.7% and 3.7%, respectively, in cancer cases. Among controls, the distribution of CC, CT and TT genotype was 48.14%, 47.66% and 10.18% respectively. Significant differences in allele and genotype distribution among controls and patients were found (OR, 18.87 95% CI, 7.55:47.16; p = 0.0001). The results from this study suggest that the FGFR2 C:906T polymorphism may be associated to breast cancer in population studied. Well:designed studies with larger sample sizes are needed to confirm the role of FGFR2 SNP in breast cancer risk.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25639874",
+      "title": "The breast cancer susceptibility FGFR2 provides an alternate mode of HER2 activation.",
+      "abstract": "Fibroblast growth factor receptor 2 (FGFR2) has been shown reproducibly in genome-wide association studies to be associated with increased breast cancer risk. Here we show that mouse mammary tumor virus-neu mice develop breast carcinomas with FGFR2 immunoreactivity that parallels HER2 expression. FGFR2 signaling promotes HER2 shedding through the metalloprotease ADAM10 leading to intracellular accumulation of the truncated p95HER2 protein. This is accompanied by enhanced HER2 signaling and diminished sensitivity to trastuzumab. Functionally, FGFR2 facilitates HER2-mediated cell proliferation, acinar growth in three-dimensional morphogenesis assays and promotes tumor progression in mouse xenografts. These data implicate FGFR2 in a novel mechanism of ErbB activation and demonstrate an important interaction between FGFR2 and HER2 in promoting breast cancer progression.Oncogene advance online publication, 2 February 2015; doi:10.1038/onc.2014.440.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "23184080",
+      "title": "Assessing interactions between the associations of fibroblast growth factor receptor 2 common genetic variants and hormone receptor status with breast cancer risk.",
+      "abstract": "Fibroblast growth factor receptor 2 (FGFR2) is a member of a receptor tyrosine kinase gene superfamily, involved in cell growth, invasiveness, motility, and angiogenesis, which has attracted considerable attention as a candidate gene for breast cancer (BC) since it was first identified through genome-wide association approach. In the past few years, the relationship between FGFR2 and BC has been reported in various ethnic groups; however, these studies have yielded contradictory results. To investigate this inconsistency, we performed a meta-analysis of 37 studies involving a total of 288,142 subjects for rs2981582, rs1219648, and rs2420946 polymorphism of the FGFR2 gene to evaluate the effect of FGFR2 on genetic susceptibility for BC. Overall, significantly increased BC risk was associated with these polymorphisms when all studies were pooled into the meta-analysis. In addition, our data indicate that FGFR2 is involved in BC susceptibility and confer its effect primarily in estrogen receptor-positive and progesterone receptor-positive tumors. When stratified by ethnicity, significantly increased risks were found in Caucasian and East Asian populations. However, no significant associations were detected among African descent populations. There was strong evidence of heterogeneity (P < 0.05), which largely disappeared after stratification by ethnicity. This meta-analysis demonstrated that FGFR2 polymorphism is a risk factor associated with increased BC susceptibility, but thes",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "22006548",
+      "title": "Increased expression of fibroblastic growth factor receptor 2 is correlated with poor prognosis in patients with breast cancer.",
+      "abstract": "BACKGROUND AND OBJECTIVES: Although there is growing evidence supporting the hypothesis that fibroblast growth factor receptor 2 (FGFR2) is one of the few candidate genes linked with breast cancer susceptibility, the precise role of FGFR2 protein expression in breast cancer is still unknown. Our study examines FGFR2 protein expression in breast cancer and determines its associations with clinicopathological features and survival. METHODS: Specimens from 125 invasive ductal carcinoma grade 2 (IDC2) breast cancer patients were investigated by immunohistochemistry for FGFR2 protein expression. Associations between the expression of FGFR2 and various clinicopathological features as well as survival status were studied. RESULT: Cytoplasmic and nuclear FGFR2 were expressed in 64.8% and 56.8% of breast cancer patients, respectively. Cytoplasmic FGFR2 expression was significantly associated with tumor size and TNM stage. Furthermore, patients with high expression levels of cytoplasmic and nuclear FGFR2 showed much lower overall survival (OS) and disease-free survival (DFS) rates than those patients with low FGFR2 expression. Cytoplasmic FGFR2 expression and lymph node metastasis were independent prognostic factors for both DFS and OS by multivariate analysis. CONCLUSIONS: High FGFR2 expression is correlated with poor OS and DFS in breast cancer patients. It could be a biomarker for poor prognosis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "20853316",
+      "title": "FGFR2 intronic SNPs and breast cancer risk: associations with tumor characteristics and interactions with exogenous exposures and other known breast cancer risk factors.",
+      "abstract": "Recent genome-wide association studies have revealed several new candidate genes for breast cancer, including fibroblast growth factor receptor 2 (FGFR2) gene. The associations were also replicated in several other independent studies. The next important step is to study whether these common variants interact with known breast cancer risk factors, exogenous exposures and tumor characteristics. In a population-based case-control study of 1,170 breast cancer cases and 2,115 controls, we examined genetic associations of four intronic FGFR2 single-nucleotide polymorphisms (SNPs) and breast tumor characteristics and assessed the potential interactions with smoking, alcohol consumption, adiposity and known breast cancer risk factors. FGFR2 variants were significantly associated with breast cancer risk regardless of estrogen and progesterone receptor status, metastasis, lymph node involvement and histologic and nuclear grade. The FGFR2-breast cancer association was modified by smoking status, with increased risk for former and current smokers compared to never smokers; former/current smokers carrying two copies of the rs1219648 minor allele were at highest risk with a crude OR (95% confidence interval) of 2.11 (1.52-2.92) compared to never smokers with no rs1219648 variant alleles. Our study found no evidence for either modification of FGFR2 and breast cancer by alcohol intake or adiposity, even when analyses were stratified by menopausal status. Although these results require furth",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21418638",
+      "title": "FGFR2 protein expression in breast cancer: nuclear localisation and correlation with patient genotype",
+      "abstract": "Background\n\nSingle Nucleotide Polymorphisms (SNPs) in intron 2 of the Fibroblast Growth Factor Receptor Type 2 (FGFR2) gene, including rs2981582, contribute to multifactorial breast cancer susceptibility. The high risk polymorphism haplotype in the FGFR2 gene has been associated with increased mRNA transcription and altered transcription factor binding but the effect on FGFR2 protein expression is unknown. 40 breast tumours were identified from individuals with known rs2981582 genotype. Tumour sections were stained for FGFR2 protein expression, and scored for nuclear and cytoplasmic staining in tumour and surrounding normal tissue.\n\nFindings\n\nFGFR2 immunohistochemistry demonstrated variable nuclear staining in normal tissue and tumour tissue, as well as consistent cytoplasmic staining. We did not find an association between nuclear staining for FGFR2 and genotype, and there was no association between FGFR2 staining and estrogen or progestogen receptor status. There was an association between presence of nuclear staining for FGFR2 in normal tissue and presence of nuclear staining in the adjacent tumour (Fishers exact test, p = 0.002).\n\nConclusions\n\nVariable nuclear staining for FGFR2 in breast cancer, but an absence of correlation with rs2981582 genotype suggests that the mechanism of action of polymorphisms at the FGFR2 locus may be more complex than a direct effect on mRNA expression levels in the final cancer. The effect may relate to FGFR2 function or localisation during b",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "18483326",
+      "title": "FGFR2 is a breast cancer susceptibility gene in Jewish and Arab Israeli populations.",
+      "abstract": "Genetic variation in FGFR2 is a newly described risk factor for breast cancer. We estimated the relative risk and contribution of FGFR2 polymorphisms to breast cancer risk in diverse ethnic groups within Jewish and other Middle Eastern populations. We genotyped four FGFR2 single nucleotide polymorphisms (SNP) and tested for association of these SNPs and haplotypes with breast cancer risk in a population-based case-control study of 1,529 women with breast cancer and 1,528 controls. We found significant associations between breast cancer risk and all four studied SNPs in FGFR2 (P trend for all SNPs < 0.0001). In ethnicity-specific analysis, all four SNPs were significantly associated with breast cancer risk in Ashkenazi and Sephardi Jews, with a similar but not significant trend in Arabs. Haplotype analysis identified five common haplotypes (>1%). The previously described AAGT risk haplotype was significantly associated with breast cancer risk in Ashkenazi [odds ratio (OR), 1.25; 95% confidence interval (95% CI), 1.07-1.45; P = 0.0059] and Sephardi Jews (OR, 1.46; 95% CI, 1.17-1.80; P = 0.0006) compared with the reference GGAC haplotype. The AAAC haplotype was significantly associated with breast cancer risk in Sephardi Jews (OR, 1.97; 95% CI, 1.16-3.35; P = 0.0125) but not in Ashkenazi Jews (OR, 0.83; 95% CI, 0.41-1.62; P = 0.5613) or in Arabs (OR, 1.31; 95% CI, 0.80-2.14; P = 0.2881). Genetic variation in FGFR2, identified by rs1219648, may account for a substantial fraction ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR2"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38317965",
+      "title": "New insight into the role of the ADAM protease family in breast carcinoma progression",
+      "abstract": "Protease and adhesion molecules play a very emphasized role in the occurrence or progression of metastasis in many types of cancers. In this context, a molecule that contains both protease and adhesion functions play a crucial role in metastasis. ADAMs (a disintegrin and metalloprotease) are molecules with this special characteristic. Recently, a lot of attention has been attracted to various ADAM molecules and researchers have tried to elucidate the role of ADAMs in breast cancer occurrence and progression. Disrupting ADAMs protease and adhesion capabilities can lead to the discovery of worthy therapeutic targets in breast cancer treatment. In this review, we intend to discuss the mechanism of action of various ADAM molecules, their relation to pathogenic processes of breast cancer, and their potential as possible targets for breast cancer treatment.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell invasion",
+          "tumor microenvironment",
+          "proteolytic activity"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "18394187",
+      "title": "Inflammation and breast cancer. Metalloproteinases as common effectors of inflammation and extracellular matrix breakdown in breast cancer",
+      "abstract": "Two rapidly evolving fields are converging to impact breast cancer: one has identified novel substrates of metalloproteinases that alter immune cell function, and the other has revealed a role for inflammation in human cancers. Evidence now shows that the mechanisms underlying these two fields interact in the context of breast cancer, providing new opportunities to understand this disease and uncover novel therapeutic strategies. The metalloproteinase class of enzymes is well studied in mammary gland development and physiology, but mostly in the context of extracellular matrix modification. Aberrant metalloproteinase expression has also been implicated in breast cancer progression, where these genes act as tumor modifiers. Here, we review how the metalloproteinase axis impacts mammary physiology and tumorigenesis and is associated with inflammatory cell influx in human breast cancer, and evaluate its potential as a regulator of inflammation in the mammary gland.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell invasion",
+          "tumor microenvironment",
+          "proteolytic activity"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40214422",
+      "title": "Cell Progression and Survival Functions of Enzymes Secreted in Extracellular Vesicles Associated with Breast and Prostate Cancers",
+      "abstract": "Extracellular vesicles (EVs) are membrane-bound cargoes secreted by normal and pathological cells. Through their protein, nucleic acid, and lipid cargoes, EVs mediate several cellular processes, such as cell-cell communication, cell development, immune response, and tissue repair. Most importantly, through their enzyme cargo, EVs mediate pathophysiological processes, including the pathogenesis of cancer. In this review, we enumerate several enzymes secreted in EVs (EV enzyme cargo) from cells and patient clinical samples of breast and prostate cancers and detail their contributions to the progression and survival of both cancers. Findings in this review reveal that the EV enzyme cargo could exert cell progression functions via adhesion, proliferation, migration, invasion, and metastasis. The EV enzyme cargo might also influence cell survival functions of chemoresistance, radioresistance, angiogenesis, cell death inhibition, cell colony formation, and immune evasion. While the current literature provides evidence of the possible contributions of the EV enzyme cargo to the progression and survival mechanisms of breast and prostate cancers, future studies are required to validate that these effects are modified by EVs and provide insights into the clinical applications of the EV enzyme cargo in breast and prostate cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell invasion",
+          "tumor microenvironment",
+          "proteolytic activity"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32875951",
+      "title": "Structure, regulatory factors and cancer-related physiological effects of ADAM9",
+      "abstract": "ABSTRACT\n\nThe ADAMs family belongs to the transmembrane protein superfamily of zinc-dependent metalloproteases, which consists of multiple domains. These domains have independent but complementary functions that enable them to participate in multiple biological processes. Among them, ADAM9 can not only participate in the degradation of extracellular matrix as a metalloprotease, but also mediate tumor cell adhesion through its deintegrin domain, which is closely related to tumor invasion and metastasis. It is widely expressed in a variety of tumor cells and can affect the proliferation, invasion and metastasis of related cancer cells. We provide our views on current progress, its increasing importance as a strategic treatment goal, and our vision for the future of ADAM9.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell invasion",
+          "tumor microenvironment",
+          "proteolytic activity"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33096780",
+      "title": "An Overview of ADAM9: Structure, Activation, and Regulation in Human Diseases",
+      "abstract": "ADAM9 (A disintegrin and a metalloprotease 9) is a membrane-anchored protein that participates in a variety of physiological functions, primarily through the disintegrin domain for adhesion and the metalloprotease domain for ectodomain shedding of a wide variety of cell surface proteins. ADAM9 influences the developmental process, inflammation, and degenerative diseases. Recently, increasing evidence has shown that ADAM9 plays an important role in tumor biology. Overexpression of ADAM9 has been found in several cancer types and is correlated with tumor aggressiveness and poor prognosis. In addition, through either proteolytic or non-proteolytic pathways, ADAM9 promotes tumor progression, therapeutic resistance, and metastasis of cancers. Therefore, comprehensively understanding the mechanism of ADAM9 is crucial for the development of therapeutic anti-cancer strategies. In this review, we summarize the current understanding of ADAM9 in biological function, pathophysiological diseases, and various cancers. Recent advances in therapeutic strategies using ADAM9-related pathways are presented as well.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell invasion",
+          "tumor microenvironment",
+          "proteolytic activity"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32194680",
+      "title": "ADAM9: A novel player in vestibular schwannoma pathogenesis",
+      "abstract": "A disintegrin and metalloproteinase 9 (ADAM9) is a member of the transmembrane ADAM family. It is expressed in different types of solid cancer and promotes tumor invasiveness. To the best of our knowledge, the present study was the first to examine ADAM9 expression in vestibular schwannomas (VS) from patients with and without neurofibromatosis type 2 (NF2) and to associate the data with clinical parameters of the patients. The aim of the present study was to evaluate if ADAM9 could be used as prognostic marker or therapeutic target. ADAM9 mRNA and protein levels were measured in VS samples (n=60). A total of 30 of them were from patients with neurofibromatosis. Healthy peripheral nerves from autopsies (n=10) served as controls. ADAM9 mRNA levels were measured by PCR, and protein levels were determined by immunohistochemistry (IHC) and western blotting (WB). The Hannover Classification was used to categorize tumor extension and hearing loss. ADAM9 mRNA levels were 8.8-fold higher in VS compared with in controls. The levels were 5.6-fold higher in patients with NF2 and 12-fold higher in patients with sporadic VS. WB revealed two mature isoforms of the protein, and according to IHC ADAM9 was mainly expressed by S100-positive Schwann cells. There was a strong correlation between ADAM9 mRNA expression and the level of functional impairment (r~1, p=0.01). Particularly, the secreted isoform of ADAM9 was expressed in patients with higher hearing impairment. ADAM9 mRNA was overexpress",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell invasion",
+          "tumor microenvironment",
+          "proteolytic activity"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25980435",
+      "title": "YBX1/YB-1 induces partial EMT and tumourigenicity through secretion of angiogenic factors into the extracellular microenvironment",
+      "abstract": "Epithelial-mesenchymal transition (EMT) describes a morphogenetic program which confers mesenchymal cell properties, such as reduced cell-cell contact and increased cell migration and invasion, to epithelial cells. Here we investigate the role of the pleiotropic transcription/splicing factor and RNA-binding protein nuclease-sensitive element-binding protein 1 (YBX1/YB-1) in increasing the oncogenic potential of epithelial MDCK cells. Characterization of MDCK cells expressing YBX1 (MDCKYBX1 cells) revealed a partial EMT phenotype, including cytosolic relocalization of E-cadherin, increased cell scattering, and anchorage-independent growth. Subcutaneous injection of parental MDCK cells into NOD/SCID mice did not form tumours. Critically, MDCKYBX1 cells established viable tumour xenografts, and immuno-histochemical staining indicated murine vascularization by CD31+ endothelial cells. We analysed the total secretome (containing soluble and extracellular vesicles) of MDCKYBX1 cells to investigate regulation of the tumour microenvironment. YBX1 expression elevated release of secreted factors known to enhance angiogenesis (TGF-beta, CSF-1, NGF, VGF, ADAM9 and ADAM17), compared to MDCK cells. Importantly, treatment with MDCKYBX1 cell-derived secretome increased recipient 2F-2B endothelial cell motility. This defines YBX1 as an oncogenic enhancer that can regulate tumour angiogenesis via release of secreted modulators into the extracellular microenvironment.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell invasion",
+          "tumor microenvironment",
+          "proteolytic activity"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25177692",
+      "title": "A Disintegrin and Metalloproteinase 9 Is Involved in Ectodomain Shedding of Receptor-Binding Cancer Antigen Expressed on SiSo Cells ",
+      "abstract": "In several human malignancies, the expression of receptor-binding cancer antigen expressed on SiSo cells (RCAS1) is associated with aggressive characteristics and poor overall survival. RCAS1 alters the tumor microenvironment by inducing peripheral lymphocyte apoptosis and angiogenesis, while reducing the vimentin-positive cell population. Although proteolytic processing, referred to as \"ectodomain shedding,\" is pivotal for induction of apoptosis by RCAS1, the proteases involved in RCAS1-dependent shedding remain unclear. Here we investigated proteases involved in RCAS1 shedding and the association between tumor protease expression and serum RCAS1 concentration in uterine cancer patients. A disintegrin and metalloproteinase (ADAM) 9 was shown to be involved in the ectodomain shedding of RCAS1. Given the significant correlation between tumor ADAM9 expression and serum RCAS1 concentration in both cervical and endometrial cancer as well as the role for ADAM9 in RCAS1 shedding, further exploration of the regulatory mechanisms by which ADAM9 converts membrane-anchored RCAS1 into its soluble form should aid the development of novel RCAS1-targeting therapeutic strategies to treat human malignancies.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM9"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell invasion",
+          "tumor microenvironment",
+          "proteolytic activity"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "ADAM9"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "FGFR2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "ADAM9"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "metalloprotease",
+        "cell invasion",
+        "tumor microenvironment",
+        "proteolytic activity"
+      ]
+    },
+    {
+      "genes": [
+        "FGFR2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "fibroblast growth factor receptor",
+        "tyrosine kinase",
+        "signaling pathway",
+        "therapeutic target"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "FGFR signaling",
+        "fibroblast growth factor pathway",
+        "RTK signaling",
+        "tumor progression"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "ADAM protease pathway",
+        "ectodomain shedding",
+        "growth factor activation",
+        "cell signaling"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "macrophage",
+        "tumor-associated macrophage",
+        "endothelial cell",
+        "perivascular",
+        "spatial distribution"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "DCIS",
+        "invasive carcinoma",
+        "myoepithelial layer",
+        "stromal interaction",
+        "tumor heterogeneity"
+      ]
+    },
+    {
+      "genes": [
+        "ADAM9",
+        "FGFR2"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "spatial transcriptomics",
+        "cell-cell communication",
+        "tumor microenvironment",
+        "ligand-receptor interaction",
+        "invasive front"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "T cell infiltration",
+        "immune evasion",
+        "stromal-tumor crosstalk",
+        "hybrid cell states"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "ADAM9",
+      "FGFR2"
+    ],
+    "genes_matched_by": {
+      "ADAM9": "biomcp_tag+text_confirmed",
+      "FGFR2": "fgfr2"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Macrophages 1",
+      "Macrophages 2",
+      "Endothelial",
+      "Stromal",
+      "DCIS 2"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 41.66666666666667,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Invasive Tumor",
+      "Myoepi ACTA2+",
+      "Myoepi KRT15+",
+      "Perivascular-Like",
+      "Prolif Invasive Tumor",
+      "Stromal & T Cell Hybrid",
+      "T Cell & Tumor Hybrid"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 86,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": "final",
+      "papers": 30,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    }
+  ],
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with controlled pathway labels/aliases + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

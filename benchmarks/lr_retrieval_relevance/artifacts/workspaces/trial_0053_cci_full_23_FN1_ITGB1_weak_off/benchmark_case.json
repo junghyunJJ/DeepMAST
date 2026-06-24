@@ -1,0 +1,93 @@
+{
+  "case_id": "cci_full_23_FN1_ITGB1",
+  "category": "high_morans_known",
+  "lr_pair": "FN1-ITGB1",
+  "genes": [
+    "FN1",
+    "ITGB1"
+  ],
+  "pathways": [
+    "Hypoxia"
+  ],
+  "celltypes": [
+    "DCIS 1",
+    "Endothelial",
+    "Invasive Tumor",
+    "Macrophages 1",
+    "Macrophages 2",
+    "Perivascular-Like",
+    "Prolif Invasive Tumor",
+    "Stromal",
+    "Stromal & T Cell Hybrid"
+  ],
+  "disease": "breast cancer",
+  "search_context": {
+    "genes": [
+      "FN1",
+      "ITGB1"
+    ],
+    "pathways": [
+      "Hypoxia"
+    ],
+    "celltypes": [
+      "DCIS 1",
+      "Endothelial",
+      "Invasive Tumor",
+      "Macrophages 1",
+      "Macrophages 2",
+      "Perivascular-Like",
+      "Prolif Invasive Tumor",
+      "Stromal",
+      "Stromal & T Cell Hybrid"
+    ],
+    "disease": "breast cancer",
+    "lr_pair": "FN1-ITGB1",
+    "category": "high_morans_known"
+  },
+  "raw_case": {
+    "case_id": "cci_full_23_FN1_ITGB1",
+    "benchmark_type": "cci_interpretation_v2",
+    "lr_pair": "FN1-ITGB1",
+    "category": "high_morans_known",
+    "input_bundle": {
+      "ligand": "FN1",
+      "receptor": "ITGB1",
+      "interaction": "FN1^ITGB1",
+      "morans_r": 0.190252,
+      "morans_pval": 0.0,
+      "ligand_means": 2.6109,
+      "ligand_props": 0.9767,
+      "receptor_means": 1.3756,
+      "receptor_props": 0.8986,
+      "factor1": 1.1014,
+      "factor2": 1.9602,
+      "factor3": 0.4852,
+      "pathway_associations": [
+        "Hypoxia"
+      ],
+      "disease_associations": [
+        "Neoplasm Invasiveness"
+      ],
+      "ligand_cell_types": [
+        "DCIS 1",
+        "Endothelial",
+        "Invasive Tumor",
+        "Macrophages 1",
+        "Macrophages 2",
+        "Perivascular-Like",
+        "Prolif Invasive Tumor",
+        "Stromal",
+        "Stromal & T Cell Hybrid"
+      ],
+      "receptor_cell_types": [
+        "Macrophages 2",
+        "Stromal",
+        "Stromal & T Cell Hybrid"
+      ],
+      "mean_interest": 0.007884,
+      "pval_interest": 1.1618324080586715e-09,
+      "pval_interest_adj": 1.5802191768225263e-08,
+      "tissue_context": "Breast cancer Visium spatial transcriptomics"
+    }
+  }
+}

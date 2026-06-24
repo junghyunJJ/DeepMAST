@@ -1,0 +1,41 @@
+{
+  "name": "cci_skill_ablation_reproducible_bundle",
+  "assembled_on": "2026-06-06",
+  "repository_head_at_assembly": "ad8e462",
+  "primary_reproducibility": "offline artifact regeneration from committed judged trial outputs",
+  "live_rerun": "optional; depends on OpenAI and Anthropic API credentials",
+  "case_count": 30,
+  "trial_count": 600,
+  "conditions": [
+    "A_no_skill",
+    "B_unstructured_prose",
+    "C_structured_skill",
+    "D_guide_compliant_skill"
+  ],
+  "condition_labels": {
+    "A_no_skill": "No Skills",
+    "B_unstructured_prose": "Unstructured Prose",
+    "C_structured_skill": "Basic Structured SKILLs",
+    "D_guide_compliant_skill": "Guide-Compliant Structured SKILLs"
+  },
+  "condition_interpretation": "B_unstructured_prose vs C_structured_skill isolates structured formatting over prose with matched hallucination-prevention content; C_structured_skill vs D_guide_compliant_skill tests guide-specific design patterns and is positive but not statistically significant.",
+  "models": {
+    "generator": "openai:gpt-5.4-nano, temperature=0.3",
+    "judges": [
+      "openai:gpt-5.4, temperature=0",
+      "claude:claude-sonnet-4-20250514, temperature=0"
+    ]
+  },
+  "reference_artifacts": [
+    "inputs/cci_full_cases.json",
+    "results/full_cci_v2_D_guide_trials.jsonl",
+    "results/full_cci_v2_D_guide_summary.json",
+    "results/full_cci_v2_D_guide_results.md",
+    "results/figure_tables/main_condition_scores.csv",
+    "results/figure_tables/supplementary_condition_scores.csv",
+    "results/figure_tables/fabrication_counts.csv",
+    "figures/SkillAblation.png",
+    "figures/SkillAblation.svg",
+    "figures/s_SkillAblation.png"
+  ]
+}

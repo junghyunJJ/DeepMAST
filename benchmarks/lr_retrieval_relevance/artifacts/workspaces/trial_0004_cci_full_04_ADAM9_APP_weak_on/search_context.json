@@ -1,0 +1,26 @@
+{
+  "genes": [
+    "ADAM9",
+    "APP"
+  ],
+  "pathways": [
+    "Estrogen"
+  ],
+  "celltypes": [
+    "DCIS 2",
+    "Endothelial",
+    "Invasive Tumor",
+    "Macrophages 1",
+    "Macrophages 2",
+    "Myoepi ACTA2+",
+    "Myoepi KRT15+",
+    "Perivascular-Like",
+    "Prolif Invasive Tumor",
+    "Stromal",
+    "Stromal & T Cell Hybrid",
+    "T Cell & Tumor Hybrid"
+  ],
+  "disease": "breast cancer",
+  "lr_pair": "ADAM9-APP",
+  "category": "low_morans_known"
+}

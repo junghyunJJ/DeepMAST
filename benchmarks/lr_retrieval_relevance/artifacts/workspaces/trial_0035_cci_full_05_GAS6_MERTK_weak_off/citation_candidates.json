@@ -1,0 +1,1648 @@
+{
+  "schema_version": "deep_interpreter_literature_candidates_v1",
+  "inputs": {
+    "disease": "breast cancer",
+    "lr_pairs": [
+      {
+        "pair": "GAS6-MERTK",
+        "ligand": "GAS6",
+        "receptor": "MERTK"
+      }
+    ],
+    "pathways": [
+      "PI3K"
+    ],
+    "celltypes": [
+      "Endothelial",
+      "Macrophages 1",
+      "Macrophages 2",
+      "Myoepi ACTA2+",
+      "Myoepi KRT15+",
+      "Perivascular-Like",
+      "Stromal",
+      "Stromal & T Cell Hybrid"
+    ]
+  },
+  "source": {
+    "total_papers": 30,
+    "unique_papers": 30,
+    "duplicates_dropped": 0
+  },
+  "bucket_order": [
+    "direct_lr_evidence",
+    "receptor_pathway_context_evidence",
+    "disease_only_background",
+    "rejected_weak_evidence"
+  ],
+  "counts": {
+    "direct_lr_evidence": 1,
+    "receptor_pathway_context_evidence": 18,
+    "disease_only_background": 2,
+    "rejected_weak_evidence": 9
+  },
+  "pair_results": [
+    {
+      "lr_pair": "GAS6-MERTK",
+      "ligand": "GAS6",
+      "receptor": "MERTK",
+      "direct_lr_evidence": 1,
+      "receptor_pathway_context_evidence": 15
+    }
+  ],
+  "papers": [
+    {
+      "pmid": "39510154",
+      "title": "AXL/GAS6 signaling governs differentiation of tumor-associated macrophages in breast cancer.",
+      "abstract": "Most epithelial cancers are infiltrated by prognostically relevant myelomonocytic cells. Immunosuppressive tumor associated macrophages (TAMs) and their precursor monocytic-MDSCs have previously been associated with worse outcomes in human breast cancer (BCa), yet the mechanism of immunosuppressive TAMs-polarization from myelomonocytic precursors is not completely understood. In this study, we show that persuaded AXL/GAS6 pathway alters macrophage phenotype from HLA-DRhighCD206low CD163low classical phagocytic into HLA-DRlowCD206highCD163high immunosuppressive ones with accelerated BCa progression, and increased angiogenesis signature and invasion ability of cancer cells at tumor beds. Notably, both AXL and GAS6 expressions are upregulated in human invasive breast carcinoma, with maximum expression in triple negative histology type. Mechanistically, we demonstrate that AXL/GAS6 signaling drives immunosuppression by governing increased immunosuppressive IL10 production while dampening IL-1beta expression within the tumor microenvironment (TME) of BCa. Further, AXL/GAS6 signaling promotes angiogenesis through the activation of PI3K/AKT and NF-kappaB signaling pathways. Our results unveil role of AXL/GAS6 axis in the differentiation of TAMs, which governs malignant growth, and suggest that therapies that uncouple AXL/GAS6 axis may exhibit therapeutic opportunity for otherwise undruggable Triple Negative Breast Cancer (TNBC) patients.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "GAS6",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [
+          "PI3K"
+        ],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "35093137",
+      "title": "Gene expression predicts dormant metastatic breast cancer cell phenotype",
+      "abstract": "Background\n\nBreast cancer can recur months to decades after an initial diagnosis and treatment. The mechanisms that control tumor cell dormancy remain poorly understood, making it difficult to predict which patients will recur and thus benefit from more rigorous screening and treatments. Unfortunately, the extreme rarity of dormant DTCs has been a major obstacle to their study.\n\nMethods\n\nTo overcome this challenge, we developed an efficient system to isolate and study rare dormant breast cancer cells from metastatic organs including bones, which represent a major site of metastasis. After isolation of cells from the long bones, we used single cell RNA-sequencing (scRNA-seq) to profile proliferative and dormant PyMT-Bo1 breast cancer cells. We also compared this signature to dormant versus proliferative tumor cells isolated from the lungs. Finally, we compared our dormant signature to human datasets.\n\nResults\n\nWe identified a group of genes including Cfh, Gas6, Mme and Ogn that were highly expressed in dormant breast cancer cells present in the bone and lung. Expression of these genes had no impact on dormancy in murine models, but their expression correlated with disease-free survival in primary human breast cancer tumors, suggesting that these genes have predictive value in determining which patients are likely to recur.\n\nConclusions\n\nDormant breast cancer cells exhibit a distinct gene expression signature regardless of metastatic site. Genes enriched in dormant breast cance",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "GAS6",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "34976151",
+      "title": "Long non-coding RNA GAS6-AS1 enhances breast cancer cell aggressiveness by functioning as a competing endogenous RNA of microRNA-215-5p to enhance SOX9 expression.",
+      "abstract": "Long non-coding (lnc) RNAs play crucial functions in human cancer. However, until recently, the involvement of the lncRNA GAS6-AS1 in breast cancer (BCa) malignancy has not been studied exhaustively. The roles and underlying mode of action of GAS6-AS1 action in BCa progression were examined through functional experiments. A decline in GAS6-AS1 level led to a significant decrease in BCa cell proliferation, and the ability for colony formation. Here, GAS6-AS1 competed as endogenous RNA by sequestering microRNA-215-5p (miR-215-5p) causing an enhanced expression of SRY-box transcription factor 9 (SOX9). The effects of silencing GAS6-AS1 on BCa malignant phenotypes could be ameliorated by inhibiting miR-215-5p or restoring SOX9. Thus, GAS6-AS1 acted as a lncRNA that drives tumor in BCa, and enabled progression of BCa through miR-215-5p /SOX9 axis regulation. These outcomes show that the GAS6-AS1/miR-215-5p/SOX9 axis is a potentially effective target for cancer treatment and management.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "GAS6",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "33359886",
+      "title": "Opposite trends of GAS6 and GAS6-AS expressions in breast cancer tissues.",
+      "abstract": "Growth arrest-specific gene 6 (GAS6) is a growth factor-like cytokine whose function is related with vitamin K. This protein interacts with receptor tyrosine kinase proteins such as Tyro3, Axl, and TAM Receptor family, therefore affecting the tumorigenic processes via different mechanisms. GAS6-antisense 1 (GAS6-AS1) is a long non-coding RNAs (lncRNAs) that is transcribed from a genomic regions nearby GAS6. This lncRNA is also implicated in the pathobiology of cancer. We intended to judge the role of GAS6 and GAS6-AS1 in the pathogenesis of breast cancer through appraisal of their expression levels in breast cancer tissues and their paired neighboring non-cancerous samples. Expression of GAS6 was up-regulated in breast cancer tissues compared with neighboring tissues (Ratio of Mean Expressions = 2.18, P value = 4.98E-02). On the other hand, expression of GAS6-AS1 was down-regulated in breast tumor tissues compared with controls (Ratio of Mean Expressions = 0.37, P value = 4.26E-03). There were substantial correlations between expression levels GAS6 and GAS6-AS1 in non-cancerous tissues (r = 0.74, P value = 1.47e-13) and cancer tissues (r = 0.85, P value = 2.28e-20). Expression of GAS6-AS was associated with progesterone receptor status (P value = 1.36E-02). However, expressions of this gene and the sense transcript were not linked with any other clinical or demographic variable. Taken together, GAS6 and GAS6-AS1 might partake in the development of breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "GAS6",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "32352034",
+      "title": "Gas6 expression is reduced in advanced breast cancers",
+      "abstract": "Growth arrest-specific gene 6 (Gas6) is a cytokine that binds to receptor tyrosine kinases Tyro3, Axl, and Mer. Numerous studies have suggested that macrophage-derived Gas6 interacts with Axl to promote cancer progression, and Axl has been associated with poor clinical outcome. However, the expression and relevance of Gas6 in human breast cancer patients has not been studied. Analysis of tissue microarrays showed that Gas6 was highly expressed in ductal carcinoma in situ (DCIS) but markedly decreased in invasive breast cancer. Gas6 and Axl were weakly correlated, suggesting that their functions may not exclusively rely on each other. Analyses of publicly available databases showed significantly improved overall and relapse-free survival in patients with high Gas6 mRNA, particularly in luminal A breast cancers. These findings indicate that tumor-derived Gas6 is not overexpressed in invasive breast cancer, and may not be a negative prognostic factor in human breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "GAS6",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "31839366",
+      "title": "Long noncoding RNA GAS6-AS2 sponges microRNA-493, thereby enhancing the malignant characteristics of breast cancer cells via upregulation of FUT4.",
+      "abstract": "Long noncoding RNA (lncRNA) GAS6-AS2 serves as an oncogenic lncRNA in various types of human cancer. In this study, we attempted to examine the functions of GAS6-AS2 in breast cancer (BC) and explore the potential mechanisms involved. Reverse-transcription quantitative PCR was carried out to determine GAS6-AS2 expression in BC tissues and cell lines. Multiple functional experiments, including a Cell Counting Kit-8 assay, Transwell migration and invasion assays, and an in vivo nude-mouse xenograft experiment, were conducted to evaluate the effects of GAS6-AS2 in BC cells. GAS6-AS2 expression was high in BC tumors, manifesting a strong correlation with tumor size, lymph node metastasis, TNM stage, and shorter overall survival in patients with BC. A knockdown of GAS6-AS2 restricted BC cell proliferation, migration, and invasion in vitro and retarded tumor growth in vivo. With regard to its mechanism, GAS6-AS2 acted as a competing endogenous RNA that sponged microRNA-493 (miR-493), thereby increasing the expression of fucosyltransferase IV (FUT4). Either miR-493 inhibition or FUT4 upregulation abrogated the consequences of GAS6-AS2 knockdown in BC cells. These results revealed that GAS6-AS2 sponges miR-493 to enhance the malignant characteristics of BC in vitro and in vivo by increasing FUT4 expression. Thus, this lncRNA is an effective therapeutic target in BC and a promising diagnostic biomarker of this cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "GAS6",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "27279912",
+      "title": "Gas6/Axl Axis Contributes to Chemoresistance and Metastasis in Breast Cancer through Akt/GSK-3beta/beta-catenin Signaling",
+      "abstract": "Chemoresistance in breast cancer has been of great interest in past studies. However, the development of rational therapeutic strategies targeting chemoresistant cells is still a challenge in clinical oncology. By integrating data from global differences of gene expression and phospho-receptor tyrosine kinases between sensitive parental cells (MCF-7) and doxorubicin-resistant cells (MCF-7/ADR), we identified Axl as a potential target for chemoresistance and metastasis in multidrug resistant breast cancer cells. We analyzed Axl expression in 57 breast cancer cell lines and detected a dramatic increase in its expression level in mesenchymal breast cancer cell lines. Axl silencing suppressed invasive and metastatic potentials of chemoresistant breast cancer cells as well as increased elimination of cancer cells when combined with doxorubicin. Furthermore, in preclinical assays, an Axl inhibitor R428 showed increased cell death upon doxorubicin treatment. Additionally, using phospho-kinase array based proteomic analysis, we identified that Akt/GSK-3beta/beta-catenin cascade was responsible for Axl-induced cell invasion. Nuclear translocation of beta-catenin then induced transcriptional upregulation of ZEB1, which in turn regulated DNA damage repair and doxorubicin-resistance in breast cancer cells. Most importantly, Axl was correlated with its downstream targets in tumor samples and was associated with poor prognosis in breast cancer patients. These results demonstrate that Gas6/",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "GAS6",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "18283315",
+      "title": "Growth arrest-specific gene 6 expression in human breast cancer",
+      "abstract": "Growth arrest-specific gene 6 (Gas6), identified in 1995, acts as the ligand to the Axl/Tyro3 family of tyrosine kinase receptors and exerts mitogenic activity when bound to these receptors. Overexpression of the Axl/Tyro3 receptor family has been found in breast, ovarian and lung tumours. Gas6 is upregulated 23-fold by progesterone acting through the progesterone receptor B (PRB). Recently, Gas6 has been shown to be a target for overexpression and amplification in breast cancer. Quantitative real-time PCR analysis was used to determine the levels of Gas6 mRNA expression in 49 primary breast carcinomas. Expression of PRB protein was evaluated immunohistochemically with a commercially available PRB antibody. The results showed a positive association between PRB protein and Gas6 mRNA levels (P=0.04). Gas6 correlated positively with a number of favourable prognostic variables including lymph node negativity (P=0.0002), younger age at diagnosis (P=0.04), smaller size of tumours (P=0.02), low Nottingham prognostic index scores (P=0.03) and low nuclear morphology (P=0.03). This study verifies for the first time the association between PRB and Gas6 in breast cancer tissue.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "GAS6",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "17483321",
+      "title": "Identification of novel amplification gene targets in mouse and human breast cancer at a syntenic cluster mapping to mouse ch8A1 and human ch13q34.",
+      "abstract": "Serial analysis of gene expression from aggressive mammary tumors derived from transplantable p53 null mouse mammary outgrowth lines revealed significant up-regulation of Tfdp1 (transcription factor Dp1), Lamp1 (lysosomal membrane glycoprotein 1) and Gas6 (growth arrest specific 6) transcripts. All of these genes belong to the same linkage cluster, mapping to mouse chromosome band 8A1. BAC-array comparative genomic hybridization and fluorescence in situ hybridization analyses revealed genomic amplification at mouse region ch8A1.1. The minimal region of amplification contained genes Cul4a, Lamp1, Tfdp1, and Gas6, highly overexpressed in the p53 null mammary outgrowth lines at preneoplastic stages, and in all its derived tumors. The same amplification was also observed in spontaneous p53 null mammary tumors. Interestingly, this region is homologous to human chromosome 13q34, and some of the same genes were previously observed amplified in human carcinomas. Thus, we further investigated the occurrence and frequency of gene amplification affecting genes mapping to ch13q34 in human breast cancer. TFDP1 showed the highest frequency of amplification affecting 31% of 74 breast carcinomas analyzed. Statistically significant positive correlation was observed for the amplification of CUL4A, LAMP1, TFDP1, and GAS6 genes (P < 0.001). Meta-analysis of publicly available gene expression data sets showed a strong association between the high expression of TFDP1 and decreased overall survival",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "GAS6",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "17174935",
+      "title": "GAS6 is an estrogen-inducible gene in mammary epithelial cells.",
+      "abstract": "To identify estrogen-responsive genes in mammary glands, microarray assays were performed. Twenty genes were found to be up-regulated while 16 genes were repressed in the 9h estrogen treated glands. The induction of GAS6, one of the genes up-regulated by estrogen, was confirmed by RNase protection assay. Furthermore, GAS6 was also demonstrated to be induced by estrogen in ER positive breast cancer cells. Analysis of GAS6 promoter revealed that GAS6 promoter was regulated by estrogen. An estrogen response element (ERE) was identified in the GAS6 promoter. Electrophoretic mobility shift assay revealed that ERalpha interacted with the ERE in the GAS6 promoter. Chromatin immunoprecipitation demonstrated that ERalpha was recruited to the GAS6 promoter upon estrogen stimulation. These results suggested that GAS6 is an estrogen target gene in mammary epithelial cells.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "GAS6",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "40850283",
+      "title": "Dual inhibition of AXL and MER kinase: scope for lung and breast cancer therapeutics.",
+      "abstract": "Cancer cells use multiple survival pathways for continuous proliferation, survival, and growth. Recent anticancer drug discovery commonly focuses on a single target that maintains key cancer cell survival mechanisms, where typically, this is a cellular enzyme that inhibits DNA replication, inducing cell damage and apoptosis. Since drugs that act on a single target may be more susceptible to the development of resistance, the search for polypharmacotherapeutics is becoming increasingly popular to defeat drug-resistant cancer cells. Receptor tyrosine kinases (RTKs) family members, AXL and MER, have been identified as important cancer targets and found to be overexpressed and associated with various forms of cancers, such as lung and breast cancers. This review has focused on the dual inhibition of AXL and MER kinases as a strategy for treating lung and breast cancer. The roles of these two kinases in non-small cell lung cancer (NSCLC) are such that dual inhibition would be therapeutically complementary, with MER inhibition more fully blocking tumor growth while AXL inhibition encourages chemosensitivity. Hence, treatment strategies targeting both of these RTKs may be more effective and beneficial than singly targeted agents, and a dual AXL/MER inhibitor is a potential therapy for NSCLC along with breast cancer. This review highlights the preclinical and clinical development of dual AXL and MER kinase inhibitors as lung and breast cancer treatments and the prospects for their fu",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "MERTK"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "33848267",
+      "title": "Myeloid cell-derived PROS1 inhibits tumor metastasis by regulating inflammatory and immune responses via IL-10.",
+      "abstract": "Stimulation of TAM (TYRO3, AXL, and MERTK) receptor tyrosine kinases promotes tumor progression through numerous cellular mechanisms. TAM cognate ligands GAS6 and PROS1 (for TYRO3 and MERTK) are secreted by host immune cells, an interaction which may support tumor progression. Here, we revealed an unexpected antimetastatic role for myeloid-derived PROS1: suppressing metastatic potential in lung and breast tumor models. Pros1 deletion in myeloid cells led to increased lung metastasis, independent of primary tumor infiltration. PROS1-cKO bone marrow-derived macrophages (BMDMs) led to elevated TNF-alpha, IL-6, Nos2, and IL-10 via modulation of the Socs3/NF-kappaB pathway. Conditioned medium from cKO BMDMs enhanced EMT, ERK, AKT, and STAT3 activation within tumor cells and promoted IL-10-dependent invasion and survival. Macrophages isolated from metastatic lungs modulated T cell proliferation and function, as well as expression of costimulatory molecules on DCs in a PROS1-dependent manner. Inhibition of MERTK kinase activity blocked PROS1-mediated suppression of TNF-alpha and IL-6 but not IL-10. Overall, using lung and breast cancer models, we identified the PROS1/MERTK axis within BMDMs as a potent regulator of adaptive immune responses with a potential to suppress metastatic seeding and revealed IL-10 regulation by PROS1 to deviate from that of TNF-alpha and IL-6.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "MERTK"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "direct_lr_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "GAS6",
+          "receptor": "MERTK",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "ligand_receptor_disease_co_mention"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "33239426",
+      "title": "Axl and Mertk Receptors Cooperate to Promote Breast Cancer Progression by Combined Oncogenic Signaling and Evasion of Host Antitumor Immunity.",
+      "abstract": "Despite the promising clinical benefit of targeted and immune checkpoint blocking therapeutics, current strategies have limited success in breast cancer, indicating that additional inhibitory pathways are required to complement existing therapeutics. TAM receptors (Tyro-3, Axl, and Mertk) are often correlated with poor prognosis because of their capacities to sustain an immunosuppressive environment. Here, we ablate Axl on tumor cells using CRISPR/Cas9 gene editing, and by targeting Mertk in the tumor microenvironment (TME), we observed distinct functions of TAM as oncogenic kinases, as well as inhibitory immune receptors. Depletion of Axl suppressed cell intrinsic oncogenic properties, decreased tumor growth, reduced the incidence of lung metastasis and increased overall survival of mice when injected into mammary fat pad of syngeneic mice, and demonstrated synergy when combined with anti-PD-1 therapy. Blockade of Mertk function on macrophages decreased efferocytosis, altered the cytokine milieu, and resulted in suppressed macrophage gene expression patterns. Mertk-knockout mice or treatment with anti-Mertk-neutralizing mAb also altered the cellular immune profile, resulting in a more inflamed tumor environment with enhanced T-cell infiltration into tumors and T-cell-mediated cytotoxicity. The antitumor activity from Mertk inhibition was abrogated by depletion of cytotoxic CD8alpha T cells by using anti-CD8alpha mAb or by transplantation of tumor cells into B6.CB17-Prkdc SCI",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "MERTK"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "",
+          "receptor": "MERTK",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "33412963",
+      "title": "The role of Galpha protein signaling in the membrane estrogen receptor-mediated signaling.",
+      "abstract": "Estrogens exert rapid, extranuclear effects by their action on the plasma membrane estrogen receptors (mERs). Galpha protein associated with the cell membrane is involved in many important processes regulated by estrogens. However, the Galpha's role in the mER-mediated signaling and the signaling pathways involved are poorly understood. This review aims to outline the Galpha's role in the mER-mediated signaling. Immunoblotting, immunofluorescence, co-immunoprecipitation, and RNA interference were carried out using vascular endothelial cells (ECs) and human breast carcinoma cell lines as experimental models. Electrophysiology and immunocytochemistry were carried out using guinea pigs as animal models. Recent advances suggest that the signaling of mERalpha through Galpha is required for vascular EC migration or endothelial H2S release, while Galpha13 is involved in estrogen-induced breast cancer cell invasion. Besides, the Galphaq-coupled PLC-PKC-PKA pathway is critical for the neural regulation of energy homeostasis. This review summarizes the contributions of Galpha to mER-mediated signaling, including cardiovascular protection, breast cancer metastasis, neural regulation of homeostatic functions, and osteogenesis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "MERTK"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "28263720",
+      "title": "Simvastatin down-regulates differential genetic profiles produced by organochlorine mixtures in primary breast cell (HMEC).",
+      "abstract": "Women all over the world are exposed to an unavoidable contamination by organochlorine pesticides and other chemical pollutants. Many of them are considered as xenoestrogens and have been associated with the development and progression of breast cancer. We have demonstrated that the most prevalent pesticide mixtures found in healthy women and in women diagnosed with breast cancer modulates the gene expression in human epithelial mammary cells. Statins are well-known cholesterol-depleting agents acting as inhibitors of cholesterol synthesis. Since the early 1990s, it has been known that statins could be successfully used in cancer therapy, including breast cancer, but the exact mechanism behind anti-tumor activity of the statins remains unclear. In the present study we evaluated the effect of simvastatin in the gene expression pattern induced by realistic organochlorine mixtures found in breast cancer patients. The gene expression of 94 genes related with the cell signaling pathways were assessed. Our results indicate that simvastatin exerts a global down regulating effect on successfully determined genes (78.7%), thus attenuating the effects induced by organochlorine mixtures on the gene profile of human mammary epithelial cells. This effect was more evident on genes whose function is the ATP-binding process (that also were particularly up-regulated by pesticide mixtures). We also found that MERTK (a proto-oncogene which is overexpressed in several malignancies) and PDGFRB (a",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "MERTK"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "",
+          "receptor": "MERTK",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "25074939",
+      "title": "Overexpression of MERTK receptor tyrosine kinase in epithelial cancer cells drives efferocytosis in a gain-of-function capacity.",
+      "abstract": "MERTK, a member of the TAM (TYRO3, AXL, and MERTK) receptor tyrosine kinases, has complex and diverse roles in cell biology. On the one hand, knock-out of MERTK results in age-dependent autoimmunity characterized by failure of apoptotic cell clearance, while on the other, MERTK overexpression in cancer drives classical oncogene pathways leading to cell transformation. To better understand the interplay between cell transformation and efferocytosis, we stably expressed MERTK in human MCF10A cells, a non-tumorigenic breast epithelial cell line devoid of endogenous MERTK. While stable expression of MERTK in MCF10A resulted in enhanced motility and AKT-mediated chemoprotection, MERTK-10A cells did not form stable colonies in soft agar, or enhance proliferation compared with parental MCF10A cells. Concomitant to chemoresistance, MERTK also stimulated efferocytosis in a gain-of-function capacity. However, unlike AXL, MERTK activation was highly dependent on apoptotic cells, suggesting MERTK may preferentially interface with phosphatidylserine. Consistent with this idea, knockdown of MERTK in breast cancer cells MDA-MB 231 reduced efferocytosis, while transient or stable expression of MERTK stimulated apoptotic cell clearance in all cell lines tested. Moreover, human breast cancer cells with higher endogenous MERTK showed higher levels of efferocytosis that could be blocked by soluble TAM receptors. Finally, through MERTK, apoptotic cells induced PD-L1 expression, an immune checkpoi",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "MERTK"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "",
+          "receptor": "MERTK",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "23833304",
+      "title": "Molecular pathways: MERTK signaling in cancer.",
+      "abstract": "MERTK is a receptor tyrosine kinase of the TAM (Tyro3, Axl, MERTK) family, with a defined spectrum of normal expression. However, MERTK is overexpressed or ectopically expressed in a wide variety of cancers, including leukemia, non-small cell lung cancer, glioblastoma, melanoma, prostate cancer, breast cancer, colon cancer, gastric cancer, pituitary adenomas, and rhabdomyosarcomas, potentially resulting in the activation of several canonical oncogenic signaling pathways. These include the mitogen-activated protein kinase and phosphoinositide 3-kinase pathways, as well as regulation of signal transducer and activator of transcription family members, migration-associated proteins including the focal adhesion kinase and myosin light chain 2, and prosurvival proteins such as survivin and Bcl-2. Each has been implicated in MERTK physiologic and oncogenic functions. In neoplastic cells, these signaling events result in functional phenotypes such as decreased apoptosis, increased migration, chemoresistance, increased colony formation, and increased tumor formation in murine models. Conversely, MERTK inhibition by genetic or pharmacologic means can reverse these pro-oncogenic phenotypes. Multiple therapeutic approaches to MERTK inhibition are currently in development, including ligand \"traps\", a monoclonal antibody, and small-molecule tyrosine kinase inhibitors.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "MERTK"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "",
+          "receptor": "MERTK",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "20809868",
+      "title": "Taking aim at Mer and Axl receptor tyrosine kinases as novel therapeutic targets in solid tumors.",
+      "abstract": "IMPORTANCE OF THE FIELD: Axl and/or Mer expression correlates with poor prognosis in several cancers. Until recently, the role of these receptor tyrosine kinases (RTKs) in development and progression of cancer remained unexplained. Studies demonstrating that Axl and Mer contribute to cell survival, migration, invasion, metastasis and chemosensitivity justify further investigation of Axl and Mer as novel therapeutic targets in cancer. AREAS COVERED IN THIS REVIEW: Axl and Mer signaling pathways in cancer cells are summarized and evidence validating these RTKs as therapeutic targets in glioblastoma multiforme, NSCLC, and breast cancer is examined. A discussion of Axl and/or Mer inhibitors in development is provided. WHAT THE READER WILL GAIN: Potential toxicities associated with Axl or Mer inhibition are addressed. We propose that the probable action of Mer and Axl inhibitors on cells within the tumor microenvironment will provide a therapeutic opportunity to target both tumor cells and the stromal components that facilitate disease progression. TAKE HOME MESSAGE: Axl and Mer mediate multiple oncogenic phenotypes and activation of these RTKs constitutes a mechanism of chemoresistance in a variety of solid tumors. Targeted inhibition of these RTKs may be effective as anti-tumor and/or anti-metastatic therapy, particularly if combined with standard cytotoxic therapies.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "MERTK"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "26011102",
+      "title": "Article 26011102",
+      "abstract": "",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "MERTK"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "no_disease_anchored_evidence",
+          "title_only_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence",
+        "title_only_evidence"
+      ]
+    },
+    {
+      "pmid": "2954712",
+      "title": "The effect of a novel taurine nitrosourea, 1-(2-chloroethyl)-3-[2-(dimethylaminosulfonyl)ethyl]-1-nitrosour ea (TCNU) on cytotoxicity, DNA crosslinking and glutathione reductase in lung carcinoma cell lines.",
+      "abstract": "A novel nitrosourea, 1-(2-chloroethyl)-3-[2-(dimethylaminosulfonyl)ethyl]-1-nitrosourea (TCNU) has been investigated with respect to cytotoxic mechanisms in rat and human cell lines which either possess (Mer+) or lack (Mer-) 0(6)-alkylguanine transferase activity. TCNU produced significantly greater cytotoxicity in the Mer- cells (Walker 256 rat breast carcinoma resistant to nitrogen mustards; human lung carcinoma A427) than in the Mer+ cells (Walker 256 wild-type; human lung carcinoma A594). This correlated with results generated by alkaline elution studies which showed that TCNU caused DNA interstrand crosslinks in A427 but not in A549 cells. Inhibition of glutathione reductase activity by TCNU demonstrated that in carbamoylating activity the drug was intermediate between chlorozotocin and 1,(2-chloroethyl)-3-cyclohexyl-1-nitrosourea (CCNU) in both A427 and A549 cells. These data suggest that the presence of taurine in the drug structure does little to alter the cytotoxicity or the alkylating or carbamoylating properties of TCNU, and that any clinical advantages with TCNU will be the consequence of other factors.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "MERTK"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "37265798",
+      "title": "Gas6/AXL pathway: immunological landscape and therapeutic potential",
+      "abstract": "Cancer is a disease with ecological and evolutionary unity, which seriously affects the survival and quality of human beings. Currently, many reports have suggested Gas6 plays an important role in cancer. Binding of gas6 to TAM receptors is associated with the carcinogenetic mechanisms of multiple malignancies, such as in breast cancer, chronic lymphocytic leukemia, non-small cell lung cancer, melanoma, prostate cancer, etc., and shortened overall survival. It is accepted that the Gas6/TAM pathway can promote the malignant transformation of various types of cancer cells. Gas6 has the highest affinity for Axl, an important member of the TAM receptor family. Knockdown of the TAM receptors Axl significantly affects cell cycle progression in tumor cells. Interestingly, Gas6 also has an essential function in the tumor microenvironment. The Gas6/AXL pathway regulates angiogenesis, immune-related molecular markers and the secretion of certain cytokines in the tumor microenvironment, and also modulates the functions of a variety of immune cells. In addition, evidence suggests that the Gas6/AXL pathway is involved in tumor therapy resistance. Recently, multiple studies have begun to explore in depth the importance of the Gas6/AXL pathway as a potential tumor therapeutic target as well as its broad promise in immunotherapy; therefore, a timely review of the characteristics of the Gas6/AXL pathway and its value in tumor treatment strategies is warranted. This comprehensive review assess",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "ligand",
+          "phagocytosis",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "GAS6",
+          "receptor": "MERTK"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "GAS6-MERTK": {
+          "ligand": "GAS6",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "37034672",
+      "title": "Distinct tumor architectures for metastatic colonization of the brain",
+      "abstract": "Summary\n\nBrain metastasis is a dismal cancer complication, hinging on the initial survival and outgrowth of disseminated cancer cells. To understand these crucial early stages of colonization, we investigated two prevalent sources of cerebral relapse, triple-negative (TNBC) and HER2+ breast cancer (HER2BC). We show that these tumor types colonize the brain aggressively, yet with distinct tumor architectures, stromal interfaces, and autocrine growth programs. TNBC forms perivascular sheaths with diffusive contact with astrocytes and microglia. In contrast, HER2BC forms compact spheroids prompted by autonomous extracellular matrix components and segregating stromal cells to their periphery. Single-cell transcriptomic dissection reveals canonical Alzheimer's disease-associated microglia (DAM) responses. Differential engagement of tumor-DAM signaling through the receptor AXL suggests specific pro-metastatic functions of the tumor architecture in both TNBC perivascular and HER2BC spheroidal colonies. The distinct spatial features of these two highly efficient modes of brain colonization have relevance for leveraging the stroma to treat brain metastasis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "ligand",
+          "phagocytosis",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "33182542",
+      "title": "AXL Receptor in Breast Cancer: Molecular Involvement and Therapeutic Limitations",
+      "abstract": "Breast cancer was one of the first malignancies to benefit from targeted therapy, i.e., treatments directed against specific markers. Inhibitors against HER2 are a significant example and they improved the life expectancy of a large cohort of patients. Research on new biomarkers, therefore, is always current and important. AXL, a member of the TYRO-3, AXL and MER (TAM) subfamily, is, today, considered a predictive and prognostic biomarker in many tumor contexts, primarily breast cancer. Its oncogenic implications make it an ideal target for the development of new pharmacological agents; moreover, its recent role as immune-modulator makes AXL particularly attractive to researchers involved in the study of interactions between cancer and the tumor microenvironment (TME). All these peculiarities characterize AXL as compared to other members of the TAM family. In this review, we will illustrate the biological role played by AXL in breast tumor cells, highlighting its molecular and biological features, its involvement in tumor progression and its implication as a target in ongoing clinical trials.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "ligand",
+          "phagocytosis",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "36059952",
+      "title": "The expression and significance of efferocytosis and immune checkpoint related molecules in pancancer samples and the correlation of their expression with anticancer drug sensitivity",
+      "abstract": " Background: The efferocytosis-related molecules have been considered to be correlated with the resistance to cancer chemotherapy. The aim of this study was to investigate the expression and significance of efferocytosis-related molecules in cancers and the correlation of their expression with anticancer drug sensitivity, and provide new potential targets and treatment options for cancers.\n\n Methods: We investigated the differential expression of 15 efferocytosis-related molecules (Axl, Tyro3, MerTK, CX3CL1, Tim-4, BAI1, Stab2, Gas6, IDO1, Rac1, MFGE8, ICAM-1, CD47, CD31, and PD-L1) and other 12 common immune checkpoint-related molecules in tumor and normal tissues, the correlation between their expression and various clinicopathological features in 16 types of cancers using publicly available pancancer datasets in The Cancer Genome Atlas. We also analyzed the correlation of the expression of efferocytosis and immune checkpoint related molecules with 126 types of anticancer drugs sensitivity using drug-RNA-seq data.\n\n Results: There is a panel of circulating molecules among the 27 molecules. Based on the results of differential expression and correlation with various clinicopathological features of efferocytosis-related molecules in cancers, we identified new potential therapeutic targets for anticancer therapy, such as Axl for kidney renal clear cell carcinoma, Tyro3 for liver hepatocellular carcinoma, and IDO1 for renal papillary cell carcinoma. Except for BAI1, CD31, and M",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "ligand",
+          "phagocytosis",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "lr_match_without_disease_context"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "35158733",
+      "title": "AXL Receptor Tyrosine Kinase as a Promising Therapeutic Target Directing Multiple Aspects of Cancer Progression and Metastasis",
+      "abstract": "Simple Summary\n\nMetastasis is a complex process that requires the acquisition of certain traits by cancer cells as well as the cooperation of several non-neoplastic cells that populate the stroma. Cancer-related deaths are predominantly associated with complications arising from metastases. Limiting metastasis therefore represents an important clinical challenge. The receptor tyrosine kinase AXL is required at many steps of the metastatic cascade and contributes to tumor microenvironment deregulation. In this review, we describe how AXL contributes to metastatic progression by governing various biological processes in cancer cells and in stromal cells, highlighting the potential of its inhibition.\n\nAbstract\n\nThe receptor tyrosine kinase AXL is emerging as a key player in tumor progression and metastasis and its expression correlates with poor survival in a plethora of cancers. While studies have shown the benefits of AXL inhibition for the treatment of metastatic cancers, additional roles for AXL in cancer progression are still being explored. This review discusses recent advances in understanding AXL's functions in different tumor compartments including cancer, vascular, and immune cells. AXL is required at multiple steps of the metastatic cascade where its activation in cancer cells leads to EMT, invasion, survival, proliferation and therapy resistance. AXL activation in cancer cells and various stromal cells also results in tumor microenvironment deregulation, leading to m",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "ligand",
+          "phagocytosis",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "31775787",
+      "title": "TAM receptors, Phosphatidylserine, inflammation, and Cancer",
+      "abstract": "Abstract\n\nThe numerous and diverse biological roles of Phosphatidylserine (PtdSer) are featured in this special issue. This review will focus on PtdSer as a cofactor required for stimulating TYRO3, AXL and MERTK - comprising the TAM family of receptor tyrosine kinases by their ligands Protein S (PROS1) and growth-arrest-specific 6 (GAS6) in inflammation and cancer. As PtdSer binding to TAMs is a requirement for their activation, the biological repertoire of PtdSer is now recognized to be broadened to include functions performed by TAMs. These include key homeostatic roles necessary for preserving a healthy steady state in different tissues, controlling inflammation and further additional roles in diseased states and cancer. The impact of PtdSer on inflammation and cancer through TAM signaling is a highly dynamic field of research. This review will focus on PtdSer as a necessary component of the TAM receptor-ligand complex, and for maximal TAM signaling. In particular, interactions between tumor cells and their immediate environment - the tumor microenvironment (TME) are highlighted, as both cancer cells and TME express TAMs and secrete their ligands, providing a nexus for a multifold of cross-signaling pathways which affects both immune cells and inflammation as well as tumor cell biology and growth. Here, we will highlight the current and emerging knowledge on the implications of PtdSer on TAM signaling, inflammation and cancer.\n\nGraphical Abstract",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "ligand",
+          "phagocytosis",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "lr_match_without_disease_context"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "28333143",
+      "title": "Molecular insights of Gas6/TAM in cancer development and therapy",
+      "abstract": "Since growth arrest-specific gene 6 (Gas6) was discovered in 1988, numerous studies have highlighted the role of the Gas6 protein and its receptors Tyro3, Axl and Mer (collectively referred to as TAM), in proliferation, apoptosis, efferocytosis, leukocyte migration, sequestration and platelet aggregation. Gas6 has a critical role in the development of multiple types of cancers, including pancreatic, prostate, oral, ovarian and renal cancers. Acute myelocytic leukaemia (AML) is a Gas6-dependent cancer, and Gas6 expression predicts poor prognosis in AML. Interestingly, Gas6 also has a role in establishing tumour dormancy in the bone marrow microenvironment and in suppressing intestinal tumorigenesis. Numerous studies regarding cancer therapy have targeted Gas6 and TAM receptors with good results. However, some findings have suggested that Gas6 is associated with the development of resistance to cancer therapies. Concerning these significant effects of Gas6 in numerous cancers, we discuss the roles of Gas6 in cancer development in this review. First, we introduce basic knowledge on Gas6 and TAM receptors. Next, we describe and discuss the involvement of Gas6 and TAM receptors in cancers from different organ systems. Finally, we highlight the progress in therapies targeting Gas6 and TAM receptors. This review presents the significant roles of Gas6 in cancers from different systems and may contribute to the continued promotion of Gas6 as a therapeutic target.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "ligand",
+          "phagocytosis",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "28251492",
+      "title": "Key Roles of AXL and MER Receptor Tyrosine Kinases in Resistance to Multiple Anticancer Therapies",
+      "abstract": "A major challenge in anticancer treatment is the pre-existence or emergence of resistance to therapy. AXL and MER are two members of the TAM (TYRO3-AXL-MER) family of receptor tyrosine kinases, which, when activated, can regulate tumor cell survival, proliferation, migration and invasion, angiogenesis, and tumor-host interactions. An increasing body of evidence strongly suggests that these receptors play major roles in resistance to targeted therapies and conventional cytotoxic agents. Multiple resistance mechanisms exist, including the direct and indirect crosstalk of AXL and MER with other receptors and the activation of feedback loops regulating AXL and MER expression and activity. These mechanisms may be innate, adaptive, or acquired. A principal role of AXL appears to be in sustaining a mesenchymal phenotype, itself a major mechanism of resistance to diverse anticancer therapies. Both AXL and MER play a role in the repression of the innate immune response which may also limit response to treatment. Small molecule and antibody inhibitors of AXL and MER have recently been described, and some of these have already entered clinical trials. The optimal design of treatment strategies to maximize the clinical benefit of these AXL and MER targeting agents are discussed in relation to the different cancer types and the types of resistance encountered. One of the major challenges to successful development of these therapies will be the application of robust predictive biomarkers f",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "ligand",
+          "phagocytosis",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "27775650",
+      "title": "The Role of TAM Family Receptors in Immune Cell Function: Implications for Cancer Therapy",
+      "abstract": "The TAM receptor protein tyrosine kinases:Tyro3, Axl, and Mer:are essential regulators of immune homeostasis. Guided by their cognate ligands Growth arrest-specific gene 6 (Gas6) and Protein S (Pros1), these receptors ensure the resolution of inflammation by dampening the activation of innate cells as well as by restoring tissue function through promotion of tissue repair and clearance of apoptotic cells. Their central role as negative immune regulators is highlighted by the fact that deregulation of TAM signaling has been linked to the pathogenesis of autoimmune, inflammatory, and infectious diseases. Importantly, TAM receptors have also been associated with cancer development and progression. In a cancer setting, TAM receptors have a dual regulatory role, controlling the initiation and progression of tumor development and, at the same time, the associated anti-tumor responses of diverse immune cells. Thus, modulation of TAM receptors has emerged as a potential novel strategy for cancer treatment. In this review, we discuss our current understanding of how TAM receptors control immunity, with a particular focus on the regulation of anti-tumor responses and its implications for cancer immunotherapy.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "ligand",
+          "phagocytosis",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "26356564",
+      "title": "Novel Axl-driven signaling pathway and molecular signature characterize high-grade ovarian cancer patients with poor clinical outcome",
+      "abstract": "High-grade epithelial ovarian cancer (HGEOC) is a clinically diverse and molecularly heterogeneous disease comprising subtypes with distinct biological features and outcomes. The receptor tyrosine kinases, expressed by EOC cells, and their ligands, present in the microenvironment, activate signaling pathways, which promote EOC cells dissemination. Herein, we established a molecular link between the presence of Gas6 ligand in the ascites of HGEOCs, the expression and activation of its receptor Axl in ovarian cancer cell lines and biopsies, and the progression of these tumors. We demonstrated that Gas6/Axl signalling converges on the integrin beta3 pathway in the presence of the adaptor protein p130Cas, thus inducing tumor cell adhesion to the extracellular matrix and invasion. Accordingly, Axl and p130Cas were significantly co-expressed in HGEOC samples. Clinically, we identified an Axl-associated signature of 62 genes able to portray the HGEOCs with the shortest overall survival. These data biologically characterize a group of HGEOCs and could help guide a more effective therapeutic approach to be taken for these patients.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "GAS6"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor tyrosine kinase",
+          "ligand",
+          "phagocytosis",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "GAS6-MERTK": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    }
+  ]
+}

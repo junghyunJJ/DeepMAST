@@ -1,0 +1,74 @@
+{
+  "name": "sgcp_accuracy_recall_reproducible_bundle",
+  "assembled_on": "2026-06-08",
+  "primary_reproducibility": "offline validation and figure regeneration from committed MultiHop-RAG raw JSONL artifacts",
+  "live_rerun": "optional; depends on llmwiki_rag repository plus local qwen3.5:35b and qwen3.5:122b endpoints",
+  "dataset": "MultiHop-RAG",
+  "models": [
+    "qwen3.5:35b",
+    "qwen3.5:122b"
+  ],
+  "conditions": [
+    "wiki_off",
+    "wiki_static_refs",
+    "wiki_doc_routing"
+  ],
+  "condition_labels": {
+    "wiki_off": "Baseline retrieval",
+    "wiki_static_refs": "Static-reference SGCP",
+    "wiki_doc_routing": "SGCP-enabled retrieval"
+  },
+  "main_figure_conditions": [
+    "wiki_off",
+    "wiki_doc_routing"
+  ],
+  "writing_reproducibility_conditions": [
+    "wiki_off",
+    "wiki_static_refs",
+    "wiki_doc_routing"
+  ],
+  "metrics": [
+    "Exact-answer accuracy",
+    "Evidence recall"
+  ],
+  "case_count_per_condition": 2556,
+  "evidence_recall_pairs_per_condition": 2255,
+  "reference_metrics": {
+    "35B": {
+      "exact_answer_accuracy_off": 0.262910798122066,
+      "exact_answer_accuracy_static_refs": 0.289514866979656,
+      "exact_answer_accuracy_routing": 0.348982785602504,
+      "exact_answer_accuracy_delta": 0.0860719874804382,
+      "evidence_recall_off": 0.154879920522936,
+      "evidence_recall_static_refs": 0.204713239458251,
+      "evidence_recall_routing": 0.255665684401826,
+      "evidence_recall_delta": 0.10078576387889
+    },
+    "122B": {
+      "exact_answer_accuracy_off": 0.280516431924883,
+      "exact_answer_accuracy_static_refs": 0.250391236306729,
+      "exact_answer_accuracy_routing": 0.317292644757434,
+      "exact_answer_accuracy_delta": 0.0367762128325509,
+      "evidence_recall_off": 0.191621408894136,
+      "evidence_recall_static_refs": 0.196422108317895,
+      "evidence_recall_routing": 0.257708027375433,
+      "evidence_recall_delta": 0.0660866184812971
+    }
+  },
+  "reference_artifacts": [
+    "results/raw/multihop_full_qwen35_35b_port7000_wiki_off_rw3.jsonl",
+    "results/raw/multihop_full_qwen35_35b_port7000_wiki_static_refs_rw3.jsonl",
+    "results/raw/multihop_full_qwen35_35b_port7000_wiki_doc_routing_rw3.jsonl",
+    "results/raw/multihop_full_qwen35_122b_port6000_wiki_off_rw3.jsonl",
+    "results/raw/multihop_full_qwen35_122b_port6000_wiki_static_refs_rw3.jsonl",
+    "results/raw/multihop_full_qwen35_122b_port6000_wiki_doc_routing_rw3.jsonl",
+    "results/multihop_full_summary_35b_7000_20260604T003510Z_rw3.json",
+    "results/multihop_full_summary_122b_6000_20260605T004513Z_rw3.json",
+    "results/sgcp_accuracy_recall_summary.csv",
+    "results/sgcp_accuracy_recall_tests.csv",
+    "results/sgcp_all_conditions_summary.csv",
+    "results/sgcp_static_reference_tests.csv",
+    "figures/sgcp_accuracy_recall_main.svg",
+    "figures/sgcp_accuracy_recall_main.png"
+  ]
+}
