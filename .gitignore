@@ -47,6 +47,8 @@ res*
 old*
 
 .langgraph_api
+.langgraph_api.bak.*/
+final_res_*_drugtarget/
 
 CLAUDE.md
 
