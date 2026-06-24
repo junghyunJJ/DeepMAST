@@ -186,7 +186,7 @@ def get_subagents(
         model_overrides: Optional per-subagent model overrides.
             Keys are subagent names, values are init_chat_model format strings
             (e.g. "openai:gpt-4.1-mini") or BaseChatModel instances.
-        skills_sources: Native skill discovery paths for planner, searcher, and reporter.
+        skills_sources: Skill discovery paths for planner, searcher, and reporter.
         skill_registry: Skill name → directory path mapping for SkillActivator.
 
     Returns:
@@ -219,12 +219,15 @@ def get_subagents(
         middleware.insert(0, WriteFileArgGuardMiddleware(backend_root=data_dir))
         subagent["middleware"] = middleware
 
-    # Apply skills AFTER WriteFileArgGuardMiddleware (harness appended at end)
+    # Apply skills AFTER WriteFileArgGuardMiddleware (harness appended at end).
+    # Do not set Deep Agents' native `skills` field here: deepagents==0.5.3
+    # constructs ToolRuntime without the `tools` argument required by the
+    # installed langgraph-prebuilt package. SkillActivator + read_skill_file
+    # provides the same progressive-disclosure behavior through local tools.
     if skills_sources:
         _skill_subagents = {"planner", "searcher", "reporter"}
         for subagent in subagents:
             if subagent["name"] in _skill_subagents:
-                subagent["skills"] = skills_sources
                 if skill_registry:
                     from src.agents.shared.skill_activator import SkillActivator
                     mw = list(subagent.get("middleware", []))
