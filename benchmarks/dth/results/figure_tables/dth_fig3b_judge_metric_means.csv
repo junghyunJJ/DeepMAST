@@ -1,0 +1,37 @@
+judge_label,judge_model,condition,metric,mean_score,condition_label
+GLM-5.2,glm-5.2:cloud,DTH_no,biological_plausibility,3.95,Baseline
+GLM-5.2,glm-5.2:cloud,DTH_no,claim_boundary_restraint,2.8,Baseline
+GLM-5.2,glm-5.2:cloud,DTH_no,evidence_grounding,3.5,Baseline
+GLM-5.2,glm-5.2:cloud,DTH_no,specificity_testability,3.55,Baseline
+GLM-5.2,glm-5.2:cloud,DTH_no,therapeutic_relevance,3.5,Baseline
+GLM-5.2,glm-5.2:cloud,DTH_no,unsupported_claim_penalty,-0.7,Baseline
+GLM-5.2,glm-5.2:cloud,DTH_yes,biological_plausibility,3.8,DTH-guided
+GLM-5.2,glm-5.2:cloud,DTH_yes,claim_boundary_restraint,4.8,DTH-guided
+GLM-5.2,glm-5.2:cloud,DTH_yes,evidence_grounding,3.95,DTH-guided
+GLM-5.2,glm-5.2:cloud,DTH_yes,specificity_testability,3.45,DTH-guided
+GLM-5.2,glm-5.2:cloud,DTH_yes,therapeutic_relevance,3.65,DTH-guided
+GLM-5.2,glm-5.2:cloud,DTH_yes,unsupported_claim_penalty,0,DTH-guided
+GPT-5.4,gpt-5.4,DTH_no,biological_plausibility,3.45,Baseline
+GPT-5.4,gpt-5.4,DTH_no,claim_boundary_restraint,2.8,Baseline
+GPT-5.4,gpt-5.4,DTH_no,evidence_grounding,2.95,Baseline
+GPT-5.4,gpt-5.4,DTH_no,specificity_testability,3.55,Baseline
+GPT-5.4,gpt-5.4,DTH_no,therapeutic_relevance,3.5,Baseline
+GPT-5.4,gpt-5.4,DTH_no,unsupported_claim_penalty,-1,Baseline
+GPT-5.4,gpt-5.4,DTH_yes,biological_plausibility,3.75,DTH-guided
+GPT-5.4,gpt-5.4,DTH_yes,claim_boundary_restraint,4.95,DTH-guided
+GPT-5.4,gpt-5.4,DTH_yes,evidence_grounding,4,DTH-guided
+GPT-5.4,gpt-5.4,DTH_yes,specificity_testability,3.6,DTH-guided
+GPT-5.4,gpt-5.4,DTH_yes,therapeutic_relevance,3.65,DTH-guided
+GPT-5.4,gpt-5.4,DTH_yes,unsupported_claim_penalty,-0.1,DTH-guided
+Sonnet 4.6,claude-sonnet-4-6,DTH_no,biological_plausibility,3.65,Baseline
+Sonnet 4.6,claude-sonnet-4-6,DTH_no,claim_boundary_restraint,2.95,Baseline
+Sonnet 4.6,claude-sonnet-4-6,DTH_no,evidence_grounding,3.2,Baseline
+Sonnet 4.6,claude-sonnet-4-6,DTH_no,specificity_testability,3.35,Baseline
+Sonnet 4.6,claude-sonnet-4-6,DTH_no,therapeutic_relevance,3.5,Baseline
+Sonnet 4.6,claude-sonnet-4-6,DTH_no,unsupported_claim_penalty,-0.4,Baseline
+Sonnet 4.6,claude-sonnet-4-6,DTH_yes,biological_plausibility,3.45,DTH-guided
+Sonnet 4.6,claude-sonnet-4-6,DTH_yes,claim_boundary_restraint,4.6,DTH-guided
+Sonnet 4.6,claude-sonnet-4-6,DTH_yes,evidence_grounding,3.65,DTH-guided
+Sonnet 4.6,claude-sonnet-4-6,DTH_yes,specificity_testability,3.15,DTH-guided
+Sonnet 4.6,claude-sonnet-4-6,DTH_yes,therapeutic_relevance,3.2,DTH-guided
+Sonnet 4.6,claude-sonnet-4-6,DTH_yes,unsupported_claim_penalty,0,DTH-guided
