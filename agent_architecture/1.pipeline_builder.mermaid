@@ -6,7 +6,8 @@
     "primaryBorderColor": "#c9d1d9",
     "lineColor": "#9aa4b2",
     "secondaryColor": "#eef2f7",
-    "tertiaryColor": "#ffffff"
+    "tertiaryColor": "#ffffff",
+    "lineColor":"#6b7280"
   }
 }}%%
 
@@ -17,14 +18,17 @@ flowchart TB
 %% =========================
 
 __start__([Start]):::terminal
+INPUT[/"Inputs<br/>(<i>meta data</i>)"/]:::io_white
 info_chain[Information<br/>Collection]:::module
-validate_info{{🧠 Information<br/>Validation}}:::decision
+validate_info[🧠 Information<br/>Validation]:::decision
 
-generate_pipeline[Pipeline<br/>Generation]:::module
-human_node{{Human<br/>Decision}}:::human
+generate_pipeline["Pipeline<br/>Generation<br/>(default)"]:::module
+human_node{{"Human<br/>Decision<br/>(HITL)"}}:::human
 
 update_pipeline[Pipeline<br/>Update]:::module
 summary_pipeline[Pipeline<br/>Summary]:::module
+OUTPUT[\"Output<br/>(Pipeline<br/>Information)"\]:::io_white
+
 __end__([End]):::terminal
 
 
@@ -35,20 +39,20 @@ __end__([End]):::terminal
 subgraph react_agent["ReAct Agent"]
     direction TB
 
-    Query[🗨️ Queries]:::inner
-    Thinking{{🧠 Pipeline<br/>Selection}}:::inner_decision
-    Tool[🔧 Tool Execution]:::tool
+    Query[🗨️ Queries]:::module
+    Thinking{🧠 Pipeline<br/>Selection}:::decision
+    Tool[🔧 Tool<br/>Execution]:::tool
     Answer[📝 Answer]:::answer
 
     Query --> Thinking
     Thinking -->|Action| Tool
     Thinking -->|Finish| Answer
-    Tool -->|Observation| Thinking
+    %% Tool -->|Observation| Thinking
+    Tool -. &nbsp;Observation&nbsp; .-> Thinking
 
     subgraph MCP["MCP Tools"]
-        mcp_download[Article Download]
-        lc[MAST-RAG]
-        mcp_st[Sequential Thinking]
+        mcp_st[[Sequential<br/>Thinking]]:::mcp
+        lc[[SGCP-RAG]]:::mcp
     end
 end
 
@@ -57,9 +61,10 @@ end
 %% Flow Connections
 %% =========================
 
-__start__ --> info_chain
+__start__ --> INPUT
+INPUT --> info_chain
 info_chain --> validate_info
-validate_info -->|continue| info_chain
+validate_info -. &nbsp;continue&nbsp; .-> info_chain
 validate_info --> generate_pipeline
 generate_pipeline --> human_node
 
@@ -70,21 +75,24 @@ human_node -. &nbsp;3#46;select (HITL)&nbsp; .-> Query
 
 Answer --> summary_pipeline
 update_pipeline --> summary_pipeline
-summary_pipeline --> __end__
+summary_pipeline --> OUTPUT
+
+OUTPUT --> __end__
 
 
 %% =========================
 %% Style Definitions
 %% =========================
 
-classDef module fill:#ffffff,stroke:#c9d1d9,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
-classDef decision fill:#e3f2fd,stroke:#90caf9,stroke-width:1.5px,rx:12,ry:12
-classDef human fill:#e8f5e9,stroke:#81c784,stroke-width:1.5px,rx:12,ry:12
-classDef inner fill:#f9fafb,stroke:#d1d5db,stroke-width:1.2px,rx:10,ry:10
-classDef inner_decision fill:#f3e5f5,stroke:#ce93d8,stroke-width:1.2px,rx:10,ry:10
-classDef tool fill:#eceff1,stroke:#b0bec5,stroke-width:1.2px,rx:10,ry:10
-classDef answer fill:#fff8e1,stroke:#ffcc80,stroke-width:1.2px,rx:10,ry:10
+classDef module fill:#f9fafb,stroke:#666666,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+classDef decision fill:#e3f2fd,stroke:#0000FF,stroke-width:1.5px,rx:12,ry:12
+classDef human fill:#e8f5e9,stroke:#008000,stroke-width:1.5px,rx:12,ry:12
+classDef tool fill:#f3e5f5,stroke:#800080,stroke-width:1.2px,rx:10,ry:10
+classDef answer fill:#fff8e1,stroke:#C9A227,stroke-width:1.2px,rx:10,ry:10
 classDef terminal fill:#263238,color:#ffffff,stroke:#263238,stroke-width:2px,rx:15,ry:15
+classDef mcp fill:#eceff1,stroke:#666666,stroke-width:1.5px,rx:10,ry:10,color:#1f2933
+classDef io_white fill:#ffffff,stroke:#111111,stroke-width:2px,rx:14,ry:14,color:#1f2933
 
-style react_agent fill:#f4f6f8,stroke:#d0d7de,stroke-width:2px,rx:20,ry:20
+style react_agent fill:#FAF7F2,stroke:#A99F91,stroke-width:2px,rx:20,ry:20
 style MCP fill:#ffffff,stroke:#d0d7de,stroke-dasharray: 5 5,rx:12,ry:12
+linkStyle default stroke-width:2px;

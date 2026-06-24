@@ -2,8 +2,13 @@
   "theme": "base",
   "themeVariables": {
     "fontFamily": "Helvetica, Arial",
-    "primaryBorderColor": "#b0b8c1",
-    "lineColor": "#8c96a3"
+    "primaryColor": "#f5f7fa",
+    "primaryBorderColor": "#c9d1d9",
+    "lineColor": "#9aa4b2",
+    "secondaryColor": "#eef2f7",
+    "tertiaryColor": "#ffffff",
+    "lineColor":"#6b7280"
+
   }
 }}%%
 
@@ -13,67 +18,67 @@ flowchart TB
 %% PANEL A — INPUT
 %% =========================
 
-subgraph A["Input & Data Preparation"]
-direction TB
-
 start([Start]):::terminal
+INPUT[/"Inputs<br/>(<i>Load Configuration,<br/>Load Spatial Data</i>)"/]:::io_white
+    start --> INPUT
+    INPUT --> CECK
 
-load_config["Load Configuration"]:::module
-load_st["Load Spatial Data"]:::module
-sc_ref["Resolve SC Reference<br/>(if spot-based)"]:::module
-validate["Validate & Setup"]:::module
-prep["MCP Readiness Check"]:::module
-gen_mcp["MCP Generation<br/>(if required)"]:::module
-human_confirm{{"Human Confirmation<br/>HITL"}}:::decision
+subgraph A["Data Preparation"]
+    CECK{"Platform<br/>Check"}:::check_decision
+    sc_ref["🧠 Resolve<br/>SC Reference"]:::decision
+    validate["Validate & Setup"]:::module
 
-start --> load_config --> load_st
-load_st -->|spot-based| sc_ref
-load_st -->|single-cell| validate
-sc_ref --> validate
-validate --> prep
-prep -->|missing MCP| gen_mcp --> prep
-prep -->|ready| human_confirm
+    prep{"MCP<br/>Readiness<br/>Check"}:::check_decision
 
+    gen_mcp["🧠 MCP<br/>Generation<br/>"]:::decision
+    human_confirm{{"Human<br/>Confirmation<br/>(HITL)"}}:::human
+
+    CECK -->|spot<br/>resolution| sc_ref
+    CECK -->|single-cell<br/>resolution| validate
+    sc_ref --> validate
+    validate --> prep
+    prep -->|missing MCP| gen_mcp
+    gen_mcp -.-> prep
+    prep -->|ready| human_confirm
 end
 
 %% =========================
 %% PANEL B — EXECUTION CORE
 %% =========================
 
-subgraph B["Single ReAct Execution Core"]
-direction TB
+subgraph B["ReAc Agent"]
+    Query["Query"]:::inner
+    Thinking{"🧠 Pipeline<br/>Executor"}:::decision
+    ToolCall[🔧 Tool<br/>Execution]:::tool
 
-Query["Query"]:::inner
-Thinking{{"Pipeline Executor"}}:::agent
-ToolCall["Tool Invocation"]:::tool
-Answer["Final Answer"]:::inner
+    Answer["Final Answer"]:::answer
 
-Query --> Thinking
-Thinking -->|Action| ToolCall
-ToolCall -->|Observation| Thinking
-Thinking -->|Finish| Answer
+    Query[🗨️ Queries]:::inner
+    Query --> Thinking
 
-subgraph MCP["MCP Tool Layer"]
-direction TB
-mcp_st["Sequential Thinking"]
-preprocessing["Preprocessing Modules"]
-end
+    Thinking -->|Action| ToolCall
+    %% ToolCall -->|Observation| Thinking
+    ToolCall -. &nbsp;Observation&nbsp; .-> Thinking
 
+    Thinking -->|Finish| Answer
+    Answer[📝 Answer]:::answer
+
+    subgraph MCP["MCP Tools"]
+        mcp_st[["Sequential<br/>Thinking"]]:::mcp
+        preprocessing[["Preprocessing<br/>Modules"]]:::mcp
+    end
 end
 
 %% =========================
 %% PANEL C — OUTPUT
 %% =========================
 
-subgraph C["Output"]
-direction TB
-
-save["Save Results"]:::module
+save[\"Output<br/>(Save Results)"\]:::io_white
 end_node([End]):::terminal
 
 save --> end_node
 
-end
+
 
 %% =========================
 %% MAIN FLOW
@@ -83,12 +88,20 @@ human_confirm --> Query
 Answer --> save
 
 %% =========================
-%% STYLES — Academic Minimal
+%% STYLES — Match pipeline_builder theme
 %% =========================
 
-classDef module fill:#ffffff,stroke:#b0b8c1,stroke-width:1.2px,rx:8,ry:8
-classDef decision fill:#f7f9fb,stroke:#8fa1b3,stroke-width:1.2px,rx:8,ry:8
-classDef agent fill:#f0f3f6,stroke:#6b7785,stroke-width:2px,rx:12,ry:12
-classDef inner fill:#ffffff,stroke:#c5ccd3,stroke-width:1px,rx:6,ry:6
-classDef tool fill:#f4f6f8,stroke:#aab4bf,stroke-width:1px,rx:6,ry:6
-classDef terminal fill:#2f3b45,color:#ffffff,stroke:#2f3b45,stroke-width:1.5px,rx:12,ry:12
+classDef module fill:#f9fafb,stroke:#666666,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+classDef decision fill:#e3f2fd,stroke:#0000FF,stroke-width:1.5px,rx:12,ry:12
+classDef human fill:#e8f5e9,stroke:#008000,stroke-width:1.5px,rx:12,ry:12
+classDef tool fill:#f3e5f5,stroke:#800080,stroke-width:1.2px,rx:10,ry:10
+classDef answer fill:#fff8e1,stroke:#C9A227,stroke-width:1.2px,rx:10,ry:10
+classDef terminal fill:#263238,color:#ffffff,stroke:#263238,stroke-width:2px,rx:15,ry:15
+classDef mcp fill:#eceff1,stroke:#666666,stroke-width:1.5px,rx:10,ry:10,color:#1f2933
+classDef check_decision fill:#fff8e1,stroke:#C9A227,stroke-width:1.8px,color:#1f2933
+classDef io_white fill:#ffffff,stroke:#111111,stroke-width:2px,rx:14,ry:14,color:#1f2933
+
+style A fill:#FAF7F2,stroke:#d0d7de,stroke-width:2px,rx:20,ry:20
+style B fill:#FAF7F2,stroke:#d0d7de,stroke-width:2px,rx:20,ry:20
+style MCP fill:#ffffff,stroke:#d0d7de,stroke-dasharray: 5 5,rx:12,ry:12
+linkStyle default stroke-width:2px;

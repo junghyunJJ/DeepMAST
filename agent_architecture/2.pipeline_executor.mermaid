@@ -2,112 +2,91 @@
   "theme": "base",
   "themeVariables": {
     "fontFamily": "Helvetica, Arial",
-    "primaryColor": "#f5f7fa",
-    "primaryBorderColor": "#c9d1d9",
-    "lineColor": "#9aa4b2"
+    "primaryBorderColor": "#b0b8c1",
+    "lineColor": "#8c96a3"
   }
 }}%%
 
-flowchart LR
+flowchart TB
 
-%% =====================================================
-%% LEFT PANEL — Input & Preparation
-%% =====================================================
+%% =========================
+%% PANEL A — INPUT
+%% =========================
 
-subgraph INPUT_PANEL["Input & Preparation"]
+subgraph A["Input & Data Preparation"]
 direction TB
 
 start([Start]):::terminal
 
-load_config["Load Pipeline Config<br/>(parse config,<br/>derive celltype_mode)"]:::module
+load_config["Load Configuration"]:::module
+load_st["Load Spatial Data"]:::module
+sc_ref["Resolve SC Reference<br/>(if spot-based)"]:::module
+validate["Validate & Setup"]:::module
+prep["MCP Readiness Check"]:::module
+gen_mcp["MCP Generation<br/>(if required)"]:::module
+human_confirm{{"Human Confirmation<br/>HITL"}}:::decision
 
-load_st["Load ST Data<br/>(HITL: collect h5ad)"]:::module
+start --> load_config --> load_st
+load_st -->|spot-based| sc_ref
+load_st -->|single-cell| validate
+sc_ref --> validate
+validate --> prep
+prep -->|missing MCP| gen_mcp --> prep
+prep -->|ready| human_confirm
 
-sc_ref["Resolve SC Reference<br/>(HITL confirmation)"]:::module
-
-validate["Validate Data<br/>(check h5ad,<br/>setup dirs)"]:::module
-
-prep["Prepare Executor<br/>(MCP readiness check)"]:::module
-
-gen_mcp["Generate MCP<br/>(code2MCP / rmcpagent)"]:::module
-
-human_confirm{{"Human Confirm<br/>(HITL execution plan)"}}:::human
-
-end_input_anchor(( )):::hidden
 end
 
-%% =====================================================
-%% CENTER PANEL — Single ReAct Executor
-%% =====================================================
+%% =========================
+%% PANEL B — EXECUTION CORE
+%% =========================
 
-subgraph EXECUTOR["Single ReAct Pipeline Executor"]
+subgraph B["Single ReAct Execution Core"]
 direction TB
 
-Query["🗨️ Query"]:::inner
-Thinking{{"🧠 Pipeline<br/>Executor"}}:::agent
-ToolCall["🔧 Tool Execution"]:::tool
-Answer["📝 Answer"]:::answer
+Query["Query"]:::inner
+Thinking{{"Pipeline Executor"}}:::agent
+ToolCall["Tool Invocation"]:::tool
+Answer["Final Answer"]:::inner
 
 Query --> Thinking
 Thinking -->|Action| ToolCall
-Thinking -->|Finish| Answer
 ToolCall -->|Observation| Thinking
+Thinking -->|Finish| Answer
 
 subgraph MCP["MCP Tools"]
-direction TB
-mcp_st["Sequential Thinking"]:::subtool
-preprocessing["Preprocessing Tools<br/>(normalization,<br/>cell type analysis,<br/>spatial clustering)"]:::subtool
+    mcp_st["Sequential<br/>Thinking"]
+    preprocessing["Preprocessing<br/>Modules"]
 end
 
+
 end
 
-%% =====================================================
-%% RIGHT PANEL — Output
-%% =====================================================
+%% =========================
+%% PANEL C — OUTPUT
+%% =========================
 
-subgraph OUTPUT_PANEL["Output"]
-direction TB
 
 save["Save Results"]:::module
 end_node([End]):::terminal
 
-end
-
-%% =====================================================
-%% FLOW CONNECTIONS
-%% =====================================================
-
-start --> load_config
-
-load_config -->|has config| load_st
-load_config -->|no config| save
-
-load_st -->|h5ad missing| load_st
-load_st -->|spot-based| sc_ref
-load_st -->|single-cell| validate
-
-sc_ref --> validate
-validate --> prep
-
-prep -->|all MCP ready| human_confirm
-prep -->|MCP missing| gen_mcp
-gen_mcp --> prep
-
-human_confirm --> Query
-Answer --> save
 save --> end_node
 
 
-%% =====================================================
-%% STYLE DEFINITIONS
-%% =====================================================
 
-classDef module fill:#ffffff,stroke:#c9d1d9,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
-classDef human fill:#e8f5e9,stroke:#81c784,stroke-width:1.5px,rx:12,ry:12
-classDef agent fill:#f4f6f8,stroke:#9aa4b2,stroke-width:2.5px,rx:18,ry:18
-classDef inner fill:#ffffff,stroke:#d1d5db,stroke-width:1.2px,rx:10,ry:10
-classDef tool fill:#eceff1,stroke:#b0bec5,stroke-width:1.2px,rx:10,ry:10
-classDef answer fill:#fff8e1,stroke:#ffcc80,stroke-width:1.2px,rx:10,ry:10
-classDef subtool fill:#f9fafb,stroke:#d1d5db,stroke-dasharray:4 4,rx:8,ry:8
-classDef terminal fill:#263238,color:#ffffff,stroke:#263238,stroke-width:2px,rx:16,ry:16
-classDef hidden fill:transparent,stroke:transparent
+%% =========================
+%% MAIN FLOW
+%% =========================
+
+human_confirm --> Query
+Answer --> save
+
+%% =========================
+%% STYLES — Academic Minimal
+%% =========================
+
+classDef module fill:#ffffff,stroke:#b0b8c1,stroke-width:1.2px,rx:8,ry:8
+classDef decision fill:#f7f9fb,stroke:#8fa1b3,stroke-width:1.2px,rx:8,ry:8
+classDef agent fill:#f0f3f6,stroke:#6b7785,stroke-width:2px,rx:12,ry:12
+classDef inner fill:#ffffff,stroke:#c5ccd3,stroke-width:1px,rx:6,ry:6
+classDef tool fill:#f4f6f8,stroke:#aab4bf,stroke-width:1px,rx:6,ry:6
+classDef terminal fill:#2f3b45,color:#ffffff,stroke:#2f3b45,stroke-width:1.5px,rx:12,ry:12
