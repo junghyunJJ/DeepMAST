@@ -1,0 +1,2045 @@
+{
+  "schema_version": "deep_interpreter_literature_handoff_v1",
+  "policy": {
+    "included_buckets": [
+      "direct_lr_evidence",
+      "receptor_pathway_context_evidence"
+    ],
+    "excluded_buckets": [
+      "disease_only_background",
+      "rejected_weak_evidence"
+    ],
+    "cap": 40
+  },
+  "source": {
+    "total_papers": 93,
+    "unique_papers": 93,
+    "duplicates_dropped": 0,
+    "raw_papers_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0080_cci_full_20_COL6A1_CD44_strong_on/papers_raw.json",
+    "citation_candidates_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0080_cci_full_20_COL6A1_CD44_strong_on/citation_candidates.json"
+  },
+  "counts": {
+    "direct_lr_evidence": 0,
+    "receptor_pathway_context_evidence": 34,
+    "disease_only_background": 19,
+    "rejected_weak_evidence": 40
+  },
+  "papers": [
+    {
+      "pmid": "40927672",
+      "title": "Collagen proteins, thrombospondin 1 and lumican are differentially expressed across breast cancer subtypes by functional proteomics from core needle biopsy samples of Taiwanese breast cancer.",
+      "abstract": "Purpose: This study aimed to conduct functional proteomics across breast cancer subtypes with bioinformatics analyses. Methods: Candidate proteins were identified using nanoscale liquid chromatography with tandem mass spectrometry (NanoLC-MS/MS) from core needle biopsy samples of early stage (0-III) breast cancers, followed by external validation with public domain gene-expression datasets (TCGA TARGET GTEx and TCGA BRCA). Results: Seventeen proteins demonstrated significantly differential expression and protein-protein interaction (PPI) found the strong networks including COL2A1, COL11A1, COL6A1, COL6A2, THBS1 and LUM. Public domain databases also showed that COL2A1, COL11A1, COL6A1, COL6A2 and LUM were higher in primary/metastatic tumor than in normal tissue (one-way ANOVA, all P-values less than 0.001), and all six genes were differentially expressed across four molecular subtypes based on hormone receptor (HR) status and human epidermal growth factor receptor II (HER2) status (one-way ANOVA, all P-values less than 0.001). Disease-specific survival discrepancy was observed comparing breast cancer patients of the upper and lower quartile of the collagen family (COL2A1, COL11A1, COL6A1, COL6A2), THBS1 and LUM gene expression signature (log-rank test, P = 0.06). Conclusion: Functional proteomics suggested that collagen proteins, thrombospondin 1 and lumican are differentially expressed across breast cancer subtypes.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "COL6A1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "34541602",
+      "title": "Identification of potential genes related to breast cancer brain metastasis in breast cancer patients",
+      "abstract": "Abstract\n\nBrain metastases (BMs) usually develop in breast cancer (BC) patients. Thus, the molecular mechanisms of breast cancer brain metastasis (BCBM) are of great importance in designing therapeutic strategies to treat or prevent BCBM. The present study attempted to identify novel diagnostic and prognostic biomarkers of BCBM. Two datasets (GSE125989 and GSE100534) were obtained from the Gene Expression Omnibus (GEO) database to find differentially expressed genes (DEGs) in cases of BC with and without brain metastasis (BM). A total of 146 overlapping DEGs, including 103 up-regulated and 43 down-regulated genes, were identified. Functional enrichment analysis showed that these DEGs were mainly enriched for functions including extracellular matrix (ECM) organization and collagen catabolic fibril organization. Using protein-protein interaction (PPI) and principal component analysis (PCA) analysis, we identified ten key genes, including LAMA4, COL1A1, COL5A2, COL3A1, COL4A1, COL5A1, COL5A3, COL6A3, COL6A2, and COL6A1. Additionally, COL5A1, COL4A1, COL1A1, COL6A1, COL6A2, and COL6A3 were significantly associated with the overall survival of BC patients. Furthermore, COL6A3, COL5A1, and COL4A1 were potentially correlated with BCBM in human epidermal growth factor 2 (HER2) expression. Additionally, the miR-29 family might participate in the process of metastasis by modulating the cancer microenvironment. Based on datasets in the GEO database, several DEGs have been identified as ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "COL6A1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "32894152",
+      "title": "Non-canonical Fzd7 signaling contributes to breast cancer mesenchymal-like stemness involving Col6a1",
+      "abstract": "Mesenchymal-like stemness is characterized by epithelial-mesenchymal transition (EMT). Breast cancer (BC) cell mesenchymal-like stemness is responsible for distal lung metastasis. Interrogation of databases showed that Fzd7 was closely associated with a panel of mesenchymal-related genes and a panel of stemness-related genes. Fzd7 knockdown in mesenchymal-like MDA-MB-231 and Hs578T cells reduced expression of Vimentin, Slug and Zeb1, induced an epithelial-like morphology, inhibited cell motility, impaired mammosphere formation and decreased Lgr5+ subpopulation. In contrast, Fzd7 overexpression in MCF7 cells resulted in opposite changes. Fzd7 knockdown delayed xenograft tumor formation, suppressed tumor growth, and impaired lung metastasis. Mechanistically, Fzd7 combined with Wnt5a/b and modulated expression of phosphorylated Stat3 (p-STAT3), Smad3 and Yes-associated protein 1 (Yap1). Moreover, Fzd7-Wnt5b modulated expression of collagen, type VI, alpha 1 (Col6a1). Both Wnt5b knockdown and Col6a1 knockdown disrupted BC cell mesenchymal phenotype and stemness. Taken together, Fzd7 contributes to BC cell EMT and stemness, inducing tumorigenesis and metastasis, mainly through a non-canonical Wnt5b pathway. Col6a1 is implicated in Fzd7-Wnt5b signaling, and mediates Fzd7-Wnt5b -induced mesenchymal-like stemness.\n\nVideo Abstract",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "COL6A1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "10220145",
+      "title": "Reliable and sensitive detection of premature termination mutations using a protein truncation test designed to overcome problems of nonsense-mediated mRNA instability.",
+      "abstract": "The protein truncation test (PTT) is a mutation-detection method used to scan for premature termination (nonsense) mutations. PCR amplification of the DNA or mRNA source material is performed using forward primers containing a T7-promoter sequence and translation initiation signals such that the resultant products can be transcribed and translated in vitro to identify the smaller truncated protein products. mRNA is commonly used as the source material, but success of the PTT and other RNA-based mutation detection methods can be severely compromised by nonsense mutation-induced mRNA decay, a well-documented process that is often overlooked in mutation detection strategies. In this study, we develop an RNA-based PTT that overcomes the problem of mRNA decay by preincubating cells with cycloheximide to stabilise the mutant mRNA. The effectiveness of this method for mutation detection in abundant mRNAs was demonstrated in osteogenesis imperfecta fibroblasts by the protection of type I collagen (COL1A1) mRNA containing nonsense mutations that normally resulted in mutant mRNA degradation. Stabilisation of mutant mismatch repair gene (MLH1) mRNA was also observed in transformed lymphocytes from patients with hereditary nonpolyposis colorectal cancer (HNPCC). Importantly, our strategy also stabilised very low-level (or illegitimate) nonsense-containing transcripts in lymphoblasts from patients with Bethlem myopathy (COL6A1), familial adenomatous polyposis (APC), and breast cancer (BRC",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "COL6A1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "42184620",
+      "title": "A cross-sectional study on the expression of CD44 as a stem cell marker in breast cancer patients: Association with clinicopathological prognostic markers across molecular subtypes.",
+      "abstract": "The clinical application of cancer stem cell marker CD44 in breast cancer prognosis has been widely explored. However, data on the association between CD44 expression and prognostication across molecular subtypes of breast cancer remain limited. In this study we evaluated CD44 expression in various breast carcinoma subtypes and its association with clinicopathological prognostic parameters. Further, molecular docking studies were performed to investigate molecular interactions involving CD44. A cross-sectional study was conducted on breast tissue specimens collected from 60 patients over a period of two years. Immunohistochemistry analyses were performed to assess CD44 expression in paraffin-embedded breast tissue samples. Clinicopathological prognostic parameters were analysed in relation to CD44 expression. Of the 60 cases, CD44 staining was positive in 34 cases (57%) and negative in 26 (43%). Increased CD44 expression was correlated with histological grade (p=0.022), lymphovascular invasion (p=0.039), and lymph node status (p=0.033) in invasive breast carcinoma. Notably, high CD44 expression was also observed in patients with triple-negative breast cancer. Further, protein docking analysis revealed significant interactions between CD44 and molecular markers such as ER, PR, HER2/neu, and Ki-67, with HER2/neu showing the strongest correlation. Several new targeted treatments for breast cancer were also identified through docking studies. These findings highlight that induced",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "27121210",
+      "title": "MicroRNA-143 targets CD44 to inhibit breast cancer progression and stem cell-like properties.",
+      "abstract": "CD44 is closely linked to breast cancer progression; however, the regulatory functions of microRNAs (miRs) in breast cancer have yet to be fully elucidated. In order to investigate the regulation of CD44 by miRs in breast cancer, the present study isolated CD44+ and CD44- breast cancer cells by flow cytometry, revealing that CD44+ cells were enriched in transplanted compared with those in primary breast cancers, and that their proliferation and stem-cell sphere formation ability were enhanced. A miRNA array assay indicated that miR-143 expression in CD44+ breast cancer cells was lower than that in CD44- cells. Furthermore, miR-143 was decreased in breast cancer tissues and cell lines compared with that in normal tissues and cells. Restoration of miR-143 expression in CD44+ breast cancer cells inhibited their proliferation and sphere formation. A luciferase reporter assay demonstrated that miR-143 directly tartgeted the 3'-untranslated region of CD44. In addition, miR-143 inhibited metastasis-associated features in breast cancer and reduced tumor growth in a mouse model of breast cancer. In conclusion, the results of the present study demonstrated that miR-143 inhibited the progression and stem-cell properties of breast cancer cells by targeting CD44. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "25683728",
+      "title": "FOXP3 suppresses breast cancer metastasis through downregulation of CD44.",
+      "abstract": "Forkhead box protein 3 (FOXP3) plays an important role in breast cancer as an X-linked tumor suppressor gene. However, the biological functions and significance of FOXP3 in breast cancer metastasis remain unclear. Here, we find that, clinically, nuclear FOXP3 expression is inversely correlated with breast cancer metastasis. Moreover, we demonstrate that FOXP3 significantly inhibits adhesion, invasion and metastasis of breast cancer cells in vivo and in vitro. In addition, the adhesion molecule CD44 is found to be suppressed by FOXP3 through transcriptome sequence analysis (RNA-seq). A luciferase reporter assay, chromatin immunoprecipitation and electrophoretic mobility shift assay identify CD44 as a direct target of FOXP3. The expression of CD44 is downregulated by FOXP3 in breast cancer cells. Importantly, anti-CD44 antibody reverses the FOXP3 siRNA-induced effects on the breast cancer cells in vitro and FOXP3 expression level in the nucleus of breast cancer cells is inversely correlated with CD44 expression level in clinic breast cancer tissues. Taken together, the results from the present study suggest that FOXP3 is a suppressor of breast cancer metastasis. FOXP3 directly binds to the promoter of CD44 and inhibits its protein expression, thereby suppressing adhesion and invasion of human breast cancer cells. This finding highlights the therapeutic potential of FOXP3-CD44 signaling to inhibit breast cancer metastasis. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "25815697",
+      "title": "Blocking the adhesion cascade at the premetastatic niche for prevention of breast cancer metastasis.",
+      "abstract": "Shear-resistant adhesion and extravasation of disseminated cancer cells at the target organ is a crucial step in hematogenous metastasis. We found that the vascular adhesion molecule E-selectin preferentially promoted the shear-resistant adhesion and transendothelial migration of the estrogen receptor (ER)(-)/CD44(+) hormone-independent breast cancer cells, but not of the ER(+)/CD44(-/low) hormone-dependent breast cancer cells. Coincidentally, CD44(+) breast cancer cells were abundant in metastatic lung and brain lesions in ER(-) breast cancer, suggesting that E-selectin supports hematogenous metastasis of ER(-)/CD44(+) breast cancer. In an attempt to prevent hematogenous metastasis through the inhibition of a shear-resistant adhesion of CD44(+) cancer cells to E-selectin-expressing blood vessels on the premetastatic niche, an E-selectin targeted aptamer (ESTA) was developed. We demonstrated that a single intravenous injection of ESTA reduced metastases to a baseline level in both syngeneic and xenogeneic forced breast cancer metastasis models without relocating the site of metastasis. The effect of ESTA was absent in E-selectin knockout mice, suggesting that E-selectin is a molecular target of ESTA. Our data highlight the potential application of an E-selectin antagonist for the prevention of hematogenous metastasis of ER(-)/CD44(+) breast cancer. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "22152097",
+      "title": "Differentiation of breast cancer stem cells by knockdown of CD44: promising differentiation therapy",
+      "abstract": "Background\n\nBreast cancer stem cells (BCSCs) are the source of breast tumors. Compared with other cancer cells, cancer stem cells show high resistance to both chemotherapy and radiotherapy. Targeting of BCSCs is thus a potentially promising and effective strategy for breast cancer treatment. Differentiation therapy represents one type of cancer stem-cell-targeting therapy, aimed at attacking the stemness of cancer stem cells, thus reducing their chemo- and radioresistance. In a previous study, we showed that down-regulation of CD44 sensitized BCSCs to the anti-tumor agent doxorubicin. This study aimed to determine if CD44 knockdown caused BCSCs to differentiate into breast cancer non-stem cells (non-BCSCs).\n\nMethods\n\nWe isolated a breast cancer cell population (CD44+CD24- cells) from primary cultures of malignant breast tumors. These cells were sorted into four sub-populations based on their expression of CD44 and CD24 surface markers. CD44 knockdown in the BCSC population was achieved using small hairpin RNA lentivirus particles. The differentiated status of CD44 knock-down BCSCs was evaluated on the basis of changes in CD44+CD24- phenotype, tumorigenesis in NOD/SCID mice, and gene expression in relation to renewal status, metastasis, and cell cycle in comparison with BCSCs and non-BCSCs.\n\nResults\n\nKnockdown of CD44 caused BCSCs to differentiate into non-BCSCs with lower tumorigenic potential, and altered the cell cycle and expression profiles of some stem cell-related genes",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "21970856",
+      "title": "Understanding the dual nature of CD44 in breast cancer progression.",
+      "abstract": "CD44 has been the subject of extensive research for more than 3 decades because of its role in breast cancer, in addition to many physiological processes, but interestingly, conflicting data implicate CD44 in both tumor suppression and tumor promotion. CD44 has been shown to promote protumorigenic signaling and advance the metastatic cascade. On the other hand, CD44 has been shown to suppress growth and metastasis. Histopathological studies of human breast cancer have correlated CD44 expression with both favorable and unfavorable clinical outcomes. In recent years, CD44 has garnered significant attention because of its utility as a stem cell marker and has surfaced as a potential therapeutic target, necessitating a greater understanding of CD44 in breast cancer. In this review, we attempt to unify the literature implicating CD44 in both tumor promotion and suppression, and explain its dualistic nature.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "21804359",
+      "title": "Implications of single nucleotide polymorphisms in CD44 exon 2 for risk of breast cancer.",
+      "abstract": "CD44 is a cell-surface glycoprotein involved in many cellular functions including lymphocyte activation, recirculation and homing, hematopoiesis and tumor metastasis, suggesting that CD44 may play an important role in breast cancer development. In this study, we examined whether CD44 exon 2 polymorphisms are associated with increased susceptibility to breast cancer. Direct nucleotide sequencing analysis showed that multiple single nucleotide polymorphisms were present in the CD44 exon 2 coding region in female patients with breast cancer. There was no significant difference in the frequency of any one single nucleotide polymorphism in the CD44 exon 2 coding region between patients with breast cancer and normal donors. However, CD44 polymorphisms in the CD44 exon 2 coding region were identified in approximately 40% of patients with breast cancer, which was significantly higher than in normal donors (odds ratio, 9.34; 95% confidence interval = 2.58-33.82; P < 0.0001). The Wilcoxon-Mann-Whitney test analysis showed that the patients with the CD44 polymorphisms in CD44 exon 2 coding sequence had breast cancer at earlier ages, 49 +- 3 versus 62 +- 2 years (P < 0.0005), and larger tumor burdens (4.9 +- 1.22 vs. 1.6 +- 0.15 mm, P < 0.01) at the time of diagnosis. Interestingly, African-American female patients having the CD44 polymorphisms in CD44 exon 2 coding sequence were diagnosed with breast cancer at very young age (41 +- 2 years). Our results show that CD44 exon 2 polymorphis",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "20530438",
+      "title": "Unique SNP in CD44 intron 1 and its role in breast cancer development.",
+      "abstract": "In the current study, we investigated if CD44 polymorphisms are associated with increased susceptibility to breast cancer. Direct nucleotide sequencing analysis identified a novel and unique single nucleotide polymorphism (SNP, designated as CD44 Ex2+14 A>G) in the CD44 intron 1 region in 84% of breast cancer patients, which was significantly higher than that seen in normal donors. Moreover, the breast cancer patients with homozygous unique SNP in CD44 intron 1 had breast cancer at earlier ages, larger tumor burden, more regional lymph node metastases at the time of diagnosis, and higher cancer recurrence rate. There was a strong association between the unique SNP in CD44 intron 1 and CD44 expression on peripheral blood mononuclear cells. Our results suggest that CD44 polymorphism is associated with breast cancer development, and CD44 polymorphism analysis may be effectively used in the risk assessment, prediction, prevention, diagnosis and genetic epidemiological analysis of breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "8669866",
+      "title": "Expression of the CD44 glycoprotein (lymphocyte-homing receptor) in untreated human breast cancer and its relationship to prognostic markers.",
+      "abstract": "CD44 is a cell surface glycoprotein which has been suggested to be associated with aggressive histological features in breast cancer (BC). It has also been implicated in conferring metastatic potential to rat carcinoma cells. The aim of this study was to determine the potential value of CD44 as a prognostic/metastatic marker in BC by means of immunohistochemistry. The expression of the CD44 glycoprotein was investigated in tumours from 52 untreated female patients with BC, using the monoclonal antibody A3D8. 10 samples of normal breast tissue were randomly obtained and also investigated with respect to CD44 expression. DNA ploidy, the S-phase fraction (SPF) and oestrogen-(OR) and progesterone-receptor (PgR) contents in the tumours were determined and together with the prognostic markers of age, tumour size, tumour grade and lymph node status, correlated with CD44 expression in BC. Also, the distribution of CD44 tumour cell expression was compared with expression of the permeability drug resistance glycoprotein (P-gp) in this material. Expression of CD44 on carcinoma cells was observed in 21/52 cases (40%). Capillary endothelial reactivity of the tumours occurred in 42 cases (80%). Non-neoplastic epithelial breast tissue was positive in 2/10 (20%) samples and capillary vessels in 7/10 (70%). Carcinoma CD44 cell expression was not associated with age, tumour size, tumour grade, DNA ploidy, SPF, hormone-receptor contents or lymph node metastases. There was a statistical correlat",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "34685653",
+      "title": "In Silico Evaluation of Natural Compounds for an Acidic Extracellular Environment in Human Breast Cancer",
+      "abstract": "The survival rates for breast cancer (BC) have improved in recent years, but resistance, metastasis, and recurrence still remain major therapeutic challenges for BC. The acidic tumor microenvironment (TME) has attracted attention because of its association with tumorigenesis, metastasis, drug resistance, and immune surveillance. In this study, we evaluated natural compounds from traditional herbal medicine used to treat cancer that selectively target genes regulated by extracellular acidosis. We integrated four transcriptomic data including BC prognostic data from The Cancer Genome Atlas database, gene expression profiles of MCF-7 cells treated with 102 natural compounds, patterns of gene profiles by acidic condition, and single-cell RNA-sequencing from BC patient samples. Bruceine D (BD) was predicted as having the highest therapeutic potential, having an information gain (IG) score of 0.24, to regulate reprogrammed genes driven by acidosis affecting the survival of BC patients. BD showed the highest IG on EMT (IG score: 0.11) and invasion (IG score: 0.1) compared to the other phenotypes with the CancerSEA database. BD also demonstrated therapeutic potential by interfering with the tumor cell-TME interactions by reducing the amyloid beta precursor protein and CD44 expression. Therefore, BD is a potential candidate to target the acidic TME induced metastatic process in BC.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "37040171",
+      "title": "Truncation of GalNAc-type O-glycans Suppresses CD44-mediated Osteoclastogenesis and Bone Metastasis in Breast Cancer",
+      "abstract": "Abstract\n\nThe glycoprotein CD44 is a key regulator of malignant behaviors in breast cancer cells. To date, hyaluronic acid (HA)-CD44 signaling pathway has been widely documented in the context of metastatic bone diseases. Core 1 beta1,3-galactosyltransferase (C1GALT1) is a critical enzyme responsible for the elongation of O-glycosylation. Aberrant O-glycans is recognized as a hallmark in cancers. However, the effects of C1GALT1 on CD44 signaling and bone metastasis remain unclear. In this study, IHC analysis indicated that C1GALT1 expression positively correlates with CD44 in breast cancer. Silencing C1GALT1 accumulates the Tn antigen on CD44, which decreases CD44 levels and osteoclastogenic signaling. Mutations in the O-glycosites on the stem region of CD44 impair its surface localization as well as suppress cell-HA adhesion and osteoclastogenic effects of breast cancer cells. Furthermore, in vivo experiments demonstrated the inhibitory effect of silencing C1GALT1 on breast cancer bone metastasis and bone loss. In conclusion, our study highlights the importance of O-glycans in promoting CD44-mediated tumorigenic signals and indicates a novel function of C1GALT1 in driving breast cancer bone metastasis.\n\nImplications:\n\nTruncation of GalNAc-type O-glycans by silencing C1GALT1 suppresses CD44-mediated osteoclastogenesis and bone metastasis in breast cancer. Targeting the O-glycans on CD44 may serve as a potential therapeutic target for blocking cancer bone metastasis.\n\nVisual O",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "33292278",
+      "title": "CD44 cross-linking increases malignancy of breast cancer via upregulation of p-Moesin",
+      "abstract": "Background\n\nCD44 is highly expressed in most cancer cells and its cross-linking pattern is closely related to tumor migration and invasion. However, the underlying molecular mechanism regarding CD44 cross-linking during cancer cell metastasis is poorly understood. Therefore, the purpose of this study was to explore whether disruption of CD44 cross-linking in breast cancer cells could prevent the cells migration and invasion and determine the effects of CD44 cross-linking on the malignancy of the cancer cells.\n\nMethods\n\nThe expression of CD44, CD44 cross-linking and Moesin phosphorylation in breast cancer cells was assessed by Western Blot assays. Effects of CD44 cross-linking on tumor metastasis were evaluated by Transwell assay. The effects of CD44 cross-linking disruption on cell viability were assessed using CCK-8 assays. The expression of p-Moesin between normal and breast cancer tissues was examined by immunohistochemical staining.\n\nResults\n\nHigh expression of CD44 cross-linking was found in invasive breast cancer cells (BT-549 and MDA-MB-231), which is associated with the malignancy of breast cancer. The expressions of ERM complex in a panel of breast cancer cell lines indicate that Moesin and its phosphorylation may play a significant role in cell metastasis. Moesin phosphorylation was inhibited by CD44 de-crosslinking in breast cancer cells and Moesin shRNA knockdown attenuated the promotion of CD44 cross-linking on cell migration and invasion. Finally, immunohistoche",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "30443182",
+      "title": "Novel CD44-downstream signaling pathways mediating breast tumor invasion",
+      "abstract": "CD44, also known as homing cell adhesion molecule is a multi-structural cell molecule involved in cell-cell and cell-extracellular matrix communications. CD44 regulates a number of central signaling pathways, including PI3K/AKT, Rho GTPases and the Ras-MAPK pathways, but also acts as a growth/arrest sensor, and inhibitor of angiogenesis and invasion, in response to signals from the microenvironment. The function of CD44 has been very controversial since it acts as both, a suppressor and a promoter of tumor growth and progression. To address this discrepancy, we have previously established CD44-inducible system both in vitro and in vivo. Next, using microarray analysis, we have identified and validated Survivin, Cortactin and TGF-beta2 as novel CD44-downstream target genes, and characterized their signaling pathways underpinning CD44-promoted breast cancer (BC) cell invasion. This report aims to update the literature by adding and discussing the impact of these novel three signaling pathways to better understand the CD44-signaling pathways involved in BC tumor cell invasion.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "29339728",
+      "title": "How BMP-2 induces EMT and breast cancer stemness through Rb and CD44?",
+      "abstract": "Article: 29339728",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "26447611",
+      "title": "CD44-mediated activation of alpha5beta1-integrin, cortactin and paxillin signaling underpins adhesion of basal-like breast cancer cells to endothelium and Fibronectin-enriched matrices",
+      "abstract": "CD44 expression is elevated in basal-like breast cancer (BLBC) tissue, and correlates with increased efficiency of distant metastasis in patients and experimental models. We sought to characterize mechanisms underpinning CD44-promoted adhesion of BLBC cells to vascular endothelial monolayers and extracellular matrix (ECM) substrates. Stimulation with hyaluronan (HA), the native ligand for CD44, increased expression and activation of beta1-integrin receptors, and increased alpha5-integrin subunit expression. Adhesion assays confirmed that CD44-signalling potentiated BLBC cell adhesion to endothelium and Fibronectin in an alpha5B1-integrin-dependent mechanism. Co-immunoprecipitation experiments confirmed HA-promoted association of CD44 with talin and the beta1-integrin chain in BLBC cells. Knockdown of talin inhibited CD44 complexing with beta1-integrin and repressed HA-induced, CD44-mediated activation of beta1-integrin receptors. Immunoblotting confirmed that HA induced rapid phosphorylation of cortactin and paxillin, through a CD44-dependent and beta1-integrin-dependent mechanism. Knockdown of CD44, cortactin or paxillin independently attenuated the adhesion of BL-BCa cells to endothelial monolayers and Fibronectin. Accordingly, we conclude that CD44 induced, integrin-mediated signaling not only underpins efficient adhesion of BLBC cells to BMECs to facilitate extravasation but initiates their adhesion to Fibronectin, enabling penetrant cancer cells to adhere more efficientl",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "23983821",
+      "title": "TGF-beta2: A Novel Target of CD44-Promoted Breast Cancer Invasion",
+      "abstract": "We have developed a tetracycline (tet)-off regulated expression of CD44s gene in the breast cancer (BC) cell line MCF-7 (B5 clone) and identified TGF-beta2 (Transforming Growth Factor beta-2; 3 fold induction) as a potential CD44-downstream transcriptional target by microarray analysis. To further validate this finding, the same RNA samples, used for microarray analysis and their corresponding protein lysates, collected from the BC cell line MCF-7-B5, were examined for CD44 expression in the presence of HA. Our results showed that TGF-beta2 mRNA levels were significantly elevated following the removal of tetracycline at 18, 24, and 48 h post-HA stimulation compared to the parental cells. Furthermore, the TGF-beta2 precursor protein increased in a time-dependent pattern upon HA-stimulation and in the absence of tetracycline. More interestingly, inhibition of CD44 gene by RNAi method decreased TGF-beta2 expression upon HA-stimulation, and subsequently inhibited BC cell invasion in vitro. In addition to identifying TGF-beta2 as a target for HA/CD44 signaling, this data suggests that ATF/CREB might be a potential transcription factor linking HA/CD44 activation to TGF-beta2 transcription and additional experiments are required for a better understanding of the molecular mechanisms underpinning the novel function of the CD44/ TGF-beta2 signaling pathway in breast cancer metastasis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "23039365",
+      "title": "Overexpression of CD44 accompanies acquired tamoxifen resistance in MCF7 cells and augments their sensitivity to the stromal factors, heregulin and hyaluronan",
+      "abstract": "Background\n\nAcquired resistance to endocrine therapy in breast cancer is a significant problem with relapse being associated with local and/or regional recurrence and frequent distant metastases. Breast cancer cell models reveal that endocrine resistance is accompanied by a gain in aggressive behaviour driven in part through altered growth factor receptor signalling, particularly involving erbB family receptors. Recently we identified that CD44, a transmembrane cell adhesion receptor known to interact with growth factor receptors, is upregulated in tamoxifen-resistant (TamR) MCF7 breast cancer cells. The purpose of this study was to explore the consequences of CD44 upregulation in an MCF7 cell model of acquired tamoxifen resistance, specifically with respect to the hypothesis that CD44 may influence erbB activity to promote an adverse phenotype.\n\nMethods\n\nCD44 expression in MCF7 and TamR cells was assessed by RT-PCR, Western blotting and immunocytochemistry. Immunofluorescence and immunoprecipitation studies revealed CD44-erbB associations. TamR cells (A+- siRNA-mediated CD44 suppression) or MCF7 cells (A+- transfection with the CD44 gene) were treated with the CD44 ligand, hyaluronon (HA), or heregulin and their in vitro growth (MTT), migration (Boyden chamber and wound healing) and invasion (Matrigel transwell migration) determined. erbB signalling was assessed using Western blotting. The effect of HA on erbB family dimerisation in TamR cells was determined by immunoprecipi",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "22788972",
+      "title": "CD44 rs13347 C>T polymorphism predicts breast cancer risk and prognosis in Chinese populations",
+      "abstract": "Introduction\n\nIt has been demonstrated that the interplay of adhesion molecule CD44 and its ligands can regulate cancer cell proliferation, migration and invasion, as well as tumor-associated angiogenesis and is related to breast cancer patient survival. In this two-stage, case control study, we determined whether common functional tagSNPs (single nucleotide polymorphisms) are associated with breast cancer risk and prognosis.\n\nMethods\n\nFive tagSNPs of CD44 (rs10836347C>T, rs13347C>T, rs1425802A>G, rs11821102G>A, rs713330T>C) were selected and genotyped in 1,853 breast cancer patients and 1,992 healthy control subjects in Eastern and Southern populations. Potential function of rs13347C>T and association between this variation and breast cancer were further studied.\n\nResults\n\nCompared with the most common rs13347CC genotype, variant genotypes (CT and TT) increased an individual's susceptibility to breast cancer, especially in estrogen receptor (ER) negative patients (odds ratio (OR) = 1.37, 95%CI = 1.17 to 1.59 for ER positive patients; OR = 2.37, 95% CI = 2.00 to 2.80 for ER negative patients). We also found that rs13347CT+ TT genotypes predicts lower five-year survival rate (hazard ratio (HR) = 1.85, 95% CI = 1.09 to 3.15, P = 0.023), with the lowest survival probability in ER negative T allele carriers. Furthermore, our reporter assay findings, although preliminary and rather modest, showed that miR-509-3p may suppress CD44 expression more strongly in C allele carriers than ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "22621373",
+      "title": "CD44 enhances invasion of basal-like breast cancer cells by upregulating serine protease and collagen-degrading enzymatic expression and activity",
+      "abstract": "Introduction\n\nBasal-like breast cancers (BL-BCa) have the worst prognosis of all subgroups of this disease. Hyaluronan (HA) and the HA receptor CD44 have a long-standing association with cell invasion and metastasis of breast cancer. The purpose of this study was to establish the relation of CD44 to BL-BCa and to characterize how HA/CD44 signaling promotes a protease-dependent invasion of breast cancer (BrCa) cells.\n\nMethods\n\nCD44 expression was determined with immunohistochemistry (IHC) analysis of a breast cancer tissue microarray (TMA). In vitro experiments were performed on a panel of invasive BL-BCa cell lines, by using quantitative polymerase chain reaction (PCR), immunoblotting, protease activity assays, and invasion assays to characterize the basis of HA-induced, CD44-mediated invasion.\n\nResults\n\nExpression of the hyaluronan (HA) receptor CD44 associated with the basal-like subgroup in a cohort of 141 breast tumor specimens (P = 0.018). Highly invasive cells of the representative BL-BCa cell line, MDA-MB-231 (MDA-MB-231Hi) exhibited increased invasion through a basement membrane matrix (Matrigel) and collagen. In further experiments, HA-induced promotion of CD44 signaling potentiated expression of urokinase plasminogen activator (uPA) and its receptor uPAR, and underpinned an increased cell-associated activity of this serine protease in MDA-MB-231Hi and a further BL-BCa cell line, Hs578T cells. Knockdown of CD44 attenuated both basal and HA-stimulated uPA and uPAR gen",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hyaluronan receptor",
+          "cancer stem cell",
+          "invasion",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "COL6A1",
+          "receptor": "CD44"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "COL6A1-CD44": {
+          "ligand": "",
+          "receptor": "CD44",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "40056038",
+      "title": "Tumor Microenvironment On-A-Chip and Single-Cell Analysis Reveal Synergistic Stromal-Immune Crosstalk on Breast Cancer Progression",
+      "abstract": "Abstract\n\nSolid tumors develop within a complex environment called the tumor microenvironment (TME), which is sculpted by the presence of other cells, such as cancer-associated fibroblasts (CAFs) and immune cells like macrophages (Mphis). Despite the presence of immune cells, tumor cells orchestrate a tumor-supportive environment through intricate interaction with the components of the TME. However, the specific mechanism by which this intercellular dialogue is regulated is not fully understood. To that end, the development of an organotypic 3D breast TME-on-a-chip (TMEC) model, integrated with single-cell RNA sequencing analysis, is reported to mechanistically evaluate the progression of triple-negative breast cancer (TNBC) cells in the presence of patient-derived CAFs and Mphis. Extensive functional assays, including invasion and morphometric characterization, reveal the synergistic influence of CAFs and Mphis on tumor cells. Furthermore, gene expression and pathway enrichment analyses identify the involvement of the KYNU gene, suggesting a potential immune evasion mechanism through the kynurenine pathway. Lastly, the pharmacological targeting of the identified pathway is investigated.\n\nUsing a 3D tumor microenvironment (TME)-on-a-chip model, tumor-stromal-immune crosstalk in triple-negative breast cancer is studied, revealing the TME's combinatorial effect on cancer progression. Integrating single-cell transcriptomic analysis demonstrates metabolic reprogramming via the ky",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "40470875",
+      "title": "Fibronectin Fibers Progressively Lose Their Tension in Invasive Human Breast Carcinoma while Being Tensed in DCIS and Healthy Breast Tissue",
+      "abstract": "Abstract\n\nExtracellular matrix (ECM) remodeling plays critical roles in cancer progression and involves alterations in its composition and biophysical properties. Aggressiveness and malignancy of solid tumors are strongly correlated with tissue stiffening, mainly due to upregulated ECM production and cross-linking. However, nothing is known about the tensional alterations that occur at the single-fiber level during tumorigenesis in humans. The well-validated peptide tension probe (FnBPA5) now reveals that Fibronectin fibers lose their tension as invasive tumors progress while they are stretched in healthy human breast tissue stroma and in ductal carcinoma in situ (DCIS), the non-invasive precursor of breast cancer. In invasive carcinomas, cancer cells, cancer-associated fibroblasts (CAFs) and infiltrating immune cells (cytotoxic T cells and regulatory T cells), are predominantly located in proximity to untensed Fibronectin fibers. This is significant, as Fibronectin fiber stretching can mechano-regulate the reciprocal cell-ECM crosstalk and the bioavailability of ECM-bound molecules. Not only tissue stiffening, but also the accumulation of untensed Fibronectin fibers may serve as a mechanical biomarker that correlates with tumor grade. Loss of Fibronectin fiber tension may play a central role in regulating tumor invasiveness. This suggests that physically altered ECM fibers can be exploited for stroma-targeted drug delivery and immunotherapy.\n\nExtracellular matrix remodeling ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "tumor progression",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Invasive Tumor"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "36940196",
+      "title": "Identification of molecularly unique tumor-associated mesenchymal stromal cells in breast cancer patients",
+      "abstract": "The tumor microenvironment is a complex mixture of cell types that bi-directionally interact and influence tumor initiation, progression, recurrence, and patient survival. Mesenchymal stromal cells (MSCs) of the tumor microenvironment engage in crosstalk with cancer cells to mediate epigenetic control of gene expression. We identified CD90+ MSCs residing in the tumor microenvironment of patients with invasive breast cancer that exhibit a unique gene expression signature. Single-cell transcriptional analysis of these MSCs in tumor-associated stroma identified a distinct subpopulation characterized by increased expression of genes functionally related to extracellular matrix signaling. Blocking the TGFbeta pathway reveals that these cells directly contribute to cancer cell proliferation. Our findings provide novel insight into communication between breast cancer cells and MSCs that are consistent with an epithelial to mesenchymal transition and acquisition of competency for compromised control of proliferation, mobility, motility, and phenotype.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1",
+          "CD44"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "27725631",
+      "title": "Cancer-associated fibroblast-secreted CXCL16 attracts monocytes to promote stroma activation in triple-negative breast cancers",
+      "abstract": "Triple-negative (TN) breast cancers (ER-PR-HER2-) are highly metastatic and associated with poor prognosis. Within this subtype, invasive, stroma-rich tumours with infiltration of inflammatory cells are even more aggressive. The effect of myeloid cells on reactive stroma formation in TN breast cancer is largely unknown. Here, we show that primary human monocytes have a survival advantage, proliferate in vivo and develop into immunosuppressive myeloid cells expressing the myeloid-derived suppressor cell marker S100A9 only in a TN breast cancer environment. This results in activation of cancer-associated fibroblasts and expression of CXCL16, which we show to be a monocyte chemoattractant. We propose that this migratory feedback loop amplifies the formation of a reactive stroma, contributing to the aggressive phenotype of TN breast tumours. These insights could help select more suitable therapies targeting the stromal component of these tumours, and could aid prediction of drug resistance.\n\n A reactive tumour stroma is associated with poor prognosis. Here, the authors show that in patients with triple negative breast cancer resident monocytes activate cancer-associated fibroblasts and induce production of CXCL16, which acts as a monocyte chemoattractant, resulting in an amplificatory feedback loop.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL6A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "collagen VI",
+          "fibrosis",
+          "myofibroblast activation",
+          "matrix remodeling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "40216762",
+      "title": "The transcriptional regulators GATA6 and TET1 regulate the TGF-beta pathway in cancer-associated fibroblasts to promote breast cancer progression",
+      "abstract": "Cancer-associated fibroblasts (CAFs) are pivotal drivers of tumor progression, yet the molecular mechanisms underlying their activation remain incompletely understood. Here, we identified the TET1/SMAD4/GATA6 regulatory axis as a central mechanism governing CAF transformation and function in breast cancer. Through integrative in vitro and in vivo models, we demonstrated that TET1, an epigenetic modulator, demethylates the SMAD4 promoter, enhancing SMAD4 expression. SMAD4 transcriptionally upregulates GATA6, which amplifies TGF-beta signaling by directly activating the TGF-beta promoter, establishing a self-reinforcing feedforward loop critical for CAF identity and stromal-tumor crosstalk. GATA6 and TET1 were significantly upregulated in breast CAFs compared to normal fibroblasts (NFs) and TGF-beta-induced CAFs. Loss- or gain-of-function experiments revealed that these regulators control CAF survival, marker expression, and secretion of pro-tumorigenic factors. Knockdown of GATA6 or TET1 reduced CAF-mediated migration and invasion of breast cancer cells in vitro, while their overexpression enhanced cancer cell aggressiveness. Mechanistically, TET1-mediated epigenetic remodeling and GATA6-driven transcriptional activation converge on the TGF-beta/SMAD pathway, sustaining CAF activation. In vivo, tumors derived from GATA6- or TET1-depleted CAFs exhibited reduced growth, proliferation, and CAF engraftment, underscoring their role in tumor progression. These findings position GATA",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "TGF-beta signaling",
+          "EMT pathway",
+          "fibroblast activation",
+          "stromal crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "36835413",
+      "title": "Crosstalk of Inflammatory Cytokines within the Breast Tumor Microenvironment",
+      "abstract": "Several immune and immunocompetent cells, including dendritic cells, macrophages, adipocytes, natural killer cells, T cells, and B cells, are significantly correlated with the complex discipline of oncology. Cytotoxic innate and adaptive immune cells can block tumor proliferation, and others can prevent the immune system from rejecting malignant cells and provide a favorable environment for tumor progression. These cells communicate with the microenvironment through cytokines, a chemical messenger, in an endocrine, paracrine, or autocrine manner. These cytokines play an important role in health and disease, particularly in host immune responses to infection and inflammation. They include chemokines, interleukins (ILs), adipokines, interferons, colony-stimulating factors (CSFs), and tumor necrosis factor (TNF), which are produced by a wide range of cells, including immune cells, such as macrophages, B-cells, T-cells, and mast cells, as well as endothelial cells, fibroblasts, a variety of stromal cells, and some cancer cells. Cytokines play a crucial role in cancer and cancer-related inflammation, with direct and indirect effects on tumor antagonistic or tumor promoting functions. They have been extensively researched as immunostimulatory mediators to promote the generation, migration and recruitment of immune cells that contribute to an effective antitumor immune response or pro-tumor microenvironment. Thus, in many cancers such as breast cancer, cytokines including leptin, IL",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "TGF-beta signaling",
+          "EMT pathway",
+          "fibroblast activation",
+          "stromal crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial",
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "41294885",
+      "title": "Integrin alphavbeta3 as a Non-Genomic Estrogen Receptor in Breast Cancer for Signaling Pathways and Crosstalk",
+      "abstract": "Highlights\n\nIntegrin alphavbeta3 functions as a crucial non-genomic receptor for estrogen, initiating rapid activation of FAK, ERK1/2, and PI3K signaling pathways.\n\nThis non-genomic estrogen signaling is shown to critically modulate integrin alphavbeta3 activity, subsequently driving cancer proliferation, migration, and metastasis\n\n What are the main findings?  \n\nCrosstalk among estrogen, integrin alphavbeta3, and GPER generates diverse cellular effects relevant to breast cancer biology.\n\nTargeting the Integrin alphavbeta3 non-genomic axis is proposed as a therapeutic strategy to overcome resistance observed in cancers.\n\n What is the implication of the main finding?  \n\nAbstract\n\nIntegrin alphavbeta3, a key member of the integrin family, plays a crucial role in cell localization, mobilization, and signal transduction through collaborating with extracellular proteins. Its unique expression and activation in tumor cells and rapidly dividing endothelial cells suggest its potential role in cancer cell growth and metastasis, making it a promising therapeutic target. In genomic pathways, estrogen binds to its receptors to form transcription complexes that bind to the promoters of steroid hormone-receptive genes. Conversely, G protein-coupled estrogen receptor 1 (GPER) and integrin alphavbeta3 have been shown to play oles in non-genomic actions that contribute to estrogen-induced cancer growth. The molecular mechanisms of these non-genomic functions involve signal transduction via fo",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "integrin signaling",
+          "FAK pathway",
+          "cell migration",
+          "adhesion signaling"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "39937011",
+      "title": "Three-Dimensional Models: Biomimetic Tools That Recapitulate Breast Tissue Architecture and Microenvironment to Study Ductal Carcinoma In Situ Transition to Invasive Ductal Breast Cancer",
+      "abstract": "Diagnosis of ductal carcinoma in situ (DCIS) presents a challenge as we cannot yet distinguish between those lesions that remain dormant from cases that may progress to invasive ductal breast cancer (IDC) and require therapeutic intervention. Our overall interest is to develop biomimetic three-dimensional (3D) models that more accurately recapitulate the structure and characteristics of pre-invasive breast cancer in order to study the underlying mechanisms driving malignant progression. These models allow us to mimic the microenvironment to investigate many aspects of mammary cell biology, including the role of the extracellular matrix (ECM), the interaction between carcinoma-associated fibroblasts (CAFs) and epithelial cells, and the dynamics of cytoskeletal reorganization. In this review article, we outline the significance of 3D culture models as reliable pre-clinical tools that mimic the in vivo tumor microenvironment and facilitate the study of DCIS lesions as they progress to invasive breast cancer. We also discuss the role of CAFs and other stromal cells in DCIS transition as well as the clinical significance of emerging technologies like tumor-on-chip and co-culture models.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "tumor progression",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "35526305",
+      "title": "Prognostic value of integrin alphaV expression and localization pattern in invasive breast carcinomas",
+      "abstract": "Highlights\n\nLow expression of integrin alphaV correlates with poor cancer-specific survival human breast cancer patients.\n\nLoss of integrin alphaV continuity in the periphery of tumor cell clusters correlates with decreased cancer-specific survival.\n\nStromal localization of integrin alphaV can be an indicative of poor survival and metastasis risk.\n\n3D culture models of non-malignant and malignant breast cells recapitulate the expression pattern and spatial distribution of integrin in the epithelia observed in patient samples.\n\nInvasion of surrounding stroma is an early event in breast cancer metastatic progression, and involves loss of cell polarity, loss of myoepithelial layer, epithelial-mesenchymal transition (EMT) and remodeling of the extracellular matrix (ECM). Integrins are transmembrane receptors responsible for cell-ECM binding, which triggers signals that regulate many aspects of cell behavior and fate. Changes in the expression, localization and pairing of integrins contribute for abnormal responses found in transformed epithelia. We analyzed 345 human breast cancer samples in tissue microarrays (TMA) from cases diagnosed with invasive breast carcinoma to assess the expression and localization pattern of integrin alphaV and correlation with clinical parameters. Patients with lower levels of integrin alphaV staining showed reduced cancer specific survival. A subset of cases presented a peripheral staining of integrin alphaV surrounding tumor cell clusters, possibly ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "invasive carcinoma",
+          "myoepithelial layer",
+          "tumor progression",
+          "spatial distribution"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "35202089",
+      "title": "Non-Coding RNAs in the Crosstalk between Breast Cancer Cells and Tumor-Associated Macrophages",
+      "abstract": "Non-coding RNAs (ncRNAs) play a pivotal role in regulating the tumor microenvironment (TME) by controlling gene expression at multiple levels. In tumors, ncRNAs can mediate the crosstalk between cancer cells and other cells in the TME, such as immune cells, stromal cells, and endothelial cells, influencing tumor development and progression. Tumor-associated macrophages (TAMs) are among the most abundant inflammatory cells infiltrating solid cancers that promote tumorigenesis, and their infiltration correlates with a poor prognosis in many tumors. Cancer cells produce different ncRNAs that orchestrate TAM recruitment and polarization toward a tumor-promoting phenotype. Tumor-reprogrammed macrophages shape the TME by promoting angiogenesis and tissue remodeling, and suppressing the anti-tumor activity of adaptive immune cells. TAMs can also produce ncRNA molecules that boost cancer cell proliferation and direct their phenotype and metabolic changes facilitating cancer progression and metastasis. This review will focus on the crosstalk between cancer cells and TAMs mediated by microRNAs and long non-coding RNAs during breast cancer (BC) initiation and progression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "endothelial cell",
+          "tumor-associated macrophage",
+          "immune infiltration",
+          "angiogenesis"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial",
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "34354867",
+      "title": "Increased apoptosis is associated with robust immune cell infiltration and cytolytic activity in breast cancer.",
+      "abstract": "Tumor infiltrating immune cells plays a critical role in cancer progression. Apoptosis is an autonomous cell death that counteracts tumor growth. To this end, we hypothesized that increased apoptosis in breast cancer is associated with immune cell killing. Apoptosis score of MSigDB Hallmark collection was used to analyze METABRIC cohort (n=1904) and TCGA (n=1069) as validation cohort. High apoptosis tumors enriched cancer promoting signaling pathways; hypoxia, KRAS, TGF-beta, PI3K signaling, and was associated with low MKI67 expression and less cell proliferation gene sets, less homologous recombination defects, and less altered fraction. High apoptosis tumors also enriched angiogenesis and high infiltration of vascular endothelial cells, pericytes and stromal cells and significantly enriched inflammation and immune response-related gene sets and high infiltration of CD8, CD4 memory, dendritic cells, M1 and M2 macrophages and significant elevation of cytolytic activity and immune checkpoint molecules, consistently in both cohorts. In conclusion, breast cancer patients with high apoptosis are associated with angiogenesis, immune response, high immune cell infiltration and cytolytic activity. To the best of our knowledge, this is the first study to utilize in silico translational approach to demonstrate the clinical relevance of apoptosis in breast cancer patients in large cohorts.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "endothelial cell",
+          "tumor-associated macrophage",
+          "immune infiltration",
+          "angiogenesis"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "COL6A1-CD44": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial",
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    }
+  ],
+  "search_method": "search_literature_dynamic",
+  "coverage": {
+    "genes_covered": [
+      "COL6A1",
+      "CD44"
+    ],
+    "genes_matched_by": {
+      "COL6A1": "biomcp_tag_only",
+      "CD44": "biomcp_tag_only"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Macrophages 2",
+      "Stromal",
+      "DCIS 2",
+      "Invasive Tumor",
+      "Endothelial"
+    ],
+    "total_papers": 93,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 55.55555555555556,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Myoepi ACTA2+",
+      "Myoepi KRT15+",
+      "Prolif Invasive Tumor",
+      "Stromal & T Cell Hybrid"
+    ]
+  }
+}

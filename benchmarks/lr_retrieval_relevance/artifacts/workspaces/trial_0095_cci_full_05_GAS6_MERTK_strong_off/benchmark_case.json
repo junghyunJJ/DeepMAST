@@ -1,0 +1,90 @@
+{
+  "case_id": "cci_full_05_GAS6_MERTK",
+  "category": "low_morans_known",
+  "lr_pair": "GAS6-MERTK",
+  "genes": [
+    "GAS6",
+    "MERTK"
+  ],
+  "pathways": [
+    "PI3K"
+  ],
+  "celltypes": [
+    "Endothelial",
+    "Macrophages 1",
+    "Macrophages 2",
+    "Myoepi ACTA2+",
+    "Myoepi KRT15+",
+    "Perivascular-Like",
+    "Stromal",
+    "Stromal & T Cell Hybrid"
+  ],
+  "disease": "breast cancer",
+  "search_context": {
+    "genes": [
+      "GAS6",
+      "MERTK"
+    ],
+    "pathways": [
+      "PI3K"
+    ],
+    "celltypes": [
+      "Endothelial",
+      "Macrophages 1",
+      "Macrophages 2",
+      "Myoepi ACTA2+",
+      "Myoepi KRT15+",
+      "Perivascular-Like",
+      "Stromal",
+      "Stromal & T Cell Hybrid"
+    ],
+    "disease": "breast cancer",
+    "lr_pair": "GAS6-MERTK",
+    "category": "low_morans_known"
+  },
+  "raw_case": {
+    "case_id": "cci_full_05_GAS6_MERTK",
+    "benchmark_type": "cci_interpretation_v2",
+    "lr_pair": "GAS6-MERTK",
+    "category": "low_morans_known",
+    "input_bundle": {
+      "ligand": "GAS6",
+      "receptor": "MERTK",
+      "interaction": "GAS6^MERTK",
+      "morans_r": 0.025068,
+      "morans_pval": 0.0,
+      "ligand_means": 0.9086,
+      "ligand_props": 0.7987,
+      "receptor_means": 0.1861,
+      "receptor_props": 0.3512,
+      "factor1": 0.8183,
+      "factor2": 0.6154,
+      "factor3": 0.4042,
+      "pathway_associations": [
+        "PI3K"
+      ],
+      "disease_associations": [
+        "Thromboembolism",
+        "Thrombosis",
+        "Thrombus"
+      ],
+      "ligand_cell_types": [
+        "Endothelial",
+        "Myoepi ACTA2+",
+        "Myoepi KRT15+",
+        "Perivascular-Like",
+        "Stromal",
+        "Stromal & T Cell Hybrid"
+      ],
+      "receptor_cell_types": [
+        "Macrophages 1",
+        "Macrophages 2",
+        "Stromal"
+      ],
+      "mean_interest": -0.268068,
+      "pval_interest": 5.073334530258933e-09,
+      "pval_interest_adj": 2.673925639468643e-08,
+      "tissue_context": "Breast cancer Visium spatial transcriptomics"
+    }
+  }
+}

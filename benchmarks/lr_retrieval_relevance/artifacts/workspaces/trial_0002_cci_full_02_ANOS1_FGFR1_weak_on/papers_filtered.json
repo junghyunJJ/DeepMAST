@@ -1,0 +1,1234 @@
+{
+  "schema_version": "deep_interpreter_literature_handoff_v1",
+  "policy": {
+    "included_buckets": [
+      "direct_lr_evidence",
+      "receptor_pathway_context_evidence"
+    ],
+    "excluded_buckets": [
+      "disease_only_background",
+      "rejected_weak_evidence"
+    ],
+    "cap": 40
+  },
+  "source": {
+    "total_papers": 30,
+    "unique_papers": 30,
+    "duplicates_dropped": 0,
+    "raw_papers_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0002_cci_full_02_ANOS1_FGFR1_weak_on/papers_raw.json",
+    "citation_candidates_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0002_cci_full_02_ANOS1_FGFR1_weak_on/citation_candidates.json"
+  },
+  "counts": {
+    "direct_lr_evidence": 0,
+    "receptor_pathway_context_evidence": 19,
+    "disease_only_background": 4,
+    "rejected_weak_evidence": 7
+  },
+  "papers": [
+    {
+      "pmid": "38354330",
+      "title": "Sunitinib in Patients With Breast Cancer With FGFR1 or FGFR2 Amplifications or Mutations: Results From the Targeted Agent and Profiling Utilization Registry Study.",
+      "abstract": "PURPOSE: The Targeted Agent and Profiling Utilization Registry Study is a phase II basket trial evaluating the antitumor activity of commercially available targeted agents in patients with advanced cancer and genomic alterations known to be drug targets. Results from cohorts of patients with metastatic breast cancer (BC) with FGFR1 and FGFR2 alterations treated with sunitinib are reported. METHODS: Eligible patients had measurable disease, Eastern Cooperative Oncology Group performance status 0-2, adequate organ function, and no standard treatment options. Simon's two-stage design was used with a primary end point of disease control (DC), defined as objective response (OR) or stable disease of at least 16 weeks duration (SD16+) according to RECIST v1.1. Secondary end points included OR, progression-free survival, overall survival, duration of response, duration of stable disease, and safety. RESULTS: Forty patients with BC with FGFR1 (N = 30; amplification only n = 26, mutation only n = 1, both n = 3) or FGFR2 (N = 10; amplification only n = 2, mutation only n = 6, both n = 2) alterations were enrolled. Three patients in the FGFR1 cohort were not evaluable for efficacy; all patients in the FGFR2 cohort were evaluable. For the FGFR1 cohort, two patients with partial response and four with SD16+ were observed for DC and OR rates of 27% (90% CI, 13 to 100) and 7% (95% CI, 1 to 24), respectively. The null hypothesis of 15% DC rate was not rejected (P = .169). No patients achieved",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "36002765",
+      "title": "TNFAIP3 mediates FGFR1 activation-induced breast cancer angiogenesis by promoting VEGFA expression and secretion.",
+      "abstract": "PURPOSE: To investigate the role and mechanism of TNF-inducible protein 3(TNFAIP3) in breast cancer angiogenesis induced by fibroblast growth factor receptor1 (FGFR1) activation. METHODS: The immunohistochemical assay was used to detect the expression of vascular endothelial cell marker CD31 and CD105 in mice DCIS.COM-iFGFR1 transplanted tumor (previously established by our group). The effects of TNFAIP3 knockout/knockdown breast cancer cell lines on angiogenesis, migration, and invasion of Human Umbilical Vein Endothelial Cells (HUVEC) were detected by the tubulogenesis and Trewells assay. RNA-seq analysis of TNFAIP3 downstreams differential genes after TNFAIP3 knockdown. The expression and secretion of VEGFA after FGFR1 activation in breast cancer cells were detected by qPCR, Western blot, and ELISA. RESULTS: Immunohistochemistry showed that TNFAIP3 knockout inhibited the expression of CD31 and CD105 in DCIS grafted tumors promoted by FGFR1 activation. Tubulogenesis and Trewells experiments showed that TNFAIP3 gene knockout/knockdown inhibited the angiogenesis, migration, and invasion of HUVEC cells promoted by FGFR1 activation. qPCR assay showed that VEGFA mRNA level in the TNFAIP3 knockdown cell line was significantly down-regulated (p < 0.05). qPCR, Western blot and ELISA results showed that TNFAIP3 gene knockout/knockdown could inhibit the expression and secretion of VEGFA in breast cancer cells induced by FGFR1 activation. CONCLUSION: TNFAIP3 promotes breast cancer ang",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "33753561",
+      "title": "FGFR1 copy number in breast cancer: associations with proliferation, histopathological grade and molecular subtypes.",
+      "abstract": "AIMS: FGFR1 is located on 8p11.23 and regulates cell proliferation and survival. Increased copy number of FGFR1 is found in several cancers including cancer of the breast. ZNF703 is located close to FGFR1 at 8p11-12 and is frequently expressed in the luminal B subtype of breast cancer. Using tissue samples from a well-described cohort of patients with breast cancer with long-term follow-up, we studied associations between FGFR1 copy number in primary breast cancer tumours and axillary lymph node metastases, and proliferation status, molecular subtype and prognosis. Furthermore, we studied associations between copy number increase of FGFR1 and copy number of ZNF703. METHODS: We used fluorescence in situ hybridisation for FGFR1 and the chromosome 8 centromere applied to tissue microarray sections from a series of 534 breast cancer cases. RESULTS: We found increased copy number (>=4) of FGFR1 in 74 (13.9%) of tumours. Only 6 of the 74 cases with increased copy number were non-luminal. Increased FGFR1 copy number was significantly associated with high Ki-67 status, high mitotic count and high histopathological grade, but not with prognosis. Forty-two (7.9%) cases had mean copy number >=6. Thirty of these showed ZNF708 copy number >=6. CONCLUSIONS: Our results show that FGFR1 copy number increase is largely found among luminal subtypes of breast cancer, particularly luminal B (HER2-). It is frequently accompanied by increased copy number of ZNF703. FGFR1 copy number increase is as",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "33783288",
+      "title": "FGFR1 Is Associated With Tamoxifen Resistance and Poor Prognosis of ER-Positive Breast Cancers by Suppressing ER Protein Expression",
+      "abstract": "Fibroblast growth factor receptor 1 (FGFR1) is widely recognized as a key player in mammary carcinogenesis and associated with the prognosis and therapeutic response of breast cancers. With the aim of investigating the correlation between FGFR1 expression and estrogen receptor (ER) and exploring the effect of FGFR1 on endocrine therapy response and ER+ breast cancer prognosis, we examined the FGFR1 protein expression among 184 ER-positive breast cancers by the immunohistochemistry (IHC) method, analyzed the association between FGFR1 expression and disease characters using the Pearson's chi-square test, and assessed the prognostic role of FGFR1 among breast cancers using Cox regression and Kaplan-Meier analyses. Moreover, in vitro assays were conducted to confirm the correlation between FGFR1 and ER expression and investigate the effect of FGFR1 on tamoxifen (TAM) sensitivity in ER+ breast cancer. The results showed that ER expression was negatively correlated with FGFR1 expression (P = 0.011, r = -0.221). Moreover, FGFR1 expression was one of the prognostic factors of ER-positive breast cancer (OR = 1.974, 95% CI = 1.043-3.633), and high FGFR1 expression was correlated with decreased breast cancer overall survival. In addition, knocking down FGFR1 inhibited cell proliferation and enhanced TAM sensitivity in TAM-resistant cells. In conclusion, we found that there was a significant negative correlation between FGFR1 and ER levels in ER+ breast cancers, high FGFR1 protein expres",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "31371343",
+      "title": "FGFR1 Amplification Mediates Endocrine Resistance but Retains TORC Sensitivity in Metastatic Hormone Receptor-Positive (HR+) Breast Cancer.",
+      "abstract": "PURPOSE: While FGFR1 amplification has been described in breast cancer, the optimal treatment approach for FGFR1-amplified (FGFR1+) metastatic breast cancer (MBC) remains undefined.Experimental Design: We evaluated clinical response to endocrine and targeted therapies in a cohort of patients with hormone receptor-positive (HR+)/HER2- MBC and validated the functional role of FGFR1-amplification in mediating response/resistance to hormone therapy in vitro. RESULTS: In the clinical cohort (N = 110), we identified that patients with FGFR1+ tumors were more likely to have progesterone receptor (PR)-negative disease (47% vs. 20%; P = 0.005), coexisting TP53 mutations (41% vs. 21%; P = 0.05), and exhibited shorter time to progression with endocrine therapy alone and in combination with CDK4/6 inhibitor, but not with a mTOR inhibitor (everolimus), adjusting for key prognostic variables in multivariate analysis. Furthermore, mTOR-based therapy resulted in a sustained radiological and molecular response in an index case of FGFR1+ HR+/HER2- MBC. In preclinical models, estrogen receptor-positive (ER+)/FGFR1-amplified CAMA1 human breast cancer cells were only partially sensitive to fulvestrant, palbociclib, and alpelisib, but highly sensitive to everolimus. In addition, transduction of an FGFR1 expression vector into ER+ T47D cells induced resistance to fulvestrant that could be overcome by added TORC1 inhibition, but not PI3K or CDK4/6 inhibition. CONCLUSIONS: Collectively, these finding",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "29970903",
+      "title": "Synergistic anti-angiogenic treatment effects by dual FGFR1 and VEGFR1 inhibition in FGFR1-amplified breast cancer.",
+      "abstract": "FGFR1 amplification has been found in 15% of patients with breast cancer and has been postulated as a promising marker to predict response against FGFR inhibitors. However, early phase clinical trials of selective FGFR inhibitors demonstrated only limited efficacy in FGFR1-amplified breast cancer patients. We found that BGJ398, an FGFR inhibitor, effectively inhibited phosphorylation of FGFR1 and MEK/ERK signaling in FGFR1-amplified breast cancer without affecting tumor cell proliferation. However, FGFR1 knockout inhibited tumor angiogenesis in vivo. We unraveled that FGFR1 regulates the secretion of the proangiogenic vascular endothelial growth factor (VEGF) in a MAPK-dependent manner. We further found that FGF-FGFR1 signaling induces an autocrine activation of VEGF-VEGFR1 pathway that again amplifies VEGF secretion via VEGF-VEGFR1-AKT signaling. Targeting both VEGFR1 and FGFR1 resulted in synergistic anti-angiogenic treatment effects in vivo. We thus postulate synergistic treatment effects in FGFR1/VEGFR1-positive breast cancer patients by dual targeting of FGFR and VEGFR.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "29996114",
+      "title": "Effects of FGFR1 Gene Polymorphisms on the Risk of Breast Cancer and FGFR1 Protein Expression.",
+      "abstract": "BACKGROUND/AIMS: Fibroblast growth factor receptor 1 (FGFR1) is widely considered to play an important role in mammary carcinogenesis. Some common variants in FGFR1 might be associated with its expression, and further affect breast cancer risk. The aim of this study was to investigate effects of single-nucleotide polymorphisms (SNPs) in FGFR1 on breast cancer susceptibility and FGFR1 protein expression. METHODS: SNPs rs17182023, rs17175624 and rs10958704 in FGFR1 were genotyped in 747 breast cancer cases and 716 healthy controls by SNaPshot method. The associations between SNPs and breast cancer were examined by logistic regression. Immunohistochemistry(IHC) was used to detect FGFR1 protein expression, and the association of FGFR1 polymorphisms with its protein expression was analyzed by Pearson's chi-square test. Additionally, Cox regression and Kaplan-Meier analysis was used to evaluate the association between FGFR1 protein expression and breast cancer prognosis. RESULTS: The minor allele of rs17182023 in FGFR1 was significantly associated with reduced breast cancer risk, with an odds ratio of 0.800 (95%CI = 0.684-0.935). No significant associations were detected between other SNPs and breast cancer. Moreover, rs17182023 was correlated to FGFR1 protein expression (P = 0.006), and patients with high FGFR1 protein expression tended to have poor outcomes. CONCLUSIONS: SNP rs17182023 was correlated to reduced breast cancer risk, and was associated with FGFR1 protein expression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "29223982",
+      "title": "Pazopanib Sensitivity in a Patient With Breast Cancer and FGFR1 Amplification.",
+      "abstract": "Treatment options for patients with hormone receptor-positive (HR+), HER2-negative (HER2-) breast cancer and resistance to endocrine therapy remain limited. An interesting therapeutic target in these patients is fibroblast growth factor receptor 1 (FGFR1). FGFR1 is amplified in approximately 11% of patients with breast cancer, especially those with HR+ disease. This report presents a patient with metastatic HR+ HER2- breast cancer harboring an FGFR1 amplification who was resistant to endocrine therapy but responded to pazopanib, a multi-tyrosine kinase inhibitor with FGFR-inhibiting activity. Upon pazopanib treatment, the patient's brain lesions nearly disappeared, and she experienced therapeutic changes in the lung and an improvement of liver function. This case suggests that pazopanib may be a promising agent for the treatment of patients with breast cancer and FGFR1 amplifications.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "26993162",
+      "title": "FGFR antagonist induces protective autophagy in FGFR1-amplified breast cancer cell.",
+      "abstract": "Breast cancer, representing approximately 30% of all gynecological cancer cases diagnosed yearly, is a leading cause of cancer-related mortality for women. Amplification of FGFR1 is frequently observed in breast cancers and is associated with poor prognosis. Though FGFRs have long been considered as anti-cancer drug targets, and a cluster of FGFR antagonists are currently under clinical trials, the precise cellular responses under the treatment of FGFR antagonists remains unclear. Here, we show that PD166866, an FGFR1-selective inhibitor, inhibits proliferation and triggers anoikis in FGFR1-amplified breast cancer cell lines. Notably, we demonstrate that PD166866 induces autophagy in FGFR1-amplified breast cancer cell lines, while blockage of autophagy by Atg5 knockdown further enhances the anti-proliferative activities of PD166866. Moreover, mechanistic study reveals that PD166866 induces autophagy through repressing Akt/mTOR signaling pathway. Together, the present study provides new insights into the molecular mechanisms underlying the anti-tumor activities of FGFR antagonists, and may further assist the FGFRs-based drug discovery.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "23151501",
+      "title": "FGFR1 amplification and the progression of non-invasive to invasive breast cancer",
+      "abstract": "The incidence of invasive breast cancer (IBC) can be dramatically reduced by improving our abilities to detect and treat ductal carcinoma in situ (DCIS). Progress will be based on a detailed understanding of molecular mechanisms responsible for tumor progression. An interesting study by Jang and colleagues evaluated and compared the frequency of amplification of four oncogenes (HER2, c-MYC, CCND1 and FGFR1) in large cohorts of pure DCIS, in the DCIS component of IBC, and in corresponding IBC. Of particular interest, they found a twofold increase in FGFR1 amplification in IBC versus pure DCIS, and significantly reduced disease-free survival in amplified versus unamplified IBC - leading the authors to conclude that FGFR1 plays an important role in the development and progression of IBC. These observations indeed provide hints that FGFR1 is important in this setting, although the issue is very complex and far from resolved.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "37490511",
+      "title": "Caffeic acid phenethyl ester suppresses metastasis of breast cancer cells by inactivating FGFR1 via MD2",
+      "abstract": "Background\n\nTumor metastasis is the main cause of death for breast cancer patients. Caffeic acid phenethyl ester (CAPE) has strong anti-tumor effects with very low toxicity and may be a potential candidate drug. However, the anti-metastatic effect and molecular mechanism of CAPE on breast cancer need more research.\n\nMethods\n\nMCF-7 and MDA-MB-231 breast cancer cells were used here. Wound healing and Transwell assay were used for migration and invasion detection. Western blot and RT-qPCR were carried out for the epithelial-to-myofibroblast transformation (EMT) process investigation. Western blot and immunofluorescence were performed for fibroblast growth factor receptor1 (FGFR1) phosphorylation and nuclear transfer detection. Co-immunoprecipitation was used for the FGFR1/myeloid differentiation protein2 (MD2) complex investigation.\n\nResults\n\nOur results suggested that CAPE blocks the migration, invasion, and EMT process of breast cancer cells. Mechanistically, CAPE inhibits FGFR1 phosphorylation and nuclear transfer while overexpression of FGFR1 reduces the anti-metastasis effect of CAPE. Further, we found that FGFR1 is bound to MD2, and silencing MD2 inhibits FGFR1 phosphorylation and nuclear transfer as well as cell migration and invasion.\n\nConclusion\n\nThis study illustrated that CAPE restrained FGFR1 activation and nuclear transfer through MD2/FGFR1 complex inhibition and showed good inhibitory effects on the metastasis of breast cancer cells.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "fibroblast growth factor receptor",
+          "tyrosine kinase",
+          "angiogenesis",
+          "receptor signaling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "34722544",
+      "title": "Targeted Inhibition of Fibroblast Growth Factor Receptor 1-GLI Through AZD4547 and GANT61 Modulates Breast Cancer Progression",
+      "abstract": "The underlying mechanism of fibroblast growth factor receptor 1 (FGFR1) mediated carcinogenesis is still not fully understood. For instance, FGFR1 upregulation leads to endocrine therapy resistance in breast cancer patients. The current study aimed to identify FGFR1-linked genes to devise improved therapeutic strategies. RNA-seq and microarray expression data of 1,425 breast cancer patients from two independent cohorts were downloaded for the analysis. Gene Set Enrichment Analysis (GSEA) was performed to identify differentially expressed pathways associated with FGFR1 expression. Validation was done using 150 fresh tumor biopsy samples of breast cancer patients. The clinical relevance of mRNA and protein expression of FGFR1 and its associated genes were also evaluated in mouse embryonic fibroblasts (MEFs) and breast cancer cell line (MDA-MB-231). Furthermore, MDA-MB-231 cell line was treated with AZD4547 and GANT61 to identify the probable role of FGFR1 and its associated genes on cells motility and invasion. According to GSEA results, SHH pathway genes were significantly upregulated in FGFR1 patients in both discovery cohorts of breast cancer. Statistical analyses using both discovery cohorts and 150 fresh biopsy samples revealed strong association of FGFR1 and GLI1, a member of SHH pathway. The increase in the expression of these molecules was associated with poor prognosis, lymph node involvement, late stage, and metastasis. Combined exposures to AZD4547 (FGFR1 inhibitor) ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "fibroblast growth factor receptor",
+          "tyrosine kinase",
+          "angiogenesis",
+          "receptor signaling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "32852708",
+      "title": "Impact of fibroblast growth factor receptor 1 (FGFR1) amplification on the prognosis of breast cancer patients",
+      "abstract": "Purpose\n\nVarious aberrations in the fibroblast growth factor receptor genes FGFR1, FGFR2, and FGFR3 are found in different cancers, including breast cancer (BC). This study analyzed the impact of FGFR amplification on the BC prognosis.\n\nMethods\n\nThe study included 894 BC patients. The amplification rates of FGFR1, FGFR2, and FGFR3 were evaluated on tissue microarrays using fluorescence in situ hybridization (FISH). Associations between these parameters and prognosis were analyzed using multivariate Cox regression analyses.\n\nResults\n\nFGFR1 FISH was assessable in 503 samples, FGFR2 FISH in 447, and FGFR3 FISH in 562. The FGFR1 amplification rate was 6.6% (n = 33). Increased FGFR2 copy numbers were seen in 0.9% (n = 4); only one patient had FGFR3 amplification (0.2%). Most patients with FGFR1 amplification had luminal B-like tumors (69.7%, n = 23); only 32.6% (n = 153) of patients without FGFR1 amplification had luminal B-like BC. Other patient and tumor characteristics appeared similar between these two groups. Observed outcome differences between BC patients with and without FGFR1 amplification did not achieve statistical significance; however, there was a trend toward poorer distant metastasis-free survival in BC patients with FGFR1 amplification (HR = 2.08; 95% CI 0.98 to 4.39, P = 0.05).\n\nConclusion\n\nFGFR1 amplification occurs most frequently in patients with luminal B-like BC. The study showed a nonsignificant correlation with the prognosis, probably due to the small sampl",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "fibroblast growth factor receptor",
+          "tyrosine kinase",
+          "angiogenesis",
+          "receptor signaling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "33000910",
+      "title": " Hsa_circRNA_0000518 facilitates breast cancer development via regulation of the miR-326/FGFR1 axis",
+      "abstract": "Background\n\nBreast cancer (BC) is a heterogeneous malignant tumor that threatens the health of women worldwide. Hsa_circRNA_0000518 (circ_0000518) has been revealed to be upregulated in BC tissues. However, the role and mechanism of circ_0000518 in BC are indistinct.\n\nMethods\n\nQuantitative real-time polymerase chain reaction (qRT-PCR) was implemented to detect the levels of circ_0000518, microRNA (miR)-326, and fibroblast growth factor receptor 1 (FGFR1) mRNA in BC tissues and cells. Cell counting kit-8 (CCK-8), colony formation, flow cytometry, and transwell assays were executed to estimate BC cell proliferation, cell cycle progression, apoptosis, migration, and invasion. The relationship between circ_0000518 or FGFR1 and miR-326 was verified by dual-luciferase reporter and/or RNA immunoprecipitation (RIP) assays. The role of circ_0000518 in vivo was confirmed by xenograft assay.\n\nResults\n\nCirc_0000518 and FGFR1 were upregulated while miR-326 was downregulated in BC tissues and cells. Circ_0000518 silencing impeded tumor growth in vivo and induced cell cycle arrest, apoptosis, cured proliferation, colony formation, migration, and invasion of BC cells in vitro. Circ_0000518 regulated FGFR1 expression via competitively binding to miR-326 in BC cells. MiR-326 inhibitor reversed the inhibitory influence of circ_0000518 knockdown on the malignant behaviors of BC cells. FGFR1 overexpression abolished miR-326 mimic-mediated influence on the malignant behaviors of BC cells.\n\nConclus",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "fibroblast growth factor receptor",
+          "tyrosine kinase",
+          "angiogenesis",
+          "receptor signaling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "33019728",
+      "title": "The Relationship between Leptin, the Leptin Receptor and FGFR1 in Primary Human Breast Tumors",
+      "abstract": "Obesity is associated with increased breast cancer risk and poorer cancer outcomes; however, the precise etiology of these observations has not been fully identified. Our previous research suggests that adipose tissue-derived fibroblast growth factor-2 (FGF2) promotes the malignant transformation of epithelial cells through the activation of fibroblast growth factor receptor-1 (FGFR1). FGF2 is increased in the context of obesity, and increased sera levels have been associated with endocrine-resistant breast cancer. Leptin is a marker of obesity and promotes breast carcinogenesis through several mechanisms. In this study, we leverage public gene expression datasets to evaluate the associations between FGFR1, leptin, and the leptin receptor (LepR) in breast cancer. We show a positive association between FGFR1 and leptin protein copy number in primary breast tumors. These observations coincided with a positive association between Janus kinase 2 (Jak2) mRNA with both leptin receptor (LepR) mRNA and FGFR1 mRNA. Moreover, two separate Jak2 inhibitors attenuated both leptin+FGF2-stimulated and mouse adipose tissue-stimulated MCF-10A transformation. These results demonstrate how elevated sera FGF2 and leptin in obese patients may promote cancer progression in tumors that express elevated FGFR1 and LepR through Jak2 signaling. Therefore, Jak2 is a potential therapeutic target for FGFR1 amplified breast cancer, especially in the context of obesity.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "fibroblast growth factor receptor",
+          "tyrosine kinase",
+          "angiogenesis",
+          "receptor signaling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "32499836",
+      "title": "FGFR aberrations increase the risk of brain metastases and predict poor prognosis in metastatic breast cancer patients",
+      "abstract": "Background:\n\nThe survival status of patients with breast cancer and brain metastasis (BCBM) receiving current treatments is poor.\n\nMethod:\n\nWe designed a real-world study to investigate using patients' clinical and genetic aberrations to forecast the prognoses of BCBM patients. We recruited 146 BCBM patients and analyzed their clinical features to evaluate the overall survival (OS). For genetic testing, 30 BCBM and 165 non-brain-metastatic (BM) metastatic breast cancer (MBC) patients from Hunan Cancer Hospital, and 86 BCBM and 1416 non-BM MBC patients from the Geneplus database who received circulating tumor DNA testing, were compared and analyzed.\n\nResults:\n\nKi67 >14% and >3 metastatic brain tumors were significant risk factors associated with poor OS, while chemotherapy and brain radiotherapy were beneficial factors for better OS. Compared with non-BM MBC patients, BCBM patients had more fibroblast growth factor receptor (FGFR) aberrations. The combination of FGFR, TP53 and FLT1 aberrations plus immunohistochemistry HER2-positive were associated with an increased risk of brain metastasis (AUC = 77.13%). FGFR aberration alone was not only a predictive factor (AUC = 67.90%), but also a significant risk factor for poor progression-free survival (Logrank p = 0.029). FGFR1 aberration was more frequent than other FGFR family genes in BCBM patients, and FGFR1 aberration was significantly higher in BCBM patients than non-BM MBC patients. Most FGFR1-amplified MBC patients progressed",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "fibroblast growth factor receptor",
+          "tyrosine kinase",
+          "angiogenesis",
+          "receptor signaling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "32381997",
+      "title": "Comprehensive Analysis of Fibroblast Growth Factor Receptor (FGFR) Family Genes in Breast Cancer by Integrating Online Databases and Bioinformatics",
+      "abstract": "Background\n\nFibroblast growth factor receptors (FGFRs) play vital roles in the development and progression of human cancers. This study aimed to comprehensively understand the prognostic performances of FGFR1-4 expression in breast cancer (BC) by mining databases.\n\nMaterial/Methods\n\nThe levels of FGFR1-4 expression in BC were analyzed by online databases, GEPIA (Gene Expression Profiling Interactive Analysis) and UALCAN. Survival analysis of FGFR1-4 was carried out by Kaplan-Meier plotter. GSE74146 was downloaded from Gene Expression Omnibus (GEO) and analyzed by GEO2R to screen the differentially expressed genes (DEGs) between FGFR2-silenced BC cells and control. Over-presentation for DEGs were done by Enrichr tool. Networks of DEGs were obtained by using Search Tool for the Retrieval of Interacting Genes (STRING) and Cytoscape software. Hub genes were identified by cytoHubba Cytoscape plugin.\n\nResults\n\nThe online databases showed that FGFR1 was significantly downregulated whereas FGFR3 was upregulated in BC. Kaplan-Meier plotter demonstrated the upregulation of both FGFR1 and FGFR3 indicated favorable relapse free survival (RFS) whereas FGFR4 overexpression predicted unfavorable overall survival (OS) in BC patients. Importantly, our results showed FGFR2 overexpression robustly predicted favorable OS and RFS in BC. Further bioinformatics analysis of GSE74146 suggested FGFR2 mainly participated in regulating degradation and organization of the extracellular matrix and signali",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FGFR1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "fibroblast growth factor receptor",
+          "tyrosine kinase",
+          "angiogenesis",
+          "receptor signaling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ANOS1",
+          "receptor": "FGFR1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ANOS1-FGFR1": {
+          "ligand": "",
+          "receptor": "FGFR1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "41144119",
+      "title": "Microenvironmental regulation and remodeling of breast cancer angiogenesis: from basic mechanisms to clinical therapeutic implications.",
+      "abstract": "Angiogenesis, the formation of new blood vessels, is a pivotal process in breast cancer (BC) progression and metastasis, intricately regulated by complex interactions within the tumor microenvironment (TME). While the vascular endothelial growth factor (VEGF) pathway represents a cornerstone of these pro-angiogenic mechanisms, resistance to anti-VEGF therapies is common, underscoring the involvement of alternative pathways. Key insights reveal that hypoxia, metabolic reprogramming, and stromal components including cancer-associated fibroblasts (CAFs), cancer-associated adipocytes (CAAs) and immune cells, cooperate to drive aberrant angiogenesis and treatment resistance. This review synthesizes emerging evidence on the multifaceted regulation of angiogenesis by endothelial cells (ECs), pericytes, immune cells, and stromal components in shaping the angiogenic landscape, and discusses innovative therapeutic strategies. These include hypoxia-targeted agents, immune modulation, and combination therapies that co-target compensatory pathways. We emphasize that overcoming resistance requires integrated approaches that remodel the TME rather than solely inhibiting VEGF. Finally, we highlight ongoing clinical trials and translational opportunities aimed at improving outcomes and reducing metastasis in breast cancer patients.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hypoxia",
+          "angiogenesis",
+          "VEGF",
+          "tumor progression",
+          "metastasis"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [
+          "Hypoxia"
+        ],
+        "celltypes": [
+          "Endothelial",
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "35202089",
+      "title": "Non-Coding RNAs in the Crosstalk between Breast Cancer Cells and Tumor-Associated Macrophages",
+      "abstract": "Non-coding RNAs (ncRNAs) play a pivotal role in regulating the tumor microenvironment (TME) by controlling gene expression at multiple levels. In tumors, ncRNAs can mediate the crosstalk between cancer cells and other cells in the TME, such as immune cells, stromal cells, and endothelial cells, influencing tumor development and progression. Tumor-associated macrophages (TAMs) are among the most abundant inflammatory cells infiltrating solid cancers that promote tumorigenesis, and their infiltration correlates with a poor prognosis in many tumors. Cancer cells produce different ncRNAs that orchestrate TAM recruitment and polarization toward a tumor-promoting phenotype. Tumor-reprogrammed macrophages shape the TME by promoting angiogenesis and tissue remodeling, and suppressing the anti-tumor activity of adaptive immune cells. TAMs can also produce ncRNA molecules that boost cancer cell proliferation and direct their phenotype and metabolic changes facilitating cancer progression and metastasis. This review will focus on the crosstalk between cancer cells and TAMs mediated by microRNAs and long non-coding RNAs during breast cancer (BC) initiation and progression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "tumor-associated macrophage",
+          "TAM",
+          "immune infiltration",
+          "myeloid cells"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ANOS1-FGFR1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial",
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    }
+  ],
+  "search_method": "search_literature_dynamic",
+  "coverage": {
+    "genes_covered": [
+      "ANOS1",
+      "FGFR1"
+    ],
+    "genes_matched_by": {
+      "ANOS1": "biomcp_tag_only",
+      "FGFR1": "fgfr"
+    },
+    "pathways_covered": [
+      "Hypoxia"
+    ],
+    "pathways_matched_by": {
+      "Hypoxia": "biomcp_tag+text_confirmed"
+    },
+    "celltypes_covered": [
+      "Endothelial",
+      "Stromal",
+      "Macrophages 2"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 100.0,
+    "celltypes_coverage_pct": 75.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Myoepi ACTA2+"
+    ]
+  }
+}

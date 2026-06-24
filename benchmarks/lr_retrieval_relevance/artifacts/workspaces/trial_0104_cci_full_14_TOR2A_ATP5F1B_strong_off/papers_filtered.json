@@ -1,0 +1,105 @@
+{
+  "schema_version": "deep_interpreter_literature_handoff_v1",
+  "policy": {
+    "included_buckets": [
+      "direct_lr_evidence",
+      "receptor_pathway_context_evidence"
+    ],
+    "excluded_buckets": [
+      "disease_only_background",
+      "rejected_weak_evidence"
+    ],
+    "cap": 40
+  },
+  "source": {
+    "total_papers": 30,
+    "unique_papers": 30,
+    "duplicates_dropped": 0,
+    "raw_papers_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0104_cci_full_14_TOR2A_ATP5F1B_strong_off/papers_raw.json",
+    "citation_candidates_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0104_cci_full_14_TOR2A_ATP5F1B_strong_off/citation_candidates.json"
+  },
+  "counts": {
+    "direct_lr_evidence": 0,
+    "receptor_pathway_context_evidence": 1,
+    "disease_only_background": 16,
+    "rejected_weak_evidence": 13
+  },
+  "papers": [
+    {
+      "pmid": "35614988",
+      "title": "Immunogenomic landscape analyses of immune molecule signature-based risk panel for patients with triple-negative breast cancer",
+      "abstract": "Triple-negative breast cancer (TNBC) presented as high heterogeneous immunogenicity that lacks useful clinical signatures to risk-stratify immune-benefit subtypes. We hypothesized that molecular-based phenotypic characterization of TNBC tumors and their immunity may overcome these challenges. We enrolled 1,145 patients with TNBC for analysis. Through combining algorithm integration analysis and TNBC datasets, a tumor immune risk score (TIRS) panel consisting of 8 potential biomarkers was identified. The TIRS panel represented excellent effectiveness as an independent predictor. High- and low risk stratification of patients was further achieved by TIRS, and significant survival and immune-infiltration pattern differences were found in each cohort, both at the transcriptome and protein levels. Non-negative matrix factorization clustering further identified four different tumor immune microenvironment types (TIMTs), among which TIMT-II was associated with the best prognosis and immune status, whereas TIMT-IV had the opposite effect, TIMT-III was associated with highly unstable genomes, and TIMT-I displayed stem-cell-related characteristics along with high stromal scores and may have extensive enrichment of tumor-associated fibroblasts and vascular cells. In conclusion, our TIRS panel could serve as a robust prognostic signature and provide therapeutic benefits for immunotherapy. Additionally, coordinating four TIMTs may be helpful for clinical decision-making in TNBC patients.\n\n",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "TOR2A"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "TOR2A-ATP5F1B": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    }
+  ],
+  "search_method": "search_literature_dynamic",
+  "coverage": {
+    "genes_covered": [
+      "TOR2A",
+      "ATP5F1B"
+    ],
+    "genes_matched_by": {
+      "TOR2A": "tor2a",
+      "ATP5F1B": "atp"
+    },
+    "pathways_covered": [
+      "TNFa",
+      "NFkB"
+    ],
+    "pathways_matched_by": {
+      "TNFa": "tnf-alpha",
+      "NFkB": "nf-kappab"
+    },
+    "celltypes_covered": [
+      "Stromal",
+      "Endothelial"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 100.0,
+    "celltypes_coverage_pct": 50.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Macrophages 2",
+      "Stromal & T Cell Hybrid"
+    ]
+  }
+}

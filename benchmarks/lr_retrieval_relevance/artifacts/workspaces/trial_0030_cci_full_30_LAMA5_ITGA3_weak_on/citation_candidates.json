@@ -1,0 +1,1504 @@
+{
+  "schema_version": "deep_interpreter_literature_candidates_v1",
+  "inputs": {
+    "disease": "breast cancer",
+    "lr_pairs": [
+      {
+        "pair": "LAMA5-ITGA3",
+        "ligand": "LAMA5",
+        "receptor": "ITGA3"
+      }
+    ],
+    "pathways": [],
+    "celltypes": [
+      "Endothelial",
+      "Macrophages 1",
+      "Macrophages 2",
+      "Myoepi ACTA2+",
+      "Myoepi KRT15+",
+      "Perivascular-Like",
+      "Stromal",
+      "Stromal & T Cell Hybrid"
+    ]
+  },
+  "source": {
+    "total_papers": 30,
+    "unique_papers": 30,
+    "duplicates_dropped": 0
+  },
+  "bucket_order": [
+    "direct_lr_evidence",
+    "receptor_pathway_context_evidence",
+    "disease_only_background",
+    "rejected_weak_evidence"
+  ],
+  "counts": {
+    "direct_lr_evidence": 0,
+    "receptor_pathway_context_evidence": 11,
+    "disease_only_background": 10,
+    "rejected_weak_evidence": 9
+  },
+  "pair_results": [
+    {
+      "lr_pair": "LAMA5-ITGA3",
+      "ligand": "LAMA5",
+      "receptor": "ITGA3",
+      "direct_lr_evidence": 0,
+      "receptor_pathway_context_evidence": 9
+    }
+  ],
+  "papers": [
+    {
+      "pmid": "35202089",
+      "title": "Non-Coding RNAs in the Crosstalk between Breast Cancer Cells and Tumor-Associated Macrophages",
+      "abstract": "Non-coding RNAs (ncRNAs) play a pivotal role in regulating the tumor microenvironment (TME) by controlling gene expression at multiple levels. In tumors, ncRNAs can mediate the crosstalk between cancer cells and other cells in the TME, such as immune cells, stromal cells, and endothelial cells, influencing tumor development and progression. Tumor-associated macrophages (TAMs) are among the most abundant inflammatory cells infiltrating solid cancers that promote tumorigenesis, and their infiltration correlates with a poor prognosis in many tumors. Cancer cells produce different ncRNAs that orchestrate TAM recruitment and polarization toward a tumor-promoting phenotype. Tumor-reprogrammed macrophages shape the TME by promoting angiogenesis and tissue remodeling, and suppressing the anti-tumor activity of adaptive immune cells. TAMs can also produce ncRNA molecules that boost cancer cell proliferation and direct their phenotype and metabolic changes facilitating cancer progression and metastasis. This review will focus on the crosstalk between cancer cells and TAMs mediated by microRNAs and long non-coding RNAs during breast cancer (BC) initiation and progression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "tumor-associated macrophage",
+          "TAM",
+          "immune infiltration",
+          "myeloid cells"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial",
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "38963646",
+      "title": "Evaluation of Boric Acid Treatment on microRNA-127-5p and Metastasis Genes Orchestration of Breast Cancer Stem Cells",
+      "abstract": "Coregulation of microRNAs (miRNAs) and cancer stem cells (CSCs) is very important in carcinogenesis. miR-127-5p is known to be downregulated in breast cancer. In this study, we aimed to investigate how boric acid (BA), known for its previously unstudied anti-cancer properties, would affect the expression of miR127-5p and genes responsible for breast cancer stem cells (BC-SCs) metastasis. BC-SCs were isolated from human breast cancer cells (MCF-7) by immunomagnetic cell separation and characterized with flow cytometry and sphere formation. The viability of BC-SCs and the determination of its IC50 value in response to boric acid (BA) were assessed via the MTT assay. Boric acid exhibited dose- and time-dependent inhibition of cell viability in cells. The IC50 doses of boric acid in MCF-7 cells and BC-SCs were 45.69 mM and 41.27 mM, respectively. The impact of BA on the expression of metastatic genes and miR127-5p was elucidated through RT-qPCR analysis. While the expression of the COL1A1 (p < 0.05) and VIM (p < 0.01) was downregulated, the expression of the miR-127-5p, ZEB1 (p < 0.01), CDH1 (p < 0.05), ITGB1 (p < 0.05), ITGA5 (p < 0.05), LAMA5 (p < 0.01), and SNAIL (p < 0.05), was up-regulated in dose-treated BC-SCs (p < 0.001) to the RT-qPCR results. Our findings suggest that boric acid could induce miR-127-5p expression. However, it cannot be said that it improves the metastasis properties of breast cancer stem cells.\n\nGraphical Abstract",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "LAMA5-ITGA3": {
+          "ligand": "LAMA5",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "40694271",
+      "title": "The role of LAMA5 in breast cancer progression and its potential in immunotherapy.",
+      "abstract": "BACKGROUND: Laminin alpha-5 (LAMA5), a major extracellular matrix component, is involved in tumor progression by modulating cell adhesion, migration, and tissue architecture. However, its specific role in breast cancer (BRCA) remains unclear. METHODS: We analyzed LAMA5 expression in BRCA and normal tissues using TCGA and GTEx datasets. Differential expression analysis was conducted using DESeq2. Survival associations were assessed using Kaplan-Meier and Cox regression models. GSEA was performed to identify LAMA5-related biological pathways. Immune infiltration was evaluated using CIBERSORT and ESTIMATE algorithms. Single-cell RNA sequencing and spatial transcriptomics were used to explore the spatial distribution and cellular localization of LAMA5. Drug sensitivity and immunotherapy response analyses were also conducted. RESULTS: LAMA5 was significantly downregulated in BRCA tissues compared to normal tissues. Higher LAMA5 expression was associated with better recurrence-free and overall survival. Functional enrichment analysis revealed that LAMA5 is involved in immune regulation and extracellular matrix-related pathways. Single-cell RNA sequencing and spatial transcriptomics demonstrated spatial and cellular heterogeneity of LAMA5 expression in BRCA. Immune-related analyses suggested that LAMA5 may influence immune cell infiltration and contribute to immune microenvironment remodeling. ROC analysis indicated moderate predictive value for immunotherapy response (AUC = 0.704),",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "LAMA5-ITGA3": {
+          "ligand": "LAMA5",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "38601284",
+      "title": "Tumor-derived mesenchymal progenitor cell-related genes in the regulation of breast cancer proliferation",
+      "abstract": "Background\n\nBreast cancer (BC) is one of the most common malignancies worldwide, and its development is affected in various ways by the tumor microenvironment (TME). Tumor-derived mesenchymal progenitor cells (MPCs), as the most important components of the TME, participate in the proliferation and metastasis of BC in several ways. In this study, we aimed to characterize the genes associated with tumor-derived MPCs and determine their effects on BC cells.\n\nMethods\n\nTumor-derived MPCs and normal breast tissue-derived mesenchymal stem cells (MSCs) were isolated from tissues specimens of patients with BC. We conducted culture and passage, phenotype identification, proliferation and migration detection, inflammatory factor release detection, and other experiments on isolated MPCs from tumors and MSCs from normal breast tissues. Three paired tumor-derived MPCs and normal breast tissue-derived MSCs were then subjected to transcriptome analysis to determine the expression profiles of the relevant genes, and quantitative real-time polymerase chain reaction (qRT-PCR) was used to further confirm gene expression. Subsequently, the overexpression plasmids were transfected into tumor-derived MPCs, and the expression of various inflammatory factors of tumor-derived MPCs and their proliferation were characterized with a cell viability test reagent (Cell Counting Kit 8). Subsequently, the transfected tumor-derived MPCs were cocultured with BC cells using a conditioned medium coculture method ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "36010848",
+      "title": "Integrative, In Silico and Comparative Analysis of Breast Cancer Secretome Highlights Invasive-Ductal-Carcinoma-Grade Progression Biomarkers",
+      "abstract": "Simple Summary\n\nGlobally, breast cancer (BC) is the most frequently diagnosed cancer in women. Rapid advances in omics technologies have enabled the identification of biomarkers across various malignancies, including BC. The aim of this study was to enable identification of novel secreted biomarkers that may indicate progression to high-grade BC malignancies and therefore predict metastatic potential. We conducted a comprehensive systematic review to identify eligible secretomic datasets. This study identified putative predictors of IDC grade progression and their association with patient mortality outcomes, namely, HSPG2, ACTG1, and LAMA5. The present study highlights novel putative secretome biomarkers that may provide insight of the tumor biology and could inform clinical decision making in the context of IDC management in a non-invasive manner.\n\nAbstract\n\nGlobally, BC is the most frequently diagnosed cancer in women. The aim of this study was to identify novel secreted biomarkers that may indicate progression to high-grade BC malignancies and therefore predict metastatic potential. A total of 33 studies of breast cancer and 78 of other malignancies were screened via a systematic review for eligibility, yielding 26 datasets, 8 breast cancer secretome datasets, and 18 of other cancers that were included in the comparative secretome analysis. Sequential bioinformatic analysis using online resources enabled the identification of enriched GO_terms, overlapping clusters, and pa",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "LAMA5-ITGA3": {
+          "ligand": "LAMA5",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "24601751",
+      "title": "Bone-derived soluble factors and laminin-511 cooperate to promote migration, invasion and survival of bone-metastatic breast tumor cells.",
+      "abstract": "Tumor intrinsic and extrinsic factors are thought to contribute to bone metastasis but little is known about how they cooperate to promote breast cancer spread to bone. We used the bone-metastatic 4T1BM2 mammary carcinoma model to investigate the cooperative interactions between tumor LM-511 and bone-derived soluble factors in vitro. We show that bone conditioned medium cooperates with LM-511 to enhance 4T1BM2 cell migration and invasion and is sufficient alone to promote survival in the absence of serum. These responses were associated with increased secretion of MMP-9 and activation of ERK and AKT signaling pathways and were partially blocked by pharmacological inhibitors of MMP-9, AKT-1/2 or MEK. Importantly, pre-treatment of 4T1BM2 cells with an AKT-1/2 inhibitor significantly reduced experimental metastasis to bone in vivo. Promotion of survival and invasive responses by bone-derived soluble factors and tumor-derived LM-511 are likely to contribute to the metastatic spread of breast tumors to bone.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "24002891",
+      "title": "Integrin alpha3beta1 can function to promote spontaneous metastasis and lung colonization of invasive breast carcinoma.",
+      "abstract": "UNLABELLED: Significant evidence implicates alpha3beta1 integrin in promoting breast cancer tumorigenesis and metastasis-associated cell behaviors in vitro and in vivo. However, the extent to which alpha3beta1 is actually required for breast cancer metastasis remains to be determined. We used RNA interference to silence alpha3 integrin expression by approximately 70% in 4T1 murine mammary carcinoma cells, a model of aggressive, metastatic breast cancer. Loss of alpha3 integrin reduced adhesion, spreading, and proliferation on laminin isoforms, and modestly reduced the growth of orthotopically implanted cells. However, spontaneous metastasis to lung was strikingly curtailed. Experimental lung colonization after tail vein injection revealed a similar loss of metastatic capacity for the alpha3-silenced (alpha3si) cells, suggesting that critical, alpha3-dependent events at the metastatic site could account for much of alpha3beta1's contribution to metastasis in this model. Reexpressing alpha3 in the alpha3si cells reversed the loss of metastatic capacity, and silencing another target, the small GTPase RhoC, had no effect, supporting the specificity of the effect of silencing alpha3. Parental, alpha3si, and alpha3-rescued cells, all secreted abundant laminin alpha5 (LAMA5), an alpha3beta1 integrin ligand, suggesting that loss of alpha3 integrin might disrupt an autocrine loop that could function to sustain metastatic growth. Analysis of human breast cancer cases revealed reduced s",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "LAMA5-ITGA3": {
+          "ligand": "LAMA5",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "21938437",
+      "title": "Laminin alpha5-derived peptides modulate the properties of metastatic breast tumour cells.",
+      "abstract": "The basement membrane protein laminin-511 has been implicated in breast cancer progression and metastasis. To identify peptides from LM-511 that modulate the metastatic properties of breast tumours, we screened laminin alpha 5 chain-derived peptides for their ability to promote adhesion of metastatic mammary carcinoma cells. Two selected adhesive peptides, alpha5A13b (FHVAYVLIKF) from the LN domain and A5G27 (RLVSYNGIIFFLK) from the LG-globular domain, were further characterised for their inhibitory properties against LM-511 activities in vitro and metastasis in vivo. In vitro, these peptides strongly inhibited LM-511-dependent adhesion and migration of highly metastatic 4T1.2 mammary carcinoma cells. In addition, A5G27 but not alpha5A13b significantly reduced breast tumour cell proliferation and inhibited laminin-511-induced matrix metalloproteinase-9 expression. Surprisingly, despite its potent inhibitory activity in vitro, A5G27 promoted rather than inhibited 4T1.2 experimental pulmonary metastasis in vivo, regardless of its route of administration. Adhesion of 4T1.2 cells to A5G27 was not inhibited by antibodies directed against alpha6, beta1 or beta3 integrins or CD44 but was significantly reduced in the presence of heparin suggesting a role for cell surface glycans. Treatment of the cells with alpha-L-fucosidase but not neuraminidase or heparinase II also partially inhibited cell adhesion to A5G27 and to LM-511 indicating that these interactions are mediated in part via",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "17525279",
+      "title": "Evidence for a role of tumor-derived laminin-511 in the metastatic progression of breast cancer.",
+      "abstract": "Most studies investigating laminins (LMs) in breast cancer have focused on LM-111 or LM-332. Little is known, however, about the expression and function of alpha5 chain-containing LM-511/521 during metastatic progression. Expression of LM-511/521 subunits was examined in genetically related breast tumor lines and corresponding primary tumors and metastases in a syngeneic mouse model using real-time quantitative polymerase chain reaction, in situ hybridization, and immunohistochemistry. The results from our investigation indicate that LM-511 rather than LM-111, -332, or -521 correlates with metastatic potential in mouse mammary tumors. LM-511 was a potent adhesive substrate for both murine and human breast carcinoma cells and promoted strong haptotactic responses in metastatic lines. Haptotaxis was mediated by alpha3 integrin in both MCF-7 and MDA-MB-231 cells and was strongly inhibited by blocking antibodies against this integrin subunit. However, whereas nonmetastatic MCF-7 cells migrated toward LM-511 primarily via alpha3beta1 integrin, results from antibody perturbation experiments and flow cytometry analysis suggest that this response is mediated by an as yet unidentified alpha3beta integrin heterodimer (other than alpha3beta1) in MDA-MB-231 cells. These results are consistent with earlier reports implicating alpha3 integrins in breast cancer progression and support the role of LM-511 as a functional substrate regulating breast cancer metastasis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "26299867",
+      "title": "Article 26299867",
+      "abstract": "",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "no_disease_anchored_evidence",
+          "title_only_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence",
+        "title_only_evidence"
+      ]
+    },
+    {
+      "pmid": "23981902",
+      "title": "Article 23981902",
+      "abstract": "",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "no_disease_anchored_evidence",
+          "title_only_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence",
+        "title_only_evidence"
+      ]
+    },
+    {
+      "pmid": "36843258",
+      "title": "Integrin alpha3 mediates stemness and invasion of glioblastoma by regulating POU3F2.",
+      "abstract": "BACKGROUND: Glioblastoma (GBM) is an aggressive brain tumor. Integrins have been implicated in the malignancy of GBM. A recent study demonstrated that integrin alpha3 (ITGA3) promoted the invasion of breast cancer cells by regulating transcriptional factor POU3F2. However, whether this also happened in GBM remained unknown. METHODS: Therefore, we explored the relationship between ITGA3 and POU3F2 in GBM. We measured the expression of ITGA3 and POU3F2 in GBM tissues. We generated ITGA3 knockdown and POU3F2 knockdown GBM U87MG cells and the proliferation, migration and invasion, the expression of stemness markers and epithelial to mesenchymal transition (EMT) markers were measured. We transplanted ITGA3 knockdown and POU3F2 knockdown GBM U87MG cells into mice. The mice were treated with anti-ITGA3 antibody. The tumor sizes, the expression of stemness markers and epithelial-to-mesenchymal transition (EMT) markers were measured. RESULTS: Both ITGA3 and POU3F2 were upregulated in GBM tissues. Knocking down ITGA3 resulted in reduced expression of POU3F2. Knocking down ITGA3 and POU3F2 suppressed U87MG cells proliferation, migration and invasion, inhibited the expression of stemness markers and prevented epithelial-to-mesenchymal transition. The transplantation of ITGA3 knockdown and POU3F2 knockdown U87MG cells decreased tumor size. CONCLUSION: Anti-ITGA3 antibody treatment reduced the tumor size. ITGA3 regulates stemness and invasion of glioblastoma through POU3F2.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "LAMA5-ITGA3": {
+          "ligand": "",
+          "receptor": "ITGA3",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "34426644",
+      "title": "Osthole inhibits the migration and invasion of highly metastatic breast cancer cells by suppressing ITGalpha3/ITGbeta5 signaling.",
+      "abstract": "Metastasis is the leading cause of death in breast cancer patients. Osthole, as an active compound detected in the traditional Chinese medicine Wenshen Zhuanggu Formula, has shown a promising anti-metastatic activity in human breast cancer cells, but the underlying mechanisms remain ambiguous. In this study we elucidated the anti-metastatic mechanisms of osthole in highly metastatic breast cancer cells and a zebrafish xenograft model. We showed that the expression of integrin alpha3 (ITGalpha3) and integrin beta5 (ITGbeta5) was upregulated in highly metastatic MDA-MB-231, MDA-MB-231BO breast cancer cell lines but was downregulated in poorly metastatic MCF-7 breast cancer cell line, which might be the key targets of osthole's anti-metastatic action. Furthermore, we showed that knockdown of ITGalpha3 and ITGbeta5 attenuated breast cancer cell migration and invasion possibly via suppression of FAK/Src/Rac1 pathway, whereas overexpression of ITGalpha3 and ITGbeta5 caused the opposite effects. Consistently, osthole significantly inhibited breast cancer metastasis by downregulating ITGalpha3/ITGbeta5 signaling in vitro and in vivo. These results provide new evidence that osthole may be developed as a candidate therapeutic drug for metastatic breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "34094951",
+      "title": " ITGA3 Is Associated With Immune Cell Infiltration and Serves as a Favorable Prognostic Biomarker for Breast Cancer",
+      "abstract": "Background\n\n ITGA3 is a member of the integrin family, a cell surface adhesion molecule that can interact with extracellular matrix (ECM) proteins. The purpose of this study was to explore the significance of ITGA3 expression in the prognosis and clinical diagnosis of breast cancer patients.\n\nMethods\n\nOncomine, the Human Protein Atlas (HPA) and UALCAN were used to analyze the expression of ITGA3 in various cancers. PrognoScan, GEPIA, Kaplan-Meier plotter and Easysurv were utilized to analyze the prognosis of ITGA3 in certain cancers. Based on TCGA data, a receiver operating characteristic (ROC) curve was used to evaluate the diagnostic performance of ITGA3 expression. cBio-Portal and MethSurv were used to evaluate the genomic mechanism. LinkedOmics, NetworkAnalyst and Metascape were used to build the signaling network. TIMER is a web server for comprehensive analysis of tumor infiltrating immune cells and tumor infiltrating lymphocytes (TILs).\n\nResults\n\nThe expression of ITGA3 in normal breast tissues was greater than that in breast cancer tissues at both the mRNA and protein levels. High expression of ITGA3 was associated with better prognosis of breast cancer patients. ROC analysis indicated that ITGA3 had significant diagnostic value. Genomic analysis revealed that promoter methylation of ITGA3 leads to transcriptional silencing, which may be one of the mechanisms underlying ITGA3 downregulation in BRCA. Immune infiltration analysis showed that ITGA3 may be involved in the",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "LAMA5-ITGA3": {
+          "ligand": "",
+          "receptor": "ITGA3",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "33513758",
+      "title": "Integrin alpha3beta1 Promotes Invasive and Metastatic Properties of Breast Cancer Cells through Induction of the Brn-2 Transcription Factor",
+      "abstract": "Simple Summary\n\nMetastatic triple-negative breast cancer (TNBC) is highly lethal with limited therapy options. Integrin alpha3beta1 is a cell surface receptor that interacts with the extracellular matrix and facilitates communication between tumor cells and their microenvironment. alpha3beta1 is implicated in breast cancer progression and metastasis, so understanding mechanisms by which alpha3beta1 promotes invasion and metastasis will facilitate the development of this integrin as a potential therapeutic target. Here we identify a novel role for alpha3beta1 in promoting the expression of the transcription factor Brain-2 (Brn-2) in triple-negative breast cancer cells. We further report that Brn-2 promotes invasion and metastasis and partially restores invasion to cells in which expression of alpha3beta1 has been suppressed. Bioinformatic analysis of patient datasets revealed a positive correlation between the expression of the genes encoding the integrin alpha3 subunit and Brn-2. In summary, our work identifies alpha3beta1-mediated induction of Brn-2 as a mechanism that regulates invasive and metastatic properties of breast cancer cells.\n\nAbstract\n\nIn the current study, we demonstrate that integrin alpha3beta1 promotes invasive and metastatic traits of triple-negative breast cancer (TNBC) cells through induction of the transcription factor, Brain-2 (Brn-2). We show that RNAi-mediated suppression of alpha3beta1 in MDA-MB-231 cells caused reduced expression of Brn-2 mRNA and pr",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "33500458",
+      "title": "Abnormal promoter DNA hypermethylation of the integrin, nidogen, and dystroglycan genes in breast cancer",
+      "abstract": "Cell transmembrane receptors and extracellular matrix components play a pivotal role in regulating cell activity and providing for the concerted integration of cells in the tissue structures. We have assessed DNA methylation in the promoter regions of eight integrin genes, two nidogen genes, and the dystroglycan gene in normal breast tissues and breast carcinomas (BC). The protein products of these genes interact with the basement membrane proteins LAMA1, LAMA2, and LAMB1; abnormal hypermethylation of the LAMA1, LAMA2, and LAMB1 promoters in BC has been described in our previous publications. In the present study, the frequencies of abnormal promoter hypermethylation in BC were 13% for ITGA1, 31% for ITGA4, 4% for ITGA7, 39% for ITGA9, 38% for NID1, and 41% for NID2. ITGA2, ITGA3, ITGA6, ITGB1, and DAG1 promoters were nonmethylated in normal and BC samples. ITGA4, ITGA9, and NID1 promoter hypermethylation was associated with the HER2 positive tumors, and promoter hypermethylation of ITGA1, ITGA9, NID1 and NID2 was associated with a genome-wide CpG island hypermethylated BC subtype. Given that ITGA4 is not expressed in normal breast, one might suggest that its abnormal promoter hypermethylation in cancer is non-functional and is thus merely a passenger epimutation. Yet, this assumption is not supported by our finding that it is not associated with a hypermethylated BC subtype. ITGA4 acquires expression in a subset of breast carcinomas, and methylation of its promoter may be pr",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "LAMA5-ITGA3": {
+          "ligand": "",
+          "receptor": "ITGA3",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "31987909",
+      "title": "ITGA3 interacts with VASP to regulate stemness and epithelial-mesenchymal transition of breast cancer cells.",
+      "abstract": "BACKGROUND: The interaction of integrin and extracellular matrix (ECM) has a profound implication on pathological conditions such as tumor growth and infiltration. Related reports have confirmed that integrin alpha3 (ITGA3) influences the development of bladder cancer, head and neck cancer, colorectal cancer and other cancers. However, the mechanism of ITGA3 in breast cancer is unknown. METHODS: The impact of ITGA3 on the biological features of breast cancer cells was explored using the Transwell and wound healing assays. In addition, its influence on stemness of breast cancer cells was examined with the sphere formation assay. The possible mechanism by which ITGA3 regulates breast cancer was explored using Western blot. The interaction between ITGA3 and VASP was determined by co-immunoprecipitation and immunofluorescence staining assays. RESULTS: Results show that downregulation of ITGA3 promotes breast cancer cell proliferation, apoptosis, invasion and migration. Indeed, suppression of ITGA3 negatively regulates the stemness of breast cancer cells and EMT process. Our findings indicate that ITGA3 interacts with VASP and regulates its expression, and knockdown of ITGA3 inhibits the activity of the PI3K-AKT axis. CONCLUSION: Our results show that ITGA3-VASP modulates breast cancer cell stemness, EMT and PI3K-AKT pathways. Therefore, ITGA3 might be a druggable target for clinical breast cancer management.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "LAMA5-ITGA3": {
+          "ligand": "",
+          "receptor": "ITGA3",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "30659093",
+      "title": "A complex between phosphatidylinositol 4-kinase IIalpha and integrin alpha3beta1 is required for N-glycan sialylation in cancer cells.",
+      "abstract": "Aberrant N-glycan sialylation of glycoproteins is closely associated with malignant phenotypes of cancer cells and metastatic potential, which includes cell adhesion, migration, and growth. Recently, phosphatidylinositol 4-kinase IIalpha (PI4KIIalpha), which is localized to the trans-Golgi network, was identified as a regulator of Golgi phosphoprotein 3 (GOLPH3) and of vesicle transport in the Golgi apparatus. GOLPH3 is a target of PI4KIIalpha and helps anchor sialyltransferases and thereby regulates sialylation of cell surface receptors. However, how PI4KIIalpha-mediated sialyation of cell surface proteins is regulated remains unclear. In this study, using several cell lines, CRISPR/Cas9-based gene knockout and short hairpin RNA-mediated silencing, RT-PCR, lentivirus-mediated overexpression, and immunoblotting methods, we confirmed that PI4KIIalpha knockdown suppresses the sialylation of N-glycans on the cell surface, in Akt phosphorylation and activation, and integrin alpha3-mediated cell migration of MDA-MB-231 breast cancer cells. Interestingly, both integrin alpha3beta1 and PI4KIIalpha co-localized to the trans-Golgi network, where they physically interacted with each other, and PI4KIIalpha specifically associated with integrin alpha3 but not alpha5. Furthermore, overexpression of both integrin alpha3beta1 and PI4KIIalpha induced hypersialylation. Conversely, integrin alpha3 knockout significantly inhibited the sialylation of membrane proteins, such as the epidermal grow",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "29462126",
+      "title": "Plasticity and intratumoural heterogeneity of cell surface antigen expression in breast cancer",
+      "abstract": "Background:\n\nThe intratumoural heterogeneity, often driven by epithelial-to-mesenchymal transition (EMT), significantly contributes to chemoresistance and disease progression in adenocarcinomas.\n\nMethods:\n\nWe introduced a high-throughput screening platform to identify surface antigens that associate with epithelial-mesenchymal plasticity in well-defined pairs of epithelial cell lines and their mesenchymal counterparts. Using multicolour flow cytometry, we then analysed the expression of 10 most robustly changed antigens and identified a 10-molecule surface signature, in pan-cytokeratin-positive/EpCAM-positive and -negative fractions of dissociated breast tumours.\n\nResults:\n\nWe found that surface CD9, CD29, CD49c, and integrin beta5 are lost in breast cancer cells that underwent EMT in vivo. The tetraspanin family member CD9 was concordantly downregulated both in vitro and in vivo and associated with epithelial phenotype and favourable prognosis.\n\nConclusions:\n\nWe propose that overall landscape of 10-molecule surface signature expression reflects the epithelial-mesenchymal plasticity in breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "23786209",
+      "title": "Identification of integrin alpha3 as a molecular marker of cells undergoing epithelial-mesenchymal transition and of cancer cells with aggressive phenotypes.",
+      "abstract": "Epithelial-mesenchymal transition (EMT) is a crucial event in wound healing, tissue repair, and cancer progression in adult tissues. Transforming growth factor (TGF)-beta induces EMT in mouse epithelial cells. During prolonged treatment, TGF-beta successively induces myofibroblastic differentiation with increased expression of myofibroblast marker proteins, including smooth muscle alpha actin and calponin. We recently showed that fibroblast growth factor-2 prevented myofibroblastic differentiation induced by TGF-beta, and transdifferentiated the cells to those with much more aggressive characteristics (enhanced EMT). To identify the molecular markers specifically expressed in cells undergoing enhanced EMT induced by the combination of TGF-beta and fibroblast growth factor-2, we carried out a microarray-based analysis and found that integrin alpha3 (ITGA3) and Ret were upregulated. Intriguingly, ITGA3 was also overexpressed in breast cancer cells with aggressive phenotypes and its expression was correlated with that of deltaEF-1, a key regulator of EMT. Moreover, the expression of both genes was downregulated by U0126, a MEK 1/2 inhibitor. Therefore, ITGA3 is a potential marker protein for cells undergoing enhanced EMT and for cancer cells with aggressive phenotypes, which is positively regulated by deltaEF-1 and the MEK-ERK pathway.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "LAMA5",
+          "receptor": "ITGA3"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "LAMA5-ITGA3": {
+          "ligand": "",
+          "receptor": "ITGA3",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "17929166",
+      "title": "Identification of the functional role of AF1Q in the progression of breast cancer.",
+      "abstract": "A novel highly metastatic MDA-MB-231HM cells, derived from MDA-MB-231, was established in our institute. RT-PCR, real-time PCR and Western blot showed that AF1Q gene was differentially expressed between highly metastatic MDA-MB-231HM cells and its parental MDA-MB-231 cells. However, its molecular mechanisms in breast cancer metastasis remain to be characterized. To investigate the effects of AF1Q on the progression of human breast cancer cells, in the present study, recombinant expression plasmid vectors of the human AF1Q gene was transfected into MDA-MB-231 cells. We demonstrated that AF1Q overexpression enhanced the in vitro proliferation and invasive potential of breast cancer cells. Focused microarray analyses showed that 22 genes were differentially expressed between AF1Q transfected cells and its parental counterparts. Integrin alpha3, accompanied by up-regulation of Ets-1 and MMP-2, significantly enhanced the in vitro invasive potential of human breast cancer cells mediated by AF1Q. Estrogen-responsive ring finger protein gene (EFP), also played a role in the enhancement of in vitro proliferation of human breast cancer cells mediated by AF1Q, accompanied by down-regulation of 14-3-3delta. The association was ERalpha independent. These results were further demonstrated by RNA interference (RNAi) experiment in vitro. In in vivo study, we also demonstrated that AF1Q transfected breast cancer cells grew much faster and had more pulmonary metastases than vector-transfected ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "24737780",
+      "title": "Angiomodulin, a marker of cancer vasculature, is upregulated by vascular endothelial growth factor and increases vascular permeability as a ligand of integrin alphavbeta3",
+      "abstract": "Angiomodulin (AGM) is a member of insulin-like growth factor binding protein (IGFBP) superfamily and often called IGFBP-rP1 or IGFBP-7. AGM was originally identified as a tumor-derived cell adhesion factor, which was highly accumulated in blood vessels of human cancer tissues. AGM is also overexpressed in cancer-associated fibroblasts (CAFs) and activates fibroblasts. However, some studies have shown tumor-suppressing activity of AGM. To understand the roles of AGM in cancer progression, we here investigated the expression of AGM in benign and invasive breast cancers and its functions in cancer vasculature. Immunohistochemical analysis showed that AGM was highly expressed in cancer vasculature even in ductal carcinoma in situ (DCIS) as compared to normal vasculature, while its expression in CAFs was more prominent in invasive carcinomas than DCIS. In vitro analyses showed that AGM was strongly induced by vascular endothelial cell growth factor (VEGF) in vascular endothelial cells. Although AGM stimulated neither the growth nor migration of endothelial cells, it supported efficient adhesion of endothelial cells. Integrin alphavbeta3 was identified as a novel major receptor for AGM in vascular endothelial cells. AGM retracted endothelial cells by inducing actin stress fibers and loosened their VE-cadherin-mediated intercellular junction. Consequently, AGM increased vascular permeability both in vitro and in vivo. Furthermore, AGM and integrin alphavbeta3 were highly expressed a",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "laminin alpha 5",
+          "extracellular matrix",
+          "basement membrane",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "40426238",
+      "title": "Extracellular matrix: unlocking new avenues in cancer treatment",
+      "abstract": "The extracellular matrix (ECM) plays a critical role in cancer progression by influencing tumor growth, invasion, and metastasis. This review explores the emerging therapeutic strategies that target the ECM as a novel approach in cancer treatment. By disrupting the structural and biochemical interactions within the tumor microenvironment, ECM-targeted therapies aim to inhibit cancer progression and overcome therapeutic resistance. We examine the current state of ECM research, focusing on key components such as collagen, laminin, fibronectin, periostin, and hyaluronic acid, and their roles in tumor biology. Additionally, we discuss the challenges associated with ECM-targeted therapies, including drug delivery, specificity, and potential side effects, while highlighting recent advancements and future directions. This review underscores the potential of ECM-focused strategies to enhance the efficacy of existing treatments and contribute to more effective cancer therapies.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "laminin alpha 5",
+          "extracellular matrix",
+          "basement membrane",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "39994886",
+      "title": "Correlation of Pancreatic Laminin Alpha 5 Expression With Clinical Outcomes in Total Pancreatectomy With Islet Autotransplantation",
+      "abstract": "This study examines extracellular matrix (ECM) protein (ECM) expression in chronic pancreatitis (CP) patients and its correlation with graft function after total pancreatectomy with islet autologous transplantation (TPIAT). Pancreatic sections from 29 CP patients undergoing TPIAT were analyzed for ECM including pan-laminin, laminin alpha 5 (LAMA5), collagen IV, and Perlecan by immunohistochemistry and scored by the percentage positive staining area within the whole tissue area. Graft function was monitored by blood glucose and C-peptide levels. Laminin alpha 5 levels in blood plasma were greater in CP. Laminin alpha 5 expression was significantly higher in all CP patient etiological categories including alcoholic, hereditary, idiopathic, Oddi dysfunction, and pancreatic divisum compared to healthy controls. The overall expression of LAMA5 positively correlated with expression of the ECM proteins pan-laminin (R = 0.63, P < 0.001), collagen IV (R = 0.67, P < 0.001), and Perlecan (R = 0.71, P < 0.001). Increased LAMA5 expression was observed within islet endothelial vascular tissue and the peri-islet basal membrane. Increased LAMA5 expression in the pancreas correlated with poor islet isolation yield and posttransplant islet function after 3 months. Increased endothelial expression of LAMA5 and ECM proteins is indicative of progressive damage to the pancreas and correlates with poor graft function after TPIAT.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "laminin alpha 5",
+          "extracellular matrix",
+          "basement membrane",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "39246099",
+      "title": "Tunable Hybrid Hydrogels of Alginate and Cell-Derived dECM to Study the Impact of Matrix Alterations on Epithelial-to-Mesenchymal Transition",
+      "abstract": "Abstract\n\nEpithelial-to-mesenchymal transition (EMT) is crucial for tumor progression, being linked to alterations in the extracellular matrix (ECM). Understanding the ECM's role in EMT can uncover new therapeutic targets, yet replicating these interactions in vitro remains challenging. It is shown that hybrid hydrogels of alginate (ALG) and cell-derived decellularized ECM (dECM), with independently tunable composition and stiffness, are useful 3D-models to explore the impact of the breast tumor matrix on EMT. Soft RGD-ALG hydrogels (200 Pa), used as neutral bulk material, supported mammary epithelial cells morphogenesis without spontaneous EMT, allowing to define the gene, protein, and biochemical profiles of cells at different TGFbeta1-induced EMT states. To mimic the breast tumor composition, dECM from TGFbeta1-activated fibroblasts (adECM) are generated, which shows upregulation of tumor-associated proteins compared to ndECM from normal fibroblasts. Using hybrid adECM-ALG hydrogels, it is shown that the presence of adECM induces partial EMT in normal epithelial cells, and amplifes TGF-beta1 effects compared to ALG and ndECM-ALG. Increasing the hydrogel stiffness to tumor-like levels (2.5 kPa) have a synergistic effect, promoting a more evident EMT. These findings shed light on the complex interplay between matrix composition and stiffness in EMT, underscoring the utility of dECM-ALG hydrogels as a valuable in vitro platform for cancer research.\n\nThis study introduces a no",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "laminin alpha 5",
+          "extracellular matrix",
+          "basement membrane",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "36647260",
+      "title": "Basal cell adhesion molecule promotes metastasis-associated processes in ovarian cancer",
+      "abstract": "Abstract\n\nBackground\n\nBasal cell adhesion molecule (BCAM) is a laminin alpha5 (LAMA5) binding membrane-bound protein with a putative role in cancer. Besides full-length BCAM1, an isoform lacking most of the cytoplasmic domain (BCAM2), and a soluble form (sBCAM) of unknown function are known. In ovarian carcinoma (OC), all BCAM forms are abundant and associated with poor survival, yet BCAM's contribution to peritoneal metastatic spread remains enigmatic.\n\nMethods\n\nBiochemical, omics-based and real-time cell assays were employed to identify the source of sBCAM and metastasis-related functions of different BCAM forms. OC cells, explanted omentum and a mouse model of peritoneal colonisation were used in loss- and gain-of-function experiments.\n\nResults\n\nWe identified ADAM10 as a major BCAM sheddase produced by OC cells and identified proteolytic cleavage sites proximal to the transmembrane domain. Recombinant soluble BCAM inhibited single-cell adhesion and migration identically to membrane-bound isoforms, confirming its biological activity in OC. Intriguingly, this seemingly anti-tumorigenic potential of BCAM contrasts with a novel pro-metastatic function discovered in the present study. Thus, all queried BCAM forms decreased the compactness of tumour cell spheroids by inhibiting LAMA5 - integrin beta1 interactions, promoted spheroid dispersion in a three-dimensional collagen matrix, induced clearance of mesothelial cells at spheroid attachment sites in vitro and enhanced invasion",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "laminin alpha 5",
+          "extracellular matrix",
+          "basement membrane",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "34204148",
+      "title": "Neutrophil Extracellular Traps in Tumor Metastasis: Pathological Functions and Clinical Applications",
+      "abstract": "Simple Summary\n\nTumor-associated neutrophils constitute an important portion of the infiltrating immune cells in the tumor microenvironment. One of the abilities of neutrophils is forming neutrophil extracellular traps. Recent studies on tumor-associated neutrophils have drawn increasing attention to the role of neutrophil extracellular traps in the tumor microenvironment. There were also some reviews summarize the pro-tumorigenic activity of NETs in tumors. The specific novelty of this article is the specific summarization on the pivotal roles of NETs in tumor invasion-metastasis cascade and the recapitulation on the potential of NETs in clinical applications. \n\nAbstract\n\nNeutrophil extracellular trap (NET) formation is an ability of neutrophils to capture and kill pathogens by releasing chromatin scaffolds, along with associated cytotoxic enzymes and proteases, into the extracellular space. NETs are usually stimulated by pathogenic microorganisms and their products, surgical pressure or hypoxia. Interestingly, a number of recent studies suggest that tumor cells can induce NET formation, which in turn confers tumor cell malignancy. Notably, emerging studies indicate that NETs are involved in enhancing local invasion, increasing vascular permeability and facilitating immune escape and colonization, thus promoting tumor metastasis. In this article, we review the pivotal roles of NETs in the tumor metastasis cascade. We also recapitulate the potential of NETs as a cancer progno",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "laminin alpha 5",
+          "extracellular matrix",
+          "basement membrane",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "28869579",
+      "title": "Exploring the Role of RGD-Recognizing Integrins in Cancer",
+      "abstract": "Integrins are key regulators of communication between cells and with their microenvironment. Eight members of the integrin superfamily recognize the tripeptide motif Arg-Gly-Asp (RGD) within extracelluar matrix (ECM) proteins. These integrins constitute an important subfamily and play a major role in cancer progression and metastasis via their tumor biological functions. Such transmembrane adhesion and signaling receptors are thus recognized as promising and well accessible targets for novel diagnostic and therapeutic applications for directly attacking cancer cells and their fatal microenvironment. Recently, specific small peptidic and peptidomimetic ligands as well as antibodies binding to distinct integrin subtypes have been developed and synthesized as new drug candidates for cancer treatment. Understanding the distinct functions and interplay of integrin subtypes is a prerequisite for selective intervention in integrin-mediated diseases. Integrin subtype-specific ligands labelled with radioisotopes or fluorescent molecules allows the characterization of the integrin patterns in vivo and later the medical intervention via subtype specific drugs. The coating of nanoparticles, larger proteins, or encapsulating agents by integrin ligands are being explored to guide cytotoxic reagents directly to the cancer cell surface. These ligands are currently under investigation in clinical studies for their efficacy in interference with tumor cell adhesion, migration/invasion, prolifer",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "laminin alpha 5",
+          "extracellular matrix",
+          "basement membrane",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "23076050",
+      "title": "Occupy tissue",
+      "abstract": "The critical role of migration and invasion in cancer metastasis warrants new therapeutic approaches targeting the machinery regulating cell migration and invasion. While 2-dimensional (2D) models have helped identify a range of adhesion molecules, cytoskeletal components and regulators that are potentially important for cell migration, the use of models that better mimic the 3-dimensional (3D) environment has yielded new insights into the physiology of cell movement. For example, studying cells in 3D models has revealed that invading cancer cells may switch between heterogeneous invasion modes and thus evade pharmacological inhibition of invasion. Here we summarize published data in which the role of cell adhesion molecules in 2D vs. 3D migration have been directly compared and discuss mechanisms that regulate migration speed and persistence in 2D and 3D. Finally we discuss limits of 3D culture models to recapitulate the in vivo  situation.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "LAMA5"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "laminin alpha 5",
+          "extracellular matrix",
+          "basement membrane",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "38835038",
+      "title": "Alpha-6 integrin deletion delays the formation of Brca1/p53-deficient basal-like breast tumors by restricting luminal progenitor cell expansion",
+      "abstract": "Background\n\nThe aberrant amplification of mammary luminal progenitors is at the origin of basal-like breast cancers associated with BRCA1 mutations. Integrins mediate cell-matrix adhesion and transmit mechanical and chemical signals that drive epithelial stem cell functions and regulate tumor progression, metastatic reactivation, and resistance to targeted therapies. Consistently, we have recently shown that laminin-binding integrins are essential for the expansion and differentiation of mammary luminal progenitors in physiological conditions. As over-expression of the laminin-binding alpha6 integrin (Itgalpha6) is associated with poor prognosis and reduced survival in breast cancer, we here investigate the role of Itgalpha6 in mammary tumorigenesis.\n\nMethods\n\nWe used Blg-Cre; Brca1F/F; Trp53F/F mice, a model that phenocopies human basal-like breast cancer with BRCA1 mutations. We generated mutant mice proficient or deficient in Itgalpha6 expression and followed tumor formation. Mammary tumors and pretumoral tissues were characterized by immunohistochemistry, flow cytometry, RT-qPCR, Western blotting and organoid cultures. Clonogenicity of luminal progenitors from preneoplastic glands was studied in 3D Matrigel cultures.\n\nResults\n\nWe show that Itga6 deletion favors activation of p16 cell cycle inhibitor in the preneoplastic tissue. Subsequently, the amplification of luminal progenitors, the cell of origin of Brca1-deficient tumors, is restrained in Itgalpha6-deficient gland. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGA3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "integrin alpha 3",
+          "cell adhesion",
+          "laminin receptor",
+          "invasion"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "LAMA5-ITGA3": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    }
+  ]
+}

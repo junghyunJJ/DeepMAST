@@ -1,0 +1,825 @@
+{
+  "papers": [
+    {
+      "pmid": "38186020",
+      "title": "FEATURES OF COL1A1 EXPRESSION IN BREAST CANCER TISSUE OF YOUNG PATIENTS.",
+      "abstract": "BACKGROUND: In the last decades, the incidence of breast cancer (BCa) in young women has been increasing steadily. The quantitative indicators of expression of collagen, which play important role in stromal microenvironment, and their association with the age and survival rates of BCa patients have not been yet definitively clarified. AIM: To investigate the relationship between the COL1A1 gene expression at the mRNA and protein levels in BCa tissue and the clinicopatological features and survival rates of BCa patients of different age groups. MATERIALS AND METHODS: The study was conducted on the clinical material of 50 patients with stage I-III BCa. COL1A1 gene expression at the mRNA and protein levels in BCa tissue were studied using the real-time PCR and immunohistochemical methods, as well as the bioinformatic analysis (UALCAN and Kaplan - Meier Plotter databases). RESULTS: The bioinformatic analysis showed that BCa tissue is characterized by 6.0 times (p < 0.05) higher level of COL1A1 mRNA compared to normal breast tissue. The correlation of COL1A1 expression at the mRNA and protein levels with the molecular subtype of neoplasms was demonstrated. According to Kaplan - Meier Plotter database, a low level of expression of COL1A1 protein level in BCa tissue is associated with lower rates of relapse-free survival of patients. The ex vivo study of the clinical material revealed a decrease in COL1A1 protein expression in tumor tissue of young patients with BCa of T3 category (",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38045487",
+      "title": "Down-regulation of COL1A1 inhibits tumor-associated fibroblast activation and mediates matrix remodeling in the tumor microenvironment of breast cancer",
+      "abstract": "Abstract\n\nWe investigated the effects of collagen type I alpha 1 (COL1A1) on tumor-associated fibroblast activation and matrix remodeling in the tumor microenvironment of breast cancer. Cells were divided into the blank control, negative control, and siRNA-COL1A1 groups, or HKF control, HKF + exosomes (EXO), HKF + siRNA negative control-EXO, and HKF + siRNA-COL1A1-EXO co-culture groups. Western blot and quantitative real-time PCR detected gene expressions. COL I, COL III, and TGF-beta1 were detected by enzyme-linked immunosorbent assay. We found that compared with blank and negative control groups, COL1A1 expression and the secretion of exosomes by breast cancer cells were inhibited in the siRNA-COL1A1 group. Compared with the HKF control group, the COL I, COL III, TGF-beta1, alpha-SMA, and fibroblast activation protein (FAP) were increased, while the E-cadherin and CAV-1 were decreased in the HKF + EXO, HKF + siRNA negative control-EXO, and HKF + siRNA-COL1A1-EXO co-culture groups. Compared with HKF + EXO and HKF + siRNA negative control-EXO co-culture groups, the COL I, COL III, TGF-beta1, alpha-SMA, and FAP were decreased, and the E-cadherin and CAV-1 were increased in the HKF + siRNA-COL1A1-EXO co-culture group. Collectively, COL1A1 down-regulation may inhibit exosome secretion possibly via inhibiting COL I and upregulating CAV-1, thereby inhibiting tumor-associated fibroblast activation and matrix remodeling in the tumor microenvironment.\n\nGraphical abstract",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37417284",
+      "title": "ABERRANT EXPRESSION OF COL14A1, CELRS3, and CTHRC1 IN BREAST CANCER SELLS.",
+      "abstract": "BACKGROUND: Collagens, which are the major components of the extracellular matrix involved in the regulation of tumor microenvironment, could be differentially expressed in breast cancer (BC) with different transcriptome profiling. AIM: To analyze the transcript level expression of COL1A1, COL5A1, COL10A1, COL11A1, COL12A1, COL14A1, CTHRC1, and CELRS3 genes and the clinical relevance of their differential expression in BC. MATERIALS AND METHODS: The transcript level expression of the genes was analyzed using the quantitative real-time PCR (qPCR) in tumor tissue of 60 BC patients. RESULTS: Overexpression of COL1A1, COL5A1, COL10A1, COL11A1, COL12A1, CTHRC, and CELRS3 anddown-regulated expression of COL14A1 were observed. COL14A1 down-regulation was associated with aggressive, basal, and Her-2/neu BC subtypes (p = 0.031). Overexpression of CELSR3 was found to be associated with the older age of the patients (> 55 years, p = 0.049). Further analysis with the TCGA BC data set has shown a concordance in the differential expression of the above genes. Furthermore, overexpression of CTHRC1 was associated with poor overall survival (OS), particularly with poor prognosis (p = 0.00042) for the luminal BC subtype. On the other hand, CELSR3 overexpression was associated with mucinous tumors and poor prognosis in post-menopausal women. In silicotarget prediction identified several BC-associated miRNAs and members of miR-154, -515, and -10 families to perform a likely regulatory role in th",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35698915",
+      "title": "RhoBTB3 Regulates Proliferation and Invasion of Breast Cancer Cells via Col1a1",
+      "abstract": "Breast cancer is the leading cause of cancer-related death in women worldwide, despite medical and technological advancements. The RhoBTB family consists of three isoforms: RhoBTB1, RhoBTB2, and RhoBTB3. RhoBTB1 and RhoBTB2 have been proposed as tumor suppressors in breast cancer. However, the roles of RhoBTB3 proteins are unknown in breast cancer. Bioinformatics analysis, including Oncomine, cBioportal, was used to evaluate the potential functions and prognostic values of RhoBTB3 and Col1a1 in breast cancer. qRT-PCR analysis and immunoblotting assay were performed to investigate relevant expression. Functional experiments including proliferation assay, invasion assay, and flow cytometry assay were conducted to determine the role of RhoBTB3 and Col1a1 in breast cancer cells. RhoBTB3 mRNA levels were significantly up-regulated in breast cancer tissues as compared to in adjacent normal tissues. Moreover, RhoBTB3 expression was found to be associated with Col1a1 expression. Decreasing RhoBTB3 expression may lead to decreases in the proliferative and invasive properties of breast cancer cells. Further, Col1a1 knockdown in breast cancer cells limited the proliferative and invasive ability of cancer cells. Knockdown of RhoBTB3 may exert inhibit the proliferation, migration, and metastasis of breast cancer cells by repressing the expression of Col1a1, providing a novel therapeutic strategy for treating breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35990840",
+      "title": "Comprehensive Analysis Identifies COL1A1, COL3A1, and POSTN as Key Genes Associated with Brain Metastasis in Patients with Breast Cancer",
+      "abstract": "Objective\n\n Brain metastasis (BM) is associated with a high mortality in patients with breast cancer (BC). Nevertheless, the molecular mechanisms of BM in BM remain uncertain. The study aims to identify the key genes in BC in relation to BM and to assess their prognostic value. \n\nMethods\n\n Two microarray datasets GSE125989 and GSE100534 were downloaded from the Gene Expression Omnibus (GEO) database to identify differentially expressed genes (DEGs) between primary BC and BM samples. The function enrichment analysis and protein-protein interaction (PPI) network were performed. We mapped hub genes into the Kaplan-Meier database for their correlations with BC survival. \n\nResults\n\n Venn diagram analysis showed an overlapped upregulated DEG and 18 overlapped downregulated ones between primary BC and BM samples. We constructed the PPI network, and top 5 hub genes were sorted out according to the node degree, including type I collagen alpha1 chain (COL1A1), lumican (LUM), type III collagen alpha1 chain (COL3A1), type V collagen alpha2 chain (COL5A2), and periosteal protein (POSTN). The Kaplan-Meier database analysis found that COL1A1, COL3A1, and POSTN were significantly correlated with overall survival of BC patients. \n\nConclusion\n\n The study suggests that COL1A1, COL3A1, and POSTN may be key genes associated with BM in patients with BC.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "31957232",
+      "title": "Circular RNA hsa_circRNA_002178 silencing retards breast cancer progression via microRNA-328-3p-mediated inhibition of COL1A1",
+      "abstract": "Abstract\n\nCircular RNAs (circRNAs) are a group of non-coding RNAs implicated in the pathogenesis of cancer progression, which exert their functions via regulation of microRNAs (miRNAs) and genes. The present study uses gain- and loss-of-function approaches to evaluate the functions of hsa_circRNA_002178 in angiogenesis along with energy metabolism and underlying downstream signals. The expression pattern of hsa_circRNA_002178 in clinical breast cancer tissues and its association with prognosis were characterized at first. Next, the energy metabolism and angiogenesis as well as cell viability were evaluated when the expression of hsa_circRNA_002178 in breast cancer cells was knocked down by siRNA. The interaction between hsa_circRNA_002178 and its downstream miR-328-3p was identified, followed by the analysis of their functions in regulation of breast cancer cellular behaviours. The target gene of miR-328-3p was predicted and verified, followed by identifying its role in the breast cancer progression. Higher expression of hsa_circRNA_002178 shared an association with worse prognosis in breast cancer. The inhibition of hsa_circRNA_002178 resulted in reductions in cell viability, energy metabolism and tube formation ability. Hsa_circRNA_002178 could competitively bind to miR-328-3p and down-regulated its expression. Restoration of miR-328-3p eliminated the tumour-promoting effects of hsa_circRNA_002178. COL1A1, as a target of miR-328-3p, could be up-regulated by overexpression o",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30416655",
+      "title": "Downregulation of MiR-196b-5p impedes cell proliferation and metastasis in breast cancer through regulating COL1A1.",
+      "abstract": "Breast cancer is considered to be the most frequently diagnosed malignancy in women worldwide. MicroRNAs (miRNAs) play key roles in the regulation of tumor properties based on their capacity to regulate the expression of tumor-related genes. However, the involvement of miR-196b-5p in breast cancer development is largely unknown. Here, we showed that the expression levels of miR-196b-5p were significantly down-regulated in breast cancer samples and cell lines compared to the matched normal tissues and breast epithelial cell line, respectively. Notably, the expression of miR-196b-5p was negatively associated with lymph node metastasis and the progression of clinical stage in patients with breast cancer. MiR-196b-5p over-expression significantly inhibited the proliferation and migration of MDA-MB-231 and MDA-MB-468 cells in breast cancer. Furthermore, combining bioinformatics prediction and biochemical analyses, we showed that COL1A1 (collagen type I alpha 1 chain) was a direct downstream target gene of miR-196b-5p. Furthermore, overexpression of COL1A1 partly abrogated miR-196b-5p-mediated inhibition of proliferation and migration in MDA-MB-231 and MDA-MB-468 cells. Our data collectively indicate that miR-196b-5p inhibits cell growth and metastasis in breast cancer through down-regulating COL1A1, supporting the targeting of the new miR-196b-5p/COL1A1 axis as a promising effective therapeutic approach for breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30237810",
+      "title": "Systematic identification of the key candidate genes in breast cancer stroma",
+      "abstract": "Background\n\nTumor microenvironment, in particular the stroma, plays an important role in breast cancer cell invasion and metastasis. Investigation of the molecular characteristics of breast cancer stroma may reveal targets for future study.\n\nMethods\n\nThe transcriptome profiles of breast cancer stroma and normal breast stroma were compared to identify differentially expressed genes (DEGs). The method was analysis of GSE26910 and GSE10797 datasets. Common DEGs were identified and then analyses of enriched pathways and hub genes were performed.\n\nResults\n\nA total of 146 DEGs were common to GSE26910 and GSE10797. The enriched pathways were associated with \"extracellular matrix (ECM) organization\", \"ECM-receptor interaction\" and \"focal adhesion\". Network analysis identified six key genes, including JUN, FOS, ATF3, STAT1, COL1A1 and FN1. Notably, COL1A1 and FN1 were identified for the first time as cancer stromal key genes associated with breast cancer invasion and metastasis. Oncome analysis showed that the high expression levels of COL1A1 and FN1 correlated to an advanced stage of breast cancer and poor clinical outcomes.\n\nConclusions\n\nWe found that several conserved tumor stromal genes might regulate breast cancer invasion through ECM remodeling. The clinical outcome analyses of COL1A1 and FN1 suggest these two genes are promising targets for future studies.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "29807221",
+      "title": "MRTF-A mediates the activation of COL1A1 expression stimulated by multiple signaling pathways in human breast cancer cells.",
+      "abstract": "Deposition of type I collage in ECM is an important property of various fibrotic diseases including breast cancer. The excessive expression of type I collagen contributes to the rigidity of cancer tissue and increases the mechanical stresses which facilitate metastasis and proliferation of cancer cells via the activation of TGF-beta signaling pathway. The increased mechanical stresses also cause the compression of blood vessels and result in hypoperfusion and impaired drug delivery in cancer tissue. Additionally, type I collage functions as the ligand of alpha2beta1-integrin and DDR1/2 receptors on the membrane of cancer cells to initiate signal transduction leading to metastasis. The expression of type I collage in cancer cells is previously shown to be inducible by TGF-beta however the detailed mechanism by which the synthesis of type I collagen is regulated in breast cancer cells remains unclear. Herein, we report that MRTF-A, a co-activator of SRF, is important for the regulation of type I collagen gene COL1A1 in breast cancer cells. MRTF-A physically interacted with the promoter of COL1A1 to facilitate histone acetylation and RNA polymerase II recruitment. The RhoC-ROCK signaling pathway which controls the nuclear localization of MRTF-A regulated the transcription of COL1A1 in human breast cancer cells. TGF-beta and Wnt signaling increased the expression of both MRTF-A and COL1A1. Furthermore, depletion of MRTF-A abolished the upregulation of COL1A1 in response to the TG",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "29906404",
+      "title": "Collagen 1A1 (COL1A1) promotes metastasis of breast cancer and is a potential therapeutic target.",
+      "abstract": "PURPOSE: Extracellular matrix (ECM) is an important component of tumor microenvironment and plays critical roles in cancer development and metastasis, in which collagen is the major structural protein. Collagen type I alpha 1 (COL1A1) is reportedly associated with the development of several human diseases. However, the functions and mechanisms of cellular expression of COL1A1 in breast cancer remain unknown. The purpose of this study is to investigate the cellular expression of COL1A1 in breast cancer cells and patients, and its role in the development and metastasis of breast cancer. METHODS: The immunofluorescence staining was used to identify the cellular location of COL1A1 in breast cancer cell lines. Real-time PCR was applied to measuring the mRNA levels of COL1A1 and genes of interest. Wound healing and transwell assay were performed to evaluate the effect of COL1A1 on metastasis of breast cancer cells. 97 patients with breast cancer were recruited in this study for evaluating the correlation of COL1A1 with survival and clinicopathological parameters. RESULTS: COL1A1 was expressed in all examined breast cancer cells. Knockdown of COL1A1 inhibited metastasis of breast cancer cells, with a low-level of CXCR4, independent of the epithelial-mesenchymal transition (EMT) process. In patients with breast cancer, cellular expression of COL1A1 was associated with ER/PR expression and metastasis status. The increased COL1A1 level was associated with poor survival, especially in p",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38511888",
+      "title": "CD93 regulates breast cancer growth and vasculogenic mimicry through the PI3K/AKT/SP2 signaling pathway activated by integrin beta1.",
+      "abstract": "In women, breast cancer (BC) accounts for 7%-10% of all cancer cases and is one of the most common cancers. To identify a new method for treating BC, the role of CD93 and its underlying mechanism were explored. MDA-MB-231 cells were used in this study and transfected with si-CD93, si-MMRN2, oe-CD93, si-integrin beta1, or oe-SP2 lentivirus. After MDA-MB-231 cells were transfected with si-NC or si-CD93, they were injected into nude mice by subcutaneous injection at a dose of 5 x 106/mouse to construct a BC animal model. The expression of genes and proteins and cell migration, invasion and vasculogenic mimicry were detected by RT-qPCR, western blot, immunohistochemistry, immunofluorescence, Transwell, and angiogenesis assays. In pathological samples and BC cell lines, CD93 was highly expressed. Functionally, CD93 promoted the proliferation, migration, and vasculogenic mimicry of MDA-MB-231 cells. Moreover, CD93 interacts with MMRN2 and integrin beta1. Knockdown of CD93 and MMRN2 can inhibit the activation of integrin beta1, thereby inhibiting the PI3K/AKT/SP2 signaling pathway and inhibiting BC growth and vasculogenic mimicry. In conclusion, the binding of CD93 to MMRN2 can activate integrin beta1, thereby activating the PI3K/AKT/SP2 signaling pathway and subsequently promoting BC growth and vasculogenic mimicry.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36737789",
+      "title": "Establishment and characterization of canine mammary tumoroids for translational research",
+      "abstract": "Background\n\nCancer heterogeneity is a main obstacle for the development of effective therapies, as its replication in in vitro preclinical models is challenging. Around 96% of developed drugs are estimated to fail from discovery to the clinical trial phase probably because of the unsuitability and unreliability of current preclinical models (Front Pharmacol 9:6, 2018; Nat Rev Cancer 8: 147-56, 2008) in replicating the overall biology of tumors, for instance the tumor microenvironment. Breast cancer is the most frequent cancer among women causing the greatest number of cancer-related deaths. Breast cancer can typically be modeled in vitro through the use of tumoroids; however, current approaches using mouse tumoroids fail to reproduce crucial aspect of human breast cancer, while access to human cells is limited and the focus of ethical concerns. New models of breast cancer, such as companion dogs, have emerged given the resemblance of developed spontaneous mammary tumors to human breast cancer in many clinical and molecular aspects; however, they have so far failed to replicate the tumor microenvironment. The present work aimed at developing a robust canine mammary tumor model in the form of tumoroids which recapitulate the tumor diversity and heterogeneity.\n\nResults\n\nWe conducted a complete characterization of canine mammary tumoroids through histologic, molecular, and proteomic analysis, demonstrating their strong similarity to the primary tumor. We demonstrated that these t",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30670769",
+      "title": "Low mutation and neoantigen burden and fewer effector tumor infiltrating lymphocytes correlate with breast cancer metastasization to lymph nodes",
+      "abstract": "Lymph node metastasis is of major prognostic significance for breast cancer. Lymph node metastasis arises at a very early stage in some patients. Using the data downloaded from the TCGA database, we studied the differences between primary tumors with and without lymph node metastasis at the multi-omics level using bioinformatics approaches. Our study found that low mutation and neoantigen burdens correlated with lymph node metastazation of breast cancer. All three conserved domains in TP53 were mutated in lymph node-negative breast cancers, whereas only one domain was mutated in lymph node-positive samples. Mutations in microtubule-related proteins appear to help immune cells recognize tumors and inhibit their lymph node metastasis. Destroying microtubule-related proteins is a potential therapeutic strategy to inhibit lymph node metastasis of breast cancer. As the neoantigens specifically present in lymph node-positive breast cancers, MAPK10, BC9L, TRIM65, CD93, KITLG, CNPPD1, CPED1, CCDC146, TMEM185A, INO80D, and PSMD11 are potential targets for vaccine design. In the tumor microenvironment, reduced numbers of effector immune cells, especially activated memory CD4+ T cells and activated mast cells, facilitate breast cancer metastasis to the lymph nodes. According to transcriptome data, lymph node metastasis was mostly driven by gene mutation rather than by gene expression. Although differential gene expression analysis was based on lymph node metastasis status, many genes we",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26319982",
+      "title": "Identification of Aberrant Chromosomal Regions in Human Breast Cancer Using Gene Expression Data and Related Gene Information",
+      "abstract": "Background\n\nChromosomal instability is a hallmark of cancer. Chromosomal imbalances, like amplifications and deletions, influence the transcriptional activity of genes. These imbalances affect not only the expression of genes in the aberrant chromosomal regions, but also that of related genes, and may be relevant to the cancer status.\n\nMaterial/Methods\n\nHere, we used the 7 publicly available microarray studies in breast cancer tissues and propose a general and unsupervised method by using the gene expression data and related gene information to systematically identify aberrant chromosomal regions. This method aimed to identify the chromosomal regions where the genes and their related genes both show consistent changes in the expression levels. Such patterns have been reported to be associated with the chromosomal aberrations and may be used in cancer diagnosis.\n\nResults\n\nWe compared 488 tumor and 222 normal samples from 7 microarray-based human breast cancer studies and detected the amplifications of 8q11.21, 14q32.11, 4q21.23, 18q11.2, Xq28, and the deletions of 3p24.1, 10q23.2 (BSCG1), 20p11.21, 9q21.13, and 1q41, which may be involved in the novel mechanisms of tumorigenesis. In addition, several known pathogenic genes, transcription factors (TFs), and microRNAs (miRNAs) associated with breast cancer were found.\n\nConclusions\n\nThis approach can be applied to other microarray studies, which provide a new and useful method for exploring chromosome structural variations in dif",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "19372141",
+      "title": "Candidate gene approach evaluates association between innate immunity genes and breast cancer risk in Korean women.",
+      "abstract": "OBJECTIVES: This study was conducted to investigate the role of common variation in innate immunity-related genes as susceptibility factors to breast cancer risk in Korean women. METHODS: Total 1536 single-nucleotide polymorphisms (SNPs) in 203 genes were analyzed by Illumina GoldenGate assay in 209 cases and the same numbers of controls. Both SNP and gene-based tests were used to evaluate the association with breast cancer risk. The robustness of results was further evaluated with permutation method, false discovery rate and haplotype analyses. RESULTS: Both SNP and gene-based analyses showed promising associations with breast cancer risk for 17 genes: OR10J3, FCER1A, NCF4, CNTNAP1, CTNNB1, KLKB1, ITGB2, ALOX12B, KLK2, IRAK3, KLK4, STAT6, NCF2, CCL1, C1QR1, MBP and NOS1. The most significant association with breast cancer risk was observed for the OR10J3 SNP (rs2494251, P-value = 1.2 x 10(-4)) and FCER1A SNP (rs7548864, P-value = 7.7 x 10(-4)). Gene-based permutation and false discovery rate P-values for OR10J3 SNP (rs2494251) with breast cancer risk were also significant (P = 4 x 10(-5) and 0.008, respectively). Haplotype analyses supported these findings that OR10J3 and FCER1A were most significantly associated with risk for breast cancer (P = 2 x 10(-4) and 0.004, respectively). CONCLUSION: This study suggests that common genetic variants in the OR10J3 and FCER1A be strongly associated with breast cancer risk among Korean women.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39533706",
+      "title": "Immuno-PET Imaging of CD93 Expression with 64Cu-Radiolabeled NOTA-mCD93 ([64Cu]Cu-NOTA-mCD93) and Insulin-Like Growth Factor Binding Protein 7 ([64Cu]Cu-NOTA-IGFBP7).",
+      "abstract": "CD93 is overexpressed in multiple solid tumor types, serving as a novel target for antiangiogenic therapy. The goal of this study was to develop a 64Cu-based positron emission tomography (PET) tracer for noninvasive imaging of CD93 expression. Antimouse-CD93 mAb (mCD93) and the CD93 ligand IGFBP7 were conjugated to a bifunctional chelator, p-isothiocyanatobenzyl-1,4,7-triazacyclononane-1,4,7-triacetic acid (p-SCN-NOTA) and labeled with 64Cu. To evaluate the pharmacokinetic properties and tumor-targeting efficacy of [64Cu]Cu-NOTA-mCD93 and [64Cu]Cu-NOTA-IGFBP7, PET imaging and biodistribution were performed on both 4T1 murine breast tumor-bearing mice and MDA-MB-231 human breast tumor-bearing mice. The tumor model HT1080-FAP, which does not overexpress CD93, was used as a negative control. Fluorescent immunostaining was conducted on different tissues to correlate radiotracer uptake with CD93 expression. 64Cu-labeling was achieved with high yield and specific activity. Serial PET imaging revealed that the in vivo performance of [64Cu]Cu-NOTA-IGFBP7 was superior to that of [64Cu]Cu-NOTA-mCD93, and that the tracer [64Cu]Cu-NOTA-IGFBP7 exhibited elevated tumor uptake values and excellent tumor retention in MDA-MB-231 mice, rather than in 4T1 murine mice. The MDA-MB-231 tumor uptake of [64Cu]Cu-NOTA-IGFBP7 was 2.85 +- 0.15, 3.69 +- 0.60, 6.91 +- 0.88, and 6.35 +- 0.55%ID/g at 1, 4, 24, and 48 h p.i., respectively, which were significantly higher than that in the CD93-negative HT108",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37689006",
+      "title": "Hub genes in adenocarcinoma of the esophagogastric junction based on weighted gene co-expression network analysis and immunohistochemistry",
+      "abstract": "Highlights\n\nWe determined the CD93, TRIM28, SLC3A2, CBX4, PATL1 as hub genes of AEG by WGCNA.\n\nWhat's more, we verified the CD93, TRIM28, SLC3A2, CBX4, PATL1, IGFBP7 in AEG tissue and normal tissue by immunohistochemical analysis.\n\nThe results indicated that the expression of CD93 is closely related to tumor T staging and tumor diameter, suggesting that CD93 plays an important role in the growth and development of tumor blood vessels.\n\nBackground\n\nGastric cancer (GC) is the fifth most common malignant tumor, and it is usually fatal. Adenocarcinoma of the esophagogastric junction (AEG) accounts for about 50% of all GC cases. However, the systematic co-expression analysis of this tumor does not fully explain its pathogenesis. This study aimed to identify hub genes based on weighted gene co-expression networks and immunohistochemistry analyses.\n\nMethods\n\nThe RNA-seq data of 22 AEG patients were processed using weighted gene co-expression network analysis. We differentiated the modules with clinical tumor markers and performed Gene Ontology and pathway enrichment analysis. We identified the hub genes related to the biological processes of tumorigenesis based on weighted gene co-expression network analysis and immunohistochemistry analysis.\n\nResults\n\nTwenty-five distinct co-expression gene modules were identified; the tumorigenic genes CD93, TRIM28, SLC3A2, CBX4, PATL1, and ZNF473 had high intramodular connectivity. Immunohistochemistry confirmed that these hub genes are upregulat",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36389798",
+      "title": "Identify the immune characteristics and immunotherapy value of CD93 in the pan-cancer based on the public data sets",
+      "abstract": "CD93 is a transmembrane receptor that is mainly expressed on endothelial cells. A recent study found that upregulated CD93 in tumor vessels is essential for tumor angiogenesis in several cancers. However, the underlying mechanisms are largely unexplored. Our present research systematically analyzed the characteristics of CD93 in tumor immunotherapy among 33 cancers. CD93 levels and co-expression of CD93 on cancer and stromal cells were detected using public databases and multiple immunofluorescence staining. The Kaplan-Meier (KM) analysis identified the predictive role of CD93 in these cancer types. The survival differences between CD93 mutants and WT, CNV groups, and methylation were also investigated. The immune landscape of CD93 in the tumor microenvironment was analyzed using the SangerBox, TIMER 2.0, and single-cell sequencing. The immunotherapy value of CD93 was predicted through public databases. CD93 mRNA and protein levels differed significantly between cancer samples and adjacent control tissues in multiply cancer types. CD93 mRNA expression associated with patient prognosis in many cancers. The correlation of CD93 levels with mutational status of other gene in these cancers was also analyzed. CD93 levels significantly positively related to three scores (immune, stromal, and extimate), immune infiltrates, immune checkpoints, and neoantigen expression.. Additionally, single-cell sequencing revealed that CD93 is predominantly co-expressed on tumor and stromal cells, s",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26008729",
+      "title": "CD93 gene polymorphism is associated with disseminated colorectal cancer",
+      "abstract": "Purpose\n\nCluster of differentiation 93 (CD93) is involved in apoptosis and inflammation and has a suggested role in angiogenesis, and all of which are involved in the development and dissemination of cancer. We evaluated the expression of CD93 and the association with two single nucleotide polymorphisms (SNPs), rs2749812 and rs2749817, as possible biomarkers in colorectal cancer (CRC).\n\nMethods\n\nTissue levels and plasma levels of CD93 were measured using an enzyme-linked immunosorbent assay (ELISA). Expression of CD93 was determined by immunohistochemistry, western blot and gene expression analysis. Genotype frequencies were established for the SNPs by real-time polymerase chain reaction (PCR), and the association with tumour stage and survival was analysed.\n\nResults\n\nTotal CD93 levels were 82 % higher (P < 0.001) in tumours compared to matched normal tissues. Mean levels of soluble CD93 in plasma were 30 % lower (P < 0.001) in the patients compared to the controls. The T/T genotype of SNP rs2749817 was more common in stage IV patients, with consequently higher risk of CRC death (T/T vs. C/C and C/T; hazard ratio (HR) = 1.73, 95 % confidence interval (CI) = 1.11-2.67, P = 0.014), and was associated with a higher risk of CRC recurrence after radical operation (T/T vs. C/C and C/T; HR = 2.07, CI = 1.22-3.51, P = 0.007).\n\nConclusions\n\nWe showed that the T/T genotype of SNP rs2749817 is associated with disseminated cancer at diagnosis and an increased recurrence rate after radica",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "25120546",
+      "title": "Cancer Stem Cell Immunology: Key to Understanding Tumorigenesis and Tumor Immune Escape?",
+      "abstract": "Cancer stem cell (CSC) biology and tumor immunology have shaped our understanding of tumorigenesis. However, we still do not fully understand why tumors can be contained but not eliminated by the immune system and whether rare CSCs are required for tumor propagation.\n\nLong latency or recurrence periods have been described for most tumors. Conceptually, this requires a subset of malignant cells which is capable of initiating tumors, but is neither eliminated by immune cells nor able to grow straight into overt tumors. These criteria would be fulfilled by CSCs. Stem cells are pluripotent, immune-privileged, and long-living, but depend on specialized niches. Thus, latent tumors may be maintained by a niche-constrained reservoir of long-living CSCs that are exempt from immunosurveillance while niche-independent and more immunogenic daughter cells are constantly eliminated.\n\nThe small subpopulation of CSCs is often held responsible for tumor initiation, metastasis, and recurrence. Experimentally, this hypothesis was supported by the observation that only this subset can propagate tumors in non-obese diabetic/scid mice, which lack T and B cells. Yet, the concept was challenged when an unexpectedly large proportion of melanoma cells were found to be capable of seeding complex tumors in mice which further lack NK cells. Moreover, the link between stem cell-like properties and tumorigenicity was not sustained in these highly immunodeficient animals. In humans, however, tumor-propagati",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "27809802",
+      "title": "The expression pattern of matrix-producing tumor stroma is of prognostic importance in breast cancer",
+      "abstract": "Background\n\nThere are several indications that the composition of the tumor stroma can contribute to the malignancy of a tumor. Here we utilized expression data sets to identify metagenes that may serve as surrogate marker for the extent of matrix production and vascularization of a tumor and to characterize prognostic molecular components of the stroma.\n\nMethods\n\nTCGA data sets from six cancer forms, two breast cancer microarray sets and one mRNA data set of xenografted tumors were downloaded. Using the mean correlation as distance measure compact clusters with genes representing extracellular matrix production (ECM metagene) and vascularization (endothelial metagene) were defined. Explorative Cox modeling was used to identify prognostic stromal gene sets.\n\nResults\n\nClustering of stromal genes in six cancer data sets resulted in metagenes, each containing three genes, representing matrix production and vascularization. The ECM metagene was associated with poor prognosis in renal clear cell carcinoma and in lung adenocarcinoma but not in other cancers investigated. Explorative Cox modeling using gene pairs identified gene sets that in multivariate models were prognostic in breast cancer. This was validated in two microarray sets. Two notable genes are TCF4 and P4HA3 which were included in the sets associated with positive and negative prognosis, respectively. Data from laser-microdissected tumors, a xenografted tumor data set and from correlation analyses demonstrate the stro",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1",
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "stromal interaction",
+          "tumor microenvironment",
+          "collagen type I"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40316422",
+      "title": "Harnessing agent-based frameworks in CellAgentChat to unravel cell-cell interactions from single-cell and spatial transcriptomics",
+      "abstract": "Understanding cell-cell interactions (CCIs) is essential yet challenging owing to the inherent intricacy and diversity of cellular dynamics. Existing approaches often analyze global patterns of CCIs using statistical frameworks, missing the nuances of individual cell behavior owing to their focus on aggregate data. This makes them insensitive in complex environments where the detailed dynamics of cell interactions matter. We introduce CellAgentChat, an agent-based model (ABM) designed to decipher CCIs from single-cell RNA sequencing and spatial transcriptomics data. This approach models biological systems as collections of autonomous agents governed by biologically inspired principles and rules. Validated across eight diverse single-cell data sets, CellAgentChat demonstrates its effectiveness in detecting intricate signaling events across different cell populations. Moreover, CellAgentChat offers the ability to generate animated visualizations of single-cell interactions and provides flexibility in modifying agent behavior rules, facilitating thorough exploration of both close and distant cellular communications. Furthermore, CellAgentChat leverages ABM features to enable intuitive in silico perturbations via agent rule modifications, facilitating the development of novel intervention strategies. This ABM method unlocks an in-depth understanding of cellular signaling interactions across various biological contexts, thereby enhancing in silico studies for cellular communicatio",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1",
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "stromal interaction",
+          "tumor microenvironment",
+          "collagen type I"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40276611",
+      "title": "Pan-cancer analysis identified CD248 as a potential target for multiple tumor types",
+      "abstract": "Objective\n\nTumors remain a major cause of death worldwide due to late-stage presentation and late diagnosis. Cell therapies have revolutionized the landscape in the precision treatment of tumors. However, there are still many challenges that limit the therapeutic efficacy. Additionally, cancer treatment also entails a major financial burden throughout the entire phase, making it preferable to find a specific biomarker for the early prognosis of the tumor.\n\nMethods\n\nIn this study, the role of CD248 in pan-cancer was analyzed through diverse tumor-associated databases, such as the Human Protein Atlas Database, the GEPIA2 Database, the cBioPortal Database, the TIMER Database, the STRING tool, and so on. In addition, CD248 mRNA and protein levels were assessed in a series of head and neck squamous cell carcinoma (HNSC) cell lines using qRT-PCR and Western blot. Furthermore, siCD248 was used to detect the effect of CD248 on the invasion, migration, and proliferation of HNSC cells by transwell assay, scratch wound healing assay, and EdU assay, respectively.\n\nResults\n\nCD248 expression was significantly increased and correlated with advanced stage and poor prognosis in various tumors. Genetic alterations of CD248 were also associated with a poor prognosis of patients. Single-cell sequencing revealed that CD248 was mainly expressed on fibroblasts within the stroma, and its expression was positively correlated with the infiltration of immune cells in tumors. In addition, CD248 interact",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1",
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "stromal interaction",
+          "tumor microenvironment",
+          "collagen type I"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "39499736",
+      "title": "Transcriptomic analysis of the 12 major human breast cell types reveals mechanisms of cell and tissue function",
+      "abstract": "A fundamental question in biology, central to our understanding of cancer and other pathologies, is determining how different cell types coordinate to form and maintain tissues. Recognizing the distinct features and capabilities of the cells that compose these tissues is critical. Unfortunately, the complexity of tissues often hinders our ability to distinguish between neighboring cell types and, in turn, scrutinize their transcriptomes and generate reliable and tractable cell models for studying their inherently different biologies. We have recently introduced a novel method that permits the identification and purification of the 12 cell types that compose the human breast:nearly all of which could be reliably propagated in the laboratory. Here, we explore the nature of these cell types. We sequence mRNAs from each purified population and investigate transcriptional patterns that reveal their distinguishing features. We describe the differentially expressed genes and enriched biological pathways that capture the essence of each cell type, and we highlight transcripts that display intriguing expression patterns. These data, analytic tools, and transcriptional analyses form a rich resource whose exploration provides remarkable insights into the inner workings of the cell types composing the breast, thus furthering our understanding of the rules governing normal cell and tissue function.\n\nDetermining how different cell types coordinate to form and maintain tissues is crucial to",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1",
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "stromal interaction",
+          "tumor microenvironment",
+          "collagen type I"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38280909",
+      "title": "RARRES2 is involved in the \"lock-and-key\" interactions between osteosarcoma stem cells and tumor-associated macrophages",
+      "abstract": "Osteosarcoma (OS) is a type of tumor. Osteosarcoma stem cells (OSCs) are responsible for drug resistance, recurrence, and immunosuppression in OS. We aimed to determine the heterogeneity of OSCs and the immunosuppression mechanisms underlying the interactions between OSCs and tumor-associated macrophages (TAMs). The cell components, trajectory changes, and cell communication profiles of OS cells were analyzed by transcriptomics at the single-cell level. The intercellular communication patterns of OSCs were verified, and the role of the cell hub genes was revealed. Hub geneS are genes that play important roles in regulating certain biological processes; they are often defined as the genes with the strongest regulatory effect on differentially expressed gene sets. Moreover, various cellular components of the OS microenvironment were identified. Malignant cells were grouped, and OSCs were identified. Further regrouping and communication analysis revealed that the genes in the stemness maintenance and differentiation subgroups were involved in communication with macrophages. Key receptor-ligand pairs and target gene sets for cell communication were obtained. Transcriptome data analysis revealed the key gene RARRES2, which is involved in intercellular communication between OSCs and TAMs. In vitro studies confirmed that macrophages promote RARRES2-mediated stemness maintenance in OSCs via the TAM-secreted cytokine insulin-like growth factor 1. Patient studies confirmed that RARRES2",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1",
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "stromal interaction",
+          "tumor microenvironment",
+          "collagen type I"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38267611",
+      "title": "A single-cell atlas of conventional central chondrosarcoma reveals the role of endoplasmic reticulum stress in malignant transformation",
+      "abstract": "The transformation of benign lesions to malignant tumours is a crucial aspect of understanding chondrosarcomas, which are malignant cartilage tumours that could develop from benign chondroid lesions. However, the process of malignant transformation for chondroid lesions remains poorly understood, and no reliable markers are available to aid clinical decision-making. To address this issue, we conducted a study analysing 11 primary cartilage tumours and controls using single-cell RNA sequencing. By creating a single-cell atlas, we were able to identify the role of endoplasmic reticulum (ER) stress in the malignant transformation of conventional central chondrosarcomas (CCCS). Our research revealed that lower levels of ER stress promote chondrosarcoma growth in a patient-derived xenograft mouse model, while intensive ER stress reduces primary chondrosarcoma cell viability. Furthermore, we discovered that the NF-kappaB pathway alleviates ER stress-induced apoptosis during chondrosarcoma progression. Our single-cell signatures and large public data support the use of key ER stress regulators, such as DNA Damage Inducible Transcript 3 (DDIT3; also known as CHOP), as malignant markers for overall patient survival. Ultimately, our study highlights the significant role that ER stress plays in the malignant transformation of cartilaginous tumours and provides a valuable resource for future diagnostic markers and therapeutic strategies.\n\nSingle-cell RNA sequencing identifies the composi",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1",
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "stromal interaction",
+          "tumor microenvironment",
+          "collagen type I"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36906534",
+      "title": "Extracellular matrix remodeling in tumor progression and immune escape: from mechanisms to treatments",
+      "abstract": "The malignant tumor is a multi-etiological, systemic and complex disease characterized by uncontrolled cell proliferation and distant metastasis. Anticancer treatments including adjuvant therapies and targeted therapies are effective in eliminating cancer cells but in a limited number of patients. Increasing evidence suggests that the extracellular matrix (ECM) plays an important role in tumor development through changes in macromolecule components, degradation enzymes and stiffness. These variations are under the control of cellular components in tumor tissue via the aberrant activation of signaling pathways, the interaction of the ECM components to multiple surface receptors, and mechanical impact. Additionally, the ECM shaped by cancer regulates immune cells which results in an immune suppressive microenvironment and hinders the efficacy of immunotherapies. Thus, the ECM acts as a barrier to protect cancer from treatments and supports tumor progression. Nevertheless, the profound regulatory network of the ECM remodeling hampers the design of individualized antitumor treatment. Here, we elaborate on the composition of the malignant ECM, and discuss the specific mechanisms of the ECM remodeling. Precisely, we highlight the impact of the ECM remodeling on tumor development, including proliferation, anoikis, metastasis, angiogenesis, lymphangiogenesis, and immune escape. Finally, we emphasize ECM \"normalization\" as a potential strategy for anti-malignant treatment.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1",
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "stromal interaction",
+          "tumor microenvironment",
+          "collagen type I"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30404002",
+      "title": "Analysis of Single-Cell RNA-Seq Identifies Cell-Cell Communication Associated with Tumor Characteristics",
+      "abstract": "SUAMMARY\n\nTumor ecosystems are composed of multiple cell types that communicate by ligand-receptor interactions. Targeting ligand-receptor interactions (for instance, with immune checkpoint inhibitors) can provide significant benefits for patients. However, our knowledge of which interactions occur in a tumor and how these interactions affect outcome is still limited. We present an approach to characterize communication by ligand-receptor interactions across all cell types in a microenvironment using single-cell RNA sequencing. We apply this approach to identify and compare the ligand-receptor interactions present in six syngeneic mouse tumor models. To identify interactions potentially associated with outcome, we regress interactions against phenotypic measurements of tumor growth rate. In addition, we quantify ligand-receptor interactions between T cell subsets and their relation to immune infiltration using a publicly available human melanoma dataset. Overall, this approach provides a tool for studying cell-cell interactions, their variability across tumors, and their relationship to outcome.\n\nIn Brief\n\nTumors are composed of cancer cells and many non-malignant cell types, such as immune and stromal cells. To better understand how all cell types in a tumor cooperate to facilitate malignant growth, Kumar et al. studied communication between cells via ligand and receptor interactions using single-cell data and computational modeling.\n\nGraphical Abstract",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1",
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "stromal interaction",
+          "tumor microenvironment",
+          "collagen type I"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "27057137",
+      "title": "Endosialin and Associated Protein Expression in Soft Tissue Sarcomas: A Potential Target for Anti-Endosialin Therapeutic Strategies",
+      "abstract": "Endosialin (CD248, TEM-1) is expressed in pericytes, tumor vasculature, tumor fibroblasts, and some tumor cells, including sarcomas, with limited normal tissue expression, and appears to play a key role in tumor-stromal interactions, including angiogenesis. Monoclonal antibodies targeting endosialin have entered clinical trials, including soft tissue sarcomas. We evaluated a cohort of 94 soft tissue sarcoma samples to assess the correlation between gene expression and protein expression by immunohistochemistry for endosialin and PDGFR-beta, a reported interacting protein, across available diagnoses. Correlations between the expression of endosialin and 13 other genes of interest were also examined. Within cohorts of soft tissue diagnoses assembled by tissue type (liposarcoma, leiomyosarcoma, undifferentiated sarcoma, and other), endosialin expression was significantly correlated with a better outcome. Endosialin expression was highest in liposarcomas and lowest in leiomyosarcomas. A robust correlation between protein and gene expression data for both endosialin and PDGFR-beta was observed. Endosialin expression positively correlated with PDGFR-beta and heparin sulphate proteoglycan 2 and negatively correlated with carbonic anhydrase IX. Endosialin likely interacts with a network of extracellular and hypoxia activated proteins in sarcomas and other tumor types. Since expression does vary across histologic groups, endosialin may represent a selective target in soft tissue sarco",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1",
+          "CD93"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "extracellular matrix",
+          "stromal interaction",
+          "tumor microenvironment",
+          "collagen type I"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38525245",
+      "title": "Fibroblast heterogeneity and functions: insights from single-cell sequencing in wound healing, breast cancer, ovarian cancer and melanoma",
+      "abstract": "Cancer has been described as the wound that does not heal, in large part due to fibroblast involvement. Activation of cancer-associated fibroblasts (CAFs) contributes to critical features of the tumor microenvironment, including upregulation of key marker proteins, recruitment of immune cells, and deposition of extracellular matrix (ECM):similar to fibroblast activation in injury-induced wound healing. Prior to the widespread availability of single-cell RNA sequencing (scRNA seq), studies of CAFs or fibroblasts in wound healing largely relied on models guided by individual fibroblast markers, or methods with less resolution to unravel the heterogeneous nature of CAFs and wound healing fibroblasts (especially regarding scarring outcome). Here, insights from the enhanced resolution provided by scRNA sequencing of fibroblasts in normal wound healing, breast cancer, ovarian cancer, and melanoma are discussed. These data have revealed differences in expression of established canonical activation marker genes, epigenetic modifications, fibroblast lineages, new gene and proteins of clinical interest for further experimentation, and novel signaling interactions with other cell types that include spatial information.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "COL1A1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "fibroblast activation",
+          "myofibroblast",
+          "ACTA2",
+          "desmoplasia",
+          "matrix remodeling"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "COL1A1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "CD93"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "COL1A1",
+        "CD93"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "extracellular matrix",
+        "stromal interaction",
+        "tumor microenvironment",
+        "collagen type I"
+      ]
+    },
+    {
+      "genes": [
+        "COL1A1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "fibroblast activation",
+        "myofibroblast",
+        "ACTA2",
+        "desmoplasia",
+        "matrix remodeling"
+      ]
+    },
+    {
+      "genes": [
+        "CD93"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "endothelial cell",
+        "angiogenesis",
+        "vascular remodeling",
+        "C1q receptor",
+        "tumor vasculature"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "tumor-stroma crosstalk",
+        "collagen signaling",
+        "integrin signaling",
+        "ECM-receptor interaction"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "angiogenic signaling",
+        "vascular endothelial growth",
+        "endothelial-tumor interaction",
+        "blood vessel formation"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "DCIS",
+        "invasive carcinoma",
+        "ductal carcinoma in situ",
+        "tumor progression",
+        "histological subtypes"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "macrophage",
+        "T cell",
+        "endothelial",
+        "myoepithelial",
+        "spatial distribution"
+      ]
+    },
+    {
+      "genes": [
+        "COL1A1",
+        "CD93"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "spatial transcriptomics",
+        "cell-cell communication",
+        "ligand-receptor interaction",
+        "tumor microenvironment architecture"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "COL1A1",
+      "CD93"
+    ],
+    "genes_matched_by": {
+      "COL1A1": "col1a1",
+      "CD93": "cd93"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Stromal",
+      "Endothelial",
+      "Macrophages 2"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 33.33333333333333,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "DCIS 2",
+      "Invasive Tumor",
+      "Myoepi ACTA2+",
+      "Prolif Invasive Tumor",
+      "Stromal & T Cell Hybrid",
+      "T Cell & Tumor Hybrid"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 37,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": "final",
+      "papers": 30,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    }
+  ],
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with controlled pathway labels/aliases + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}

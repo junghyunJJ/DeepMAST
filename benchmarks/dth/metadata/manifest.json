@@ -1,0 +1,93 @@
+{
+  "name": "dth_yes_no_qwen397b_cloud_reproducible_bundle",
+  "assembled_on": "2026-06-23",
+  "source_pull_request": "https://github.com/junghyunJJ/DeepMAST/pull/51",
+  "source_commit": "533fef9",
+  "primary_reproducibility": "offline artifact regeneration from committed cumulative benchmark, judge, and figure-table outputs",
+  "live_rerun": "optional; depends on Ollama access to qwen3.5:397b-cloud",
+  "disease": "breast cancer",
+  "model": "qwen3.5:397b-cloud",
+  "provider": "ollama",
+  "port": 11434,
+  "target_valid_per_condition": 20,
+  "valid_run_count": 40,
+  "judge_pair_count": 20,
+  "conditions": [
+    "DTH_no",
+    "DTH_yes"
+  ],
+  "condition_labels": {
+    "DTH_no": "Baseline",
+    "DTH_yes": "DTH-guided"
+  },
+  "condition_contract": {
+    "DTH_no": {
+      "hypothesis_skill_set": "dth_none",
+      "hypothesis_writer_prompt_mode": "operational_contract_minimal"
+    },
+    "DTH_yes": {
+      "hypothesis_skill_set": "dth_only",
+      "hypothesis_writer_prompt_mode": "operational_contract_minimal_plus_dth"
+    }
+  },
+  "common_runner_settings": {
+    "mode": "middleware_only",
+    "host_hypothesis_fallback": "off",
+    "native_hypothesis_retry": true,
+    "max_quality_retries": 3,
+    "timeout_minutes": 120,
+    "wait_for_completion": true
+  },
+  "included_result_stamps": [
+    "ollama_cloud_qwen397b_dth_minimal_v120_2each_cloudfix_20260619_193723",
+    "ollama_cloud_qwen397b_dth_minimal_v120_extra3_for5each_20260619_202225",
+    "ollama_cloud_qwen397b_dth_minimal_v120_4each_20260619_215955",
+    "ollama_cloud_qwen397b_dth_minimal_v120_2more_20260620_000720",
+    "ollama_cloud_qwen397b_dth_minimal_v120_9more_for20each_20260620_014911"
+  ],
+  "excluded_failed_stamps": [
+    "ollama_cloud_qwen397b_dth_minimal_v120_2each_20260619_193457"
+  ],
+  "judges": [
+    {
+      "provider": "ollama",
+      "model": "glm-5.2:cloud",
+      "wins": {
+        "DTH_yes": 15,
+        "DTH_no": 2,
+        "tie": 3
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "wins": {
+        "DTH_yes": 18,
+        "DTH_no": 1,
+        "tie": 1
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "wins": {
+        "DTH_yes": 11,
+        "DTH_no": 5,
+        "tie": 4
+      }
+    }
+  ],
+  "reference_artifacts": [
+    "inputs/conditions.json",
+    "results/cumulative_valid_only_summary_for_20each_target.json",
+    "results/judge/dth_yes_no_glm52_cloud_blind_summary.json",
+    "results/judge/dth_yes_no_gpt54_blind_summary.json",
+    "results/judge/dth_yes_no_sonnet46_blind_summary.json",
+    "results/figure_tables/dth_fig3a_evidence_coverage_paired_test.csv",
+    "results/figure_tables/dth_fig3b_claim_boundary_aggregate_paired_test.csv",
+    "figures/Fig3A_DTH_EvidenceCoverage.svg",
+    "figures/Fig3B_DTH_BlindJudgeRigor.svg",
+    "figures/FigS3D_DTH_BlindJudgeRigorByJudge.svg",
+    "figures/FigS3E_DTH_BlindJudgeWinRate.svg"
+  ]
+}

@@ -1,0 +1,1565 @@
+{
+  "schema_version": "deep_interpreter_literature_candidates_v1",
+  "inputs": {
+    "disease": "breast cancer",
+    "lr_pairs": [
+      {
+        "pair": "EGF-RACK1",
+        "ligand": "EGF",
+        "receptor": "RACK1"
+      }
+    ],
+    "pathways": [],
+    "celltypes": [
+      "DCIS 2",
+      "Endothelial",
+      "Invasive Tumor",
+      "Macrophages 2",
+      "Prolif Invasive Tumor",
+      "Stromal",
+      "T Cell & Tumor Hybrid"
+    ]
+  },
+  "source": {
+    "total_papers": 30,
+    "unique_papers": 30,
+    "duplicates_dropped": 0
+  },
+  "bucket_order": [
+    "direct_lr_evidence",
+    "receptor_pathway_context_evidence",
+    "disease_only_background",
+    "rejected_weak_evidence"
+  ],
+  "counts": {
+    "direct_lr_evidence": 0,
+    "receptor_pathway_context_evidence": 12,
+    "disease_only_background": 15,
+    "rejected_weak_evidence": 3
+  },
+  "pair_results": [
+    {
+      "lr_pair": "EGF-RACK1",
+      "ligand": "EGF",
+      "receptor": "RACK1",
+      "direct_lr_evidence": 0,
+      "receptor_pathway_context_evidence": 12
+    }
+  ],
+  "papers": [
+    {
+      "pmid": "36064121",
+      "title": "Can EGFR be a therapeutic target in breast cancer?",
+      "abstract": "Epidermal growth factor receptor (EGFR) is highly expressed in certain cancer types and is involved in regulating the biological characteristics of cancer progression, including proliferation, metastasis, and drug resistance. Various medicines targeting EGFR have been developed and approved for several cancer types, such as lung and colon cancer. To date, however, EGFR inhibitors have not achieved satisfactory clinical results in breast cancer, which continues to be the most serious malignant tumor type in females. Therefore, clarifying the underlying mechanisms related to the ineffectiveness of EGFR inhibitors in breast cancer and developing new EGFR-targeted strategies (e.g., combination therapy) remain critical challenges. Various studies have demonstrated aberrant expression and maintenance of EGFR levels in breast cancer. In this review, we summarize the regulatory mechanisms underlying EGFR protein expression in breast cancer cells, including EGFR mutations, amplification, endocytic dysfunction, recycling acceleration, and degradation disorders. We also discuss potential therapeutic strategies that act directly or indirectly on EGFR, including reducing EGFR protein expression, treating the target protein to mediate precise clearance, and inhibiting non-EGFR signaling pathways. This review should provide new therapeutic perspectives for breast cancer patients with high EGFR expression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "34765314",
+      "title": "Conflicting roles of EGFR expression by subtypes in breast cancer.",
+      "abstract": "Epidermal growth factor receptor (EGFR) is one of the receptors that belong to the epidermal growth factor family of receptor tyrosine kinases (ErbBs). Several malignancies including breast cancer that express EGFR have poor prognosis. Our study examined the EGFR expression among 5176 breast cancer patients from GSE96058 and METABRIC cohorts and the contribution of tumor immune microenvironment in different subtypes. We found that among different breast cancer subtypes, EGFR expression in TNBC was the highest compared to other subtypes. EGFR high ER-positive/HER2-negative breast cancer had significantly higher survival compared to EGFR low ER-positive/HER2-negative breast cancer. It was also associated with high level of intratumor heterogeneity and homologous recombination defects (HRD). This group was also enriched in immune-related gene sets. On the other hand, low EGFR tumor was enriched in cell proliferation-related gene sets. However, these findings were not observed in TNBC. Interestingly, there was a greater infiltration of anti-cancer immune cells in high EGFR ER-positive/HER2-negative breast cancers, while, TNBC with higher EGFR expression had lower fraction of immune cells along with low level of cytolytic activity. Tumor cells have significantly higher EGFR expression compared to immune cells in single cell sequencing data. There was higher expression of immune checkpoint molecules in high EGFR ER-positive/HER2-negative breast cancer but lower expression in TNBC. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "30799393",
+      "title": "A Single-Center Retrospective Study of Patients with Double Primary Cancers: Breast Cancer and EGFR-Mutant Non-Small Cell Lung Cancer.",
+      "abstract": "BACKGROUND: Second primary malignancies (SPM) in the lung are not common in breast cancer (BC) patients. EGFR-mutant lung cancer (LC) is a separate molecular subset, and the co-existence of EGFR-mutant LC and BC has not been explored. We hypothesized that EGFR-mutant LC patients could have higher rates of primary BC than those with EGFR-wild type (WT). METHODS: We collected data on clinical and molecular characteristics and outcomes of female patients with LC and a previous or simultaneous history of primary BC treated in our hospital from 2008 to 2014. RESULTS: Data on treatment, follow-up, and EGFR mutation status were available for 356 patients. 17.7% (11/62) of patients with EGFR mutations had BC, compared to 1.02% (3/294) of EGFR-WT patients (p < 0.001). Both tumors were metachronous in 81.8%, with LC diagnosed 9 years after the diagnosis of BC. 5 of the 6 (83.3%) BC patients treated with radiotherapy developed LC in an area within the radiation field. No EGFR mutations were detected in BC tissue and no HER2 expression was detected in LC samples. CONCLUSION: SPM in the lung and breast occur more frequently among EGFR-mutant compared to EGFR-WT LC patients. Radiotherapy for BC may increase the risk of developing primary LC.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "29409930",
+      "title": "The importance of EGFR as a biomarker in molecular apocrine breast cancer.",
+      "abstract": "Molecular apocrine breast cancer (MABC) is a molecular subtype with a poor prognosis, and there is urgent need to find new therapeutic targets. Epidermal growth factor receptor (EGFR) plays an important part in regulating the biological behavior of tumor cells, and EGFR-targeted drugs have already been used in therapy for lung and colorectal cancers. The purpose of this study was to analyze the significance of EGFR expression in MABC. A total of 400 patients with invasive breast cancer were analyzed, including 200 MABC and 200 non-MABC cases. Immunohistochemistry and immunofluorescence were carried out to evaluate the expression of estrogen receptor, progesterone receptor, androgen receptor (AR), EGFR, epidermal growth factor receptor 2 (HER2), and other biomarkers. Two hundred twelve (53%) cases were positive for EGFR expression, including 173 MABC and 39 non-MABC cases. EGFR expression was positively associated with AR expression in MABC, as well as with more advanced tumor stage and high Ki67 expression. Patients with EGFR expression had worse outcomes than those without. As a prognosis biomarker, EGFR was significantly associated with poorer clinical outcomes, and the co-expression of EGFR and HER2 often predicted worse outcomes in MABC. This study suggests that the identification of new targets such as HER2 and EGFR may help with assessing the prognosis of patients with MABC. Using both AR and EGFR as therapeutic targets may be especially important in MABC and may help t",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "28271910",
+      "title": "Early clinical development of epidermal growth factor receptor targeted therapy in breast cancer.",
+      "abstract": "INTRODUCTION: Epidermal growth factor receptor (EGFR) targeted treatment has been evaluated but has not shown a clear clinical benefit for breast cancer. This review article aims to consider the knowledge of the biological background of EGFR pathways in dissecting clinical studies of EGFR targeted treatment in breast cancer. Areas covered: This review focuses on the role of the EGFR pathway and the investigational drugs that target EGFR for breast cancer. Expert opinion: Recent studies have indicated that EGFR targeted therapy for breast cancer has some promising effects for patients with triple-negative breast cancer, basal-like breast cancer, and inflammatory breast cancer. However, predictive and prognostic biomarkers for EGFR targeted therapy have not been identified. The overexpression or amplification of EGFR itself may not be the true factor of induction of the canonical pathway as an oncogenic driver of breast cancer. Instead, downstream, non-canonical pathways related to EGFR may contribute to some aspects of the biological behavior of breast cancer; therefore, the blockade of the receptor could result in sufficient suppression of downstream pathways to inhibit the aggressive behavior of breast cancer. Mechanistic studies to investigate the dynamic interaction between the EGFR pathway and non-canonical pathways are warranted.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "25124473",
+      "title": "FOXC1 is a critical mediator of EGFR function in human basal-like breast cancer.",
+      "abstract": "BACKGROUND: Human basal-like breast cancer (BLBC) has a poor prognosis and is often identified by expression of the epidermal growth factor receptor (EGFR). BLBC remains a major clinical challenge because its pathogenesis is not well understood, thus hindering efforts to develop targeted therapies. Recent data implicate the forkhead box C1 (FOXC1) transcription factor as an important prognostic biomarker and functional regulator of BLBC, but its regulatory mechanism and impact on BLBC tumorigenesis remain unclear. METHODS: The association between FOXC1 and EGFR expression in human breast cancer was examined by immunohistochemistry in formalin-fixed tissues and analysis of the TCGA database. The regulation of FOXC1 by EGFR activation was investigated in MDA-MB-468 cells using immunoblotting, qRT-PCR, and luciferase activity assays. This EGFR effect on FOXC1 expression was confirmed using the MDA-MB-468 xenograft model. RESULTS: Both FOXC1 mRNA and protein levels significantly correlated with EGFR expression in human breast tumors. EGFR activation induced FOXC1 transcription through the ERK and Akt pathways in BLBC. EGFR inhibition in vivo reduced FOXC1 expression in xenograft tumors. We also found that FOXC1 knockdown impaired the effects of EGF on BLBC cell proliferation, migration, and invasion. CONCLUSIONS: Our findings uncover a novel EGFR-FOXC1 signaling axis critical for BLBC cell functions, supporting the notion that intervention in the FOXC1 pathway may provide potenti",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "EGF-RACK1": {
+          "ligand": "EGF",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "17989321",
+      "title": "Progressive loss of epidermal growth factor receptor in a subpopulation of breast cancers: implications in target-directed therapeutics.",
+      "abstract": "Understanding the molecular etiology and heterogeneity of disease has a direct effect on cancer therapeutics. To identify novel molecular changes associated with breast cancer progression, we conducted phosphoproteomics of the MCF10AT model comprising isogenic, ErbB2- and ErbB3-positive, xenograft-derived cell lines that mimic different stages of breast cancer. Using in vitro animal model and clinical breast samples, our study revealed a marked reduction of epidermal growth factor receptor (EGFR) expression with breast cancer progression. Such diminution of EGFR expression was associated with increased resistance to Gefitinib/Iressa in vitro. Fluorescence in situ hybridization showed that loss of EGFR gene copy number was one of the key mechanisms behind the low/null expression of EGFR in clinical breast tumors. Statistical analysis on the immunohistochemistry data of EGFR expression from 93 matched normal and breast tumor samples showed that (a) diminished EGFR expression could be detected as early as in the preneoplastic lesion (ductal carcinoma in situ) and this culminated in invasive carcinomas; (b) EGFR expression levels could distinguish between normal tissue versus carcinoma in situ and invasive carcinoma with high statistical significance (P < 0.001, n = 81). However, no significant correlation of EGFR expression with disease-free survival and overall survival was observed. This is the first time EGFR expression has been tracked meaningfully and developmentally from t",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "15920544",
+      "title": "EGFR gene amplification in breast cancer: correlation with epidermal growth factor receptor mRNA and protein expression and HER-2 status and absence of EGFR-activating mutations.",
+      "abstract": "The human epidermal growth factor receptor (HER) family of receptor tyrosine kinase has been extensively studied in breast cancer; however, systematic studies of EGFR gene amplification and protein overexpression in breast carcinoma are lacking. We studied EGFR gene amplification by chromogenic in situ hybridization (CISH) and protein expression by immunohistochemistry in 175 breast carcinomas, using tissue microarrays. Tumors with >5 EGFR gene copies per nucleus were interpreted as positive for gene amplification. Protein overexpression was scored according to standardized criteria originally developed for HER-2. EGFR mRNA levels, as measured by Affymetrix U133 Gene Chip microarray hybridization, were available in 63 of these tumors. HER-2 gene amplification by fluorescence in situ hybridization (FISH) and protein overexpression by immunohistochemistry were also studied. EGFR gene amplification (copy number range: 7-18; median: 12) was detected in 11/175 (6%) tumors, and protein overexpression was found in 13/175 (7%) tumors. Of the 11 tumors, 10 (91%) with gene amplification also showed EGFR protein overexpression (2+ or 3+ by immunohistochemistry). The EGFR mRNA level, based on Affymetrix U133 chip hybridization data, was increased relative to other breast cancer samples in three of the five tumors showing gene amplification. Exons 19 and 21 of EGFR, the sites of hotspot mutations in lung adenocarcinomas, were screened in the 11 EGFR-amplified tumors but no mutations were ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "15052538",
+      "title": "Challenges in the development of anti-epidermal growth factor receptor therapies in breast cancer.",
+      "abstract": "Emerging results from clinical trials with epidermal growth factor receptor (EGFR) inhibitors indicate good tolerability and, at best, modest to no clinical activity in a variety of epithelial tumors, including breast carcinomas. Although the EGFR is widely expressed in epithelial cancers, there is no evidence of frequent EGFR alterations at the DNA level in human tumors. This lack of molecular evidence to suggest a pathogenic role for the EGFR in breast cancer questions the notion that use of single-agent EGFR inhibitors in this disease is a viable therapeutic approach. The lack of selection of EGFR-dependent breast tumors into trials with EGFR inhibitors suggests the possibility that these were not true-negative studies. A point of view regarding challenges in the development of anti-EGFR therapies for patients with breast cancer and possible approaches to overcome them is presented in this article.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "16273187",
+      "title": "Remarkably high frequency of EGFR expression in breast carcinomas with squamous differentiation.",
+      "abstract": "The human epidermal growth factor receptor (EGFR) is reportedly overexpressed in 15-20% of breast carcinomas. EGFR overexpression is associated with reduced survival and is inversely correlated with expression of estrogen receptor (ER). This study assessed EGFR expression in breast carcinomas with squamous differentiation. The immunohistochemical (IHC) expression of EGFR was evaluated in 39 breast carcinomas with squamous differentiation (30 pure squamous, 6 adenosquamous, 3 carcinosarcomas) by use of the pharmDx assay (clone 2-18C9, DakoCytomation). Cases were considered positive if at least 10% of the cells showed 1+ positivity in the squamous component. Squamous differentiation was confirmed with IHC for CK5-6 (clone D5/16B4, DakoCytomation). ER, PR, and HER2 status as well as clinical information regarding treatment and outcome were correlated. As a control, a tissue microarray comprising 280 lymph node positive breast carcinomas was evaluated with the same EGFR assay. The 39 patients ranged in age from 33 to 77 years (mean 52). The tumors measured 1.3-30 cm (mean 4.8). Sentinel or full axillary lymph node dissection was performed in 28 patients. Fourteen patients had positive lymph nodes. At the time of initial diagnosis, 3 patients had distant metastasis. Follow-up was available for 16 patients (mean 45 months). Disease-free survival at 3 years was 70%. Among the 39 tumors 87% (34) were positive for EGFR (p<0.0001). Sixty-nine percent (27 of 39) showed >50% 2+ EGFR stai",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "37848434",
+      "title": "RACK1 facilitates breast cancer progression by competitively inhibiting the binding of beta-catenin to PSMD2 and enhancing the stability of beta-catenin",
+      "abstract": "The receptor for activated C kinase 1 (RACK1) is a key scaffolding protein with multifunctional and multifaceted properties. By mediating protein-protein interactions, RACK1 integrates multiple intracellular signals involved in the regulation of various physiological and pathological processes. Dysregulation of RACK1 has been implicated in the initiation and progression of many tumors. However, the exact function of RACK1 in cancer cellular processes, especially in proliferation, remains controversial. Here, we show that RACK1 is required for breast cancer cell proliferation in vitro and tumor growth in vivo. This effect of RACK1 is associated with its ability to enhance beta-catenin stability and activate the canonical WNT signaling pathway in breast cancer cells. We identified PSMD2, a key component of the proteasome, as a novel binding partner for RACK1 and beta-catenin. Interestingly, although there is no interaction between RACK1 and beta-catenin, RACK1 binds PSMD2 competitively with beta-catenin. Moreover, RACK1 prevents ubiquitinated beta-catenin from binding to PSMD2, thereby protecting beta-catenin from proteasomal degradation. Collectively, our findings uncover a novel mechanism by which RACK1 increases beta-catenin stability and promotes breast cancer proliferation.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "RACK1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "EGF-RACK1": {
+          "ligand": "",
+          "receptor": "RACK1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "32726469",
+      "title": "Ribosomes as a nexus between translation and cancer progression: Focus on ribosomal Receptor for Activated C Kinase 1 (RACK1) in breast cancer.",
+      "abstract": "Ribosomes coordinate spatiotemporal control of gene expression, contributing to the acquisition and maintenance of cancer phenotype. The link between ribosomes and cancer is found in the roles of individual ribosomal proteins in tumorigenesis and cancer progression, including the ribosomal protein, receptor for activated C kinase 1 (RACK1). RACK1 regulates cancer cell invasion and is localized in spreading initiation centres, structural adhesion complexes containing RNA binding proteins and poly-adenylated mRNAs that suggest a local translation process. As RACK1 is a ribosomal protein directly involved in translation and in breast cancer progression, we propose a new molecular mechanism for breast cancer cell migration and invasion, which considers the molecular differences between epithelial and mesenchymal cell profiles in order to characterize and provide novel targets for therapeutic strategies. Hence, we provide an analysis on how ribosomes translate cancer progression with a final focus on the ribosomal protein RACK1 in breast cancer. LINKED ARTICLES: This article is part of a themed issue on New avenues in cancer prevention and treatment (BJP 75th Anniversary). To view the other articles in this section visit http://onlinelibrary.wiley.com/doi/10.1111/bph.v179.12/issuetoc.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "RACK1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "EGF-RACK1": {
+          "ligand": "",
+          "receptor": "RACK1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "34790772",
+      "title": "USP41 promotes breast cancer via regulating RACK1",
+      "abstract": "Background\n\nBreast cancer (BC) is the most common cancer diagnosed among women and is the second leading cause of cancer death. It is of great significance to explore potential candidate targets for BC.\n\nMethods\n\nThe expression of ubiquitin-specific protease 41 (USP41) and its prognosis prediction function was firstly evaluated by TCGA database analysis. Using BC cell lines and specimens from 10 patients with primary BC, the upregulation of USP41 in BC was ensured. By USP41 overexpression or knockdown, its function was studied by cell function assays, small interfering RNA (siRNA), western blot, mass spectrometry, and flow cytometry. The potential mechanism of USP41 was explored via Co-Immunoprecipitation mass spectrometry, and western blot.\n\nResults\n\nTCGA database analysis revealed that in metastatic BC, USP41 expression was upregulated and negatively correlated with BC prognosis. In BC cancer cells and cancer specimens, USP41 was also upregulated. Overexpression of USP41 greatly enhanced BC colony-forming ability, proliferation, and migration. In contrast, USP41 knockdown significantly inhibited BC colony-forming ability, proliferation, and migration. Moreover, Co-Immunoprecipitation mass spectrometry results indicated that USP41 could interact with RACK1. USP41 promoted the protein expression of RACK1. The expression of RACK1 in BC tissues was upregulated. Knockdown of RACK1 inhibited cell growth and migration, and reversed the oncogenic function of USP41 in BC cells.\n\nCon",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "RACK1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "EGF-RACK1": {
+          "ligand": "",
+          "receptor": "RACK1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "33311444",
+      "title": "OXER1 and RACK1-associated pathway: a promising drug target for breast cancer progression",
+      "abstract": "Recent data indicate that receptor for activated C kinase 1 (RACK1) is a putative prognostic marker and drug target in breast cancer (BC). High RACK1 expression is negatively associated with overall survival, as it seems to promote BC progression. In tumors, RACK1 expression is controlled by a complex balance between glucocorticoids and androgens. Given the fact that androgens and androgenic derivatives can inhibit BC cell proliferation and migration, the role of androgen signaling in regulating RACK1 transcription in mammary tumors is of pivotal interest. Here, we provide evidence that nandrolone (19-nortosterone) inhibits BC cell proliferation and migration by antagonizing the PI3K/Akt/NF-kappaB signaling pathway, which eventually results in RACK1 downregulation. We also show that nandrolone impairs the PI3K/Akt/NF-kappaB signaling pathway and decreases RACK1 expression via binding to the membrane-bound receptor, oxoeicosanoid receptor 1 (OXER1). High levels of OXER1 are observed in several BC cell lines and correlate with RACK1 expression and poor prognosis. Our data provide evidence on the role played by the OXER1-dependent intracellular pathway in BC progression and shed light on the mechanisms underlying membrane-dependent androgen effects on RACK1 regulation. Besides the mechanistic relevance, the results of the study are of interest from a translational prospective. In fact, they identify a new and actionable pathway to be used for the design of innovative and rationa",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "RACK1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "EGF-RACK1": {
+          "ligand": "",
+          "receptor": "RACK1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "31113450",
+      "title": "Rack1 mediates tyrosine phosphorylation of Anxa2 by Src and promotes invasion and metastasis in drug-resistant breast cancer cells",
+      "abstract": "Background\n\nAcquirement of resistance is always associated with a highly aggressive phenotype of tumor cells. Recent studies have revealed that Annexin A2 (Anxa2) is a key protein that links drug resistance and cancer metastasis. A high level of Anxa2 in cancer tissues is correlated to a highly aggressive phenotype. Increased Anxa2 expression appears to be specific in many drug-resistant cancer cells. The functional activity of Anxa2 is regulated by tyrosine phosphorylation at the Tyr23 site. Nevertheless, the accurate molecular mechanisms underlying the regulation of Anxa2 tyrosine phosphorylation and whether phosphorylation is necessary for the enhanced invasive phenotype of drug-resistant cells remain unknown.\n\nMethods\n\nSmall interfering RNAs, small molecule inhibitors, overexpression, loss of function or gain of function, rescue experiments, Western blot, wound healing assays, transwell assays, and in vivo metastasis mice models were used to investigate the functional effects of Rack1 and Src on the tyrosine phosphorylation of Anxa2 and the invasion and metastatic potential of drug-resistant breast cancer cells. The interaction among Rack1, Src, and Anxa2 in drug-resistant cells was verified by co-immunoprecipitation assay.\n\nResults\n\nWe demonstrated that Anxa2 Tyr23 phosphorylation is necessary for multidrug-resistant breast cancer invasion and metastasis. Rack1 is required for the invasive and metastatic potential of drug-resistant breast cancer cells through modulating ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "RACK1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "EGF-RACK1": {
+          "ligand": "",
+          "receptor": "RACK1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "27600565",
+      "title": "RACK1 stabilises the activity of PP2A to regulate the transformed phenotype in mammary epithelial cells.",
+      "abstract": "Conflicting reports implicate the scaffolding protein RACK1 in the progression of breast cancer. RACK1 has been identified as a key regulator downstream of growth factor and adhesion signalling and as a direct binding partner of PP2A. Our objective was to further characterise the interaction between PP2A and RACK1 and to advance our understanding of this complex in breast cancer cells. We examined how the PP2A holoenzyme is assembled on the RACK1 scaffold in MCF-7 cells. We used immobilized peptide arrays representing the entire PP2A-catalytic subunit to identify candidate amino acids on the C subunit of PP2A that might be involved in binding of RACK1. We identified the RACK1 interaction sites on PP2A. Stable cell lines expressing PP2A with FR69/70AA, R214A and Y218F substitutions were generated and it was confirmed that the RACK1/PP2A interaction is essential to stabilise PP2A activity. We used Real-Time Cell Analysis and a series of assays to demonstrate that disruption of the RACK1/PP2A complex also reduces the adhesion, proliferation, migration and invasion of breast cancer cells and plays a role in maintenance of the cancer phenotype. This work has significantly advanced our understanding of the RACK1/PP2A complex and suggests a pro-carcinogenic role for the RACK1/PP2A interaction. This work suggests that approaches to target the RACK1/PP2A complex are a viable option to regulate PP2A activity and identifies a novel potential therapeutic target in the treatment of breast",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "RACK1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "EGF-RACK1": {
+          "ligand": "",
+          "receptor": "RACK1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "24648344",
+      "title": "Human rhomboid family-1 suppresses oxygen-independent degradation of hypoxia-inducible factor-1alpha in breast cancer.",
+      "abstract": "Intermittent oxygen deficiency in cancers promotes prolonged inflammation, continuous angiogenesis, and increased drug resistance. Hypoxia-inducible factor-1 (HIF1) has a pivotal role in the regulation of cellular responses to oxygen deficiency. The alpha-subunit of HIF1 (HIF1alpha) is degraded in normoxia but stabilized in hypoxia. However, the molecular mechanism that controls oxygen-independent degradation of HIF1alpha has remained elusive. Human rhomboid family-1 (RHBDF1) is a member of a large family of nonprotease rhomboids whose function is basically unknown. We report here that RHBDF1 expression in breast cancer is highly elevated and is strongly correlated with escalated disease progression, metastasis, poor prognosis, and poor response to chemotherapy. We show that RHBDF1 interaction with the receptor of activated protein-C kinase-1 (RACK1) in breast cancer cells prevents RACK1-assisted, oxygen-independent HIF1alpha degradation. In addition, we show that the HIF1alpha-stabilizing activity of RHBDF1 diminishes when the phosphorylation of a tyrosine residue on the RHBDF1 molecule is inhibited. These findings are consistent with the view that RHBDF1 is a critical component of a molecular switch that regulates HIF1alpha stability in cancer cells in hypoxia and that RHBDF1 is of potential value as a new target for cancer treatment.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "RACK1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "EGF-RACK1": {
+          "ligand": "",
+          "receptor": "RACK1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "20020495",
+      "title": "RACK1: A superior independent predictor for poor clinical outcome in breast cancer.",
+      "abstract": "We aimed to investigate the expression of RACK1 in breast cancer, evaluate its role in predicting prognosis and compare with commonly used biomarkers: Ki67, ER, PR and HER-2 for patients with breast cancer. The RACK1 expression and its clinical significance were examined in 160 breast carcinoma patients using immunohistochemistry. Correlations of RACK1 expression with other commonly used biomarkers and survival analyses were assessed. Immunohistochemistry results showed that the number of RACK1 cases scoring 0, 1, and 2 were 66, 54, and 40, respectively. RACK1 staining was strongly related to clinical stage, histological grade, Ki67, ER, PR and HER-2 (all p < 0.05). Consistently, all of the cases exhibiting RACK1 staining score 0 were survivors, whereas the majority (55.0%) of those exhibiting RACK1 staining score 2 were deaths. Kaplan-Meier survival analysis of 160 cases revealed a correlation between higher RACK1 expression levels and shorter overall survival times (p < 0.001). Univariate and multivariate analyses revealed that RACK1, tumor size, lymph node metastasis, and HER-2 were independent prognostic factors (all p < 0.05). Interestingly, receiver operator characteristic (ROC) curves showed that the ROC areas for RACK1, Ki67, ER, PR and HER-2 were 0.833, 0.766, 0.446, 0.387, and 0.689, respectively, and the superiority of RACK1 in sensitivity and specificity as biomarker was demonstrated. To our knowledge, it is the first time to investigate the expression of RACK1, a",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "RACK1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "EGF-RACK1": {
+          "ligand": "",
+          "receptor": "RACK1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "20499158",
+      "title": "RACK1 promotes breast carcinoma migration/metastasis via activation of the RhoA/Rho kinase pathway.",
+      "abstract": "We aimed to gain a mechanistic understanding of the role of RACK1 in breast carcinoma migration/metastasis. Migration assays were conducted in breast carcinoma cell lines. siRNA targeting RACK1 as well as the Rho kinase inhibitor were also applied. Immunoprecipitation and immunofluorescence were used to study the RACK1/RhoA interaction. GTP-Rho pull-down assays were performed to assess the activation of RhoA. We also conducted immunohistochemistry in 160 breast carcinoma samples. Experiments in vitro showed that RACK1 promotes migration via interaction with RhoA and activation of the RhoA/Rho kinase pathway. Immunohistochemistry in 160 samples revealed that RACK1 is strongly correlated with accepted tumor spread indicators and RhoA (all P < 0.05). Kaplan-Meier survival analysis indicated a correlation between higher RACK1 expression and shorter survival times (P < 0.001). RACK1 is a prognostic factor that promotes breast carcinoma migration/metastasis by interacting with RhoA and activating the RhoA/Rho kinase pathway.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "RACK1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "19946739",
+      "title": "RACK1 promotes breast carcinoma proliferation and invasion/metastasis in vitro and in vivo.",
+      "abstract": "A yeast two-hybrid system was utilized to identify novel PI3K p110alpha-interacting proteins, of which receptor of activated protein kinase C1 (RACK1) was chosen for successive detailed analyses. Our aim was to investigate the function(s) of RACK1 and its involvement in mechanisms of breast carcinoma proliferation and invasion/metastasis. Experiments in breast carcinoma cell lines stably transfected with RACK1, as well as nude mouse models, showed that RACK1 promotes breast carcinoma proliferation and invasion/metastasis in vitro and in vivo. Conversely, knockdown of RACK1 by siRNA in vitro inhibited proliferation, migration, and invasion. In cell lines stably transfected with RACK1, p-AKT, cyclin D1, cyclin D3, and CD147 expression, as well as MMP2 activity, were elevated. RACK1-induced migration could be inhibited by the addition of Rho-kinase inhibitor. In 160 breast carcinoma cases, survival analyses established that RACK1 is an independent prognostic factor for poor outcome (P < 0.001). In conclusion, RACK1 is an independent prognosis-related factor and promotes breast carcinoma proliferation and invasion/metastasis in vitro and in vivo.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "RACK1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "36674955",
+      "title": "Tumorigenicity of EGFR- and/or HER2-Positive Breast Cancers Is Mediated by Recruitment of Tumor-Associated Macrophages",
+      "abstract": "Basal-like breast cancer (BLBC) has a clinically aggressive nature. It is prevalent in young women and is known to often relapse rapidly. To date, the molecular mechanisms regarding the aggressiveness of BLBC have not been fully understood. In the present study, mechanisms of aggressiveness of BLBC involving EGFR and/or HER2 expression and interactions between tumor and tumor-associated macrophages (TAMs) were explored. The prognosis of breast cancer patients who underwent surgery at Samsung Medical Center was analyzed. It was found that the co-expression of EGFR and HER2 was associated with a worse prognosis. Therefore, we generated EGFR-positive BLBC cells with stable HER2 overexpression and analyzed the profile of secretory cytokines. Chemokine (C-C motif) ligand 2 (CCL2) expression was increased in HER2-overexpressed BLBC cells. Recombinant human CCL2 treatment augmented the motility of TAMs. In addition, the conditioned culture media of HER2-overexpressed BLBC cells increased the motility of TAMs. Furthermore, activation of TAMs by CCL2 or the conditioned culture media of HER2-overexpressed cells resulted in the production of pro-inflammatory cytokines, such as IL-8 and IL-1beta. These observations reveal that CCL2 derived from EGFR and HER2 co-expressed BLBC cells can lead to increased TAM recruitment and the induction of IL-8 and IL-1beta from recruited TAMs, triggering the tumorigenesis of breast cancer with the expression of both EGFR and HER2. Our findings demonstra",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "epidermal growth factor",
+          "EGFR signaling",
+          "tumor progression",
+          "proliferation"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "35388661",
+      "title": "Mammaglobin, GATA-binding protein 3 (GATA3), and epithelial growth factor receptor (EGFR) expression in different breast cancer subtypes and their clinical significance",
+      "abstract": "Increasing evidence has shown that mammaglobin, GATA-binding protein 3 (GATA3), and epithelial growth factor receptor (EGFR) have unique clinical implications for breast cancer subtyping and classification, as well as for breast cancer targeted therapy. It is particularly important to clarify the correlation between their expression and different molecular breast carcinoma subtypes to better understand the molecular basis of the subtypes and to identify effective therapeutic targets for the disease. This study aimed to evaluate mammaglobin, GATA3, and EGFR expression in different breast cancer subtypes, as well as their clinical significance. Subjects of the study included 228 patients with breast cancer at The First Affiliated Hospital of University of Science and Technology of China. They were divided into triple negative (TN), Luminal A, Luminal B, and HER-2 positive (HER-2.P) breast cancer groups based on molecular classification. Immunohistochemical methods were used to detect mammaglobin, GATA3, and EGFR expression in cases of different molecular subtypes before determining the correlation between protein expression and subtype. Mammaglobin and GATA3 expression levels were found to significantly vary with respect to histopathological grade, lymph node status, and molecular subtype; EGFR expression was significantly correlated with breast cancer histopathological grade and molecular subtype. For breast cancer, the expression levels of mammaglobin and GATA3, as well as ma",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "epidermal growth factor",
+          "EGFR signaling",
+          "tumor progression",
+          "proliferation"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "28703807",
+      "title": "The EGFR/miR-338-3p/EYA2 axis controls breast tumor growth and lung metastasis",
+      "abstract": "Dysregulation of the epidermal growth factor receptor (EGFR) promotes cancer cell growth, invasion and metastasis. However, its relevant downstream effectors are still limited. Here, we show that EGFR promotes breast tumor growth and metastasis by downregulating the tumor suppressor micoRNA-338-3p (miR-338-3p) and activating the EYA2 (EYA transcriptional coactivator and phosphatase 2) oncoprotein. EGFR represses miR-338-3p expression largely through HIF1alpha transcription factor. miR-338-3p inhibits EYA2 expression by binding to the 3'-untranslated region of EYA2. EGFR increases EYA2 expression via HIF1alpha repression of miR-338-3p. Through the miR-338-3p/EYA2 pathway, EGFR increases breast cancer cell growth, epithelial-to-mesenchymal transition, migration, invasion and lung metastasis in vitro and in a allograft tumor mouse model in vivo. In breast cancer patients, miR-338-3p expression negatively correlates with the expression of EGFR and EYA2, EGFR status positively associates with EYA2 expression, and miR-338-3p and EYA2 predict breast cancer lung metastasis when expressed in primary breast cancers. These data suggest that the miR-338-3p/EYA2 axis contributes to EGFR-mediated tumor growth and lung metastasis and that miR-338-3p activation or EYA2 inhibition or combination therapy targeting EGFR/miR-338-3p/EYA2 axis may be a promising way to treat patients with metastatic cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "epidermal growth factor",
+          "EGFR signaling",
+          "tumor progression",
+          "proliferation"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "28435746",
+      "title": "The paradoxical functions of EGFR during breast cancer progression",
+      "abstract": "The epidermal growth factor receptor (EGFR) is one of the most well-studied signaling pathways in cancer progression. As a result, numerous therapeutics including small-molecule inhibitors and monoclonal antibodies have been developed to target this critical oncogenic driver. Several of these EGFR inhibitors (EGFRi) have been evaluated in metastatic breast cancer, as high-level EGFR expression in primary tumors correlates with the highly aggressive basal-like phenotype and predicts for poor patient prognosis. Surprisingly, these trials have been unanimously unsuccessful at improving patient outcomes. Numerous factors, such as lack of proper patient selection may have contributed to the failure of these trials. However, recent findings suggest that there are fundamental changes in EGFR signaling that take place during primary tumor invasion, dissemination and ultimate metastasis of breast cancer cells. Herein, we review the outcomes of EGFR-targeted clinical trials in breast cancer and explore our current understanding of EGFR signaling within primary mammary tumors and how these events are altered in the metastatic setting. Overall, we put forth the hypothesis that fundamental changes in EGFR signaling between primary and metastatic tumors, a process we term the 'EGFR paradox,' contribute to the clinically observed inherent resistance to EGFRi. Furthermore, this hypothesis introduces the possibility of utilizing EGFR agonism as a potential therapeutic approach for the treatme",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "epidermal growth factor",
+          "EGFR signaling",
+          "tumor progression",
+          "proliferation"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "27590506",
+      "title": "A novel application of E1A in combination therapy with EGFR-TKI treatment in breast cancer",
+      "abstract": "Epidermal growth factor receptor (EGFR) is commonly overexpressed in breast cancer and is associated with poor clinical outcomes; however, an increasing number of patients have shown a poor effective response to EGFR tyrosine kinase inhibitors (EGFR-TKI). Here, we found that AXL expression was positively correlated with poor progression in breast cancer patients. Suppression of AXL by an anti-tumor protein, E1A, enhanced EGFR-TKI (gefitinib, erlotinib and lapatinib) sensitization, resulting in significant inhibition of tumor growth in breast cancer cells. Additionally, AXL overexpression dramatically impaired E1A-mediated EGFR-TKI sensitization. These findings show that downregulation of AXL expression by E1A contributes to sensitization to EGFR-TKI in breast cancer, suggesting that combinatorial therapy of AXL inhibitors or E1A gene therapy with EGFR-TKI may be a potential therapeutic strategy for treatment of breast cancer patients.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "epidermal growth factor",
+          "EGFR signaling",
+          "tumor progression",
+          "proliferation"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "25349977",
+      "title": "Prognostic and predictive values of EGFR overexpression and EGFR copy number alteration in HER2-positive breast cancer",
+      "abstract": "Background:\n\nEpidermal growth factor receptor (EGFR) is overexpressed in a subset of human epidermal growth factor receptor 2 (HER2)-positive breast cancers, and coexpression of HER2 and EGFR has been reported to be associated with poor clinical outcome. Moreover, interaction between HER2 and EGFR has been suggested to be a possible basis for trastuzumab resistance.\n\nMethods:\n\nWe analysed the clinical significance of EGFR overexpression and EGFR gene copy number alterations in 242 HER2-positive primary breast cancers. In addition, we examined the correlations between EGFR overexpression, trastuzumab response and clinical outcome in 447 primary, and 112 metastatic HER2-positive breast cancer patients treated by trastuzumab.\n\nResults:\n\nOf the 242 primary cases, the level of EGFR overexpression was 2+ in 12.7% and 3+ in 11.8%. High EGFR gene copy number was detected in 10.3%. Epidermal growth factor receptor overexpression was associated with hormone receptor negativity and high Ki-67 proliferation index. In survival analyses, EGFR overexpression, but not high EGFR copy number, was associated with poor disease-free survival in all patients, and in the subgroup not receiving adjuvant trastuzumab. In 447 HER2-positive primary breast cancer patients treated with adjuvant trastuzumab, EGFR overexpression was also an independent poor prognostic factor. However, EGFR overexpression was not associated with trastuzumab response, progression-free survival or overall survival in the metas",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "epidermal growth factor",
+          "EGFR signaling",
+          "tumor progression",
+          "proliferation"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "22072864",
+      "title": "Quantum dot-based quantitative immunofluorescence detection and spectrum analysis of epidermal growth factor receptor in breast cancer tissue arrays",
+      "abstract": "Background\n\nThe epidermal growth factor receptor (EGFR) is a promising therapeutic target in cancer, but its clinical value in breast cancer remains controversial. Our previous studies have found that quantitative analysis of biomarkers with quantum dot-based nanotechnology had better detection performance than conventional immunohistochemistry. The present study was undertaken to investigate the prognostic value of EGFR in breast cancer using quantum dot-based quantitative spectral analysis.\n\nMethods\n\nEGFR expression in 65 breast cancer specimens was detected by immunohistochemistry and quantum dot-immunohistochemistry, and comparisons were made between the two methods. EGFR expression in tissue microarrays of 240 breast cancer patients was then detected by quantum dot-immunohistochemistry and spectral analysis. The prognostic value of EGFR immunofluorescence area (EGFR area) for five-year recurrence-free survival was investigated.\n\nResults\n\nThe same antigen localization, high correlation of staining rates (r = 0.914), and high agreement of measurement (kappa = 0.848) of EGFR expression in breast cancer were found by quantum dot-immunohistochemistry and immunohistochemistry. The EGFR area showed significant differences by tumor grade, lymph node status, HER2 status, and hormone receptor status (all P < 0.05). Patients in the large EGFR area (>=30.51) group had a significantly higher five-year recurrence rate (47.2% versus 27.4%, P = 0.002) and worse five-year recurrence-free",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "epidermal growth factor",
+          "EGFR signaling",
+          "tumor progression",
+          "proliferation"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "19491269",
+      "title": "TOB1 is regulated by EGF-dependent HER2 and EGFR signaling, is highly phosphorylated, and indicates poor prognosis in node-negative breast cancer.",
+      "abstract": "Clinical and animal studies have shown that coexpression of the receptor tyrosine kinases HER2 and epidermal growth factor (EGF) receptor (EGFR) indicates a highly metastatic phenotype of breast cancer. In a cellular model of this phenotype using differential gene expression analysis, we identified TOB1 to be up-regulated depending on EGF stimulation and transduction through phosphorylation of HER2 tyrosine 1248. mRNA expression analysis of breast cancers from a cohort of node-negative patients showed significantly shortened distant metastasis-free survival for patients with high TOB1 expression. In subsequent tissue microarray studies of 725 clinical samples, high HER2 and EGF protein levels were significantly correlated with TOB1 expression in breast cancer, whereas EGFR and EGF levels correlated with TOB1 phosphorylation. We did not observe a correlation between TOB1 expression and cyclin D1, which was previously suggested to mediate the antiproliferative effect of unphosphorylated TOB1. A positive correlation of TOB1 phosphorylation status with proliferation marker Ki67 suggests that elevated TOB1 phosphorylation might abrogate the antiproliferative effect of TOB1 in breast cancer. This suggests a new regulatory role for TOB1 in cancer progression with particular significance in HER2- and/or EGFR-positive breast cancers.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "epidermal growth factor",
+          "EGFR signaling",
+          "tumor progression",
+          "proliferation"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "EGF-RACK1": {
+          "ligand": "EGF",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "16861904",
+      "title": "Cell death of MCF-7 human breast cancer cells induced by EGFR activation in the absence of other growth factors.",
+      "abstract": "The epidermal growth factor (EGF) receptor (EGFR) plays an important role in the growth and progression of breast cancer. Overexpression of EGFR or the high activity of EGFR signal pathway has been related with increases in cell proliferation and a poor prognosis in patients with breast cancer. Several human breast cancer cell lines depend on estrogen for their proliferation. EGF may bypass the requirement of estrogen for the proliferation of breast cancer cells. To evaluate this hypothesis, MCF-7 breast cancer cells were stimulated with EGF and the effects on cell proliferation, signal pathways, and cell cycle progression were determined. The results demonstrate that EGF stimulation in the absence of others growth factors induced a modest effect on cell proliferation and the induction of a cellular arrest in the G(1) phase of the cell cycle. Although phosphorylation of AKT and ERK proteins were detected, this phosphorylation was insufficient to support of cell cycle progression. Cellular arrest in G(1) phase was accompanied by an increase in p21(CIP1) protein, down regulation of the BCL-2 protein, induction of caspase-8, and ARHI/NOEY2 an imprinted tumor suppressor gene. These results indicate that EGFR activation by itself is not sufficient for the proliferation of breast cancer cells and suggest the existence of a mechanism that induces apoptosis upon EGFR activation.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "EGF"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "epidermal growth factor",
+          "EGFR signaling",
+          "tumor progression",
+          "proliferation"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "EGF-RACK1": {
+          "ligand": "EGF",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "39939870",
+      "title": "Rack1 promotes breast cancer stemness properties and tumorigenesis through the E2F1-SOX2 axis",
+      "abstract": "Background\n\nBreast cancer remains the most prevalent malignancy and the leading cause of cancer-related mortality among women worldwide. The primary factors contributing to the deterioration and death of patients with breast cancer are metastasis, recurrence, and drug resistance. These phenomena are closely related to the presence of breast cancer stem cells; however, the exact mechanisms regulating stemness remain to be elucidated. Rack1 (Receptor for Activated C Kinase 1), a well-known versatile scaffold protein, has been implicated in tumorigenesis and progression in numerous cancer types; however, its specific role in breast cancer stemness remains to be elucidated.\n\nMethods\n\nUsing bioinformatic and immunohistochemical approaches, we validated that the expression level of Rack1 is associated with cancer stemness and affects the prognosis of patients. Through a series of experimental methods including mammosphere formation assay, flow cytometry, qPCR, Western blotting, and CHX assays, we validated at the molecular and cellular levels the mechanism by which Rack1 influences cancer stemness via the E2F1/SOX2 axis. Furthermore, by designing and utilizing lentiviral constructs to establish xenograft tumor models in mice, we further confirmed in vivo the impact of the Rack1/E2F1/SOX2 axis on the tumorigenic capacity of breast cancer cells.\n\nResults\n\nOur findings indicate that Rack1 plays a critical role in preserving the stemness characteristics of breast cancer cells. Mechanis",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "RACK1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "receptor for activated C kinase",
+          "protein kinase C",
+          "signaling scaffold",
+          "metastasis"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "EGF",
+          "receptor": "RACK1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "EGF-RACK1": {
+          "ligand": "",
+          "receptor": "RACK1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "EGF-RACK1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    }
+  ]
+}

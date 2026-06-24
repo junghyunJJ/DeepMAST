@@ -1,0 +1,22 @@
+{
+  "genes": [
+    "GAS6",
+    "MERTK"
+  ],
+  "pathways": [
+    "PI3K"
+  ],
+  "celltypes": [
+    "Endothelial",
+    "Macrophages 1",
+    "Macrophages 2",
+    "Myoepi ACTA2+",
+    "Myoepi KRT15+",
+    "Perivascular-Like",
+    "Stromal",
+    "Stromal & T Cell Hybrid"
+  ],
+  "disease": "breast cancer",
+  "lr_pair": "GAS6-MERTK",
+  "category": "low_morans_known"
+}

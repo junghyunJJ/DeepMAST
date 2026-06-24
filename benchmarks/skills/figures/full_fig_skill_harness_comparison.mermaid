@@ -1,0 +1,78 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Helvetica, Arial",
+    "primaryColor": "#f5f7fa",
+    "primaryBorderColor": "#c9d1d9",
+    "lineColor": "#9aa4b2",
+    "secondaryColor": "#eef2f7",
+    "tertiaryColor": "#ffffff",
+    "fontSize": "13px"
+  }
+}}%%
+flowchart LR
+    %% ════════════════════════════════════
+    %%  (A) SkillActivator
+    %% ════════════════════════════════════
+    subgraph A ["<b>SkillActivator</b>"]
+        direction TB
+
+        B_PROMPT["<b>System Prompt</b><br/><br/><i>Skill Evaluation Protocol:</i><br/><br/>Phase 1: QUICK SCREEN<br/>&nbsp;&nbsp;--> Gate question<br/>&nbsp;&nbsp;--> Default: NO<br/><br/>Phase 2: EVALUATE<br/>&nbsp;&nbsp;--> Per-skill YES/NO<br/>&nbsp;&nbsp;--> Explicit reasoning<br/><br/>Phase 3: IMPLEMENT<br/>&nbsp;&nbsp;--> Execute with<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;loaded guidance"]:::agent
+
+        B_PROMPT --> B_EVAL
+
+        B_EVAL["Structured evaluation<br/>reduces FP and FN"]:::decision
+
+        B_EVAL --> B_MIT
+
+        B_MIT["<b>Mitigations</b><br/><br/>+  Quick Screen gates<br/>&nbsp;&nbsp;&nbsp;&nbsp;<i>irrelevant tasks</i><br/><br/>+  Explicit per-skill eval<br/>&nbsp;&nbsp;&nbsp;&nbsp;<i>forces consideration</i><br/><br/>+  Auditable YES/NO<br/>&nbsp;&nbsp;&nbsp;&nbsp;<i>with reasoning</i>"]:::mitigateNode
+
+        B_MIT --> B_PERF
+
+        B_PERF["Prec &nbsp;█████████░&nbsp; 98%<br/>Rec &nbsp;&nbsp;█████████░&nbsp; 92%<br/>F1 &nbsp;&nbsp;&nbsp;█████████░&nbsp; 95%"]:::perfHarness
+    end
+
+    %% ════════════════════════════════════
+    %%  (B) Passive Skill Listing
+    %% ════════════════════════════════════
+    subgraph B ["<b>Passive Skill Listing</b>"]
+        direction TB
+
+        A_PROMPT["<b>System Prompt</b><br/><br/><i>Available Skills:<br/>- Skill 1: desc<br/>- Skill 2: desc<br/>- ...<br/>- Skill N: desc</i>"]:::module
+
+        A_NOTE["No evaluation protocol.<br/>No gate question.<br/>No explicit reasoning."]:::tool
+
+        A_PROMPT --> A_NOTE
+
+        A_NOTE --> A_LLM
+
+        A_LLM["LLM decides <b>implicitly</b><br/>which skills to read"]:::decision
+
+        A_LLM --> A_FAIL
+
+        A_FAIL["<b>Failure Modes</b><br/><br/>x  Over-activation (FP)<br/>&nbsp;&nbsp;&nbsp;&nbsp;<i>might be useful bias</i><br/><br/>x  Under-activation (FN)<br/>&nbsp;&nbsp;&nbsp;&nbsp;<i>skills overlooked</i><br/><br/>x  No reasoning trace<br/>&nbsp;&nbsp;&nbsp;&nbsp;<i>opaque decisions</i>"]:::failNode
+
+        A_FAIL --> A_PERF
+
+        A_PERF["Prec &nbsp;████████░░&nbsp; 97%<br/>Rec &nbsp;&nbsp;███████░░░&nbsp; 71%<br/>F1 &nbsp;&nbsp;&nbsp;████████░░&nbsp; 82%"]:::perfPassive
+    end
+
+    %% ── Invisible link for side-by-side layout ──
+    A ~~~ B
+
+    %% ════════════════════════════════════
+    %%  Style Classes
+    %% ════════════════════════════════════
+    classDef module fill:#ffffff,stroke:#c9d1d9,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+    classDef decision fill:#e3f2fd,stroke:#90caf9,stroke-width:1.5px,rx:12,ry:12,color:#1a1a1a
+    classDef agent fill:#f4f6f8,stroke:#9aa4b2,stroke-width:2px,rx:18,ry:18,color:#1f2933
+    classDef tool fill:#eceff1,stroke:#b0bec5,stroke-width:1.2px,rx:10,ry:10,color:#1a1a1a
+    classDef terminal fill:#263238,color:#ffffff,stroke:#263238,stroke-width:2px,rx:15,ry:15
+    classDef failNode fill:#ffebee,stroke:#c62828,stroke-width:1.5px,rx:12,ry:12,color:#1a1a1a
+    classDef perfPassive fill:#f5f7fa,stroke:#9aa4b2,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+    classDef mitigateNode fill:#e8f5e9,stroke:#2e7d32,stroke-width:1.5px,rx:12,ry:12,color:#1a1a1a
+    classDef perfHarness fill:#e8f5e9,stroke:#2e7d32,stroke-width:1.5px,rx:12,ry:12,color:#1f2933
+
+    %% Subgraph panel styles
+    style A fill:#f5f7fa,stroke:#9aa4b2,stroke-width:2px
+    style B fill:#fafafa,stroke:#c9d1d9,stroke-width:2px

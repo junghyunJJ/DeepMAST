@@ -1,0 +1,1443 @@
+{
+  "schema_version": "deep_interpreter_literature_candidates_v1",
+  "inputs": {
+    "disease": "breast cancer",
+    "lr_pairs": [
+      {
+        "pair": "CSF1-CSF1R",
+        "ligand": "CSF1",
+        "receptor": "CSF1R"
+      }
+    ],
+    "pathways": [],
+    "celltypes": [
+      "Endothelial",
+      "Macrophages 1",
+      "Macrophages 2",
+      "Stromal"
+    ]
+  },
+  "source": {
+    "total_papers": 30,
+    "unique_papers": 30,
+    "duplicates_dropped": 0
+  },
+  "bucket_order": [
+    "direct_lr_evidence",
+    "receptor_pathway_context_evidence",
+    "disease_only_background",
+    "rejected_weak_evidence"
+  ],
+  "counts": {
+    "direct_lr_evidence": 3,
+    "receptor_pathway_context_evidence": 3,
+    "disease_only_background": 17,
+    "rejected_weak_evidence": 7
+  },
+  "pair_results": [
+    {
+      "lr_pair": "CSF1-CSF1R",
+      "ligand": "CSF1",
+      "receptor": "CSF1R",
+      "direct_lr_evidence": 3,
+      "receptor_pathway_context_evidence": 2
+    }
+  ],
+  "papers": [
+    {
+      "pmid": "40850976",
+      "title": "Dual roles and therapeutic targeting of tumor-associated macrophages in tumor microenvironments",
+      "abstract": "Tumor-associated macrophages (TAMs), derived from circulating monocytes recruited to tumor sites via chemotactic signals such as C-C motif ligand 2 (CCL2) and colony-stimulating factor-1 (CSF-1), are pivotal components of the tumor microenvironment (TME). Functionally polarized into distinct subtypes, TAMs play dual roles: proinflammatory M1-type TAMs enhance antitumor immunity through the secretion of cytokines such as interleukin-12 (IL-12) and tumor necrosis factor alpha (TNF-alpha) and direct tumor cell cytotoxicity, whereas M2-type TAMs promote tumor progression by facilitating angiogenesis, metastasis, and immunosuppression. This polarization is dynamically regulated by different cytokines, various signaling pathways, and metabolic cues within the TME. Spatial distribution analyses revealed that M2-like TAMs predominantly infiltrate hypoxic and stromal regions, where they secrete factors such as vascular endothelial growth factor (VEGF), transforming growth factor beta (TGF-beta), and matrix metalloproteinases (MMPs) to remodel the extracellular matrix and suppress immune responses via programmed death-ligand 1 (PD-L1) and arginase-1 upregulation. Crucially, TAMs interact extensively with immune cells; M2-TAMs secrete interleukin-10 (IL-10) and TGF-beta to inhibit cytotoxic T lymphocytes while expanding regulatory T (Treg) cells and impairing natural killer (NK) cell function via altered antigen presentation. Conversely, M1-TAMs synergize with dendritic cells to enhance",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1",
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell interaction",
+          "macrophage-endothelial crosstalk",
+          "stromal interaction",
+          "ligand-receptor mapping"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial",
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "25667468",
+      "title": "Macrophage-colony stimulating factor (CSF1) predicts breast cancer progression and mortality.",
+      "abstract": "BACKGROUND: Macrophage colony-stimulating factor (CSF1), also known as colony-stimulating factor-1 (CSF1), and its receptor CSF1R have been correlated with poor prognosis in many cancer types including breast cancer. Herein, we investigated the prognostic impact of CSF1 and CSF1R expression in tumor epithelial and stromal compartments in primary breast cancer and axillary lymph node metastases. In addition, the density of CD68+ tumor-associated macrophages (TAMs) and CD3+ T-lymphocytes was examined. MATERIALS AND METHODS: Tumor tissue was obtained at the time of primary surgery from 68 prior treatment breast cancer patients, 38 with axillary lymph node metastases and 30 patients without metastases. Digital video analysis was performed on immunohistochemically stained slides. RESULTS: The expression of CSF1, CSF1R and the density of TAMs and CD3+ T-lymphocytes were then correlated to metastases and disease-specific mortality. Metastasized primary cancers had higher tumor epithelial and stromal expressions of CSF1 (p<0.001 and p=0.002, respectively) and CSF1R (both p=0.03) compared to non-metastatic cancers. Similar findings were made for the density of CD68+ (p=0.003) and CD3+ cells in the tumor epithelium (p<0.001). In multivariate analysis, a high tumor epithelial expression of CSF1 in primary breast cancer predicted mortality (hazard ratio (HR)=8.6, p=0.039). CONCLUSION: High expression of CSF1 and CSF1R and high density of TAMs and CD3+ T-lymphocytes were related to breast",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "direct_lr_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CSF1",
+          "receptor": "CSF1R"
+        }
+      ],
+      "direct_lr_pairs": [
+        {
+          "ligand": "CSF1",
+          "receptor": "CSF1R"
+        }
+      ],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {
+        "CSF1-CSF1R": {
+          "ligand": "CSF1",
+          "receptor": "CSF1R",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "ligand_receptor_disease_co_mention"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "24342436",
+      "title": "Next generation sequencing-based expression profiling identifies signatures from benign stromal proliferations that define stromal components of breast cancer",
+      "abstract": "Introduction\n\nMultiple studies have shown that the tumor microenvironment (TME) of carcinomas can play an important role in the initiation, progression, and metastasis of cancer. Here we test the hypothesis that specific benign fibrous soft tissue tumor gene expression profiles may represent distinct stromal fibroblastic reaction types that occur in different breast cancers. The discovered stromal profiles could classify breast cancer based on the type of stromal reaction patterns in the TME.\n\nMethods\n\nNext generation sequencing-based gene expression profiling (3SEQ) was performed on formalin fixed, paraffin embedded (FFPE) samples of 10 types of fibrous soft tissue tumors. We determined the extent to which these signatures could identify distinct subsets of breast cancers in four publicly available breast cancer datasets.\n\nResults\n\nA total of 53 fibrous tumors were sequenced by 3SEQ with an average of 29 million reads per sample. Both the gene signatures derived from elastofibroma (EF) and fibroma of tendon sheath (FOTS) demonstrated robust outcome results for survival in the four breast cancer datasets. The breast cancers positive for the EF signature (20-33% of the cohort) demonstrated significantly better outcome for survival. In contrast, the FOTS signature-positive breast cancers (11-35% of the cohort) had a worse outcome.\n\nConclusions\n\nWe defined and validated two new stromal signatures in breast cancer (EF and FOTS), which are significantly associated with prognosis. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "24016870",
+      "title": "Elevated CSF1 serum concentration predicts poor overall survival in women with early breast cancer.",
+      "abstract": "Colony-stimulating factor 1 (CSF1) is a key regulator of mammary gland development, and a modulator of tissue macrophages. Expression of the CSF1 receptor gene C-FMS (CSF1R) is strongly associated with poor outcome in breast cancer and results in tumor cell invasiveness and pro-metastatic behavior in vitro. However, CSF1's role as a predictive factor in breast cancer remains unclear. We have prospectively measured circulating CSF1 using ELISA in 572 women with early breast cancer and in 688 women with benign breast lesions, and correlated these concentrations with overall survival (OS), nodal status, and other clinical and histological parameters. Serum CSF1 concentrations were significantly elevated in patients with early breast cancer when compared with those with benign tumors (P<0.0001). Within breast cancer patients, CSF1 was higher in women with axillary lymph nodes (P=0.03). Serum CSF1 correlated with tumor size (P=0.002), age (P<0.001), and Ki67 expression (P=0.006). Log CSF1 serum concentrations were predictive of poor survival in both univariate (hazard ratio (HR): 3.77, 95% CI: 1.65-8.65, P=0.002) and multivariate analyses (HR: 3.1, 95% CI: 1.03-9.33, P=0.04). Post- but not premenopausal women with CSF1 serum concentrations >873  pg/ml experienced a significantly poorer outcome (P=0.004 log-rank test). Serum CSF1 concentrations are elevated in women with malignant breast tumors. In early breast cancer, elevated serum CSF1 is associated with nodal involvement, and i",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "direct_lr_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CSF1",
+          "receptor": "CSF1R"
+        }
+      ],
+      "direct_lr_pairs": [
+        {
+          "ligand": "CSF1",
+          "receptor": "CSF1R"
+        }
+      ],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {
+        "CSF1-CSF1R": {
+          "ligand": "CSF1",
+          "receptor": "CSF1R",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "ligand_receptor_disease_co_mention"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "22678116",
+      "title": "miR-21 is targeted by omega-3 polyunsaturated fatty acid to regulate breast tumor CSF-1 expression.",
+      "abstract": "Increasing evidence shows the beneficial effects of fish oil on breast cancer growth and invasion in vitro and in animal models. Expression of CSF-1 (colony stimulating factor-1) by breast cancer cells acts as potent activator of malignancy and metastasis. In this report, we used two human breast cancer cell lines, MDA-MB-231 and MCF-7, to show that the bioactive fish oil component DHA (docosahexaenoic acid) inhibits expression of CSF-1 and its secretion from these cancer cells. We found that the tumor suppressor protein PTEN regulates CSF-1 expression through PI 3 kinase/Akt signaling via a transcriptional mechanism. The enhanced abundance of microRNA-21 (miR-21) in breast cancer cells contributes to the growth and metastasis. Interestingly, DHA significantly inhibited expression of miR-21. miR-21 Sponge, which derepresses the miR-21 targets, markedly decreased expression of CSF-1 and its secretion. Furthermore, miR-21-induced upregulation of CSF-1 mRNA and its transcription were prevented by expression of PTEN mRNA lacking 3'-untranslated region (UTR) and miR-21 recognition sequence. Strikingly, miR-21 reversed DHA-forced reduction of CSF-1 expression and secretion. Finally, we found that expression of miR-21 as well as CSF-1 was significantly attenuated in breast tumors of mice receiving a diet supplemented with fish oil. Our results reveal a novel mechanism for the therapeutic function of fish oil diet that blocks miR-21, thereby increasing PTEN levels to prevent expressi",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "19188147",
+      "title": "The macrophage colony-stimulating factor 1 response signature in breast carcinoma.",
+      "abstract": "PURPOSE: Macrophages play an important role in breast carcinogenesis. The pathways that mediate the macrophage contribution to breast cancer and the heterogeneity that exists within macrophages are incompletely understood. Macrophage colony-stimulating factor 1 (CSF1) is the primary regulator of tissue macrophages. The purpose of this study was to define a novel CSF1 response signature and to evaluate its clinical and biological significance in breast cancer. EXPERIMENTAL DESIGN: We defined the CSF1 response signature by identifying genes overexpressed in tenosynovial giant cell tumor and pigmented villonodular synovitis (tumors composed predominantly of macrophages recruited in response to the overexpression of CSF1) compared with desmoid-type fibromatosis and solitary fibrous tumor. To characterize the CSF1 response signature in breast cancer, we analyzed the expression of CSF1 response signature genes in eight published breast cancer gene expression data sets (n = 982) and did immunohistochemistry and in situ hybridization for CSF1 response genes on a breast cancer tissue microarray (n = 283). RESULTS: In both the gene microarray and tissue microarray analyses, a consistent subset (17-25%) of breast cancers shows the CSF1 response signature. The signature is associated with higher tumor grade, decreased expression of estrogen receptor, decreased expression of progesterone receptor, and increased TP53 mutations (P < 0.001). CONCLUSIONS: Our data show that the CSF1 response ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CSF1",
+          "receptor": "CSF1R"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CSF1",
+          "receptor": "CSF1R"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CSF1-CSF1R": {
+          "ligand": "CSF1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "18172291",
+      "title": "Circulating colony stimulating factor-1 and breast cancer risk.",
+      "abstract": "Colony stimulating factor-1 (CSF1) and its receptor (CSF1-R) are important in mammary gland development and have been implicated in breast carcinogenesis. In a nested case-control study in the Nurses' Heath Study of 726 breast cancer cases diagnosed between June 1, 1992, and June 1, 1998, and 734 matched controls, we prospectively evaluated whether circulating levels of CSF1 (assessed in 1989-1990) are associated with breast cancer risk. The association varied by menopausal status (P(heterogeneity) = 0.009). CSF1 levels in the highest quartile (versus lowest) were associated with an 85% reduced risk of premenopausal breast cancer [relative risk (RR), 0.15; 95% confidence interval (95% CI), 0.03-0.85; P(trend) = 0.02]. In contrast, CSF1 levels in the highest quartile conferred a 33% increased risk of postmenopausal breast cancer (RR, 1.33; 95% CI, 0.96-1.86; P(trend) = 0.11), with greatest risk for invasive (RR, 1.45; 95% CI, 1.02-2.07; P(trend) = 0.06) and ER+/PR+ tumors (RR, 1.72; 95% CI, 1.11-2.66; P(trend) = 0.04). Thus, the association of circulating CSF1 levels and breast cancer varies by menopausal status.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CSF1",
+          "receptor": "CSF1R"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "CSF1",
+          "receptor": "CSF1R"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "CSF1-CSF1R": {
+          "ligand": "CSF1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "16631152",
+      "title": "The pretreatment plasma level and diagnostic utility of M-CSF in benign breast tumor and breast cancer patients.",
+      "abstract": "BACKGROUND: In the present study, we investigated the plasma levels of M-CSF and commonly accepted tumor marker (antigen CA 15-3) in breast cancer patients in relation to the group with benign breast tumor and to the healthy controls. Additionally, we compared the plasma level of M-CSF with the tumor stage of breast cancer and defined the diagnostic criteria: sensitivity, specificity, the positive and the negative predictive values. Moreover, we defined the receiver-operating characteristics (ROC) curve for M-CSF and CA 15-3, and correlation between both parameters. METHODS: M-CSF and CA 15-3 were measured in 80 patients with breast cancer, 17 patients with benign breast tumor and in 30 healthy subjects. M-CSF was determined using enzyme-linked immunosorbent assay (ELISA). CA 15-3 was measured using a microparticle enzyme immunoassay kit (MEIA). RESULTS: There were statistically significant differences in the levels of circulating M-CSF and CA 15-3 in the breast cancer patients comparing to the group with benign breast tumor and to the control group. The levels of M-CSF and CA 15-3 were also significantly higher in patients with more advanced tumor stage. Statistically significant positive correlation was observed between the M-CSF and CA 15-3 levels. The M-CSF and CA 15-3 diagnostic specificities were 95%. The diagnostic sensitivity (59%), the positive predictive value (97%) and the negative predictive value (41%) were higher for M-CSF than for CA 15-3 (48.8%, 95% and 40.1%,",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "11956031",
+      "title": "Circulating macrophage colony stimulating factor as a marker of tumour progression.",
+      "abstract": "Tumour expression of the macrophage colony stimulating factor (CSF-1 or MCSF) has been associated with an adverse prognosis in breast cancer, through an effect on the promotion of metastasis. The aim of the present study was to evaluate the clinical relevance of high circulating CSF-1 levels in patients with newly diagnosed breast tumours and correlate CSF-1 with clinico-pathological parameters. A secondary aim was to also measure CSF-1 in patients with other tumour types and at different stages of disease. Using a commercially available ELISA, pre-treatment plasma levels of CSF-1 were assessed, in 471 consecutive patients diagnosed with breast tumours, in 70 patients with newly diagnosed cancer of the head & neck, in 32 men with prostate cancer metastatic to bone and in 39 women with advanced metastatic breast cancer. Mean CSF-1 levels were significantly higher in patients with locally advanced (p <.015) or metastatic breast tumours (p <.048) and in a group of primary breast cancer patients (n = 26) selected for intensive chemotherapy because of multiple adverse tumour characteristics (p <.0002). Mean CSF-1 was also higher in patients younger than 35 years (p <.02) and in post-menopausal patients (p <.03). There was no significant association with tumour histologic type, grade, or other individual histopathologic parameters. No significant association was found between pre-treatment CSF-1 and overall/relapse free survival. Median CSF-1 levels were dramatically higher in pati",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "11205275",
+      "title": "The constitutive production of colony stimulating factor 1 by invasive human breast cancer cells.",
+      "abstract": "Colony Stimulating Factor 1 (CSF-1) and its receptor, the c-fms proto-oncogene product, are expressed in normal and malignant tissues. The many actions of CSF-1 include induction of urokinase-type plasminogen activator (uPA), a serine protease involved in extracellular matrix degradation. To explore the role of CSF-1 in breast cancer progression, we evaluated the expression of CSF-1, c fms, and uPA in human breast cancer cell lines well-characterized for differing degrees of invasive, metastatic capability. The more invasive cell lines expressed elevated levels of CSF-1 by Northern analysis and ELISA. Increased uPA expression was noted in these same cell lines. CSF-1 receptor mRNA transcripts and protein were demonstrable in the different cell lines. These data suggest a role for CSF-1 in the autocrine and paracrine regulation of tumor progression in breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "1334964",
+      "title": "Article 1334964",
+      "abstract": "",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "no_disease_anchored_evidence",
+          "title_only_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence",
+        "title_only_evidence"
+      ]
+    },
+    {
+      "pmid": "25088194",
+      "title": "Autocrine CSF1R signaling mediates switching between invasion and proliferation downstream of TGFbeta in claudin-low breast tumor cells",
+      "abstract": "Patient data suggest that colony stimulating factor-1 (CSF1) and its receptor (CSF1R) play critical roles during breast cancer progression. We have previously shown that in human breast tumors expressing both CSF1 and CSF1R, invasion in vivo is dependent both on a paracrine interaction with tumor-associated macrophages and an autocrine regulation of CSF1R in the tumor cells themselves. Although the role of the paracrine interaction between tumor cells and macrophages has been extensively studied, very little is known about the mechanism by which the autocrine CSF1R signaling contributes to tumor progression. We show here that breast cancer patients of the claudin-low subtype have significantly increased expression of CSF1R. Using a panel of breast cancer cells lines, we confirm that CSF1R expression is elevated and regulated by TGFbeta specifically in claudin-low cell lines. Abrogation of autocrine CSF1R signaling in MDA-MB-231 xenografts (a claudin-low cell line) leads to increased tumor size by enhanced proliferation, but significantly reduced invasion, dissemination and metastasis. Indeed, we show that proliferation and invasion are oppositely regulated by CSF1R downstream of TGFbeta only in claudin-low cells lines. Intravital multiphoton imaging revealed that inhibition of CSF1R in the tumor cells leads to decreased in vivo motility and a more cohesive morphology. We show that, both in vitro and in vivo, CSF1R inhibition results in a reversal of claudin-low marker express",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "direct_lr_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "CSF1",
+          "receptor": "CSF1R"
+        }
+      ],
+      "direct_lr_pairs": [
+        {
+          "ligand": "CSF1",
+          "receptor": "CSF1R"
+        }
+      ],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {
+        "CSF1-CSF1R": {
+          "ligand": "CSF1",
+          "receptor": "CSF1R",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "ligand_receptor_disease_co_mention"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "24362524",
+      "title": "Chromatin-associated CSF-1R binds to the promoter of proliferation-related genes in breast cancer cells",
+      "abstract": "The colony-stimulating factor-1 (CSF-1) and its receptor CSF-1R physiologically regulate the monocyte/macrophage system, trophoblast implantation and breast development. An abnormal CSF-1R expression has been documented in several human epithelial tumors, including breast carcinomas. We recently demonstrated that CSF-1/CSF-1R signaling drives proliferation of breast cancer cells via 'classical' receptor tyrosine kinase signaling, including activation of the extracellular signal-regulated kinase 1/2. In this paper, we show that CSF-1R can also localize within the nucleus of breast cancer cells, either cell lines or tissue specimens, irrespectively of their intrinsic molecular subtype. We found that the majority of nuclear CSF-1R is located in the chromatin-bound subcellular compartment. Chromatin immunoprecipitation revealed that CSF-1R, once in the nucleus, binds to the promoters of the proliferation-related genes CCND1, c-JUN and c-MYC. CSF-1R also binds the promoter of its ligand CSF-1 and positively regulates CSF-1 expression. The existence of such a receptor/ligand regulatory loop is a novel aspect of CSF-1R signaling. Moreover, our results provided the first evidence of a novel localization site of CSF-1R in breast cancer cells, suggesting that CSF-1R could act as a transcriptional regulator on proliferation-related genes.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "24599884",
+      "title": "Autocrine inhibition of the c-fms proto-oncogene reduces breast cancer bone metastasis assessed with in vivo dual-modality imaging.",
+      "abstract": "Breast cancer cells preferentially home to the bone microenvironment, which provides a unique niche with a network of multiple bidirectional communications between host and tumor, promoting survival and growth of bone metastases. In the bone microenvironment, the c-fms proto-oncogene that encodes for the CSF-1 receptor, along with CSF-1, serves as one critical cytokine/receptor pair, functioning in paracrine and autocrine fashion. Previous studies concentrated on the effect of inhibition of host (mouse) c-fms on bone metastasis, with resulting decrease in osteolysis and bone metastases as a paracrine effect. In this report, we assessed the role of c-fms inhibition within the tumor cells (autocrine effect) in the early establishment of breast cancer cells in bone and the effects of this early c-fms inhibition on subsequent bone metastases and destruction. This study exploited a multidisciplinary approach by employing two non-invasive, in vivo imaging methods to assess the progression of bone metastases and bone destruction, in addition to ex vivo analyses using RT-PCR and histopathology. Using a mouse model of bone homing human breast cancer cells, we showed that an early one-time application of anti-human c-fms antibody delayed growth of bone metastases and bone destruction for at least 31 days as quantitatively measured by bioluminescence imaging and computed tomography, compared to controls. Thus, neutralizing human c-fms in the breast cancer cell alone decreases extent of ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "21063905",
+      "title": "Inhibition of the c-fms proto-oncogene autocrine loop and tumor phenotype in glucocorticoid stimulated human breast carcinoma cells.",
+      "abstract": "The c-fms proto-oncogene encoded CSF-1 receptor and its ligand represent a feedback loop, which in a paracrine manner, is well known to promote spread of breast cancers. The role of the autocrine feedback loop in promotion of breast tumor behavior, in particular in vitro, is less well understood. The physiologic stimulation of c-fms expression by glucocorticoids (GCs) in vitro and in vivo magnifies the tumor promoting effect seen in these cells from activated c-fms signaling by CSF-1. Targeted molecular therapy against c-fms could therefore abrogate both complementary feedback loops. Using breast cancer cells endogenously co-expressing receptor and ligand, we used complementary approaches to inhibit c-fms expression and function within this autocrine pathway in the context of GC stimulation. Silencing RNA (shRNA), antisense oligonucleotide therapy (AON), and inhibition of c-fms signaling, were all used to quantitate inhibition of GC-stimulated adhesion, motility, and invasion of human breast cancer cells in vitro. shRNA to c-fms downregulated GC-stimulated c-fms mRNA by fourfold over controls, correlating with over twofold reduction in cellular invasiveness. AON therapy was also able to inhibit GC stimulation of c-fms mRNA, and resulted in threefold less invasiveness and 1.5 to 2-fold reductions in adhesion and motility. Finally, the small-molecule c-fms inhibitor Ki20227 was able to decrease in a dose-response manner, breast cancer cell invasion by up to fourfold. Inhibition",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "22096574",
+      "title": "The Colony-Stimulating Factor-1 (CSF-1) Receptor Sustains ERK1/2 Activation and Proliferation in Breast Cancer Cell Lines",
+      "abstract": "Breast cancer is the second leading cause of cancer-related deaths in western countries. Colony-Stimulating Factor-1 (CSF-1) and its receptor (CSF-1R) regulate macrophage and osteoclast production, trophoblast implantation and mammary gland development. The expression of CSF-1R and/or CSF-1 strongly correlates with poor prognosis in several human epithelial tumors, including breast carcinomas. We demonstrate that CSF-1 and CSF-1R are expressed, although at different levels, in 16/17 breast cancer cell lines tested with no differences among molecular subtypes. The role of CSF-1/CSF-1R in the proliferation of breast cancer cells was then studied in MDAMB468 and SKBR3 cells belonging to different subtypes. CSF-1 administration induced ERK1/2 phosphorylation and enhanced cell proliferation in both cell lines. Furthermore, the inhibition of CSF-1/CSF-1R signaling, by CSF-1R siRNA or imatinib treatment, impaired CSF-1 induced ERK1/2 activation and cell proliferation. We also demonstrate that c-Jun, cyclin D1 and c-Myc, known for their involvement in cell proliferation, are downstream CSF-1R in breast cancer cells. The presence of a proliferative CSF-1/CSF-1R autocrine loop involving ERK1/2 was also found. The wide expression of the CSF-1/CSF-1R pair across breast cancer cell subtypes supports CSF-1/CSF-1R targeting in breast cancer therapy.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "19151756",
+      "title": "Regulation of non-AU-rich element containing c-fms proto-oncogene expression by HuR in breast cancer.",
+      "abstract": "The role of RNA-binding proteins in cancer biology is recognized increasingly. The nucleocytoplasmic shuttling and AU-rich RNA-binding protein HuR stabilizes several cancer-related target mRNAs. The proto-oncogene c-fms, whose 3'untranslated region (3'UTR) is not AU-rich, is associated with poor prognosis in breast cancer. Using a large breast-cancer tissue array (N=670), we found nuclear HuR expression to be associated with nodal metastasis and independently with poor survival (P=0.03, RR 1.45), as well as to be co-expressed with c-fms in the breast tumors (P=0.0007). We described c-fms mRNA as a direct target of HuR in vivo, and that HuR bound specifically to a 69-nt region containing 'CUU' motifs in 3'UTR c-fms RNA. Overexpressing or silencing HuR significantly up- or down-regulated c-fms RNA expression, respectively. We also found that known glucocorticoid stimulation of c-fms RNA and protein is largely dependent on the presence of HuR. HuR, by binding to the 69-nt wild type, but not mutant, c-fms sequence can regulate reporter gene expression post-transcriptionally. We are the first to describe that HuR can regulate gene expression by binding non-AU-rich sequences in 3'UTR c-fms RNA. Collectively, our findings suggest that HuR plays a supportive role for c-fms in breast cancer progression by binding a 69-nt element in its 3'UTR, thus regulating its expression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "14734466",
+      "title": "Macrophage colony-stimulating factor-1 receptor expression is associated with poor outcome in breast cancer by large cohort tissue microarray analysis.",
+      "abstract": "PURPOSE: Macrophage colony-stimulating factor-1 receptor (CSF-1R) is a transmembrane tyrosine kinase receptor, which is abnormally expressed in invasive breast cancer. Small cohort studies have demonstrated that increased expression of CSF-1R is associated with ipsilateral breast cancer recurrence. Correlation with survival has not been reported. Our aim was to further evaluate the role of CSF-1R in breast cancer, by studying the expression of CSF-1R in a large cohort of clinical specimens. EXPERIMENTAL DESIGN: Tissue microarrays containing 301 node-negative and 280 node-positive cases were used. Immunohistochemical staining was performed and correlated with overall survival, nodal status, and other clinicopathological data. RESULTS: CSF-1R expression was strongly associated with nodal status. Of the node-negative cases, 114 (38.9%) stained positive for CSF-1R, whereas 189 (67.5%) of the node-positive cases expressed CSF-1R (P < 0.0001). CSF-1R expression is also associated with larger tumor size (P = 0.02). Positive staining was strongly associated with decreased survival (P = 0.0003). Among node-negative patients, CSF-1R expression was associated with decreased overall survival (P = 0.045), whereas among node-positive patients, it was not (P = 0.47). In multivariate analysis, CSF-1R was not independent of nodal status as a predictor of survival. CONCLUSIONS: CSF-1R expression is a strong predictor of poor outcome in nonmetastatic breast cancer. It is significantly more freq",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "9717811",
+      "title": "Prognostic significance of colony-stimulating factor receptor expression in ipsilateral breast cancer recurrence.",
+      "abstract": "The macrophage colony-stimulating factor receptor (CSF-1R), the product of the c-fms proto-oncogene, regulates normal proliferation and differentiation of macrophages and trophoblasts. Recent research found abnormal expression of CSF-1R in human carcinomas of the breast, endometrium, and ovary. Furthermore, activation of CSF-1R by its ligand has been shown to regulate invasiveness and anchorage-independent growth in breast carcinoma cells. To study the significance of CSF-1R expression in breast cancer, we designed a case-controlled immunohistochemical study. We chose 80 patients from a database of 1200 early stage I or II breast cancer patients treated with conservative surgery and radiation therapy. Expression of CSF-1R in the tumors of 40 patients who experienced an ipsilateral breast tumor recurrence (IBTR) as a primary site of relapse were compared with 40 patients who had not experienced an IBTR. The index and control patients were matched by age, clinical stage, nodal status, and follow-up. Paraffin-embedded sections were immunostained with antibodies directed toward CSF-1R. For the CSF-1R antibody, a total of 28 index cases (70%) demonstrated strong staining, whereas only 16 control cases (40%) demonstrated high immunoreactivity (P = 0.007). The CSF-1R antibody showed a positive correlation for local relapse, but no correlation was found between CSF-1R expression and distant metastasis. In summary, our findings provide evidence for the poor prognostic role of CSF-1R i",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "9191055",
+      "title": "Recognition of activated CSF-1 receptor in breast carcinomas by a tyrosine 723 phosphospecific antibody.",
+      "abstract": "The macrophage colony stimulating factor receptor (CSF-1R), the product of the c-fms proto-oncogene, plays an important role in regulating the normal proliferation and differentiation of macrophages and trophoblasts. However, the abnormal expression of CSF-1R transcripts and protein by human breast carcinomas has been shown to correlate with advanced stage and poor prognosis. Ligand activated CSF-1R dimers transphosphorylate several tyrosines in their cytoplasmic domains which provide recognition sites for various effector proteins in multiple signal transduction pathways. In cells transformed by the c-fms oncogene, one of the major CSF-1R phosphotyrosines, pTyr723 is important for phenotypic expression of anchorage-independent growth and metastasis. In order to investigate the relationship between receptor activation/phosphorylation and cellular phenotypes in vitro and in vivo, we prepared a CSF-1R phosphorylation-state specific antibody raised against a specific phosphopeptide of CSF-1R, which included phosphorylated tyrosine 723. On immunoblots of lysates from cells expressing CSF-1R, this antibody recognizes phosphorylated CSF-IR in CSF-1 stimulated cells but not in unstimulated cells. As an immunohistochemical reagent, this antibody stained 52% of invasive human breast tumors (72% of CSF-1R positive cases) in a sample of 114 cases and 38% of carcinoma in situ. This data represents the first direct evidence of in vivo phosphorylation of CSF-1R in human breast carcinomas.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "7846733",
+      "title": "Post-transcriptional regulation of c-fms proto-oncogene expression by dexamethasone and of CSF-1 in human breast carcinomas in vitro.",
+      "abstract": "The c-fms proto-oncogene encodes the receptor for a hematopoietic growth factor, CSF-1. Recently, the importance of c-fms and its ligand CSF-1 in malignancies of non-hematopoietic origin, such as breast, ovarian, endometrial, pulmonary, and trophoblastic cancers has been recognized. We have previously shown that glucocorticoids induce a large increase in c-fms mRNA and protein levels in breast carcinoma cell lines. In this report, we investigate the mechanism underlying such c-fms overexpression by dexamethasone. We show that dexamethasone treatment of two breast carcinoma cell lines (BT20-c-fms expressor, and SKBR3-co-expressor of both c-fms and CSF-1) does not increase the rate of c-fms gene transcription, suggesting a post-transcriptional mechanism of regulation of c-fms expression by dexamethasone. The effect of protein synthesis inhibition was studied to help determine whether there was a role for intermediary regulatory proteins in the regulation of c-fms expression. We find that several protein synthesis inhibitors interfere with dexamethasone induction of c-fms transcripts, suggesting the existence of regulatory proteins. These regulatory proteins do not appear to be constitutively expressed, as we show no effect of protein synthesis inhibition on c-fms transcript expression in resting BT20 cells. These findings suggest that the putative regulatory proteins are induced by dexamethasone. Furthermore, the addition of a protein synthesis inhibitor, pactamycin, to dexamet",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "40092996",
+      "title": "Mechanisms of tumor-associated macrophages in breast cancer and treatment strategy",
+      "abstract": "Breast cancer (BC) is the most common cancer in women and a leading cause of cancer-related mortality. Despite advances in screening and treatment, outcomes for advanced or recurrent BC remain poor, highlighting the need for new strategies. Recent research emphasizes the tumor microenvironment (TME), particularly tumor-associated macrophages (TAMs), as key drivers of tumor growth, metastasis, and resistance to therapy. The presence of M2-like TAMs in the TME promotes immune evasion and tumor progression across BC subtypes. This review summarizes TAMs classification, their role in BC, and emerging therapies targeting TAMs, including depletion, inhibition of recruitment, and reprogramming from pro-tumoral M2 to anti-tumoral M1 phenotypes. Targeting TAMs offers a promising strategy to improve BC treatment outcomes.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1",
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "CSF1",
+          "CSF1R",
+          "colony-stimulating factor",
+          "receptor tyrosine kinase",
+          "ligand-receptor interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "37569410",
+      "title": "Navigating the Blood-Brain Barrier: Challenges and Therapeutic Strategies in Breast Cancer Brain Metastases",
+      "abstract": "Breast cancer (BC) is the most common cancer in women, with metastatic BC being responsible for the highest number of deaths. A frequent site for BC metastasis is the brain. Brain metastasis derived from BC involves the cooperation of multiple genetic, epigenetic, angiogenic, and tumor-stroma interactions. Most of these interactions provide a unique opportunity for development of new therapeutic targets. Potentially targetable signaling pathways are Notch, Wnt, and the epidermal growth factor receptors signaling pathways, all of which are linked to driving BC brain metastasis (BCBM). However, a major challenge in treating brain metastasis remains the blood-brain barrier (BBB). This barrier restricts the access of unwanted molecules, cells, and targeted therapies to the brain parenchyma. Moreover, current therapies to treat brain metastases, such as stereotactic radiosurgery and whole-brain radiotherapy, have limited efficacy. Promising new drugs like phosphatase and kinase modulators, as well as BBB disruptors and immunotherapeutic strategies, have shown the potential to ease the disease in preclinical studies, but remain limited by multiple resistance mechanisms. This review summarizes some of the current understanding of the mechanisms involved in BC brain metastasis and highlights current challenges as well as opportunities in strategic designs of potentially successful future therapies.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1",
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "CSF1",
+          "CSF1R",
+          "colony-stimulating factor",
+          "receptor tyrosine kinase",
+          "ligand-receptor interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "34716900",
+      "title": "Harnessing nanomedicine for enhanced immunotherapy for breast cancer brain metastases",
+      "abstract": "Brain metastases (BMs) are the most common type of brain tumor, and the incidence among breast cancer (BC) patients has been steadily increasing over the past two decades. Indeed, ~ 30% of all patients with metastatic BC will develop BMs, and due to few effective treatments, many will succumb to the disease within a year. Historically, patients with BMs have been largely excluded from clinical trials investigating systemic therapies including immunotherapies (ITs) due to limited brain penetration of systemically administered drugs combined with previous assumptions that BMs are poorly immunogenic. It is now understood that the central nervous system (CNS) is an immunologically distinct site and there is increasing evidence that enhancing immune responses to BCBMs will improve patient outcomes and the efficacy of current treatment regimens. Progress in IT for BCBMs, however, has been slow due to several intrinsic limitations to drug delivery within the brain, substantial safety concerns, and few known targets for BCBM IT. Emerging studies demonstrate that nanomedicine may be a powerful approach to overcome such limitations, and has the potential to greatly improve IT strategies for BMs specifically. This review summarizes the evidence for IT as an effective strategy for BCBM treatment and focuses on the nanotherapeutic strategies currently being explored for BCBMs including targeting the blood-brain/tumor barrier (BBB/BTB), tumor cells, and tumor-supporting immune cells for co",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1",
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "CSF1",
+          "CSF1R",
+          "colony-stimulating factor",
+          "receptor tyrosine kinase",
+          "ligand-receptor interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "33463063",
+      "title": "Research trends in pharmacological modulation of tumor-associated macrophages",
+      "abstract": "Abstract\n\nAs one of the most abundant immune cell populations in the tumor microenvironment (TME), tumor-associated macrophages (TAMs) play important roles in multiple solid malignancies, including breast cancer, prostate cancer, liver cancer, lung cancer, ovarian cancer, gastric cancer, pancreatic cancer, and colorectal cancer. TAMs could contribute to carcinogenesis, neoangiogenesis, immune-suppressive TME remodeling, cancer chemoresistance, recurrence, and metastasis. Therefore, reprogramming of the immune-suppressive TAMs by pharmacological approaches has attracted considerable research attention in recent years. In this review, the promising pharmaceutical targets, as well as the existing modulatory strategies of TAMs were summarized. The chemokine-chemokine receptor signaling, tyrosine kinase receptor signaling, metabolic signaling, and exosomal signaling have been highlighted in determining the biological functions of TAMs. Besides, both preclinical research and clinical trials have suggested the chemokine-chemokine receptor blockers, tyrosine kinase inhibitors, bisphosphonates, as well as the exosomal or nanoparticle-based targeting delivery systems as the promising pharmacological approaches for TAMs deletion or reprogramming. Lastly, the combined therapies of TAMs-targeting strategies with traditional treatments or immunotherapies as well as the exosome-like nanovesicles for cancer therapy are prospected.\n\nThe biofunctions and clinical implications of TAMs in cancer",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1",
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "CSF1",
+          "CSF1R",
+          "colony-stimulating factor",
+          "receptor tyrosine kinase",
+          "ligand-receptor interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "31700993",
+      "title": "If we build it they will come: targeting the immune response to breast cancer",
+      "abstract": "Historically, breast cancer tumors have been considered immunologically quiescent, with the majority of tumors demonstrating low lymphocyte infiltration, low mutational burden, and modest objective response rates to anti-PD-1/PD-L1 monotherapy. Tumor and immunologic profiling has shed light on potential mechanisms of immune evasion in breast cancer, as well as unique aspects of the tumor microenvironment (TME). These include elements associated with antigen processing and presentation as well as immunosuppressive elements, which may be targeted therapeutically. Examples of such therapeutic strategies include efforts to (1) expand effector T-cells, natural killer (NK) cells and immunostimulatory dendritic cells (DCs), (2) improve antigen presentation, and (3) decrease inhibitory cytokines, tumor-associated M2 macrophages, regulatory T- and B-cells and myeloid derived suppressor cells (MDSCs). The goal of these approaches is to alter the TME, thereby making breast tumors more responsive to immunotherapy. In this review, we summarize key developments in our understanding of antitumor immunity in breast cancer, as well as emerging therapeutic modalities that may leverage that understanding to overcome immunologic resistance.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1",
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "CSF1",
+          "CSF1R",
+          "colony-stimulating factor",
+          "receptor tyrosine kinase",
+          "ligand-receptor interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "29796177",
+      "title": "Differential prognostic impact of interleukin-34 mRNA expression and infiltrating immune cell composition in intrinsic breast cancer subtypes",
+      "abstract": "Interleukin-34 (IL-34) is a ligand for the CSF-1R and has also two additional receptors, PTPRZ1 and syndecan-1. IL-34 plays a role in innate immunity, inflammation, and cancer. However, the role of IL-34 in breast cancer is still ill-defined. We analyzed IL-34 mRNA expression in breast cancer cell lines and breast cancer patients and applied established computational approaches (CIBERSORT, ESTIMATE, TIMER, TCIA), to analyze gene expression data from The Cancer Genome Atlas (TCGA). Expression of IL-34 was associated with a favorable prognosis in luminal and HER2 but not basal breast cancer patients. Gene expression of CSF-1 and CSF-1R was strongly associated with myeloid cell infiltration, while we found no or only weak correlations between IL-34, PTPRZ1, syndecan-1 and myeloid cells. In vitro experiments showed that tyrosine phosphorylation of CSF-1R, ERK, and FAK and cell migration are differentially regulated by IL-34 and CSF-1 in breast cancer cell lines. Collectively, our data suggest that correlation of IL-34 gene expression with survival is dependent on the molecular breast cancer subtype. Furthermore, IL-34 is not associated with myeloid cell infiltration and directly regulates breast cancer cell migration and signaling.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1",
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "CSF1",
+          "CSF1R",
+          "colony-stimulating factor",
+          "receptor tyrosine kinase",
+          "ligand-receptor interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "40007537",
+      "title": "Insights into CSF-1/CSF-1R signaling: the role of macrophage in radiotherapy",
+      "abstract": "Macrophage plays an important role in homeostasis and immunity, and dysfunctional macrophage polarization is believed to be associated with the pathogenesis of tissue fibrosis and tumor progression. Colony stimulating factor-1 (CSF-1), a polypeptide chain cytokine, through its receptor (CSF-1R) regulates the differentiation of macrophages. Recently, the promising therapeutic potential of CSF-1/CSF-1R signaling pathway inhibition in cancer treatment is widely used. Furthermore, inhibition of CSF-1/CSF-1R signaling combined with radiotherapy has been extensively studied to reduce immunosuppression and promote abscopal effect. In addition, cumulative evidence demonstrated that M2 phenotype macrophage is dominant in tissue fibrosis and the inhibition of CSF-1/CSF-1R signaling pathway ameliorated pulmonary fibrosis, including radiation-induced lung fibrosis. Herein, we provide a comprehensive review of the CSF-1/CSF-1R signaling pathway in radiotherapy, with a focus on advances in macrophage-targeted strategies in the treatment of cancer and pulmonary fibrosis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1",
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "CSF1",
+          "CSF1R",
+          "colony-stimulating factor",
+          "receptor tyrosine kinase",
+          "ligand-receptor interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "38822100",
+      "title": "Role of CSF1R 550th-tryptophan in kusunokinin and CSF1R inhibitor binding and ligand-induced structural effect",
+      "abstract": "Binding affinity is an important factor in drug design to improve drug-target selectivity and specificity. In this study, in silico techniques based on molecular docking followed by molecular dynamics (MD) simulations were utilized to identify the key residue(s) for CSF1R binding affinity among 14 pan-tyrosine kinase inhibitors and 15 CSF1R-specific inhibitors. We found tryptophan at position 550 (W550) on the CSF1R binding site interacted with the inhibitors' aromatic ring in a pi-pi way that made the ligands better at binding. Upon W550-Alanine substitution (W550A), the binding affinity of trans-(-)-kusunokinin and imatinib to CSF1R was significantly decreased. However, in terms of structural features, W550 did not significantly affect overall CSF1R structure, but provided destabilizing effect upon mutation. The W550A also did not either cause ligand to change its binding site or conformational changes due to ligand binding. As a result of our findings, the pi-pi interaction with W550's aromatic ring could be still the choice for increasing binding affinity to CSF1R. Nevertheless, our study showed that the increasing binding to W550 of the design ligand may not ensure CSF1R specificity and inhibition since W550-ligand bound state did not induce significantly conformational change into inactive state.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1",
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "CSF1",
+          "CSF1R",
+          "colony-stimulating factor",
+          "receptor tyrosine kinase",
+          "ligand-receptor interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "27042097",
+      "title": "Myeloid cell signatures in tumor microenvironment predicts therapeutic response in cancer",
+      "abstract": "Tumor microenvironment (TME) consists of several immune and nonimmune cell populations including tumor cells. For many decades, experimental studies have depicted profound contribution of TME toward cancer progression and metastasis development. Several therapeutic strategies have been tested against TME through preclinical studies and clinical trials. Unfortunately, most of them have shown transient effect, and have largely failed due to aggressive tumor growth and without improving survival. Solid tumors are known to have a strong myeloid component (eg, tumor-associated macrophages) in tumor development. Recent data suggest that therapeutic responses in tumor are characterized by alterations in immune cell signatures, including tumor-associated myeloid cells. Polarized tumor-associated myeloid cells (M1-M2) are critical in impairing therapeutic effect and promoting tumor growth. The present review is intended to compile all the literatures related to the emerging contribution of different populations of myeloid cells in the development of tumor and therapeutic failures. Finally, we have discussed targeting of myeloid cell populations as a combination therapy with chemo-, targeted-, or radiation therapies.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "CSF1",
+          "CSF1R"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "CSF1",
+          "CSF1R",
+          "colony-stimulating factor",
+          "receptor tyrosine kinase",
+          "ligand-receptor interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "CSF1-CSF1R": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    }
+  ]
+}

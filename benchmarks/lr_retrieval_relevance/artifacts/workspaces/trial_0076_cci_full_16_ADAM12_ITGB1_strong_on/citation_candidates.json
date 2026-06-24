@@ -1,0 +1,1587 @@
+{
+  "schema_version": "deep_interpreter_literature_candidates_v1",
+  "inputs": {
+    "disease": "breast cancer",
+    "lr_pairs": [
+      {
+        "pair": "ADAM12-ITGB1",
+        "ligand": "ADAM12",
+        "receptor": "ITGB1"
+      }
+    ],
+    "pathways": [],
+    "celltypes": [
+      "Endothelial",
+      "Macrophages 2",
+      "Perivascular-Like",
+      "Stromal",
+      "Stromal & T Cell Hybrid"
+    ]
+  },
+  "source": {
+    "total_papers": 30,
+    "unique_papers": 30,
+    "duplicates_dropped": 0
+  },
+  "bucket_order": [
+    "direct_lr_evidence",
+    "receptor_pathway_context_evidence",
+    "disease_only_background",
+    "rejected_weak_evidence"
+  ],
+  "counts": {
+    "direct_lr_evidence": 0,
+    "receptor_pathway_context_evidence": 14,
+    "disease_only_background": 11,
+    "rejected_weak_evidence": 5
+  },
+  "pair_results": [
+    {
+      "lr_pair": "ADAM12-ITGB1",
+      "ligand": "ADAM12",
+      "receptor": "ITGB1",
+      "direct_lr_evidence": 0,
+      "receptor_pathway_context_evidence": 13
+    }
+  ],
+  "papers": [
+    {
+      "pmid": "28765266",
+      "title": "ADAM12 Is a Novel Regulator of Tumor Angiogenesis via STAT3 Signaling.",
+      "abstract": "ADAM12, (ADisintegrin and metalloproteinase domain-containing protein 12), is upregulated in epithelial cancers and contributes to increased tumor proliferation, metastasis, and endocrine resistance. However, its role in tumor angiogenesis is unknown. Here, we report that ADAM12 is upregulated in the vessels of aggressive breast tumors and exerts key regulatory functions. ADAM12 significantly increases bFGF-mediated angiogenesis in vivo and ADAM12 levels are upregulated in tumors that have undergone a switch to the angiogenic phenotype. Importantly, ADAM12-overexpressing breast tumors display a higher microvessel density (MVD). Our goal was to identify the mechanisms by which tumor-associated ADAM12 promotes angiogenesis. ADAM12 expression in breast tumor cells correlated with a significant upregulation of proangiogenic factors such as VEGF and MMP-9 and downregulation of antiangiogenic factors such as Thrombospondin-1 (THBS1/TSP1) and Tissue Inhibitor of Metalloproteinases-2 (TIMP-2). Co-culture with ADAM12-expressing tumor cells promoted endothelial cell (EC) recruitment and capillary tube formation. Conversely, downregulation of endogenous ADAM12 in breast cancer cell lines resulted in reduction of pro-angiogenic factors and EC recruitment. These ADAM12-mediated effects are driven by the activation of EGFR, STAT3 and Akt signaling. Blockade of EGFR/STAT3 or silencing of ADAM12 reversed the proangiogenic tumor phenotype, significantly downregulated pro-angiogenic mitogens a",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ADAM12-ITGB1": {
+          "ligand": "ADAM12",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "36531051",
+      "title": "PDLIM2 is highly expressed in Breast Cancer tumour-associated macrophages and is required for M2 macrophage polarization",
+      "abstract": "The PDZ-LIM domain-containing protein 2 (PDLIM2) regulates cell polarity and the protein stability of key transcription factors in epithelial and hemopoietic cells. We previously reported that PDLIM2 is more highly expressed in Triple Negative Breast Cancer (TNBC) than in other breast cancer types or normal breast tissue. In the course of the TNBC study, it was noted that PDLIM2 was highly expressed in the stroma of PDLIM2-expressing tumours. Here, we investigated the phenotype of these stromal cells and whether any infiltrating immune population was linked to PDLIM2 expression. We found that high PDLIM2 expression in breast tumours was associated with higher levels of infiltrating M2 macrophages, but was not associated with infiltrating T cell sub-populations. We then tested whether PDLIM2 contributes to macrophage differentiation or function by using cultures of bone marrow-derived macrophages from wildtype and Pdlim2 knockout mice. This demonstrated that PDLIM2 is required for naive macrophage migration and for the full adoption of IL-4-induced M2 polarization, including expression of M2 phenotypic markers, cell adhesion and cell migration. TLR4-, TLR3- or IFNgamma-induced M1 macrophage activity was less dependent on PDLIM2. Finally, analysis of publicly available breast cancer datasets showed that high PDLIM2 expression is associated with increased M2 macrophage infiltration. We conclude that PDLIM2 expression influences the tumour associated stroma and, in particular, M2",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "macrophage",
+          "M2 macrophage",
+          "tumor-associated macrophage",
+          "immune infiltration"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "39343856",
+      "title": "Integrin beta1 in breast cancer: mechanisms of progression and therapy.",
+      "abstract": "The therapy for breast cancer (BC), to date, still needs improvement. Apart from traditional therapy methods, biological therapy being explored opens up a novel avenue for BC patients. Integrin beta1 (ITGbeta1), one of the largest subgroups in integrin family, is a key player in cancer evolution and therapy. Recent researches progress in the relationship of ITGbeta1 level and BC, finding that ITGbeta1 expression evidently concerns BC progression. In this chapter, we outline diverse ITGbeta1-based mechanisms regarding to the promoted effect of ITGbeta1 on BC cell structure rearrangement and malignant phenotype behaviors, the unfavorable patient prognosis conferred by ITGbeta1, BC therapy tolerance induced by ITGbeta1, and lastly novel inhibitors targeting ITGbeta1 for BC therapy. As an effective biomarker, ITGbeta1 undoubtedly emerges one of targeted-therapy opportunities of BC patients in future. It is a necessity focusing on scientific and large-scale clinical trials on the validation of targeted-ITGbeta1 drugs for BC patients.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "30042416",
+      "title": "Adam12 and lnc015192 act as ceRNAs in breast cancer by regulating miR-34a.",
+      "abstract": "Long non-coding RNAs (lncRNAs) are reported to play vital roles in the progress of multiple cancers. However, the functions of lncRNAs in breast cancer remain to be discovered. We performed microarrays to identify the differentially expressed mRNAs and lncRNAs in breast tissues with or without miR-34a knockout. To explore the functions of the differentially expressed mRNA and lncRNA in breast cancer, we conducted a series of experiments. We found that Adam12 and lnc015192 were significantly upregulated in miR-34a knockout breast tissues. Knockdown of Adam12 and lnc015192 inhibited breast cancer cell migration, invasion, and epithelial-mesenchymal transition (EMT). Further experiments revealed that lnc015192 regulated Adam12 expression by functioning as a competing endogenous RNA (ceRNA) for miR-34a. In summary, our study demonstrate that Adam12 and lnc015192 promote breast cancer metastasis partly by sponging miR-34a through the ceRNA mechanism.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ADAM12-ITGB1": {
+          "ligand": "ADAM12",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "28468988",
+      "title": "ADAM12 induction by Twist1 promotes tumor invasion and metastasis via regulation of invadopodia and focal adhesions.",
+      "abstract": "The Twist1 transcription factor promotes tumor invasion and metastasis by inducing epithelial-mesenchymal transition (EMT) and invadopodia-mediated extracellular matrix (ECM) degradation. The critical transcription targets of Twist1 for mediating these events remain to be uncovered. Here, we report that Twist1 strongly induces expression of a disintegrin and metalloproteinase 12 (ADAM12). We observed that the expression levels of Twist1 mRNA and ADAM12 mRNA are tightly correlated in human breast tumors. Knocking down ADAM12 blocked cell invasion in a 3D mammary organoid culture. Suppression of ADAM12 also inhibited Twist1-induced tumor invasion and metastasis in human breast tumor xenografts, without affecting primary tumor formation. Mechanistically, knockdown of ADAM12 in breast cancer cells significantly reduced invadopodia formation and matrix degradation, and simultaneously increased overall cell adhesion to the ECM. Live-imaging analysis showed that knockdown of ADAM12 significantly inhibited focal adhesion turnover. Mechanistically, both the disintegrin and metalloproteinase domains of ADAM12 are required for its function at invadopodia, whereas the metalloproteinase domain is dispensable for its function at focal adhesions. Taken together, these data suggest that ADAM12 plays a crucial role in tumor invasion and metastasis by regulating both invadopodia and focal adhesions.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ADAM12-ITGB1": {
+          "ligand": "ADAM12",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "26722530",
+      "title": "ADAM12 expression predicts clinical outcome in estrogen receptor-positive breast cancer.",
+      "abstract": "OBJECTIVES: Our study was aimed to make sure whether ADAM12 could serve as a prognostic biomarker of estrogen receptor (ER) -positive breast cancer. METHODS: 127 patients with ER-positive breast cancer were included in the present study. The level of ADAM12 was assayed through real-time quantitative PCR (RT-qPCR). Levels of ADAM12 in tumor tissues and adjacent normal tissues were compared with paired t-test. The association of ADAM12 expression with clinical characteristics was analyzed via chi(2) test. Kaplan-Meier survival curve was used to evaluate the role of ADAM12 expression in overall survival (OS) of patients. Cox-regression analysis was performed to judge if ADAM12 could serve as a prognostic marker in breast cancer. RESULTS: The level of ADAM12 was upregulated in tumor tissues of breast cancer compared to that of adjacent normal tissues (P < 0.05). The expression of ADAM12 was closely related to the Ki-67 and HER2 status (P < 0.05 for both). The results of Kaplan-Meier survival curve showed that patients with higher level of ADAM12 exhibited shorter survival time compared to that of low level of ADAM12 (P < 0.001). Cox regression analysis showed that ADAM12 might be a biomarker in predicting prognosis of patients with ER-positive breast cancer (HR = 7.116, 95% CI = 3.329-15.212). CONCLUSION: ADAM12 appears to be a prognostic marker in ER-positive breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ADAM12-ITGB1": {
+          "ligand": "ADAM12",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "24690292",
+      "title": "Urinary concentrations of ADAM 12 from breast cancer patients pre- and post-surgery vs. cancer-free controls: a clinical study for biomarker validation",
+      "abstract": "Background\n\nThe ADAMs (A Disintegrin and Metalloproteinases) are a family of multi-domain, zinc-dependent metalloproteinase enzymes. ADAM 12 has been previously associated with the onset and progression of breast cancer, and elevated levels of ADAM 12 have been previously found in the urine of breast cancer patients. Aims of the current study are: 1) establish the viability of urinary ADAM 12 as a diagnostic marker for breast cancer, and 2) explore the effects of surgical tumor removal on the levels of urinary ADAM 12.\n\nMethods\n\nA total of 96 patients have been recruited for this study, including 50 patients diagnosed with cancer, and 46 age-matched controls. Commercially available ELISA kits for ADAM 12 were used to quantify the presence and concentration of this enzyme in the urine from cancer patients with ductal carcinoma in situ (DCIS) and invasive breast cancer (IBC) both prior to any treatment and approximately two weeks following surgery, as well as from controls.\n\nResults\n\nWe find no statistically significant differences between the concentrations of ADAM 12 in the urine of breast cancer patients prior to treatment and that of their age-matched controls; however the concentration of ADAM 12, both alone and as a function of urine total protein, are significantly elevated following surgery (p < 0.0001). Patients who underwent a mastectomy have significantly higher urinary ADAM 12 concentrations than those who underwent a lumpectomy (significant at p = 0.0271).\n\nConclus",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "21387162",
+      "title": "ADAM12 induces estrogen-independence in breast cancer cells.",
+      "abstract": "Antiestrogen therapy has been used successfully to prolong disease-free and overall survival of ER positive breast cancer patients. However, 50% of patients with ER+ tumors fail to respond to such therapy or eventually acquire resistance to endocrine therapy, resulting in tumor progression and mortality. It is imperative, therefore, to understand the mechanisms that lead to hormone refractory breast cancer in order to develop therapeutics that can modulate the resistance to antiestrogen therapy. The protease, ADAM12, can be detected in the urine of breast cancer patients and its levels correlate with disease status, stage, and cancer risk. Within the context of this study, the authors have investigated the role of the two distinct isoforms of ADAM12 in breast tumor cell proliferation and as potential mediators of endocrine resistance. Using stable clones of ADAM12-overexpressing MCF-7 cells, the authors analyzed proliferation rates of these ER+ breast tumor cells both in estrogen-depleted medium and in the presence of the antiestrogens, tamoxifen, and ICI 182,780. Acquired estrogen resistance in these cells was analyzed using phospho-RTK analysis. Upregulation and phosphorylation of proteins were detected via immunoprecipitation and immunoblotting. EGFR and MAPK inhibitors were used to explore the mechanism of acquired estrogen resistance in breast tumor cells. It was observed that overexpression of the two isoforms, transmembrane ADAM12-L, and secreted ADAM12-S, in breast tu",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ADAM12-ITGB1": {
+          "ligand": "ADAM12",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "21875931",
+      "title": "ADAM12 produced by tumor cells rather than stromal cells accelerates breast tumor progression.",
+      "abstract": "Expression of ADAM12 is low in most normal tissues but is markedly increased in numerous human cancers, including breast carcinomas. We have previously shown that overexpression of ADAM12 accelerates tumor progression in a mouse model of breast cancer (PyMT). In this study, we found that ADAM12 deficiency reduces breast tumor progression in the PyMT model. However, the catalytic activity of ADAM12 seems to be dispensable for its tumor-promoting effect. Interestingly, we show that ADAM12 endogenously expressed in tumor-associated stroma in the PyMT model does not influence tumor progression, but that ADAM12 expression by tumor cells is necessary for tumor progression in these mice. This finding is consistent with our observation that in human breast carcinoma, ADAM12 is almost exclusively located in tumor cells and, only rarely, seen in the tumor-associated stroma. We hypothesized, however, that the tumor-associated stroma may stimulate ADAM12 expression in tumor cells, on the basis of the fact that TGF-beta1 stimulates ADAM12 expression and is a well-known growth factor released from tumor-associated stroma. TGF-beta1 stimulation of ADAM12-negative Lewis lung tumor cells induced ADAM12 synthesis, and growth of these cells in vivo induced more than 200-fold increase in ADAM12 expression. Our observation that ADAM12 expression is significantly higher in the terminal duct lobular units (TDLU) adjacent to human breast carcinoma compared with TDLUs found in normal breast tissue su",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ADAM12-ITGB1": {
+          "ligand": "ADAM12",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "21493715",
+      "title": "ADAM12 transmembrane and secreted isoforms promote breast tumor growth: a distinct role for ADAM12-S protein in tumor metastasis.",
+      "abstract": "Increased levels of ADAM12 have been reported in a variety of human cancers. We have previously reported that urinary ADAM12 is predictive of disease status in breast cancer patients and that ADAM12 protein levels in urine increase with progression of disease. On the basis of these findings, the goal of this study was to elucidate the contribution of ADAM12 in breast tumor growth and progression. Overexpression of both the ADAM12-L (transmembrane) and ADAM12-S (secreted) isoforms in human breast tumor cells resulted in a significantly higher rate of tumor take and increased tumor size. Cells expressing the enzymatically inactive form of the secreted isoform, ADAM12-S, had tumor take rates and tumor volumes similar to those of wild-type cells, suggesting that the tumor-promoting activity of ADAM12-S was a function of its proteolytic activity. Of the two isoforms, only the secreted isoform, ADAM12-S, enhanced the ability of tumor cells to migrate and invade in vitro and resulted in a higher incidence of local and distant metastasis in vivo. This stimulatory effect of ADAM12-S on migration and invasion was dependent on its catalytic activity. Expression of both ADAM12 isoforms was found to be significantly elevated in human malignant breast tissue. Taken together, our results suggest that ADAM12 overexpression results in increased tumor take, tumor size, and metastasis in vivo. These findings suggest that ADAM12 may represent a potential therapeutic target in breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ADAM12-ITGB1": {
+          "ligand": "ADAM12",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "21103624",
+      "title": "Molecular profiling of ADAM12 gene in breast cancers.",
+      "abstract": "ADAMs (a disintegrin and metalloproteinase) family have been associated with the process of proteolytic \"shedding\" of membrane-associated proteins ectodomain and hence the rapid modulation of key cell signaling pathways in tissues microenvironment. A variety of cytokines, chemokines and growth factors which are initially produced as transmembrane proforms are activated by these sheddase activities. ADAM12 is highly expressed in rapidly growing tissues such as placenta and malignant tumors and it was found as one of the Candidate Cancer Genes in a comprehensive mutational analysis of human breast cancers. Our aim was to determine the gene expression profile of ADAM12 in breast cancers in comparison with normal breast and to correlate their level of expression with the clinical and pathological characteristics of breast cancers. Gene expression of ADAM12 spliced variants (12L and 12S) was evaluated using quantitative reverse-transcription PCR in samples obtained by laser capture microdissection from 38 patients with breast cancers and compared with adjacent healthy breast tissues. Both ADAM12L and 12S expression were significantly up-regulated in breast cancers, while in the normal breast, we found a very low expression. ADAM12L expression was significantly correlated with the histopathological types and, although not statistically significant, ADAM12 both variants were up-regulated in high-grade, highly-proliferative and HER2/neu positive tumors. From these preliminary results",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ADAM12-ITGB1": {
+          "ligand": "ADAM12",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "15930294",
+      "title": "A role for ADAM12 in breast tumor progression and stromal cell apoptosis.",
+      "abstract": "As in developmental and regenerative processes, cell survival is of fundamental importance in cancer. Thus, a tremendous effort has been devoted to dissecting the molecular mechanisms involved in understanding the resistance of tumor cells to programmed cell death. Recently, the importance of stromal fibroblasts in tumor initiation and progression has been elucidated. Here, we show that stromal cell apoptosis occurs in human breast carcinoma but is only rarely seen in nonmalignant breast lesions. Furthermore, we show that ADAM12, a disintegrin and metalloprotease up-regulated in human breast cancer, accelerates tumor progression in a mouse breast cancer model. ADAM12 does not influence tumor cell proliferation but rather confers both decreased tumor cell apoptosis and increased stromal cell apoptosis. This dual role of ADAM12 in governing cell survival is underscored by the finding that ADAM12 increases the apoptotic sensitivity of nonneoplastic cells in vitro while rendering tumor cells more resistant to apoptosis. Together, these results show that the ability of ADAM12 to influence apoptosis may contribute to tumor progression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ADAM12-ITGB1": {
+          "ligand": "ADAM12",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "37044238",
+      "title": "A novel computational predictive biological approach distinguishes Integrin beta1 as a salient biomarker for breast cancer chemoresistance.",
+      "abstract": "Chemoresistance is a primary cause of breast cancer treatment failure, and protein-protein interactions significantly contribute to chemoresistance during different stages of breast cancer progression. In pursuit of novel biomarkers and relevant protein-protein interactions occurring during the emergence of breast cancer chemoresistance, we used a computational predictive biological (CPB) approach. CPB identified associations of adhesion molecules with proteins connected with different breast cancer proteins associated with chemoresistance. This approach identified an association of Integrin beta1 (ITGB1) with chemoresistance and breast cancer stem cell markers. ITGB1 activated the Focal Adhesion Kinase (FAK) pathway promoting invasion, migration, and chemoresistance in breast cancer by upregulating Erk phosphorylation. FAK also activated Wnt/Sox2 signaling, which enhanced self-renewal in breast cancer. Activation of the FAK pathway by ITGB1 represents a novel mechanism linked to breast cancer chemoresistance, which may lead to novel therapies capable of blocking breast cancer progression by intervening in ITGB1-regulated signaling pathways.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ADAM12-ITGB1": {
+          "ligand": "",
+          "receptor": "ITGB1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "30719702",
+      "title": "beta1 Integrin is essential for fascin-mediated breast cancer stem cell function and disease progression",
+      "abstract": "Breast cancer remains the second cause of tumor-related mortality in women worldwide mainly due to chemoresistance and metastasis. The chemoresistance and metastasis are attributed to a rare subpopulation with enriched stem-like characteristics, thus called Cancer Stem Cells (CSCs). We have previously reported aberrant expression of the actin-bundling protein (fascin) in breast cancer cells, which enhances their chemoresistance, metastasis and enriches CSC population. The intracellular mechanisms that link fascin with its downstream effectors are not fully elucidated. Here, loss and gain of function approaches in two different breast cancer models were used to understand how fascin promotes disease progression. Importantly, findings were aligned with expression data from actual breast cancer patients. Expression profiling of a large breast cancer dataset (TCGA, 530 patients) showed statistically significant correlation between fascin expression and a key adherence molecule, beta1 integrin (ITGB1). In vitro manipulation of fascin expression in breast cancer cells exhibited its direct effect on ITGB1 expression. Fascin-mediated regulation of ITGB1 was critical for several breast cancer cell functions including adhesion to different extracellular matrix, self-renewability and chemoresistance. Importantly, there was a significant relationship between fascin and ITGB1 co-expression and short disease-free as well as overall survival in chemo-treated breast cancer patients. This nov",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ADAM12-ITGB1": {
+          "ligand": "",
+          "receptor": "ITGB1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "28829502",
+      "title": "Expression of long non-coding RNA linc-ITGB1 in breast cancer and its influence on prognosis and survival.",
+      "abstract": "OBJECTIVE: Long noncoding RNA linc-ITGB1 (linc-ITGB1) was reported to serve as a tumor promoter in breast cancer (BC). However, the clinical significance of linc-ITGB1 has not been reported. The present study aimed to determine the relationship between linc-ITGB1 expression and clinicopathological features and survival. PATIENTS AND METHODS: qRT-PCR was used to quantify the expression levels of linc-ITGB1 in BC and adjacent non-cancerous breast tissues. The X2 test was performed to determine the associations between linc-ITGB expression and the clinicopathological characters. The overall survival time (OS) and disease-free survival (DFS) were collected by follow-up and analyzed by Kaplan-Meier analysis. Multivariate Cox regression analysis was used to identify the independent risk factors for BC. RESULTS: The results showed that linc-ITGB1 levels were lower in tumor tissues of BC patients in comparison to adjacent non-cancerous breast tissues (p < 0.001). Linc-ITGB1 expression was significantly associated with lymph node metastasis, pathological differentiation and TNM stage (all p < 0.05). Furthermore, Kaplan-Meier analysis demonstrated that high-linc-ITGB1 expression level was associated with poorer OS (p = 0.006) and DFS (p = 0.003). Cox proportional hazards risk analysis demonstrated that linc-ITGB1 was an independent predictor for both OS (p = 0.004) and DFS (p = 0.002) in BC. CONCLUSIONS: These results indicated, for the first time, that linc-ITGB1 be a potential biomar",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ADAM12-ITGB1": {
+          "ligand": "",
+          "receptor": "ITGB1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "28160423",
+      "title": "Polymeric Delivery of siRNA against Integrin-beta1 (CD29) to Reduce Attachment and Migration of Breast Cancer Cells.",
+      "abstract": "Cell surface integrins, which play important roles in the survival, proliferation, migration, and invasion of cancer cells, are a viable target for treatment of metastatic breast cancer. This line of therapy still remains challenging due to the lack of proper identification and validation of effective targets as well as the lack of suitable therapeutic agents for treatment. The focus is on one such molecular target for this purpose, namely integrin-beta1, and effective lowering of integrin-beta1 levels on a breast cancer model (MDA-MB-231 cells) is achieved by delivering a dicer-substrate short interfering RNA (siRNA) targeting integrin-beta1 with lipid-modified low molecular weight polyethylenimine polymers. Reduction of integrin-beta1 levels leads to reduced adhesion of MDA-MB-231 cells to extracellular matrix component fibronectin as well as to human bone marrow cells. A reduced migration of the breast cancer cells is also observed after integrin-beta1 silencing in \"scratch\" and \"transwell\" migration assays. These results highlight the importance of integrin-beta1 for the migration of metastatic breast cancer cells by effectively silencing this target with a practical dose of siRNA.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "25426561",
+      "title": "New mechanistic insights of integrin beta1 in breast cancer bone colonization",
+      "abstract": "Bone metastasis is a frequent and life-threatening complication of breast cancer. The molecular mechanisms supporting the establishment of breast cancer cells in the skeleton are still not fully understood, which may be attributed to the lack of suitable models that interrogate interactions between human breast cancer cells and the bone microenvironment. Although it is well-known that integrins mediate adhesion of malignant cells to bone extracellular matrix, their role during bone colonization remains unclear. Here, the role of beta1 integrins in bone colonization was investigated using tissue-engineered humanized in vitro and in vivo bone models. In vitro, bone-metastatic breast cancer cells with suppressed integrin beta1 expression showed reduced attachment, spreading, and migration within human bone matrix compared to control cells. Cell proliferation in vitro was not affected by beta1 integrin knockdown, yet tumor growth in vivo within humanized bone microenvironments was significantly inhibited upon beta1 integrin suppression, as revealed by quantitative in/ex vivo fluorescence imaging and histological analysis. Tumor cells invaded bone marrow spaces in the humanized bone and formed osteolytic lesions; osteoclastic bone resorption was, however, not reduced by beta1 integrin knockdown. Taken together, we demonstrate that beta1 integrins have a pivotal role in bone colonization using unique tissue-engineered humanized bone models.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "21400218",
+      "title": "Expression of Toll-like receptor 4 and beta 1 integrin in breast cancer.",
+      "abstract": "Toll-like receptor (TLR) 4 signaling pathway has been shown to support tumor cell growth in vitro and in vivo. Its stimulation on breast cancer cell lines induces beta1 integrin and promotes tumor invasiveness. However, its role in predicting clinical behavior of tumor is not yet clarified. Therefore, we investigated TLR4 and beta1 integrin expression on 133 primary breast cancer samples by immunohistochemistry and correlated it with overall survival and disease-free survival of patients as well as with clinicopathological characteristics of the tumor. We found higher beta1 integrin expression in invasive lobular cancer in comparison with other tumor types. No significant association of TLR4 and beta1 integrin expression with overall survival or disease-free survival was seen. Therefore, we conclude that expression of these markers is of biological interest but appears to be of little additional use as predictive clinical marker.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "17234776",
+      "title": "Increased beta1 integrin is associated with decreased survival in invasive breast cancer.",
+      "abstract": "Aberrant microenvironments and loss of balance in cell-extracellular matrix signaling are associated with breast cancer invasion, metastasis, and resistance to therapy. We have recently shown that increased beta1 integrin signaling is involved in malignant progression and that inhibitory antibody to beta1 integrin leads to selective apoptosis and decreased proliferation in three-dimensional cultures and in xenograft models of breast cancer in vivo. To investigate the clinical importance of these findings, in the present study we examined the expression of beta1 integrin and extracellular beta1 integrin ligands fibronectin and laminin-1 in a cohort of 249 breast cancer patients who had a median follow-up of 8.4 years. Among the 149 scorable cases, the highest beta1 integrin intensity score (3+ versus 0-2+) was associated with significantly decreased 10-year overall survival of 48% versus 71% (P<0.03) and decreased disease-free survival of 50% versus 80% (P<0.05). Importantly, high fibronectin expression was associated with decreased overall and disease-free survival on univariate analysis (P<0.04) and beta1 integrin intensity score was significantly correlated with fibronectin expression (Kendall's tau-b=0.19; P=0.03). In a multivariate Cox proportional hazards model, beta1 integrin intensity score remained a significant independent predictor of overall survival [hazard ratio (HR), 1.69; 95% confidence interval (95% CI), 1.19-2.38; P<0.003] and disease-free survival (HR, 1.87;",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "11526484",
+      "title": "Integrin signaling inhibits paclitaxel-induced apoptosis in breast cancer cells.",
+      "abstract": "Inherent or acquired drug resistance is one of the major problems in chemotherapy. The mechanisms by which cancer cells survive and escape the cytotoxic effects of chemotherapeutic agents are essentially unknown. In the present study, we demonstrate that in the MDA-MB-231 and MDA-MB-435 breast cancer cells, ligation of beta1 integrins by their extracellular matrix ligands inhibits significantly apoptosis induced by paclitaxel and vincristine, two microtubule-directed chemotherapeutic agents that are widely used in the therapy of breast cancer. We show that beta1 integrin signaling inhibits drug-induced apoptosis by inhibiting the release of cytochrome c from the mitochondria in response to drug treatment. Further, integrin-mediated protection from drug-induced apoptosis and inhibition of cytochrome c release are dependent on the activation of the PI 3-kinase/Akt pathway. Our results identify beta1 integrin signaling as an important survival pathway in drug-induced apoptosis in breast cancer cells and suggest that activation of this pathway may contribute to the generation of drug resistance.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "11408736",
+      "title": "Potential role of beta 1 integrin and collagen biosynthesis in estrogen-dependent reduction of apoptosis in tamoxifen-treated breast cancer cells.",
+      "abstract": "It was found that 10 microM tamoxifen induced apoptosis and a significant (approximately 50%) depletion of beta 1 integrin levels in human breast cancer cells. Estradiol-treated MCF-7 cells exhibited exceptional viability and adherence, high levels of beta 1 integrin and increased (by 100%) collagen biosynthesis. Pretreatment of MCF-7 cells with 1 nM estradiol prevented tamoxifen-induced cell death, loss of cell adherence and decrease in beta 1 integrin level. Tamoxifen and estradiol had an opposite effect on the beta 1 integrin level and adherence in breast cancer cells, suggesting that the decrease in the beta 1 integrin level may be an early event during tamoxifen-induced apoptosis in breast cancer cells.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "38317965",
+      "title": "New insight into the role of the ADAM protease family in breast carcinoma progression",
+      "abstract": "Protease and adhesion molecules play a very emphasized role in the occurrence or progression of metastasis in many types of cancers. In this context, a molecule that contains both protease and adhesion functions play a crucial role in metastasis. ADAMs (a disintegrin and metalloprotease) are molecules with this special characteristic. Recently, a lot of attention has been attracted to various ADAM molecules and researchers have tried to elucidate the role of ADAMs in breast cancer occurrence and progression. Disrupting ADAMs protease and adhesion capabilities can lead to the discovery of worthy therapeutic targets in breast cancer treatment. In this review, we intend to discuss the mechanism of action of various ADAM molecules, their relation to pathogenic processes of breast cancer, and their potential as possible targets for breast cancer treatment.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell adhesion",
+          "tumor progression",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "35205770",
+      "title": "Transcriptional Factor Repertoire of Breast Cancer in 3D Cell Culture Models",
+      "abstract": "Simple Summary\n\nKnowledge of the transcriptional regulation of breast cancer tumorigenesis is largely based on studies performed in two-dimensional (2D) monolayer culture models, which lack tissue architecture and therefore fail to represent tumor heterogeneity. However, three-dimensional (3D) cell culture models are better at mimicking in vivo tumor microenvironment, which is critical in regulating cellular behavior. Hence, 3D cell culture models hold great promise for translational breast cancer research.\n\nAbstract\n\nIntratumor heterogeneity of breast cancer is driven by extrinsic factors from the tumor microenvironment (TME) as well as tumor cell-intrinsic parameters including genetic, epigenetic, and transcriptomic traits. The extracellular matrix (ECM), a major structural component of the TME, impacts every stage of tumorigenesis by providing necessary biochemical and biomechanical cues that are major regulators of cell shape/architecture, stiffness, cell proliferation, survival, invasion, and migration. Moreover, ECM and tissue architecture have a profound impact on chromatin structure, thereby altering gene expression. Considering the significant contribution of ECM to cellular behavior, a large body of work underlined that traditional two-dimensional (2D) cultures depriving cell-cell and cell-ECM interactions as well as spatial cellular distribution and organization of solid tumors fail to recapitulate in vivo properties of tumor cells residing in the complex TME. Thus",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell adhesion",
+          "tumor progression",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "26407179",
+      "title": "The Disintegrin and Metalloprotease ADAM12 Is Associated with TGF-beta-Induced Epithelial to Mesenchymal Transition",
+      "abstract": "The increased expression of the Disintegrin and Metalloprotease ADAM12 has been associated with human cancers, however its role remain unclear. We have previously reported that ADAM12 expression is induced by the transforming growth factor, TGF-beta and promotes TGF-beta-dependent signaling through interaction with the type II receptor of TGF-beta. Here we explore the implication of ADAM12 in TGF-beta-mediated epithelial to mesenchymal transition (EMT), a key process in cancer progression. We show that ADAM12 expression is correlated with EMT markers in human breast cancer cell lines and biopsies. Using a non-malignant breast epithelial cell line (MCF10A), we demonstrate that TGF-beta-induced EMT increases expression of the membrane-anchored ADAM12L long form. Importantly, ADAM12L overexpression in MCF10A is sufficient to induce loss of cell-cell contact, reorganization of actin cytoskeleton, up-regulation of EMT markers and chemoresistance. These effects are independent of the proteolytic activity but require the cytoplasmic tail and are specific of ADAM12L since overexpression of ADAM12S failed to induce similar changes. We further demonstrate that ADAM12L-dependent EMT is associated with increased phosphorylation of Smad3, Akt and ERK proteins. Conversely, inhibition of TGF-beta receptors or ERK activities reverses ADAM12L-induced mesenchymal phenotype. Together our data demonstrate that ADAM12L is associated with EMT and contributes to TGF-beta-dependent EMT by favoring b",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell adhesion",
+          "tumor progression",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "ADAM12",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "ADAM12-ITGB1": {
+          "ligand": "ADAM12",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "18394187",
+      "title": "Inflammation and breast cancer. Metalloproteinases as common effectors of inflammation and extracellular matrix breakdown in breast cancer",
+      "abstract": "Two rapidly evolving fields are converging to impact breast cancer: one has identified novel substrates of metalloproteinases that alter immune cell function, and the other has revealed a role for inflammation in human cancers. Evidence now shows that the mechanisms underlying these two fields interact in the context of breast cancer, providing new opportunities to understand this disease and uncover novel therapeutic strategies. The metalloproteinase class of enzymes is well studied in mammary gland development and physiology, but mostly in the context of extracellular matrix modification. Aberrant metalloproteinase expression has also been implicated in breast cancer progression, where these genes act as tumor modifiers. Here, we review how the metalloproteinase axis impacts mammary physiology and tumorigenesis and is associated with inflammatory cell influx in human breast cancer, and evaluate its potential as a regulator of inflammation in the mammary gland.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell adhesion",
+          "tumor progression",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "disease_only_background",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "38250812",
+      "title": "Unveiling the Dichotomy of Urinary Proteins: Diagnostic Insights into Breast and Prostate Cancer and Their Roles",
+      "abstract": "This review covers the diagnostic potential of urinary biomarkers, shedding light on their linkage to cancer progression. Urinary biomarkers offer non-invasive avenues for detecting cancers, potentially bypassing the invasiveness of biopsies. The investigation focuses primarily on breast and prostate cancers due to their prevalence among women and men, respectively. The intricate interplay of urinary proteins is explored, revealing a landscape where proteins exhibit context-dependent behaviors. The review highlights the potential impact of physical activity on urinary proteins, suggesting its influence on tumorigenic behaviors. Exercise-conditioned urine may emerge as a potential diagnostic biomarker source. Furthermore, treatment effects, notably after lumpectomy and prostatectomy, induce shifts in the urinary proteome, indicating therapeutic impacts rather than activating oncogenic signaling. The review suggests further investigations into the double-sided, context-dependent nature of urinary proteins, the potential role of post-translational modifications (PTM), and the integration of non-protein markers like mRNA and metabolites. It also discusses a linkage of urinary proteomes with secretomes from induced tumor-suppressing cells (iTSCs). Despite challenges like cancer heterogeneity and sample variability due to age, diet, and comorbidities, harnessing urinary proteins and proteoforms may hold promise for advancing our understanding of cancer progressions, as well as the ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell adhesion",
+          "tumor progression",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "33507683",
+      "title": "Aberrant Methylation of Tumour Suppressor Gene ADAM12 in Chronic Lympocytic Leukemia Patients: Application of Methylation Specific-PCR Technique",
+      "abstract": "Objective:\n\nChronic Lymphocytic Leukemia (CLL) is a common leukemia among Caucasians but rare in Asians population. We postulated that aberrant methylation either hypermethylation or partial methylation might be one of the silencing mechanisms that inactivates the tumour suppressor genes in CLL. This study aimed to compare the methylation status of tumour suppressor gene, ADAM12, among CLL patients and normal individuals. We also evaluated the association between methylation of ADAM12 and clinical and demographic characteristics of the participants. \n\nMethods:\n\nA total of 25 CLL patients and 25 normal individuals were recruited in this study. The methylation status of ADAM12 was determined using Methylation-Specific PCR (MSP); whereas, DNA sequencing method was applied for validation of the MSP results. \n\nResults:\n\nAmong CLL patients, 12 (48%) were partially methylated and 13 (52%) were unmethylated. Meanwhile, 5 (20%) and 20 (80.6%) of healthy individuals were partially methylated and unmethylated, respectively. There was a statistically significant association between the status of methylation at ADAM12 and the presence of CLL (p=0.037). \n\nConclusion:\n\nThe aberrant methylation of ADAM12 found in this study using MSP assay may provide new exposure to CLL that may improve the gaps involved in genetic epigenetic study in CLL. ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell adhesion",
+          "tumor progression",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "32466129",
+      "title": "Metalloproteinases and Their Inhibitors: Potential for the Development of New Therapeutics",
+      "abstract": "The metalloproteinase (MP) family of zinc-dependent proteases, including matrix metalloproteinases (MMPs), a disintegrin and metalloproteases (ADAMs), and a disintegrin and metalloproteinase with thrombospondin motifs (ADAMTSs) plays a crucial role in the extracellular matrix (ECM) remodeling and degradation activities. A wide range of substrates of the MP family includes ECM components, chemokines, cell receptors, and growth factors. Metalloproteinases activities are tightly regulated by proteolytic activation and inhibition via their natural inhibitors, tissue inhibitors of metalloproteinases (TIMPs), and the imbalance of the activation and inhibition is responsible in progression or inhibition of several diseases, e.g., cancer, neurological disorders, and cardiovascular diseases. We provide an overview of the structure, function, and the multifaceted role of MMPs, ADAMs, and TIMPs in several diseases via their cellular functions such as proteolysis of other cell signaling factors, degradation and remodeling of the ECM, and other essential protease-independent interactions in the ECM. The significance of MP inhibitors targeting specific MMP or ADAMs with high selectivity is also discussed. Recent advances and techniques used in developing novel MP inhibitors and MP responsive drug delivery tools are also reviewed.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell adhesion",
+          "tumor progression",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "31565100",
+      "title": "Adamalysines as Biomarkers and a Potential Target of Therapy in Colorectal Cancer Patients: Preliminary Results",
+      "abstract": "Colorectal cancer is one of the most common cancers in the world. Due to its still undetermined pathogenesis, we are searching for signaling pathways that are important in the development of colorectal cancer. In this article, we present results of study on the role of ADAM proteins in colorectal cancer. The study included 85 adult colorectal cancer patients (48 men, 37 women) and 25 patients in the control group (after diagnostic colonoscopy:without cancer). During hospitalization, a serum sample (3 cm3) was collected from the study and control group, anthropometric measurements were conducted and others clinical data were analyzed. In the serum ADAM10, 12, 17, and 28, protein concentrations were determined and, in the next step, examined the relationship between ADAMs concentrations and selected clinical parameters in both groups. The analysis showed that serum levels of ADAM10 and ADAM28 are significantly higher in patients with colorectal cancer and correlate with histopathological grading and with presence of distant metastases. Moreover, noticed the trend to correlate concentrations of adamalysines with higher BMI score. One of the functions of adamalysines is the activation of growth factors involved in cancer, including IGF and TNFalpha. The increased activity of adamalysines in patients may play a role in the pathogenesis of colorectal cancer. Our study highlights the prevalence of metabolic disorders in the group of patients with diagnosed CRC, and this cancer seems",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell adhesion",
+          "tumor progression",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    },
+    {
+      "pmid": "30442938",
+      "title": "ADAM12 is a circulating marker for stromal activation in pancreatic cancer and predicts response to chemotherapy",
+      "abstract": "Pancreatic ductal adenocarcinoma (PDAC) is characterized by abundant stroma that harbors tumor-promoting properties. No good biomarkers exist to monitor the effect of stromal targeting therapies or to predict response. We set out to identify such non-invasive markers for PDAC stroma and predict response to therapy. Gene expression datasets, co-culture experiments, xenografts, and patient samples were analyzed. Serum samples were measured from a cohort of 58 resected patients, and 87 metastatic or locally advanced PDAC patients. Baseline and follow-up levels were assessed in 372 additional metastatic PDAC patients who received nab-paclitaxel with gemcitabine (n = 184) or gemcitabine monotherapy (n = 188) in the phase III MPACT trial. Increased levels of ADAM12 were found in PDAC patients compared to healthy controls (p < 0.0001, n = 157 and n = 38). High levels of ADAM12 significantly associated with poor outcome in resected PDAC (HR 2.07, p = 0.04). In the MPACT trial survival was significantly longer for patients who received nab-paclitaxel and had undetectable ADAM12 levels before treatment (OS 12.3 m vs 7.9 m p = 0.0046). Consistently undetectable or decreased ADAM12 levels during treatment significantly associated with longer survival as well (OS 14.4 m and 11.2 m, respectively vs 8.3, p = 0.0054). We conclude that ADAM12 is a blood-borne proxy for stromal activation, the levels of which have prognostic significance and correlate with treatment benefit.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ADAM12"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "metalloprotease",
+          "cell adhesion",
+          "tumor progression",
+          "stromal interaction"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "rejected_weak_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "ADAM12-ITGB1": [
+          "no_disease_anchored_evidence"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "no_disease_anchored_evidence"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,635 @@
+{
+  "schema_version": "deep_interpreter_literature_handoff_v1",
+  "policy": {
+    "included_buckets": [
+      "direct_lr_evidence",
+      "receptor_pathway_context_evidence"
+    ],
+    "excluded_buckets": [
+      "disease_only_background",
+      "rejected_weak_evidence"
+    ],
+    "cap": 40
+  },
+  "source": {
+    "total_papers": 30,
+    "unique_papers": 30,
+    "duplicates_dropped": 0,
+    "raw_papers_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0083_cci_full_23_FN1_ITGB1_strong_on/papers_raw.json",
+    "citation_candidates_path": "/Users/jungj2/Dropbox/Metadata/aiagent/DeepMAST/worktrees/literature-search-dynamic-update/docs/benchmarks/lr_retrieval_relevance/results/cci_retrieval_skill_only_qwen_full_thinkfalse_workspaces/trial_0083_cci_full_23_FN1_ITGB1_strong_on/citation_candidates.json"
+  },
+  "counts": {
+    "direct_lr_evidence": 0,
+    "receptor_pathway_context_evidence": 10,
+    "disease_only_background": 18,
+    "rejected_weak_evidence": 2
+  },
+  "papers": [
+    {
+      "pmid": "38455411",
+      "title": "Single-cell analysis reveals one cancer-associated fibroblasts subtype linked to metastasis in breast cancer: MXRA5 as a potential novel marker for prognosis.",
+      "abstract": "Cancer-associated fibroblasts (CAFs) are prevalent in the tumor microenvironment of breast cancer, comprising a group of cell subpopulations with spatial, phenotypic, and functional heterogeneity. Due to the lack of specific markers for CAF subpopulations, their specific mechanisms in breast cancer remain unclear. We identified eight distinct CAF phenotypes in breast cancer using multiple single-cell RNA sequencing datasets and determined distinct transcription factors (TFs) of CAFs through SCENIC analysis. Our study highlights one CAF subtype in breast cancer, FN1+CAF2, associated with metastasis and macrophage polarization. We observed elevated FN1 expression in the stromal tissue of breast cancer patients. Furthermore, FN1 knockdown in CAFs reduced the migration ability of breast cancer cells. We identified a regulatory gene, MXRA5, in CAF2, which may play crucial roles in breast cancer. Our results indicated upregulated MXRA5 expression in breast cancer tissues and CAFs from patients with lymph node metastasis in the following experiment. Overall, our study reveals that the FN1+CAF2 subtype is associated with metastasis and suggests that MXRA5 may be a novel marker mediating the effects of CAF2 on breast cancer metastasis. This study enriches our understanding of CAF heterogeneity and offers new insights for treating breast cancer metastasis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FN1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "FN1",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "FN1",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "FN1-ITGB1": {
+          "ligand": "FN1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "FN1-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "37044238",
+      "title": "A novel computational predictive biological approach distinguishes Integrin beta1 as a salient biomarker for breast cancer chemoresistance.",
+      "abstract": "Chemoresistance is a primary cause of breast cancer treatment failure, and protein-protein interactions significantly contribute to chemoresistance during different stages of breast cancer progression. In pursuit of novel biomarkers and relevant protein-protein interactions occurring during the emergence of breast cancer chemoresistance, we used a computational predictive biological (CPB) approach. CPB identified associations of adhesion molecules with proteins connected with different breast cancer proteins associated with chemoresistance. This approach identified an association of Integrin beta1 (ITGB1) with chemoresistance and breast cancer stem cell markers. ITGB1 activated the Focal Adhesion Kinase (FAK) pathway promoting invasion, migration, and chemoresistance in breast cancer by upregulating Erk phosphorylation. FAK also activated Wnt/Sox2 signaling, which enhanced self-renewal in breast cancer. Activation of the FAK pathway by ITGB1 represents a novel mechanism linked to breast cancer chemoresistance, which may lead to novel therapies capable of blocking breast cancer progression by intervening in ITGB1-regulated signaling pathways.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "FN1",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "FN1",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "FN1-ITGB1": {
+          "ligand": "",
+          "receptor": "ITGB1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "FN1-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "30719702",
+      "title": "beta1 Integrin is essential for fascin-mediated breast cancer stem cell function and disease progression",
+      "abstract": "Breast cancer remains the second cause of tumor-related mortality in women worldwide mainly due to chemoresistance and metastasis. The chemoresistance and metastasis are attributed to a rare subpopulation with enriched stem-like characteristics, thus called Cancer Stem Cells (CSCs). We have previously reported aberrant expression of the actin-bundling protein (fascin) in breast cancer cells, which enhances their chemoresistance, metastasis and enriches CSC population. The intracellular mechanisms that link fascin with its downstream effectors are not fully elucidated. Here, loss and gain of function approaches in two different breast cancer models were used to understand how fascin promotes disease progression. Importantly, findings were aligned with expression data from actual breast cancer patients. Expression profiling of a large breast cancer dataset (TCGA, 530 patients) showed statistically significant correlation between fascin expression and a key adherence molecule, beta1 integrin (ITGB1). In vitro manipulation of fascin expression in breast cancer cells exhibited its direct effect on ITGB1 expression. Fascin-mediated regulation of ITGB1 was critical for several breast cancer cell functions including adhesion to different extracellular matrix, self-renewability and chemoresistance. Importantly, there was a significant relationship between fascin and ITGB1 co-expression and short disease-free as well as overall survival in chemo-treated breast cancer patients. This nov",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "FN1",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "FN1",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "FN1-ITGB1": {
+          "ligand": "",
+          "receptor": "ITGB1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "FN1-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "28829502",
+      "title": "Expression of long non-coding RNA linc-ITGB1 in breast cancer and its influence on prognosis and survival.",
+      "abstract": "OBJECTIVE: Long noncoding RNA linc-ITGB1 (linc-ITGB1) was reported to serve as a tumor promoter in breast cancer (BC). However, the clinical significance of linc-ITGB1 has not been reported. The present study aimed to determine the relationship between linc-ITGB1 expression and clinicopathological features and survival. PATIENTS AND METHODS: qRT-PCR was used to quantify the expression levels of linc-ITGB1 in BC and adjacent non-cancerous breast tissues. The X2 test was performed to determine the associations between linc-ITGB expression and the clinicopathological characters. The overall survival time (OS) and disease-free survival (DFS) were collected by follow-up and analyzed by Kaplan-Meier analysis. Multivariate Cox regression analysis was used to identify the independent risk factors for BC. RESULTS: The results showed that linc-ITGB1 levels were lower in tumor tissues of BC patients in comparison to adjacent non-cancerous breast tissues (p < 0.001). Linc-ITGB1 expression was significantly associated with lymph node metastasis, pathological differentiation and TNM stage (all p < 0.05). Furthermore, Kaplan-Meier analysis demonstrated that high-linc-ITGB1 expression level was associated with poorer OS (p = 0.006) and DFS (p = 0.003). Cox proportional hazards risk analysis demonstrated that linc-ITGB1 was an independent predictor for both OS (p = 0.004) and DFS (p = 0.002) in BC. CONCLUSIONS: These results indicated, for the first time, that linc-ITGB1 be a potential biomar",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "ITGB1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "FN1",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "FN1",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "FN1-ITGB1": {
+          "ligand": "",
+          "receptor": "ITGB1",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "FN1-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "39617209",
+      "title": "Curcumin alleviates the aggressiveness of breast cancer through inhibiting cell adhesion mediated by TEAD4-fibronectin axis.",
+      "abstract": "Breast cancer (BC) ranks first among women in the world and metastasis is the main reason of cancer death. TEA domain transcription factor 4 (TEAD4) plays an important role in TEAD family members in the Hippo signaling pathway, and its pro-cancer effect is gradually being discovered, but little is known about the mechanism of TEAD4 regulating tumor adhesion and metastasis. Curcumin is an active polyphenol compound with anti-inflammatory and anti-tumor properties. However, its effects and the underlying mechanisms on BC metastasis remain unknown. Here, we show that curcumin reduced the abilities of migration and invasion of BC cells as well as lung metastasis of BC in nude mice by TEAD4 induced. TEAD4 could regulate the transcription level of adhesion molecule Fibronectin (FN1), which is an important component of extracellular matrix participating in tumor cell adhesion and migration processes, and the binding of TEAD4 to the FN1 promoter was suppressed by curcumin. Furthermore, the metastatic mobility was significantly reduced in FN1 knockout BC cells, and FN1 knockout can reverse metastatic potential of TEAD4 overexpressed cells. Our work demonstrates that TEAD4 could promote cell adhesion and migration by binding with FN1 promoter and suggested that TEAD4-FN1 axis in tumor microenvironment is expected to become a potential target for alleviating metastasis of BC of curcumin. Abbreviations: Breast cancer (BC); Bicinchoninic acid (BCA); Bovine Serum Albumin (BSA); Curcumin at",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FN1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "fibronectin",
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "FN1",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "FN1",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "FN1-ITGB1": {
+          "ligand": "FN1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "FN1-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "36035176",
+      "title": "FN1 overexpression is correlated with unfavorable prognosis and immune infiltrates in breast cancer",
+      "abstract": " Objective: To investigate the correlation of fibronectin 1 (FN1) expression with prognosis and tumor-infiltrating immune cells in breast cancer (BRCA).\n\n Methods: FN1 mRNA and protein expressions were analyzed through Tumor Immune Estimation Resource (TIMER), Gene Set Cancer Analysis (GSCA), Human Protein Atlas (HPA) databases, and immunohistochemical analysis. The clinicopathological characteristics and genetic factors affecting the FN1 mRNA expression were assessed by various public databases. Then, we analyzed the prognostic value of FN1 in BRCA by Kaplan-Meier plotter, receiver operating characteristic, and Cox regression analyses. Further, the UCSC Xena database was used to retrieve TCGA-BRCA expression profiles for functional enrichment analysis and immune cell infiltration analysis. The potential drugs for the BRCA patients with high- FN1 expression were identified using the connectivity map analysis.\n\n Results: FN1 was upregulated in BRCA tissues compared with normal tissues. High FN1 mRNA expression was correlated with poor clinical outcomes and had good performance in predicting the survival status of BRCA patients. Further, Cox regression analysis showed that FN1 was an independent prognostic factor for predicting the overall survival of patients with BRCA. Moreover, hypermethylation of FN1 contributed to a better prognosis for BRCA patients. Functional enrichment analyses revealed the ECM-receptor interaction pathway and focal adhesion as the common pathways. Mor",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FN1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "fibronectin",
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [
+        {
+          "ligand": "FN1",
+          "receptor": "ITGB1"
+        }
+      ],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [
+        {
+          "ligand": "FN1",
+          "receptor": "ITGB1"
+        }
+      ],
+      "matched_terms_by_pair": {
+        "FN1-ITGB1": {
+          "ligand": "FN1",
+          "receptor": "",
+          "disease": [
+            "breast cancer"
+          ],
+          "pathways": [],
+          "celltypes": []
+        }
+      },
+      "bucket_reasons_by_pair": {
+        "FN1-ITGB1": [
+          "disease_context_with_partial_lr_or_modifier"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": []
+      },
+      "global_bucket_reasons": [
+        "disease_context_only"
+      ]
+    },
+    {
+      "pmid": "40851994",
+      "title": "Hypoxia-driven angiogenesis in breast cancer mechanisms and therapeutic targets: a narrative review",
+      "abstract": "Breast cancer remains a significant global health challenge, with hypoxia playing a crucial role in its progression. Hypoxia, defined as reduced oxygen availability, is a hallmark of solid tumors and particularly influences the tumor microenvironment in breast cancer. Under hypoxic conditions, tumors activate a variety of molecular responses that promote survival, including the stabilization of hypoxia-inducible factors (HIFs). These transcription factors regulate the expression of pro-angiogenic genes, such as vascular endothelial growth factor (VEGF), which drive angiogenesis and support tumor growth. However, the vasculature formed under hypoxic conditions is often dysfunctional, contributing to tumor progression, metastasis, and resistance to therapies. This review explores the mechanisms by which hypoxia drives angiogenesis in breast cancer, emphasizing the roles of HIFs, VEGF signaling, and metabolic reprogramming. Angiogenesis, a critical process for tumor survival and growth, is primarily mediated by the induction of VEGF under hypoxic conditions. VEGF acts on endothelial cells to promote blood vessel formation, ensuring the tumor receives sufficient oxygen and nutrients. However, the vessels formed are typically leaky and inefficient, exacerbating the hypoxic environment and perpetuating a cycle of tumor progression. The metabolic reprogramming that occurs in hypoxic tumor cells, such as the shift toward glycolysis (the Warburg effect), also plays a pivotal role in s",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "hypoxia",
+          "hypoxic microenvironment",
+          "HIF-1alpha",
+          "oxygen deprivation",
+          "angiogenesis"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "FN1-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [
+          "Hypoxia"
+        ],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "39937011",
+      "title": "Three-Dimensional Models: Biomimetic Tools That Recapitulate Breast Tissue Architecture and Microenvironment to Study Ductal Carcinoma In Situ Transition to Invasive Ductal Breast Cancer",
+      "abstract": "Diagnosis of ductal carcinoma in situ (DCIS) presents a challenge as we cannot yet distinguish between those lesions that remain dormant from cases that may progress to invasive ductal breast cancer (IDC) and require therapeutic intervention. Our overall interest is to develop biomimetic three-dimensional (3D) models that more accurately recapitulate the structure and characteristics of pre-invasive breast cancer in order to study the underlying mechanisms driving malignant progression. These models allow us to mimic the microenvironment to investigate many aspects of mammary cell biology, including the role of the extracellular matrix (ECM), the interaction between carcinoma-associated fibroblasts (CAFs) and epithelial cells, and the dynamics of cytoskeletal reorganization. In this review article, we outline the significance of 3D culture models as reliable pre-clinical tools that mimic the in vivo tumor microenvironment and facilitate the study of DCIS lesions as they progress to invasive breast cancer. We also discuss the role of CAFs and other stromal cells in DCIS transition as well as the clinical significance of emerging technologies like tumor-on-chip and co-culture models.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "DCIS",
+          "ductal carcinoma in situ",
+          "invasive carcinoma",
+          "tumor progression",
+          "histological subtypes"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "FN1-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "32880442",
+      "title": "Three-Dimensional Human Liver-Chip Emulating Premetastatic Niche Formation by Breast Cancer-Derived Extracellular Vesicles.",
+      "abstract": "The liver is one of the most common sites of breast cancer metastasis and is associated with high lethality. Although the interaction between tumor cells and their microenvironment at metastatic sites has been recognized as a key regulator of tumor progression, the underlying mechanism is not fully elucidated. Here, we describe a three-dimensional (3D) microfluidic human liver-on-a-chip (liver-chip) that emulates the formation of a premetastatic niche to investigate the roles of breast cancer-derived extracellular vesicles (EVs) in liver metastasis. We demonstrate that breast cancer-derived EVs activate liver sinusoidal endothelial cells (LSECs) in the liver-chip, inducing endothelial to mesenchymal transition and destruction of vessel barriers. In addition, we show that transforming growth factor beta1 (TGFbeta1) in breast cancer-derived EVs upregulates fibronectin, an adhesive extracellular matrix protein, on LSECs, which facilitates the adhesion of breast cancer cells to the liver microenvironment. Furthermore, we observed that EVs isolated from triple-negative breast cancer (TNBC) patients with liver metastasis contain higher TGFbeta1 levels and induce adhesion of more breast cancer cells to the 3D human liver-chip than do EVs isolated from healthy donors or nonmetastatic TNBC patients. These findings provide a better understanding of the mechanisms through which breast cancer-derived EVs guide secondary metastasis to the liver. Furthermore, the 3D human liver-chip descri",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FN1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "fibronectin",
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "FN1-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Endothelial"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    },
+    {
+      "pmid": "32429591",
+      "title": "The Dynamic Relationship of Breast Cancer Cells and Fibroblasts in Fibronectin Accumulation at Primary and Metastatic Tumor Sites",
+      "abstract": "In breast cancer (BC), tissue stiffening via fibronectin (FN) and collagen accumulation is associated with advanced disease progression at both the primary tumor and metastatic sites. Here, we evaluate FN production in 15 BC cell lines, representing a variety of subtypes, phenotypes, metastatic potentials, and chemotherapeutic sensitivities. We demonstrate that intracellular and soluble FN is initially lost during tumorigenic transformation but is rescued in all lines with epithelial-mesenchymal plasticity (EMP). Importantly, we establish that no BC cell line was able to independently organize a robust FN matrix. Non-transformed mammary epithelial cells were also unable to deposit FN matrices unless transglutaminase 2, a FN crosslinking enzyme, was overexpressed. Instead, BC cells manipulated the FN matrix production of fibroblasts in a phenotypic-dependent manner. In addition, varied accumulation levels were seen depending if the fibroblasts were conditioned to model paracrine signaling or endocrine signaling of the metastatic niche. In the former, fibroblasts conditioned by BC cultures with high EMP resulted in the largest FN matrix accumulation. In contrast, mesenchymal BC cells produced extracellular vesicles (EV) that resulted in the highest levels of matrix formation by conditioned fibroblasts. Overall, we demonstrate a dynamic relationship between tumor and stromal cells within the tumor microenvironment, in which the levels and fibrillarization of FN in the extracellu",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "FN1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "fibronectin",
+          "extracellular matrix",
+          "cell adhesion",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene",
+      "evidence_bucket": "receptor_pathway_context_evidence",
+      "supported_lr_pairs": [],
+      "direct_lr_pairs": [],
+      "context_lr_pairs": [],
+      "matched_terms_by_pair": {},
+      "bucket_reasons_by_pair": {
+        "FN1-ITGB1": [
+          "disease_context_only"
+        ]
+      },
+      "global_matched_terms": {
+        "ligand": "",
+        "receptor": "",
+        "disease": [
+          "breast cancer"
+        ],
+        "pathways": [],
+        "celltypes": [
+          "Stromal"
+        ]
+      },
+      "global_bucket_reasons": [
+        "disease_context_with_partial_lr_or_modifier"
+      ]
+    }
+  ],
+  "search_method": "search_literature_dynamic",
+  "coverage": {
+    "genes_covered": [
+      "FN1",
+      "ITGB1"
+    ],
+    "genes_matched_by": {
+      "FN1": "biomcp_tag_only",
+      "ITGB1": "biomcp_tag_only"
+    },
+    "pathways_covered": [
+      "Hypoxia"
+    ],
+    "pathways_matched_by": {
+      "Hypoxia": "biomcp_tag+text_confirmed"
+    },
+    "celltypes_covered": [
+      "Macrophages 1",
+      "Macrophages 2",
+      "Endothelial",
+      "DCIS 1",
+      "Stromal"
+    ],
+    "total_papers": 30,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 100.0,
+    "celltypes_coverage_pct": 55.55555555555556,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Invasive Tumor",
+      "Perivascular-Like",
+      "Prolif Invasive Tumor",
+      "Stromal & T Cell Hybrid"
+    ]
+  }
+}

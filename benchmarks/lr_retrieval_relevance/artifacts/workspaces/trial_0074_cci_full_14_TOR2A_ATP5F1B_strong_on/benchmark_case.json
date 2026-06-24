@@ -1,0 +1,78 @@
+{
+  "case_id": "cci_full_14_TOR2A_ATP5F1B",
+  "category": "medium_morans_known",
+  "lr_pair": "TOR2A-ATP5F1B",
+  "genes": [
+    "TOR2A",
+    "ATP5F1B"
+  ],
+  "pathways": [
+    "NFkB",
+    "TNFa"
+  ],
+  "celltypes": [
+    "Endothelial",
+    "Macrophages 2",
+    "Stromal",
+    "Stromal & T Cell Hybrid"
+  ],
+  "disease": "breast cancer",
+  "search_context": {
+    "genes": [
+      "TOR2A",
+      "ATP5F1B"
+    ],
+    "pathways": [
+      "NFkB",
+      "TNFa"
+    ],
+    "celltypes": [
+      "Endothelial",
+      "Macrophages 2",
+      "Stromal",
+      "Stromal & T Cell Hybrid"
+    ],
+    "disease": "breast cancer",
+    "lr_pair": "TOR2A-ATP5F1B",
+    "category": "medium_morans_known"
+  },
+  "raw_case": {
+    "case_id": "cci_full_14_TOR2A_ATP5F1B",
+    "benchmark_type": "cci_interpretation_v2",
+    "lr_pair": "TOR2A-ATP5F1B",
+    "category": "medium_morans_known",
+    "input_bundle": {
+      "ligand": "TOR2A",
+      "receptor": "ATP5F1B",
+      "interaction": "TOR2A^ATP5F1B",
+      "morans_r": 0.064729,
+      "morans_pval": 0.0,
+      "ligand_means": 0.1216,
+      "ligand_props": 0.2901,
+      "receptor_means": 1.0323,
+      "receptor_props": 0.7704,
+      "factor1": 0.6136,
+      "factor2": 0.3234,
+      "factor3": 0.7476,
+      "pathway_associations": [
+        "NFkB",
+        "TNFa"
+      ],
+      "disease_associations": [],
+      "ligand_cell_types": [
+        "Macrophages 2",
+        "Stromal"
+      ],
+      "receptor_cell_types": [
+        "Endothelial",
+        "Macrophages 2",
+        "Stromal",
+        "Stromal & T Cell Hybrid"
+      ],
+      "mean_interest": 0.524967,
+      "pval_interest": 1.8337354967812303e-09,
+      "pval_interest_adj": 1.5802191768225263e-08,
+      "tissue_context": "Breast cancer Visium spatial transcriptomics"
+    }
+  }
+}

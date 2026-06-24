@@ -1,0 +1,1905 @@
+{
+  "papers": [
+    {
+      "pmid": "41269758",
+      "title": "Spatial transcriptomics reveals immune-stromal crosstalk within the synovium of patients with juvenile idiopathic arthritis",
+      "abstract": "Juvenile idiopathic arthritis (JIA) is the most prevalent chronic inflammatory arthritis of childhood, yet the spatial organization in the synovium remains poorly understood. Here, we perform subcellular-resolution spatial transcriptomic profiling of synovial tissue from patients with active JIA. We identify diverse immune and stromal cell populations and reconstruct spatially defined cellular niches. Applying a newly developed spatial colocalization analysis pipeline, we uncover microanatomical structures, including endothelial-fibroblast interactions mediated by NOTCH signaling, and a CXCL9/CXCR3 signaling axis between inflammatory macrophages and CD8+ T cells, alongside the characterization of other resident macrophage subsets. We also detect and characterize tertiary lymphoid structures marked by CXCL13/CXCR5 and CCL19-mediated signaling from Tph cells and immunoregulatory DCs, analogous to those observed in other autoimmune diseases. Finally, comparative analysis with rheumatoid arthritis reveals JIA-enriched cell states, including NOTCH3+ and CXCL12+ sublining fibroblasts, suggesting potentially differential inflammatory programs in pediatric versus adult arthritis. These findings provide a spatially resolved molecular framework of JIA synovitis and introduce a generalizable computational pipeline for spatial colocalization analysis in tissue inflammation.\n\nSpatial transcriptomics reveals immune-stromal niches and disease-specific interactions in juvenile idiopathic art",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "angiogenesis",
+          "vascular remodeling",
+          "endothelial activation",
+          "perivascular niche"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36539520",
+      "title": "JAG1 is associated with the prognosis and metastasis in breast cancer",
+      "abstract": "Jagged canonical Notch ligand 1 (JAG1) regulates the progression of many cancers by the Notch signaling pathway, but its role in breast cancer (BC) remains unclear. In this research, JAG1 protein expression in BC tissues was detected by immunohistochemistry. The association between JAG1 and clinical significance was analyzed. The effect of JAG1 on malignant behaviors of BC cells was demonstrated by in vitro experiments. JAG1 expression in BC tissues was higher than that in para-carcinoma tissues. High JAG1 expression was significantly linked to advanced lymph node metastasis, distant metastasis, and the TNM stage. JAG1 was an independent prognostic factor for BC patients. JAG1 knockdown inhibited the proliferation, motility, migration, and invasion of BC cells, and weakened adhesion and penetration abilities to the blood-brain barrier, whereas JAG1 overexpression had the opposite effects. JAG1 has the potential to be a prognostic marker and therapeutic target for BC patients.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32111499",
+      "title": "Highly Expressed DLL4 and JAG1: Their Role in Incidence of Breast Cancer Metastasis.",
+      "abstract": "BACKGROUND: The role of Notch signaling dysregulation in causing metastatic breast cancer is not yet elucidated, therefore, this study aimed to investigate the expression of DLL4 and JAG1 in metastatic breast cancer. Moreover, we examined the possible association between clinicopathological features and studied parameters. DESIGN AND METHODS: A total of 90 patients with invasive ductal breast carcinomas (52 non-metastatic and 38 metastatic) were enrolled in the current study. Furthermore, there were 42 patients with benign breast diseases. The mRNA and protein expression of DLL4 and JAG1 were analyzed by RT-PCR and ELISA, respectively in breast cell lysates. RESULTS: The mRNA and protein expression of DLL4 and JAG1 were obviously higher in patients with breast cancer compared to patients with benign breast diseases and in metastatic versus non-metastatic breast cancer. A significant positive correlation was declared between DLL4 and JAG1 at both mRNA and protein levels in metastatic and localized breast cancer patients. Highly expressed mRNA and protein of DLL4 and JAG1 were associated with late tumor stages; moreover, upregulation of mRNA and protein of JAG1 was correlated with poorly differentiated tumors. CONCLUSION: Our data emphasize that overexpression of DLL4 and JAG1 could predict the development of distant metastasis in breast cancer patients.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "30576770",
+      "title": "Wenshen Zhuanggu formula mitigates breast cancer bone metastasis through the signaling crosstalk among the Jagged1/Notch, TGF-beta and IL-6 signaling pathways.",
+      "abstract": "ETHNOPHARMACOLOGICAL RELEVANCE: Advanced breast cancer frequently metastasizes to the bone, resulting in patient morbidity and mortality. The interaction of tumor cells with osteoclasts and osteoblasts seriously affects the occurrence and development of bone metastasis in breast cancer. The signaling crosstalk among the Jagged1/Notch, TGF-beta and IL-6 signaling pathways plays a significant role in the context of bone metastasis. AIM OF THE STUDY: Although Wenshen Zhuanggu (WSZG) formula efficiently decreased the risk of bone metastases in tumor-bearing mice, it remains unclear how WSZG formula regulates the interaction of cancer cells with osteoclasts and osteoblasts in bone metastasis of breast cancer. MATERIALS AND METHODS: In this study, we investigated the role of WSZG formula in the progress of bone metastasis in breast cancer and focused on the cell-cell interactions of tumor cells with osteoclasts and osteoblasts. Western blotting and quantitative real-time PCR were utilized to evaluate the inhibitory activities of WSZG formula on Jagged1 expression both in vivo and in vitro. Osteoblast co-culture and osteoclastogenesis co-culture were applied to analyze the effects of WSZG formula on the interaction of tumor cells with osteoclasts and osteoblasts. A breast cancer xenograft model was also used to test the inhibitory effects of WSZG formula on bone metastasis in breast cancer. RESULTS: WSZG formula decreased Jagged1 expression in osteolytic lesions in the breast cancer",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26269752",
+      "title": "Quantitative DNA hypomethylation of ligand Jagged1 and receptor Notch1 signifies occurrence and progression of breast carcinoma.",
+      "abstract": "Methylation alterations of Jagged1 and Notch1 genes have been reported in non-tumor lesions and a few cancers. However, methylation profiles of Jagged1 promoter and Notch1 exon25 in breast cancer and matched normal tissue and the association of methylation with clinicopathological characteristics still remain unclear. To explore the potential effects of aberrant DNA methylation of Jagged1 and Notch1 on occurrence and progression of breast cancer, we detected the quantitative DNA methylation of Jagged1 and Notch1 in 73 breast cancer (BC) and 20 adjacent normal breast tissues (ANBT) by using MassARRAY spectrometry. The methylation level of overall and majority individual CpG sites of the two genes were synergistically significantly lower in BC than in ANBT. The overall hypomethylation of the two genes, particularly of Jagged1 CpG_8.9.10 and Notch1 CpG_14.15.16 in primary tumors, were markedly associated with lymph node metastasis, advanced stage and high grade. The protein expressions of the both genes were examined by immunohistochemical staining in same cohorts. The expression was significantly inverse correlation with methylation. The two proteins in primary tumor were synergistically up-regulated and dramatically related to lymph node metastasis, advanced stage and high grade. Our findings suggest that the synergetic hypomethylation of Jagged1 and Notch1 genes, especially of Jagged1 CpG_8.9.10 and Notch1 CpG_14.15.16, may involve tumorigenesis and development of breast canc",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "26175933",
+      "title": "Quantitative DNA hypomethylation of ligand Jagged1 and receptor Notch1 signifies occurrence and progression of breast carcinoma.",
+      "abstract": "Methylation alterations of Jagged1 and Notch1 genes have been reported in non-tumor lesions and a few cancers. However, methylation profiles of Jagged1 promoter and Notch1 exon25 in breast cancer and matched normal tissue and the association of methylation with clinicopathological characteristics still remain unclear. To explore the potential effects of aberrant DNA methylation of Jagged1 and Notch1 on occurrence and progression of breast cancer, we detected the quantitative DNA methylation of Jagged1 and Notch1 in 73 breast cancer (BC) and 20 adjacent normal breast tissues (ANBT) by using MassARRAY spectrometry. The methylation level of overall and majority individual CpG sites of the two genes were synergistically significantly lower in BC than in ANBT. The overall hypomethylation of the two genes, particularly of Jagged1 CpG_8.9.10 and Notch1 CpG_14.15.16 in primary tumors, were markedly associated with lymph node metastasis, advanced stage and high grade. The protein expressions of the both genes were examined by immunohistochemical staining in same cohorts. The expression was significantly inverse correlation with methylation. The two proteins in primary tumor were synergistically up-regulated and dramatically related to lymph node metastasis, advanced stage and high grade. Our findings suggest that the synergetic hypomethylation of Jagged1 and Notch1 genes, especially of Jagged1 CpG_8.9.10 and Notch1 CpG_14.15.16, may involve tumorigenesis and development of breast canc",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "22618231",
+      "title": "Regulatory interplay between miR-21, JAG1 and 17beta-estradiol (E2) in breast cancer cells.",
+      "abstract": "Overexpression of the oncomir miR-21 is associated with many cancers, including breast cancer. Elevated levels of Jagged-1 (JAG1), a predicted miR-21 target, are implicated in estrogen receptor negative (ER-) breast cancer. We demonstrate (by ablation of the miR-21 binding site in the JAG1 3'UTR) that miR-21 directly targets and represses JAG1 levels in MCF-7 (ER+) breast cancer cells. MiR-21 targeting of JAG1 in MDA-MB-231 (ER-) breast cancer cells is dependent on miR-21 dosage (levels). In both cell lines, miR-21 and JAG1 expression levels were negatively correlated due to their regulatory relationship. In addition, 17beta-estradiol (E2) increases JAG1 levels by limiting (via downregulating miR-21 levels) the repressive effects of miR-21 on the JAG1 3'UTR. Our results reveal a regulatory interplay between miR-21, JAG1 and E2 that is important for advancing understanding of how the oncogenic potential of miR-21 and JAG1 manifests in different sub-types of breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21199807",
+      "title": "Plasminogen activator uPA is a direct transcriptional target of the JAG1-Notch receptor signaling pathway in breast cancer.",
+      "abstract": "Aberrant activation of the Notch receptor signaling pathway and overexpression of the Notch ligand JAG1 are associated with poor outcome in breast cancer. The plasminogen activator system, which includes urokinase-type plasminogen activator (uPA), has been validated as a marker of recurrence, high metastasis risk and death in breast malignancy. By using microarray profiling of breast cancer cell lines that had undergone siRNA-mediated abrogation of Notch signaling we uncovered a link between activated Notch signaling and uPA expression. An association between elevated expression of the Notch ligand JAG1, uPA, and the basal-like breast cancer subtype was confirmed in breast cancer cell lines. The association between JAG1 and uPA expression persisted in a survey of primary carcinomas of the breast. We found that Notch knockdown reduced transcription of uPA and phenocopied uPA knockdown in breast cancer cells. Through mutational analysis we identified a CBF-1 binding site in the uPA promoter that is required for direct transcriptional regulation by Notch. These data suggest that JAG1-induced Notch activation results in breast cancer progression through upregulation of the plasminogen activator system, directly linking these 2 important pathways of poor prognosis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "19915977",
+      "title": "Cyclin D1 is a direct target of JAG1-mediated Notch signaling in breast cancer.",
+      "abstract": "The Notch ligand, JAG1 is associated with breast cancer recurrence. Herein, we report on a genomics approach to elucidate mechanisms downstream of JAG1 that promote breast cancer growth. In a survey of 46 breast cancer cell lines, we found that triple negative (TN; basal and mesenchymal ER-, PR-, and Her2-negative) lines express JAG1 at significantly higher levels than do HER2(+) or luminal (ER(+)) Her2(-) cell lines. In contrast to the luminal lines tested (T47D and MCF7), TN breast cancer cell lines (HCC1143 and MDA MB231) display high-level JAG1 expression and growth inhibition with RNA interference-induced JAG1 down-regulation. We used microarray profiling of TN tumor cells transfected with JAG1 siRNA to identify JAG1-regulated genes (P <or= 0.005; fold change >or=1.5). Among JAG1-regulated genes identified, cyclin D1 was found to be a direct target of NOTCH1 and NOTCH3. We show that JAG1 down-regulation reduces direct binding of Notch to the cyclin D1 promoter, reduced cyclin D1 expression and inhibition of cell cycle progression through the cyclin D1-dependant G1/S checkpoint. Furthermore, we show that cyclin D1 and JAG1 expression correlate in TN breast cancer expression datasets. These data suggest a model whereby JAG1 promotes cyclin D1-mediated proliferation of TN breast cancers.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "17990101",
+      "title": "JAG1 expression is associated with a basal phenotype and recurrence in lymph node-negative breast cancer.",
+      "abstract": "Expression of the JAG1 Notch ligand has previously been shown to correlate with poor overall survival in women with advanced breast cancer. We undertook to test whether expression of JAG1 is associated with reduced disease free survival (DFS) in 887 samples from a prospectively accrued LNN cohort with a median follow-up greater than 8 years. Moderate to high JAG1 mRNA expression was associated with reduced DFS in univariate analysis (hazard ratio of 1.58; 95% confidence interval, 1.03-2.40; P = 0.034) and correlated with large tumor size, ER and PgR negativity, high tumor grade, and p53 antibody reactivity. Although elevated risk of reduced DFS in patients with high JAG1 mRNA did not persist with adjustment for other prognostic factors, it did in combination with HER2. JAG1 mRNA was positively associated with expression of basal breast cancer markers, however, in contrast to the finding that basal gene expression is most strongly associated with reduced DFS in the first 36 months of follow-up, JAG1 mRNA expression was associated with reduced DFS through the full follow-up period. Also, tumors expressing high levels of both mRNA and protein showed reduced DFS as compared to all other groups in univariate analysis (hazard ratio of 1.73; 95% confidence interval, 1.09-2.74; P = 0.020). Thus, JAG1 expression is associated with poor DFS in LNN breast cancer. As JAG1 is a target of several oncogenic signaling pathways, and is a ligand for Notch, these data provide novel insights int",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "17974275",
+      "title": "[Notch signaling in human breast cancer].",
+      "abstract": "OBJECTIVE: To explore the role of Notch signaling in human breast cancers, the expression of Notch1 and its ligand JAG1 in human breast cancers and their relationships with clinical stages of breast cancers were analyzed. METHODS: RT-PCR was used to detect the expression of Notch1 and JAG1 in 62 breast cancer specimens and 22 normal breast tissues at the margin of tumor sections, and the statistical difference of expression rates and standardized coefficient between the two groups were analyzed. To compare the expression intensity of Notch1 and JAG1 at different development stages of the illness and at different stages with or without axillary node metastasis. RESULTS: The expression rate and standardized coefficient of Notch1 in human breast cancers were significantly higher than those of normal breast tissues at the margin of tumor sections. The expression rate of JAG1 in human breast cancers was 15%, while JAG1 was not detected in normal breast tissues at the margin of tumor sections. The standardized coefficient of Notch1 in cases with axillary node metastasis was significantly higher than that in cases without axillary node metastasis. The standardized coefficient of Notch1 at stage I was significantly lower than that at stage II, and stage II was significantly higher than stage III. There was no statistically significant difference between stage I and stage III. CONCLUSION: Notch1 and JAG1 are highly expressed in human breast cancers, indicating that the aberrant expres",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 0,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38164285",
+      "title": "NOTCH3 inhibits transcription factor ZEB1 expression and metastasis of breast cancer cells via transcriptionally upregulating miR-223",
+      "abstract": "Background: NOTCH receptor 3 (NOTCH3) and zinc finger E-box binding protein 1 (ZEB1) play important roles in breast cancer respectively. NOTCH3 maintains the luminal phenotype and inhibits epithelial-mesenchymal transition (EMT) in breast cancer, while ZEB1 and NOTCH3 have the opposite effects.\n\nMethods: Public databases were used to predict the expression of NOTCH3 and ZEB1 in breast cancer cell lines. The regulatory effect of NOTCH3 on ZEB1 expression was verified by western blot and RT-PCR. MiRNAs regulating ZEB1 expression were identified by using multiple databases and confirmed by reporter gene experiments. Cellular function experiments were conducted to evaluate the role of NOTCH3/miR-223/ZEB1 in the proliferation and invasion of triple-negative breast cancer (TNBC).\n\nResults: NOTCH3 and ZEB1 have opposite expression pattern in MCF-7 cells that over-express LncATB or were incubated in TGF-beta to induce EMT. Western blotting and RT-PCR showed that NOTCH3 could regulate expression of ZEB1. MiR-223 inhibited the proliferation and invasion of breast cancer cells via down-regulating the expression of ZEB1. NOTCH3 inhibited the proliferation and invasion of breast cancer cells via up-regulating the expression of miR-223. Clinically, high expression of NOTCH3, miR-223 or low expression of ZEB1 were related to good prognosis of breast cancer patients.\n\nConclusion: The current study reports a novel NOTCH3/miR-223/ZEB1 axis, which can inhibit the proliferation and invasion of b",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38124049",
+      "title": "Notch3 restricts metastasis of breast cancers through regulation of the JAK/STAT5A signaling pathway",
+      "abstract": "Purpose\n\nTo explore the potential role of signal transducer and activator of transcription 5A (STAT5A) in the metastasis of breast cancer, and its mechanism of regulation underlying.\n\nMethods and results\n\nTCGA datasets were used to evaluate the expression of STAT5A in normal and different cancerous tissues through TIMER2.0, indicating that STAT5A level was decreased in breast cancer tissues compared with normal ones. Gene Set Enrichment Analysis predicted that STAT5A was associated with the activation of immune cells and cell cycle process. We further demonstrated that the infiltration of immune cells was positively associated with STAT5A level. Influorescence staining revealed the expression and distribution of F-actin was regulated by STAT5A, while colony formation assay, wound healing and transwell assays predicted the inhibitory role of STAT5A in the colony formation, migratory and invasive abilities in breast cancer cells. In addition, overexpression of the Notch3 intracellular domain (N3ICD), the active form of Notch3, resulted in the increased expression of STAT5A. Conversely, silencing of Notch3 expression by siNotch3 decreased STAT5A expression, supporting that STAT5A expression is positively associated with Notch3 in human breast cancer cell lines and breast cancer tissues. Mechanistically, chromatin immunoprecipitation showed that Notch3 was directly bound to the STAT5A promoter and induced the expression of STAT5A. Moreover, overexpressing STAT5A partially reverse",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36854682",
+      "title": "Notch3 regulates Mybl2 via HeyL to limit proliferation and tumor initiation in breast cancer",
+      "abstract": "Notch signaling is a conserved signaling pathway that participates in many aspects of mammary gland development and homeostasis, and has extensively been associated with breast tumorigenesis. Here, to unravel the as yet debated role of Notch3 in breast cancer development, we investigated its expression in human breast cancer samples and effects of its loss in mice. Notch3 expression was very weak in breast cancer cells and was associated with good patient prognosis. Interestingly, its expression was very strong in stromal cells of these patients, though this had no prognostic value. Mechanistically, we demonstrated that Notch3 prevents tumor initiation via HeyL-mediated inhibition of Mybl2, an important regulator of cell cycle. In the mammary glands of Notch3-deficient mice, we observed accelerated tumor initiation and proliferation in a MMTV-Neu model. Notch3-null tumors were enriched in Mybl2 mRNA signature and protein expression. Hence, our study reinforces the anti-tumoral role of Notch3 in breast tumorigenesis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36740988",
+      "title": "Expressions and Prognostic Values of Notch3 and DLL4 in Human Breast Cancer",
+      "abstract": "Background: Notch signaling played a critical role in promoting breast tumorigenesis and progression. However, the role and prognostic value of Notch3 combined with DLL4 expression in breast carcinoma had not been explored. Methods: The retrospective study enrolled 90 breast cancer tissues and 60 noncancerous tissues from (conceal). The expression and prognostic value of Notch3 and DLL4 in patients with breast carcinoma were investigated using Oncomine and UALCAN database. Notch3 and DLL4 expression levels were detected by quantitative real-time polymerase chain reaction, western blotting, and immunohistochemistry. We analyzed the correlation between both proteins expression and clinicopathological parameters and survival data, respectively. Results: The expressions of Notch3 and DLL4 were increased, and Notch3 expression was significantly positively associated with DLL4 in breast carcinoma. The 2 proteins dramatically correlated with advanced stage, high grade and negative Her2 status. The overexpressing of single or both Notch3 and DLL4 resulted in shortened survival of breast cancer patients. And Notch3 overexpression was one of independent risk predictors to poor prognosis. Conclusion: The interaction of Notch3 receptor and DLL4 ligand accelerates oncogenesis, progression, and poor prognosis of breast cancer patients. Notch3 protein may serve as one of biomarker to independently predict prognosis of patients.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "35508283",
+      "title": "NOTCH expression variability and relapse of breast cancer in high-risk groups.",
+      "abstract": "BACKGROUND: In regards to breast cancer (BC), survival or disease-free periods are still compromised mainly in Triple Negative (TN) and HER2 tumors. The participation of estrogen receptor (ER) has been reported as crucial in the signaling pathways, including the NOTCH pathway. The study was aimed to evaluate the expression of NOTCH1 and NOTCH3 in BC and its relationship with the presence of ER, as well as with relapses. METHODS: NOTCH1 and NOTCH3 expression was evaluated in BC using Oncomine database, Breast Cancer Gene Expression Miner database and Kaplan Meier Plotter. Subsequently, detection of NOTCH1 and NOTCH3 in 100 paraffin-embedded BC samples from Mexican patients was achieved by immunohistochemistry (IHC) and RT-qPCR, a group of benign breast tumors were included as controls. Relapses were evaluated by BC subtypes and their relationship with NOTCH1 and NOTCH3 expression, as well as with ER expression. RESULTS: The analyses from public databases of TN and HER2 groups, which are estrogen receptor-negative (ERN), revealed NOTCH1 and NOTCH3 expression variability. The overexpression was associated with lower relapse-free survival (P = 0.00019). These data were concordant with results from tumor samples of patients included in this study, which showed overexpression of NOTCH1 and NOTCH3 in ERN tumors, as well as lower relapse-free survival (P < 0.0001). CONCLUSIONS: NOTCH1 and NOTCH3 were found to be overexpressed mainly in ERN tumors. HER2 and TN groups, are related to h",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36139447",
+      "title": "Notch3 Transactivates Glycogen Synthase Kinase-3-Beta and Inhibits Epithelial-to-Mesenchymal Transition in Breast Cancer Cells",
+      "abstract": "As a critical transformational process in the attributes of epithelial cells, epithelial-to-mesenchymal transition (EMT) is involved in tumor invasion, metastasis, and resistance to treatment, which contributes to the ultimate death of some patients with breast cancer. Glycogen synthase kinase-3-beta (GSK3beta) is thought to be an EMT suppressor that down-regulates the protein, snail, a zinc finger transcription inhibitor, and regulates E-cadherin expression and the Wnt signaling pathway. Our previous studies have shown that Notch3 also inhibits EMT in breast cancer. In mammary gland cells, GSK3beta physically bound and phosphorylated the intracellular domain of two Notch paralogs: N1ICD was positively regulated, but N2ICD was negatively regulated; however, the relationship between Notch3, GSK3beta, and EMT in breast cancer is still unclear and crosstalk between Notch3 and GSK3beta has not been widely investigated. In this study, we revealed that Notch3 was an essential antagonist of EMT in breast cancer cells by transcriptionally upregulating GSK3beta. In breast cancer, MCF-7 and MDA-MB-231 cell lines, the silencing of Notch3 reduced GSK3beta expression, which is sufficient to induce EMT. Conversely, ectopic Notch3 expression re-activated GSK3beta and E-cadherin. Mechanistically, Notch3 can bind to the GSK3beta promoter directly and activate GSK3beta transcription. In human breast cancer samples, Notch3 expression is positively associated with GSK3beta (r = 0.416, p = 0.001)",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34993814",
+      "title": "KCNQ1OT1 affects cell proliferation, invasion, and migration through a miR-34a / Notch3 axis in breast cancer.",
+      "abstract": "BACKGROUND: Breast cancer (BC) accounts for a significant share of cancer-related deaths worldwide. Ongoing investigations have shown that long non-coding RNAs (lncRNAs) drive BC progression but their underlying mechanisms remain largely undescribed. LncRNA KCNQ1OT1 was previously identified in BC but its functional significance remained to be fully investigated. METHODS: KCNQ1OT1 and its downstream target genes were analyzed in breast cancer tissues and cell lines using methods including RT-qPCR, immunohistochemistry and Western blotting. The effects of KCNQ1OT1, miR-34a and Notch3 on BC cells were investigated using assays measuring proliferation (CCK-8, colony formation), apoptosis, and migration/invasion (scratch and Transwell assays). MS2-RIP and dual-luciferase reporter assays were used to study RNA interactions. Xenograft studies were employed to define the tumorigenic potential of KCNQ1OT1 in vivo. RESULTS: KCNQ1OT1 expression was up-regulated in BC tissues and high levels were associated with poorer prognosis. ShRNA inhibition of KCNQ1OT1 expression in BC cell lines retarded proliferation, migration and invasion in vitro and tumor growth in vivo. Up-regulation of KCNQ1OT1 was shown to inhibit miR-34a which was associated with blocking the inhibitory effect of miR-34a on BC cell proliferation, migration and invasion. Notch3 was found to be a downstream target of miR-34a with KCNQ1OT1 markedly inducing Notch3 expression in BC. Evidence for KCNQ1OT1/miR-34a/Notch3 axis ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "29027990",
+      "title": "IL6 blockade potentiates the anti-tumor effects of gamma-secretase inhibitors in Notch3-expressing breast cancer.",
+      "abstract": "Notch pathways have important roles in carcinogenesis including pathways involving the Notch1 and Notch2 oncogenes. Pan-Notch inhibitors, such as gamma secretase inhibitors (GSIs), have been used in the clinical trials, but the outcomes of these trials have been insufficient and have yielded unclear. In the present study, we demonstrated that GSIs, such as MK-0752 and RO4929097, inhibit breast tumor growth, but increase the breast cancer stem cell (BCSC) population in Notch3-expressing breast cancer cells, in a process that is coupled with IL6 induction and is blocked by the IL6R antagonist Tocilizumab (TCZ). IL6 induction results from inhibition of Notch3-Hey2 signaling through MK-0752. Furthermore, HIF1alpha upregulates Notch3 expression via direct binding to the Notch3 promoter and subsequently downregulates BCSCs by decreasing the IL6 levels in Notch3-expressing breast cancer cells. Utilizing both breast cancer cell line xenografts and patient-derived xenografts (PDX), we showed that the combination of MK-0752 and Tocilizumab significantly decreases BCSCs and inhibits tumor growth and thus might serve as a novel therapeutic strategy for treating women with Notch3-expressing breast cancers.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "29109797",
+      "title": "Notch3 Maintains Luminal Phenotype and Suppresses Tumorigenesis and Metastasis of Breast Cancer via Trans-Activating Estrogen Receptor-alpha",
+      "abstract": "The luminal A phenotype is the most common breast cancer subtype and is characterized by estrogen receptor alpha expression (ERalpha). Identification of the key regulator that governs the luminal phenotype of breast cancer will clarify the pathogenic mechanism and provide novel therapeutic strategies for this subtype of cancer. ERalpha signaling pathway sustains the epithelial phenotype and inhibits the epithelial-mesenchymal transition (EMT) of breast cancer. In this study, we demonstrate that Notch3 positively associates with ERalpha in both breast cancer cell lines and human breast cancer tissues. We found that overexpression of Notch3 intra-cellular domain, a Notch3 active form (N3ICD), in ERalpha negative breast cancer cells re-activated ERalpha, while knock-down of Notch3 reduced ERalpha transcript and proteins, with alteration of down-stream genes, suggesting its ability to regulate ERalpha. Mechanistically, our results show that Notch3 specifically binds to the CSL binding element of the ERalpha promoter and activates ERalpha expression. Moreover, Notch3 suppressed EMT, while suppression of Notch3 promoted EMT in cellular assay. Overexpressing N3ICD in triple-negative breast cancer suppressed tumorigenesis and metastasis in vivo. Conversely, depletion of Notch3 in luminal breast cancer promoted metastasis in vivo. Furthermore, Notch3 transcripts were significantly associated with prolonged relapse-free survival in breast cancer, in particular in ERalpha positive breas",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "27743379",
+      "title": "Notch3 negatively regulates chemoresistance in breast cancers.",
+      "abstract": "To define the role of the NOTCH signaling pathway in the development of chemoresistance and the associated epithelial-mesenchymal transition (EMT), we investigated the effect of Notch3 on adriamycin (ADM)-resistant human breast cancer cells (MCF-7/ADM cells). We found that Notch3 was downregulated and involved in the chemoresistance of MCF-7/ADM cells, while forced expression of Notch3 reversed the chemoresistance. Furthermore, fos-related antigen 1 (Fra1) was negatively regulated by Notch3 and was highly expressed in MCF-7/ADM cells. Increased Fra1 activated the EMT process. Finally, Notch3 expression was confirmed in clinically chemoresistant samples of breast cancers from patients receiving anthracycline-based chemotherapy. Low expression of Notch3 was an unfavorable predictor of distant relapse-free survival in ER positive breast cancers. Taken together, our findings demonstrate that the Notch3-Fra1 signaling pathway mediates chemoresistance via the EMT.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [],
+        "query_intent": "gene"
+      },
+      "query_index": 1,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34374886",
+      "title": "Mammary Development and Breast Cancer: a Notch Perspective",
+      "abstract": "Mammary gland development primarily occurs postnatally, and this unique process is complex and regulated by systemic hormones and local growth factors. The mammary gland is also a highly dynamic organ that undergoes profound changes at puberty and during the reproductive cycle. These changes are driven by mammary stem cells (MaSCs). Breast cancer is one of the most common causes of cancer-related death in women. Cancer stem cells (CSCs) play prominent roles in tumor initiation, drug resistance, tumor recurrence, and metastasis. The highly conserved Notch signaling pathway functions as a key regulator of the niche mediating mammary organogenesis and breast neoplasia. In this review, we discuss mechanisms by which Notch contributes to breast carcinoma pathology and suggest potentials for therapeutic targeting of Notch in breast cancer. In summary, we provide a comprehensive overview of Notch functions in regulating MaSCs, mammary development, and breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ligand",
+          "receptor",
+          "cell signaling",
+          "tumor progression"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33872192",
+      "title": "The many facets of Notch signaling in breast cancer: toward overcoming therapeutic resistance",
+      "abstract": "In this review, Nandi et al. revisit the mechanisms by which Notch receptors and ligands contribute to normal mammary gland development and breast tumor progression. The authors also discuss combinatorial approaches aimed at disrupting Notch- and TME-mediated resistance that may improve prognosis in breast cancer patients.\n\nBreast cancer is the second leading cause of cancer-related death in women and is a complex disease with high intratumoral and intertumoral heterogeneity. Such heterogeneity is a major driving force behind failure of current therapies and development of resistance. Due to the limitations of conventional therapies and inevitable emergence of acquired drug resistance (chemo and endocrine) as well as radio resistance, it is essential to design novel therapeutic strategies to improve the prognosis for breast cancer patients. Deregulated Notch signaling within the breast tumor and its tumor microenvironment (TME) is linked to poor clinical outcomes in treatment of resistant breast cancer. Notch receptors and ligands are also important for normal mammary development, suggesting the potential for conserved signaling pathways between normal mammary gland development and breast cancer. In this review, we focus on mechanisms by which Notch receptors and ligands contribute to normal mammary gland development and breast tumor progression. We also discuss how complex interactions between cancer cells and the TME may reduce treatment efficacy and ultimately lead to acqu",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ligand",
+          "receptor",
+          "cell signaling",
+          "tumor progression"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32636747",
+      "title": "Notch Signaling Pathway and Endocrine Resistance in Breast Cancer",
+      "abstract": "Nearly 70% of breast cancers express the estrogen receptor (ER) and are hormone-dependent for cell proliferation and survival. Anti-estrogen therapies with aromatase inhibitors (AIs), selective estrogen receptor modulators (SERMs) or selective estrogen receptor down regulators (SERDs) are the standard endocrine therapy approach for ER positive breast cancer patients. However, about 30% of patients receiving endocrine therapy will progress during the therapy or become endocrine resistance eventually. The intrinsic or acquired endocrine resistance has become a major obstacle for endocrine therapy. The mechanism of endocrine resistance is very complicated and recently emerging evidence indicates dysregulation of Notch signaling pathway contributes to endocrine resistance in breast cancer patients. The potential mechanisms include regulation of ER, promotion of cancer stem cell (CSC) phenotype and mesenchymal cell ratio, alteration of the local tumor microenvironment and cell cycle. This review will summarize the latest progress on the investigation of Notch signaling pathway in breast cancer endocrine resistance.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ligand",
+          "receptor",
+          "cell signaling",
+          "tumor progression"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32313717",
+      "title": "PD-L1 is overexpressed on breast cancer stem cells through notch3/mTOR axis",
+      "abstract": "ABSTRACT\n\nThe T-cell inhibitory molecule PD-L1 is expressed on a fraction of breast cancer cells. The distribution of PD-L1 on the different subpopulations of breast cancer cells is not well-defined. Our aim was to study the expression level of PD-L1 on breast cancer stem-like (CSC-like) cells and their differentiated-like counterparts. We used multi-parametric flow cytometry to measure PD-L1 expression in different subpopulations of breast cancer cells. Pathway inhibitors, quantitative immunofluorescence, cell sorting, and western blot were used to investigate the underlying mechanism of PD-L1 upregulation in CSC-like cells. Specifically, PD-L1 was overexpressed up to three folds on breast CSC-like cells compared with more differentiated-like cancer cells. Functional in vitro and in vivo assays show higher stemness of PD-L1hi as compared with PD-L1lo cells. Among different pathways examined, PD-L1 expression on CSCs was partly dependant on Notch, and/or PI3K/AKT pathway activation. The effect of Notch inhibitors on PD-L1 overexpression in CSCs was completely abrogated upon mTOR knockdown. Specific knockdown of different Notch receptors shows Notch3 as a mediator for PD-L1 overexpression on CSCs and important for maintaining their stemness. Indeed, Notch3 was found to be overexpressed on PD-L1hi cells and specific knockdown of Notch3 abolished the effect of notch inhibitors and ligands on PD-L1 expression as well as mTOR activation. Our data demonstrated that overexpression o",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ligand",
+          "receptor",
+          "cell signaling",
+          "tumor progression"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "31379945",
+      "title": "Notch Signaling Activation as a Hallmark for Triple-Negative Breast Cancer Subtype",
+      "abstract": "Triple-negative breast cancer (TNBC) is a subgroup of 15%-20% of diagnosed breast cancer patients. It is generally considered to be the most difficult breast cancer subtype to deal with, due to the lack of estrogen receptor (ER), progesterone receptor (PR), and human epidermal growth factor receptor 2 (HER2), which usually direct targeted therapies. In this scenario, the current treatments of TNBC-affected patients rely on tumor excision and conventional chemotherapy. As a result, the prognosis is overall poor. Thus, the identification and characterization of targets for novel therapies are urgently required. The Notch signaling pathway has emerged to act in the pathogenesis and tumor progression of TNBCs. Firstly, Notch receptors are associated with the regulation of tumor-initiating cells (TICs) behavior, as well as with the aetiology of TNBCs. Secondly, there is a strong evidence that Notch pathway is a relevant player in mammary cancer stem cells maintenance and expansion. Finally, Notch receptors expression and activation strongly correlate with the aggressive clinicopathological and biological phenotypes of breast cancer (e.g., invasiveness and chemoresistance), which are relevant characteristics of TNBC subtype. The purpose of this up-to-date review is to provide a detailed overview of the specific role of all four Notch receptors (Notch1, Notch2, Notch3, and Notch4) in TNBCs, thus identifying the Notch signaling pathway deregulation/activation as a pathognomonic featu",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ligand",
+          "receptor",
+          "cell signaling",
+          "tumor progression"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28938159",
+      "title": "Lunatic Fringe and p53 Cooperatively Suppress Mesenchymal Stem-Like Breast Cancer",
+      "abstract": "Claudin-low breast cancer (CLBC) is a poor prognosis molecular subtype showing stemness and mesenchymal features. We previously discovered that deletion of a Notch signaling modulator, Lunatic Fringe (Lfng), in the mouse mammary gland induced a subset of tumors resembling CLBC. Here we report that deletion of one copy of p53 on this background not only accelerated mammary tumor development but also led to a complete penetrance of the mesenchymal stem-like phenotype. All mammary tumors examined in the Lfng/p53 compound mutant mice displayed a mesenchymal/spindloid pathology. These tumors showed high level expressions of epithelial-to-mesenchymal transition (EMT) markers including Vimentin, Twist, and PDGFRalpha, a gene known to be enriched in CLBC. Prior to tumor onset, Lfng/p53 mutant mammary glands exhibited increased levels of Vimentin and E-cadherin, but decreased expressions of cytokeratin 14 and cytokeratin 8, accompanied by elevated basal cell proliferation and an expanded mammary stem cell-enriched population. Lfng/p53 mutant glands displayed increased accumulation of Notch3 intracellular fragment, up-regulation of Hes5 and down-regulation of Hes1. Analysis in human breast cancer datasets found the lowest HES1 and second lowest LFNG expressions in CLBC among molecular subtypes, and low level of LFNG is associated with poor survival. Immunostaining of human breast cancer tissue array found correlation between survival and LFNG immunoreactivity. Finally, patients carryin",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ligand",
+          "receptor",
+          "cell signaling",
+          "tumor progression"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "21672271",
+      "title": "Notch signaling as a therapeutic target for breast cancer treatment?",
+      "abstract": "Aberrant Notch signaling can induce mammary gland carcinoma in transgenic mice, and high expressions of Notch receptors and ligands have been linked to poor clinical outcomes in human patients with breast cancer. This suggests that inhibition of Notch signaling may be beneficial for breast cancer treatment. In this review, we critically evaluate the evidence that supports or challenges the hypothesis that inhibition of Notch signaling would be advantageous in breast cancer management. We find that there are many remaining uncertainties that must be addressed experimentally if we are to exploit inhibition of Notch signaling as a treatment approach in breast cancer. Nonetheless, Notch inhibition, in combination with other therapies, is a promising avenue for future management of breast cancer. Furthermore, since aberrant Notch4 activity can induce mammary gland carcinoma in the absence of RBPjkappa, a better understanding of the components of RBPjkappa-independent oncogenic Notch signaling pathways and their contribution to Notch-induced tumorigenesis would facilitate the deployment of Notch inhibition strategies for effective treatment of breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ligand",
+          "receptor",
+          "cell signaling",
+          "tumor progression"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34195229",
+      "title": "The Role of Notch3 Signaling in Cancer Stemness and Chemoresistance: Molecular Mechanisms and Targeting Strategies",
+      "abstract": "Aberrant Notch signaling profoundly affects cancer progression. Especially the Notch3 receptor was found to be dysregulated in cancer, where its expression is correlated with worse clinicopathological features and poor prognosis. The activation of Notch3 signaling is closely related to the activation of cancer stem cells (CSCs), a small subpopulation in cancer that is responsible for cancer progression. In addition, Notch3 signaling also contributes to tumor chemoresistance against several drugs, including doxorubicin, platinum, taxane, epidermal growth factor receptor (EGFR)-tyrosine kinase inhibitors (TKIs) and gemcitabine, through complex mechanisms. In this review, we mainly focus on discussing the molecular mechanisms by which Notch3 modulates cancer stemness and chemoresistance, as well as other cancer behaviors including metastasis and angiogenesis. What's more, we propose potential treatment strategies to block Notch3 signaling, such as non-coding RNAs, antibodies and antibody-drug conjugates, providing a comprehensive reference for research on precise targeted cancer therapy.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ligand",
+          "receptor",
+          "cell signaling",
+          "tumor progression"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "28851367",
+      "title": "Role of exosomal proteins in cancer diagnosis",
+      "abstract": "Exosomes are emerging as a new type of cancer biomarkers. Exosome is a bilayered nano-sized vesicle secreted by various living cells in all body fluids. Based on the expanding albeit incomplete knowledge of their biogenesis, secretion by cells and cancer cell-specific molecular and genetic contents, exosomes are viewed as promising, clinically-relevant surrogates of cancer progression and response to therapy. Preliminary proteomic, genetic and functional profiling of cancer cell-derived or cancer plasma-derived exosomes confirms their unique characteristics. Alterations in protein or nucleic acid profiles of exosomes in plasma correlate with pathological processes of many diseases including cancer. However, previous studies on exosome application in cancer diagnosis and treatment mainly focussed on miRNAs. With the development of rapid large-scale production, purification, extraction and screening of exosomal contents, exosomal protein application can be explored for early stage cancer diagnosis, monitoring and prognosis evaluation. Here, we summarized the recent developments in application of exosomal proteins for cancer diagnosis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "ligand",
+          "receptor",
+          "cell signaling",
+          "tumor progression"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 2,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "32604738",
+      "title": "Influence of Fibroblasts on Mammary Gland Development, Breast Cancer Microenvironment Remodeling, and Cancer Cell Dissemination",
+      "abstract": "The stromal microenvironment regulates mammary gland development and tumorigenesis. In normal mammary glands, the stromal microenvironment encompasses the ducts and contains fibroblasts, the main regulators of branching morphogenesis. Understanding the way fibroblast signaling pathways regulate mammary gland development may offer insights into the mechanisms of breast cancer (BC) biology. In fact, the unregulated mammary fibroblast signaling pathways, associated with alterations in extracellular matrix (ECM) remodeling and branching morphogenesis, drive breast cancer microenvironment (BCM) remodeling and cancer growth. The BCM comprises a very heterogeneous tissue containing non-cancer stromal cells, namely, breast cancer-associated fibroblasts (BCAFs), which represent most of the tumor mass. Moreover, the different components of the BCM highly interact with cancer cells, thereby generating a tightly intertwined network. In particular, BC cells activate recruited normal fibroblasts in BCAFs, which, in turn, promote BCM remodeling and metastasis. Thus, comparing the roles of normal fibroblasts and BCAFs in the physiological and metastatic processes, could provide a deeper understanding of the signaling pathways regulating BC dissemination. Here, we review the latest literature describing the structure of the mammary gland and the BCM and summarize the influence of epithelial-mesenchymal transition (EpMT) and autophagy in BC dissemination. Finally, we discuss the roles of fibro",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "angiogenesis",
+          "vascular remodeling",
+          "endothelial activation",
+          "perivascular niche"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38528180",
+      "title": "Pericyte signaling via soluble guanylate cyclase shapes the vascular niche and microenvironment of tumors",
+      "abstract": "Pericytes and endothelial cells (ECs) constitute the fundamental components of blood vessels. While the role of ECs in tumor angiogenesis and the tumor microenvironment is well appreciated, pericyte function in tumors remains underexplored. In this study, we used pericyte-specific deletion of the nitric oxide (NO) receptor, soluble guanylate cyclase (sGC), to investigate via single-cell RNA sequencing how pericytes influence the vascular niche and the tumor microenvironment. Our findings demonstrate that pericyte sGC deletion disrupts EC-pericyte interactions, impairing Notch-mediated intercellular communication and triggering extensive transcriptomic reprogramming in both pericytes and ECs. These changes further extended their influence to neighboring cancer-associated fibroblasts (CAFs) and tumor-associated macrophages (TAMs) through paracrine signaling, collectively suppressing tumor growth. Inhibition of pericyte sGC has minimal impact on quiescent vessels but significantly increases the vulnerability of angiogenic tumor vessels to conventional anti-angiogenic therapy. In conclusion, our findings elucidate the role of pericytes in shaping the tumor vascular niche and tumor microenvironment and support pericyte sGC targeting as a promising strategy for improving anti-angiogenic therapy for cancer treatment.\n\nSynopsis\n\nThe precise role and therapeutic targeting potential of pericytes in tumor growth remains insufficiently explored. By selectively disrupting soluble guanylat",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "angiogenesis",
+          "vascular remodeling",
+          "endothelial activation",
+          "perivascular niche"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37971882",
+      "title": "DLL4/Notch3/WNT5B axis mediates bidirectional prometastatic crosstalk between melanoma and lymphatic endothelial cells",
+      "abstract": "Despite strong indications that interactions between melanoma and lymphatic vessels actively promote melanoma progression, the molecular mechanisms are not yet completely understood. To characterize molecular factors of this crosstalk, we established human primary lymphatic endothelial cell (LEC) cocultures with human melanoma cell lines. Here, we show that coculture with melanoma cells induced transcriptomic changes in LECs and led to multiple changes in their function. WNT5B, a paracrine signaling molecule upregulated in melanoma cells upon LEC interaction, was found to contribute to the functional changes in LECs. Moreover, WNT5B transcription was regulated by Notch3 in melanoma cells following the coculture with LECs, and Notch3 and WNT5B were coexpressed in melanoma patient primary tumor and metastasis samples. Moreover, melanoma cells derived from LEC coculture escaped efficiently from the primary site to the proximal tumor-draining lymph nodes, which was impaired upon WNT5B depletion. This supported the role of WNT5B in promoting the metastatic potential of melanoma cells through its effects on LECs. Finally, DLL4, a Notch ligand expressed in LECs, was identified as an upstream inducer of the Notch3/WNT5B axis in melanoma. This study elucidated WNT5B as a key molecular factor mediating bidirectional crosstalk between melanoma cells and lymphatic endothelium and promoting melanoma metastasis.\n\nA bi-directional DLL4/Notch3/WNT5B-dependent signaling cascade underlies cros",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "angiogenesis",
+          "vascular remodeling",
+          "endothelial activation",
+          "perivascular niche"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "38292177",
+      "title": "Tumor microenvironment of cancer stem cells: Perspectives on cancer stem cell targeting",
+      "abstract": "There are few tumor cell subpopulations with stem cell characteristics in tumor tissue, defined as cancer stem cells (CSCs) or cancer stem-like cells (CSLCs), which can reconstruct neoplasms with malignant biological behaviors such as invasiveness via self-renewal and unlimited generation. The microenvironment that CSCs depend on consists of various cellular components and corresponding medium components. Among these factors existing at a variety of levels and forms, cytokine networks and numerous signal pathways play an important role in signaling transduction. These factors promote or maintain cancer cell stemness, and participate in cancer recurrence, metastasis, and resistance. This review aims to summarize the recent molecular data concerning the multilayered relationship between CSCs and CSC-favorable microenvironments. We also discuss the therapeutic implications of targeting this synergistic interplay, hoping to give an insight into targeting cancer cell stemness for tumor therapy and prognosis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "angiogenesis",
+          "vascular remodeling",
+          "endothelial activation",
+          "perivascular niche"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37503127",
+      "title": "NOTCH3 drives meningioma tumorigenesis and resistance to radiotherapy",
+      "abstract": "Summary\n\nMeningiomas are the most common primary intracranial tumors. Treatments for patients with meningiomas are limited to surgery and radiotherapy, and systemic therapies remain ineffective or experimental. Resistance to radiotherapy is common in high-grade meningiomas, and the cell types and signaling mechanisms driving meningioma tumorigenesis or resistance to radiotherapy are incompletely understood. Here we report NOTCH3 drives meningioma tumorigenesis and resistance to radiotherapy and find NOTCH3+ meningioma mural cells are conserved across meningiomas from humans, dogs, and mice. NOTCH3+ cells are restricted to the perivascular niche during meningeal development and homeostasis and in low-grade meningiomas but are expressed throughout high-grade meningiomas that are resistant to radiotherapy. Integrating single-cell transcriptomics with lineage tracing and imaging approaches across mouse genetic and xenograft models, we show NOTCH3 drives tumor initiating capacity, cell proliferation, angiogenesis, and resistance to radiotherapy to increase meningioma growth and reduce survival. An antibody stabilizing the extracellular negative regulatory region of NOTCH3 blocks meningioma tumorigenesis and sensitizes meningiomas to radiotherapy, reducing tumor growth and improving survival in preclinical models. In summary, our results identify a conserved cell type and signaling mechanism that underlie meningioma tumorigenesis and resistance to radiotherapy, revealing a new ther",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "angiogenesis",
+          "vascular remodeling",
+          "endothelial activation",
+          "perivascular niche"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37046676",
+      "title": "Fibroblasts as Turned Agents in Cancer Progression",
+      "abstract": "Simple Summary\n\nNormal epithelial cells in our organs are surrounded by stroma, which is an ecosystem made up of a variety of cells and proteins that support their intended functions. When normal epithelial cells go through a series of genetic steps that transform them into cancer cells, the cancer cells, in turn, change the character of the stroma. The stroma co-evolves with the cancer to become an autonomous tumor organ with its own ecosystem. Initially, stromal cells try to maintain normal epithelial cell function and suppress malignant changes. However, during their co-evolution, the cancer cells recruit supporting cells to actively promote their growth, invasion, metastasis, and treatment resistance. Here, I outline how cancer cells change the character of the most abundant cells in the stroma, called fibroblasts, and how the altered fibroblasts, in turn, make cancers more aggressive. I also outline efforts to use these changed fibroblasts as new targets for cancer treatment.\n\nAbstract\n\nDifferentiated epithelial cells reside in the homeostatic microenvironment of the native organ stroma. The stroma supports their normal function, their G0 differentiated state, and their expansion/contraction through the various stages of the life cycle and physiologic functions of the host. When malignant transformation begins, the microenvironment tries to suppress and eliminate the transformed cells, while cancer cells, in turn, try to resist these suppressive efforts. The tumor microe",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "angiogenesis",
+          "vascular remodeling",
+          "endothelial activation",
+          "perivascular niche"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36430649",
+      "title": "Akt-Activated Endothelium Increases Cancer Cell Proliferation and Resistance to Treatment in Ovarian Cancer Cell Organoids",
+      "abstract": "Ovarian cancer (OC) is a heterogeneous disease characterized by its late diagnosis (FIGO stages III and IV) and the importance of abdominal metastases often observed at diagnosis. Detached ovarian cancer cells (OCCs) float in ascites and form multicellular spheroids. Here, we developed endothelial cell (EC)-based 3D spheroids to better represent in vivo conditions. When co-cultured in 3D conditions, ECs and OCCs formed organized tumor angiospheres with a core of ECs surrounded by proliferating OCCs. We established that Akt and Notch3/Jagged1 pathways played a role in angiosphere formation and peritoneum invasion. In patients' ascites we found angiosphere-like structures and demonstrated in patients' specimens that tumoral EC displayed Akt activation, which supports the importance of Akt activation in ECs in OC. Additionally, we demonstrated the importance of FGF2, Pentraxin 3 (PTX3), PD-ECGF and TIMP-1 in angiosphere organization. Finally, we confirmed the role of Notch3/Jagged1 in OCC-EC crosstalk relating to OCC proliferation and during peritoneal invasion. Our results support the use of multicellular spheroids to better model tumoral and stromal interaction. Such models could help decipher the complex pathways playing critical roles in metastasis spread and predict tumor response to chemotherapy or anti-angiogenic treatment.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "angiogenesis",
+          "vascular remodeling",
+          "endothelial activation",
+          "perivascular niche"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "36114508",
+      "title": "The extracellular matrix alteration, implication in modulation of drug resistance mechanism: friends or foes?",
+      "abstract": "The extracellular matrix (ECM) is an important component of the tumor microenvironment (TME), having several important roles related to the hallmarks of cancer. In cancer, multiple components of the ECM have been shown to be altered. Although most of these alterations are represented by the increased or decreased quantity of the ECM components, changes regarding the functional alteration of a particular ECM component or of the ECM as a whole have been described. These alterations can be induced by the cancer cells directly or by the TME cells, with cancer-associated fibroblasts being of particular interest in this regard. Because the ECM has this wide array of functions in the tumor, preclinical and clinical studies have assessed the possibility of targeting the ECM, with some of them showing encouraging results. In the present review, we will highlight the most relevant ECM components presenting a comprehensive description of their physical, cellular and molecular properties which can alter the therapy response of the tumor cells. Lastly, some evidences regarding important biological processes were discussed, offering a more detailed understanding of how to modulate altered signalling pathways and to counteract drug resistance mechanisms in tumor cells.\n\nSupplementary Information\n\nThe online version contains supplementary material available at 10.1186/s13046-022-02484-1.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "angiogenesis",
+          "vascular remodeling",
+          "endothelial activation",
+          "perivascular niche"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34588926",
+      "title": "The Adipokine Component in the Molecular Regulation of Cancer Cell Survival, Proliferation and Metastasis",
+      "abstract": "A hormonal imbalance may disrupt the rigorously monitored cellular microenvironment by hampering the natural homeostatic mechanisms. The most common example of such hormonal glitch could be seen in obesity where the uprise in adipokine levels is in virtue of the expanding bulk of adipose tissue. Such aberrant endocrine signaling disrupts the regulation of cellular fate, rendering the cells to live in a tumor supportive microenvironment. Previously, it was believed that the adipokines support cancer proliferation and metastasis with no direct involvement in neoplastic transformations and tumorigenesis. However, the recent studies have reported discrete mechanisms that establish the direct involvement of adipokine signaling in tumorigenesis. Moreover, the individual adipokine profile of the patients has never been considered in the prognosis and staging of the disease. Hence, the present manuscript has focused on the reported extensive mechanisms that culminate the basis of poor prognosis and diminished survival rate in obese cancer patients.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "angiogenesis",
+          "vascular remodeling",
+          "endothelial activation",
+          "perivascular niche"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 3,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40665579",
+      "title": "Cancer stem cells: Bridging microenvironmental interactions and clinical therapy",
+      "abstract": "Abstract\n\nCancer stem cells (CSCs) are a core subpopulation of tumour tissues exhibiting stem cell properties. Although they constitute only a minority of tumour cells, CSCs have become a central force driving tumourigenesis, metastasis, recurrence and resistance to therapy, owing to their abilities for self-renewal, multi-lineage differentiation and tumour-initiating ability. Recent advances in multi-omics analysis, lineage tracing and single-cell sequencing technologies have systematically elucidated the dynamic biology of CSCs, including their epigenetic plasticity, metabolic adaptations and phenotypic heterogeneity, which depend on their ecological niche. In this review, we summarise the biological properties of CSCs, the molecular regulatory mechanisms and the complex interactions with the tumour microenvironment. We focus on strategies to target CSCs and the clinical translational challenges associated with these approaches. Collectively, this review organically integrates basic mechanisms and clinical translational research on CSCs, offering a comprehensive framework for understanding tumour biology and developing precision therapeutic strategies.\n\nHighlights\n\nSystems integration of CSC biology: Elucidate the dynamic properties, self-renewal, plasticity and drug resistance.\n\nMicroenvironmental interactions: Bidirectional interactions between CSCs and other cells, providing insights into niche-driven immune evasion and metastasis.\n\nTherapeutic strategies: Evaluate emerg",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell communication",
+          "endothelial-macrophage interaction",
+          "perivascular niche",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "40242505",
+      "title": "Nanotherapeutic strategies exploiting biological traits of cancer stem cells",
+      "abstract": "Cancer stem cells (CSCs) represent a distinct subpopulation of cancer cells that orchestrate cancer initiation, progression, metastasis, and therapeutic resistance. Despite advances in conventional therapies, the persistence of CSCs remains a major obstacle to achieving cancer eradication. Nanomedicine-based approaches have emerged for precise CSC targeting and elimination, offering unique advantages in overcoming the limitations of traditional treatments. This review systematically analyzes recent developments in nanomedicine for CSC-targeted therapy, emphasizing innovative nanomaterial designs addressing CSC-specific challenges. We first provide a detailed examination of CSC biology, focusing on their surface markers, signaling networks, microenvironmental interactions, and metabolic signatures. On this basis, we critically evaluate cutting-edge nanomaterial engineering designed to exploit these CSC traits, including stimuli-responsive nanodrugs, nanocarriers for drug delivery, and multifunctional nanoplatforms capable of generating localized hyperthermia or reactive oxygen species. These sophisticated nanotherapeutic approaches enhance selectivity and efficacy in CSC elimination, potentially circumventing drug resistance and cancer recurrence. Finally, we present an in-depth analysis of current challenges in translating nanomedicine-based CSC-targeted therapies from bench to bedside, offering critical insights into future research directions and clinical implementation. Th",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell communication",
+          "endothelial-macrophage interaction",
+          "perivascular niche",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "37784082",
+      "title": "Define cancer-associated fibroblasts (CAFs) in the tumor microenvironment: new opportunities in cancer immunotherapy and advances in clinical trials",
+      "abstract": " Despite centuries since the discovery and study of cancer, cancer is still a lethal and intractable health issue worldwide. Cancer-associated fibroblasts (CAFs) have gained much attention as a pivotal component of the tumor microenvironment. The versatility and sophisticated mechanisms of CAFs in facilitating cancer progression have been elucidated extensively, including promoting cancer angiogenesis and metastasis, inducing drug resistance, reshaping the extracellular matrix, and developing an immunosuppressive microenvironment. Owing to their robust tumor-promoting function, CAFs are considered a promising target for oncotherapy. However, CAFs are a highly heterogeneous group of cells. Some subpopulations exert an inhibitory role in tumor growth, which implies that CAF-targeting approaches must be more precise and individualized. This review comprehensively summarize the origin, phenotypical, and functional heterogeneity of CAFs. More importantly, we underscore advances in strategies and clinical trials to target CAF in various cancers, and we also summarize progressions of CAF in cancer immunotherapy.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell communication",
+          "endothelial-macrophage interaction",
+          "perivascular niche",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34124039",
+      "title": "Therapeutic Targeting of Notch Signaling: From Cancer to Inflammatory Disorders",
+      "abstract": "Over the past two decades, the Notch signaling pathway has been investigated as a therapeutic target for the treatment of cancers, and more recently in the context of immune and inflammatory disorders. Notch is an evolutionary conserved pathway found in all metazoans that is critical for proper embryonic development and for the postnatal maintenance of selected tissues. Through cell-to-cell contacts, Notch orchestrates cell fate decisions and differentiation in non-hematopoietic and hematopoietic cell types, regulates immune cell development, and is integral to shaping the amplitude as well as the quality of different types of immune responses. Depriving some cancer types of Notch signals has been shown in preclinical studies to stunt tumor growth, consistent with an oncogenic function of Notch signaling. In addition, therapeutically antagonizing Notch signals showed preclinical potential to prevent or reverse inflammatory disorders, including autoimmune diseases, allergic inflammation and immune complications of life-saving procedures such allogeneic bone marrow and solid organ transplantation (graft-versus-host disease and graft rejection). In this review, we discuss some of these unique approaches, along with the successes and challenges encountered so far to target Notch signaling in preclinical and early clinical studies. Our goal is to emphasize lessons learned to provide guidance about emerging strategies of Notch-based therapeutics that could be deployed safely and ef",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell communication",
+          "endothelial-macrophage interaction",
+          "perivascular niche",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "33324652",
+      "title": "Bone Angiogenesis and Vascular Niche Remodeling in Stress, Aging, and Diseases",
+      "abstract": "The bone marrow (BM) vascular niche microenvironments harbor stem and progenitor cells of various lineages. Bone angiogenesis is distinct and involves tissue-specific signals. The nurturing vascular niches in the BM are complex and heterogenous consisting of distinct vascular and perivascular cell types that provide crucial signals for the maintenance of stem and progenitor cells. Growing evidence suggests that the BM niche is highly sensitive to stress. Aging, inflammation and other stress factors induce changes in BM niche cells and their crosstalk with tissue cells leading to perturbed hematopoiesis, bone angiogenesis and bone formation. Defining vascular niche remodeling under stress conditions will improve our understanding of the BM vascular niche and its role in homeostasis and disease. Therefore, this review provides an overview of the current understanding of the BM vascular niches for hematopoietic stem cells and their malfunction during aging, bone loss diseases, arthritis and metastasis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [
+          "JAG1",
+          "NOTCH3"
+        ],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "spatial transcriptomics",
+          "cell-cell communication",
+          "endothelial-macrophage interaction",
+          "perivascular niche",
+          "tumor microenvironment"
+        ],
+        "query_intent": "gene"
+      },
+      "query_index": 8,
+      "iteration": 0,
+      "query_type": "gene"
+    },
+    {
+      "pmid": "34295896",
+      "title": "Notch Signalling in Breast Development and Cancer",
+      "abstract": "The Notch signalling pathway is a highly conserved developmental signalling pathway, with vital roles in determining cell fate during embryonic development and tissue homeostasis. Aberrant Notch signalling has been implicated in many disease pathologies, including cancer. In this review, we will outline the mechanism and regulation of the Notch signalling pathway. We will also outline the role Notch signalling plays in normal mammary gland development and how Notch signalling is implicated in breast cancer tumorigenesis and progression. We will cover how Notch signalling controls several different hallmarks of cancer within epithelial cells with sections focussed on its roles in proliferation, apoptosis, invasion, and metastasis. We will provide evidence for Notch signalling in the breast cancer stem cell phenotype, which also has implications for therapy resistance and disease relapse in breast cancer patients. Finally, we will summarise the developments in therapeutic targeting of Notch signalling, and the pros and cons of this approach for the treatment of breast cancer.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch signaling pathway",
+          "JAG1-NOTCH3 axis",
+          "canonical Notch signaling",
+          "lateral inhibition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "41294868",
+      "title": "The Two-Way Role of Jagged1 in Cancer: A Focus on CRC",
+      "abstract": "Highlights\n\nJagged1 is cleaved, releasing an intracellular domain (Jag1-ICD).\n\nJag1-ICD acquires oncogenic properties in CRC.\n\n What are the main findings?  \n\nJagged1 is a novel oncogenic driver that contributes to the multistep genetic model underlying the adenoma-to-carcinoma sequence in CRC.\n\nUnderstanding the two-way role of Jagged1 could lead to new strategies for addressing drug resistance in CRC.\n\n What are the implications of the main findings?  \n\nAbstract\n\nColorectal cancer (CRC) remains one of the most prevalent and lethal malignancies. Accumulating genetic evidence supports a multistep model of tumor progression, in which early APC loss leads to chromosomal instability and adenoma formation, followed by activating mutations in KRAS that synergize with beta-catenin signaling to promote tumor growth and invasion. Among the downstream effectors of these pathways, the Notch ligand Jagged1 has emerged as a critical mediator of CRC progression and chemoresistance. Jagged1 is not only a transcriptional target of the Wnt/beta-catenin axis but also undergoes proteolytic cleavage via the KRAS/ERK/ADAM17 signaling cascade, generating a nuclear Jagged1 intracellular domain (Jag1-ICD) that drives reverse signaling. This dual functionality, activating canonical Notch signaling and initiating reverse nuclear signaling, positions Jagged1 as a key oncogenic driver in CRC. In this review, we first summarize the role of Jagged1 as an integral part of canonical Notch signaling. We the",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch signaling pathway",
+          "JAG1-NOTCH3 axis",
+          "canonical Notch signaling",
+          "lateral inhibition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "37936690",
+      "title": "Astrogliosis in multiple sclerosis and neuro-inflammation: what role for the notch pathway?",
+      "abstract": "Multiple sclerosis is an autoimmune inflammatory disease of the central nervous system leading to neurodegeneration. It affects 2.3 million people worldwide, generally younger than 50. There is no known cure for the disease, and current treatment options - mainly immunotherapies to limit disease progression - are few and associated with serious side effects. In multiple sclerosis, disruption of the blood-brain barrier is an early event in the pathogenesis of lesions, predisposing to edema, excito-toxicity and inflammatory infiltration into the central nervous system. Recently, the vision of the blood brain barrier structure and integrity has changed and include contributions from all components of the neurovascular unit, among which astrocytes. During neuro-inflammation, astrocytes become reactive. They undergo morphological and molecular changes named \"astrogliosis\" driving the conversion from acute inflammatory injury to a chronic neurodegenerative state. Astrogliosis mechanisms are minimally explored despite their significance in regulating the autoimmune response during multiple sclerosis. Therefore, in this review, we take stock of the state of knowledge regarding astrogliosis in neuro-inflammation and highlight the central role of NOTCH signaling in the process of astrocyte reactivity. Indeed, a very detailed nomenclature published in nature neurosciences in 2021, listing all the reactive astrocyte markers fully identified in the literature, doesn't cover the NOTCH sign",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch signaling pathway",
+          "JAG1-NOTCH3 axis",
+          "canonical Notch signaling",
+          "lateral inhibition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "37509254",
+      "title": "Landscape of Genetic Mutations in Appendiceal Cancers",
+      "abstract": "Simple Summary\n\nAn analysis of the presence of mutations of 105 genes in appendiceal cancers through the lens of the reviewed literature supports the view that in most of them, the inactivation of tumor suppressor genes, such as TP53 and SMAD4, is required in parallel with the reactivation of genes with oncogenic potentials, such as KRAS, GNAS, and BRAF, which support the main tumor processes, cell proliferation, angiogenesis, and evasion of apoptosis. Of all appendiceal cancers, the most mutated genes are reported in mucinous neoplasms of the appendix, not including those in the RAS-RAF-MEK-ERK signaling pathway, followed by low-grade appendiceal mucinous neoplasms, appendiceal goblet cell adenocarcinomas, and mucinous adenocarcinomas of the appendix, in which this signaling pathway is most frequently affected, showing its importance in their tumorigenesis. Microsatellite instability rarely occurs in appendix cancers, being reported only in adenocarcinomas.\n\nAbstract\n\nIn appendiceal cancers, the most frequently mutated genes are (i) KRAS, which, when reactivated, restores signal transduction via the RAS-RAF-MEK-ERK signaling pathway and stimulates cell proliferation in the early stages of tumor transformation, and then angiogenesis; (ii) TP53, whose inactivation leads to the inhibition of programmed cell death; (iii) GNAS, which, when reactivated, links the cAMP pathway to the RAS-RAF-MEK-ERK signaling pathway, stimulating cell proliferation and angiogenesis; (iv) SMAD4, exh",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch signaling pathway",
+          "JAG1-NOTCH3 axis",
+          "canonical Notch signaling",
+          "lateral inhibition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "36605720",
+      "title": "Notch signaling sculpts the stem cell niche",
+      "abstract": "Adult stem cells depend on their niches for regulatory signaling that controls their maintenance, division, and their progeny differentiation. While communication between various types of stem cells and their niches is becoming clearer, the process of stem cell niche establishment is still not very well understood. Model genetic organisms provide simplified systems to address various complex questions, for example, how is a stem cell niche formed? What signaling cascades induce the stem cell niche formation? Are the mechanisms of stem cell niche formation conserved? Notch signaling is an evolutionarily conserved pathway first identified in fruit flies, crucial in fate acquisition and spatiotemporal patterning. While the core logic behind its activity is fairly simple and requires direct cell-cell interaction, it reaches an astonishing complexity and versatility by combining its different modes of action. Subtleties such as equivalency between communicating cells, their physical distance, receptor and ligand processing, and endocytosis can have an effect on the way the events unfold, and this review explores some important general mechanisms of action, later on focusing on its involvement in stem cell niche formation. First, looking at invertebrates, we will examine how Notch signaling induces the formation of germline stem cell niche in male and female Drosophila. In the developing testis, a group of somatic gonadal precursor cells receive Delta signals from the gut, activati",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch signaling pathway",
+          "JAG1-NOTCH3 axis",
+          "canonical Notch signaling",
+          "lateral inhibition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35332121",
+      "title": "Notch signaling pathway: architecture, disease, and therapeutics",
+      "abstract": "The NOTCH gene was identified approximately 110 years ago. Classical studies have revealed that NOTCH signaling is an evolutionarily conserved pathway. NOTCH receptors undergo three cleavages and translocate into the nucleus to regulate the transcription of target genes. NOTCH signaling deeply participates in the development and homeostasis of multiple tissues and organs, the aberration of which results in cancerous and noncancerous diseases. However, recent studies indicate that the outcomes of NOTCH signaling are changeable and highly dependent on context. In terms of cancers, NOTCH signaling can both promote and inhibit tumor development in various types of cancer. The overall performance of NOTCH-targeted therapies in clinical trials has failed to meet expectations. Additionally, NOTCH mutation has been proposed as a predictive biomarker for immune checkpoint blockade therapy in many cancers. Collectively, the NOTCH pathway needs to be integrally assessed with new perspectives to inspire discoveries and applications. In this review, we focus on both classical and the latest findings related to NOTCH signaling to illustrate the history, architecture, regulatory mechanisms, contributions to physiological development, related diseases, and therapeutic applications of the NOTCH pathway. The contributions of NOTCH signaling to the tumor immune microenvironment and cancer immunotherapy are also highlighted. We hope this review will help not only beginners but also experts to sy",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch signaling pathway",
+          "JAG1-NOTCH3 axis",
+          "canonical Notch signaling",
+          "lateral inhibition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "34830355",
+      "title": "Three-Dimensional Culture Systems for Dissecting Notch Signalling in Health and Disease",
+      "abstract": "Three-dimensional (3D) culture systems opened up new horizons in studying the biology of tissues and organs, modelling various diseases, and screening drugs. Producing accurate in vitro models increases the possibilities for studying molecular control of cell-cell and cell-microenvironment interactions in detail. The Notch signalling is linked to cell fate determination, tissue definition, and maintenance in both physiological and pathological conditions. Hence, 3D cultures provide new accessible platforms for studying activation and modulation of the Notch pathway. In this review, we provide an overview of the recent advances in different 3D culture systems, including spheroids, organoids, and \"organ-on-a-chip\" models, and their use in analysing the crucial role of Notch signalling in the maintenance of tissue homeostasis, pathology, and regeneration.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch signaling pathway",
+          "JAG1-NOTCH3 axis",
+          "canonical Notch signaling",
+          "lateral inhibition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "34680255",
+      "title": "Targeting Notch to Maximize Chemotherapeutic Benefits: Rationale, Advanced Strategies, and Future Perspectives",
+      "abstract": "Simple Summary\n\nThe Notch signaling pathway regulates cell proliferation, apoptosis, stem cell self-renewal, and differentiation in a context-dependent fashion both during embryonic development and in adult tissue homeostasis. Consistent with its pleiotropic physiological role, unproper activation of the signaling promotes or counteracts tumor pathogenesis and therapy response in distinct tissues. In the last twenty years, a wide number of studies have highlighted the anti-cancer potential of Notch-modulating agents as single treatment and in combination with the existent therapies. However, most of these strategies have failed in the clinical exploration due to dose-limiting toxicity and low efficacy, encouraging the development of novel agents and the design of more appropriate combinations between Notch signaling inhibitors and chemotherapeutic drugs with improved safety and effectiveness for distinct types of cancer.\n\nAbstract\n\nNotch signaling guides cell fate decisions by affecting proliferation, apoptosis, stem cell self-renewal, and differentiation depending on cell and tissue context. Given its multifaceted function during tissue development, both overactivation and loss of Notch signaling have been linked to tumorigenesis in ways that are either oncogenic or oncosuppressive, but always context-dependent. Notch signaling is critical for several mechanisms of chemoresistance including cancer stem cell maintenance, epithelial-mesenchymal transition, tumor-stroma interac",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch signaling pathway",
+          "JAG1-NOTCH3 axis",
+          "canonical Notch signaling",
+          "lateral inhibition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "33681228",
+      "title": "Notch Signaling in Vascular Endothelial Cells, Angiogenesis, and Tumor Progression: An Update and Prospective",
+      "abstract": "The Notch signaling pathway plays an essential role in a wide variety of biological processes including cell fate determination of vascular endothelial cells and the regulation of arterial differentiation and angiogenesis. The Notch pathway is also an essential regulator of tumor growth and survival by functioning as either an oncogene or a tumor suppressor in a context-dependent manner. Crosstalk between the Notch and other signaling pathways is also pivotal in tumor progression by promoting cancer cell growth, migration, invasion, metastasis, tumor angiogenesis, and the expansion of cancer stem cells (CSCs). In this review, we provide an overview and update of Notch signaling in endothelial cell fate determination and functioning, angiogenesis, and tumor progression, particularly in the development of CSCs and therapeutic resistance. We further summarize recent studies on how endothelial signaling crosstalk with the Notch pathway contributes to tumor angiogenesis and the development of CSCs, thereby providing insights into vascular biology within the tumor microenvironment and tumor progression.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch signaling pathway",
+          "JAG1-NOTCH3 axis",
+          "canonical Notch signaling",
+          "lateral inhibition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 4,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "41894035",
+      "title": "The role of Notch signalling and its crosstalk with oestrogen receptor signalling in breast cancer",
+      "abstract": "Breast cancer (BCa) is the most frequently diagnosed malignancy in women worldwide, with approximately 70% of cases driven by oestrogen receptor alpha (ERalpha). Endocrine therapies aim to suppress ERalpha signalling activity and form the foundation of current therapeutic strategies. However, a substantial proportion of patients either fail to respond due to intrinsic resistance or acquire resistance over the course of the treatment. This resistance arises through a complex interplay of factors including crosstalk with other signalling pathways such as Notch. Notch signalling, essential for mammary gland development, is aberrantly activated in breast tumours, where it contributes to cancer stem cell maintenance, epithelial-mesenchymal transition, angiogenesis, and metastasis. Notch receptors exert context- and subtype-specific roles: Notch1 and 4 promote tumour aggressiveness, whereas Notch2 often exhibits tumour-suppressive roles. In ERalpha-positive BCa, ERalpha and Notch signalling cooperate to drive resistance, whereas in ERalpha-negative disease, Notch promotes stemness and angiogenesis. While anti-oestrogen therapies effectively inhibit tumour growth, they can paradoxically activate Notch signalling and promote therapeutic resistance. Co-targeting Notch alongside endocrine therapy has been proposed as a strategy to delay the onset of therapeutic resistance. However, clinical development of Notch inhibitors has been limited by toxicity associated with pan-Notch blockade.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch pathway",
+          "JAG1 signaling",
+          "NOTCH3 activation",
+          "tumor microenvironment crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35805056",
+      "title": "Breast Cancer Stem Cells: Signaling Pathways, Cellular Interactions, and Therapeutic Implications",
+      "abstract": "Simple Summary\n\nCancer stem cells (CSCs) in breast cancer have been identified for almost two decades. Many outstanding discoveries have established the important functions of CSCs in breast cancer progression, metastasis, and resistance to therapy. As the defining feature of CSCs, stemness is induced and maintained by several important signaling pathways. Targeting these pathways is inevitably challenging because they are also critically involved in normal stem cells. Here, we will summarize the literature on breast cancer stem cells, including major signaling pathways, cellular interactions within the tumor microenvironment (TME), and potential therapeutic implications.\n\nAbstract\n\nBreast cancer stem cells (BCSCs) constitute a small population of cells within breast cancer and are characterized by their ability to self-renew, differentiate, and recapitulate the heterogeneity of the tumor. Clinically, BCSCs have been correlated with cancer progression, metastasis, relapse, and drug resistance. The tumorigenic roles of BCSCs have been extensively reviewed and will not be the major focus of the current review. Here, we aim to highlight how the crucial intrinsic signaling pathways regulate the fate of BCSCs, including the Wnt, Notch, Hedgehog, and NF-kappaB signaling pathways, as well as how different cell populations crosstalk with BCSCs within the TME, including adipocytes, endothelial cells, fibroblasts, and immune cells. Based on the molecular and cellular activities of BCSC",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch pathway",
+          "JAG1 signaling",
+          "NOTCH3 activation",
+          "tumor microenvironment crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35682974",
+      "title": "Notch Signaling in Breast Tumor Microenvironment as Mediator of Drug Resistance",
+      "abstract": "Notch signaling dysregulation encourages breast cancer progression through different mechanisms such as stem cell maintenance, cell proliferation and migration/invasion. Furthermore, Notch is a crucial driver regulating juxtracrine and paracrine communications between tumor and stroma. The complex interplay between the abnormal Notch pathway orchestrating the activation of other signals and cellular heterogeneity contribute towards remodeling of the tumor microenvironment. These changes, together with tumor evolution and treatment pressure, drive breast cancer drug resistance. Preclinical studies have shown that targeting the Notch pathway can prevent or reverse resistance, reducing or eliminating breast cancer stem cells. In the present review, we will summarize the current scientific evidence that highlights the involvement of Notch activation within the breast tumor microenvironment, angiogenesis, extracellular matrix remodeling, and tumor/stroma/immune system interplay and its involvement in mechanisms of therapy resistance.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch pathway",
+          "JAG1 signaling",
+          "NOTCH3 activation",
+          "tumor microenvironment crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "37860822",
+      "title": "Notch receptor/ligand diversity: contribution to colorectal cancer stem cell heterogeneity",
+      "abstract": "Cancer cell heterogeneity is a key contributor to therapeutic failure and post-treatment recurrence. Targeting cell subpopulations responsible for chemoresistance and recurrence seems to be an attractive approach to improve treatment outcome in cancer patients. However, this remains challenging due to the complexity and incomplete characterization of tumor cell subpopulations. The heterogeneity of cells exhibiting stemness-related features, such as self-renewal and chemoresistance, fuels this complexity. Notch signaling is a known regulator of cancer stem cell (CSC) features in colorectal cancer (CRC), though the effects of its heterogenous signaling on CRC cell stemness are only just emerging. In this review, we discuss how Notch ligand-receptor specificity contributes to regulating stemness, self-renewal, chemoresistance and cancer stem cells heterogeneity in CRC.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch pathway",
+          "JAG1 signaling",
+          "NOTCH3 activation",
+          "tumor microenvironment crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "36517618",
+      "title": "The role of Hedgehog and Notch signaling pathway in cancer",
+      "abstract": "Notch and Hedgehog signaling are involved in cancer biology and pathology, including the maintenance of tumor cell proliferation, cancer stem-like cells, and the tumor microenvironment. Given the complexity of Notch signaling in tumors, its role as both a tumor promoter and suppressor, and the crosstalk between pathways, the goal of developing clinically safe, effective, tumor-specific Notch-targeted drugs has remained intractable. Drugs developed against the Hedgehog signaling pathway have affirmed definitive therapeutic effects in basal cell carcinoma; however, in some contexts, the challenges of tumor resistance and recurrence leap to the forefront. The efficacy is very limited for other tumor types. In recent years, we have witnessed an exponential increase in the investigation and recognition of the critical roles of the Notch and Hedgehog signaling pathways in cancers, and the crosstalk between these pathways has vast space and value to explore. A series of clinical trials targeting signaling have been launched continually. In this review, we introduce current advances in the understanding of Notch and Hedgehog signaling and the crosstalk between pathways in specific tumor cell populations and microenvironments. Moreover, we also discuss the potential of targeting Notch and Hedgehog for cancer therapy, intending to promote the leap from bench to bedside.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch pathway",
+          "JAG1 signaling",
+          "NOTCH3 activation",
+          "tumor microenvironment crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "35582386",
+      "title": "Notch signaling in female cancers: a multifaceted node to overcome drug resistance",
+      "abstract": "Drug resistance is one of the main challenges in cancer therapy, including in the treatment of female-specific malignancies, which account for more than 60% of cancer cases among women. Therefore, elucidating the underlying molecular mechanisms is an urgent need in gynecological cancers to foster novel therapeutic approaches. Notably, Notch signaling, including either receptors or ligands, has emerged as a promising candidate given its multifaceted role in almost all of the hallmarks of cancer. Concerning the connection between Notch pathway and drug resistance in the afore-mentioned tumor contexts, several studies focused on the Notch-dependent regulation of the cancer stem cell (CSC) subpopulation or the induction of the epithelial-to-mesenchymal transition (EMT), both features implicated in either intrinsic or acquired resistance. Indeed, the present review provides an up-to-date overview of the published results on Notch signaling and EMT- or CSC-driven drug resistance. Moreover, other drug resistance-related mechanisms are examined such as the involvement of the Notch pathway in drug efflux and tumor microenvironment. Collectively, there is a long way to go before every facet will be fully understood; nevertheless, some small pieces are falling neatly into place. Overall, the main aim of this review is to provide strong evidence in support of Notch signaling inhibition as an effective strategy to evade or reverse resistance in female-specific cancers.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch pathway",
+          "JAG1 signaling",
+          "NOTCH3 activation",
+          "tumor microenvironment crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "33430387",
+      "title": "Context Matters: NOTCH Signatures and Pathway in Cancer Progression and Metastasis",
+      "abstract": "The Notch signaling pathway is a critical player in embryogenesis but also plays various roles in tumorigenesis, with both tumor suppressor and oncogenic activities. Mutations, deletions, amplifications, or over-expression of Notch receptors, ligands, and a growing list of downstream Notch-activated genes have by now been described for most human cancer types. Yet, it often remains unclear what may be the functional impact of these changes for tumor biology, initiation, and progression, for cancer therapy, and for personalized medicine. Emerging data indicate that Notch signaling can also contribute to increased aggressive properties such as invasion, tumor heterogeneity, angiogenesis, or tumor cell dormancy within solid cancer tissues; especially in epithelial cancers, which are in the center of this review. Notch further supports the \"stemness\" of cancer cells and helps define the stem cell niche for their long-term survival, by integrating the interaction between cancer cells and the cells of the tumor microenvironment (TME). The complexity of Notch crosstalk with other signaling pathways and its roles in cell fate and trans-differentiation processes such as epithelial-to-mesenchymal transition (EMT) point to this pathway as a decisive player that may tip the balance between tumor suppression and promotion, differentiation and invasion. Here we not only review the literature, but also explore genomic databases with a specific focus on Notch signatures, and how they relate ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "Notch pathway",
+          "JAG1 signaling",
+          "NOTCH3 activation",
+          "tumor microenvironment crosstalk"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 5,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "41521297",
+      "title": "Spatial and temporal dynamics of cancer-associated fibroblast niches in breast cancer",
+      "abstract": "Background\n\nCancer-associated fibroblasts (CAFs) are the main constituents of the tumor microenvironment. Several studies have delineated CAF heterogeneity in different types of tumors, however, it is still unknown how the distinct CAF transcriptional profiles are established during tumor progression.\n\nMethods\n\nWe reanalyzed a previously published single-cell RNA-sequencing dataset of MMTV-PyMT tumors at higher resolution using Seurat , and CytoTRACE to characterize CAF subtypes and their differentiation states. Wilcoxon rank sum test was applied for differential gene expression. Multiplex immunostaining (Akoya PhenoImager HT) was performed on 38 murine mammary tumors from MMTV-PyMT mice to identify the distinct CAF subtypes. Whole-slide imaging and spatial analysis were conducted using QuPath and Cellpose , followed by neighborhood clustering and interaction mapping with CytoMAP . Cellular distances from CAFs to immune, tumor, and endothelial cells were quantified using SPIAT and Wilcoxon tests for comparisons. In parallel, human spatial transcriptomics data from the 10X Genomics Xenium platform were integrated for cross-species validation.\n\nResults\n\nHere, by single cell RNA-sequencing and multiplex immunostaining, we identify six CAF substates. Spatial analysis on immunostained murine mammary tumors and human spatial transcriptomics data outlined temporal changes in stromal composition and the existence of distinct functional niches enriched with different CAF substates. Im",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "endothelial cells",
+          "macrophages",
+          "myoepithelial cells",
+          "ACTA2+",
+          "perivascular-like cells"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "40448123",
+      "title": "Multiplex imaging reveals novel patterns of MRTFA/B activation in the breast cancer microenvironment",
+      "abstract": "Background\n\nBreast cancer progression and metastasis involve the action of multiple transcription factors in tumors and in the cells of the tumor microenvironment (TME) and understanding how these transcription factors are coordinated can guide novel therapeutic strategies. Myocardin-related transcription factors A and B (MRTFA/B also known as MKL1/2) are two related transcription factors that redundantly control cancer cell invasion and metastasis in mouse models of breast cancer, but their roles in human cancer are incompletely understood. Here, we investigated the expression and activation of these transcription factors to better assess their tumorigenic and metastatic impact on breast cancer and cells of the tumor microenvironment.\n\nMethods\n\nWe used a multiplexed immunofluorescence approach to label MRTFA, MRTFB, tumor cells by using pan Cytokeratin, endothelial cells by using CD31, and antigen presenting cells (APCs) by using HLA-DRA on two different breast cancer tissue microarrays (TMA): The breast cancer progression TMA provided by the Cooperative Human Tissue Network (CHTN_BrCaProg3) and the University of Illinois Breast Cancer Working Group (TMA BCWG UIC-001-TMA) that included primary tumor and lymph node metastases from patients residing in the West Side and South Side of Chicago. We also used bioinformatics analyses of the TCGA and METABRIC databases and the Broad Institute's single-cell RNA sequencing portal to investigate MRTFA/B expression patterns in the cells",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "endothelial cells",
+          "macrophages",
+          "myoepithelial cells",
+          "ACTA2+",
+          "perivascular-like cells"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "38855191",
+      "title": "Single-cell analyses reveal evolution mimicry during the specification of breast cancer subtype",
+      "abstract": "Background: The stem or progenitor antecedents confer developmental plasticity and unique cell identities to cancer cells via genetic and epigenetic programs. A comprehensive characterization and mapping of the cell-of-origin of breast cancer using novel technologies to unveil novel subtype-specific therapeutic targets is still absent.\n\nMethods: We integrated 195,144 high-quality cells from normal breast tissues and 406,501 high-quality cells from primary breast cancer samples to create a large-scale single-cell atlas of human normal and cancerous breasts. Potential heterogeneous origin of malignant cells was explored by contrasting cancer cells against reference normal epithelial cells. Multi-omics analyses and both in vitro and in vivo experiments were performed to screen and validate potential subtype-specific treatment targets. Novel biomarkers of identified immune and stromal cell subpopulations were validated by immunohistochemistry in our cohort.\n\nResults: Tumor stratification based on cancer cell-of-origin patterns correlated with clinical outcomes, genomic aberrations and diverse microenvironment constitutions. We found that the luminal progenitor (LP) subtype was robustly associated with poor prognosis, genomic instability and dysfunctional immune microenvironment. However, the LP subtype patients were sensitive to neoadjuvant chemotherapy (NAC), PARP inhibitors (PARPi) and immunotherapy. The LP subtype-specific target PLK1 was investigated by both in vitro and in v",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "endothelial cells",
+          "macrophages",
+          "myoepithelial cells",
+          "ACTA2+",
+          "perivascular-like cells"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "38507720",
+      "title": "A Subpopulation of Luminal Progenitors Secretes Pleiotrophin to Promote Angiogenesis and Metastasis in Inflammatory Breast Cancer",
+      "abstract": "Nonmalignant luminal progenitor cells expressing pleiotrophin promote angiogenesis by activating NRP1 and induce a prometastatic tumor microenvironment in inflammatory breast cancer, providing potential therapeutic targets for this aggressive breast cancer subtype.\n\nAbstract\n\nInflammatory breast cancer (IBC) is a highly aggressive subtype of breast cancer characterized by rapidly arising diffuse erythema and edema. Genomic studies have not identified consistent alterations and mechanisms that differentiate IBC from non-IBC tumors, suggesting that the microenvironment could be a potential driver of IBC phenotypes. Here, using single-cell RNA sequencing, multiplex staining, and serum analysis in patients with IBC, we identified enrichment of a subgroup of luminal progenitor (LP) cells containing high expression of the neurotropic cytokine pleiotrophin (PTN) in IBC tumors. PTN secreted by the LP cells promoted angiogenesis by directly interacting with the NRP1 receptor on endothelial tip cells located in both IBC tumors and the affected skin. NRP1 activation in tip cells led to recruitment of immature perivascular cells in the affected skin of IBC, which are correlated with increased angiogenesis and IBC metastasis. Together, these findings reveal a role for cross-talk between LPs, endothelial tip cells, and immature perivascular cells via PTN-NRP1 axis in the pathogenesis of IBC, which could lead to improved strategies for treating IBC.\n\nSignificance:\n\nNonmalignant luminal prog",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "endothelial cells",
+          "macrophages",
+          "myoepithelial cells",
+          "ACTA2+",
+          "perivascular-like cells"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "37496657",
+      "title": "The role of cancer-associated fibroblasts in breast cancer metastasis",
+      "abstract": "Breast cancer deaths are primarily caused by metastasis. There are several treatment options that can be used to treat breast cancer. There are, however, a limited number of treatments that can either prevent or inhibit the spread of breast tumor metastases. Thus, novel therapeutic strategies are needed. Studies have increasingly focused on the importance of the tumor microenvironment (TME) in metastasis of breast cancer. As the most abundant cells in the TME, cancer-associated fibroblasts (CAFs) play important roles in cancer pathogenesis. They can remodel the structure of the extracellular matrix (ECM) and engage in crosstalk with cancer cells or other stroma cells by secreting growth factors, cytokines, and chemokines, as well as components of the ECM, which assist the tumor cells to invade through the TME and cause distant metastasis. Clinically, CAFs not only foster the initiation, growth, angiogenesis, invasion, and metastasis of breast cancer but also serve as biomarkers for diagnosis, therapy, and prediction of prognosis. In this review, we summarize the biological characteristics and subtypes of CAFs and their functions in breast cancer metastasis, focusing on their important roles in the diagnosis, prognosis, and treatment of breast cancer. Recent studies suggest that CAFs are vital partners of breast cancer cells that assist metastasis and may represent ideal targets for prevention and treatment of breast cancer metastasis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "endothelial cells",
+          "macrophages",
+          "myoepithelial cells",
+          "ACTA2+",
+          "perivascular-like cells"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "36127427",
+      "title": "Single cell atlas identifies lipid-processing and immunomodulatory endothelial cells in healthy and malignant breast",
+      "abstract": "Since a detailed inventory of endothelial cell (EC) heterogeneity in breast cancer (BC) is lacking, here we perform single cell RNA-sequencing of 26,515 cells (including 8433 ECs) from 9 BC patients and compare them to published EC taxonomies from lung tumors. Angiogenic ECs are phenotypically similar, while other EC subtypes are different. Predictive interactome analysis reveals known but also previously unreported receptor-ligand interactions between ECs and immune cells, suggesting an involvement of breast EC subtypes in immune responses. We also identify a capillary EC subtype (LIPEC (Lipid Processing EC)), which expresses genes involved in lipid processing that are regulated by PPAR-gamma and is more abundant in peri-tumoral breast tissue. Retrospective analysis of 4648 BC patients reveals that treatment with metformin (an indirect PPAR-gamma signaling activator) provides long-lasting clinical benefit and is positively associated with LIPEC abundance. Our findings warrant further exploration of this LIPEC/PPAR-gamma link for BC treatment.\n\nTumor blood vessels contribute to cancer growth, invasion and metastasis. Here, by using single cell transcriptomics, the authors report an inventory of endothelial cell heterogeneity in patients with breast cancer, including a subtype that expresses genes involved in lipid processing and is regulated by PPAR-gamma.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "endothelial cells",
+          "macrophages",
+          "myoepithelial cells",
+          "ACTA2+",
+          "perivascular-like cells"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "33810979",
+      "title": "Mammary gland development from a single cell 'omics view",
+      "abstract": "Understanding the complexity and heterogeneity of mammary cell subpopulations is vital to delineate the mechanisms behind breast cancer development, progression and prevention. Increasingly sophisticated tools for investigating these cell subtypes has led to the development of a greater understanding of these cell subtypes, complex interplay of certain subtypes and their developmental potential. Of note, increasing accessibility and affordability of single cell technologies has led to a plethora of studies being published containing data from mammary cell subtypes and their differentiation potential in both mice and human data sets. Here, we review the different types of single cell technologies and how they have been used to improve our understanding of mammary gland development.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "endothelial cells",
+          "macrophages",
+          "myoepithelial cells",
+          "ACTA2+",
+          "perivascular-like cells"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "33950524",
+      "title": "A single-cell RNA expression atlas of normal, preneoplastic and tumorigenic states in the human breast",
+      "abstract": "Abstract\n\nTo examine global changes in breast heterogeneity across different states, we determined the single-cell transcriptomes of > 340,000 cells encompassing normal breast, preneoplastic BRCA1 +/- tissue, the major breast cancer subtypes, and pairs of tumors and involved lymph nodes. Elucidation of the normal breast microenvironment revealed striking changes in the stroma of post-menopausal women. Single-cell profiling of 34 treatment-naive primary tumors, including estrogen receptor (ER)+, HER2+, and triple-negative breast cancers, revealed comparable diversity among cancer cells and a discrete subset of cycling cells. The transcriptomes of preneoplastic BRCA1 +/- tissue versus tumors highlighted global changes in the immune microenvironment. Within the tumor immune landscape, proliferative CD8+ T cells characterized triple-negative and HER2+ cancers but not ER+ tumors, while all subtypes comprised cycling tumor-associated macrophages, thus invoking potentially different immunotherapy targets. Copy number analysis of paired ER+ tumors and lymph nodes indicated seeding by genetically distinct clones or mass migration of primary tumor cells into axillary lymph nodes. This large-scale integration of patient samples provides a high-resolution map of cell diversity in normal and cancerous human breast.\n\nA large-scale gene expression resource integrates diverse tissue samples and reveals unexpected heterogeneity of breast cancer subtypes.  ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "endothelial cells",
+          "macrophages",
+          "myoepithelial cells",
+          "ACTA2+",
+          "perivascular-like cells"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "39499736",
+      "title": "Transcriptomic analysis of the 12 major human breast cell types reveals mechanisms of cell and tissue function",
+      "abstract": "A fundamental question in biology, central to our understanding of cancer and other pathologies, is determining how different cell types coordinate to form and maintain tissues. Recognizing the distinct features and capabilities of the cells that compose these tissues is critical. Unfortunately, the complexity of tissues often hinders our ability to distinguish between neighboring cell types and, in turn, scrutinize their transcriptomes and generate reliable and tractable cell models for studying their inherently different biologies. We have recently introduced a novel method that permits the identification and purification of the 12 cell types that compose the human breast:nearly all of which could be reliably propagated in the laboratory. Here, we explore the nature of these cell types. We sequence mRNAs from each purified population and investigate transcriptional patterns that reveal their distinguishing features. We describe the differentially expressed genes and enriched biological pathways that capture the essence of each cell type, and we highlight transcripts that display intriguing expression patterns. These data, analytic tools, and transcriptional analyses form a rich resource whose exploration provides remarkable insights into the inner workings of the cell types composing the breast, thus furthering our understanding of the rules governing normal cell and tissue function.\n\nDetermining how different cell types coordinate to form and maintain tissues is crucial to",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "endothelial cells",
+          "macrophages",
+          "myoepithelial cells",
+          "ACTA2+",
+          "perivascular-like cells"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 6,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "41491840",
+      "title": "The spatial immune landscape predicts outcome and reveals the central role of tumor-associated macrophages in inflammatory breast cancer biology",
+      "abstract": "Background\n\nInflammatory breast cancer (IBC) is a rare but aggressive subtype of breast cancer characterized by rapid progression and poor prognosis. Despite its distinct clinical presentation and molecular features, the immune landscape of IBC and its potential role in driving the aggressive phenotype remain poorly understood. This study aimed to characterize the spatial immune landscape of IBC, compare it with that of subtype-matched non-inflammatory breast cancer (nIBC), and evaluate the prognostic implications of immune cell composition and localization.\n\nMethods\n\nWe analyzed pre-treatment tumor samples from 161 IBC and 115 subtype-matched nIBC patients using immunohistochemistry (IHC) for CD8, FOXP3, CD79alpha, CD163, and PD-L1. Digital image analysis quantified the immune cell density and relative marker area in the tumor area (TA) and invasive margin (IM). Associations with clinicopathological features, pathological response to neoadjuvant chemotherapy (NACT), and survival were assessed using multivariate logistic regression and Cox proportional hazards models. Transcriptomic validation was performed using Affymetrix gene expression data and consensus TME deconvolution.\n\nResults\n\nIBC showed higher infiltration of CD163 + tumor-associated macrophages (TAMs) compared to nIBC. Gene expression data confirmed IHC findings, and pathway analysis linked high TAM density with inflammatory and proliferative pathways. The spatial distribution of immune cells was prognostically re",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tumor microenvironment",
+          "cell-cell interaction",
+          "immune infiltration",
+          "spatial transcriptomics",
+          "cell composition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "40170080",
+      "title": "STopover captures spatial colocalization and interaction in the tumor microenvironment using topological analysis in spatial transcriptomics data",
+      "abstract": "Unraveling the spatial configuration of the tumor microenvironment (TME) is crucial for elucidating tumor-immune interactions based on immuno-oncology. We present STopover, a novel approach utilizing spatially resolved transcriptomics (SRT) data and topological analysis to investigate the TME. By gradually lowering the feature threshold, connected components (CCs) are extracted based on spatial distance and persistence, with Jaccard indices quantifying their spatial overlap, and transcriptomic profiles are permutated to assess statistical significance. Applied to lung and breast cancer SRT, STopover revealed immune and stromal cell infiltration patterns, predicted key cell-cell communication, and identified relevant regions, shedding light on cancer pathophysiology (URL: https://github.com/bsungwoo/STopover). \n\nSupplementary Information\n\nThe online version contains supplementary material available at 10.1186/s13073-025-01457-1.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tumor microenvironment",
+          "cell-cell interaction",
+          "immune infiltration",
+          "spatial transcriptomics",
+          "cell composition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "40079015",
+      "title": "Analysis of single-cell and spatial transcriptomics in TNBC cell-cell interactions",
+      "abstract": "Triple-negative breast cancer (TNBC) is a highly malignant tumor in women, characterized by high morbidity, mortality, and recurrence rates. Although surgical treatment, radiotherapy, and chemotherapy are the mainstays of current treatment methods, the high heterogeneity of TNBC results in unsatisfactory outcomes with low 5-year survival rates. Rapid advancements in omics technology have propelled the understanding of TNBC molecular biology. The emergence of single-cell RNA sequencing (scRNA-seq) and spatial transcriptomics (ST) has significantly enhanced knowledge of tumor heterogeneity and the distribution, functionality, and intercellular interactions of various cell types within the tumor microenvironment, including tumor cells, T cells, B cells, macrophages, and fibroblasts. The present study provides an overview of the technical characteristics of scRNA-seq and ST, highlighting their applications in exploring TNBC heterogeneity, cell spatial distribution patterns, and intercellular interactions. This review aims to enhance the comprehension of TNBC at the cellular level for the development of effective therapeutic targets.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tumor microenvironment",
+          "cell-cell interaction",
+          "immune infiltration",
+          "spatial transcriptomics",
+          "cell composition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "33467084",
+      "title": "A High-Dimensional Window into the Micro-Environment of Triple Negative Breast Cancer",
+      "abstract": "Simple Summary\n\nTriple negative breast cancer (TNBC) shows a substantial level of genomic, cellular, and phenotypic heterogeneity. While genomic heterogeneity and subclonal diversity are prevalent in this subgroup of tumors, a growing body of evidence indicates that the disease course depends on the interaction between cancer cells and the tumor micro-environment (TME). The TME is not static and can change over time, owing to differences in cell numbers, phenotypes, and spatial relationships. Efforts to further elucidate the TME have been aided by a plethora of new technologies that study tumors in a high-dimensional manner. These high-dimensional technologies enable comprehensive analysis of cell phenotypes at the single cell level or the spatial relationships of tumor and immune cells. In this review, we discuss studies in TNBC that unravel specific spatial patterns of cells in the breast TME and single cell phenotypes.\n\nAbstract\n\nProviding effective personalized immunotherapy for triple negative breast cancer (TNBC) patients requires a detailed understanding of the composition of the tumor microenvironment. Both the tumor cell and non-tumor components of TNBC can exhibit tremendous heterogeneity in individual patients and change over time. Delineating cellular phenotypes and spatial topographies associated with distinct immunological states and the impact of chemotherapy will be necessary to optimally time immunotherapy. The clinical successes in immunotherapy have intensi",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tumor microenvironment",
+          "cell-cell interaction",
+          "immune infiltration",
+          "spatial transcriptomics",
+          "cell composition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "41238964",
+      "title": "Exploration of the roles of CAFs in melanoma based on single-cell transcriptomics and spatial transcriptomics",
+      "abstract": "Background\n\nCancer-associated fibroblasts (CAFs) are increasingly recognized as critical contributors to the limited efficacy of immunotherapy, particularly through the establishment of immune-excluded tumor microenvironments. However, the functional heterogeneity and spatial ecological roles of CAFs in melanoma remain poorly characterized.\n\nMethods\n\nWe integrated single-cell RNA sequencing, spatial transcriptomics, and bulk RNA-seq data to systematically dissect CAF molecular programs in melanoma using weighted gene co-expression network analysis (WGCNA). Spatial distribution, CellChat, and ligand-receptor interaction analyses were applied to construct CAF-centered immune exclusion networks. A functional scoring model (riskScore) based on the CAF-M1 module was developed to evaluate clinical relevance.\n\nResults\n\nCAF was spatially co-localized with endothelial cells, and engaged in strong crosstalk with multiple immune cell types via pathways such as COLLAGEN-integrin and THBS1-CD47. The derived riskScore model demonstrated robust prognostic value across TCGA-SKCM cohort.\n\nConclusion\n\nThrough spatial aggregation and multifaceted immune signaling, CAF constructs a multilayered immune-exclusion network in melanoma, linking stromal remodeling to immune evasion. These findings offer novel insights into CAF-driven immune resistance and may inform future stratified immunotherapeutic strategies.\n\nSupplementary Information\n\nThe online version contains supplementary material available ",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tumor microenvironment",
+          "cell-cell interaction",
+          "immune infiltration",
+          "spatial transcriptomics",
+          "cell composition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "38821717",
+      "title": "Spatially resolved tissue imaging to analyze the tumor immune microenvironment: beyond cell-type densities",
+      "abstract": "Introduction\n\nThe tissue immune microenvironment is associated with key aspects of tumor biology. The interaction between the immune system and cancer cells has predictive and prognostic potential across different tumor types. Spatially resolved tissue-based technologies allowed researchers to simultaneously quantify different immune populations in tumor samples. However, bare quantification fails to harness the spatial nature of tissue-based technologies. Tumor-immune interactions are associated with specific spatial patterns that can be measured. In recent years, several computational tools have been developed to increase our understanding of these spatial patterns.\n\nTopics covered\n\nIn this review, we cover standard techniques as well as new advances in the field of spatial analysis of the immune microenvironment. We focused on marker quantification, spatial intratumor heterogeneity analysis, cell-cell spatial interaction studies and neighborhood analyses.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tumor microenvironment",
+          "cell-cell interaction",
+          "immune infiltration",
+          "spatial transcriptomics",
+          "cell composition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "37234284",
+      "title": "Deciphering the tumour immune microenvironment cell by cell",
+      "abstract": "Immune checkpoint inhibitors (ICIs) have rejuvenated therapeutic approaches in oncology. Although responses tend to be durable, response rates vary in many cancer types. Thus, the identification and validation of predictive biomarkers is a key clinical priority, the answer to which is likely to lie in the tumour microenvironment (TME). A wealth of data demonstrates the huge impact of the TME on ICI response and resistance. However, these data also reveal the complexity of the TME composition including the spatiotemporal interactions between different cell types and their dynamic changes in response to ICIs. Here, we briefly review some of the modalities that sculpt the TME, in particular the metabolic milieu, hypoxia and the role of cancer-associated fibroblasts. We then discuss recent approaches to dissect the TME with a focus on single-cell RNA sequencing, spatial transcriptomics and spatial proteomics. We also discuss some of the clinically relevant findings these multi-modal analyses have yielded.\n\nHighlights\n\nThe TME shapes responses to ICIs.\n\nWe discuss how metabolites, hypoxia and cancer-associated fibroblasts sculpt the TME.\n\nWe discuss single-cell omics technologies to analyse and quantify the TME.\n\nWe survey spatial transcriptomics and proteomics technologies for analysing the TME.\n\nWe discuss the clinical impact of TME spatial and single-cell analysis.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tumor microenvironment",
+          "cell-cell interaction",
+          "immune infiltration",
+          "spatial transcriptomics",
+          "cell composition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    },
+    {
+      "pmid": "36376874",
+      "title": "Spatial multi-omics analyses of the tumor immune microenvironment",
+      "abstract": "In the past decade, single-cell technologies have revealed the heterogeneity of the tumor-immune microenvironment at the genomic, transcriptomic, and proteomic levels and have furthered our understanding of the mechanisms of tumor development. Single-cell technologies have also been used to identify potential biomarkers. However, spatial information about the tumor-immune microenvironment such as cell locations and cell-cell interactomes is lost in these approaches. Recently, spatial multi-omics technologies have been used to study transcriptomes, proteomes, and metabolomes of tumor-immune microenvironments in several types of cancer, and the data obtained from these methods has been combined with immunohistochemistry and multiparameter analysis to yield markers of cancer progression. Here, we review numerous cutting-edge spatial 'omics techniques, their application to study of the tumor-immune microenvironment, and remaining technical challenges.",
+      "journal_quality": 0.5,
+      "matched_via_query": {
+        "genes": [],
+        "diseases": [
+          "breast cancer"
+        ],
+        "keywords": [
+          "tumor microenvironment",
+          "cell-cell interaction",
+          "immune infiltration",
+          "spatial transcriptomics",
+          "cell composition"
+        ],
+        "query_intent": "keyword"
+      },
+      "query_index": 7,
+      "iteration": 0,
+      "query_type": "keyword"
+    }
+  ],
+  "generated_queries": [
+    {
+      "genes": [
+        "JAG1"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "NOTCH3"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": []
+    },
+    {
+      "genes": [
+        "JAG1",
+        "NOTCH3"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "ligand",
+        "receptor",
+        "cell signaling",
+        "tumor progression"
+      ]
+    },
+    {
+      "genes": [
+        "JAG1",
+        "NOTCH3"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "angiogenesis",
+        "vascular remodeling",
+        "endothelial activation",
+        "perivascular niche"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "Notch signaling pathway",
+        "JAG1-NOTCH3 axis",
+        "canonical Notch signaling",
+        "lateral inhibition"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "Notch pathway",
+        "JAG1 signaling",
+        "NOTCH3 activation",
+        "tumor microenvironment crosstalk"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "endothelial cells",
+        "macrophages",
+        "myoepithelial cells",
+        "ACTA2+",
+        "perivascular-like cells"
+      ]
+    },
+    {
+      "genes": [],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "tumor microenvironment",
+        "cell-cell interaction",
+        "immune infiltration",
+        "spatial transcriptomics",
+        "cell composition"
+      ]
+    },
+    {
+      "genes": [
+        "JAG1",
+        "NOTCH3"
+      ],
+      "diseases": [
+        "breast cancer"
+      ],
+      "keywords": [
+        "spatial transcriptomics",
+        "cell-cell communication",
+        "endothelial-macrophage interaction",
+        "perivascular niche",
+        "tumor microenvironment"
+      ]
+    }
+  ],
+  "coverage": {
+    "genes_covered": [
+      "JAG1",
+      "NOTCH3"
+    ],
+    "genes_matched_by": {
+      "JAG1": "biomcp_tag_only",
+      "NOTCH3": "biomcp_tag+text_confirmed"
+    },
+    "pathways_covered": [],
+    "pathways_matched_by": {},
+    "celltypes_covered": [
+      "Endothelial",
+      "Macrophages 2"
+    ],
+    "total_papers": 77,
+    "genes_coverage_pct": 100.0,
+    "pathways_coverage_pct": 0.0,
+    "celltypes_coverage_pct": 40.0,
+    "genes_missing": [],
+    "pathways_missing": [],
+    "celltypes_missing": [
+      "Myoepi ACTA2+",
+      "Perivascular-Like",
+      "Stromal & T Cell Hybrid"
+    ]
+  },
+  "search_method": "search_literature_dynamic",
+  "iterations": 2,
+  "coverage_history": [
+    {
+      "iteration": 0,
+      "papers": 0,
+      "gene_coverage": 0.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": 1,
+      "papers": 77,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    },
+    {
+      "iteration": "final",
+      "papers": 77,
+      "gene_coverage": 1.0,
+      "pathway_coverage": 0.0
+    }
+  ],
+  "coverage_sufficient": false,
+  "recommended_actions": [
+    "Pathway coverage 0% < 50% target. Missing: []. Search with controlled pathway labels/aliases + disease context.",
+    "Use think_tool to reflect on gaps before proceeding."
+  ],
+  "filter_stage": "deterministic_only",
+  "rerank_applied_count": 0,
+  "rerank_dropped_count": 0
+}
