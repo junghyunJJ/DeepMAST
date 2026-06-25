@@ -818,3 +818,17 @@ class TestAnalysisStepFailureDoesNotAdvance:
         assert result["current_analysis_step"] == 9
         assert result.get("analysis_9_11_complete") is not True
         assert "sig_liana.csv not found" in result["messages"][0].content[0]["text"]
+
+
+class TestResearchSummaryMoransColumn:
+    """The wrapper should summarize the actual sig_liana.csv column name."""
+
+    def setup_method(self):
+        self.agent = _make_agent()
+
+    def test_morans_column_is_available_to_summary_candidates(self):
+        candidates = DeepInterpreterWrapperAgent.LIANA_MORANS_SUMMARY_COLUMNS
+
+        assert candidates[0] == "morans"
+        assert "morans_r" in candidates
+        assert "Morans_R" in candidates

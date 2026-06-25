@@ -97,6 +97,14 @@ class DeepInterpreterWrapperAgent(BaseAgent):
         "INVOKE_DEEP": "invoke_deep_agent",
     }
 
+    LIANA_MORANS_SUMMARY_COLUMNS: ClassVar[tuple[str, ...]] = (
+        "morans",
+        "morans_r",
+        "MoransR",
+        "morans_R",
+        "Morans_R",
+    )
+
     ANALYSIS_STEPS = [
         {"step": 1, "tool": "plot_cluster", "desc": "Spatial clustering",
          "figures": ["1.cluster_spatial.png"], "data_files": []},
@@ -1391,7 +1399,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
                     pair_counts = {f: int(liana_df[f].notna().sum()) for f in factor_cols_liana}
                     summary_lines.append(f"Significant L-R pairs per factor: {pair_counts}")
                 morans_col = None
-                for candidate in ["morans_r", "MoransR", "morans_R", "Morans_R"]:
+                for candidate in self.LIANA_MORANS_SUMMARY_COLUMNS:
                     if candidate in liana_df.columns:
                         morans_col = candidate
                         break
