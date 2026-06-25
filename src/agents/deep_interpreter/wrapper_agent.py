@@ -1867,13 +1867,23 @@ Available factors: {available_factors}
         sel_factor = state["sel_factor"]
         if current_step == 9:
             csv_path = f"{save_path}/sig_liana.csv"
-            try:
-                sig_headers = await asyncio.to_thread(pd.read_csv, csv_path, index_col=0, nrows=0)
-                available = [c for c in sig_headers.columns if c.startswith("Factor")]
-                if sel_factor not in available and available:
-                    sel_factor = available[0]
-            except FileNotFoundError:
-                pass
+            if not os.path.exists(csv_path):
+                message_content = [{
+                    "type": "text",
+                    "text": (
+                        f"**Step {current_step}/11: {step_config['desc']}** - "
+                        "BLOCKED (sig_liana.csv not found; Step 8 must complete first)"
+                    ),
+                }]
+                return {
+                    "current_analysis_step": current_step,
+                    "messages": [AIMessage(content=message_content)],
+                }
+
+            sig_headers = await asyncio.to_thread(pd.read_csv, csv_path, nrows=0)
+            available = [c for c in sig_headers.columns if c.startswith("Factor")]
+            if sel_factor not in available and available:
+                sel_factor = available[0]
 
         # Dependency check: Steps 10-11 need sel_interest_sig_liana.csv from Step 9
         if current_step in (10, 11):

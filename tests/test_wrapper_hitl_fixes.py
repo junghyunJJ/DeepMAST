@@ -798,3 +798,23 @@ class TestAnalysisStepFailureDoesNotAdvance:
 
         assert result["current_analysis_step"] == 9
         assert result.get("analysis_9_11_complete") is not True
+
+    @pytest.mark.asyncio
+    async def test_step_9_missing_sig_liana_does_not_call_mcp(self, tmp_path):
+        state = {
+            "current_analysis_step": 9,
+            "data_directory": str(tmp_path),
+            "cluster_key": "IRIS_domain",
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+            "interest_sample": "V19S23-092-B1",
+        }
+        (tmp_path / "lrdata_V19S23-092-B1.h5ad").write_text("sample")
+
+        with patch("src.agents.deep_interpreter.wrapper_agent.MultiServerMCPClient") as client_cls:
+            result = await self.agent.run_single_analysis_step_9_11_node(state, DUMMY_CONFIG)
+
+        client_cls.assert_not_called()
+        assert result["current_analysis_step"] == 9
+        assert result.get("analysis_9_11_complete") is not True
+        assert "sig_liana.csv not found" in result["messages"][0].content[0]["text"]
