@@ -48,6 +48,44 @@ def _make_agent() -> DeepInterpreterWrapperAgent:
 DUMMY_CONFIG = {"configurable": {}}
 
 
+class TestLRDataPathResolution:
+    """Verify interest_sample-specific LIANA artifacts are preferred."""
+
+    def setup_method(self):
+        self.agent = _make_agent()
+
+    def test_prefers_interest_sample_lrdata_when_both_exist(self, tmp_path):
+        (tmp_path / "lrdata.h5ad").write_text("combined")
+        sample_path = tmp_path / "lrdata_V19S23-092-B1.h5ad"
+        sample_path.write_text("sample")
+
+        result = self.agent._resolve_lrdata_path(
+            str(tmp_path),
+            interest_sample="V19S23-092-B1",
+        )
+
+        assert result == str(sample_path)
+
+    def test_falls_back_to_combined_lrdata_without_interest_sample(self, tmp_path):
+        combined_path = tmp_path / "lrdata.h5ad"
+        combined_path.write_text("combined")
+
+        result = self.agent._resolve_lrdata_path(str(tmp_path))
+
+        assert result == str(combined_path)
+
+    def test_falls_back_to_combined_lrdata_when_sample_file_missing(self, tmp_path):
+        combined_path = tmp_path / "lrdata.h5ad"
+        combined_path.write_text("combined")
+
+        result = self.agent._resolve_lrdata_path(
+            str(tmp_path),
+            interest_sample="V19S23-092-B1",
+        )
+
+        assert result == str(combined_path)
+
+
 # ===========================================================================
 # Test Group 1: route_after_clusters routing logic (Fix 4)
 # ===========================================================================

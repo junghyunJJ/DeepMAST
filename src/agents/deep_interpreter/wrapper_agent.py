@@ -796,17 +796,19 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
     def _resolve_lrdata_path(self, save_path: str, interest_sample: str | None = None) -> str | None:
         """Resolve lrdata h5ad path, supporting interest_sample suffix.
 
-        Resolution order (no glob to avoid blocking scandir in async context):
-        1. {save_path}/lrdata.h5ad (backward compat)
-        2. {save_path}/lrdata_{interest_sample}.h5ad
+        Resolution order:
+        1. {save_path}/lrdata_{interest_sample}.h5ad when interest_sample is set
+        2. {save_path}/lrdata.h5ad
         """
-        default = f"{save_path}/lrdata.h5ad"
-        if os.path.exists(default):
-            return default
         if interest_sample:
             specific = f"{save_path}/lrdata_{interest_sample}.h5ad"
             if os.path.exists(specific):
                 return specific
+
+        default = f"{save_path}/lrdata.h5ad"
+        if os.path.exists(default):
+            return default
+
         return None
 
     # ===== Node Initialization =====
