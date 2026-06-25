@@ -86,6 +86,73 @@ class TestLRDataPathResolution:
         assert result == str(combined_path)
 
 
+class TestLRDataPathRoles:
+    """Step 7 uses global NMF; Step 8+ uses targeted sample lrdata."""
+
+    def setup_method(self):
+        self.agent = _make_agent()
+
+    def _state(self, tmp_path):
+        return {
+            "h5ad_files": [str(tmp_path / "input.h5ad")],
+            "cluster_key": "IRIS_domain",
+            "data_directory": str(tmp_path),
+            "species": "human",
+            "sample_key": "sample",
+            "interest_sample": "V19S23-092-B1",
+            "interest_clusters": ["9", "11", "10", "13", "5"],
+        }
+
+    def test_step_7_factor_score_uses_combined_lrdata(self, tmp_path):
+        combined_path = tmp_path / "lrdata.h5ad"
+        sample_path = tmp_path / "lrdata_V19S23-092-B1.h5ad"
+        combined_path.write_text("combined")
+        sample_path.write_text("sample")
+
+        result = self.agent._build_step_args(7, self._state(tmp_path))
+
+        assert result["filename"] == str(combined_path)
+
+    def test_step_8_loadings_use_interest_sample_lrdata(self, tmp_path):
+        combined_path = tmp_path / "lrdata.h5ad"
+        sample_path = tmp_path / "lrdata_V19S23-092-B1.h5ad"
+        combined_path.write_text("combined")
+        sample_path.write_text("sample")
+
+        result = self.agent._build_step_args(8, self._state(tmp_path))
+
+        assert result["filename"] == str(sample_path)
+
+    def test_step_9_quadrant_uses_interest_sample_lrdata(self, tmp_path):
+        combined_path = tmp_path / "lrdata.h5ad"
+        sample_path = tmp_path / "lrdata_V19S23-092-B1.h5ad"
+        combined_path.write_text("combined")
+        sample_path.write_text("sample")
+
+        result = self.agent._build_step_args_9_11(
+            9,
+            self._state(tmp_path),
+            sel_factor="Factor1",
+        )
+
+        assert result["lrdata_path"] == str(sample_path)
+
+    def test_step_6_cache_requires_combined_lrdata(self, tmp_path):
+        (tmp_path / "sig_liana.csv").write_text("interaction,morans\n")
+        (tmp_path / "lrdata_V19S23-092-B1.h5ad").write_text("sample")
+        step_config = DeepInterpreterWrapperAgent.ANALYSIS_STEPS[5]
+
+        result = self.agent._check_step_outputs_exist(
+            step_config,
+            str(tmp_path),
+            step=6,
+            sample_key="sample",
+            interest_sample="V19S23-092-B1",
+        )
+
+        assert result is False
+
+
 # ===========================================================================
 # Test Group 1: route_after_clusters routing logic (Fix 4)
 # ===========================================================================

@@ -567,7 +567,6 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         sample_key = state.get("sample_key")
         interest_sample = state.get("interest_sample")
         save_path = state["data_directory"]
-        lrdata_path = self._resolve_lrdata_path(save_path, interest_sample) or f"{save_path}/lrdata.h5ad"
 
         if step == 1:
             args = {"filename": filename, "cluster_key": cluster_key, "save_path": save_path}
@@ -605,12 +604,14 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             return args
 
         if step == 7:
+            lrdata_path = self._resolve_combined_lrdata_path(save_path) or f"{save_path}/lrdata.h5ad"
             args = {"filename": lrdata_path, "cluster_key": cluster_key, "save_path": save_path}
             if sample_key:
                 args["sample_key"] = sample_key
             return args
 
         if step == 8:
+            lrdata_path = self._resolve_lrdata_path(save_path, interest_sample) or f"{save_path}/lrdata.h5ad"
             return {"filename": lrdata_path, "organism": organism,
                     "geneset": "progeny", "save_path": save_path}
 
@@ -754,7 +755,10 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         if data_files:
             for f in data_files:
                 if f == "lrdata.h5ad":
-                    if not self._resolve_lrdata_path(save_path, interest_sample):
+                    if step == 6:
+                        if not self._resolve_combined_lrdata_path(save_path):
+                            return False
+                    elif not self._resolve_lrdata_path(save_path, interest_sample):
                         return False
                 elif not os.path.exists(f"{save_path}/{f}"):
                     return False
@@ -800,6 +804,13 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             return step_config["figures"]
 
         return step_config["figures"]
+
+    def _resolve_combined_lrdata_path(self, save_path: str) -> str | None:
+        """Resolve the full-dataset lrdata artifact used for global NMF factor plots."""
+        combined = f"{save_path}/lrdata.h5ad"
+        if os.path.exists(combined):
+            return combined
+        return None
 
     def _resolve_lrdata_path(self, save_path: str, interest_sample: str | None = None) -> str | None:
         """Resolve lrdata h5ad path, supporting interest_sample suffix.
@@ -1235,13 +1246,18 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         save_path = state["data_directory"]
         sample_key = state.get("sample_key")
 
-        # Dependency check: Steps 7-8 need lrdata.h5ad from Step 6
+        # Dependency check: Step 7 needs combined lrdata; Step 8 can use sample-specific lrdata.
         if current_step in (7, 8):
             interest_sample = state.get("interest_sample")
-            lrdata_path = await asyncio.to_thread(self._resolve_lrdata_path, save_path, interest_sample)
+            if current_step == 7:
+                lrdata_path = await asyncio.to_thread(self._resolve_combined_lrdata_path, save_path)
+                missing_text = "combined lrdata.h5ad not found, Step 6 may have failed"
+            else:
+                lrdata_path = await asyncio.to_thread(self._resolve_lrdata_path, save_path, interest_sample)
+                missing_text = "sample-specific lrdata not found, Step 6 may have failed"
             if not lrdata_path:
                 message_content = [{"type": "text",
-                    "text": f"**Step {current_step}/8: {step_config['desc']}** - SKIPPED (lrdata.h5ad not found, Step 6 may have failed)"}]
+                    "text": f"**Step {current_step}/8: {step_config['desc']}** - SKIPPED ({missing_text})"}]
                 is_last = current_step >= 8
                 return {
                     "current_analysis_step": current_step + 1 if not is_last else current_step,
