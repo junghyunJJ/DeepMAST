@@ -1312,6 +1312,12 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
             8, sample_key,
         )
 
+        if status == "failed":
+            return {
+                "current_analysis_step": current_step,
+                "messages": [AIMessage(content=message_content)],
+            }
+
         is_last = current_step >= 8
         update = {
             "current_analysis_step": current_step + 1 if not is_last else current_step,
@@ -1952,6 +1958,12 @@ Available factors: {available_factors}
             current_step, step_config, status, save_path, error_msg,
             11, sample_key,
         )
+
+        if status == "failed":
+            return {
+                "current_analysis_step": current_step,
+                "messages": [AIMessage(content=message_content)],
+            }
 
         is_last = current_step >= 11
         update = {

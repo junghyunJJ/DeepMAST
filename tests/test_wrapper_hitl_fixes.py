@@ -718,3 +718,83 @@ class TestSuggestFactorEdgeCases:
         assert isinstance(result, str)
         # Factor2 should win (Factor1 gets -inf from fillna)
         assert result == "Factor2"
+
+
+class TestAnalysisStepFailureDoesNotAdvance:
+    """MCP failures should not be treated as completed pipeline progress."""
+
+    def setup_method(self):
+        self.agent = _make_agent()
+        self.agent.ANALYSIS_STEPS = DeepInterpreterWrapperAgent.ANALYSIS_STEPS
+        self.agent.ANALYSIS_STEPS_9_11 = DeepInterpreterWrapperAgent.ANALYSIS_STEPS_9_11
+
+    @pytest.mark.asyncio
+    async def test_step_8_failure_does_not_mark_analysis_1_8_complete(self, tmp_path):
+        state = {
+            "current_analysis_step": 8,
+            "h5ad_files": [str(tmp_path / "input.h5ad")],
+            "cluster_key": "IRIS_domain",
+            "data_directory": str(tmp_path),
+            "species": "human",
+            "interest_sample": "V19S23-092-B1",
+        }
+        (tmp_path / "input.h5ad").write_text("unused")
+        (tmp_path / "lrdata_V19S23-092-B1.h5ad").write_text("sample")
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "SP_ENRICH_MCP_PYTHON": "python",
+                    "SP_ENRICH_MCP_SERVER_PATH": "/tmp/sp",
+                },
+            ),
+            patch.object(self.agent, "_check_step_outputs_exist", return_value=False),
+            patch.object(self.agent, "_build_step_args", return_value={"filename": "x"}),
+            patch("src.agents.deep_interpreter.wrapper_agent.MultiServerMCPClient") as client_cls,
+        ):
+            client = AsyncMock()
+            client.get_tools.return_value = []
+            client_cls.return_value = client
+
+            result = await self.agent.run_single_analysis_step_node(state, DUMMY_CONFIG)
+
+        assert result["current_analysis_step"] == 8
+        assert result.get("analysis_1_8_complete") is not True
+
+    @pytest.mark.asyncio
+    async def test_step_9_failure_does_not_route_to_drug_target(self, tmp_path):
+        state = {
+            "current_analysis_step": 9,
+            "data_directory": str(tmp_path),
+            "cluster_key": "IRIS_domain",
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+            "interest_sample": "V19S23-092-B1",
+        }
+        (tmp_path / "lrdata_V19S23-092-B1.h5ad").write_text("sample")
+        pd.DataFrame({"interaction": ["A^B"], "Factor1": [1.0]}).to_csv(
+            tmp_path / "sig_liana.csv",
+            index=False,
+        )
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "SP_ENRICH_MCP_PYTHON": "python",
+                    "SP_ENRICH_MCP_SERVER_PATH": "/tmp/sp",
+                },
+            ),
+            patch.object(self.agent, "_check_step_outputs_exist", return_value=False),
+            patch.object(self.agent, "_build_step_args_9_11", return_value={"csv_path": "x"}),
+            patch("src.agents.deep_interpreter.wrapper_agent.MultiServerMCPClient") as client_cls,
+        ):
+            client = AsyncMock()
+            client.get_tools.return_value = []
+            client_cls.return_value = client
+
+            result = await self.agent.run_single_analysis_step_9_11_node(state, DUMMY_CONFIG)
+
+        assert result["current_analysis_step"] == 9
+        assert result.get("analysis_9_11_complete") is not True
