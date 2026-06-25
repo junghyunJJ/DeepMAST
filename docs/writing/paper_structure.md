@@ -276,20 +276,20 @@ Claim boundary
 
 ---
 
-## 3. Evidence-governed claim control constrains biological interpretation and Evidence-Grounded Follow-up Recommendations
+## 3. Evidence-governed claim control constrains biological interpretation and follow-up recommendations
 
-**역할:** Figure 2에서 evidence가 system으로 들어오는 과정을 보여준 뒤, Figure 3은 그 evidence가 claim으로 바뀌는 지점을 직접 검증하는 bridge figure입니다. 이 섹션을 real-data application 앞에 두면 Figure 2에서 Figure 4로 넘어가는 논리적 약점이 줄어듭니다. MEDEA/SPARK처럼 "system design -> validation bridge -> application" 구조가 되고, DeepMAST의 novelty도 **Evidence-Governed Agent Harness**로 더 선명해집니다.
+**역할:** Figure 3은 Figure 2의 evidence-acquisition benchmark와 Figure 4 이후 real-data application 사이의 claim-governance bridge입니다. Figure 2는 "citable/source-grounded evidence가 system으로 들어오는가"를 검증하지만, 그 evidence가 final biological claim으로 바뀔 때 unsupported mechanism, causal overclaiming, premature therapeutic claim이 줄어드는지는 별도 검증하지 않습니다. 따라서 Figure 3을 Figure 4 앞에 배치해 fixed evidence substrate 아래에서 guidance effect를 비교하고, 이후 biological application이 단순한 agent narrative가 아니라 evidence-boundary를 통과한 harness output임을 보여줍니다. MEDEA, SPARK, SpatialAgent, STAgent 모두 overview/evidence system 뒤에 benchmark 또는 validation figure를 두고, 그 다음 application을 전개하는 구조를 사용하므로 DeepMAST도 "evidence input -> claim-governance benchmark -> biological application" 흐름으로 정리하는 것이 가장 자연스럽습니다.
 
 추천 heading:
 
 ```text
-Evidence-governed claim control constrains biological interpretation and Evidence-Grounded Follow-up Recommendations
+Evidence-governed claim control constrains biological interpretation and follow-up recommendations
 ```
 
-Section 3 시작 bridge:
+Section 3 시작 bridge
 
 ```text
-After establishing that DeepMAST improves evidence acquisition and source-grounded retrieval, we next evaluated whether structured guidance constrained the claims generated from that evidence. We tested this at two claim-generation points: ligand-receptor interpretation in a CCI benchmark and downstream breast cancer Evidence-Grounded Follow-up Recommendations under controlled guide activation.
+After establishing that DeepMAST improves evidence acquisition and source-grounded retrieval, we next evaluated whether evidence artifacts remain bounded when they are converted into written biological claims. Retrieval success alone does not demonstrate evidence-governed interpretation, because retrieved sources can still be transformed into unsupported mechanisms, overstated causal links, or premature therapeutic claims. We therefore tested this claim-governance layer before the real-data applications at two claim-generation points: ligand-receptor interpretation in a CCI benchmark and downstream breast cancer follow-up recommendations under controlled guide activation.
 ```
 
 Figure 3 panel 구성:
@@ -297,12 +297,12 @@ Figure 3 panel 구성:
 ```text
 Figure 3
 Evidence-governed claim control benchmark.
-Message: DeepMAST constrains unsupported biological interpretation upstream and improves claim-boundary restraint downstream in Evidence-Grounded Follow-up Recommendations outputs.
+Message: DeepMAST tests the same evidence-governance principle in two benchmark branches: upstream CCI interpretation and downstream follow-up recommendation writing.
 
 Figure 3A
-Claim-governance lifecycle schematic.
+Two-branch claim-governance benchmark schematic.
 Source path: benchmarks/dth/figures/Fig3A_ClaimGovernanceLifecycle.svg
-Message: evidence package -> structured guide activation -> claim generation -> evidence audit -> blind judging/finalization. This panel is a schematic bridge, not a new benchmark result.
+Message: fixed evidence artifacts and structured guidance split into two controlled benchmark branches: CCI interpretation supporting Figure 3B and follow-up recommendations supporting Figure 3C. This panel is a schematic bridge, not a new benchmark result.
 
 Figure 3B
 Structured SKILL CCI ablation benchmark.
@@ -311,19 +311,19 @@ Linked supplement: Supplementary Figure S4B shows dimension-level scores and fab
 Message: structured SKILL guidance reduces plausible but unsupported ligand-receptor interpretation.
 
 Figure 3C, left
-Evidence-Grounded Follow-up Recommendations evidence coverage.
+Follow-up recommendation evidence coverage.
 Source path: benchmarks/dth/figures/Fig3A_DTH_EvidenceCoverage.svg
 Message: guide-activated generation produced a modest/borderline increase in evidence coverage and should be treated as a secondary endpoint.
 
 Figure 3C, right
-Evidence-Grounded Follow-up Recommendations claim-boundary restraint.
+Follow-up recommendation claim-boundary restraint.
 Source path: benchmarks/dth/figures/Fig3B_DTH_BlindJudgeRigor.svg
 Message: follow-up recommendation guidance primarily improves evidence-boundary behavior by increasing blinded claim-boundary restraint scores.
 ```
 
-**Figure 3A: Claim-governance lifecycle schematic**
+**Figure 3A: Two-branch claim-governance benchmark schematic**
 
-Figure 3A는 결과값을 추가로 주장하는 panel이 아니라, Figure 3B-C를 읽는 방법을 정리하는 design schematic입니다. Figure 2가 "evidence를 어떻게 가져오는가"를 보여준다면, Figure 3A는 "evidence가 claim으로 바뀔 때 어떤 gate를 통과하는가"를 보여줍니다. CCI interpretation과 Evidence-Grounded Follow-up Recommendations validation이 같은 claim-governance lifecycle 위에 놓인다는 메시지를 주는 것이 좋습니다.
+Figure 3A는 결과값을 추가로 주장하는 panel이 아니라, Figure 3B-C를 읽는 방법을 정리하는 design schematic입니다. Figure 2가 "evidence를 어떻게 가져오는가"를 보여준다면, Figure 3A는 "evidence가 claim으로 바뀔 때 어떤 gate를 통과하는가"를 보여줍니다. 특히 Figure 3A는 two benchmark branches를 명확히 보여줘야 합니다. Branch 1은 breast cancer LR cases에서 structured SKILL guidance가 unsupported CCI interpretation을 줄이는지를 검증하고 Figure 3B로 이어집니다. Branch 2는 fixed breast cancer Deep Target Prioritizer evidence package에서 follow-up recommendation guide가 evidence-boundary behavior를 개선하는지를 검증하고 Figure 3C로 이어집니다.
 
 **Figure 3B: Structured biological SKILL guidance reduces unsupported interpretation in spatial CCI analysis**
 
@@ -371,22 +371,24 @@ Source result:
 - Claim-boundary restraint is the primary endpoint: guided mean 4.78 versus baseline 2.88 after averaging judges within pair, mean paired difference +1.90, paired Wilcoxon P = 8.13e-05.
 - Judge preference supports the same direction but is model-dependent: gpt-5.4 favored guided outputs in 18 of 20 pairs, whereas claude-sonnet-4-6 favored guided outputs in 11 of 20 pairs.
 
-Paper-ready Results draft:
+Paper-ready Results draft
 
 ```text
-We next asked whether structured guidance constrained the biological claims generated from DeepMAST evidence artifacts. In a breast cancer ligand-receptor CCI benchmark, guide-compliant structured SKILL guidance produced the strongest hallucination-control composite score among the evaluated prompting conditions (3.89 versus 3.59 for unstructured prose and 3.14 without skills) and reduced unsupported fabrication counts from 3.89 to 1.78 per interpretation (Figure 3B; Supplementary Figure S4B). These gains were concentrated in faithfulness, overclaiming, uncertainty handling, and fabrication count, whereas spatial calibration was near ceiling across conditions. Thus, the structured guidance primarily reduced unsupported biological interpretation rather than simply improving recognition of spatial statistics.
+Having established that DeepMAST improves evidence acquisition and source-grounded retrieval, we next evaluated the point at which those evidence artifacts are converted into biological claims. This benchmark was necessary because evidence availability alone does not demonstrate evidence-bounded interpretation: retrieved sources can still be transformed into unsupported mechanisms, overstated causal links, or premature therapeutic claims. We therefore used a controlled claim-governance benchmark before turning to real-data spatial-transcriptomics applications. The evidence substrate, task interface, output checks, and evaluation criteria were held fixed while guidance structure or guide activation was varied (Fig. 3A).
 
-We then tested the same claim-governance principle downstream in breast cancer drug-target Evidence-Grounded Follow-up Recommendations. This benchmark was not run from an abstract prompt: the input evidence package came from the Deep Target Prioritizer, which assessed 37 unique genes from the top-30 ligand-receptor pairs through a staged evidence funnel and selected 7 Stage 3 featured candidates for deep-dive analysis (ERBB3, EPHB4, ERBB2, INSR, EFNB2, LAMA5, and NECTIN4). We treat this package as a controlled evidence substrate for follow-up recommendation validation, with the full breast cancer target-prioritization report reserved for Supplementary Data rather than as a main figure panel.
+We first tested whether this governance layer constrained upstream ligand-receptor interpretation. In a breast cancer ligand-receptor CCI benchmark, 30 LIANA+ interaction cases were interpreted under frozen prompting conditions. Guide-compliant structured SKILL guidance produced the strongest hallucination-control composite score among the main three conditions (3.89 versus 3.59 for unstructured prose and 3.14 without skills, Kruskal-Wallis H = 219.16, P = 2.57e-48) and reduced unsupported fabrication counts from 3.89 to 1.78 per interpretation (Fig. 3B; Fig. S4B). These gains were concentrated in faithfulness, overclaiming, uncertainty handling, and fabrication count, whereas spatial calibration was near ceiling across conditions. Thus, structured guidance primarily reduced unsupported biological interpretation rather than simply improving recognition of spatial statistics.
 
-The controlled guide-activation contrast used this same breast cancer evidence package, generator model, output schema, save gate, and retry policy in both conditions (Figure 3A). In the baseline condition, the writer received the operational contract but no follow-up recommendation guide; in the guided condition, the writer was required to read the guide before generating recommendations. The valid-output analysis included 20 guided and 20 baseline reports, all passing recommendation-output validation, activation-trace validation, and no-fallback filtering.
+We then tested the same claim-governance principle at a downstream writing point that turns breast cancer drug-target evidence into follow-up recommendations. To avoid conflating guide effects with changing biological inputs, this benchmark was not run from an abstract prompt. The input evidence package came from the Deep Target Prioritizer workflow (Fig. S3A), which assessed 37 unique genes from the top-30 ligand-receptor pairs through a staged evidence funnel and selected 7 Stage 3 featured candidates for deep-dive analysis (ERBB3, EPHB4, ERBB2, INSR, EFNB2, LAMA5, and NECTIN4). We treat this package as a controlled evidence substrate for follow-up recommendation validation, with the full breast cancer target-prioritization report reserved for Supplementary Data rather than as a main figure panel.
 
-Guide activation produced a modest increase in mean evidence coverage compared with baseline generation (78.53% versus 74.41%; mean paired difference, +4.12 percentage points; paired Wilcoxon P = 5.10e-02), so this result should be interpreted as a borderline secondary endpoint (Figure 3C, left). The stronger signal was claim-boundary restraint. After averaging blinded scores across gpt-5.4 and claude-sonnet-4-6 within each paired comparison, guided outputs scored higher than baseline outputs on claim-boundary restraint (4.78 versus 2.88; mean paired difference, +1.90; paired Wilcoxon P = 8.13e-05; Figure 3C, right). Thus, follow-up recommendation guidance primarily improved evidence-boundary behavior: it made the writer more explicit about the distinction between observed evidence, candidate mechanisms, and unestablished causal or clinical claims.
+The controlled guide-activation contrast used this same breast cancer evidence package, generator model, output schema, save gate, and retry policy in both conditions (Fig. 3A). In the baseline condition, the writer received the operational contract but no follow-up recommendation guide. In the guided condition, the writer was required to read the guide before generating recommendations. The valid-output analysis included 20 guided and 20 baseline reports, all passing recommendation-output validation, activation-trace validation, and no-fallback filtering.
+
+Guide activation produced a modest increase in mean evidence coverage compared with baseline generation (78.53% versus 74.41%, mean paired difference, +4.12 percentage points, paired Wilcoxon P = 5.10e-02), so this result should be interpreted as a borderline secondary endpoint (Fig. 3C, left). The stronger signal was claim-boundary restraint. After averaging blinded scores across GPT-5.4 and Sonnet 4.6 within each paired comparison, guided outputs scored higher than baseline outputs on claim-boundary restraint (4.78 versus 2.88, mean paired difference, +1.90, paired Wilcoxon P = 8.13e-05, Fig. 3C, right). Thus, follow-up recommendation guidance primarily improved evidence-boundary behavior by making the writer more explicit about the distinction between observed evidence, candidate mechanisms, and unestablished causal or clinical claims. Together, the two benchmark branches show that DeepMAST's evidence-governance benefit extends beyond retrieving evidence and constrains how evidence is converted into interpretation and follow-up recommendations before the framework is applied to real spatial-transcriptomics workflows.
 ```
 
-Paper-ready figure legend draft:
+Paper-ready figure legend draft
 
 ```text
-Figure 3. Evidence-governed claim control constrains biological interpretation and Evidence-Grounded Follow-up Recommendations. (A) Claim-governance lifecycle used to evaluate controlled guidance effects. Evidence artifacts are passed into structured guide activation, claim generation, evidence auditing, and blinded or deterministic output validation. (B) Structured SKILL CCI ablation benchmark. Guide-compliant structured SKILL guidance increased hallucination-control scores and reduced unsupported fabrication counts relative to unstructured prose or no-skill conditions. (C) Breast cancer Evidence-Grounded Follow-up Recommendations validation. Left, evidence coverage across 20 valid guided and 20 valid baseline follow-up recommendation reports; guide-activated generation showed a borderline numerical increase in evidence coverage (mean paired difference, +4.12 percentage points; paired Wilcoxon P = 5.10e-02). Right, blinded dual-judge claim-boundary restraint scores; guided reports showed higher claim-boundary restraint than baseline reports (mean paired difference, +1.90; paired Wilcoxon P = 8.13e-05). Higher scores indicate stronger separation between observed evidence, proposed mechanism, and unestablished causal or clinical claims.
+Figure 3. Evidence-governed claim control constrains biological interpretation and follow-up recommendations. (A) Two-branch claim-governance benchmark schematic showing how fixed evidence artifacts enter structured guide activation and are evaluated through CCI interpretation and follow-up recommendation branches. (B) Structured SKILL CCI ablation benchmark. Hallucination-control scores and unsupported fabrication counts compare guide-compliant structured SKILL guidance with unstructured prose and no-skill conditions. (C) Breast cancer follow-up recommendation validation. Left, evidence coverage in guided and baseline reports generated from the same fixed Deep Target Prioritizer evidence package. Right, blinded dual-judge claim-boundary restraint scores comparing guided and baseline reports.
 ```
 
 주의할 claim boundary:
@@ -396,9 +398,11 @@ Figure 3. Evidence-governed claim control constrains biological interpretation a
 - Evidence coverage should be described as modest or borderline because P = 5.10e-02.
 - The strongest guided-output claim is claim-boundary restraint, not universal improvement across all judging axes.
 - Follow-up recommendation guidance should be described as improving scientific calibration or evidence-boundary behavior.
+- Do not abbreviate Evidence-Grounded Follow-up Recommendations as EGFR because that conflicts with the EGFR gene symbol. After the first definition, use "follow-up recommendations" or "follow-up recommendation guidance."
 - Detailed staged target-evidence assessment remains reserved for the IPF/Figure 6 therapeutic-prioritization section.
 
 Linked supplement:
+- Supplementary Figure S3A: Deep Target Prioritizer overview supporting the fixed evidence package used for Figure 3C.
 - Supplementary Figure S4B: CCI skill-ablation supplement (`benchmarks/cci_skill_ablation/figures/s_SkillAblation.svg`).
 - Supplementary Figure S4C: judge-stratified claim-boundary restraint supporting Figure 3C (`benchmarks/dth/figures/FigS3D_DTH_BlindJudgeRigorByJudge.svg`).
 - Supplementary Figure S4D: blind-judge preference shares supporting Figure 3C (`benchmarks/dth/figures/FigS3E_DTH_BlindJudgeWinRate.svg`).
@@ -632,10 +636,10 @@ Main message: SGCP-enabled retrieval improves exact-answer accuracy and evidence
 
 Figure 3
 Evidence-governed claim control benchmark.
-Panels: (A) claim-governance lifecycle schematic; (B) structured SKILL CCI ablation benchmark; (C, left) Evidence-Grounded Follow-up Recommendations evidence coverage; (C, right) Evidence-Grounded Follow-up Recommendations claim-boundary restraint.
+Panels: (A) two-branch claim-governance benchmark schematic; (B) structured SKILL CCI ablation benchmark; (C, left) follow-up recommendation evidence coverage; (C, right) follow-up recommendation claim-boundary restraint.
 Source paths/data: A, `benchmarks/dth/figures/Fig3A_ClaimGovernanceLifecycle.svg`; B, `benchmarks/cci_skill_ablation/figures/SkillAblation.png`; C left, `benchmarks/dth/figures/Fig3A_DTH_EvidenceCoverage.svg`; C right, `benchmarks/dth/figures/Fig3B_DTH_BlindJudgeRigor.svg`.
 Linked supplements: Supplementary Figure S4B supports Figure 3B; Supplementary Figure S4C-D support Figure 3C right; Supplementary Table/Data contains the fixed breast cancer Deep Target Prioritizer evidence package from `final_res_bc_drugtarget/drug.md`.
-Main message: structured guidance reduces unsupported CCI interpretation upstream, the fixed breast cancer Deep Target Prioritizer evidence package defines the controlled substrate for follow-up recommendation validation, and guide activation improves downstream claim-boundary restraint in breast cancer Evidence-Grounded Follow-up Recommendations outputs.
+Main message: structured guidance reduces unsupported CCI interpretation upstream, the fixed breast cancer Deep Target Prioritizer evidence package defines the controlled substrate for follow-up recommendation validation, and guide activation improves downstream claim-boundary restraint in breast cancer follow-up recommendation outputs.
 ```
 
 ## Main application figures to build or select
@@ -872,7 +876,7 @@ The governance target is not only tool access but which biological and therapeut
 
 Recent harness and long-horizon agent studies support the same framing: useful control comes from preserving task-relevant state, retaining valid feedback, and carrying failure-derived rules into subsequent actions, not from adding raw context, tool calls, or larger harnesses alone
 
-Structured SKILL guidance reduces unsupported CCI interpretation, and follow-up recommendation guidance extends the same evidence-governance principle to breast cancer Evidence-Grounded Follow-up Recommendations claim-boundary restraint
+Structured SKILL guidance reduces unsupported CCI interpretation, and follow-up recommendation guidance extends the same evidence-governance principle to breast cancer follow-up recommendation claim-boundary restraint
 
 The Figure 2/3 validation bridge should be framed as a staged evidence-governance argument: Figure 2 tests evidence acquisition and source-grounded retrieval, whereas Figure 3 tests whether structured guidance constrains the claims generated from that evidence
 
