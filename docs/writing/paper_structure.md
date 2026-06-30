@@ -68,9 +68,9 @@ Recent biomedical, spatial-biology, pathology, and omics agents show that large 
 
 We use harness to mean the non-model control layer that surrounds an LLM agent rather than the model itself. A harness maintains task state, activates skills, constrains tool use, checks intermediate artifacts, preserves provenance, and decides whether feedback should trigger refinement or finalization. DeepAgents and the Model Context Protocol provide useful orchestration and resource-access primitives for this role [17-18]. Agent Skills and recent harness studies further suggest that long-horizon performance depends less on raw context length, tool-call volume, or harness size than on reusable procedures, task-relevant state, valid feedback, and failure-derived rules that remain active across subsequent actions [19-34].
 
-Despite this progress, spatial-transcriptomics agents and general-purpose harnesses still leave a domain-specific gap between tool execution and claim finalization. Spatial-biology agents can automate analysis and interpretation, and verification-aware omics agents can validate plans, executions, and evidence streams, but neither tool access nor general orchestration specifies how spatial-omics outputs should become evidence-bounded biological or therapeutic-prioritization claims. The unresolved need is claim governance, a domain-specific biological harness that treats candidate tool outputs and LLM-generated interpretations as provisional artifacts in a claim lifecycle. In this lifecycle, claims are refined, retried, withheld, or finalized according to evidence provenance, analytical context, and review readiness.
+Despite this progress, spatial-transcriptomics agents and general-purpose harnesses still leave a domain-specific gap between tool execution and claim finalization. Spatial-biology agents can automate analysis and interpretation, and verification-aware omics agents can validate plans, executions, and evidence streams, but neither tool access nor general orchestration specifies how spatial-omics outputs should become evidence-bounded biological or drug-target-prioritization claims. The unresolved need is claim governance, a domain-specific biological harness that treats candidate tool outputs and LLM-generated interpretations as provisional artifacts in a claim lifecycle. In this lifecycle, claims are refined, retried, withheld, or finalized according to evidence provenance, analytical context, and review readiness.
 
-To address this gap, we present DeepMAST, an evidence-governed multi-agent harness for spatial transcriptomics interpretation and drug-target prioritization. DeepMAST uses DeepAgents as a long-horizon, file-mediated orchestration substrate and MCP-enabled tools as governed analytical resources rather than interchangeable endpoints [17-18]. Its domain-specific control layer activates task-relevant biological skills, constrains tool use by analysis stage, separates literature-grounded biological interpretation from target prioritization, verifies evidence provenance, scores target-relevant evidence, preserves failure and refinement state, and governs which biological or target-prioritization claims can survive into expert-reviewable reports. We evaluate DeepMAST in three steps. First, we define its architecture as a biological harness around agentic tool use. Second, we test retrieval-side evidence acquisition, source-grounded retrieval, and claim-governance controls spanning structured CCI interpretation and breast cancer Evidence-Grounded Follow-up Recommendations. Third, we apply the harness to complementary cancer Visium workflows and then extend the analysis to mouse Alzheimer single-cell-resolution spatial transcriptomics and human idiopathic pulmonary fibrosis target-prioritization. Across these evaluations, DeepMAST treats LLM-generated conclusions as intermediate artifacts rather than final answers. Unsupported or incomplete artifacts are routed through provenance-aware validation, bounded refinement, deterministic rendering, and fail-closed finalization. In this way, DeepMAST is designed to produce not simply more automated spatial-transcriptomics workflows, but more traceable biological and drug-target prioritization claims.
+To address this gap, we present DeepMAST, an evidence-governed multi-agent harness for spatial transcriptomics interpretation and drug-target prioritization. DeepMAST uses DeepAgents as a long-horizon, file-mediated orchestration substrate and MCP-enabled tools as governed analytical resources rather than interchangeable endpoints [17-18]. Its domain-specific control layer activates task-relevant biological skills, constrains tool use by analysis stage, separates literature-grounded biological interpretation from target prioritization, verifies evidence provenance, scores target-relevant evidence, preserves failure and refinement state, and governs which biological or target-prioritization claims can survive into expert-reviewable reports. We evaluate DeepMAST in three steps. First, we define its architecture as a biological harness around agentic tool use. Second, we test retrieval-side evidence acquisition, source-grounded retrieval, and claim-governance controls spanning structured CCI interpretation and breast cancer Evidence-Grounded Follow-up Recommendations. Third, we apply the harness to complementary cancer Visium workflows and human idiopathic pulmonary fibrosis target-prioritization. Across these evaluations, DeepMAST treats LLM-generated conclusions as intermediate artifacts rather than final answers. Unsupported or incomplete artifacts are routed through provenance-aware validation, bounded refinement, deterministic rendering, and fail-closed finalization. In this way, DeepMAST is designed to produce not simply more automated spatial-transcriptomics workflows, but more traceable biological and drug-target prioritization claims.
 
 ---
 
@@ -149,7 +149,7 @@ We use harness to mean the non-model control layer that surrounds an LLM agent r
 전환 문장
 
 ```text
-These primitives are necessary for long-horizon agent execution, but they do not by themselves specify how spatial-omics outputs should become evidence-bounded biological or therapeutic-prioritization claims.
+These primitives are necessary for long-horizon agent execution, but they do not by themselves specify how spatial-omics outputs should become evidence-bounded biological or drug-target-prioritization claims.
 ```
 
 ### 4. Domain-specific gap is claim governance, not tool access
@@ -160,7 +160,7 @@ Draft 넷째 문단과 대응합니다. 여기서는 tool access나 general-purp
 - Spatial-biology agents can automate analysis and interpretation.
 - Verification-aware omics and pathology agents can validate plans, executions, and evidence streams.
 - General harnesses can support planning, state management, skills, and tool access.
-- 그러나 이 조합만으로 spatial-omics outputs가 evidence-bounded biological or therapeutic-prioritization claims로 승격되는 기준이 생기지는 않습니다.
+- 그러나 이 조합만으로 spatial-omics outputs가 evidence-bounded biological or drug-target-prioritization claims로 승격되는 기준이 생기지는 않습니다.
 - The unresolved need is claim governance, where candidate tool outputs and LLM-generated interpretations remain provisional until evidence provenance, analytical context, and review readiness are sufficient [6-8,14-15].
 - Claim outcomes should be described as refined, retried, withheld, or finalized.
 
@@ -190,7 +190,7 @@ Draft 마지막 문단과 대응합니다. 여기서는 DeepMAST가 무엇인지
 - DeepAgents is described as the long-horizon, file-mediated orchestration substrate [17-18].
 - MCP-enabled tools are governed analytical resources rather than interchangeable endpoints.
 - The domain-specific control layer activates skills, constrains tool use, separates biological interpretation from target prioritization, verifies provenance, scores target-relevant evidence, preserves failure and refinement state, and governs finalizable claims.
-- Evaluation roadmap should follow architecture, evidence acquisition and source grounding, claim-governance controls, complementary cancer Visium workflows, Alzheimer STARmapPLUS, and IPF target-prioritization.
+- Evaluation roadmap should follow architecture, evidence acquisition and source grounding, claim-governance controls, complementary cancer Visium workflows, and IPF target-prioritization.
 
 문단 구성
 - Paragraph A presents DeepMAST and its control layer.
@@ -200,14 +200,14 @@ Draft 마지막 문단과 대응합니다. 여기서는 DeepMAST가 무엇인지
 핵심 문장
 
 ```text
-Here, we present DeepMAST, an evidence-governed multi-agent harness for spatial transcriptomics interpretation and drug-target prioritization. DeepMAST uses DeepAgents as a long-horizon, file-mediated orchestration substrate and MCP-enabled tools as governed analytical resources rather than interchangeable endpoints [17-18]. Its domain-specific control layer activates task-relevant skills, constrains tool use by analysis stage, separates literature-grounded biological interpretation from target prioritization, verifies evidence provenance, scores target-relevant evidence, preserves failure and refinement state, and governs which biological or drug-target prioritization claims can survive into expert-reviewable reports. We evaluate DeepMAST by first defining its architecture, then testing evidence acquisition, source-grounded retrieval, and claim-governance controls, and finally applying the harness across complementary cancer Visium workflows, mouse Alzheimer single-cell-resolution spatial transcriptomics, and human idiopathic pulmonary fibrosis target-prioritization analyses. Across these evaluations, DeepMAST treats LLM-generated conclusions as intermediate artifacts rather than final answers, routing them through provenance-aware validation, bounded refinement, deterministic rendering, and fail-closed finalization.
+Here, we present DeepMAST, an evidence-governed multi-agent harness for spatial transcriptomics interpretation and drug-target prioritization. DeepMAST uses DeepAgents as a long-horizon, file-mediated orchestration substrate and MCP-enabled tools as governed analytical resources rather than interchangeable endpoints [17-18]. Its domain-specific control layer activates task-relevant skills, constrains tool use by analysis stage, separates literature-grounded biological interpretation from target prioritization, verifies evidence provenance, scores target-relevant evidence, preserves failure and refinement state, and governs which biological or drug-target prioritization claims can survive into expert-reviewable reports. We evaluate DeepMAST by first defining its architecture, then testing evidence acquisition, source-grounded retrieval, and claim-governance controls, and finally applying the harness across complementary cancer Visium workflows and human idiopathic pulmonary fibrosis target-prioritization analyses. Across these evaluations, DeepMAST treats LLM-generated conclusions as intermediate artifacts rather than final answers, routing them through provenance-aware validation, bounded refinement, deterministic rendering, and fail-closed finalization.
 ```
 
 ---
 
 # Results Structure
 
-Results는 **architecture -> evidence acquisition/source grounding -> claim governance -> biological applications -> translational application** 흐름으로 정리하는 것을 추천합니다. Section 1에서 DeepMAST의 architecture를 먼저 정의한 뒤, Section 2에서 evidence가 system 안으로 들어오는 두 control point, 즉 citable biological context coverage와 source-grounded retrieval을 보여줍니다. Section 3에서는 그 evidence가 실제 biological claim으로 바뀌는 지점의 governance를 보여주며 structured SKILL CCI benchmark와 breast cancer Evidence-Grounded Follow-up Recommendations validation을 같은 bridge figure로 묶습니다. Breast cancer Deep Target Prioritizer output은 독립 main panel이 아니라 follow-up recommendation validation에 사용된 fixed evidence package로 본문과 Supplementary Data/Table에서 설명합니다. 이후 Section 4부터 complementary cancer Visium workflows, Alzheimer STARmapPLUS, IPF target-prioritization application으로 넘어갑니다. 이 흐름은 MEDEA의 system/verified-planning 이후 benchmark 전개, SPARK의 design/verification 이후 use-case 전개, SpatialAgent/STAgent의 실제 spatial output 중심 use-case figure framing을 참고하되, DeepMAST의 중심 novelty를 **tool access가 아니라 evidence-governed biological harness control layer**로 유지합니다.
+Results는 **architecture -> evidence acquisition/source grounding -> claim governance -> biological applications -> translational application** 흐름으로 정리하는 것을 추천합니다. Section 1에서 DeepMAST의 architecture를 먼저 정의한 뒤, Section 2에서 evidence가 system 안으로 들어오는 두 control point, 즉 citable biological context coverage와 source-grounded retrieval을 보여줍니다. Section 3에서는 그 evidence가 실제 biological claim으로 바뀌는 지점의 governance를 보여주며 structured SKILL CCI benchmark와 breast cancer Evidence-Grounded Follow-up Recommendations validation을 같은 bridge figure로 묶습니다. Breast cancer follow-up recommendation substrate는 독립 main panel이 아니라 Figure 3C validation input으로 본문과 Supplementary Data/Table에서 설명합니다. 이후 Section 4는 complementary cancer Visium workflows, Section 5는 IPF target-prioritization application으로 이어집니다. 이 흐름은 MEDEA의 system/verified-planning 이후 benchmark 전개, SPARK의 design/verification 이후 use-case 전개, SpatialAgent/STAgent의 실제 spatial output 중심 use-case figure framing을 참고하되, DeepMAST의 중심 novelty를 **tool access가 아니라 evidence-governed biological harness control layer**로 유지합니다.
 
 Benchmarking design을 독립 Results 섹션 여러 개로 길게 떼지는 않습니다. 대신 Section 2와 Section 3을 짧은 two-step validation bridge로 둡니다:
 
@@ -227,7 +227,7 @@ Having defined DeepMAST as an evidence-governed biological harness, we next eval
 
 이 섹션은 전체 구조는 유지하되, agent별 역할과 claim boundary를 조금 더 정밀하게 업데이트합니다. Pipeline Builder와 Pipeline Executor는 DeepMAST의 analytical substrate로 자세히 설명하되 main novelty로 과도하게 올리지 않습니다. 중심 해석 모듈은 **Deep Target Prioritizer**와 **Deep Interpreter**로 통일합니다. STAgent와 SpatialAgent가 이미 spatial-transcriptomics agent automation, tool execution, multimodal interpretation, and spatial-biology workflow automation을 강하게 보여주기 때문에, DeepMAST는 그 위에 **skills, staged constraints, Summary-Guided Chunk Promotion RAG (SGCP-RAG), evidence scoring, provenance checks, deterministic report finalization**을 결합한 evidence-governed biological harness로 포지셔닝합니다. 가장 안전한 claim은 DeepMAST가 모든 모듈에 동일한 hard gate를 적용한다는 것이 아니라, core biomedical interpretation pipelines에서 validation-driven looping을 통해 intermediate artifacts를 refinement, withholding, finalization으로 라우팅한다는 것입니다.
 
-DeepMAST takes as input spatial transcriptomics data together with a natural-language biological question or analysis objective. To support users with different levels of spatial-omics expertise, DeepMAST accepts either high-level biological goals or structured pipeline choices and returns an auditable, expert-reviewable report that links spatial patterns to literature-grounded interpretation and therapeutic target evidence. DeepMAST couples a central orchestrator with four expert agents shown in Figure 1a, including Pipeline Builder, Pipeline Executor, Deep Target Prioritizer, and Deep Interpreter. The system uses MCP to standardize access to external analysis tools and biological resources [18], and uses LangGraph and DeepAgents to support stateful orchestration, subagent delegation, filesystem-mediated context management, and human-in-the-loop control during long-horizon analyses [17,35].
+DeepMAST takes as input spatial transcriptomics data together with a natural-language biological question or analysis objective. To support users with different levels of spatial-omics expertise, DeepMAST accepts either high-level biological goals or structured pipeline choices and returns an auditable, expert-reviewable report that links spatial patterns to literature-grounded interpretation and drug-target evidence. DeepMAST couples a central orchestrator with four expert agents shown in Figure 1a, including Pipeline Builder, Pipeline Executor, Deep Target Prioritizer, and Deep Interpreter. The system uses MCP to standardize access to external analysis tools and biological resources [18], and uses LangGraph and DeepAgents to support stateful orchestration, subagent delegation, filesystem-mediated context management, and human-in-the-loop control during long-horizon analyses [17,35].
 
 The Pipeline Builder and Pipeline Executor form the analytical substrate. The Pipeline Builder collects study metadata, validates information completeness, and constructs analysis workflows through three user-facing modes, including a default spatial transcriptomics pipeline, a user-specified custom pipeline, or a reference-guided pipeline selected from retrieved papers. The Pipeline Executor loads spatial data, resolves the optimal single-cell reference when spot-based platforms have multiple candidate references, checks MCP readiness, executes the configured workflow through a ReAct-style execution core [36], and saves structured intermediate outputs. Supplementary Figure S1 provides Pipeline Builder details linked to Figure 1, and Supplementary Figure S2 provides Pipeline Executor details linked to Figure 1.
 
@@ -278,7 +278,7 @@ Claim boundary
 
 ## 3. Evidence-governed claim control constrains biological interpretation and follow-up recommendations
 
-**역할:** Figure 3은 Figure 2의 evidence-acquisition benchmark와 Figure 4 이후 real-data application 사이의 claim-governance bridge입니다. Figure 2는 "citable/source-grounded evidence가 system으로 들어오는가"를 검증하지만, 그 evidence가 final biological claim으로 바뀔 때 unsupported mechanism, causal overclaiming, premature therapeutic claim이 줄어드는지는 별도 검증하지 않습니다. 따라서 Figure 3을 Figure 4 앞에 배치해 fixed evidence substrate 아래에서 guidance effect를 비교하고, 이후 biological application이 단순한 agent narrative가 아니라 evidence-boundary를 통과한 harness output임을 보여줍니다. MEDEA, SPARK, SpatialAgent, STAgent 모두 overview/evidence system 뒤에 benchmark 또는 validation figure를 두고, 그 다음 application을 전개하는 구조를 사용하므로 DeepMAST도 "evidence input -> claim-governance benchmark -> biological application" 흐름으로 정리하는 것이 가장 자연스럽습니다.
+**역할:** Figure 3은 Figure 2의 evidence-acquisition benchmark와 Figure 4 이후 real-data application 사이의 claim-governance bridge입니다. Figure 2는 "citable/source-grounded evidence가 system으로 들어오는가"를 검증하지만, 그 evidence가 final biological claim으로 바뀔 때 unsupported mechanism, causal overclaiming, premature therapeutic claim이 줄어드는지는 별도 검증하지 않습니다. 따라서 Figure 3을 Figure 4 앞에 배치해 controlled evidence substrate 아래에서 guidance effect를 비교하고, 이후 biological application이 단순한 agent narrative가 아니라 evidence-boundary를 통과한 harness output임을 보여줍니다. MEDEA, SPARK, SpatialAgent, STAgent 모두 overview/evidence system 뒤에 benchmark 또는 validation figure를 두고, 그 다음 application을 전개하는 구조를 사용하므로 DeepMAST도 "evidence input -> claim-governance benchmark -> biological application" 흐름으로 정리하는 것이 가장 자연스럽습니다.
 
 추천 heading:
 
@@ -302,7 +302,7 @@ Message: DeepMAST tests the same evidence-governance principle in two benchmark 
 Figure 3A
 Two-branch claim-governance benchmark schematic.
 Source path: benchmarks/dth/figures/Fig3A_ClaimGovernanceLifecycle.svg
-Message: fixed evidence artifacts and structured guidance split into two controlled benchmark branches: CCI interpretation supporting Figure 3B and follow-up recommendations supporting Figure 3C. This panel is a schematic bridge, not a new benchmark result.
+Message: controlled evidence artifacts and structured guidance split into two benchmark branches: CCI interpretation supporting Figure 3B and follow-up recommendations supporting Figure 3C. This panel is a schematic bridge, not a new benchmark result.
 
 Figure 3B
 Structured SKILL CCI ablation benchmark.
@@ -323,7 +323,7 @@ Message: follow-up recommendation guidance primarily improves evidence-boundary 
 
 **Figure 3A: Two-branch claim-governance benchmark schematic**
 
-Figure 3A는 결과값을 추가로 주장하는 panel이 아니라, Figure 3B-C를 읽는 방법을 정리하는 design schematic입니다. Figure 2가 "evidence를 어떻게 가져오는가"를 보여준다면, Figure 3A는 "evidence가 claim으로 바뀔 때 어떤 gate를 통과하는가"를 보여줍니다. 특히 Figure 3A는 two benchmark branches를 명확히 보여줘야 합니다. Branch 1은 breast cancer LR cases에서 structured SKILL guidance가 unsupported CCI interpretation을 줄이는지를 검증하고 Figure 3B로 이어집니다. Branch 2는 fixed breast cancer Deep Target Prioritizer evidence package에서 follow-up recommendation guide가 evidence-boundary behavior를 개선하는지를 검증하고 Figure 3C로 이어집니다.
+Figure 3A는 결과값을 추가로 주장하는 panel이 아니라, Figure 3B-C를 읽는 방법을 정리하는 design schematic입니다. Figure 2가 "evidence를 어떻게 가져오는가"를 보여준다면, Figure 3A는 "evidence가 claim으로 바뀔 때 어떤 gate를 통과하는가"를 보여줍니다. 특히 Figure 3A는 two benchmark branches를 명확히 보여줘야 합니다. Branch 1은 breast cancer LR cases에서 structured SKILL guidance가 unsupported CCI interpretation을 줄이는지를 검증하고 Figure 3B로 이어집니다. Branch 2는 breast cancer follow-up recommendation validation substrate에서 recommendation guide가 evidence-boundary behavior를 개선하는지를 검증하고 Figure 3C로 이어집니다.
 
 **Figure 3B: Structured biological SKILL guidance reduces unsupported interpretation in spatial CCI analysis**
 
@@ -349,14 +349,14 @@ Structured SKILL guidance did not simply make the model more verbose or more cau
 Deep Target Prioritizer 결과는 main Figure 3의 독립 panel로 키우지 않고, Evidence-Grounded Follow-up Recommendations validation이 어떤 evidence package 위에서 수행됐는지 본문과 Supplementary Data/Table에서 설명합니다. `drug.md`의 핵심만 압축합니다: top-30 LR pairs에서 나온 37 unique genes, Stage 3 deep-dive로 넘어간 7 featured candidates (ERBB3, EPHB4, ERBB2, INSR, EFNB2, LAMA5, NECTIN4), Stage 1 spatial/Census evidence, Stage 2 target-disease/actionability evidence, Stage 3 druggability/deep-dive evidence, and conservative follow-up tiers.
 
 추천 처리:
-- Main Results text: fixed evidence substrate로 2-3문장 설명.
+- Main Results text: controlled evidence substrate로 2-3문장 설명.
 - Supplementary Table: 37 assessed genes와 7 featured candidates, stage, score/tier, evidence class를 요약.
 - Supplementary Data: full `drug.md`/structured evidence artifacts를 audit bundle로 제공.
 
 핵심 메시지:
 
 ```text
-The breast cancer target-prioritization output is used here as a controlled evidence substrate for Evidence-Grounded Follow-up Recommendations, whereas the full biological therapeutic-prioritization application is reserved for the human IPF analysis.
+The breast cancer target-prioritization output is used here as a controlled evidence substrate for Evidence-Grounded Follow-up Recommendations, whereas the full biological drug-target-prioritization application is reserved for the human IPF analysis.
 ```
 
 **Figure 3C: Follow-up recommendation guidance improves downstream claim-boundary restraint in breast cancer Evidence-Grounded Follow-up Recommendations**
@@ -365,7 +365,7 @@ Figure 3C는 same principle이 downstream Evidence-Grounded Follow-up Recommenda
 
 Source result:
 - Use `benchmarks/dth/results/dth_yes_no_qwen397b_cloud_methods_results.md` as the follow-up recommendation validation source.
-- Guided and baseline conditions use the same Qwen3.5-397B generator (`qwen3.5:397b-cloud` runtime tag), fixed breast cancer evidence package, output schema, save gate, and retry policy.
+- Guided and baseline conditions use the same Qwen3.5-397B generator (`qwen3.5:397b-cloud` runtime tag), controlled breast cancer evidence substrate, output schema, save gate, and retry policy.
 - Valid-output analysis includes 20 guided and 20 baseline runs, all passing recommendation-output validation, activation-trace validation, and no-fallback filtering.
 - Evidence coverage is a secondary endpoint: guided mean 78.53% versus baseline 74.41%, mean paired difference +4.12 percentage points, paired Wilcoxon P = 5.10e-02.
 - Claim-boundary restraint is the primary endpoint: guided mean 4.78 versus baseline 2.88 after averaging judges within pair, mean paired difference +1.90, paired Wilcoxon P = 8.13e-05.
@@ -388,25 +388,25 @@ Guide activation produced a modest increase in mean evidence coverage compared w
 Paper-ready figure legend draft
 
 ```text
-Figure 3. Evidence-governed claim control constrains biological interpretation and follow-up recommendations. (A) Two-branch claim-governance benchmark schematic showing how fixed evidence artifacts enter structured guide activation and are evaluated through CCI interpretation and follow-up recommendation branches. (B) Structured SKILL CCI ablation benchmark. Hallucination-control scores and unsupported fabrication counts compare guide-compliant structured SKILL guidance with unstructured prose and no-skill conditions. (C) Breast cancer follow-up recommendation validation. Left, evidence coverage in guided and baseline reports generated from the same fixed Deep Target Prioritizer evidence package. Right, blinded dual-judge claim-boundary restraint scores comparing guided and baseline reports.
+Figure 3. Evidence-governed claim control constrains biological interpretation and follow-up recommendations. (A) Two-branch claim-governance benchmark schematic showing how controlled evidence artifacts enter structured guide activation and are evaluated through CCI interpretation and follow-up recommendation branches. (B) Structured SKILL CCI ablation benchmark. Hallucination-control scores and unsupported fabrication counts compare guide-compliant structured SKILL guidance with unstructured prose and no-skill conditions. (C) Breast cancer follow-up recommendation validation. Left, evidence coverage in guided and baseline reports generated from the same controlled breast cancer evidence substrate. Right, blinded dual-judge claim-boundary restraint scores comparing guided and baseline reports.
 ```
 
 주의할 claim boundary:
-- Figure 3B는 CCI interpretation quality benchmark이지 full therapeutic target validation이 아닙니다.
+- Figure 3B는 CCI interpretation quality benchmark이지 full drug target validation이 아닙니다.
 - Figure 3C는 generated follow-up recommendation quality를 검증하지 therapeutic efficacy를 검증하지 않습니다.
-- Breast cancer Deep Target Prioritizer output은 follow-up recommendation validation의 upstream evidence substrate이지 breast cancer therapeutic target validation이 아닙니다.
+- Breast cancer Deep Target Prioritizer output은 follow-up recommendation validation의 upstream evidence substrate이지 breast cancer drug target validation이 아닙니다.
 - Evidence coverage should be described as modest or borderline because P = 5.10e-02.
 - The strongest guided-output claim is claim-boundary restraint, not universal improvement across all judging axes.
 - Follow-up recommendation guidance should be described as improving scientific calibration or evidence-boundary behavior.
 - Do not abbreviate Evidence-Grounded Follow-up Recommendations as EGFR because that conflicts with the EGFR gene symbol. After the first definition, use "follow-up recommendations" or "follow-up recommendation guidance."
-- Detailed staged target-evidence assessment remains reserved for the IPF/Figure 6 therapeutic-prioritization section.
+- Detailed staged target-evidence assessment remains reserved for the IPF/Figure 5 drug-target-prioritization section.
 
 Linked supplement:
-- Supplementary Figure S3A: Deep Target Prioritizer overview supporting the fixed evidence package used for Figure 3C.
+- Supplementary Figure S3A: Deep Target Prioritizer overview supporting the controlled validation substrate used for Figure 3C.
 - Supplementary Figure S4B: CCI skill-ablation supplement (`benchmarks/cci_skill_ablation/figures/s_SkillAblation.svg`).
 - Supplementary Figure S4C: judge-stratified claim-boundary restraint supporting Figure 3C (`benchmarks/dth/figures/FigS3D_DTH_BlindJudgeRigorByJudge.svg`).
 - Supplementary Figure S4D: blind-judge preference shares supporting Figure 3C (`benchmarks/dth/figures/FigS3E_DTH_BlindJudgeWinRate.svg`).
-- Supplementary Table/Data: fixed breast cancer Deep Target Prioritizer evidence package from `final_res_bc_drugtarget/drug.md`.
+- Supplementary Table/Data: breast cancer follow-up recommendation validation substrate from `final_res_bc_drugtarget/drug.md`.
 
 ---
 
@@ -417,7 +417,7 @@ Linked supplement:
 Section logic:
 - This section should not argue that breast cancer and prostate cancer reveal a shared cancer biology mechanism. The claim is modular: the same DeepMAST harness can consume curated spatial-analysis outputs in one setting and generate reference-guided executor outputs in another.
 - This is the first application section after the evidence and claim-governance benchmark bridge, so it should show practical spatial-transcriptomics use without re-litigating benchmark metrics.
-- Do not include follow-up recommendation validation metrics in Figure 4. Figure 3 is now the dedicated claim-governance bridge that contains both the CCI SKILL benchmark and Evidence-Grounded Follow-up Recommendations validation. Detailed staged target-evidence scoring remains reserved for the IPF therapeutic-prioritization section.
+- Do not include follow-up recommendation validation metrics in Figure 4. Figure 3 is now the dedicated claim-governance bridge that contains both the CCI SKILL benchmark and Evidence-Grounded Follow-up Recommendations validation. Detailed staged target-evidence scoring remains reserved for the IPF drug-target-prioritization section.
 
 Prostate cancer Visium의 위치:
 - Prostate cancer is the upstream execution example. The dataset is the 10x Genomics Human Prostate Cancer, Adenocarcinoma with Invasive Carcinoma (FFPE) Visium dataset analyzed with Space Ranger 1.3.0, including H&E image context and adenocarcinoma/invasive carcinoma tissue annotation [57].
@@ -432,7 +432,7 @@ Breast cancer Visium의 위치:
 - Main Figure 4D-F should use the final breast cancer handoff panels: D, NMF/factor spatial programs and cluster context; E, spatial visualization of key ligand-receptor pairs; F, quantitative analysis of ligand-receptor interactions.
 - The BC analysis should focus on the selected Factor3/invasive-tumor communication program and avoid broad therapeutic claims. Interest clusters are 17, 4, and 14, interest cell type is Prolif Invasive Tumor, and selected factor is Factor3. The report identifies 19 prioritized LR pairs; CDH1-ERBB3 is the main interpreted candidate with Moran's R = 0.477 and Factor3 loading = 1.180. The displayed LR maps include AFDN-NECTIN4, CDH1-ERBB3, and EGF-ERBB2, while the remaining ranked candidates should stay in the source artifact or supplement. This is enough for a Results claim that DeepMAST can preserve spatial and quantitative evidence for selected LR candidates.
 - The displayed LR pairs should not be interpreted at the same evidentiary strength. AFDN-NECTIN4 is an adhesion-context example supported by Nectin-4 breast-cancer marker evidence and Nectin/Afadin junction biology [60,61]. CDH1-ERBB3 is the main literature-grounded interpretation candidate because the local spatial evidence aligns with E-cadherin deregulation and ErbB3-associated EMT, migration, and invasion literature [62,63]. EGF-ERBB2 should be framed conservatively as an ERBB-family growth-factor signaling context because HER2/ERBB2 has no known ligand and EGF-bound EGFR can transactivate HER2 [64].
-- If the text mentions ERBB3 or MAPK/PI3K, it should be bounded as an interpretation-prioritization signal from this curated analysis, not as a validated therapeutic target. Detailed target-evidence scoring belongs in the IPF therapeutic-prioritization section.
+- If the text mentions ERBB3 or MAPK/PI3K, it should be bounded as an interpretation-prioritization signal from this curated analysis, not as a validated drug target. Detailed target-evidence scoring belongs in the IPF drug-target-prioritization section.
 
 Fig. 4 panel plan:
 - A: Prostate cancer H&E-aligned Visium tissue and spatial cluster context (`res_pc/1.cluster_spatial.png`) establishes tissue-level spatial domains after STworkbench MCP execution.
@@ -483,81 +483,58 @@ The paired cancer Visium analyses use complementary datasets to exercise differe
 
 ---
 
-## 5. DeepMAST generalizes to single-cell-resolution spatial transcriptomics in mouse Alzheimer’s disease
+## 5. DeepMAST prioritizes candidate drug targets in human idiopathic pulmonary fibrosis Visium data
 
-**역할:** Single-cell-resolution spatial technology로의 generalization section입니다. SpatialAgent/STAgent가 spatial biology agent use cases를 이미 보여주므로, 여기서는 "DeepMAST는 특정 Visium pipeline이 아니라 harnessed biological reasoning layer"라는 점을 보여주는 용도입니다.
+**역할:** Results의 biological climax로 두는 것이 좋습니다. IPF는 human disease, Visium spot-level, drug target prioritization, and possible experimental validation을 연결할 수 있어서 가장 마지막 substantive Results section에 적합합니다.
 
-Dataset:
-- Mouse Alzheimer disease.
-- STARmapPLUS.
-- Single-cell resolution.
-
-보여줄 내용:
-- Visium spot-level에서 STARmapPLUS single-cell-resolution data로 input modality/resolution generalization.
-- Brain cell types: microglia, astrocytes, neurons, oligodendrocytes, vascular cells 등.
-- Mouse disease biology와 human therapeutic relevance를 분리해서 해석했는지.
-- Literature grounding and uncertainty calibration.
-
-추천 heading:
-
-```text
-DeepMAST generalizes from spot-level Visium to single-cell-resolution STARmapPLUS in mouse Alzheimer’s disease
-```
-
-핵심 메시지:
-
-```text
-The Alzheimer STARmapPLUS analysis tests whether the DeepMAST harness can preserve cell-type-specific and literature-grounded interpretation when the input shifts from spot-level Visium to single-cell-resolution spatial transcriptomics.
-```
-
-주의할 claim boundary:
-- Mouse result에서 human therapeutic claim을 바로 강하게 연결하지 않습니다.
-- Human relevance는 "exploratory" 또는 "translation-aware interpretation"로 제한합니다.
-
----
-
-## 6. DeepMAST prioritizes candidate therapeutic targets in human idiopathic pulmonary fibrosis Visium data
-
-**역할:** Results의 biological climax로 두는 것이 좋습니다. IPF는 human disease, Visium spot-level, therapeutic target prioritization, and possible experimental validation을 연결할 수 있어서 가장 마지막 substantive Results section에 적합합니다.
-
-Dataset:
+Dataset
 - Human idiopathic pulmonary fibrosis.
 - Visium spot-level resolution.
+- Data source: Franzén et al. [70].
+- IRIS domain maps show strong sample-to-sample heterogeneity across control and IPF sections (Supplementary Figure S6).
 
-구조:
-1. IPF spatial disease niche 해석.
-2. Disease-associated ligand-receptor/pathway/cell-type signals.
-3. Spatial ligand-receptor quadrant handoff using Moran's R, NMF Factor1 loading, and GenePT functional-semantic score.
-4. Deep Target Prioritizer evidence scoring.
-5. Top target evidence decomposition.
-6. Experimental validation이 있으면 여기서만 "validated candidate" 수준의 강한 표현 사용.
+구조
+1. IPF dataset and sample heterogeneity rationale.
+2. Clinical and epithelial biology rationale for focusing on mild IPF and AT2/transitional AT2 compartments.
+3. Mild IPF AT2/transitional AT2 niche focusing using IRIS domains 9, 11, 10, 13, and 5 from Figure 5A.
+4. Index-section selection of (V19S23-092-B1) based on interest-domain composition, not candidate target expression.
+5. Disease-associated ligand-receptor/pathway/cell-type signals.
+6. Spatial ligand-receptor quadrant handoff using Moran's R, NMF Factor1 loading, and GenePT functional-semantic score.
+7. Deep Target Prioritizer evidence scoring.
+8. Top target evidence decomposition.
+9. Experimental validation이 있으면 여기서만 "validated candidate" 수준의 강한 표현 사용.
 
-추천 heading:
+추천 heading
 
 ```text
-DeepMAST prioritizes evidence-supported therapeutic targets in human idiopathic pulmonary fibrosis
+DeepMAST prioritizes evidence-supported drug targets in human idiopathic pulmonary fibrosis
 ```
 
-핵심 메시지:
+핵심 메시지
 
 ```text
-The IPF analysis provides the strongest therapeutic-prioritization demonstration, linking human disease spatial localization, literature support, database-derived evidence, druggability context, and experimental validation when available.
+The IPF analysis provides the strongest drug target-prioritization demonstration, linking human disease spatial localization, literature support, database-derived evidence, druggability context, and experimental validation when available.
 ```
 
-주의할 claim boundary:
+추천 Results opening
+
+```text
+For the final disease application, DeepMAST was applied to the human idiopathic pulmonary fibrosis Visium atlas from Franzén et al. [70]. IRIS domain maps showed strong sample-to-sample heterogeneity in spatial domain composition across control and IPF sections (Supplementary Figure S6), motivating an index-section analysis focused on the disease niche most relevant to the biological question. Clinical studies support this focus because IPF can progress even when lung function is still relatively preserved, and prompt antifibrotic treatment is recommended to preserve lung function rather than waiting for advanced decline [71-73]. In parallel, epithelial biology studies link AT2-derived transitional cell states to fibrotic repair and persistence in human lung fibrosis, placing AT2 and transitional AT2 compartments at a plausible early epithelial-fibrotic interface [74,75]. This clinical and cellular context motivated the mild IPF, AT2/transitional AT2-centered analysis, while index-section selection itself remained based on IRIS-domain composition rather than candidate target expression. Interest domains were defined from the cell-type analysis as IRIS domains 9, 11, 10, 13, and 5 (Figure 5A). Among mild IPF sections, (V19S23-092-B1) showed the strongest representation of this pre-specified niche without using candidate target expression as a selection criterion, with 4,113 of 4,116 spots assigned to the interest domains (99.93%) and the highest AT2/transitional AT2 weighted domain score. DeepMAST therefore used (V19S23-092-B1) as the index section for spatial ligand-receptor ranking, followed by staged drug target evidence scoring.
+```
+
+주의할 claim boundary
 - 전체 논문 제목과 abstract에서는 "drug-target prioritization"을 기본으로 유지합니다.
 - "target discovery"는 IPF에서 실험검증이 충분히 있을 때 해당 result에만 제한적으로 씁니다.
 
 ---
 
-## 7. Cross-dataset analysis demonstrates evidence traceability across spatial platforms and disease contexts
+## 6. Cross-dataset analysis demonstrates evidence traceability across disease contexts and workflow types
 
 선택적이지만 있으면 Discussion 직전의 clean closing으로 좋습니다.
 
 역할:
 - Breast/prostate cancer Visium: complementary curated interpretation and reference-guided execution.
-- Alzheimer mouse: single-cell-resolution generalization.
-- IPF human: therapeutic prioritization and validation.
+- IPF human: drug target prioritization and validation.
 
 측정:
 - number of generated reports or interpretations.
@@ -570,7 +547,7 @@ The IPF analysis provides the strongest therapeutic-prioritization demonstration
 추천 heading:
 
 ```text
-Cross-dataset analyses preserve evidence traceability across spatial platforms and disease contexts
+Cross-dataset analyses preserve evidence traceability across disease contexts and workflow types
 ```
 
 핵심 메시지:
@@ -598,11 +575,9 @@ Results
 
 4. DeepMAST connects reference-guided cancer Visium execution with curated breast cancer LR interpretation
 
-5. DeepMAST generalizes from spot-level Visium to single-cell-resolution STARmapPLUS in mouse Alzheimer’s disease
+5. DeepMAST prioritizes evidence-supported drug targets in human idiopathic pulmonary fibrosis
 
-6. DeepMAST prioritizes evidence-supported therapeutic targets in human idiopathic pulmonary fibrosis
-
-7. Cross-dataset analyses preserve evidence traceability across spatial platforms and disease contexts
+6. Cross-dataset analyses preserve evidence traceability across disease contexts and workflow types
 ```
 
 ---
@@ -640,8 +615,8 @@ Figure 3
 Evidence-governed claim control benchmark.
 Panels: (A) two-branch claim-governance benchmark schematic; (B) structured SKILL CCI ablation benchmark; (C, left) follow-up recommendation evidence coverage; (C, right) follow-up recommendation claim-boundary restraint.
 Source paths/data: A, `benchmarks/dth/figures/Fig3A_ClaimGovernanceLifecycle.svg`; B, `benchmarks/cci_skill_ablation/figures/SkillAblation.png`; C left, `benchmarks/dth/figures/Fig3A_DTH_EvidenceCoverage.svg`; C right, `benchmarks/dth/figures/Fig3B_DTH_BlindJudgeRigor.svg`.
-Linked supplements: Supplementary Figure S4B supports Figure 3B; Supplementary Figure S4C-D support Figure 3C right; Supplementary Table/Data contains the fixed breast cancer Deep Target Prioritizer evidence package from `final_res_bc_drugtarget/drug.md`.
-Main message: structured guidance reduces unsupported CCI interpretation upstream, the fixed breast cancer Deep Target Prioritizer evidence package defines the controlled substrate for follow-up recommendation validation, and guide activation improves downstream claim-boundary restraint in breast cancer follow-up recommendation outputs.
+Linked supplements: Supplementary Figure S4B supports Figure 3B; Supplementary Figure S4C-D support Figure 3C right; Supplementary Table/Data contains the breast cancer follow-up recommendation validation substrate from `final_res_bc_drugtarget/drug.md`.
+Main message: structured guidance reduces unsupported CCI interpretation upstream, the controlled breast cancer substrate supports follow-up recommendation validation, and guide activation improves downstream claim-boundary restraint in breast cancer follow-up recommendation outputs.
 ```
 
 ## Main application figures to build or select
@@ -651,17 +626,13 @@ Figure 4
 Complementary human cancer Visium workflows.
 Panels: (A) prostate cancer H&E-aligned Visium tissue and spatial cluster context; (B) prostate cancer cluster-level cell-type enrichment/deconvolution heatmap; (C) prostate cancer pathway/signature enrichment heatmap after single-cell reference selection and STworkbench MCP execution; (D) breast cancer NMF/factor spatial programs with Factor3 selection context; (E) breast cancer spatial visualization of selected ligand-receptor pairs; (F) breast cancer quantitative ligand-receptor interaction summaries.
 Linked supplements: Supplementary Figure S4A documents the LR citable-context bridge, and Supplementary Figure S5 documents MCP/HITL handoff for the Figure 4 cancer Visium interpretation thread.
-Message: prostate cancer demonstrates reference-guided Pipeline Executor output after sc-reference-selector and rMCP/MCP-mediated workflow execution, whereas breast cancer demonstrates downstream interpretation of selected LR candidates from curated spatial outputs. Keep follow-up recommendation validation in Figure 3 and reserve detailed target-prioritization evidence for the IPF/Figure 6 section.
+Message: prostate cancer demonstrates reference-guided Pipeline Executor output after sc-reference-selector and rMCP/MCP-mediated workflow execution, whereas breast cancer demonstrates downstream interpretation of selected LR candidates from curated spatial outputs. Keep follow-up recommendation validation in Figure 3 and reserve detailed target-prioritization evidence for the IPF/Figure 5 section.
 
 Figure 5
-Mouse Alzheimer STARmapPLUS generalization.
-Panels: single-cell-resolution spatial domains/cell types, disease-relevant programs, literature-grounded interpretation, uncertainty/translation boundary.
-
-Figure 6
-Human IPF Visium therapeutic target prioritization.
+Human IPF Visium drug target prioritization.
 Panels: (A) quadrant analysis of IPF ligand-receptor candidates showing Moran's R, Factor1 NMF loading, and GenePT functional-semantic score for interest-cluster and other ligand-receptor pairs; (B) staged Deep Target Prioritizer evidence funnel from ligand-receptor-derived genes to Stage 3 featured candidates; (C) candidate target evidence matrix; (D) interest-cell intrinsic versus secondary spatial-niche interpretation tiers; (E) representative Evidence-Grounded Follow-up Recommendations; (F) druggability/database support or experimental validation if available.
 
-Figure 7 or Supplementary Overview
+Figure 6 or Supplementary Overview
 Cross-dataset evidence traceability summary.
 Panels/table: datasets, platform/resolution, analysis goal, main outputs, evidence sources, validation status.
 ```
@@ -707,7 +678,9 @@ Panels: STworkbench MCP execution trace, user/HITL selection or confirmation of 
 Message: Supplementary Figure S5 documents how the cancer Visium spatial outputs in Figure 4 were selected, controlled, and handed to interpretation through an auditable MCP/HITL workflow. It should not be used as the main target-prioritization evidence figure.
 
 Supplementary Figure S6
-Reserved only if additional CCI overflow panels beyond Supplementary Figure S4B are needed. Otherwise, do not duplicate the skill-ablation supplement here.
+IRIS domain maps across control and IPF Visium sections from Franzén et al. [70].
+Source path: docs/writing/figures/sfig6.png
+Message: IRIS domain composition varies substantially across samples, supporting a focused index-section strategy for the mild IPF AT2/transitional AT2 niche.
 
 Supplementary Figure S7
 Reserved only if all-retrieved literature-coverage views need a separate display beyond Supplementary Figure S4A. Otherwise, keep the literature-retrieval coverage supplement as Supplementary Figure S4A and report additional all-retrieved analyses in tables or methods artifacts.
@@ -760,7 +733,7 @@ Before execution, the module performs an MCP readiness check. If a required anal
 
 #### Deep Target Prioritizer
 
-The Deep Target Prioritizer prioritizes candidate therapeutic targets from ligand-receptor candidates identified by spatial transcriptomics cell-cell interaction analysis. Inputs include ligand-receptor candidate files, optional user-selected target cell types, disease context, and spatial analysis outputs. Outputs include per-stage evidence files, a structured target-assessment contract, and a publication-style target-prioritization report.
+The Deep Target Prioritizer prioritizes candidate drug targets from ligand-receptor candidates identified by spatial transcriptomics cell-cell interaction analysis. Inputs include ligand-receptor candidate files, optional user-selected target cell types, disease context, and spatial analysis outputs. Outputs include per-stage evidence files, a structured target-assessment contract, and a publication-style target-prioritization report.
 
 The agent applies a staged evidence funnel. An initial mapping step resolves user-provided disease and cell-type names to database-compatible vocabulary when available. Stage 1 evaluates ligand-receptor pair context using single-cell expression and disease-context evidence from CELLxGENE Census [37] and protein-interaction evidence from STRING [40]. Stage 2 evaluates unique genes from the ligand-receptor candidate set using target-validation, tractability, safety, disease-evidence, and known-drug annotations from Open Targets Platform [38] together with genetic-association evidence from GWAS Catalog [39]. Stage 3 performs focused druggability assessment for selected featured or novel candidates, using ChEMBL [41] as the default source for target search, bioactivity, indications, and mechanism-of-action evidence. Follow-up recommendations preserve claim boundaries by separating interest-cell intrinsic support from secondary spatial-niche, cross-cell, and gene-level actionability evidence.
 
@@ -786,17 +759,17 @@ DeepMAST used four study-specific MCP resources and seven skill-guided evidence 
 
 Summary-Guided Chunk Promotion RAG (SGCP-RAG) was used as a retrieval-control method for source-grounded biological interpretation. The base retrieval system extended LangConnect Client and LangChain LangConnect infrastructure for collection management, document ingestion, hybrid retrieval, and PostgreSQL/pgvector-backed storage. The methodological contribution was the SGCP-RAG promotion layer, not the base RAG service.
 
-SGCP-RAG constructs a persistent SGCP-RAG index containing generated summaries and explicit source back-references to documents and chunks. Source documents were chunked with the default SGCP-RAG MCP settings (chunk_size = 3000; chunk_overlap = 200). For the MultiHop-RAG benchmark, chunk_size was reduced to 1000 while chunk_overlap remained 200 because the corpus contained many short news articles. The summaries are non-authoritative navigation memory. They guide retrieval toward likely source regions of the corpus, but they are not injected into the answer context as evidence. At query time, selected SGCP-RAG pages either promote exact referenced chunks in a static-reference ablation or route retrieval to likely source documents for query-conditioned hybrid search. Promoted chunks are deduplicated and passed through the same LLM relevance grading, answer generation, hallucination grading, and answer-quality grading steps as ordinarily retrieved chunks. Summary injection was disabled in the benchmark, so SGCP-RAG was evaluated only as bounded retrieval-time chunk promotion.
+SGCP-RAG constructs a per-collection Summary Navigation Index (SNI), implemented as generated navigation artifacts and a runtime pack containing source pages, concept pages, summaries, keywords, and explicit back-references to source documents and chunks. Source documents were chunked with the default SGCP-RAG MCP settings (chunk_size = 3000; chunk_overlap = 200). For the MultiHop-RAG benchmark, chunk_size was reduced to 1000 while chunk_overlap remained 200 because the corpus contained many short news articles. The SNI is non-authoritative navigation metadata. It guides retrieval toward likely source regions of the corpus, but its generated summaries, titles, and concept labels are not treated as evidence and are not injected into answer generation. At query time, selected SNI pages either promote exact referenced chunks in a static-reference ablation or route retrieval to likely source documents for query-conditioned hybrid search. Promoted chunks are deduplicated and passed through the same LLM relevance grading, answer generation, hallucination grading, and answer-quality grading steps as ordinarily retrieved chunks. Thus, SGCP-RAG was evaluated as bounded retrieval-time source navigation and chunk promotion, not as summary injection.
 
-The SGCP-RAG benchmark used 2,556 MultiHop-RAG cases [56] under paired retrieval conditions for Qwen3.5-35B and Qwen3.5-122B. MultiHop-RAG was selected as a source-grounded multi-hop retrieval benchmark because its English news corpus was curated around documents with overlapping keywords, bridge entities, and bridge topics, rather than duplicated article copies [56]. This design creates a dense multi-document evidence graph in which successful retrieval requires locating source-bearing chunks across topically related news articles. The primary comparison was baseline retrieval versus SGCP-RAG-enabled document-routed retrieval. Static-reference promotion was treated as a supplementary ablation. Primary endpoints were normalized exact-answer containment and evidence recall among LLM-graded relevant documents. Token F1, no-relevant-context failure rate, retrieved chunk count, and latency were secondary endpoints.
+The SGCP-RAG benchmark used 2,556 MultiHop-RAG cases [56] under paired retrieval conditions for Qwen3.5-35B and Qwen3.5-122B. MultiHop-RAG was selected as a source-grounded multi-hop retrieval benchmark because its English news corpus was curated around documents with overlapping keywords, bridge entities, and bridge topics, rather than duplicated article copies [56]. This design creates a dense multi-document evidence graph in which successful retrieval requires locating source-bearing chunks across topically related news articles. The primary comparison was baseline retrieval versus SNI-enabled document-routed retrieval. Static-reference promotion was treated as a supplementary ablation. Primary endpoints were normalized exact-answer containment and evidence recall among LLM-graded relevant documents. Token F1, no-relevant-context failure rate, retrieved chunk count, and latency were secondary endpoints.
 
 #### STworkbench MCP for spatial transcriptomics analysis
 
-STworkbench MCP was developed as a spatial transcriptomics analysis framework implemented with FastMCP [44] for exploratory spatial characterization, ligand-receptor program discovery, and focused evaluation of candidate ligand-receptor interactions. The workflow accepted AnnData inputs containing expression matrices, spatial coordinates, cluster annotations, and either spot-level cell-type compositions or single-cell cell-type labels. For 10x Visium inputs, raw feature-barcode matrices were read with Squidpy [45], genes detected in fewer than five observations were removed, counts were normalized to 10,000 per observation, and expression values were log-transformed using Scanpy.
+STworkbench MCP was developed as a spatial transcriptomics analysis framework implemented with FastMCP [44] for exploratory spatial characterization, ligand-receptor program discovery, and focused evaluation of candidate ligand-receptor interactions. The workflow accepted AnnData [77] inputs containing expression matrices, spatial coordinates, cluster annotations, and either spot-level cell-type compositions or single-cell cell-type labels. For 10x Visium inputs, raw feature-barcode matrices were read with Squidpy [45], genes detected in fewer than five observations were removed, counts were normalized to 10,000 per observation, and expression values were log-transformed using Scanpy [78].
 
 Spatial neighbor graphs were constructed according to platform geometry. Visium analyses used grid-based spatial neighbors with six nearest neighbors and two neighbor rings. Single-cell-resolution spatial datasets used Delaunay triangulation, with long edges removed at the 99th percentile by default. Multi-sample graphs were constructed independently within each sample to prevent cells or spots from different tissue sections, fields of view, or slides from being treated as spatial neighbors.
 
-Exploratory STworkbench analyses visualized spatial clusters, quantified cluster-cell-type enrichment with one-sided Mann-Whitney U tests followed by Benjamini-Hochberg FDR correction, estimated spatial neighborhood enrichment with Squidpy [45] permutation tests, and inferred pathway activity with decoupleR using PROGENy [46] signaling signatures. Where pathway-cell-type relationships were evaluated, MISTy [47] modeled local and broader spatial relationships between pathway activity scores and cell-type compositions or single-cell summaries.
+Exploratory STworkbench analyses visualized spatial clusters, quantified cluster-cell-type enrichment with one-sided Mann-Whitney U tests followed by Benjamini-Hochberg FDR correction, estimated spatial neighborhood enrichment with Squidpy [45] permutation tests, and inferred pathway activity with decoupleR [79] using PROGENy [46] signaling signatures. Where pathway-cell-type relationships were evaluated, MISTy [47] modeled local and broader spatial relationships between pathway activity scores and cell-type compositions or single-cell summaries.
 
 Ligand-receptor interactions were inferred with LIANA+ [48] using intercellular resources derived from OmniPath [49], including CellChatDB [50], CellPhoneDB [51], connectomeDB2020 [52], and CellTalkDB [53] annotations. Spatial co-localization was quantified with LIANA+ bivariate analysis using local cosine similarity and global bivariate Moran's R with 100 permutations and a fixed random seed. Positive Moran's R ligand-receptor pairs with p < 0.05 were carried into non-negative matrix factorization (NMF). Candidate NMF ranks from 1 to 10 were evaluated by reconstruction error when the rank was not specified; an elbow detector selected the factor number, with five factors used as the fallback.
 
@@ -806,7 +779,7 @@ Ligand-receptor pairs contributing to the selected NMF factor were prioritized b
 
 The sc_reference_selector workflow compared candidate single-cell references for spot-based Visium analyses. The method was used in the prostate cancer reference-selection case study, where the spatial query was the 10x Genomics Human Prostate Cancer, Adenocarcinoma with Invasive Carcinoma (FFPE) Visium Spatial Gene Expression dataset [57]. Two candidate references, GSE181294 [58] and GSE185344 [59], were compared after metadata-aware loading, duplicate-gene resolution, stratified downsampling, common-gene harmonization, normalization, and fused Gromov-Wasserstein (FGW) distance calculation.
 
-The prostate cancer spatial input contained 4,371 spots and 17,943 genes at loading. Duplicate-gene handling left 17,941 spatial genes. GSE181294 was downsampled from 156,301 to 9,991 cells, and GSE185344 from 57,697 to 9,995 cells. After harmonization, the spatial query and both references were restricted to the same 16,385-gene feature space. Spatial and reference data were normalized to 10,000 counts per observation and log-transformed using Scanpy. Reference similarity was measured with FGW distance using a fused-distance mixing parameter of 0.5 and entropic regularization of 0.1. Lower distances were interpreted as stronger agreement between the spatial query and a candidate reference.
+The prostate cancer spatial input contained 4,371 spots and 17,943 genes at loading. Duplicate-gene handling left 17,941 spatial genes. GSE181294 was downsampled from 156,301 to 9,991 cells, and GSE185344 from 57,697 to 9,995 cells. After harmonization, the spatial query and both references were restricted to the same 16,385-gene feature space. Spatial and reference data were normalized to 10,000 counts per observation and log-transformed using Scanpy [78]. Reference similarity was measured with FGW distance using a fused-distance mixing parameter of 0.5 and entropic regularization of 0.1. Lower distances were interpreted as stronger agreement between the spatial query and a candidate reference.
 
 #### rMCPAgent for converting R workflows into MCP-compatible services
 
@@ -814,7 +787,7 @@ rMCPAgent was used as the R-workflow MCP generation layer for deconvolution-read
 
 Workflow templates specified required inputs, analysis parameters, output files, and validation rules, allowing package-specific R implementations to be wrapped behind a stable agent-facing contract. For deconvolution, templates required H5AD spatial inputs with expression matrices and spatial coordinates, single-cell reference inputs with expression and cell-type/sample metadata, and count-based filtering parameters. The primary deconvolution output was a table with one row per spatial barcode and numeric cell-type proportion columns.
 
-The production workflow applied five stages before exposing an R workflow to Pipeline Executor, including input validation, data loading, workflow integration, recovery diagnostics, and output validation with MCP registration. Input validation checked file existence, file type, readability, required assays, spatial coordinates, metadata fields, and compatibility between spatial and reference datasets. Data loading converted validated H5AD inputs into R-compatible objects through zellkonverter. Recovery diagnostics converted file-access failures, missing metadata, unsupported assays, invalid parameters, package execution failures, output-write failures, and malformed outputs into structured messages. Deconvolution outputs were accepted only when they contained barcode identifiers, at least one numeric proportion column, no missing values, values bounded between 0 and 1, and row-wise proportions summing to 1.0 within a tolerance of 0.01.
+The production workflow applied five stages before exposing an R workflow to Pipeline Executor, including input validation, data loading, workflow integration, recovery diagnostics, and output validation with MCP registration. Input validation checked file existence, file type, readability, required assays, spatial coordinates, metadata fields, and compatibility between spatial and reference datasets. Data loading converted validated H5AD inputs into R-compatible objects through zellkonverter [80]. Recovery diagnostics converted file-access failures, missing metadata, unsupported assays, invalid parameters, package execution failures, output-write failures, and malformed outputs into structured messages. Deconvolution outputs were accepted only when they contained barcode identifiers, at least one numeric proportion column, no missing values, values bounded between 0 and 1, and row-wise proportions summing to 1.0 within a tolerance of 0.01.
 
 #### Biomedical literature search skill
 
@@ -846,41 +819,57 @@ Within DeepMAST, the adapted skills constrained entity resolution, query selecti
 
 DeepMAST analyses used spatial transcriptomics datasets, ligand-receptor candidate tables, target-prioritization evidence bundles, literature retrieval collections, and frozen benchmark artifacts. The human cancer Visium analyses were designed as complementary modularity demonstrations rather than as a comparative oncology study. The breast cancer arm used preprocessed Visium/Xenium-matched breast cancer annotations and spatial clustering as a curated downstream-interpretation setting linked to the integrated single-cell, spatial, and in situ breast cancer study, the Starfysh spatial/histology analysis, and the public accession GSE243280 [42,43]. The prostate cancer arm used the 10x Genomics Human Prostate Cancer, Adenocarcinoma with Invasive Carcinoma (FFPE) Visium dataset and emphasized upstream reference selection, MCP-mediated execution, and downstream biological interpretation [57].
 
-The fixed breast cancer Deep Target Prioritizer evidence package was used for Evidence-Grounded Follow-up Recommendations validation. This package assessed 37 unique genes from the top-30 ligand-receptor pairs, selected 7 Stage 3 featured candidates, and contained prioritized target candidates, ligand-receptor candidates, malignant-cell pair evidence, gene-level target evidence, Open Targets target-disease evidence, known-drug annotations, and recommendation-validation metadata. Featured target genes included ERBB3, EPHB4, ERBB2, INSR, EFNB2, NECTIN4, and LAMA5.
+The human idiopathic pulmonary fibrosis (IPF) analysis used the Visium spatial transcriptomics atlas of human pulmonary fibrosis from Franzén et al. [70]. The source study profiled human IPF lung tissue and healthy lung controls across sections spanning mild to more advanced fibrotic remodeling. DeepMAST treated this dataset as the drug target-prioritization application and focused on AT2 and transitional AT2 compartments to identify early disease-associated markers, ligand-receptor axes, and candidate genes. For spot-based analysis, the Pipeline Executor defaulted to IRIS, which supports cell-type deconvolution and spatial clustering within the same multi-slide workflow, before downstream ligand-receptor selection and Deep Target Prioritizer evidence scoring.
 
-The mouse Alzheimer STARmapPLUS analysis should be described as a cross-platform spatial transcriptomics application rather than as therapeutic validation. Methods should specify the dataset, preprocessing status, spatial analysis outputs supplied to DeepMAST, disease/cell-type context, and which downstream modules were activated. The human idiopathic pulmonary fibrosis Visium analysis is the strongest therapeutic target-prioritization application and should describe the Visium input, ligand-receptor candidate generation, target-prioritization run, database evidence sources, featured and novel candidate selection, and any experimental or external validation used in the manuscript.
-
-Frozen reproducibility bundles should be cited in Methods as source artifacts rather than as manuscript references. Relevant bundles include CCI skill-ablation outputs under `docs/benchmarks/cci_skill_ablation/`, literature-retrieval coverage artifacts under `benchmarks/lr_retrieval_relevance/`, SGCP-RAG accuracy/recall artifacts under `benchmarks/sgcp_accuracy_recall/`, and follow-up recommendation validation artifacts under `benchmarks/dth/`. Offline reproduction scripts are preferred as stable manuscript references because they regenerate summary tables and figures from committed artifacts without calling live model endpoints or external retrieval services.
+Index-section selection for the IPF application was defined before target prioritization and was based on IRIS-domain composition rather than candidate target expression. Candidate sections were restricted to mild IPF tissue. Interest domains were defined as IRIS domains 9, 11, 10, 13, and 5, corresponding to AT2 and transitional AT2-enriched domains from the cell-type analysis. For each eligible section, the analysis computed the spot count and fraction assigned to the interest domains and a secondary AT2/transitional AT2 weighted score, calculated as the sum across interest-domain fractions weighted by the corresponding AT2 and transitional AT2 cluster-median enrichment values. The resulting section-selection table should be reported as supplementary data; repository-local CSV artifacts should remain in source-artifact notes rather than the main Methods prose.
 
 ### Benchmark design and evaluation
 
 The benchmark suite was designed to separate evidence acquisition, source-grounded retrieval, and claim generation. This separation follows the reference-paper pattern in which system modules are first defined, then evaluated through bounded benchmarks with direct endpoints. Each panel should have a narrow endpoint and should not be overinterpreted as a generic measure of full-system performance.
 
-The evidence acquisition benchmark tested whether the biomedical-literature-search skill broadened retrieval-stage citable biological context coverage before downstream interpretation. The same 30 ligand-receptor cases from the CCI benchmark were evaluated under paired skill ON and skill OFF conditions for Qwen3.5-35B and Qwen3.5-122B. Coverage was computed over all retrieved papers and over the interpreter-facing citable set, defined as direct ligand-receptor evidence or receptor/pathway context evidence after applying the same handoff policy to both arms. Main Figure 2A should use the citable set for both Qwen3.5-35B and Qwen3.5-122B, with all-retrieved analyses reported as supplementary evidence.
+#### Literature evidence acquisition benchmark
 
-The SGCP-RAG source-grounded retrieval benchmark evaluated baseline retrieval, static-reference promotion, and SGCP-RAG-enabled document-routed retrieval on the same 2,556 MultiHop-RAG cases [56]. The primary comparison was baseline retrieval versus SGCP-RAG-enabled retrieval. Static-reference promotion was retained as a supplementary ablation. Main Figure 2B should present Qwen3.5-35B and Qwen3.5-122B together to show both model-scale robustness and the larger gain in the 35B setting.
+The literature evidence acquisition benchmark tested whether the biomedical-literature-search skill broadened retrieval-stage citable biological context before downstream interpretation. The benchmark used the same 30 breast cancer Visium ligand-receptor cases as the structured CCI benchmark, sampled across Moran's R magnitude and literature/pathway annotation status. Each case supplied a ligand-receptor pair, breast cancer disease context, ligand and receptor genes, available pathway annotations, and ligand- and receptor-associated cell-type labels.
 
-The structured CCI interpretation benchmark tested whether structured biological SKILL guidance reduced unsupported free-text interpretation of ligand-receptor pairs from breast cancer Visium data. The benchmark used 30 ligand-receptor cases sampled from LIANA+ outputs using a 3 x 2 stratified design over Moran's R magnitude and literature/pathway annotation status. Each case included the interaction identifier, spatial co-localization statistics, ligand and receptor expression metrics, pathway and disease annotations, cell-type expression patterns, and tissue context. The main comparison used no skill guidance, unstructured prose guidance, and guide-compliant structured SKILL guidance; a fourth basic structured-SKILL condition was retained for supplementary analysis.
+Each case was evaluated under paired skill ON and skill OFF retrieval-only conditions for Qwen3.5-35B and Qwen3.5-122B, yielding 120 retrieval runs. The skill ON condition used the biomedical-literature-search protocol, including coverage validation and targeted gap-filling searches for missing biological context. The skill OFF condition used the same case inputs and retrieval-only execution mode but omitted the biomedical-literature-search guide. Both arms used the same downstream evidence-bucket policy after retrieval. Direct ligand-receptor evidence and receptor/pathway context evidence were retained as the interpreter-facing citable set, whereas disease-only background and weak evidence were retained for audit but excluded from the citable set. The citable handoff was capped at 40 papers per case.
 
-The Evidence-Grounded Follow-up Recommendations validation tested whether the drug-target-hypothesis workflow improved recommendation quality after spatial ligand-receptor evidence had been curated. Guided and baseline prompts used the same generator model, source evidence, schema contract, save gate, and retry policy. In the baseline condition, the writer received the operational contract but no follow-up recommendation guide. In the guided condition, the writer was required to use the recommendation guide before generating recommendations. Valid-output analysis included 20 guided and 20 baseline runs generated with Qwen3.5-397B (`qwen3.5:397b-cloud`). The primary endpoint should be Figure 3C right, claim-boundary restraint; Figure 3C left should be treated as a secondary coverage summary.
+Coverage was evaluated for three entity classes: ligand/receptor genes, pathway annotations, and cell-type labels. Coverage for a case was defined as the fraction of target entities in a class that appeared in the union of retrieved paper titles and abstracts, allowing aliases and expanded wording. Gene, pathway, and cell-type coverage were recomputed for both the all-retrieved paper set and the interpreter-facing citable set. The primary endpoint for Main Figure 2A should be cell-type coverage in the citable set, because gene coverage was expected to be near-saturated by ligand-receptor queries and pathway coverage was available only for the subset of cases with pathway annotations. All-retrieved coverage should be reported as supplementary evidence.
 
-LLM judging and automated auditing were used only for bounded evaluation targets. Automated auditing recorded evidence coverage, retained recommendations, evidence references, retry counts, and lexical evidence-use indicators. Blind judging compared anonymized guided and baseline outputs for evidence grounding, biological plausibility, therapeutic relevance, claim-boundary restraint, and specificity/testability, with unsupported-claim penalties and major-error flags.
+Coverage labels were assigned with a fixed Qwen3.5-122B labeling model over unique case-paper pairs and aggregated by case, model size, condition, entity class, and paper set. Paired comparisons used case-level skill ON minus skill OFF differences within the same model setting. Wilcoxon signed-rank tests, exact sign tests, and bootstrap confidence intervals were used for paired coverage analysis; pooled analyses combined the Qwen3.5-35B and Qwen3.5-122B paired cases only after preserving case-level pairing. This benchmark should be interpreted as retrieval-breadth evaluation, not as a direct test of final interpretation quality or per-paper precision.
+
+#### SGCP-RAG source-grounded retrieval benchmark
+
+The SGCP-RAG source-grounded retrieval benchmark tested whether SNI-enabled source navigation improved retrieval of source-bearing chunks before downstream answer generation. The benchmark used the same 2,556 MultiHop-RAG cases [56] for all conditions. MultiHop-RAG was selected because its English news corpus contains overlapping keywords, bridge entities, and bridge topics across related documents, creating a multi-document retrieval setting in which answer grounding depends on locating the correct source chunks rather than retrieving a single duplicated article.
+
+Three paired retrieval conditions were evaluated for Qwen3.5-35B and Qwen3.5-122B: baseline retrieval, static-reference promotion, and SNI-enabled document-routed retrieval. Baseline retrieval used the ordinary hybrid search path. Static-reference promotion selected SNI pages and promoted exact source-referenced chunks from those pages. SNI-enabled document-routed retrieval selected SNI pages, routed search to the corresponding source documents, and performed query-conditioned hybrid search within those documents. All conditions used hybrid search with a search limit of five chunks per retrieval call and at most three query rewrites. In all SGCP-RAG conditions, SNI summaries, titles, and concept labels were treated only as navigation metadata; they were not injected into answer generation and were not counted as evidence. Promoted chunks were deduplicated, merged with ordinary retrieval results, and passed through the same relevance grading, answer generation, hallucination grading, and answer-quality grading steps used by baseline retrieval.
+
+The primary comparison was baseline retrieval versus SNI-enabled document-routed retrieval, with static-reference promotion retained as a supplementary ablation. Exact-answer containment was evaluated over 2,556 rows per condition. Evidence recall was evaluated over the 2,255 paired cases with expected evidence keys available and was computed over LLM-graded relevant chunks. Token F1, no-relevant-context failure rate, retrieved and promoted chunk counts, and latency were treated as secondary endpoints. Exact-answer containment used exact McNemar tests for paired binary outcomes, and evidence recall used paired Wilcoxon signed-rank tests. Main Figure 2B should present Qwen3.5-35B and Qwen3.5-122B together to show both model-scale robustness and the larger gain in the 35B setting.
+
+#### Structured CCI interpretation benchmark
+
+The structured CCI interpretation benchmark tested whether structured biological SKILL guidance reduced unsupported free-text interpretation of ligand-receptor pairs from breast cancer Visium data. The benchmark used 30 ligand-receptor cases sampled from LIANA+ outputs using a 3 x 2 stratified design over Moran's R magnitude and literature/pathway annotation status. Cell type-specific spatially variable genes were identified with Celina [76], and ligand and receptor cell-type annotations were derived separately from the Celina ct-SVG calls for each ligand-receptor pair. Each case included the interaction identifier, spatial co-localization statistics, ligand and receptor expression metrics, Celina-derived ligand and receptor cell-type annotations, pathway and disease annotations, interest-cluster enrichment statistics, and tissue context. The cell-type annotations were included to calibrate source-target directionality claims, because broadly distributed ligand expression does not support assignment to a single sender cell type. The main comparison used no skill guidance, unstructured prose guidance, and guide-compliant structured SKILL guidance; a fourth basic structured-SKILL condition was retained for supplementary analysis. Each condition was repeated five times per case, yielding 600 generated interpretations across four conditions. Interpretations were generated with GPT-5.4-nano and independently scored at temperature 0 by a dual-judge panel comprising GPT-5.4 through the OpenAI API and Claude Sonnet 4.6 through the Anthropic API. Judges assigned faithfulness, uncertainty-handling, spatial-calibration, overclaiming, and fabrication-count scores, and judge-level scores were averaged for the consensus hallucination-control endpoint.
+
+#### Evidence-grounded follow-up recommendation benchmark
+
+The Evidence-Grounded Follow-up Recommendations validation tested whether the drug-target-hypothesis workflow improved recommendation quality after spatial ligand-receptor and target-prioritization evidence had been fixed. The benchmark used a controlled breast cancer evidence substrate generated by Deep Drug Target Prioritizer, including prioritized target candidates, ligand-receptor candidates, malignant-cell pair evidence, gene-level target evidence, target-disease evidence from Open Targets Platform [38], known-drug annotations, and recommendation-validation metadata. The featured target set comprised ERBB3, EPHB4, ERBB2, INSR, EFNB2, NECTIN4, and LAMA5.
+
+Guided and baseline prompts used the same Qwen3.5-397B generator, source evidence, operational contract, schema contract, evidence-reference validation, save gate, and retry policy. The output contract required four to six retained recommendations, coverage of every featured gene in at least one recommendation, at least one retained recommendation in each of four categories (Mechanism of Action, Therapeutic Strategy, Cross-Target Interaction, and Novel Pathway), evidence references restricted to loaded evidence, and cautious falsifiable predictions rather than clinical-efficacy claims. In the baseline condition, the writer received the operational contract but no follow-up recommendation guide and was prohibited from reading a skill guide. In the guided condition, the writer was required to read the drug-target-hypothesis guide before generating recommendations. Runs were included only when the process completed successfully, the generated report passed schema and evidence-reference validation, the activation trace matched the assigned condition, and no deterministic host-side fallback output was used. Additional attempts were generated until each condition reached 20 valid outputs; invalid exploratory runs were excluded from valid-output analysis.
+
+The valid-output analysis included 20 guided and 20 baseline runs, matched by valid-run order for downstream paired comparisons. Automated auditing recorded guide activation, fallback status, evidence coverage, retained recommendation count, evidence-reference count, retry attempts, category coverage, and lexical evidence-use indicators including Stage 1, Stage 3, Open Targets, malignant-cell, not-yet-established, and causal-language mentions. Blinded judging compared anonymized guided and baseline output pairs without exposing guide-activation labels and used a dual-judge panel comprising GPT-5.4 through the OpenAI API and Claude Sonnet 4.6 through the Anthropic API. Judges scored evidence grounding, biological plausibility, therapeutic relevance, claim-boundary restraint, and specificity/testability, with unsupported-claim penalties and major-error flags. The primary endpoint should be Figure 3C right, claim-boundary restraint; Figure 3C left should be treated as a secondary evidence-coverage summary.
 
 ### Biological application workflows
 
 The complementary human cancer Visium analyses were used to demonstrate modularity across upstream execution and curated downstream interpretation. In the prostate cancer arm, Pipeline Executor first selected a single-cell reference for deconvolution, then exposed downstream spatial analysis through MCP-mediated execution before outputs were passed to Deep Interpreter. In the breast cancer arm, curated HITL selection used interest clusters 17, 4, and 14, the Prolif Invasive Tumor cell type, and Factor3. STworkbench MCP generated the NMF/factor spatial program summary, selected ligand-receptor spatial maps, and quantitative interaction summaries. Deep Interpreter then generated literature-grounded disease-context interpretation from these selected outputs.
 
-The breast cancer follow-up recommendation workflow used the fixed Deep Target Prioritizer evidence package described above as the controlled evidence substrate for Figure 3C. The full staged target-evidence assessment, druggability evidence, and deterministic report finalization should be described as biological application results in the later IPF/Figure 6 target-prioritization analysis rather than as an additional main Figure 3 panel.
+The breast cancer follow-up recommendation workflow was retained only as the controlled evidence substrate for Figure 3C. Full staged target-evidence assessment, druggability evidence, and deterministic report finalization should be described in the IPF/Figure 5 target-prioritization analysis rather than as an additional main Figure 3 panel.
 
-The mouse Alzheimer STARmapPLUS analysis should test whether DeepMAST generalizes beyond Visium spot-level data to single-cell-resolution spatial transcriptomics. The Methods should specify the input data type, preprocessing status, spatial analysis outputs supplied to DeepMAST, disease/cell-type context, and downstream modules activated. The direct claim should remain cross-platform interpretability and evidence traceability, not therapeutic validation.
-
-The human IPF Visium analysis should be presented as the strongest therapeutic target-prioritization application. Methods should describe the Visium input, CCI or ligand-receptor candidate generation, Deep Target Prioritizer run, CELLxGENE, Open Targets Platform, GWAS Catalog, STRING, and ChEMBL evidence sources when used, featured and novel candidate selection, and any experimental or external validation included in the manuscript. Therapeutic language should remain conservative: DeepMAST prioritizes candidate therapeutic targets and generates Evidence-Grounded Follow-up Recommendations; it does not establish clinical efficacy without downstream experimental validation.
+The human IPF Visium analysis should be presented as the strongest drug target-prioritization application. Methods should describe the Visium input, CCI or ligand-receptor candidate generation, Deep Target Prioritizer run, CELLxGENE, Open Targets Platform, GWAS Catalog, STRING, and ChEMBL evidence sources when used, featured and novel candidate selection, and any experimental or external validation included in the manuscript. Drug-target language should remain conservative: DeepMAST prioritizes candidate drug targets and generates Evidence-Grounded Follow-up Recommendations; it does not establish clinical efficacy without downstream experimental validation.
 
 ### Statistical analysis, software, and reproducibility
 
-All benchmark analyses should use paired designs when the same prompt, case, or question is evaluated under multiple conditions. The CCI hallucination benchmark uses Kruskal-Wallis tests for omnibus condition differences, Mann-Whitney U tests with Bonferroni correction for post-hoc comparisons, and quadratic weighted kappa for inter-rater agreement. Literature-retrieval coverage uses paired case-level differences, bootstrap confidence intervals, and paired Wilcoxon signed-rank tests. SGCP-RAG uses exact McNemar tests for answer containment and paired Wilcoxon signed-rank tests for evidence recall, token F1, chunk count, and latency. Follow-up recommendation evidence-coverage comparisons use paired Wilcoxon signed-rank tests over matched valid runs. Blind-judge preferences use exact two-sided sign tests over non-tie pairs, and claim-boundary restraint uses paired Wilcoxon signed-rank tests after averaging judge scores within each pair, with judge-stratified tests as sensitivity analyses.
+Benchmark analyses used paired or matched tests when the same case, prompt, or question produced condition-matched outcomes. Omnibus or rank-sum tests were used when the benchmark generated independent replicate outputs across multiple conditions. The CCI hallucination benchmark uses Kruskal-Wallis tests for omnibus condition differences, Mann-Whitney U tests with Bonferroni correction for post-hoc comparisons, and quadratic weighted kappa for inter-rater agreement. Literature-retrieval coverage uses paired case-level differences, bootstrap confidence intervals, and paired Wilcoxon signed-rank tests. SGCP-RAG uses exact McNemar tests for answer containment and paired Wilcoxon signed-rank tests for evidence recall, token F1, chunk count, and latency. Follow-up recommendation evidence-coverage comparisons use paired Wilcoxon signed-rank tests over matched valid runs. Blind-judge preferences use exact two-sided sign tests over non-tie pairs, and claim-boundary restraint uses paired Wilcoxon signed-rank tests after averaging judge scores within each pair, with judge-stratified tests as sensitivity analyses.
 
-Software environments were recorded for reproducibility. STworkbench MCP used Python >=3.10 with Scanpy, Squidpy, LIANA, decoupleR, OmniPath, scikit-learn, statsmodels, Plotly, FastMCP, and MCP. rMCPAgent was implemented in R >=4.0.0 with ellmer, mcptools, zellkonverter, Bioconductor containers, sparse matrix support, workflow templates, JSON/HTTP utilities, and package-development/test dependencies. sc_reference_selector used FastMCP, AnnData/Scanpy, optimal transport and JAX-compatible computation when available, and Plotly report generation. SGCP-RAG benchmarks used the frozen raw provenance files and offline regeneration scripts in the SGCP-RAG reproducibility bundle.
+Software environments were recorded for reproducibility. STworkbench MCP used Python >=3.10 with Scanpy [78], Squidpy [45], LIANA+ [48], decoupleR [79], OmniPath [49], scikit-learn [81], statsmodels [82], Plotly [83], FastMCP [44], and MCP [18]. rMCPAgent was implemented in R >=4.0.0 with ellmer [84], mcptools [85], zellkonverter [80], Bioconductor containers [86], sparse matrix support, workflow templates, JSON/HTTP utilities, and package-development/test dependencies. sc_reference_selector used FastMCP [44], AnnData [77], Scanpy [78], optimal transport and JAX-compatible computation [87] when available, and Plotly [83] report generation. SGCP-RAG benchmarks used the frozen raw provenance files and offline regeneration scripts in the SGCP-RAG reproducibility bundle.
 
 Data availability and code availability should be reported separately from manuscript references. Public dataset accessions, public tool repositories, software versions, and archived benchmark bundles belong in Methods or Source Artifacts. Local file paths, generated CSV/JSON/JSONL artifacts, notebook paths, and repository-internal implementation files should not be added to the manuscript References section unless they are replaced by public URLs, DOIs, or archival repository identifiers.
 
@@ -1048,7 +1037,7 @@ DeepMAST suggests that the next stage of biomedical agent development will not b
 
 [48] DOI: 10.1038/s41556-024-01469-w. "LIANA+ provides an all-in-one framework for cell-cell communication inference."
 
-[49] DOI: 10.1093/nar/gkaf1126. [needs reference metadata]
+[49] DOI: 10.1093/nar/gkaf1126. "OmniPath: integrated knowledgebase for multi-omics analysis."
 
 [50] DOI: 10.1038/s41467-021-21246-9. "Inference and analysis of cell-cell communication using CellChat."
 
@@ -1056,7 +1045,7 @@ DeepMAST suggests that the next stage of biomedical agent development will not b
 
 [52] DOI: 10.1038/s41467-020-18873-z. "Predicting cell-to-cell communication networks using NATMI."
 
-[53] URL: https://pubmed.ncbi.nlm.nih.gov/33147626/. [needs reference metadata]
+[53] DOI: 10.1093/bib/bbaa269. "CellTalkDB: a manually curated database of ligand-receptor interactions in humans and mice."
 
 [54] DOI: 10.1101/2023.10.16.562533. "GenePT: A Simple But Effective Foundation Model for Genes and Cells Built From ChatGPT." bioRxiv preprint: https://www.biorxiv.org/content/10.1101/2023.10.16.562533v1
 
@@ -1089,3 +1078,39 @@ DeepMAST suggests that the next stage of biomedical agent development will not b
 [68] "CRISPR-GPT: An LLM Agent for Automated Design of Gene-Editing Experiments." https://citations.gxl.ai/papers/bio_ea67019d70c5#L17-L45
 
 [69] URL: https://github.com/K-Dense-AI/scientific-agent-skills. "K-Dense-AI scientific-agent-skills."
+
+[70] DOI: 10.1038/s41588-024-01819-2. "Mapping spatially resolved transcriptomes in human and mouse pulmonary fibrosis."
+
+[71] DOI: 10.1186/s12931-019-1161-4. "Antifibrotic therapy for idiopathic pulmonary fibrosis. Time to treat."
+
+[72] DOI: 10.1136/thoraxjnl-2016-208710. "Nintedanib in patients with idiopathic pulmonary fibrosis and preserved lung volume."
+
+[73] DOI: 10.1183/13993003.01966-2015. "Efficacy of pirfenidone in patients with idiopathic pulmonary fibrosis with more preserved lung function."
+
+[74] DOI: 10.1038/s41467-020-17358-3. "Alveolar regeneration through a Krt8+ transitional stem cell state that persists in human lung fibrosis."
+
+[75] DOI: 10.1165/rcmb.2024-0372TR. "The emerging role of alveolar epithelial type 2 cell-derived transitional cells in lung fibrosis."
+
+[76] DOI: 10.1038/s41467-025-56280-4. "Statistical identification of cell type-specific spatially variable genes in spatial transcriptomics."
+
+[77] DOI: 10.21105/joss.04371. "anndata: Access and store annotated data matrices."
+
+[78] DOI: 10.1186/s13059-017-1382-0. "SCANPY: large-scale single-cell gene expression data analysis."
+
+[79] DOI: 10.1093/bioadv/vbac016. "decoupleR: ensemble of computational methods to infer biological activities from omics data."
+
+[80] DOI: 10.18129/B9.bioc.zellkonverter. "zellkonverter: Conversion Between scRNA-seq Objects."
+
+[81] URL: https://jmlr.org/papers/v12/pedregosa11a.html. "Scikit-learn: Machine Learning in Python."
+
+[82] DOI: 10.25080/Majora-92bf1922-011. "Statsmodels: Econometric and Statistical Modeling with Python."
+
+[83] URL: https://plotly.com/chart-studio-help/citations/. "Collaborative data science."
+
+[84] DOI: 10.32614/CRAN.package.ellmer. "ellmer: Chat with Large Language Models."
+
+[85] DOI: 10.32614/CRAN.package.mcptools. "mcptools: Model Context Protocol Servers and Clients."
+
+[86] DOI: 10.1186/gb-2004-5-10-r80. "Bioconductor: open software development for computational biology and bioinformatics."
+
+[87] URL: https://github.com/jax-ml/jax. "JAX: composable transformations of Python+NumPy programs."
