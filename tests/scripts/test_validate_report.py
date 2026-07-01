@@ -54,13 +54,22 @@ def test_reads_pmids_from_papers_json_object_shape(tmp_path: Path) -> None:
     assert not any(i["code"] == "pmid_not_in_papers" for i in issues)
 
 
-def test_skips_pmid_check_when_papers_json_is_unreadable(tmp_path: Path) -> None:
+def test_flags_papers_json_when_unreadable(tmp_path: Path) -> None:
     (tmp_path / "papers.json").mkdir()
     (tmp_path / "part1_final.md").write_text("PMID:99999999\n", encoding="utf-8")
 
     issues = validate_report.validate_report(tmp_path)
 
-    assert not any(i["code"] == "pmid_not_in_papers" for i in issues)
+    assert any(i["code"] == "papers_json_unreadable" for i in issues)
+
+
+def test_flags_papers_json_when_malformed(tmp_path: Path) -> None:
+    (tmp_path / "papers.json").write_text("{", encoding="utf-8")
+    (tmp_path / "part1_final.md").write_text("PMID:99999999\n", encoding="utf-8")
+
+    issues = validate_report.validate_report(tmp_path)
+
+    assert any(i["code"] == "papers_json_malformed" for i in issues)
 
 
 def test_flags_factor1_significance_when_pathway_csv_lacks_factor1(tmp_path: Path) -> None:

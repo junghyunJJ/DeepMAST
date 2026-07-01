@@ -39,13 +39,46 @@ def _load_json(path: Path) -> Any:
         return None
 
 
-def _papers_pmids(data_dir: Path) -> set[str] | None:
-    data = _load_json(data_dir / "papers.json")
-    if data is None:
+def _load_papers_json(path: Path) -> tuple[Any, str | None]:
+    if not path.exists():
+        return None, "papers_json_missing"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None, "papers_json_unreadable"
+    try:
+        return json.loads(text), None
+    except json.JSONDecodeError:
+        return None, "papers_json_malformed"
+
+
+def _papers_pmids(data_dir: Path, issues: list[dict[str, str]]) -> set[str] | None:
+    data, error = _load_papers_json(data_dir / "papers.json")
+    if error:
+        issues.append(
+            _issue(
+                code=error,
+                file="papers.json",
+                section="",
+                value="papers.json",
+                evidence=f"papers.json is required for PMID grounding but could not be loaded ({error}).",
+                repair_instruction="Regenerate or repair papers.json before validating report citations.",
+            )
+        )
         return None
     rows = data.get("papers") if isinstance(data, dict) else data
     if not isinstance(rows, list):
-        return set()
+        issues.append(
+            _issue(
+                code="papers_json_invalid",
+                file="papers.json",
+                section="",
+                value=type(data).__name__,
+                evidence="papers.json must be either a list of paper records or an object with a papers list.",
+                repair_instruction="Regenerate papers.json in the expected SEARCHER-to-INTERPRETER handoff shape.",
+            )
+        )
+        return None
 
     pmids: set[str] = set()
     for row in rows:
@@ -95,7 +128,7 @@ def _issue(
 
 
 def _check_pmids(data_dir: Path, issues: list[dict[str, str]]) -> None:
-    known = _papers_pmids(data_dir)
+    known = _papers_pmids(data_dir, issues)
     if known is None:
         return
 
