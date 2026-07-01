@@ -34,14 +34,12 @@ dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
 summary_json <- file.path(result_dir, "cumulative_valid_only_summary_for_20each_target.json")
 judge_dir <- file.path(result_dir, "judge")
 judge_files <- tibble::tibble(
-  judge_label = c("GLM-5.2", "GPT-5.4", "Sonnet 4.6"),
+  judge_label = c("GPT-5.4", "Sonnet 4.6"),
   file_name = c(
-    "dth_yes_no_glm52_cloud_blind_summary.json",
     "dth_yes_no_gpt54_blind_summary.json",
     "dth_yes_no_sonnet46_blind_summary.json"
   ),
   row_file = c(
-    "dth_yes_no_glm52_cloud_blind_judge_rows.jsonl",
     "dth_yes_no_gpt54_blind_judge_rows.jsonl",
     "dth_yes_no_sonnet46_blind_judge_rows.jsonl"
   )
@@ -530,6 +528,11 @@ figs3d <- ggplot(judge_win_rates, aes(x = judge_label, y = win_percent, fill = o
 # +
 #   theme(legend.title = element_blank(), axis.text = ele)
 figs3d
+
+saveRDS(fig3a, "benchmarks/tot/fig3a.rds")
+saveRDS(fig3b, "benchmarks/tot/fig3b.rds")
+saveRDS(figs3e, "benchmarks/tot/figs3d.rds")
+saveRDS(figs3d, "benchmarks/tot/figs3e.rds")
 
 ggsave(file.path(out_dir, "Fig3A_DTH_EvidenceCoverage.svg"), fig3a, width = 3.7, height = 4.4, bg = "white")
 ggsave(file.path(out_dir, "Fig3B_DTH_BlindJudgeRigor.svg"), fig3b, width = 3.7, height = 4.4, bg = "white")

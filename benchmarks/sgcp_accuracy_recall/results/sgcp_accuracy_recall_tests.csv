@@ -1,9 +1,9 @@
-"model","metric","test","n_pairs","routing_only","off_only","delta","p_value","label","y","stars","bracket_y","star_y","tick_y","model_x","xmin","xmax"
+"model","metric","test","n_pairs","routing_only","off_only","delta","p_value","label","y","stars","bracket_y","star_y","tick_y","metric_x","xmin","xmax"
 "35B","Exact-answer accuracy","Exact McNemar test",2556,269,49,0.0860719874804382,6.31248883017803e-38,"+8.6 pp
 P=6.3e-38",42,"***",39,40.1,38.55,1,0.775,1.225
 "35B","Evidence recall","Paired Wilcoxon signed-rank test",2255,NA,NA,0.10078576387889,1.50930950828692e-78,"+10.1 pp
-P=1.5e-78",32,"***",29,30.1,28.55,1,0.775,1.225
+P=1.5e-78",32,"***",29,30.1,28.55,2,1.775,2.225
 "122B","Exact-answer accuracy","Exact McNemar test",2556,242,148,0.0367762128325509,2.23418570959254e-06,"+3.7 pp
-P=2.2e-06",39,"***",36.5,37.6,36.05,2,1.775,2.225
+P=2.2e-06",39,"***",36.5,37.6,36.05,1,0.775,1.225
 "122B","Evidence recall","Paired Wilcoxon signed-rank test",2255,NA,NA,0.0660866184812971,1.58930464629172e-31,"+6.6 pp
 P=1.6e-31",32,"***",29,30.1,28.55,2,1.775,2.225

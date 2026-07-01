@@ -11,7 +11,7 @@ The primary reproducibility target is offline artifact regeneration from committ
 - `inputs/DTH_*_dry_run.json`: runner dry-run payloads for the current-batch run that completed the 20 valid outputs per condition.
 - `results/cumulative_valid_only_summary_for_20each_target.json`: canonical 20-valid-run-per-condition summary.
 - `results/cumulative_valid_only_summary_for_20each_target.md`: human-readable cumulative summary.
-- `results/judge/`: blinded judge panels, judge rows, summaries, and markdown reports for GLM-5.2, GPT-5.4, and Sonnet 4.6.
+- `results/judge/`: blinded judge panels, judge rows, summaries, and markdown reports. The primary figures use GPT-5.4 and Sonnet 4.6 to match the companion CCI skill-ablation benchmark; the earlier GLM-5.2 judge artifact is retained as an archived sensitivity output.
 - `results/figure_tables/`: CSV tables used to draw the main and supplementary DTH figures.
 - `results/raw_runs/`: current-batch 9+9 runner artifacts used to complete the cumulative 20+20 valid set.
 - `results/dth_yes_no_qwen397b_cloud_methods_results.md`: manuscript-style Methods/Results/Discussion draft for this benchmark.
@@ -90,7 +90,6 @@ Reference outputs:
 
 ```text
 results/cumulative_valid_only_summary_for_20each_target.json
-results/judge/dth_yes_no_glm52_cloud_blind_summary.json
 results/judge/dth_yes_no_gpt54_blind_summary.json
 results/judge/dth_yes_no_sonnet46_blind_summary.json
 results/dth_yes_no_qwen397b_cloud_methods_results.md

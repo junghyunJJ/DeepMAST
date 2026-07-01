@@ -50,15 +50,6 @@
   ],
   "judges": [
     {
-      "provider": "ollama",
-      "model": "glm-5.2:cloud",
-      "wins": {
-        "DTH_yes": 15,
-        "DTH_no": 2,
-        "tie": 3
-      }
-    },
-    {
       "provider": "openai",
       "model": "gpt-5.4",
       "wins": {
@@ -80,7 +71,6 @@
   "reference_artifacts": [
     "inputs/conditions.json",
     "results/cumulative_valid_only_summary_for_20each_target.json",
-    "results/judge/dth_yes_no_glm52_cloud_blind_summary.json",
     "results/judge/dth_yes_no_gpt54_blind_summary.json",
     "results/judge/dth_yes_no_sonnet46_blind_summary.json",
     "results/figure_tables/dth_fig3a_evidence_coverage_paired_test.csv",

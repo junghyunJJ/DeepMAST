@@ -1,2 +1,2 @@
 metric,test,n_pairs,mean_delta_yes_minus_no,median_delta_yes_minus_no,p_value,sig
-claim_boundary_restraint,paired Wilcoxon signed-rank on pair-level judge means,20,1.9333333333333333,2,9.2377306023683e-5,***
+claim_boundary_restraint,paired Wilcoxon signed-rank on pair-level judge means,20,1.9,2,8.128092765038489e-5,***

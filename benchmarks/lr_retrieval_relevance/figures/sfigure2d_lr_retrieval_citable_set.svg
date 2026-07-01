@@ -139,7 +139,7 @@
 </defs>
 <g clip-path='url(#cpMzguMDJ8MzAxLjUzfDUuNDh8MjIuNDA=)'>
 <rect x='38.02' y='5.48' width='263.51' height='16.92' style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />
-<text x='169.77' y='17.09' text-anchor='middle' style='font-size: 8.80px; font-weight: bold;fill: #1A1A1A; font-family: "Arial";' textLength='112.22px' lengthAdjust='spacingAndGlyphs'>Weak model (qwen3.5:35b)</text>
+<text x='169.77' y='17.09' text-anchor='middle' style='font-size: 8.80px; font-weight: bold;fill: #1A1A1A; font-family: "Arial";' textLength='122.64px' lengthAdjust='spacingAndGlyphs'>Strong model (qwen3.5:122b)</text>
 </g>
 <g clip-path='url(#cpMC4wMHw1NzYuMDB8MC4wMHwyODguMDA=)'>
 </g>
@@ -150,28 +150,28 @@
 </defs>
 <g clip-path='url(#cpMzA3LjAxfDU3MC41Mnw1LjQ4fDIyLjQw)'>
 <rect x='307.01' y='5.48' width='263.51' height='16.92' style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />
-<text x='438.76' y='17.09' text-anchor='middle' style='font-size: 8.80px; font-weight: bold;fill: #1A1A1A; font-family: "Arial";' textLength='122.64px' lengthAdjust='spacingAndGlyphs'>Strong model (qwen3.5:122b)</text>
+<text x='438.76' y='17.09' text-anchor='middle' style='font-size: 8.80px; font-weight: bold;fill: #1A1A1A; font-family: "Arial";' textLength='112.22px' lengthAdjust='spacingAndGlyphs'>Weak model (qwen3.5:35b)</text>
 </g>
 <g clip-path='url(#cpMC4wMHw1NzYuMDB8MC4wMHwyODguMDA=)'>
 <polyline points='87.43,262.67 87.43,259.93 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
 <polyline points='169.77,262.67 169.77,259.93 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
 <polyline points='252.12,262.67 252.12,259.93 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
-<text x='87.43' y='271.17' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='25.92px' lengthAdjust='spacingAndGlyphs'>Genes</text>
-<text x='87.43' y='280.67' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='34.19px' lengthAdjust='spacingAndGlyphs'>(LR pair)</text>
-<text x='169.77' y='271.17' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='38.16px' lengthAdjust='spacingAndGlyphs'>Pathways</text>
-<text x='252.12' y='271.17' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='38.62px' lengthAdjust='spacingAndGlyphs'>Cell types</text>
+<text x='87.43' y='271.17' text-anchor='middle' style='font-size: 8.80px; font-family: "Arial";' textLength='25.92px' lengthAdjust='spacingAndGlyphs'>Genes</text>
+<text x='87.43' y='280.67' text-anchor='middle' style='font-size: 8.80px; font-family: "Arial";' textLength='34.19px' lengthAdjust='spacingAndGlyphs'>(LR pair)</text>
+<text x='169.77' y='271.17' text-anchor='middle' style='font-size: 8.80px; font-family: "Arial";' textLength='38.16px' lengthAdjust='spacingAndGlyphs'>Pathways</text>
+<text x='252.12' y='271.17' text-anchor='middle' style='font-size: 8.80px; font-family: "Arial";' textLength='38.62px' lengthAdjust='spacingAndGlyphs'>Cell types</text>
 <polyline points='356.42,262.67 356.42,259.93 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
 <polyline points='438.76,262.67 438.76,259.93 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
 <polyline points='521.11,262.67 521.11,259.93 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
-<text x='356.42' y='271.17' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='25.92px' lengthAdjust='spacingAndGlyphs'>Genes</text>
-<text x='356.42' y='280.67' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='34.19px' lengthAdjust='spacingAndGlyphs'>(LR pair)</text>
-<text x='438.76' y='271.17' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='38.16px' lengthAdjust='spacingAndGlyphs'>Pathways</text>
-<text x='521.11' y='271.17' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='38.62px' lengthAdjust='spacingAndGlyphs'>Cell types</text>
-<text x='33.09' y='263.08' text-anchor='end' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>0</text>
-<text x='33.09' y='211.89' text-anchor='end' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='9.78px' lengthAdjust='spacingAndGlyphs'>25</text>
-<text x='33.09' y='160.70' text-anchor='end' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='9.78px' lengthAdjust='spacingAndGlyphs'>50</text>
-<text x='33.09' y='109.50' text-anchor='end' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='9.78px' lengthAdjust='spacingAndGlyphs'>75</text>
-<text x='33.09' y='58.31' text-anchor='end' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='14.67px' lengthAdjust='spacingAndGlyphs'>100</text>
+<text x='356.42' y='271.17' text-anchor='middle' style='font-size: 8.80px; font-family: "Arial";' textLength='25.92px' lengthAdjust='spacingAndGlyphs'>Genes</text>
+<text x='356.42' y='280.67' text-anchor='middle' style='font-size: 8.80px; font-family: "Arial";' textLength='34.19px' lengthAdjust='spacingAndGlyphs'>(LR pair)</text>
+<text x='438.76' y='271.17' text-anchor='middle' style='font-size: 8.80px; font-family: "Arial";' textLength='38.16px' lengthAdjust='spacingAndGlyphs'>Pathways</text>
+<text x='521.11' y='271.17' text-anchor='middle' style='font-size: 8.80px; font-family: "Arial";' textLength='38.62px' lengthAdjust='spacingAndGlyphs'>Cell types</text>
+<text x='33.09' y='263.08' text-anchor='end' style='font-size: 8.80px; font-family: "Arial";' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>0</text>
+<text x='33.09' y='211.89' text-anchor='end' style='font-size: 8.80px; font-family: "Arial";' textLength='9.78px' lengthAdjust='spacingAndGlyphs'>25</text>
+<text x='33.09' y='160.70' text-anchor='end' style='font-size: 8.80px; font-family: "Arial";' textLength='9.78px' lengthAdjust='spacingAndGlyphs'>50</text>
+<text x='33.09' y='109.50' text-anchor='end' style='font-size: 8.80px; font-family: "Arial";' textLength='9.78px' lengthAdjust='spacingAndGlyphs'>75</text>
+<text x='33.09' y='58.31' text-anchor='end' style='font-size: 8.80px; font-family: "Arial";' textLength='14.67px' lengthAdjust='spacingAndGlyphs'>100</text>
 <polyline points='35.28,259.93 38.02,259.93 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
 <polyline points='35.28,208.74 38.02,208.74 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
 <polyline points='35.28,157.55 38.02,157.55 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />

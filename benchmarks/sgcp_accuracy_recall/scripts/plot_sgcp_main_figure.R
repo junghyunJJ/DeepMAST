@@ -185,6 +185,11 @@ summaries$metric <- factor(
   summaries$metric,
   levels = c("Exact-answer accuracy", "Evidence recall")
 )
+model_facet_labels <- c(
+  "122B" = "Strong model (qwen3.5:122b)",
+  "35B" = "Weak model (qwen3.5:35b)"
+)
+model_facet_levels <- unname(model_facet_labels[c("122B", "35B")])
 
 off <- summaries[summaries$condition == "wiki_off", ]
 routing <- summaries[summaries$condition == "wiki_doc_routing", ]
@@ -262,9 +267,9 @@ tests$stars <- "***"
 tests$bracket_y <- c(39.0, 29.0, 36.5, 29.0)
 tests$star_y <- tests$bracket_y + 1.1
 tests$tick_y <- tests$bracket_y - 0.45
-tests$model_x <- as.numeric(tests$model)
-tests$xmin <- tests$model_x - 0.225
-tests$xmax <- tests$model_x + 0.225
+tests$metric_x <- as.numeric(tests$metric)
+tests$xmin <- tests$metric_x - 0.225
+tests$xmax <- tests$metric_x + 0.225
 
 summary_out <- summaries
 summary_out$value_percent <- summary_out$value * 100
@@ -424,6 +429,14 @@ plot_data <- summaries
 plot_data$value_percent <- plot_data$value * 100
 plot_data$ymin_percent <- plot_data$ymin * 100
 plot_data$ymax_percent <- plot_data$ymax * 100
+plot_data$model_label <- factor(
+  model_facet_labels[as.character(plot_data$model)],
+  levels = model_facet_levels
+)
+tests$model_label <- factor(
+  model_facet_labels[as.character(tests$model)],
+  levels = model_facet_levels
+)
 
 condition_colors <- c(
   "Baseline retrieval" = "#A6CEE3",
@@ -435,7 +448,7 @@ dodge <- position_dodge(width = 0.78)
 p <- ggplot(
   plot_data,
   aes(
-    x = model,
+    x = metric,
     y = value_percent,
     fill = condition_label
   )
@@ -471,17 +484,23 @@ p <- ggplot(
   ) +
   geom_text(
     data = tests,
-    aes(x = model_x, y = star_y, label = stars),
+    aes(x = metric_x, y = star_y, label = stars),
     inherit.aes = FALSE,
     size = 3.4,
     color = "black"
   ) +
-  facet_grid(. ~ metric) +
+  facet_grid(. ~ model_label) +
+  scale_x_discrete(
+    labels = c(
+      "Exact-answer accuracy" = "Exact-answer\naccuracy",
+      "Evidence recall" = "Evidence\nrecall"
+    )
+  ) +
   scale_fill_manual(values = condition_colors, name = NULL) +
   scale_y_continuous(
     labels = label_percent(scale = 1),
-    limits = c(0, 43),
-    breaks = seq(0, 40, by = 10),
+    limits = c(0, 55),
+    breaks = seq(0, 50, by = 10),
     expand = expansion(mult = c(0, 0))
   ) +
   labs(

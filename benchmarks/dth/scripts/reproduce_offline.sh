@@ -25,7 +25,6 @@ for row in summary["valid_run_table"]:
 assert counts == {"DTH_yes": 20, "DTH_no": 20}, counts
 
 expected_wins = {
-    "dth_yes_no_glm52_cloud_blind_summary.json": {"DTH_yes": 15, "DTH_no": 2, "tie": 3},
     "dth_yes_no_gpt54_blind_summary.json": {"DTH_yes": 18, "DTH_no": 1, "tie": 1},
     "dth_yes_no_sonnet46_blind_summary.json": {"DTH_yes": 11, "DTH_no": 5, "tie": 4},
 }

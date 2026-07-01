@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Insert rendered workflow PNGs into the empty D/E slots of fig2.
+"""Insert rendered workflow PNGs into the empty A/B slots of fig2.
 
 Mermaid's SVG labels can render poorly outside browsers, so the composed SVG
 embeds the browser-rendered workflow PNGs for stable journal/PDF conversion.
@@ -13,8 +13,8 @@ import sys
 from pathlib import Path
 
 
-TOP_ROW_REL_HEIGHT = 0.3
-DIAGRAM_REL_HEIGHT_WITHIN_LOWER_ROW = 0.60
+TOP_ROW_REL_HEIGHT = 0.0
+DIAGRAM_REL_HEIGHT_WITHIN_LOWER_ROW = 0.65
 COVER_SIDE_MARGIN = 20.0
 COVER_TOP_MARGIN = 25.0
 COVER_BOTTOM_MARGIN = 10.0

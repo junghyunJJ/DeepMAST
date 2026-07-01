@@ -27,7 +27,7 @@ summary_df <- read_csv(file.path(tdir, "coverage_group_summary.csv"), show_col_t
 sig_df     <- read_csv(file.path(tdir, "coverage_sig.csv"), show_col_types = FALSE)
 
 set_levels <- c(raw = "All retrieved papers", filtered = "Citable set (direct + context)")
-strength_levels <- c(weak = "Weak model (qwen3.5:35b)", strong = "Strong model (qwen3.5:122b)")
+strength_levels <- c(weak = "Strong model (qwen3.5:122b)", strong = "Weak model (qwen3.5:35b)")
 metric_levels <- c(genes = "Genes\n(LR pair)", pathways = "Pathways", celltypes = "Cell types")
 arm_levels <- c(ON = "Skill ON", OFF = "Skill OFF")
 
@@ -109,7 +109,7 @@ p <- ggplot(summary_df, aes(x = metric, y = mean, fill = arm)) +
     x = NULL,
     y = "Coverage of case entities (%)"
   ) +
-  theme_bw(base_size = 12) +
+  theme_bw() +
   theme(
     plot.title = element_blank(),
     plot.subtitle = element_blank(),
@@ -118,16 +118,16 @@ p <- ggplot(summary_df, aes(x = metric, y = mean, fill = arm)) +
     panel.grid.major = element_line(colour = "grey90", linewidth = 0.45),
     panel.grid.minor = element_line(colour = "grey94", linewidth = 0.25),
     strip.background = element_rect(fill = "white", colour = NA),
-    strip.text = element_text(face = "bold", size = 9.5),
+    # strip.text = element_text(face = "bold", size = 9.5),
     legend.position = c(0.985, 0.985),
     legend.justification = c(1, 1),
     legend.background = element_rect(fill = "white", colour = "black", linewidth = 0.45),
     legend.key = element_rect(fill = "white", colour = NA),
     legend.margin = margin(4, 6, 4, 6),
-    legend.text = element_text(size = 8.8),
-    axis.title.y = element_text(size = 12, colour = "black"),
-    axis.text.x = element_text(size = 8.6, colour = "black"),
-    axis.text.y = element_text(size = 9.5, colour = "black")
+    # legend.text = element_text(size = 8.8),
+    axis.title.y = element_text(colour = "black"),
+    axis.text.x = element_text(colour = "black"),
+    axis.text.y = element_text(colour = "black")
   )
 p <- add_sig_brackets(p, sig_pos)
 p
@@ -173,12 +173,9 @@ p_figure2d <- ggplot(summary_figure2d, aes(x = metric, y = mean, fill = arm)) +
     legend.background = element_rect(fill = "white", colour = "black", linewidth = 0.3),
     legend.key = element_rect(fill = "white", colour = NA),
     legend.margin = margin(4, 6, 4, 6),
-    legend.text = element_text(colour = "black")
-    # ,
-    # legend.text = element_text(size = 8.8),
-    # axis.title.y = element_text(size = 12, colour = "black"),
-    # axis.text.x = element_text(size = 8.6, colour = "black"),
-    # axis.text.y = element_text(size = 9.5, colour = "black")
+    axis.title.y = element_text(colour = "black"),
+    axis.text.x = element_text(colour = "black"),
+    axis.text.y = element_text(colour = "black")
   )
 p_figure2d <- add_sig_brackets(p_figure2d, sig_pos_figure2d)
 p_figure2d
@@ -225,12 +222,9 @@ p_sfigure <- ggplot(summary_sfigure, aes(x = metric, y = mean, fill = arm)) +
     legend.background = element_rect(fill = "white", colour = "black", linewidth = 0.3),
     legend.key = element_rect(fill = "white", colour = NA),
     legend.margin = margin(4, 6, 4, 6),
-    legend.text = element_text(colour = "black")
-    # ,
-    # legend.text = element_text(size = 8.8),
-    # axis.title.y = element_text(size = 12, colour = "black"),
-    # axis.text.x = element_text(size = 8.6, colour = "black"),
-    # axis.text.y = element_text(size = 9.5, colour = "black")
+    axis.title.y = element_text(colour = "black"),
+    axis.text.x = element_text(colour = "black"),
+    axis.text.y = element_text(colour = "black")
   )
 p_sfigure <- add_sig_brackets(p_sfigure, sig_pos_sfigure)
 p_sfigure

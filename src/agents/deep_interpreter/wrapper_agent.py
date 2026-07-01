@@ -1526,7 +1526,7 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
                     SystemMessage(content=system_content),
                     HumanMessage(content=f"Analysis results:\n{summary}\n\nSuggest interest clusters and cell types."),
                 ]),
-                timeout=60.0,
+                timeout=300.0,
             )
         except asyncio.TimeoutError:
             logger.error("LLM suggestion timed out after 60s. Using fallback.")

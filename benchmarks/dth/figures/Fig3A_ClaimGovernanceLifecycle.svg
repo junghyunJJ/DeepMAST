@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="266.40pt" height="316.80pt" viewBox="0 0 266.40 316.80">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#333333"/>
+    </marker>
+    <style><![CDATA[
+      .bg { fill: #ffffff; }
+      .panel { font: 14px Arial, Helvetica, sans-serif; font-weight: 700; fill: #111111; }
+      .title { font: 11px Arial, Helvetica, sans-serif; font-weight: 700; fill: #222222; }
+      .label { font: 8.8px Arial, Helvetica, sans-serif; font-weight: 700; fill: #222222; }
+      .text { font: 7.2px Arial, Helvetica, sans-serif; fill: #333333; }
+      .branch_title { font: 7.8px Arial, Helvetica, sans-serif; font-weight: 700; fill: #222222; }
+      .source { fill: #f7f7f7; stroke: #333333; stroke-width: 1.05; }
+      .guide { fill: #f7f1f7; stroke: #430541; stroke-width: 1.05; }
+      .branch_cci { fill: #fffaf0; stroke: #b58b00; stroke-width: 1.05; }
+      .branch_followup { fill: #eef7f2; stroke: #2f7d4f; stroke-width: 1.05; }
+      .gate { fill: #ffffff; stroke: #430541; stroke-width: 1.05; }
+      .arrow { fill: none; stroke: #333333; stroke-width: 1.05; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .line { fill: none; stroke: #333333; stroke-width: 1.05; stroke-linecap: round; stroke-linejoin: round; }
+    ]]></style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="266.40" height="316.80"/>
+  <text class="panel" x="5.05" y="15.03">A</text>
+  <text class="title" x="28" y="15">Two benchmark branches</text>
+
+  <rect class="source" x="18" y="31" width="230.4" height="42" rx="6"/>
+  <text class="label" x="133.2" y="46" text-anchor="middle">Shared evidence input</text>
+  <text class="text" x="133.2" y="59" text-anchor="middle">interaction cases + target evidence</text>
+  <text class="text" x="133.2" y="69" text-anchor="middle">same input in both conditions</text>
+
+  <path class="arrow" d="M133.2 73 V87"/>
+  <rect class="guide" x="18" y="88" width="230.4" height="43" rx="6"/>
+  <text class="label" x="133.2" y="103" text-anchor="middle">Guidance on vs off</text>
+  <text class="text" x="133.2" y="116" text-anchor="middle">same task and same output checks</text>
+  <text class="text" x="133.2" y="126" text-anchor="middle">only the guidance changes</text>
+
+  <path class="line" d="M133.2 131 V143"/>
+  <path class="line" d="M72 143 H194.4"/>
+  <path class="arrow" d="M72 143 V156"/>
+  <path class="arrow" d="M194.4 143 V156"/>
+
+  <rect class="branch_cci" x="11" y="157" width="118" height="98" rx="6"/>
+  <text class="branch_title" x="70" y="171" text-anchor="middle">1. Biological interpretation</text>
+  <text class="text" x="70" y="186" text-anchor="middle">Input: interaction cases</text>
+  <text class="text" x="70" y="200" text-anchor="middle">Output: interpretation</text>
+  <text class="text" x="70" y="214" text-anchor="middle">Measured: unsupported claims</text>
+  <text class="text" x="70" y="228" text-anchor="middle">Result: fewer unsupported claims</text>
+  <text class="label" x="70" y="250" text-anchor="middle">Fig. 3B</text>
+
+  <rect class="branch_followup" x="137.4" y="157" width="118" height="98" rx="6"/>
+  <text class="branch_title" x="196.4" y="171" text-anchor="middle">2. Follow-up recommendations</text>
+  <text class="text" x="196.4" y="186" text-anchor="middle">Input: target evidence package</text>
+  <text class="text" x="196.4" y="200" text-anchor="middle">Output: recommendations</text>
+  <text class="text" x="196.4" y="214" text-anchor="middle">Measured: evidence use</text>
+  <text class="text" x="196.4" y="228" text-anchor="middle">Result: better claim restraint</text>
+  <text class="label" x="196.4" y="250" text-anchor="middle">Fig. 3C</text>
+
+  <path class="line" d="M70 255 V266"/>
+  <path class="line" d="M196.4 255 V266"/>
+  <path class="line" d="M70 266 H196.4"/>
+  <path class="arrow" d="M133.2 266 V277"/>
+
+  <rect class="gate" x="18" y="278" width="230.4" height="29" rx="6"/>
+  <text class="label" x="133.2" y="291" text-anchor="middle">Shared evidence check</text>
+  <text class="text" x="133.2" y="302" text-anchor="middle">observed evidence, mechanisms, and clinical claims stay separate</text>
+</svg>

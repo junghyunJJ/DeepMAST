@@ -100,9 +100,18 @@ CLAUDE.md.bak
 fig/
 .agents/
 test_res/
+test_res_ipf/
+tmp_res_ipf/
+tmp_res_ipf2/
 # deep_drugtaget — local experiment, not yet promoted
 src/agents/deep_drugtaget/
 src/agents/deep_drugtaget_codex/
 tests/agents/deep_drugtaget/
 tests/conftest.py
 scripts/run_deep_drugtaget_traced.py
+
+
+final_bc/
+final_ipf.zip
+final_ipf/
+tmp/

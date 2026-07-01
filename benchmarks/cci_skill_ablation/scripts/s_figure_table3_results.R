@@ -120,7 +120,8 @@ p_right <- ggplot(df_fab, aes(x = condition, y = mean, fill = condition)) +
   theme(legend.key.spacing.y = unit(1, "mm"))
 p_right
 
-p_combined <- p_left + p_right + plot_layout(widths = c(0.7, 0.25)) + plot_annotation(tag_levels = "A")
+p_combined <- p_left + p_right + plot_layout(widths = c(0.7, 0.25))
+# + plot_annotation(tag_levels = "A")
 p_combined
 saveRDS(p_combined, "benchmarks/tot/sfig2c.rds")
 
