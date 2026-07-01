@@ -789,8 +789,8 @@ class TestSuggestFactorEdgeCases:
         assert result == "Factor2"
 
 
-class TestAnalysisStepFailureDoesNotAdvance:
-    """MCP failures should not be treated as completed pipeline progress."""
+class TestAnalysisStepFailureDoesNotLoop:
+    """MCP failures should surface once and advance/terminate the step loop."""
 
     def setup_method(self):
         self.agent = _make_agent()
@@ -798,7 +798,7 @@ class TestAnalysisStepFailureDoesNotAdvance:
         self.agent.ANALYSIS_STEPS_9_11 = DeepInterpreterWrapperAgent.ANALYSIS_STEPS_9_11
 
     @pytest.mark.asyncio
-    async def test_step_8_failure_does_not_mark_analysis_1_8_complete(self, tmp_path):
+    async def test_step_8_failure_marks_analysis_1_8_complete(self, tmp_path):
         state = {
             "current_analysis_step": 8,
             "h5ad_files": [str(tmp_path / "input.h5ad")],
@@ -829,10 +829,13 @@ class TestAnalysisStepFailureDoesNotAdvance:
             result = await self.agent.run_single_analysis_step_node(state, DUMMY_CONFIG)
 
         assert result["current_analysis_step"] == 8
-        assert result.get("analysis_1_8_complete") is not True
+        assert result["analysis_1_8_complete"] is True
+        assert self.agent.route_after_step(result, DUMMY_CONFIG) == self.agent.get_node_name(
+            "PREPARE_RESEARCH"
+        )
 
     @pytest.mark.asyncio
-    async def test_step_9_failure_does_not_route_to_drug_target(self, tmp_path):
+    async def test_step_9_failure_skips_drug_target_and_advances(self, tmp_path):
         state = {
             "current_analysis_step": 9,
             "data_directory": str(tmp_path),
@@ -865,8 +868,14 @@ class TestAnalysisStepFailureDoesNotAdvance:
 
             result = await self.agent.run_single_analysis_step_9_11_node(state, DUMMY_CONFIG)
 
-        assert result["current_analysis_step"] == 9
+        assert result["current_analysis_step"] == 10
+        assert result["drug_target_complete"] is True
+        assert "Step 9 failed" in result["drug_target_error"]
         assert result.get("analysis_9_11_complete") is not True
+        assert self.agent.route_after_step_9_11(
+            result,
+            DUMMY_CONFIG,
+        ) == self.agent.get_node_name("RUN_SINGLE_STEP_9_11")
 
     @pytest.mark.asyncio
     async def test_step_9_missing_sig_liana_does_not_call_mcp(self, tmp_path):
@@ -1055,8 +1064,13 @@ class TestDrugTargetStepHandoff:
 
         assessment.ainvoke.assert_not_called()
         assert not (tmp_path / "lr_candidates.json").exists()
-        assert result["drug_target_complete"] is False
+        assert result["drug_target_complete"] is True
         assert "prioritize_top_lr_pairs" in result["drug_target_error"]
+        routed_state = {"current_analysis_step": 10, **result}
+        assert self.agent.route_after_step_9_11(
+            routed_state,
+            DUMMY_CONFIG,
+        ) == self.agent.get_node_name("RUN_SINGLE_STEP_9_11")
 
     @pytest.mark.asyncio
     async def test_prioritizer_error_still_deletes_step10_11_figures(
@@ -1092,7 +1106,7 @@ class TestDrugTargetStepHandoff:
         assessment.ainvoke.assert_not_called()
         assert not fig10.exists()
         assert not fig11.exists()
-        assert result["drug_target_complete"] is False
+        assert result["drug_target_complete"] is True
         assert "prioritize_top_lr_pairs" in result["drug_target_error"]
         assert "Deleted cached Step 10/11 figures: 2" in result["messages"][0].content[0]["text"]
 

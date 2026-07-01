@@ -1337,9 +1337,11 @@ After you have confirmed ALL required information, call the DeepInterpreterInfoE
         )
 
         if status == "failed":
+            is_last = current_step >= 8
             return {
-                "current_analysis_step": current_step,
+                "current_analysis_step": current_step + 1 if not is_last else current_step,
                 "messages": [AIMessage(content=message_content)],
+                **({"analysis_1_8_complete": True} if is_last else {}),
             }
 
         is_last = current_step >= 8
@@ -1994,10 +1996,17 @@ Available factors: {available_factors}
         )
 
         if status == "failed":
-            return {
-                "current_analysis_step": current_step,
+            is_last = current_step >= 11
+            update = {
+                "current_analysis_step": current_step + 1 if not is_last else current_step,
                 "messages": [AIMessage(content=message_content)],
             }
+            if current_step == 9:
+                update["drug_target_complete"] = True
+                update["drug_target_error"] = "skipped because Step 9 failed"
+            if is_last:
+                update["analysis_9_11_complete"] = True
+            return update
 
         is_last = current_step >= 11
         update = {
@@ -2175,10 +2184,8 @@ Available factors: {available_factors}
         if drug_target_error:
             status_parts.append(f"Warning: {drug_target_error}")
 
-        # Only mark complete on success (both sub-steps succeeded or at least assessment ran)
-        is_complete = drug_target_error is None or featured_pairs
         return {
-            "drug_target_complete": bool(is_complete),
+            "drug_target_complete": True,
             "drug_target_error": drug_target_error,
             "featured_lr_pairs": featured_pairs or [],
             "messages": [AIMessage(content=[{"type": "text", "text": "\n".join(status_parts)}])],
