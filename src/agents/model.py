@@ -158,13 +158,14 @@ def create_ollama_llm(**kwargs) -> ChatOllama:
     base_url = kwargs.get("base_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:6000"))
     temperature = kwargs.get("temperature", 0)
     
-    num_ctx = kwargs.get("num_ctx", 98304) # default to 98K
+    num_ctx = int(kwargs.get("num_ctx", os.getenv("OLLAMA_NUM_CTX", "98304"))) # default to 98K
     raw_num_predict = kwargs.get("num_predict", os.getenv("OLLAMA_NUM_PREDICT"))
     num_predict = int(raw_num_predict) if raw_num_predict not in (None, "") else -1
     if num_predict <= 0 and str(model).endswith("-cloud"):
         # Ollama cloud rejects unlimited generation as max_tokens=-1.
         num_predict = int(os.getenv("OLLAMA_CLOUD_NUM_PREDICT", "16384"))
     reasoning = _parse_optional_bool(kwargs.get("reasoning", os.getenv("OLLAMA_REASONING")))
+    request_timeout = float(kwargs.get("request_timeout", os.getenv("OLLAMA_REQUEST_TIMEOUT_SECONDS", "7200")))
 
     llm = _ChatOllamaWithThink(
         model=model,
@@ -176,7 +177,7 @@ def create_ollama_llm(**kwargs) -> ChatOllama:
         think=reasoning,
         disable_streaming=True,
         client_kwargs={
-            "timeout": 7200,
+            "timeout": request_timeout,
         }
     )
     # Set profile so deepagents SummarizationMiddleware triggers at 85% of
@@ -256,6 +257,7 @@ def create_ollama_openai_llm(**kwargs: Any) -> ChatOpenAI:
     num_ctx = int(kwargs.pop("num_ctx", 98304))
     num_predict = int(kwargs.pop("num_predict", -1))
     temperature = kwargs.pop("temperature", 0)
+    request_timeout = float(kwargs.pop("request_timeout", os.getenv("OLLAMA_REQUEST_TIMEOUT_SECONDS", "7200")))
     if "max_tokens" not in kwargs:
         raw_max_tokens_env = os.getenv("VLLM_MAX_TOKENS") or os.getenv(
             "OLLAMA_OPENAI_MAX_TOKENS"
@@ -295,7 +297,7 @@ def create_ollama_openai_llm(**kwargs: Any) -> ChatOpenAI:
         base_url=base_url,
         api_key="ollama",  # placeholder — Ollama ignores, OpenAI SDK requires non-empty
         temperature=temperature,
-        request_timeout=7200,  # pyright: ignore[reportCallIssue]  # D8: verified request_timeout, NOT timeout
+        request_timeout=request_timeout,  # pyright: ignore[reportCallIssue]  # D8: verified request_timeout, NOT timeout
         streaming=False,  # D7: explicit (matches ChatOpenAI default; defends against accidental enable)
         parallel_tool_calls=False,  # pyright: ignore[reportCallIssue]  # D10 / CP-P1-002: prevent uncertain Ollama OpenAI-compat parallel-call behavior
         # Codex P2 #1: forward Ollama-native options to server. CURRENTLY A NO-OP

@@ -157,6 +157,7 @@ async def run_deep_agent(state: DrugTargetState, config: RunnableConfig) -> dict
     config["configurable"]).
     """
     # Lazy import to avoid circular dependency at module load time
+    import asyncio
     import os
     import time
 
@@ -174,7 +175,7 @@ async def run_deep_agent(state: DrugTargetState, config: RunnableConfig) -> dict
         provider_str,
         use_checkpointer=False,
     )
-    runnable, backend = create_drug_target_agent(agent_config)
+    runnable, backend = await asyncio.to_thread(create_drug_target_agent, agent_config)
 
     # recursion_limit is a top-level RunnableConfig key (CP-P1-014)
     recursion_limit: int = config.get("recursion_limit", 10000)
@@ -190,7 +191,7 @@ async def run_deep_agent(state: DrugTargetState, config: RunnableConfig) -> dict
         )
     finally:
         if backend is not None and hasattr(backend, "cleanup"):
-            backend.cleanup()  # type: ignore[union-attr]
+            await asyncio.to_thread(backend.cleanup)  # type: ignore[union-attr]
 
     # Filter to last AIMessage only — blocks trailing ToolMessages from being
     # stored in the checkpoint (CP-P0-009 messages contract).
@@ -228,6 +229,25 @@ def _hypothesis_max_quality_retries() -> int:
     except ValueError:
         value = 3
     return max(0, value)
+
+
+async def _validate_hypothesis_report_quality_async(
+    data_dir: str,
+    *,
+    run_started_at: float | None,
+) -> dict:
+    """Run sync hypothesis validation off the LangGraph event loop."""
+    import asyncio
+
+    from src.agents.drug_target.tools.hypothesis_schema import (
+        validate_hypothesis_report_quality,
+    )
+
+    return await asyncio.to_thread(
+        validate_hypothesis_report_quality,
+        data_dir,
+        run_started_at=run_started_at,
+    )
 
 
 def _has_stage3_candidates(data_dir: str) -> bool:
@@ -275,7 +295,7 @@ async def _invoke_hypothesis_retry(
         provider,
         use_checkpointer=False,
     )
-    runnable, backend = create_drug_target_agent(agent_config)
+    runnable, backend = await asyncio.to_thread(create_drug_target_agent, agent_config)
 
     configurable = dict(config.get("configurable", {}) or {})
     configurable["thread_id"] = f"hypothesis-retry-{uuid.uuid4()}"
@@ -315,7 +335,7 @@ async def _invoke_hypothesis_retry(
             await task
     finally:
         if backend is not None and hasattr(backend, "cleanup"):
-            backend.cleanup()  # type: ignore[union-attr]
+            await asyncio.to_thread(backend.cleanup)  # type: ignore[union-attr]
 
 
 async def validate_and_maybe_retry_hypothesis(
@@ -323,11 +343,9 @@ async def validate_and_maybe_retry_hypothesis(
     config: RunnableConfig,
 ) -> dict:
     """Validate hypothesis_report.json and run bounded narrow retries if needed."""
-    from src.agents.drug_target.tools.hypothesis_schema import (
-        validate_hypothesis_report_quality,
-    )
+    import asyncio
 
-    quality = validate_hypothesis_report_quality(
+    quality = await _validate_hypothesis_report_quality_async(
         state["data_dir"],
         run_started_at=state.get("deep_agent_started_at"),
     )
@@ -343,7 +361,10 @@ async def validate_and_maybe_retry_hypothesis(
         }
 
     retry_enabled = _graph_hypothesis_retry_enabled()
-    has_stage3_candidates = _has_stage3_candidates(state["data_dir"])
+    has_stage3_candidates = await asyncio.to_thread(
+        _has_stage3_candidates,
+        state["data_dir"],
+    )
     max_attempts = _hypothesis_max_quality_retries()
 
     if retry_enabled and has_stage3_candidates and max_attempts > 0:
@@ -357,12 +378,12 @@ async def validate_and_maybe_retry_hypothesis(
                     attempt=attempt,
                     max_attempts=max_attempts,
                 )
-                quality = validate_hypothesis_report_quality(
+                quality = await _validate_hypothesis_report_quality_async(
                     state["data_dir"],
                     run_started_at=state.get("deep_agent_started_at"),
                 )
             except TimeoutError as exc:
-                quality = validate_hypothesis_report_quality(
+                quality = await _validate_hypothesis_report_quality_async(
                     state["data_dir"],
                     run_started_at=state.get("deep_agent_started_at"),
                 )

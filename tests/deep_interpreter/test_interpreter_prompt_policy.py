@@ -1,10 +1,7 @@
 """Prompt policy tests for the INTERPRETER subagent.
 
-Verifies that the Phase 4 block in the INTERPRETER production prompt
-encodes the Steps A-E reflection-driven quality loop with the correct
-ordering (think_tool BEFORE validate_quality), the correct call-site
-kwargs (score_threshold=0.8 on think_tool, use_llm=False on
-validate_quality), and the correct consumer-side gate semantics.
+Verifies that the INTERPRETER production prompt keeps grounding constraints
+while treating think_tool and validate_quality as optional/advisory checks.
 
 These are string/structural checks — no live LLM call.
 """
@@ -12,8 +9,6 @@ These are string/structural checks — no live LLM call.
 from __future__ import annotations
 
 import re
-
-import pytest
 
 from src.agents.deep_interpreter.subagents.prompts import SUBAGENT_PROMPTS
 from src.agents.deep_interpreter.subagents.configs import SUBAGENT_CONFIGS
@@ -23,10 +18,7 @@ INTERPRETER_PROMPT = SUBAGENT_PROMPTS["interpreter"]
 
 
 def _extract_phase4_block() -> str:
-    """Extract the Phase 4 reflection/quality-loop block from INTERPRETER prompt.
-
-    The block starts at the Phase 4 heading and ends at the next Phase heading.
-    """
+    """Extract the Phase 4 quality-policy block from INTERPRETER prompt."""
     match = re.search(
         r"### Phase 4:.*?(?=### Phase 5:)",
         INTERPRETER_PROMPT,
@@ -36,101 +28,46 @@ def _extract_phase4_block() -> str:
     return match.group(0)
 
 
-def test_phase4_block_contains_think_tool():
-    block = _extract_phase4_block()
-    assert "think_tool" in block, "Phase 4 block must reference think_tool"
-
-
-def test_phase4_block_contains_validate_quality():
-    block = _extract_phase4_block()
-    assert "validate_quality" in block, "Phase 4 block must reference validate_quality"
-
-
-def test_phase4_block_mentions_revision_or_completeness():
-    block = _extract_phase4_block()
-    revision_terms = ["revision", "revise", "completeness", "reflect"]
-    assert any(term in block.lower() for term in revision_terms), (
-        f"Phase 4 block must mention one of {revision_terms} to encode the "
-        f"revision/reflection loop semantics."
-    )
-
-
-def test_phase4_think_tool_before_validate_quality():
-    """Ordering: think_tool (Step B) must appear BEFORE validate_quality (Step D)."""
-    block = _extract_phase4_block()
-    think_idx = block.index("think_tool")
-    vq_idx = block.index("validate_quality")
-    assert think_idx < vq_idx, (
-        f"Phase 4 ordering violated: think_tool at {think_idx} must precede "
-        f"validate_quality at {vq_idx}. Step B (reflect) comes BEFORE Step D "
-        f"(deterministic checkpoint)."
-    )
-
-
-def test_phase4_contains_score_threshold_0_8_on_think_tool():
-    """score_threshold=0.8 must appear in the Phase 4 block."""
-    block = _extract_phase4_block()
-    assert "score_threshold=0.8" in block, (
-        "Phase 4 block must pass score_threshold=0.8 at the think_tool call site."
-    )
-
-
-def test_phase4_contains_use_llm_false():
-    block = _extract_phase4_block()
-    assert "use_llm=False" in block, (
-        "Phase 4 block must set use_llm=False on validate_quality to avoid a "
-        "duplicate reflection-tool MCP call."
-    )
-
-
-def test_phase4_validate_quality_does_not_accept_score_threshold():
-    """Regex regression guard: no validate_quality(... score_threshold=...) call site."""
+def test_phase4_keeps_quality_tools_advisory():
     block = _extract_phase4_block()
 
-    # Find each validate_quality call site and ensure score_threshold is not
-    # a kwarg in that call.
-    # validate_quality signature is (interpretation, references, use_llm);
-    # score_threshold would be a consumer-side drift.
-    pattern = re.compile(
-        r"validate_quality\s*\(([^)]*)\)",
-        flags=re.DOTALL,
-    )
-    for match in pattern.finditer(block):
-        call_args = match.group(1)
-        assert "score_threshold" not in call_args, (
-            "validate_quality call site must NOT contain score_threshold — "
-            "the 0.8 gate is a consumer-side comparison (Step E), not a tool kwarg. "
-            f"Offending call: validate_quality({call_args})"
-        )
+    assert "think_tool" in block
+    assert "validate_quality" in block
+    assert "optional" in block.lower() or "advisory" in block.lower()
 
 
-def test_phase4_score_threshold_is_attached_to_think_tool_call():
-    """score_threshold=0.8 must appear inside a think_tool(...) call, not floating."""
+def test_phase4_removes_reflection_hard_gate_language():
     block = _extract_phase4_block()
-    # Find think_tool call sites and confirm at least one contains score_threshold=0.8.
-    pattern = re.compile(
-        r"think_tool\s*\(([^)]*)\)",
-        flags=re.DOTALL,
-    )
-    matched = False
-    for match in pattern.finditer(block):
-        if "score_threshold=0.8" in match.group(1):
-            matched = True
-            break
-    assert matched, (
-        "score_threshold=0.8 must be attached to a think_tool(...) call site in "
-        "Phase 4 (Step B), not floating in prose."
-    )
+
+    forbidden = [
+        "MANDATORY think_tool",
+        "score_threshold=0.8",
+        "score_threshold = 0.8",
+        "max_iterations=3",
+        "Max 3 total iterations",
+        "Consumer-side comparison",
+        "return to Step B",
+        "score < 0.8",
+        "result['score'] < 0.8",
+    ]
+    for phrase in forbidden:
+        assert phrase not in block
 
 
-def test_phase4_labels_consumer_side_comparison():
-    """Step E must be labeled as a Consumer-side comparison to prevent future drift."""
+def test_phase4_sends_final_quality_to_downstream_guardrail():
     block = _extract_phase4_block()
-    assert re.search(r"[Cc]onsumer[- ]side", block), (
-        "Phase 4 block must label Step E explicitly as a 'Consumer-side comparison' "
-        "so future maintainers do not mistakenly add score_threshold=0.8 to "
-        "validate_quality."
-    )
+
+    assert "downstream" in block.lower()
+    assert "validate_report.py" in block
+    assert "repair_report.py" in block
+
+
+def test_interpreter_quality_requirements_do_not_set_numeric_gate():
+    prompt = INTERPRETER_PROMPT
+
+    assert "Quality threshold: 0.8" not in prompt
+    assert "Quality Score Met" not in prompt
+    assert "quality score from validate_quality is >= 0.8" not in prompt
 
 
 def test_interpreter_prompt_treats_papers_json_as_filtered_handoff():
@@ -154,3 +91,66 @@ def test_interpreter_config_uses_filtered_shared_papers_json():
 
     assert "filtered /papers.json" in description
     assert "partN_papers" not in description
+
+
+def test_part3_uses_part4_candidate_selection_selected_genes_and_lr_pairs():
+    prompt = INTERPRETER_PROMPT
+    description = SUBAGENT_CONFIGS["interpreter"]["description"]
+
+    assert "part4_candidate_selection.json" in prompt
+    assert "selected_genes" in prompt
+    assert "selected_lr_pairs" in prompt
+    assert "part4_candidate_selection.json" in description
+    assert "selected_genes" in description
+    assert "selected_lr_pairs" in description
+
+
+def test_part3_no_longer_selects_featured_candidates_from_target_assessment():
+    match = re.search(
+        r"### Part 3 \(L-R Interaction Details\).*?(?=## Quality Requirements)",
+        INTERPRETER_PROMPT,
+        flags=re.DOTALL,
+    )
+    assert match, "Could not locate Part 3 block in INTERPRETER prompt"
+    part3_block = match.group(0)
+
+    assert "is_featured" not in part3_block
+    assert "druggability_matrix" not in part3_block
+    assert "target_assessment.json" not in part3_block
+
+
+def test_part3_excludes_part4_therapeutic_synthesis_scope():
+    prompt = INTERPRETER_PROMPT
+
+    assert "part4_therapeutic_synthesis.md" in prompt
+    assert "must not read" in prompt.lower()
+    assert "therapeutic synthesis" in prompt.lower()
+    assert "Part 4" in prompt
+
+
+def test_interpreter_rag_fulltext_tools_pass_explicit_data_dir():
+    prompt = INTERPRETER_PROMPT
+
+    assert re.search(
+        r"search_literature_fulltext\s*\([^)]*data_dir=data_path\.strip\(\)",
+        prompt,
+        flags=re.DOTALL,
+    ), "INTERPRETER search_literature_fulltext calls must pass explicit data_dir"
+    assert "- data_dir: data_path.strip()" in prompt
+
+
+def test_interpreter_prompt_mentions_sni_navigation_not_citation_evidence():
+    prompt = INTERPRETER_PROMPT
+
+    assert "SNI" in prompt
+    assert "LLM Wiki" in prompt
+    assert "navigation" in prompt.lower()
+    assert "not citation evidence" in prompt.lower()
+
+
+def test_interpreter_prompt_says_search_uses_sni_promotion_when_available():
+    prompt = INTERPRETER_PROMPT
+
+    assert "search_literature_fulltext" in prompt
+    assert "SNI promotion" in prompt
+    assert "fallback" in prompt.lower()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -197,8 +198,10 @@ async def test_missing_report_retries_hypothesis_writer_once(tmp_path: Path, mon
         SimpleNamespace(ainvoke=initial_ainvoke),
         SimpleNamespace(ainvoke=retry_ainvoke),
     ]
+    create_threads: list[str] = []
 
     def fake_create_agent(cfg):
+        create_threads.append(threading.current_thread().name)
         return runnables.pop(0), None
 
     monkeypatch.setattr("src.agents.drug_target.agent.create_drug_target_agent", fake_create_agent)
@@ -218,6 +221,8 @@ async def test_missing_report_retries_hypothesis_writer_once(tmp_path: Path, mon
     assert "Do not re-run evidence_assessor" in retry_messages[0]
     assert "Quality validation failures to fix before saving" in retry_messages[0]
     assert "HYPOTHESIS_REPORT_MISSING" in retry_messages[0]
+    assert len(create_threads) == 2
+    assert threading.main_thread().name not in create_threads
     assert retry_messages[0].index("HYPOTHESIS_REPORT_MISSING") < retry_messages[0].index(
         '")\n\nFor auditability'
     )
@@ -395,6 +400,80 @@ async def test_retry_timeout_accepts_valid_report_saved_before_timeout(
     assert result["hypothesis_retry_status"] == "success_after_timeout"
     assert result["hypothesis_retry_error"] is None
     assert "report_finalization_error" not in result
+
+
+@pytest.mark.asyncio
+async def test_hypothesis_quality_validation_runs_off_event_loop_thread(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    event_loop_thread = threading.get_ident()
+    validation_threads: list[int] = []
+
+    def fake_validate_hypothesis_report_quality(data_dir_arg, *, run_started_at=None):
+        validation_threads.append(threading.get_ident())
+        assert str(data_dir_arg) == str(data_dir)
+        assert run_started_at is None
+        return {"valid": True, "errors": []}
+
+    monkeypatch.setattr(
+        "src.agents.drug_target.tools.hypothesis_schema.validate_hypothesis_report_quality",
+        fake_validate_hypothesis_report_quality,
+    )
+
+    from src.agents.drug_target.super_graph import validate_and_maybe_retry_hypothesis
+
+    result = await validate_and_maybe_retry_hypothesis(
+        _state(data_dir),
+        {"recursion_limit": 10000, "configurable": {}},
+    )
+
+    assert result["hypothesis_quality_valid"] is True
+    assert validation_threads
+    assert all(thread_id != event_loop_thread for thread_id in validation_threads)
+
+
+@pytest.mark.asyncio
+async def test_stage3_candidate_check_runs_off_event_loop_thread_when_quality_fails(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    data_dir = _write_hypothesis_evidence(tmp_path)
+    event_loop_thread = threading.get_ident()
+    stage3_threads: list[int] = []
+
+    def fake_validate_hypothesis_report_quality(data_dir_arg, *, run_started_at=None):
+        return {
+            "valid": False,
+            "errors": [{"code": "HYPOTHESIS_GROUNDING_VIOLATION", "message": "bad"}],
+        }
+
+    def fake_has_stage3_candidates(data_dir_arg):
+        stage3_threads.append(threading.get_ident())
+        assert str(data_dir_arg) == str(data_dir)
+        return False
+
+    monkeypatch.setattr(
+        "src.agents.drug_target.tools.hypothesis_schema.validate_hypothesis_report_quality",
+        fake_validate_hypothesis_report_quality,
+    )
+    monkeypatch.setattr(
+        "src.agents.drug_target.super_graph._has_stage3_candidates",
+        fake_has_stage3_candidates,
+    )
+
+    from src.agents.drug_target.super_graph import validate_and_maybe_retry_hypothesis
+
+    result = await validate_and_maybe_retry_hypothesis(
+        _state(data_dir),
+        {"recursion_limit": 10000, "configurable": {}},
+    )
+
+    assert result["hypothesis_quality_valid"] is False
+    assert result["hypothesis_retry_status"] == "skipped_no_stage3_candidates"
+    assert stage3_threads
+    assert all(thread_id != event_loop_thread for thread_id in stage3_threads)
 
 
 @pytest.mark.asyncio

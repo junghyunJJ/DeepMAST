@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import csv
 import inspect
 import json
 import os
@@ -219,6 +220,81 @@ def build_part4_candidate_selection_prompt(context: Mapping[str, Any]) -> str:
     )
 
 
+def _selected_lr_pairs_from_outputs(
+    data_dir: str | Path | None,
+    selected_genes: list[str],
+) -> list[dict[str, Any]]:
+    """Select top LR pairs related to selected genes from bounded pipeline outputs."""
+
+    if data_dir is None:
+        return []
+    selected = {_gene_text(gene) for gene in selected_genes if _safe_text(gene)}
+    if not selected:
+        return []
+
+    base = Path(data_dir)
+    stage1_path = base / "evidence" / "stage1_filter_results.csv"
+    lr_search_path = base / "lr_pairs_search.json"
+    if not stage1_path.exists() or not lr_search_path.exists():
+        return []
+
+    try:
+        with stage1_path.open(newline="", encoding="utf-8") as handle:
+            passed_rows = {
+                (_gene_text(row.get("ligand")), _gene_text(row.get("receptor"))): row
+                for row in csv.DictReader(handle)
+                if _safe_bool(row.get("passed"))
+                and _safe_text(row.get("ligand"))
+                and _safe_text(row.get("receptor"))
+            }
+        with lr_search_path.open(encoding="utf-8") as handle:
+            lr_payload = json.load(handle)
+    except (OSError, json.JSONDecodeError, csv.Error):
+        return []
+
+    pairs: list[dict[str, Any]] = []
+    for pair in _dict_list(lr_payload.get("pairs") if isinstance(lr_payload, Mapping) else None):
+        ligand = _gene_text(pair.get("ligand"))
+        receptor = _gene_text(pair.get("receptor"))
+        if not ligand or not receptor:
+            interaction = _safe_text(pair.get("interaction"))
+            if "^" in interaction:
+                ligand, receptor = [_gene_text(part) for part in interaction.split("^", 1)]
+
+        key = (ligand, receptor)
+        stage1_row = passed_rows.get(key)
+        if stage1_row is None or not ({ligand, receptor} & selected):
+            continue
+
+        score = _safe_float(
+            pair.get("combinedscore", pair.get("combined_score", pair.get("score"))),
+            default=-1.0,
+        )
+        if score < 0:
+            continue
+
+        selected_pair: dict[str, Any] = {
+            "interaction": f"{ligand}^{receptor}",
+            "ligand": ligand,
+            "receptor": receptor,
+            "combinedscore": score,
+            "stage1_passed": True,
+        }
+        string_combined = _safe_float(stage1_row.get("string_combined"), default=-1.0)
+        coexpr_pvalue = _safe_float(
+            stage1_row.get("census_coexpr_pvalue"),
+            default=-1.0,
+        )
+        if string_combined >= 0:
+            selected_pair["stage1_string_combined"] = string_combined
+        if coexpr_pvalue >= 0:
+            selected_pair["census_coexpr_pvalue"] = coexpr_pvalue
+        pairs.append(selected_pair)
+
+    pairs.sort(key=lambda item: item["combinedscore"], reverse=True)
+    return pairs[:3]
+
+
 def validate_part4_candidate_selection_output(
     raw_output: object,
     *,
@@ -346,6 +422,7 @@ def build_part4_candidate_selection_fallback(
     fallback_reason: str,
     validation_issues: list[dict[str, Any]],
     attempt_history: list[dict[str, Any]],
+    selected_lr_pairs: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build an auditable deterministic fallback payload."""
 
@@ -361,6 +438,7 @@ def build_part4_candidate_selection_fallback(
         "status": "fallback",
         "fallback_reason": fallback_reason,
         "selected_genes": selected_genes,
+        "selected_lr_pairs": selected_lr_pairs or [],
         "deterministic_selected_genes": selected_genes,
         "llm_selected_genes": [],
         "allowed_candidates": [
@@ -395,6 +473,10 @@ async def generate_part4_candidate_selection(
     allowed_evidence_references = _allowed_evidence_references(
         _string_list(context.get("evidence_references"))
     )
+    deterministic_lr_pairs = _selected_lr_pairs_from_outputs(
+        data_dir,
+        deterministic_selected_genes,
+    )
 
     if provider is None:
         return build_part4_candidate_selection_fallback(
@@ -403,6 +485,7 @@ async def generate_part4_candidate_selection(
             fallback_reason="disabled",
             validation_issues=[],
             attempt_history=[],
+            selected_lr_pairs=deterministic_lr_pairs,
         )
 
     prompt = build_part4_candidate_selection_prompt(context)
@@ -421,6 +504,7 @@ async def generate_part4_candidate_selection(
             attempt_history=[
                 {"attempt": 1, "status": "provider_timeout", "issues": [issue]}
             ],
+            selected_lr_pairs=deterministic_lr_pairs,
         )
     except Exception as exc:  # noqa: BLE001
         issue = _validation_issue(
@@ -435,6 +519,7 @@ async def generate_part4_candidate_selection(
             attempt_history=[
                 {"attempt": 1, "status": "provider_error", "issues": [issue]}
             ],
+            selected_lr_pairs=deterministic_lr_pairs,
         )
 
     accepted, issues = validate_part4_candidate_selection_output(
@@ -451,10 +536,12 @@ async def generate_part4_candidate_selection(
             attempt_history=[
                 {"attempt": 1, "status": "rejected", "issues": issues}
             ],
+            selected_lr_pairs=deterministic_lr_pairs,
         )
 
     selected_genes = _string_list(accepted.get("selected_genes"))
     evidence_references = _string_list(accepted.get("evidence_references"))
+    selected_lr_pairs = _selected_lr_pairs_from_outputs(data_dir, selected_genes)
     return {
         "schema_version": PART4_CANDIDATE_SELECTION_SCHEMA_VERSION,
         "created_at": datetime.now(UTC).isoformat(),
@@ -462,6 +549,7 @@ async def generate_part4_candidate_selection(
         "status": "accepted",
         "fallback_reason": None,
         "selected_genes": selected_genes,
+        "selected_lr_pairs": selected_lr_pairs,
         "deterministic_selected_genes": [
             _gene_text(gene)
             for gene in deterministic_selected_genes

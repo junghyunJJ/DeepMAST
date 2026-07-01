@@ -1,10 +1,10 @@
 """Integration test for REPORTER subagent.
 
-Runs the REPORTER subagent standalone against res_bc data
+Runs the REPORTER subagent standalone against configured analysis data
 and validates synthesis.md + CCI_Analysis_Report.html output.
 
 Prerequisites:
-- res_bc/ directory with all analysis files
+- analysis directory with all analysis files
 - part1_final.md, part2_final.md, part3_final.md (written by INTERPRETER)
 - interpretation_guide.md (written by PLANNER)
 - data_path.txt (written by PLANNER)
@@ -12,6 +12,7 @@ Prerequisites:
 
 Usage:
     python tests/test_reporter.py
+    DEEP_INTERPRETER_DATA_DIR=/path/to/final_bc python tests/test_reporter.py
     REPORTER_PROVIDER=openai python tests/test_reporter.py   # override provider
 """
 
@@ -27,7 +28,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # Set data directory BEFORE any project imports
-DATA_DIR = str(PROJECT_ROOT / "res_bc")
+DATA_DIR = os.getenv("DEEP_INTERPRETER_DATA_DIR", str(PROJECT_ROOT / "res_bc"))
 os.environ["DEEP_INTERPRETER_DATA_DIR"] = DATA_DIR
 
 from dotenv import load_dotenv  # noqa: E402
@@ -74,18 +75,15 @@ REPORTER_MESSAGE = {
                 "5. Validate claims and write:\n"
                 "   - Update /synthesis.md with validated claims\n"
                 "   - write_file('/synthesis_validation.json', ...) — validation results\n\n"
-                "### Phase 4.7: Drug Target Assessment\n"
-                "1. assess_therapeutic_potential(data_dir=..., disease='breast cancer', top_n=20)\n"
-                "2. Interpret results with think_tool\n"
-                "3. Add Therapeutic Implications section to /synthesis.md\n"
-                "4. write_file('/synthesis_targets.json', ...) — structured results\n\n"
+                "### Phase 4.7: Part 4 Therapeutic Synthesis\n"
+                "1. read_file('/part4_therapeutic_synthesis.md') as the canonical Part 4 narrative\n"
+                "2. read_file('/drug.md') only as supporting therapeutic assessment detail\n"
+                "3. Add a concise Therapeutic Implications section to /synthesis.md\n"
+                "4. write_file('/synthesis_targets.json', ...) with canonical/supporting source tracking\n\n"
                 "### Phase 5: Generate HTML Report\n"
                 "Call generate_html_report with parts dict containing:\n"
-                "- title, subtitle, executive_summary, analysis_config\n"
-                "- part1, part2, part3 dicts with figure_path + interpretation\n"
-                "- synthesis (full synthesis.md content)\n"
-                "- therapeutic_html (LLM-generated HTML for Therapeutic tab)\n"
-                "- quality_score, references\n"
+                "- template_mode='comprehensive'\n"
+                "- analysis_config, quality_score, references\n"
                 "- output_path='CCI_Analysis_Report.html'\n"
                 "- data_dir from /data_path.txt\n\n"
                 "## CRITICAL RULES:\n"
@@ -93,6 +91,7 @@ REPORTER_MESSAGE = {
                 "- You MUST call write_file to save /synthesis_validation.json\n"
                 "- You MUST call write_file to save /synthesis_targets.json\n"
                 "- You MUST call generate_html_report to create the HTML report\n"
+                "- Do NOT generate part1_html/part2_html/part3_html/summary_html/therapeutic_html; use template_mode='comprehensive'\n"
                 "- Do NOT just output text — all outputs must be persisted to disk\n"
                 "- synthesis.md MUST include: Executive Summary, Cross-Part Themes 1-4, "
                 "Emergent Themes, Limitations\n\n"
@@ -244,6 +243,17 @@ def verify_output():
             print(f"  [{'OK' if passed else 'MISS'}] {check_name}")
             if not passed:
                 issues.append(f"HTML missing: {check_name}")
+
+        density_checks = {
+            ">=10 embedded images": html_content.count("<img ") >= 10,
+            ">=5 tables": html_content.count("<table") >= 5,
+            "Part 4/Therapeutic source": "part4_therapeutic_synthesis.md" in html_content
+            or "Therapeutic Implications" in html_content,
+        }
+        for check_name, passed in density_checks.items():
+            print(f"  [{'OK' if passed else 'MISS'}] {check_name}")
+            if not passed:
+                issues.append(f"HTML density missing: {check_name}")
     else:
         print("[FAIL] CCI_Analysis_Report.html NOT FOUND")
         issues.append("CCI_Analysis_Report.html not found")
@@ -293,6 +303,19 @@ def verify_output():
                 print(f"[OK] synthesis_targets.json exists  "
                       f"(genes: {summary.get('total_genes_evaluated', '?')}, "
                       f"druggable: {summary.get('druggable_count', '?')})")
+                canonical = targets_data.get("canonical_source")
+                supporting = targets_data.get("supporting_source")
+                print(f"  canonical_source: {canonical}")
+                print(f"  supporting_source: {supporting}")
+                if canonical != "part4_therapeutic_synthesis.md":
+                    issues.append(
+                        "synthesis_targets.json canonical_source is not "
+                        "part4_therapeutic_synthesis.md"
+                    )
+                if supporting not in {"drug.md", None}:
+                    issues.append(
+                        "synthesis_targets.json supporting_source should be drug.md or null"
+                    )
             else:
                 print(f"[OK] synthesis_targets.json exists")
         except json.JSONDecodeError as e:
@@ -340,9 +363,16 @@ async def main():
     data_dir = Path(DATA_DIR)
     synthesis_path = data_dir / "synthesis.md"
     html_path = data_dir / "CCI_Analysis_Report.html"
+    output_paths = [
+        synthesis_path,
+        html_path,
+        data_dir / "synthesis_papers.json",
+        data_dir / "synthesis_validation.json",
+        data_dir / "synthesis_targets.json",
+    ]
 
     # Back up previous outputs if they exist
-    for path in [synthesis_path, html_path]:
+    for path in output_paths:
         if path.exists():
             backup = path.with_suffix(path.suffix + ".bak")
             path.rename(backup)
@@ -381,7 +411,7 @@ async def main():
         traceback.print_exc()
 
         # Restore backups if run failed and no new output was produced
-        for path in [synthesis_path, html_path]:
+        for path in output_paths:
             backup = path.with_suffix(path.suffix + ".bak")
             if backup.exists() and not path.exists():
                 backup.rename(path)

@@ -2698,6 +2698,15 @@ def _literature_query_generation_timeout() -> float:
     return timeout if timeout > 0 else 120.0
 
 
+def _literature_dynamic_search_timeout() -> float:
+    raw_timeout = os.getenv("LITERATURE_DYNAMIC_SEARCH_TIMEOUT", "300")
+    try:
+        timeout = float(raw_timeout)
+    except (TypeError, ValueError):
+        return 300.0
+    return timeout if timeout > 0 else 300.0
+
+
 @tool
 def search_literature_dynamic(
     genes: list[str],
@@ -2804,7 +2813,7 @@ def search_literature_dynamic(
             lr_pairs=_lr_pairs,
             enable_lr_pair_queries=enable_lr_pair_queries,
         ),
-        timeout=300,
+        timeout=_literature_dynamic_search_timeout(),
     )
 
 

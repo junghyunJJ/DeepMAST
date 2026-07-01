@@ -26,6 +26,14 @@ class _MockLLM:
         return _MockResponse(self._content or "[]")
 
 
+def test_literature_dynamic_search_timeout_is_configurable(monkeypatch):
+    monkeypatch.delenv("LITERATURE_DYNAMIC_SEARCH_TIMEOUT", raising=False)
+    assert lit._literature_dynamic_search_timeout() == 300.0
+
+    monkeypatch.setenv("LITERATURE_DYNAMIC_SEARCH_TIMEOUT", "900")
+    assert lit._literature_dynamic_search_timeout() == 900.0
+
+
 @pytest.fixture
 def isolated_literature(monkeypatch):
     async def _fake_search_with_biomcp(**_kwargs):

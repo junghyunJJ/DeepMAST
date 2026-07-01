@@ -19,6 +19,8 @@ Tests verify 3 fixes without LLM calls or MCP servers:
 
 import asyncio
 import json
+import threading
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
@@ -885,6 +887,271 @@ class TestAnalysisStepFailureDoesNotAdvance:
         assert result["current_analysis_step"] == 9
         assert result.get("analysis_9_11_complete") is not True
         assert "sig_liana.csv not found" in result["messages"][0].content[0]["text"]
+
+
+class TestDrugTargetStepHandoff:
+    """Verify Step 9.5 hands selected LR pairs to Steps 10-11."""
+
+    def setup_method(self):
+        self.agent = _make_agent()
+
+    @pytest.mark.asyncio
+    async def test_overwrites_targets_and_prefers_part4_selected_lr_pairs(self, tmp_path):
+        (tmp_path / "targets.json").write_text(
+            json.dumps({"interest_celltypes": None}),
+            encoding="utf-8",
+        )
+        (tmp_path / "lr_candidates.json").write_text("stale", encoding="utf-8")
+        (tmp_path / "part4_candidate_selection.json").write_text(
+            json.dumps(
+                {
+                    "selected_lr_pairs": [
+                        {"interaction": "ICAM1^PECAM1"},
+                        {"interaction": "ICAM1^MUC1"},
+                        {"interaction": "MIF^CD74"},
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        def prioritize(_args):
+            assert not (tmp_path / "lr_candidates.json").exists()
+            (tmp_path / "lr_candidates.json").write_text("[]", encoding="utf-8")
+            return json.dumps({"pairs": [{"interaction": "ICAM1^PECAM1"}]})
+
+        state = {
+            "data_directory": str(tmp_path),
+            "disease": "IPF",
+            "interest_celltypes": ["AT2"],
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+        }
+
+        with (
+            patch(
+                "src.agents.deep_interpreter.tools.lr_prioritizer.prioritize_top_lr_pairs"
+            ) as prioritizer,
+            patch(
+                "src.agents.drug_target.integration.run_drug_target_assessment"
+            ) as assessment,
+        ):
+            prioritizer.invoke.side_effect = prioritize
+            assessment.ainvoke = AsyncMock(
+                return_value=json.dumps(
+                    {
+                        "success": True,
+                        "target_assessment": {
+                            "druggability_matrix": [
+                                {"is_featured": True, "interaction": "OLD^PAIR"}
+                            ]
+                        },
+                    }
+                )
+            )
+
+            result = await self.agent.run_drug_target_node(state, DUMMY_CONFIG)
+
+        assert json.loads((tmp_path / "targets.json").read_text()) == {
+            "interest_celltypes": ["AT2"],
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+            "data_directory": str(tmp_path),
+        }
+        assert result["featured_lr_pairs"] == [
+            "ICAM1^PECAM1",
+            "ICAM1^MUC1",
+            "MIF^CD74",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_existing_drug_and_part4_outputs_skip_agent_and_delete_step10_11_figures(
+        self,
+        tmp_path,
+    ):
+        (tmp_path / "drug.md").write_text("# cached drug", encoding="utf-8")
+        (tmp_path / "part4_therapeutic_synthesis.md").write_text(
+            "# cached part4",
+            encoding="utf-8",
+        )
+        (tmp_path / "part4_candidate_selection.json").write_text(
+            json.dumps(
+                {
+                    "selected_lr_pairs": [
+                        {"interaction": "ICAM1^PECAM1"},
+                        {"interaction": "ICAM1^MUC1"},
+                        {"interaction": "GPC3^CD81"},
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        fig10 = tmp_path / "10.spatial_plot_interections_V19S23-092-B1.png"
+        fig11 = tmp_path / "11.lr_interections_V19S23-092-B1.png"
+        fig10.write_text("cached fig10", encoding="utf-8")
+        fig11.write_text("cached fig11", encoding="utf-8")
+
+        state = {
+            "data_directory": str(tmp_path),
+            "disease": "IPF",
+            "interest_celltypes": ["AT2"],
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+        }
+
+        with (
+            patch(
+                "src.agents.deep_interpreter.tools.lr_prioritizer.prioritize_top_lr_pairs"
+            ) as prioritizer,
+            patch(
+                "src.agents.drug_target.integration.run_drug_target_assessment"
+            ) as assessment,
+        ):
+            assessment.ainvoke = AsyncMock()
+            result = await self.agent.run_drug_target_node(state, DUMMY_CONFIG)
+
+        prioritizer.invoke.assert_not_called()
+        assessment.ainvoke.assert_not_called()
+        assert not fig10.exists()
+        assert not fig11.exists()
+        assert result["drug_target_complete"] is True
+        assert result["drug_target_error"] is None
+        assert result["featured_lr_pairs"] == [
+            "ICAM1^PECAM1",
+            "ICAM1^MUC1",
+            "GPC3^CD81",
+        ]
+        text = result["messages"][0].content[0]["text"]
+        assert "SKIPPED" in text
+        assert "Deleted cached Step 10/11 figures: 2" in text
+
+    @pytest.mark.asyncio
+    async def test_prioritizer_error_does_not_run_assessment_with_stale_candidates(
+        self,
+        tmp_path,
+    ):
+        (tmp_path / "lr_candidates.json").write_text("stale", encoding="utf-8")
+
+        state = {
+            "data_directory": str(tmp_path),
+            "disease": "IPF",
+            "interest_celltypes": ["AT2"],
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+        }
+
+        with (
+            patch(
+                "src.agents.deep_interpreter.tools.lr_prioritizer.prioritize_top_lr_pairs"
+            ) as prioritizer,
+            patch(
+                "src.agents.drug_target.integration.run_drug_target_assessment"
+            ) as assessment,
+        ):
+            prioritizer.invoke.return_value = json.dumps({"error": "missing combinedscore"})
+            assessment.ainvoke = AsyncMock()
+
+            result = await self.agent.run_drug_target_node(state, DUMMY_CONFIG)
+
+        assessment.ainvoke.assert_not_called()
+        assert not (tmp_path / "lr_candidates.json").exists()
+        assert result["drug_target_complete"] is False
+        assert "prioritize_top_lr_pairs" in result["drug_target_error"]
+
+    @pytest.mark.asyncio
+    async def test_prioritizer_error_still_deletes_step10_11_figures(
+        self,
+        tmp_path,
+    ):
+        (tmp_path / "lr_candidates.json").write_text("stale", encoding="utf-8")
+        fig10 = tmp_path / "10.spatial_plot_interections.png"
+        fig11 = tmp_path / "11.lr_interections.png"
+        fig10.write_text("cached fig10", encoding="utf-8")
+        fig11.write_text("cached fig11", encoding="utf-8")
+
+        state = {
+            "data_directory": str(tmp_path),
+            "disease": "IPF",
+            "interest_celltypes": ["AT2"],
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+        }
+
+        with (
+            patch(
+                "src.agents.deep_interpreter.tools.lr_prioritizer.prioritize_top_lr_pairs"
+            ) as prioritizer,
+            patch(
+                "src.agents.drug_target.integration.run_drug_target_assessment"
+            ) as assessment,
+        ):
+            prioritizer.invoke.return_value = json.dumps({"error": "missing combinedscore"})
+            assessment.ainvoke = AsyncMock()
+            result = await self.agent.run_drug_target_node(state, DUMMY_CONFIG)
+
+        assessment.ainvoke.assert_not_called()
+        assert not fig10.exists()
+        assert not fig11.exists()
+        assert result["drug_target_complete"] is False
+        assert "prioritize_top_lr_pairs" in result["drug_target_error"]
+        assert "Deleted cached Step 10/11 figures: 2" in result["messages"][0].content[0]["text"]
+
+    @pytest.mark.asyncio
+    async def test_stale_lr_candidates_unlink_runs_off_event_loop_thread(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        stale_path = tmp_path / "lr_candidates.json"
+        stale_path.write_text("stale", encoding="utf-8")
+
+        original_unlink = Path.unlink
+        unlink_threads = []
+
+        def tracking_unlink(path_self, *args, **kwargs):
+            if path_self == stale_path:
+                unlink_threads.append(threading.current_thread().name)
+            return original_unlink(path_self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "unlink", tracking_unlink)
+
+        def prioritize(_args):
+            assert not stale_path.exists()
+            stale_path.write_text("[]", encoding="utf-8")
+            return json.dumps({"pairs": [{"interaction": "ICAM1^PECAM1"}]})
+
+        state = {
+            "data_directory": str(tmp_path),
+            "disease": "IPF",
+            "interest_celltypes": ["AT2"],
+            "interest_clusters": ["9"],
+            "sel_factor": "Factor1",
+        }
+
+        with (
+            patch(
+                "src.agents.deep_interpreter.tools.lr_prioritizer.prioritize_top_lr_pairs"
+            ) as prioritizer,
+            patch(
+                "src.agents.drug_target.integration.run_drug_target_assessment"
+            ) as assessment,
+        ):
+            prioritizer.invoke.side_effect = prioritize
+            assessment.ainvoke = AsyncMock(
+                return_value=json.dumps(
+                    {
+                        "success": True,
+                        "target_assessment": {"druggability_matrix": []},
+                    }
+                )
+            )
+
+            result = await self.agent.run_drug_target_node(state, DUMMY_CONFIG)
+
+        assert unlink_threads
+        assert threading.main_thread().name not in unlink_threads
+        assert result["drug_target_complete"] is True
+        assessment.ainvoke.assert_called_once()
 
 
 class TestResearchSummaryMoransColumn:
