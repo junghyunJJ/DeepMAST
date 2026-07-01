@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+from typing import Any
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+
+SECTION_RE = re.compile(r"(^## .+?$)(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
+
+
+def _content(message: Any) -> str:
+    return str(getattr(message, "content", message))
+
+
+def _load_issues(path: Path) -> list[dict[str, str]]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(data, list):
+        issues = data
+    elif isinstance(data, dict):
+        issues = data.get("issues", [])
+    else:
+        issues = []
+    return [i for i in issues if isinstance(i, dict)]
+
+
+def _find_section(text: str, heading: str) -> tuple[int, int, str] | None:
+    for match in SECTION_RE.finditer(text):
+        if match.group(1).strip() == heading.strip():
+            return match.start(), match.end(), match.group(0)
+    return None
+
+
+def _build_prompt(issue: dict[str, str], section_text: str) -> str:
+    return f"""Rewrite only this markdown section to fix the validation issue.
+
+Keep the same section heading. Keep evidence-grounded scientific tone.
+Do not invent new PMIDs, p-values, scores, files, or pathway significance.
+Do not add therapeutic/druggability conclusions to Part3.
+
+Validation issue:
+{json.dumps(issue, indent=2, ensure_ascii=False)}
+
+Section:
+{section_text}
+
+Return only the corrected markdown section."""
+
+
+def _create_model(provider: str | None) -> Any:
+    from src.agents.model import create_llm
+
+    return create_llm(provider)
+
+
+def repair_report(
+    data_dir: Path,
+    issues_path: Path,
+    *,
+    llm: Any | None = None,
+    provider: str | None = None,
+) -> int:
+    data_dir = data_dir.resolve()
+    issues = _load_issues(issues_path)
+    model = llm
+    changed = 0
+
+    for issue in issues:
+        if issue.get("severity") != "error":
+            continue
+        section = issue.get("section") or ""
+        filename = issue.get("file") or ""
+        if not section or not filename:
+            continue
+        path = (data_dir / filename).resolve()
+        if not path.is_relative_to(data_dir) or path.suffix != ".md" or not path.exists():
+            continue
+
+        text = path.read_text(encoding="utf-8")
+        found = _find_section(text, section)
+        if found is None:
+            continue
+        start, end, section_text = found
+        if model is None:
+            model = _create_model(provider)
+        replacement = _content(model.invoke(_build_prompt(issue, section_text))).strip()
+        if not replacement.startswith(section.strip()):
+            replacement = section.strip() + "\n" + replacement
+        path.write_text(text[:start] + replacement.rstrip() + "\n" + text[end:], encoding="utf-8")
+        changed += 1
+
+    return changed
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Repair only validator-flagged report sections.")
+    parser.add_argument("data_dir", type=Path)
+    parser.add_argument("--issues", type=Path, required=True)
+    parser.add_argument("--provider", default=None)
+    args = parser.parse_args(argv)
+
+    changed = repair_report(args.data_dir, args.issues, provider=args.provider)
+    print(json.dumps({"changed_sections": changed}, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
